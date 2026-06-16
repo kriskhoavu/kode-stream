@@ -2,14 +2,15 @@
 
 ## Scenario List
 
-| #   | Title               | Description                                                              |
-|-----|---------------------|--------------------------------------------------------------------------|
-| 0   | Empty app           | The app starts with no repositories registered                           |
-| 1   | Register repository | The developer registers this repository with `plans` as a plan directory |
-| 2   | Scan plans          | The app indexes local plan folders without writing to the repository     |
-| 3   | Browse board        | The developer views plans grouped by Kanban status                       |
-| 4   | Open workspace      | The developer opens a plan and reads its documents                       |
-| 5   | Use mobile board    | The developer views the board on a narrow viewport                       |
+| #   | Title               | Description                                                                    |
+|-----|---------------------|--------------------------------------------------------------------------------|
+| 0   | Empty app           | The app starts with no repositories registered                                 |
+| 1   | Register repository | The developer registers this repository with one or more plan directories      |
+| 2   | Scan content        | The app indexes structured plans, hybrid plans, and freestyle docs roots       |
+| 3   | Browse board        | The developer views and filters plans grouped by Kanban status                 |
+| 4   | Open workspace      | The developer opens a plan or documentation collection and reads its documents |
+| 5   | Use mobile board    | The developer views the board on a narrow viewport                             |
+| 6   | Manage repository   | The developer edits or removes a registered repository                         |
 
 ---
 
@@ -26,7 +27,7 @@
 | Action         | Description                     | Flow                                                          |
 |----------------|---------------------------------|---------------------------------------------------------------|
 | Add Repository | Register a local Git repository | User enters name, path, baseline branch, and plan directories |
-| Open Settings  | Inspect local app settings      | User sees storage location and read-only mode                 |
+| Browse Path    | Select a local path             | User opens the native directory picker                        |
 
 ## Expected Result
 
@@ -51,23 +52,24 @@
    - Name: `Plan Manager`
    - Path: current repository path
    - Baseline branch: `main`
-   - Plan directories: `plans`
+   - Plan directories: `plans`, optionally `docs`
 3. Backend validates:
    - `.git` exists.
    - `main` exists.
-   - `plans` exists.
+   - each configured plan directory exists.
 4. Backend stores `RepositoryConfig` in the user data directory.
 
 ## Expected Result
 
-- The repository appears in the left repository card.
-- The repository appears in the top repository tabs.
+- The repository appears in the repository list.
 - The app shows a manual Scan action.
+- Plan directories appear as badges in the repository form.
+- The user can reveal the local path in the platform file manager.
 - The repository working tree is not changed.
 
 ---
 
-# Scenario 2: Scan Plans
+# Scenario 2: Scan Content
 
 ## Flow
 
@@ -75,8 +77,9 @@
 2. Backend reads local Git metadata.
 3. Backend scans configured plan directories.
 4. Backend parses `plan.yaml` when present.
-5. Backend falls back to folder and README parsing when `plan.yaml` is missing.
-6. Backend writes only to the Plan Manager app cache.
+5. Backend creates hybrid plans when structured folders are missing `plan.yaml`.
+6. Backend creates documentation collections when a docs root contains Markdown without plan structure.
+7. Backend writes only to the Plan Manager app cache.
 
 ## Expected Result
 
@@ -84,6 +87,8 @@
 - `PM-001` appears under `platform`.
 - `DI-202602` and `DI-430` appear in `In Progress`.
 - Completed plans appear in `Done`.
+- Docs roots appear as documentation collections when configured.
+- Hybrid plans show inferred metadata.
 - Unknown statuses map to `Draft`.
 
 ## Edge Cases
@@ -108,12 +113,16 @@
    - Review
    - Done
 4. Developer filters by repository, branch, status, and text.
+5. Developer selects multiple statuses or authors in one filter.
 
 ## Expected Result
 
 - Board layout follows `specs/design.png`.
 - Cards show title, repository or service, branch, author when known, and updated time.
 - Filters update the visible cards without a full page reload.
+- Multiple selections in one filter are OR-matched.
+- Different filter groups are AND-matched.
+- Filter menus close when the user clicks outside them.
 - Empty columns keep their header and count.
 
 ---
@@ -131,10 +140,14 @@
    - Preview tab.
    - Metadata sidebar.
    - Read-only diff tab.
+4. Developer collapses, expands, and resizes the file explorer or plan info panel.
 
 ## Expected Result
 
+- File tree rows use directory and file icons.
+- File tree sorting is directory-first and natural alphabetical.
 - Markdown tables, checklists, images, and Mermaid blocks render in preview.
+- Hybrid plans and documentation collections show the appropriate metadata badge or callout.
 - Raw Markdown is read-only in v1.
 - Commit, pull, save, and new-plan actions are hidden or disabled in v1.
 - The design stays close to the workspace section in `specs/design.png`.
@@ -155,3 +168,21 @@
 - Cards are readable without horizontal scrolling.
 - Bottom navigation is usable.
 - Plan details remain reachable.
+
+---
+
+# Scenario 6: Manage Repository
+
+## Flow
+
+1. Developer opens Repositories.
+2. Developer edits repository name, baseline branch, or plan directories.
+3. Developer saves changes.
+4. Developer deletes a disposable repository entry.
+
+## Expected Result
+
+- Editing updates the app-local registry.
+- Deleting removes the repository from the UI.
+- Cached plans for the deleted repository disappear from the board.
+- No files in the managed repository are changed.

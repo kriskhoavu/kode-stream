@@ -23,8 +23,8 @@
 
 ```text
 {user-data}/plan-manager/
-  config.json
-  cache.db
+  repositories.json
+  plan-index.json
   logs/
 ```
 
@@ -47,6 +47,18 @@
 - Use a configurable port.
 - Fail clearly if the selected port is unavailable.
 
+## Native OS Integration
+
+| Capability       | Purpose                                      |
+|------------------|----------------------------------------------|
+| Directory picker | Select repository paths and plan directories |
+| Reveal path      | Open a registered path in the file manager   |
+
+- macOS uses Finder-compatible commands.
+- Windows uses Explorer-compatible commands.
+- Linux uses available desktop tools when present.
+- Native actions are convenience features and do not change repository contents.
+
 ## Homebrew Path
 
 | Step                 | Output                      |
@@ -66,6 +78,8 @@
 - Treat Markdown content as untrusted when rendering preview.
 - Do not allow file reads outside configured plan directories.
 - Do not follow symlinks that escape configured plan directories.
+- Directory picker and reveal actions must not bypass indexed file access rules.
+- Repository edit and delete actions write only Plan Manager app data.
 
 ## Performance Constraints
 

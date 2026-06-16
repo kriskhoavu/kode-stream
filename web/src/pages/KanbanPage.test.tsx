@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { KanbanPage } from './KanbanPage';
+import { filterPlans, KanbanPage } from './KanbanPage';
+import type { PlanSummary } from '../lib/types';
 
 describe('KanbanPage', () => {
   it('renders status columns from cached plan summaries', async () => {
@@ -27,5 +28,46 @@ describe('KanbanPage', () => {
     expect(screen.getByRole('heading', { name: 'Ideas' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Draft' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Plan Manager')).toBeInTheDocument());
+  });
+});
+
+describe('filterPlans', () => {
+  const plans: PlanSummary[] = [
+    {
+      id: 'p1',
+      repositoryId: 'r1',
+      repositoryName: 'Discovery',
+      branch: 'main',
+      service: 'api',
+      ticket: 'DI-1',
+      title: 'API Plan',
+      status: 'draft',
+      author: 'Khoa',
+      tags: [],
+      metadataSource: 'plan.yaml'
+    },
+    {
+      id: 'p2',
+      repositoryId: 'r2',
+      repositoryName: 'Docs',
+      branch: 'feature/docs',
+      service: 'docs',
+      ticket: 'docs',
+      title: 'Docs',
+      status: 'done',
+      author: 'Giang',
+      tags: ['docs'],
+      metadataSource: 'docs'
+    }
+  ];
+
+  it('uses OR within a facet', () => {
+    const result = filterPlans(plans, { repositories: ['r1', 'r2'], statuses: [], branches: [], authors: [], metadata: [] }, '');
+    expect(result.map((plan) => plan.id)).toEqual(['p1', 'p2']);
+  });
+
+  it('uses AND across facets', () => {
+    const result = filterPlans(plans, { repositories: ['r1', 'r2'], statuses: ['done'], branches: [], authors: ['Giang'], metadata: ['Docs'] }, '');
+    expect(result.map((plan) => plan.id)).toEqual(['p2']);
   });
 });

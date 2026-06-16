@@ -55,6 +55,18 @@ func (s *Scanner) scanPlanDirectory(repo models.RepositoryConfig, branch, planDi
 	if err != nil {
 		return plans, []models.ScanWarning{{PlanPath: planDir, Message: err.Error()}}
 	}
+	if shouldScanAsDocumentCollection(root, entries) {
+		detail, planWarnings, err := s.parsePlan(repo, branch, filepath.Base(planDir), filepath.Base(planDir), filepath.ToSlash(planDir), root)
+		if err != nil {
+			return plans, []models.ScanWarning{{PlanPath: planDir, Message: err.Error()}}
+		}
+		detail.MetadataSource = "docs"
+		if detail.Title == titleFromTicket(filepath.Base(planDir)) {
+			detail.Title = titleFromDocumentRoot(planDir)
+		}
+		detail.Tags = append(detail.Tags, "docs")
+		return []models.PlanDetail{detail}, append(warnings, planWarnings...)
+	}
 	for _, serviceEntry := range entries {
 		if !serviceEntry.IsDir() || strings.HasPrefix(serviceEntry.Name(), ".") {
 			continue
@@ -87,6 +99,38 @@ func (s *Scanner) scanPlanDirectory(repo models.RepositoryConfig, branch, planDi
 	return plans, warnings
 }
 
+func shouldScanAsDocumentCollection(root string, entries []fs.DirEntry) bool {
+	if hasMarkdownFiles(root) && !hasStructuredPlanChildren(root, entries) {
+		return true
+	}
+	return false
+}
+
+func hasStructuredPlanChildren(root string, entries []fs.DirEntry) bool {
+	for _, serviceEntry := range entries {
+		if !serviceEntry.IsDir() || strings.HasPrefix(serviceEntry.Name(), ".") {
+			continue
+		}
+		tickets, err := os.ReadDir(filepath.Join(root, serviceEntry.Name()))
+		if err != nil {
+			continue
+		}
+		for _, ticketEntry := range tickets {
+			if ticketEntry.IsDir() && !strings.HasPrefix(ticketEntry.Name(), ".") && isPlanFolder(filepath.Join(root, serviceEntry.Name(), ticketEntry.Name()), ticketEntry.Name()) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isPlanFolder(path, name string) bool {
+	if _, err := os.Stat(filepath.Join(path, "plan.yaml")); err == nil {
+		return true
+	}
+	return regexp.MustCompile(`^[A-Z]+-\d+$`).MatchString(strings.ToUpper(name))
+}
+
 type planYAML struct {
 	Plan struct {
 		Ticket  string   `yaml:"ticket"`
@@ -105,8 +149,8 @@ func (s *Scanner) parsePlan(repo models.RepositoryConfig, branch, service, ticke
 	title := titleFromTicket(ticket)
 	status := models.StatusDraft
 	owner := ""
-	var tags []string
-	var documents []models.PlanDocument
+	tags := []string{}
+	documents := []models.PlanDocument{}
 	metadata := map[string]any{}
 
 	if data, err := os.ReadFile(filepath.Join(planRoot, "plan.yaml")); err == nil {
@@ -123,7 +167,9 @@ func (s *Scanner) parsePlan(repo models.RepositoryConfig, branch, service, ticke
 		}
 		owner = parsed.Plan.Owner
 		status = NormalizeStatus(parsed.Plan.Status)
-		tags = parsed.Plan.Tags
+		if parsed.Plan.Tags != nil {
+			tags = parsed.Plan.Tags
+		}
 		documents = normalizeDocuments(parsed.Documents)
 		metadata["plan"] = parsed.Plan
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -320,7 +366,7 @@ func assignDocumentField(doc *models.PlanDocument, key, value string) {
 }
 
 func fallbackDocuments(planRoot string) []models.PlanDocument {
-	var docs []models.PlanDocument
+	docs := []models.PlanDocument{}
 	_ = filepath.WalkDir(planRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
 			return nil
@@ -384,6 +430,14 @@ func firstParagraph(markdown string) string {
 
 func titleFromTicket(ticket string) string {
 	return strings.ReplaceAll(ticket, "-", " ")
+}
+
+func titleFromDocumentRoot(planDir string) string {
+	base := filepath.Base(filepath.Clean(filepath.FromSlash(planDir)))
+	if base == "." || base == string(filepath.Separator) {
+		return "Documentation"
+	}
+	return strings.Title(strings.ReplaceAll(strings.ReplaceAll(base, "-", " "), "_", " "))
 }
 
 func naturalLess(left, right string) bool {
@@ -459,6 +513,18 @@ func countMarkdownFiles(root string) int {
 		return nil
 	})
 	return count
+}
+
+func hasMarkdownFiles(root string) bool {
+	found := false
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
+			found = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+	return found
 }
 
 func latestModTime(root string) time.Time {

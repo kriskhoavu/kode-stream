@@ -36,3 +36,16 @@ func TestFirstMarkdownParagraphReturnsFullParagraph(t *testing.T) {
 		t.Fatalf("paragraph did not include the full text: %q", got)
 	}
 }
+
+func TestNormalizePlanDetailUsesEmptyCollections(t *testing.T) {
+	plan := normalizePlanDetail(models.PlanDetail{})
+	if plan.Tags == nil {
+		t.Fatal("tags should be an empty slice, got nil")
+	}
+	if plan.Documents == nil {
+		t.Fatal("documents should be an empty slice, got nil")
+	}
+	if plan.Metadata == nil {
+		t.Fatal("metadata should be an empty map, got nil")
+	}
+}

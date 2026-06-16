@@ -1,4 +1,4 @@
-import type { FileContent, FileNode, PlanDetail, PlanSummary, RepositoryConfig, RepositoryInput, ScanResult } from './types';
+import type { FileContent, FileNode, PathSelection, PlanDetail, PlanSummary, RepositoryConfig, RepositoryInput, ScanResult } from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -18,7 +18,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   repositories: async () => ((await request<RepositoryConfig[] | null>('/api/repositories')) ?? []).map(normalizeRepository),
   createRepository: (input: RepositoryInput) => request<RepositoryConfig>('/api/repositories', { method: 'POST', body: JSON.stringify(input) }),
+  updateRepository: (id: string, input: RepositoryInput) => request<RepositoryConfig>(`/api/repositories/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  deleteRepository: (id: string) => request<{ ok: boolean }>(`/api/repositories/${id}`, { method: 'DELETE' }),
   scan: (repositoryId: string) => request<ScanResult>(`/api/repositories/${repositoryId}/scan`, { method: 'POST' }),
+  selectDirectory: () => request<PathSelection>('/api/system/select-directory', { method: 'POST' }),
+  openPath: (path: string) => request<{ ok: boolean }>('/api/system/open-path', { method: 'POST', body: JSON.stringify({ path }) }),
   plans: async (params: URLSearchParams) => ((await request<PlanSummary[] | null>(`/api/plans?${params.toString()}`)) ?? []).map(normalizePlan),
   plan: async (id: string) => normalizePlanDetail(await request<PlanDetail>(`/api/plans/${id}`)),
   files: async (id: string) => (await request<FileNode[] | null>(`/api/plans/${id}/files`)) ?? [],

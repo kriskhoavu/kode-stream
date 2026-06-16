@@ -4,7 +4,7 @@
 
 Implement a local read-only Plan Manager app.
 
-The MVP registers local Git repositories, scans plan folders, renders a Kanban board, and opens a plan workspace. It follows `specs/requirement.md` for behavior and `specs/design.png` for the visual baseline.
+The MVP registers local Git repositories, scans one or more configured plan or documentation roots, renders structured plans and freestyle documentation collections on a Kanban board, and opens a read-only workspace for plan files. It follows `specs/requirement.md` for behavior and `specs/design.png` for the visual baseline.
 
 ## Terminology Lock
 
@@ -18,6 +18,10 @@ All code, API fields, and UI labels must use:
 - `PlanDocument`
 - `PlanStatus`
 - `Plan Directory`
+- `Structured Plan Root`
+- `Freestyle Docs Root`
+- `Hybrid Plan`
+- `Documentation Collection`
 - `Scan`
 - `Workspace`
 
@@ -33,11 +37,17 @@ Avoid:
 - Board and list views must use cached plan summaries.
 - File content must load only when a user opens a plan file.
 - Manual Scan rebuilds derived metadata for one repository.
+- A repository can have multiple plan directories, such as `plans`, `docs`, or `docs/plans`.
+- A structured plan root uses the `service/ticket` folder shape and usually contains `plan.yaml`.
+- A hybrid plan is a structured plan folder that is missing `plan.yaml`; the app infers metadata from folders and Markdown.
+- A freestyle docs root is indexed as a documentation collection even when it has Markdown files but no plan folder structure.
 - A bad plan creates a scan warning and must not fail the whole scan.
 - Keep backend boundaries between `RepositoryRegistry`, `GitAdapter`, `PlanScanner`, `PlanIndex`, `FileAccess`, and `PlanAPI`.
 - HTTP handlers must not read arbitrary filesystem paths directly.
 - File reads must stay inside configured plan directories.
 - PM-001 must not expose Git or file write operations.
+- Repository create, edit, delete, path browse, and path reveal actions write only app registry or cache data, not managed repositories.
+- Kanban filters are multi-select: options are OR-matched within a filter group and AND-matched across groups.
 - UI parity means matching the proposal layout, density, navigation, and mobile behavior. Pixel-perfect matching is not required.
 
 ## Backend Phases
@@ -51,6 +61,8 @@ Avoid:
 - [x] Local config path in OS user data directory.
 - [x] Repository registration model and validation.
 - [x] Repository list and create API endpoints.
+- [x] Repository update and delete API endpoints.
+- [x] Native directory selection and path reveal API endpoints.
 
 **Verification:** `go test ./...`
 
@@ -71,8 +83,11 @@ PM-001: Add local app skeleton and repository registry
 
 - [x] Git adapter for read-only commands.
 - [x] Plan scanner for configured plan directories.
+- [x] Multiple plan directories per repository.
 - [x] `plan.yaml` parser.
 - [x] Fallback parser for folder and README metadata.
+- [x] Hybrid plan discovery for structured folders without `plan.yaml`.
+- [x] Freestyle documentation collection discovery for docs roots.
 - [x] Status normalization.
 - [x] Scan result warnings.
 
@@ -99,6 +114,8 @@ PM-001: Add read-only plan scanner
 - [x] File tree API.
 - [x] File content API.
 - [x] Read-only diff API.
+- [x] Repository cache deletion when a repository is removed.
+- [x] Empty documentation collection handling in detail APIs.
 
 **Verification:** `go test ./...`
 
@@ -123,6 +140,9 @@ PM-001: Add plan index and read APIs
 - [x] API client types for repositories, plans, files, and scans.
 - [x] App shell with top bar, left nav, repository tabs, search, and theme toggle.
 - [x] Repository registration screen.
+- [x] Repository edit and delete controls.
+- [x] Native path browse, reveal, and drag-and-drop path support.
+- [x] Plan directory chips in the repository form.
 
 **Verification:** `npm run typecheck && npm test`
 
@@ -141,7 +161,10 @@ PM-001: Add frontend shell and API client
 
 **Deliverables:**
 
-- [x] Board toolbar with repository, branch, status, and search filters.
+- [x] Scalable board toolbar with repository, branch, status, author, metadata-source, and text filters.
+- [x] Multi-select filter popovers with OR matching within each facet.
+- [x] Selected filter chips and clear actions.
+- [x] Filter chevrons and outside-click dismissal.
 - [x] Five Kanban columns.
 - [x] Plan cards with title, service, branch, author, tags, and updated time.
 - [x] Empty, loading, and error states.
@@ -169,9 +192,13 @@ PM-001: Add read-only Kanban board
 - [x] Workspace route.
 - [x] Workspace header.
 - [x] Directory-first natural-sorted file tree.
+- [x] File and directory icons in the file tree.
+- [x] Collapsible and resizable file explorer panel.
 - [x] Raw Markdown tab.
 - [x] Markdown preview tab.
 - [x] Metadata sidebar.
+- [x] Collapsible and resizable plan info panel.
+- [x] Hybrid plan and documentation collection metadata callouts.
 - [x] Read-only diff tab.
 
 **Verification:** `npm run typecheck && npm test`
@@ -195,6 +222,8 @@ PM-001: Add read-only plan workspace
 
 - [x] Mobile board layout matching `specs/design.png`.
 - [x] Responsive workspace layout.
+- [x] Responsive repository management layout for large repository lists.
+- [x] Responsive Kanban filter controls for large option sets.
 - [x] Light and dark theme behavior.
 - [x] Disabled or hidden write actions for v1.
 - [ ] Screenshot verification artifacts from Playwright MCP.

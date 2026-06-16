@@ -3,10 +3,11 @@
 ## Goals
 
 - Run a local HTTP API for Plan Manager.
-- Register local Git repositories.
-- Scan plan folders without writing to managed repositories.
+- Register, edit, and remove local Git repositories.
+- Scan structured plan folders and freestyle documentation roots without writing to managed repositories.
 - Serve board, workspace, file, and diff data.
 - Cache scan results for fast startup and filtering.
+- Support native local path selection and reveal actions for repository management.
 
 ## Scale Targets
 
@@ -20,14 +21,14 @@
 
 ## Runtime
 
-| Area                | Decision                                           |
-|---------------------|----------------------------------------------------|
-| Language            | Go                                                 |
-| Server              | Standard `net/http` or a small compatible router   |
-| Git access          | Shell out to `git` through a narrow adapter        |
-| Config storage      | OS user data directory                             |
-| Cache storage       | Local SQLite database or equivalent embedded store |
-| Managed repo writes | Not allowed in v1                                  |
+| Area                | Decision                                         |
+|---------------------|--------------------------------------------------|
+| Language            | Go                                               |
+| Server              | Standard `net/http` or a small compatible router |
+| Git access          | Shell out to `git` through a narrow adapter      |
+| Config storage      | OS user data directory                           |
+| Cache storage       | Local JSON cache or equivalent embedded store    |
+| Managed repo writes | Not allowed in v1                                |
 
 ## Data Model
 
@@ -59,7 +60,7 @@
 | tags           | string[]   | Plan labels                                                        |
 | updatedAt      | time?      | Last Git or file modification time                                 |
 | description    | string?    | Short description extracted from README                            |
-| metadataSource | string     | `plan.yaml` or `fallback`                                          |
+| metadataSource | string     | `plan.yaml`, `fallback`, or `docs`                                 |
 
 ### PlanDocument
 
@@ -77,12 +78,16 @@
 |--------|----------------------------------|------------------------------|
 | GET    | `/api/repositories`              | List registered repositories |
 | POST   | `/api/repositories`              | Register a repository        |
+| PUT    | `/api/repositories/{id}`         | Update a repository          |
+| DELETE | `/api/repositories/{id}`         | Remove a repository          |
 | POST   | `/api/repositories/{id}/scan`    | Run a manual scan            |
 | GET    | `/api/plans`                     | List filtered plan summaries |
 | GET    | `/api/plans/{id}`                | Load plan detail             |
 | GET    | `/api/plans/{id}/files`          | Load file tree               |
 | GET    | `/api/plans/{id}/files/{fileId}` | Load file content            |
 | GET    | `/api/plans/{id}/diff`           | Load read-only Git diff      |
+| POST   | `/api/system/select-directory`   | Open native directory picker |
+| POST   | `/api/system/open-path`          | Reveal a local path          |
 
 ## Scan Rules
 
@@ -90,18 +95,24 @@
 - Scan local branches and the current working tree only.
 - Do not run `git fetch` in v1.
 - Do not create, switch, delete, or push branches.
-- Read `plan.yaml` first.
-- If `plan.yaml` is missing, infer:
+- A repository may configure multiple plan directories.
+- For structured roots, discover plans under `service/ticket` folders.
+- Read `plan.yaml` first for structured plan folders.
+- If `plan.yaml` is missing in a structured folder, create a hybrid plan and infer:
   - service from the first folder under a plan root.
   - ticket from the plan folder name.
   - title from the first README heading.
   - status from implementation-plan status text when possible.
+- If a configured root contains Markdown but does not match the structured plan shape, index it as a documentation collection.
+- Documentation collections use `metadataSource: docs`, a docs-oriented display type, and inferred title/description from Markdown headings.
 - Map missing or unknown status to `draft`.
 - Store scan warnings and expose them in scan results.
+- Preserve the configured plan directory in plan ids and file access metadata so duplicate paths stay unique.
 
 ## Cache Rules
 
 - Manual Scan rebuilds derived metadata for one repository.
+- Removing a repository removes its cached plans, warnings, and scan metadata.
 - Board and list APIs read from cached summaries.
 - Plan detail APIs read cached metadata and load file content on demand.
 - Cache stores plan summaries, document metadata, scan timestamps, warnings, and errors.
@@ -118,6 +129,7 @@
 | `PlanIndex`          | Store and query cached scan results        |
 | `FileAccess`         | Read files only through indexed plan paths |
 | `PlanAPI`            | Convert backend data into HTTP responses   |
+| `SystemAPI`          | Directory picker and path reveal actions   |
 
 HTTP handlers must not read arbitrary filesystem paths directly.
 
@@ -145,12 +157,16 @@ HTTP handlers must not read arbitrary filesystem paths directly.
 - File reads must stay inside configured plan directories.
 - Path traversal must be rejected.
 - Symlinks that escape configured plan directories must be rejected.
+- Native directory selection and reveal actions must not grant file read access by themselves.
+- Repository registry writes are limited to app-local config and cache files.
 - PM-001 must not expose write APIs for registered repositories.
 - PM-001 must not run Git commands that change refs, branches, remotes, index, or working tree.
 
 ## Verification
 
 - Unit test metadata parsing and fallback parsing.
+- Unit test freestyle documentation root discovery.
 - Unit test status normalization.
+- Unit test repository update/delete cache behavior.
 - Integration test this repository as a fixture.
 - Verify no backend test writes to managed plan folders.

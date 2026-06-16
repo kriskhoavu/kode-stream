@@ -79,6 +79,49 @@ func (r *Registry) Create(input models.RepositoryInput) (models.RepositoryConfig
 	return repo, r.saveLocked()
 }
 
+func (r *Registry) Update(id string, input models.RepositoryInput) (models.RepositoryConfig, error) {
+	if err := r.load(); err != nil {
+		return models.RepositoryConfig{}, err
+	}
+	repo, err := r.validate(input)
+	if err != nil {
+		return models.RepositoryConfig{}, err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, existing := range r.records {
+		if existing.ID != id && samePath(existing.Path, repo.Path) {
+			return models.RepositoryConfig{}, fmt.Errorf("repository already registered")
+		}
+	}
+	for i, existing := range r.records {
+		if existing.ID == id {
+			repo.ID = existing.ID
+			repo.CreatedAt = existing.CreatedAt
+			repo.LastScannedAt = existing.LastScannedAt
+			r.records[i] = repo
+			return repo, r.saveLocked()
+		}
+	}
+	return models.RepositoryConfig{}, fmt.Errorf("repository not found")
+}
+
+func (r *Registry) Delete(id string) error {
+	if err := r.load(); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.records {
+		if r.records[i].ID == id {
+			r.records = append(r.records[:i], r.records[i+1:]...)
+			return r.saveLocked()
+		}
+	}
+	return fmt.Errorf("repository not found")
+}
+
 func (r *Registry) TouchScanned(id string, scannedAt time.Time) error {
 	if err := r.load(); err != nil {
 		return err

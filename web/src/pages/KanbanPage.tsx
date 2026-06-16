@@ -1,7 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Filter, Plus, RotateCw, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Filter, Plus, RotateCw, Search, X } from 'lucide-react';
 import { api, statusLabels, statusOrder } from '../lib/api';
 import type { PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
+
+type FilterKey = 'repositories' | 'statuses' | 'branches' | 'authors' | 'metadata';
+
+type Filters = Record<FilterKey, string[]>;
+
+type FacetOption = { value: string; label: string };
+
+const emptyFilters: Filters = {
+  repositories: [],
+  statuses: [],
+  branches: [],
+  authors: [],
+  metadata: []
+};
 
 export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChanged }: {
   repositories: RepositoryConfig[];
@@ -9,50 +23,69 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
   onOpenPlan: (planId: string) => void;
   onRepositoriesChanged: () => void;
 }) {
-  const [repositoryId, setRepositoryId] = useState('');
-  const [branch, setBranch] = useState('');
-  const [status, setStatus] = useState('');
+  const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [localQuery, setLocalQuery] = useState('');
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scanState, setScanState] = useState('');
+  const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
   const text = query || localQuery;
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (repositoryId) params.set('repositoryId', repositoryId);
-    if (branch) params.set('branch', branch);
-    if (status) params.set('status', status);
-    if (text) params.set('q', text);
     setLoading(true);
-    api.plans(params)
+    api.plans(new URLSearchParams())
       .then(setPlans)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [repositoryId, branch, status, text]);
+  }, []);
 
-  const branches = useMemo(() => Array.from(new Set(plans.map((plan) => plan.branch))).sort(), [plans]);
+  const filteredPlans = useMemo(() => filterPlans(plans, filters, text), [plans, filters, text]);
+  const branches = useMemo(() => unique(plans.map((plan) => plan.branch)), [plans]);
+  const authors = useMemo(() => unique(plans.map((plan) => plan.author || plan.owner || 'Unknown')), [plans]);
+  const metadataTypes = useMemo(() => unique(plans.map((plan) => metadataLabel(plan.metadataSource))), [plans]);
+  const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
+    { key: 'repositories', title: 'Repositories', options: repositories.map((repo) => ({ value: repo.id, label: repo.name })) },
+    { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
+    { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
+    { key: 'branches', title: 'Branches', options: branches.map((branch) => ({ value: branch, label: branch })) },
+    { key: 'metadata', title: 'Type', options: metadataTypes.map((type) => ({ value: type, label: type })) }
+  ];
+  const activeFilterCount = Object.values(filters).reduce((sum, values) => sum + values.length, 0) + (text ? 1 : 0);
   const grouped = useMemo(() => {
     const map = new Map<PlanStatus, PlanSummary[]>();
     statusOrder.forEach((item) => map.set(item, []));
-    plans.forEach((plan) => map.get(plan.status)?.push(plan));
+    filteredPlans.forEach((plan) => map.get(plan.status)?.push(plan));
     return map;
-  }, [plans]);
+  }, [filteredPlans]);
 
   const scan = async () => {
-    const target = repositoryId || repositories[0]?.id;
+    const target = filters.repositories[0] || repositories[0]?.id;
     if (!target) return;
     setScanState('Scanning');
     try {
       const result = await api.scan(target);
       setScanState(`${result.planCount} plans indexed`);
       onRepositoriesChanged();
-      const params = new URLSearchParams(repositoryId ? { repositoryId } : {});
-      setPlans(await api.plans(params));
+      setPlans(await api.plans(new URLSearchParams()));
     } catch (err) {
       setScanState(err instanceof Error ? err.message : 'Scan failed');
     }
+  };
+
+  const toggleFilter = (key: FilterKey, value: string) => {
+    setFilters((current) => {
+      const values = current[key];
+      return {
+        ...current,
+        [key]: values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
+      };
+    });
+  };
+
+  const clearFilters = () => {
+    setFilters(emptyFilters);
+    setLocalQuery('');
   };
 
   if (repositories.length === 0 && !loading) {
@@ -73,18 +106,6 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
         </button>
       </div>
       <div className="board-toolbar">
-        <select value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}>
-          <option value="">All Repositories</option>
-          {repositories.map((repo) => <option key={repo.id} value={repo.id}>{repo.name}</option>)}
-        </select>
-        <select value={branch} onChange={(event) => setBranch(event.target.value)}>
-          <option value="">All Branches</option>
-          {branches.map((item) => <option key={item}>{item}</option>)}
-        </select>
-        <select value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="">All Status</option>
-          {statusOrder.map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}
-        </select>
         <label className="filter-input">
           <Search size={15} />
           <input value={localQuery} onChange={(event) => setLocalQuery(event.target.value)} placeholder="Filter plans..." />
@@ -92,7 +113,29 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
         <button className="secondary" onClick={scan}>
           <RotateCw size={16} /> Scan
         </button>
+        <button className="secondary" onClick={clearFilters} disabled={activeFilterCount === 0}>
+          <X size={16} /> Clear
+        </button>
         <span className="scan-state">{scanState}</span>
+      </div>
+      <div className="facet-bar">
+        {facetConfig.map((facet) => (
+          <FacetMenu
+            key={facet.key}
+            title={facet.title}
+            options={facet.options}
+            selected={filters[facet.key]}
+            open={openFacet === facet.key}
+            onOpen={() => setOpenFacet(openFacet === facet.key ? '' : facet.key)}
+            onToggle={(value) => toggleFilter(facet.key, value)}
+            onClear={() => setFilters((current) => ({ ...current, [facet.key]: [] }))}
+          />
+        ))}
+      </div>
+      <SelectedFilters facets={facetConfig} filters={filters} onRemove={toggleFilter} />
+      <div className="filter-summary">
+        <span>{filteredPlans.length} of {plans.length} items</span>
+        {activeFilterCount > 0 && <span>{activeFilterCount} active filters</span>}
       </div>
       {error && <p className="error">{error}</p>}
       <div className="kanban-board" aria-busy={loading}>
@@ -116,10 +159,98 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
   );
 }
 
-function PlanCard({ plan, onOpen }: { plan: PlanSummary; onOpen: () => void }) {
+function FacetMenu({ title, options, selected, open, onOpen, onToggle, onClear }: {
+  title: string;
+  options: FacetOption[];
+  selected: string[];
+  open: boolean;
+  onOpen: () => void;
+  onToggle: (value: string) => void;
+  onClear: () => void;
+}) {
+  const [optionQuery, setOptionQuery] = useState('');
+  const menuRef = useRef<HTMLElement | null>(null);
+  const visibleOptions = options.filter((option) => option.value);
+  const searchedOptions = visibleOptions.filter((option) => option.label.toLowerCase().includes(optionQuery.toLowerCase()));
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        onOpen();
+      }
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
+  }, [onOpen, open]);
+
+  if (visibleOptions.length === 0) return null;
   return (
-    <button className="plan-card" onClick={onOpen}>
-      <strong>{plan.title}</strong>
+    <section className="facet-menu" ref={menuRef}>
+      <button type="button" className={selected.length > 0 ? 'facet-trigger active' : 'facet-trigger'} onClick={onOpen}>
+        <span>{title}</span>
+        <span className="facet-trigger-right">
+          {selected.length > 0 && <strong>{selected.length}</strong>}
+          <ChevronDown className={open ? 'facet-chevron open' : 'facet-chevron'} size={15} />
+        </span>
+      </button>
+      {open && (
+        <div className="facet-popover">
+          <div className="facet-popover-header">
+            <strong>{title}</strong>
+            <button type="button" onClick={onClear} disabled={selected.length === 0}>Clear</button>
+          </div>
+          {visibleOptions.length > 8 && (
+            <label className="facet-search">
+              <Search size={14} />
+              <input value={optionQuery} onChange={(event) => setOptionQuery(event.target.value)} placeholder={`Find ${title.toLowerCase()}...`} />
+            </label>
+          )}
+          <div className="facet-option-list">
+            {searchedOptions.map((option) => (
+              <label className="facet-option" key={option.value}>
+                <input type="checkbox" checked={selected.includes(option.value)} onChange={() => onToggle(option.value)} />
+                <span>{option.label}</span>
+              </label>
+            ))}
+            {searchedOptions.length === 0 && <span className="facet-empty">No matches</span>}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterKey; title: string; options: FacetOption[] }[]; filters: Filters; onRemove: (key: FilterKey, value: string) => void }) {
+  const chips = facets.flatMap((facet) => filters[facet.key].map((value) => ({
+    key: facet.key,
+    value,
+    title: facet.title,
+    label: facet.options.find((option) => option.value === value)?.label ?? value
+  })));
+  if (chips.length === 0) return null;
+  return (
+    <div className="selected-filters">
+      {chips.map((chip) => (
+        <button type="button" key={`${chip.key}-${chip.value}`} onClick={() => onRemove(chip.key, chip.value)}>
+          <span>{chip.title}: {chip.label}</span>
+          <X size={13} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PlanCard({ plan, onOpen }: { plan: PlanSummary; onOpen: () => void }) {
+  const hybrid = plan.metadataSource === 'fallback';
+  const docs = plan.metadataSource === 'docs';
+  return (
+    <button className={hybrid || docs ? 'plan-card hybrid-plan' : 'plan-card'} onClick={onOpen}>
+      <div className="plan-card-title">
+        <strong>{plan.title}</strong>
+        {hybrid && <span className="metadata-badge hybrid">Hybrid docs</span>}
+        {docs && <span className="metadata-badge docs">Docs</span>}
+      </div>
       <span>{plan.service} / {plan.branch}</span>
       <p>{plan.description || plan.ticket}</p>
       <footer>
@@ -130,4 +261,43 @@ function PlanCard({ plan, onOpen }: { plan: PlanSummary; onOpen: () => void }) {
       {plan.tags.length > 0 && <div className="tags">{plan.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}</div>}
     </button>
   );
+}
+
+export function filterPlans(plans: PlanSummary[], filters: Filters, text: string): PlanSummary[] {
+  const query = text.trim().toLowerCase();
+  return plans.filter((plan) => {
+    if (filters.repositories.length > 0 && !filters.repositories.includes(plan.repositoryId)) return false;
+    if (filters.statuses.length > 0 && !filters.statuses.includes(plan.status)) return false;
+    if (filters.branches.length > 0 && !filters.branches.includes(plan.branch)) return false;
+    const author = plan.author || plan.owner || 'Unknown';
+    if (filters.authors.length > 0 && !filters.authors.includes(author)) return false;
+    if (filters.metadata.length > 0 && !filters.metadata.includes(metadataLabel(plan.metadataSource))) return false;
+    if (query && !planSearchText(plan).includes(query)) return false;
+    return true;
+  });
+}
+
+function planSearchText(plan: PlanSummary): string {
+  return [
+    plan.title,
+    plan.ticket,
+    plan.service,
+    plan.branch,
+    plan.repositoryName,
+    plan.author,
+    plan.owner,
+    plan.description,
+    plan.metadataSource,
+    ...plan.tags
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function metadataLabel(source: string): string {
+  if (source === 'docs') return 'Docs';
+  if (source === 'fallback') return 'Hybrid docs';
+  return 'Plan metadata';
+}
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }

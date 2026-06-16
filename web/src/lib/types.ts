@@ -70,3 +70,7 @@ export interface ScanResult {
   planCount: number;
   warnings: { planPath?: string; message: string }[];
 }
+
+export interface PathSelection {
+  path: string;
+}

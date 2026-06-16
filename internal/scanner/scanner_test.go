@@ -46,6 +46,55 @@ func TestFallbackDocumentsOrdersKnownPlanFiles(t *testing.T) {
 	}
 }
 
+func TestFallbackDocumentsReturnsEmptySliceForEmptyPlan(t *testing.T) {
+	docs := fallbackDocuments(t.TempDir())
+	if docs == nil {
+		t.Fatal("expected empty slice, got nil")
+	}
+	if len(docs) != 0 {
+		t.Fatalf("expected no docs, got %d", len(docs))
+	}
+}
+
+func TestDocumentCollectionDetection(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "a12/guide.md", "# Guide\n")
+	entries, err := osReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !shouldScanAsDocumentCollection(root, entries) {
+		t.Fatal("expected freestyle markdown root to scan as document collection")
+	}
+}
+
+func TestStructuredPlanDirectoryDoesNotScanAsDocumentCollection(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "api/DI-1/README.md", "# Plan\n")
+	entries, err := osReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if shouldScanAsDocumentCollection(root, entries) {
+		t.Fatal("structured plan root should not scan as one document collection")
+	}
+}
+
+func TestNestedFreestyleDocsStillScanAsDocumentCollection(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "ai/revised/note.md", "# Note\n")
+	entries, err := osReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !shouldScanAsDocumentCollection(root, entries) {
+		t.Fatal("nested freestyle docs should not look like structured plan folders")
+	}
+}
+
 func writeTestFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := root + "/" + rel

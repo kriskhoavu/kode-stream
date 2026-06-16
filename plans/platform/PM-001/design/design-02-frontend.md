@@ -5,6 +5,8 @@
 - Match the product proposal in `specs/design.png`.
 - Provide a fast Kanban board for plan browsing.
 - Provide a read-only plan workspace.
+- Provide repository management for register, edit, delete, scan, browse, and reveal actions.
+- Support structured plans, hybrid plans, and freestyle documentation collections.
 - Support desktop and mobile layouts.
 - Keep all write actions disabled or hidden in v1.
 
@@ -32,10 +34,11 @@ App
   AppShell
     TopBar
     LeftNav
-    RepositoryTabs
+    RepositoryContext
     MainContent
   KanbanPage
     BoardToolbar
+    FilterPopover
     KanbanColumn
     PlanCard
   PlanWorkspacePage
@@ -45,6 +48,11 @@ App
     MarkdownPreview
     MetadataPanel
     DiffPanel
+  RepositoriesPage
+    RepositoryForm
+    PlanDirectoryInput
+    RepositoryList
+    RepositoryActions
 ```
 
 ## Routes
@@ -53,22 +61,23 @@ App
 |------------------|----------------------------------------|
 | `/`              | Redirect to Kanban                     |
 | `/kanban`        | Board view                             |
-| `/plans`         | Searchable plan list                   |
 | `/plans/:planId` | Plan workspace                         |
-| `/repositories`  | Repository registration and validation |
-| `/settings`      | Local app settings                     |
+| `/repositories`  | Repository registration and management |
 
 ## UI States
 
-| Area       | State          | Behavior                                        |
-|------------|----------------|-------------------------------------------------|
-| Board      | Loading        | Show stable column skeletons                    |
-| Board      | Empty          | Show empty-state action to add repository       |
-| Board      | Loaded         | Show five columns and counts                    |
-| Board      | Filtered empty | Keep filters visible and show no-results text   |
-| Workspace  | Loading        | Keep shell stable and load panels independently |
-| Workspace  | File missing   | Show file-level error                           |
-| Repository | Invalid        | Show validation errors from backend             |
+| Area       | State           | Behavior                                                    |
+|------------|-----------------|-------------------------------------------------------------|
+| Board      | Loading         | Show stable column skeletons                                |
+| Board      | Empty           | Show empty-state action to add repository                   |
+| Board      | Loaded          | Show five columns and counts                                |
+| Board      | Filtered empty  | Keep filters visible and show no-results text               |
+| Workspace  | Loading         | Keep shell stable and load panels independently             |
+| Workspace  | File missing    | Show file-level error                                       |
+| Workspace  | Docs collection | Show docs metadata and an empty/file-focused reading state  |
+| Repository | Invalid         | Show validation errors from backend                         |
+| Repository | Editing         | Preserve current values and allow cancel/save               |
+| Repository | Delete confirm  | Require explicit delete confirmation before removing a repo |
 
 ## Board Behavior
 
@@ -80,7 +89,13 @@ App
   - Done
 - Use compact cards like the design.
 - Show title, repository or service, branch, author when known, tags, and updated time.
-- Use repository, branch, status, and text filters.
+- Use repository, branch, status, author, metadata-source, and text filters.
+- Allow multiple selected options in each filter group.
+- Match selected options as OR within a filter group and AND across filter groups.
+- Use searchable popovers for long option lists.
+- Show selected filter chips below the toolbar.
+- Close filter popovers when the user clicks outside them.
+- Show a small down icon on each filter button.
 - Do not enable drag-and-drop status moves in v1.
 - Keep column widths stable on desktop.
 - Use cached plan summaries from the backend.
@@ -91,6 +106,10 @@ App
 - File tree is sorted by directory first, then filename.
 - File tree uses natural alphabetical sorting, such as `design-2.md` before `design-10.md`.
 - `plan.yaml` document order is ignored for the file explorer.
+- File tree rows use directory and file icons.
+- File tree spacing must keep filenames visually separated and readable.
+- File explorer and plan info panels are collapsible.
+- File explorer and plan info panels are resizable with smooth transitions.
 - Raw Markdown tab is read-only.
 - Preview renders:
   - headings.
@@ -99,8 +118,24 @@ App
   - images with relative paths.
   - Mermaid blocks when supported.
 - Diff tab shows read-only added, changed, and deleted lines.
+- Hybrid plans show a metadata callout explaining that metadata was inferred.
+- Documentation collections show a docs-oriented metadata callout.
+- Empty documentation collections show an empty state instead of a blank page.
 - Commit, pull, save, and new-plan actions are hidden or disabled in v1.
 - Load file content only when the user opens a file.
+
+## Repository Behavior
+
+- Register repositories with one or more plan directories.
+- Support structured roots such as `plans` and docs roots such as `docs`.
+- Display selected plan directories as badges in the input area.
+- Provide quick-add directory chips for common roots such as `plans` and `docs`.
+- Allow native path browsing for repository paths and plan directories.
+- Allow dragging a local path or file URL into the repository path field.
+- Allow revealing repository paths in Finder, Windows Explorer, or the platform file manager.
+- Allow editing a registered repository.
+- Allow deleting a registered repository and clearing its cached plans from the UI.
+- Keep the repository management layout usable with large repository lists.
 
 ## Mobile Behavior
 
@@ -108,6 +143,7 @@ App
 - Keep cards readable in a single column.
 - Use bottom navigation for Kanban, Plans, Branches, and Repos.
 - Keep filters reachable without covering cards.
+- Collapse large filter sets into compact controls that do not overflow.
 
 ## Design Constraints
 

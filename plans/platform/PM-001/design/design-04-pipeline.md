@@ -38,20 +38,28 @@ The AI agent must run this flow during UI and integration phases.
 1. Start the local app server.
 2. Open the app in the in-app browser.
 3. Register this repository.
-4. Set plan directory to `plans`.
+4. Set plan directories to `plans` and `docs` when both exist.
 5. Run Scan.
-6. Verify all five Kanban columns render.
-7. Verify known sample cards:
+6. Verify the repository can be edited without changing managed repository files.
+7. Verify the repository path can be revealed in the native file manager.
+8. Verify all five Kanban columns render.
+9. Verify known sample cards:
    - `PM-001` under `platform`.
    - `DI-202602` in `In Progress`.
    - `DI-170` in `Done`.
-8. Filter by repository, status, and text.
-9. Open `PM-001`.
-10. Verify file tree, raw Markdown, preview, metadata, and diff tabs.
-11. Capture desktop screenshot.
-12. Set mobile viewport.
-13. Verify mobile board follows `specs/design.png`.
-14. Capture mobile screenshot.
+10. Verify docs or hybrid cards show the appropriate badge when a configured root has Markdown without `plan.yaml`.
+11. Filter by multiple repositories, statuses, authors, branches, metadata sources, and text.
+12. Verify selected options use OR matching within a facet and AND matching across facets.
+13. Verify filter menus show chevrons and close on outside click.
+14. Open `PM-001`.
+15. Verify file tree, raw Markdown, preview, metadata, and diff tabs.
+16. Verify file explorer and plan info panels collapse, expand, and resize smoothly.
+17. Capture desktop screenshot.
+18. Set mobile viewport.
+19. Verify mobile board follows `specs/design.png`.
+20. Capture mobile screenshot.
+21. Register a disposable repository entry and delete it.
+22. Verify deleted repository plans disappear from the board.
 
 ## Phase Gate
 
@@ -79,3 +87,4 @@ The AI agent must run this flow during UI and integration phases.
 | Run Playwright MCP during development             | Layout and workflow regressions are easier to catch in the browser |
 | Keep release automation out of MVP implementation | The MVP first needs stable runtime behavior                        |
 | Require local binary smoke test                   | Embedded frontend serving must be verified, not assumed            |
+| Include docs and hybrid roots in acceptance       | PM-001 now supports plan-like and freestyle documentation roots    |

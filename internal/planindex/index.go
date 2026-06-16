@@ -68,6 +68,30 @@ func (i *Index) ReplaceRepository(repositoryID string, plans []models.PlanDetail
 	return i.saveLocked()
 }
 
+func (i *Index) DeleteRepository(repositoryID string) error {
+	if err := i.load(); err != nil {
+		return err
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	next := i.state.Plans[:0]
+	for _, plan := range i.state.Plans {
+		if plan.RepositoryID != repositoryID {
+			next = append(next, plan)
+		}
+	}
+	i.state.Plans = next
+	nextWarnings := i.state.Warnings[:0]
+	for _, warning := range i.state.Warnings {
+		if !strings.HasPrefix(warning.PlanPath, repositoryID+":") {
+			nextWarnings = append(nextWarnings, warning)
+		}
+	}
+	i.state.Warnings = nextWarnings
+	delete(i.state.Scans, repositoryID)
+	return i.saveLocked()
+}
+
 func (i *Index) Query(q Query) ([]models.PlanSummary, error) {
 	if err := i.load(); err != nil {
 		return nil, err

@@ -4,9 +4,9 @@
 
 Plan Manager is a local Git-native web app for browsing planning documents.
 
-The MVP lets a developer register local repositories, scan plan folders, view plans on a Kanban board, and open a plan workspace with a file tree, Markdown preview, raw Markdown view, metadata, and read-only Git diff.
+The MVP lets a developer register local repositories, scan one or more plan roots, view plans and documentation collections on a Kanban board, and open a workspace with a file tree, Markdown preview, raw Markdown view, metadata, and read-only Git diff.
 
-The MVP is read-only for managed repositories. It does not edit plan files. It does not run Git write operations.
+The MVP is read-only for managed repositories. It does not edit plan files. It does not run Git write operations. It only writes Plan Manager registry and cache files in the app data directory.
 
 ## Source Material
 
@@ -17,31 +17,36 @@ The MVP is read-only for managed repositories. It does not edit plan files. It d
 
 ## Glossary
 
-| Term            | Meaning                                                   | Maps To (code)              |
-|-----------------|-----------------------------------------------------------|-----------------------------|
-| Repository      | A local Git repository registered in Plan Manager         | `RepositoryConfig`          |
-| Plan Directory  | A configured folder that contains plan documents          | `planDirectories`           |
-| Plan            | A ticket-level planning folder such as `plans/api/DI-170` | `PlanSummary`, `PlanDetail` |
-| Plan Metadata   | Optional machine-readable metadata for a plan             | `plan.yaml`                 |
-| Document        | A Markdown file that belongs to a plan                    | `PlanDocument`              |
-| Scan            | Read-only indexing of configured plan directories         | `RepositoryScanner`         |
-| Board Status    | The Kanban column for a plan                              | `PlanStatus`                |
-| Workspace       | The details view for one plan                             | `PlanWorkspace`             |
-| Visual Baseline | The required UI reference for v1                          | `specs/design.png`          |
+| Term                     | Meaning                                                                    | Maps To (code)              |
+|--------------------------|----------------------------------------------------------------------------|-----------------------------|
+| Repository               | A local Git repository registered in Plan Manager                          | `RepositoryConfig`          |
+| Plan Directory           | A configured scan root such as `plans`, `docs`, or `docs/plans`            | `planDirectories`           |
+| Structured Plan Root     | A plan root that uses `service/ticket` folders, such as `plans/api/DI-170` | `PlanScanner`               |
+| Freestyle Docs Root      | A Markdown docs root that does not use `service/ticket` folders            | `metadataSource: docs`      |
+| Plan                     | A ticket-level planning folder such as `plans/api/DI-170`                  | `PlanSummary`, `PlanDetail` |
+| Hybrid Plan              | A plan folder without `plan.yaml`; metadata is inferred from files         | `metadataSource: fallback`  |
+| Documentation Collection | A browsable docs root indexed as one board item                            | `metadataSource: docs`      |
+| Plan Metadata            | Optional machine-readable metadata for a plan                              | `plan.yaml`                 |
+| Document                 | A Markdown file that belongs to a plan or docs collection                  | `PlanDocument`              |
+| Scan                     | Read-only indexing of configured plan directories                          | `RepositoryScanner`         |
+| Board Status             | The Kanban column for a plan                                               | `PlanStatus`                |
+| Workspace                | The details view for one plan or docs collection                           | `PlanWorkspace`             |
+| Visual Baseline          | The required UI reference for v1                                           | `specs/design.png`          |
 
 ## Components
 
-| Layer    | Component           | Purpose                                                                         |
-|----------|---------------------|---------------------------------------------------------------------------------|
-| Backend  | Repository registry | Stores registered repositories in the user data directory                       |
-| Backend  | Plan scanner        | Reads Git state, plan folders, `plan.yaml`, and Markdown files                  |
-| Backend  | Plan index          | Caches searchable plan summaries and document metadata                          |
-| Backend  | HTTP API            | Serves repository, plan, file, and diff data to the frontend                    |
-| Frontend | App shell           | Matches the dark top bar, left nav, repository tabs, and search from the design |
-| Frontend | Kanban board        | Shows plans by status with filters and compact cards                            |
-| Frontend | Plan workspace      | Shows file tree, raw Markdown, preview, metadata, and read-only diff            |
-| DevOps   | Build packaging     | Builds one local app binary with embedded frontend assets                       |
-| DevOps   | AI verification     | Runs Playwright MCP checks during implementation                                |
+| Layer    | Component           | Purpose                                                                            |
+|----------|---------------------|------------------------------------------------------------------------------------|
+| Backend  | Repository registry | Stores, updates, and deletes registered repositories in the user data directory    |
+| Backend  | Plan scanner        | Reads Git state, structured plan roots, freestyle docs roots, and Markdown files   |
+| Backend  | Plan index          | Caches searchable plan summaries and document metadata                             |
+| Backend  | HTTP API            | Serves repository, plan, file, and diff data to the frontend                       |
+| Frontend | App shell           | Matches the dark top bar, left nav, repository context, and search from the design |
+| Frontend | Kanban board        | Shows plans by status with scalable multi-select filters and compact cards         |
+| Frontend | Repository page     | Registers, edits, deletes, scans, and reveals local repositories                   |
+| Frontend | Plan workspace      | Shows file tree, raw Markdown, preview, metadata, and read-only diff               |
+| DevOps   | Build packaging     | Builds one local app binary with embedded frontend assets                          |
+| DevOps   | AI verification     | Runs Playwright MCP checks during implementation                                   |
 
 ## Data Flow
 
@@ -49,13 +54,14 @@ The MVP is read-only for managed repositories. It does not edit plan files. It d
 Developer starts Plan Manager
   -> backend loads app config from user data directory
   -> frontend asks for repositories
-  -> developer registers this repo and plan directories
+  -> developer registers or edits this repo and plan directories
   -> backend validates Git repo, branch, and folders
   -> developer triggers Scan
   -> scanner reads local branches and working tree
-  -> scanner indexes plan.yaml first
+  -> scanner indexes structured plan folders and freestyle docs roots
+  -> scanner reads plan.yaml first when present
   -> scanner falls back to folder and README parsing when plan.yaml is missing
-  -> frontend renders board columns and cards
+  -> frontend renders board columns, filter facets, and cards
   -> developer opens a card
   -> frontend loads file tree, file content, metadata, and diff
 ```
@@ -68,7 +74,10 @@ Developer starts Plan Manager
 | Store app data outside managed repos        | Store config in each repo, config file only | The app should not dirty target repositories. A cache is needed for large plan sets.                       |
 | Make v1 read-only                           | Editable workspace, full Git manager        | Read-only browsing gives value first and avoids save, lock, credential, and branch mutation risks.         |
 | Use `plan.yaml` first                       | README-only parsing                         | Existing plans already use `plan.yaml`. It gives stable metadata. File explorer order is filesystem-based. |
-| Add fallback parsing                        | Require `plan.yaml`                         | Older plans and custom folders should still appear.                                                        |
+| Add fallback parsing                        | Require `plan.yaml`                         | Older plans and custom folders should still appear as Hybrid plans.                                        |
+| Support freestyle docs roots                | Force docs into `service/ticket` structure  | General docs folders such as `docs/` should be browsable without fake tickets.                             |
+| Use client-side multi-select board filters  | Add many query params to `/api/plans`       | The board already loads cached summaries. Client facets give OR filters without backend churn.             |
+| Keep repository edit/delete app-local       | Treat registry changes as managed repo ops  | Registry writes only touch Plan Manager data. They do not modify registered repositories.                  |
 | Do not auto fetch in v1                     | Fetch every 15 seconds                      | Fetch changes `.git` refs and can trigger credentials. Manual scan is safer for v1.                        |
 | Treat `specs/design.png` as visual baseline | Treat image as inspiration only             | The UI must not drift away from the documented proposal.                                                   |
 | Use Playwright MCP as a phase gate          | Manual browser checks only                  | AI-agent-run browser checks make layout and workflow regressions visible during development.               |
@@ -81,9 +90,15 @@ Developer starts Plan Manager
 - Backend code should keep clear boundaries between repository registry, Git access, scanning, indexing, and HTTP handlers.
 - HTTP handlers must not read arbitrary filesystem paths directly. They must go through the plan index and file access layer.
 - Manual Scan rebuilds derived metadata for one repository.
+- Repository edit updates app registry metadata after validation.
+- Repository delete removes the app registry entry and cached plans for that repository.
 - A bad plan creates a scan warning. It must not fail the whole repository scan.
 - The app must not write to registered repositories in PM-001.
 - File reads must stay inside configured plan directories.
+- Structured plan roots use `service/ticket` folders.
+- Freestyle docs roots with Markdown files are indexed as one Documentation Collection.
+- Hybrid plans and docs collections must be visually distinct from `plan.yaml` plans.
+- Kanban filters support OR within a facet and AND across facets.
 - The UI should match the layout, density, navigation, and mobile behavior of `specs/design.png`. It does not need pixel-perfect parity.
 
 ## Next Plan

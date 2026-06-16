@@ -17,6 +17,7 @@ import (
 	"plan-manager/internal/planindex"
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
+	"plan-manager/internal/systemdialog"
 )
 
 //go:embed all:frontend
@@ -38,7 +39,7 @@ func NewServer(port int) (*Server, error) {
 	git := gitadapter.New()
 	reg := registry.New(paths.RegistryFile, git)
 	idx := planindex.New(paths.PlanIndexFile)
-	apiHandler := api.New(reg, idx, scanner.New(git), fileaccess.New(), git)
+	apiHandler := api.New(reg, idx, scanner.New(git), fileaccess.New(), git, systemdialog.New())
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())

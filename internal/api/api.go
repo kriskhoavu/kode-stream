@@ -16,6 +16,7 @@ import (
 	"plan-manager/internal/planindex"
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
+	"plan-manager/internal/systemdialog"
 )
 
 type API struct {
@@ -24,10 +25,11 @@ type API struct {
 	scanner  *scanner.Scanner
 	files    *fileaccess.Access
 	git      *gitadapter.GitAdapter
+	dialog   *systemdialog.Dialog
 }
 
-func New(reg *registry.Registry, idx *planindex.Index, scan *scanner.Scanner, files *fileaccess.Access, git *gitadapter.GitAdapter) *API {
-	return &API{registry: reg, index: idx, scanner: scan, files: files, git: git}
+func New(reg *registry.Registry, idx *planindex.Index, scan *scanner.Scanner, files *fileaccess.Access, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog) *API {
+	return &API{registry: reg, index: idx, scanner: scan, files: files, git: git, dialog: dialog}
 }
 
 func (a *API) Routes() http.Handler {
@@ -35,12 +37,16 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/health", a.health)
 	mux.HandleFunc("GET /api/repositories", a.listRepositories)
 	mux.HandleFunc("POST /api/repositories", a.createRepository)
+	mux.HandleFunc("PUT /api/repositories/{id}", a.updateRepository)
+	mux.HandleFunc("DELETE /api/repositories/{id}", a.deleteRepository)
 	mux.HandleFunc("POST /api/repositories/{id}/scan", a.scanRepository)
 	mux.HandleFunc("GET /api/plans", a.listPlans)
 	mux.HandleFunc("GET /api/plans/{id}", a.planDetail)
 	mux.HandleFunc("GET /api/plans/{id}/files", a.planFiles)
 	mux.HandleFunc("GET /api/plans/{id}/files/{fileID}", a.planFileContent)
 	mux.HandleFunc("GET /api/plans/{id}/diff", a.planDiff)
+	mux.HandleFunc("POST /api/system/select-directory", a.selectDirectory)
+	mux.HandleFunc("POST /api/system/open-path", a.openPath)
 	return mux
 }
 
@@ -65,6 +71,33 @@ func (a *API) createRepository(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, repo)
+}
+
+func (a *API) updateRepository(w http.ResponseWriter, r *http.Request) {
+	var input models.RepositoryInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	repo, err := a.registry.Update(r.PathValue("id"), input)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, repo)
+}
+
+func (a *API) deleteRepository(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := a.registry.Delete(id); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := a.index.DeleteRepository(id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (a *API) scanRepository(w http.ResponseWriter, r *http.Request) {
@@ -104,6 +137,9 @@ func (a *API) listPlans(w http.ResponseWriter, r *http.Request) {
 		Status:       q.Get("status"),
 		Text:         q.Get("q"),
 	})
+	for i := range plans {
+		plans[i] = normalizePlanSummary(plans[i])
+	}
 	respond(w, plans, err)
 }
 
@@ -118,6 +154,7 @@ func (a *API) planDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plan.Description = fullReadmeDescription(repo, plan)
+	plan = normalizePlanDetail(plan)
 	writeJSON(w, http.StatusOK, plan)
 }
 
@@ -167,6 +204,30 @@ func (a *API) planDiff(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"diff": diff})
 }
 
+func (a *API) selectDirectory(w http.ResponseWriter, r *http.Request) {
+	path, err := a.dialog.SelectDirectory()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"path": path})
+}
+
+func (a *API) openPath(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := a.dialog.OpenPath(input.Path); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 func (a *API) repoAndPlan(planID string) (models.RepositoryConfig, models.PlanDetail, bool, error) {
 	plan, ok, err := a.index.Get(planID)
 	if err != nil || !ok {
@@ -202,6 +263,24 @@ func fullReadmeDescription(repo models.RepositoryConfig, plan models.PlanDetail)
 		return description
 	}
 	return plan.Description
+}
+
+func normalizePlanSummary(plan models.PlanSummary) models.PlanSummary {
+	if plan.Tags == nil {
+		plan.Tags = []string{}
+	}
+	return plan
+}
+
+func normalizePlanDetail(plan models.PlanDetail) models.PlanDetail {
+	plan.PlanSummary = normalizePlanSummary(plan.PlanSummary)
+	if plan.Documents == nil {
+		plan.Documents = []models.PlanDocument{}
+	}
+	if plan.Metadata == nil {
+		plan.Metadata = map[string]any{}
+	}
+	return plan
 }
 
 func firstMarkdownParagraph(markdown string) string {

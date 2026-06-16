@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GitBranch, KanbanSquare, ListChecks, Moon, Plus, Search, Settings, Sun, Boxes, FolderGit2 } from 'lucide-react';
+import { GitBranch, KanbanSquare, ListChecks, Moon, Search, Sun, Boxes, FolderGit2 } from 'lucide-react';
 import { api } from './lib/api';
 import type { RepositoryConfig } from './lib/types';
 import { KanbanPage } from './pages/KanbanPage';
@@ -87,13 +87,10 @@ export function App() {
         <NavButton active={false} onClick={() => navigate({ name: 'kanban' })} icon={<ListChecks size={18} />} label="Plans" />
         <NavButton active={false} onClick={() => navigate({ name: 'kanban' })} icon={<GitBranch size={18} />} label="Branches" />
         <NavButton active={route.name === 'repositories'} onClick={() => navigate({ name: 'repositories' })} icon={<FolderGit2 size={18} />} label="Repositories" />
-        <NavButton active={false} onClick={() => navigate({ name: 'repositories' })} icon={<Settings size={18} />} label="Settings" />
         <div className="repo-status">
-          <strong>{activeRepo?.name ?? 'No repository'}</strong>
-          <span>{activeRepo?.baselineBranch ?? 'Register a repo'}</span>
-          <button onClick={() => navigate({ name: 'repositories' })}>
-            <Plus size={14} /> Repository
-          </button>
+          <span className="repo-status-label">Current Repository</span>
+          <strong>{activeRepo?.name ?? 'None selected'}</strong>
+          <span>{activeRepo ? `${activeRepo.baselineBranch} · ${repositories.length} registered` : 'Use Repositories to add one'}</span>
         </div>
       </aside>
 
