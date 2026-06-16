@@ -1,0 +1,55 @@
+schemaVersion: 1
+
+plan:
+  ticket: PM-001
+  title: Plan Manager Read-Only MVP
+  service: platform
+  status: draft
+  owner: null
+  tags:
+    - plan-manager
+    - local-app
+    - kanban
+    - readonly
+  targetDate: null
+
+documents:
+  - id: overview
+    role: overview
+    path: README.md
+    label: Overview
+    order: 0
+  - id: scenario-overview
+    role: scenario
+    path: scenario/scenario-00-overview.md
+    label: Scenario Overview
+    order: 10
+  - id: design-backend
+    role: design
+    track: backend
+    path: design/design-01-backend.md
+    label: Backend Design
+    order: 20
+  - id: design-frontend
+    role: design
+    track: frontend
+    path: design/design-02-frontend.md
+    label: Frontend Design
+    order: 30
+  - id: design-infrastructure
+    role: design
+    track: infrastructure
+    path: design/design-03-infrastructure.md
+    label: Infrastructure Design
+    order: 40
+  - id: design-pipeline
+    role: design
+    track: pipeline
+    path: design/design-04-pipeline.md
+    label: Pipeline Design
+    order: 50
+  - id: implementation
+    role: implementation
+    path: implementation-plan.md
+    label: Implementation Plan
+    order: 60
