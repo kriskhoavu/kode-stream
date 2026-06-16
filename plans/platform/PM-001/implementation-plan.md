@@ -46,11 +46,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Go module and `cmd/plan-manager` entrypoint.
-- [ ] `plan-manager serve` command.
-- [ ] Local config path in OS user data directory.
-- [ ] Repository registration model and validation.
-- [ ] Repository list and create API endpoints.
+- [x] Go module and `cmd/plan-manager` entrypoint.
+- [x] `plan-manager serve` command.
+- [x] Local config path in OS user data directory.
+- [x] Repository registration model and validation.
+- [x] Repository list and create API endpoints.
 
 **Verification:** `go test ./...`
 
@@ -69,12 +69,12 @@ PM-001: Add local app skeleton and repository registry
 
 **Deliverables:**
 
-- [ ] Git adapter for read-only commands.
-- [ ] Plan scanner for configured plan directories.
-- [ ] `plan.yaml` parser.
-- [ ] Fallback parser for folder and README metadata.
-- [ ] Status normalization.
-- [ ] Scan result warnings.
+- [x] Git adapter for read-only commands.
+- [x] Plan scanner for configured plan directories.
+- [x] `plan.yaml` parser.
+- [x] Fallback parser for folder and README metadata.
+- [x] Status normalization.
+- [x] Scan result warnings.
 
 **Verification:** `go test ./...`
 
@@ -93,12 +93,12 @@ PM-001: Add read-only plan scanner
 
 **Deliverables:**
 
-- [ ] Plan index cache.
-- [ ] Plan list API with repository, branch, status, and text filters.
-- [ ] Plan detail API.
-- [ ] File tree API.
-- [ ] File content API.
-- [ ] Read-only diff API.
+- [x] Plan index cache.
+- [x] Plan list API with repository, branch, status, and text filters.
+- [x] Plan detail API.
+- [x] File tree API.
+- [x] File content API.
+- [x] Read-only diff API.
 
 **Verification:** `go test ./...`
 
@@ -119,10 +119,10 @@ PM-001: Add plan index and read APIs
 
 **Deliverables:**
 
-- [ ] React/Vite app setup.
-- [ ] API client types for repositories, plans, files, and scans.
-- [ ] App shell with top bar, left nav, repository tabs, search, and theme toggle.
-- [ ] Repository registration screen.
+- [x] React/Vite app setup.
+- [x] API client types for repositories, plans, files, and scans.
+- [x] App shell with top bar, left nav, repository tabs, search, and theme toggle.
+- [x] Repository registration screen.
 
 **Verification:** `npm run typecheck && npm test`
 
@@ -141,11 +141,11 @@ PM-001: Add frontend shell and API client
 
 **Deliverables:**
 
-- [ ] Board toolbar with repository, branch, status, and search filters.
-- [ ] Five Kanban columns.
-- [ ] Plan cards with title, service, branch, author, tags, and updated time.
-- [ ] Empty, loading, and error states.
-- [ ] Desktop layout matching `specs/design.png`.
+- [x] Board toolbar with repository, branch, status, and search filters.
+- [x] Five Kanban columns.
+- [x] Plan cards with title, service, branch, author, tags, and updated time.
+- [x] Empty, loading, and error states.
+- [x] Desktop layout matching `specs/design.png`.
 
 **Verification:** `npm run typecheck && npm test`
 
@@ -166,13 +166,13 @@ PM-001: Add read-only Kanban board
 
 **Deliverables:**
 
-- [ ] Workspace route.
-- [ ] Workspace header.
-- [ ] Ordered file tree.
-- [ ] Raw Markdown tab.
-- [ ] Markdown preview tab.
-- [ ] Metadata sidebar.
-- [ ] Read-only diff tab.
+- [x] Workspace route.
+- [x] Workspace header.
+- [x] Directory-first natural-sorted file tree.
+- [x] Raw Markdown tab.
+- [x] Markdown preview tab.
+- [x] Metadata sidebar.
+- [x] Read-only diff tab.
 
 **Verification:** `npm run typecheck && npm test`
 
@@ -193,10 +193,10 @@ PM-001: Add read-only plan workspace
 
 **Deliverables:**
 
-- [ ] Mobile board layout matching `specs/design.png`.
-- [ ] Responsive workspace layout.
-- [ ] Light and dark theme behavior.
-- [ ] Disabled or hidden write actions for v1.
+- [x] Mobile board layout matching `specs/design.png`.
+- [x] Responsive workspace layout.
+- [x] Light and dark theme behavior.
+- [x] Disabled or hidden write actions for v1.
 - [ ] Screenshot verification artifacts from Playwright MCP.
 
 **Verification:** `npm run typecheck && npm test`
@@ -220,10 +220,10 @@ PM-001: Add responsive visual parity
 
 **Deliverables:**
 
-- [ ] Frontend production build.
-- [ ] Go binary embedding frontend assets.
-- [ ] Configurable localhost port.
-- [ ] Startup output with local URL.
+- [x] Frontend production build.
+- [x] Go binary embedding frontend assets.
+- [x] Configurable localhost port.
+- [x] Startup output with local URL.
 - [ ] App smoke test against the built binary.
 
 **Verification:** `npm run build && go build ./cmd/plan-manager`
@@ -243,9 +243,9 @@ PM-001: Add embedded local app build
 
 **Deliverables:**
 
-- [ ] Document local build commands.
-- [ ] Add Playwright MCP acceptance checklist.
-- [ ] Add release notes for future Homebrew packaging.
+- [x] Document local build commands.
+- [x] Add Playwright MCP acceptance checklist.
+- [x] Add release notes for future Homebrew packaging.
 - [ ] Confirm managed repositories stay unchanged after scan.
 
 **Verification:** `go test ./... && npm run typecheck && npm test && npm run build`
@@ -265,9 +265,9 @@ PM-001: Add verification and release preparation
 
 ## Post-Implementation Checklist
 
-- [ ] Update `plans/platform/PM-001/` docs to reflect final naming.
-- [ ] Confirm `specs/design.png` remains the visual baseline.
-- [ ] Confirm no Git write operations are available in v1.
+- [x] Update `plans/platform/PM-001/` docs to reflect final naming.
+- [x] Confirm `specs/design.png` remains the visual baseline.
+- [x] Confirm no Git write operations are available in v1.
 - [ ] Confirm Playwright MCP screenshots were captured for desktop and mobile.
 - [ ] Create the follow-up plan `PM-002: Plan Editing And Git Operations`.
 - [ ] PR description references this plan.

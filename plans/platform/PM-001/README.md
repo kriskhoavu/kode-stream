@@ -62,16 +62,16 @@ Developer starts Plan Manager
 
 ## Design Decisions
 
-| Decision                                    | Alternatives Considered                     | Rationale                                                                                          |
-|---------------------------------------------|---------------------------------------------|----------------------------------------------------------------------------------------------------|
-| Use Go plus React/Vite                      | Node-only, Rust plus React                  | Go gives a simple local binary and strong filesystem/Git access. React/Vite fits the proposed UI.  |
-| Store app data outside managed repos        | Store config in each repo, config file only | The app should not dirty target repositories. A cache is needed for large plan sets.               |
-| Make v1 read-only                           | Editable workspace, full Git manager        | Read-only browsing gives value first and avoids save, lock, credential, and branch mutation risks. |
-| Use `plan.yaml` first                       | README-only parsing                         | Existing plans already use `plan.yaml`. It gives stable metadata and document order.               |
-| Add fallback parsing                        | Require `plan.yaml`                         | Older plans and custom folders should still appear.                                                |
-| Do not auto fetch in v1                     | Fetch every 15 seconds                      | Fetch changes `.git` refs and can trigger credentials. Manual scan is safer for v1.                |
-| Treat `specs/design.png` as visual baseline | Treat image as inspiration only             | The UI must not drift away from the documented proposal.                                           |
-| Use Playwright MCP as a phase gate          | Manual browser checks only                  | AI-agent-run browser checks make layout and workflow regressions visible during development.       |
+| Decision                                    | Alternatives Considered                     | Rationale                                                                                                  |
+|---------------------------------------------|---------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| Use Go plus React/Vite                      | Node-only, Rust plus React                  | Go gives a simple local binary and strong filesystem/Git access. React/Vite fits the proposed UI.          |
+| Store app data outside managed repos        | Store config in each repo, config file only | The app should not dirty target repositories. A cache is needed for large plan sets.                       |
+| Make v1 read-only                           | Editable workspace, full Git manager        | Read-only browsing gives value first and avoids save, lock, credential, and branch mutation risks.         |
+| Use `plan.yaml` first                       | README-only parsing                         | Existing plans already use `plan.yaml`. It gives stable metadata. File explorer order is filesystem-based. |
+| Add fallback parsing                        | Require `plan.yaml`                         | Older plans and custom folders should still appear.                                                        |
+| Do not auto fetch in v1                     | Fetch every 15 seconds                      | Fetch changes `.git` refs and can trigger credentials. Manual scan is safer for v1.                        |
+| Treat `specs/design.png` as visual baseline | Treat image as inspiration only             | The UI must not drift away from the documented proposal.                                                   |
+| Use Playwright MCP as a phase gate          | Manual browser checks only                  | AI-agent-run browser checks make layout and workflow regressions visible during development.               |
 
 ## Implementation Clarifications
 

@@ -88,8 +88,9 @@ App
 
 ## Workspace Behavior
 
-- File tree follows the plan document order from `plan.yaml`.
-- Missing metadata falls back to a sorted folder tree.
+- File tree is sorted by directory first, then filename.
+- File tree uses natural alphabetical sorting, such as `design-2.md` before `design-10.md`.
+- `plan.yaml` document order is ignored for the file explorer.
 - Raw Markdown tab is read-only.
 - Preview renders:
   - headings.

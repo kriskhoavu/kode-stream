@@ -1,0 +1,216 @@
+package fileaccess
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"unicode"
+
+	"plan-manager/internal/models"
+)
+
+type Access struct{}
+
+func New() *Access {
+	return &Access{}
+}
+
+func (a *Access) Tree(repo models.RepositoryConfig, plan models.PlanDetail) ([]models.FileNode, error) {
+	root, err := a.safePlanRoot(repo, plan)
+	if err != nil {
+		return nil, err
+	}
+	return buildTreeFromDir(root, "")
+}
+
+func (a *Access) Read(repo models.RepositoryConfig, plan models.PlanDetail, fileID string) (models.FileContent, error) {
+	root, err := a.safePlanRoot(repo, plan)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	relPath := ""
+	for _, node := range flattenTreeMust(a.Tree(repo, plan)) {
+		if node.ID == fileID {
+			relPath = node.Path
+			break
+		}
+	}
+	if relPath == "" {
+		for _, doc := range plan.Documents {
+			if fileIDForPath(doc.Path) == fileID {
+				relPath = doc.Path
+				break
+			}
+		}
+	}
+	if relPath == "" {
+		return models.FileContent{}, fmt.Errorf("file not found")
+	}
+	full, err := safeJoin(root, relPath)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	realFile, err := filepath.EvalSymlinks(full)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	if realFile != root && !strings.HasPrefix(realFile, root+string(filepath.Separator)) {
+		return models.FileContent{}, fmt.Errorf("file path escapes plan root")
+	}
+	data, err := os.ReadFile(realFile)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	return models.FileContent{ID: fileIDForPath(relPath), Path: relPath, Content: string(data), Language: language(relPath)}, nil
+}
+
+func (a *Access) safePlanRoot(repo models.RepositoryConfig, plan models.PlanDetail) (string, error) {
+	root, err := safeJoin(repo.Path, plan.PlanRoot)
+	if err != nil {
+		return "", err
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	allowed := false
+	for _, dir := range repo.PlanDirectories {
+		allowedRoot, err := filepath.EvalSymlinks(filepath.Join(repo.Path, filepath.FromSlash(dir)))
+		if err != nil {
+			continue
+		}
+		if realRoot == allowedRoot || strings.HasPrefix(realRoot, allowedRoot+string(filepath.Separator)) {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return "", fmt.Errorf("plan path is outside configured plan directories")
+	}
+	return realRoot, nil
+}
+
+func safeJoin(root, rel string) (string, error) {
+	clean := filepath.Clean(filepath.FromSlash(rel))
+	if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
+		return "", fmt.Errorf("invalid path")
+	}
+	full := filepath.Join(root, clean)
+	absRoot, _ := filepath.Abs(root)
+	absFull, _ := filepath.Abs(full)
+	if absFull != absRoot && !strings.HasPrefix(absFull, absRoot+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes root")
+	}
+	return absFull, nil
+}
+
+func flattenTreeMust(nodes []models.FileNode, _ error) []models.FileNode {
+	var out []models.FileNode
+	var walk func([]models.FileNode)
+	walk = func(in []models.FileNode) {
+		for _, node := range in {
+			if node.Type == "file" {
+				out = append(out, node)
+			}
+			walk(node.Children)
+		}
+	}
+	walk(nodes)
+	return out
+}
+
+func buildTreeFromDir(root, relDir string) ([]models.FileNode, error) {
+	fullDir := root
+	if relDir != "" {
+		fullDir = filepath.Join(root, filepath.FromSlash(relDir))
+	}
+	entries, err := os.ReadDir(fullDir)
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if entries[i].IsDir() != entries[j].IsDir() {
+			return entries[i].IsDir()
+		}
+		return naturalLess(entries[i].Name(), entries[j].Name())
+	})
+
+	nodes := make([]models.FileNode, 0, len(entries))
+	for _, entry := range entries {
+		path := filepath.ToSlash(filepath.Join(relDir, entry.Name()))
+		node := models.FileNode{ID: fileIDForPath(path), Name: entry.Name(), Path: path, Type: "file"}
+		if entry.IsDir() {
+			children, err := buildTreeFromDir(root, path)
+			if err != nil {
+				return nil, err
+			}
+			node.Type = "directory"
+			node.Children = children
+		}
+		nodes = append(nodes, node)
+	}
+	return nodes, nil
+}
+
+func naturalLess(left, right string) bool {
+	leftParts := naturalParts(left)
+	rightParts := naturalParts(right)
+	for i := 0; i < len(leftParts) && i < len(rightParts); i++ {
+		a, b := leftParts[i], rightParts[i]
+		if a.number && b.number {
+			if a.numberValue != b.numberValue {
+				return a.numberValue < b.numberValue
+			}
+			continue
+		}
+		if a.value != b.value {
+			return a.value < b.value
+		}
+	}
+	return len(leftParts) < len(rightParts)
+}
+
+type naturalPart struct {
+	value       string
+	number      bool
+	numberValue int
+}
+
+func naturalParts(input string) []naturalPart {
+	var parts []naturalPart
+	for i := 0; i < len(input); {
+		start := i
+		r := rune(input[i])
+		isNumber := unicode.IsDigit(r)
+		for i < len(input) && unicode.IsDigit(rune(input[i])) == isNumber {
+			i++
+		}
+		value := strings.ToLower(input[start:i])
+		part := naturalPart{value: value, number: isNumber}
+		if isNumber {
+			part.numberValue, _ = strconv.Atoi(value)
+		}
+		parts = append(parts, part)
+	}
+	return parts
+}
+
+func fileIDForPath(path string) string {
+	return strings.NewReplacer("/", "__", ".", "_").Replace(path)
+}
+
+func language(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".md", ".markdown":
+		return "markdown"
+	case ".yaml", ".yml":
+		return "yaml"
+	case ".json":
+		return "json"
+	default:
+		return "text"
+	}
+}

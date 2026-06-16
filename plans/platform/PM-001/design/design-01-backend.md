@@ -70,7 +70,6 @@
 | track | string? | `backend`, `frontend`, `infrastructure`, or `pipeline`         |
 | path  | string  | Path relative to plan root                                     |
 | label | string  | UI label                                                       |
-| order | int     | Display order                                                  |
 
 ## API Endpoints
 
