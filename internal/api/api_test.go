@@ -49,3 +49,24 @@ func TestNormalizePlanDetailUsesEmptyCollections(t *testing.T) {
 		t.Fatal("metadata should be an empty map, got nil")
 	}
 }
+
+func TestValidateGitPathsStaysInsidePlanDirectories(t *testing.T) {
+	repo := models.RepositoryConfig{PlanDirectories: []string{"plans", "docs"}}
+	if err := validateGitPaths(repo, []string{"plans/platform/PM-002/README.md", "docs/guide.md"}); err != nil {
+		t.Fatalf("expected paths to be valid: %v", err)
+	}
+}
+
+func TestValidateGitPathsRejectsEscapesAndUnregisteredPaths(t *testing.T) {
+	repo := models.RepositoryConfig{PlanDirectories: []string{"plans"}}
+	for _, paths := range [][]string{
+		{},
+		{"../secret.md"},
+		{"/tmp/secret.md"},
+		{"src/main.go"},
+	} {
+		if err := validateGitPaths(repo, paths); err == nil {
+			t.Fatalf("expected %#v to be rejected", paths)
+		}
+	}
+}

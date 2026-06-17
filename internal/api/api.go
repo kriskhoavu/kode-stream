@@ -16,9 +16,11 @@ import (
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/models"
 	"plan-manager/internal/planindex"
+	"plan-manager/internal/planwriter"
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
 	"plan-manager/internal/systemdialog"
+	"plan-manager/internal/writeguard"
 )
 
 type API struct {
@@ -26,12 +28,13 @@ type API struct {
 	index    *planindex.Index
 	scanner  *scanner.Scanner
 	files    *fileaccess.Access
+	writer   *planwriter.Writer
 	git      *gitadapter.GitAdapter
 	dialog   *systemdialog.Dialog
 }
 
-func New(reg *registry.Registry, idx *planindex.Index, scan *scanner.Scanner, files *fileaccess.Access, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog) *API {
-	return &API{registry: reg, index: idx, scanner: scan, files: files, git: git, dialog: dialog}
+func New(reg *registry.Registry, idx *planindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *planwriter.Writer, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog) *API {
+	return &API{registry: reg, index: idx, scanner: scan, files: files, writer: writer, git: git, dialog: dialog}
 }
 
 func (a *API) Routes() http.Handler {
@@ -47,7 +50,18 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/plans/{id}", a.planDetail)
 	mux.HandleFunc("GET /api/plans/{id}/files", a.planFiles)
 	mux.HandleFunc("GET /api/plans/{id}/files/{fileID}", a.planFileContent)
+	mux.HandleFunc("POST /api/plans/{id}/files/{fileID}", a.savePlanFile)
 	mux.HandleFunc("GET /api/plans/{id}/diff", a.planDiff)
+	mux.HandleFunc("PATCH /api/plans/{id}/metadata", a.savePlanMetadata)
+	mux.HandleFunc("PATCH /api/plans/{id}/status", a.updatePlanStatus)
+	mux.HandleFunc("POST /api/plans", a.createPlan)
+	mux.HandleFunc("GET /api/repositories/{id}/git/status", a.gitStatus)
+	mux.HandleFunc("POST /api/repositories/{id}/git/fetch", a.gitFetch)
+	mux.HandleFunc("POST /api/repositories/{id}/git/pull", a.gitPull)
+	mux.HandleFunc("POST /api/repositories/{id}/git/push", a.gitPush)
+	mux.HandleFunc("POST /api/repositories/{id}/git/commit", a.gitCommit)
+	mux.HandleFunc("POST /api/repositories/{id}/git/branches", a.gitCreateBranch)
+	mux.HandleFunc("POST /api/repositories/{id}/git/switch", a.gitSwitchBranch)
 	mux.HandleFunc("POST /api/system/select-directory", a.selectDirectory)
 	mux.HandleFunc("POST /api/system/open-path", a.openPath)
 	return mux
@@ -250,6 +264,228 @@ func (a *API) planDiff(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"diff": diff})
 }
 
+func (a *API) savePlanFile(w http.ResponseWriter, r *http.Request) {
+	repo, plan, ok, err := a.repoAndPlan(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "plan not found")
+		return
+	}
+	var input models.FileSaveInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	input.FileID = r.PathValue("fileID")
+	result, err := a.writer.SaveMarkdown(repo, plan, input)
+	respond(w, result, err)
+}
+
+func (a *API) savePlanMetadata(w http.ResponseWriter, r *http.Request) {
+	repo, plan, ok, err := a.repoAndPlan(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "plan not found")
+		return
+	}
+	var input models.PlanMetadataUpdateInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.writer.SaveMetadata(repo, plan, input)
+	respond(w, result, err)
+}
+
+func (a *API) updatePlanStatus(w http.ResponseWriter, r *http.Request) {
+	repo, plan, ok, err := a.repoAndPlan(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "plan not found")
+		return
+	}
+	var input models.PlanStatusUpdateInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.writer.UpdateStatus(repo, plan, input)
+	respond(w, result, err)
+}
+
+func (a *API) createPlan(w http.ResponseWriter, r *http.Request) {
+	var input models.NewPlanInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	repo, ok, err := a.repository(input.RepositoryID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "repository not found")
+		return
+	}
+	result, err := a.writer.CreatePlan(repo, input)
+	respond(w, result, err)
+}
+
+func (a *API) gitStatus(w http.ResponseWriter, r *http.Request) {
+	repo, ok, err := a.repository(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "repository not found")
+		return
+	}
+	status, err := a.git.Status(repo.ID, repo.Path)
+	respond(w, status, err)
+}
+
+func (a *API) gitFetch(w http.ResponseWriter, r *http.Request) {
+	a.gitOperation(w, r, func(repo models.RepositoryConfig, input models.GitOperationInput) error {
+		return a.git.Fetch(repo.Path)
+	})
+}
+
+func (a *API) gitPull(w http.ResponseWriter, r *http.Request) {
+	a.gitOperation(w, r, func(repo models.RepositoryConfig, input models.GitOperationInput) error {
+		status, err := a.git.Status(repo.ID, repo.Path)
+		if err != nil {
+			return err
+		}
+		if (status.Dirty || status.Conflicted) && !input.Confirm {
+			return fmt.Errorf("working tree has local changes; confirm to pull")
+		}
+		return a.git.Pull(repo.Path)
+	})
+}
+
+func (a *API) gitPush(w http.ResponseWriter, r *http.Request) {
+	a.gitOperation(w, r, func(repo models.RepositoryConfig, input models.GitOperationInput) error {
+		return a.git.Push(repo.Path)
+	})
+}
+
+func (a *API) gitCommit(w http.ResponseWriter, r *http.Request) {
+	repo, ok, err := a.repository(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "repository not found")
+		return
+	}
+	var input models.GitCommitInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := writeguard.ValidateCommitMessage(input.Message); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateGitPaths(repo, input.Paths); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	err = a.git.Commit(repo.Path, input.Message, input.Paths)
+	result := a.gitResult(repo, err)
+	status := http.StatusOK
+	if err != nil {
+		status = http.StatusBadRequest
+	}
+	writeJSON(w, status, result)
+}
+
+func (a *API) gitCreateBranch(w http.ResponseWriter, r *http.Request) {
+	repo, ok, err := a.repository(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "repository not found")
+		return
+	}
+	var input models.BranchCreateInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := writeguard.ValidateBranchName(input.Name); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	err = a.git.CreateBranch(repo.Path, input.Name, input.StartPoint, input.Checkout)
+	writeJSON(w, statusForError(err), a.gitResult(repo, err))
+}
+
+func (a *API) gitSwitchBranch(w http.ResponseWriter, r *http.Request) {
+	repo, ok, err := a.repository(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "repository not found")
+		return
+	}
+	var input models.BranchSwitchInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := writeguard.ValidateBranchName(input.Name); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	status, err := a.git.Status(repo.ID, repo.Path)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, a.gitResult(repo, err))
+		return
+	}
+	if (status.Dirty || status.Conflicted) && !input.Confirm {
+		err = fmt.Errorf("working tree has local changes; confirm to switch branches")
+		writeJSON(w, http.StatusBadRequest, a.gitResult(repo, err))
+		return
+	}
+	err = a.git.SwitchBranch(repo.Path, input.Name)
+	writeJSON(w, statusForError(err), a.gitResult(repo, err))
+}
+
+func (a *API) gitOperation(w http.ResponseWriter, r *http.Request, run func(models.RepositoryConfig, models.GitOperationInput) error) {
+	repo, ok, err := a.repository(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "repository not found")
+		return
+	}
+	var input models.GitOperationInput
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&input)
+	}
+	err = run(repo, input)
+	writeJSON(w, statusForError(err), a.gitResult(repo, err))
+}
+
 func (a *API) selectDirectory(w http.ResponseWriter, r *http.Request) {
 	path, err := a.dialog.SelectDirectory()
 	if err != nil {
@@ -287,6 +523,52 @@ func (a *API) repoAndPlan(planID string) (models.RepositoryConfig, models.PlanDe
 		plan.PlanRoot = fallbackPlanRoot(repo, plan)
 	}
 	return repo, plan, ok, err
+}
+
+func (a *API) repository(repositoryID string) (models.RepositoryConfig, bool, error) {
+	return a.registry.Get(repositoryID)
+}
+
+func (a *API) gitResult(repo models.RepositoryConfig, opErr error) models.GitOperationResult {
+	status, statusErr := a.git.Status(repo.ID, repo.Path)
+	if statusErr != nil && opErr == nil {
+		opErr = statusErr
+	}
+	result := models.GitOperationResult{OK: opErr == nil, Status: status}
+	if opErr != nil {
+		result.Message = opErr.Error()
+	}
+	return result
+}
+
+func validateGitPaths(repo models.RepositoryConfig, paths []string) error {
+	if len(paths) == 0 {
+		return fmt.Errorf("at least one path is required")
+	}
+	for _, path := range paths {
+		clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(path)))
+		if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "../") || clean == ".." {
+			return fmt.Errorf("path %q is invalid", path)
+		}
+		allowed := false
+		for _, dir := range repo.PlanDirectories {
+			if clean == dir || strings.HasPrefix(clean, dir+"/") {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return fmt.Errorf("path %q is outside configured plan directories", path)
+		}
+	}
+	return nil
+}
+
+func statusForError(err error) int {
+	if err != nil {
+		return http.StatusBadRequest
+	}
+	return http.StatusOK
 }
 
 func fallbackPlanRoot(repo models.RepositoryConfig, plan models.PlanDetail) string {

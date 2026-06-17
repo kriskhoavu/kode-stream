@@ -95,12 +95,12 @@ PM-002: Add safe plan write services
 
 **Deliverables:**
 
-- [ ] Extend Git adapter with status, fetch, pull, push, commit, branch create, and branch switch.
-- [ ] Add write guards for conflicts, dirty state, divergence, and selected path scope.
-- [ ] Add repository Git API endpoints.
-- [ ] Add plan file, metadata, status, and new plan API endpoints.
-- [ ] Return clear operation results with updated Git status.
-- [ ] Add tests for guarded operation behavior and API errors.
+- [x] Extend Git adapter with status, fetch, pull, push, commit, branch create, and branch switch.
+- [x] Add write guards for conflicts, dirty state, divergence, and selected path scope.
+- [x] Add repository Git API endpoints.
+- [x] Add plan file, metadata, status, and new plan API endpoints.
+- [x] Return clear operation results with updated Git status.
+- [x] Add tests for guarded operation behavior and API errors.
 
 **Verification:** `rtk go test ./...`
 

@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
+
+	"plan-manager/internal/models"
 )
 
 type GitAdapter struct {
@@ -97,6 +101,82 @@ func (g *GitAdapter) Diff(repoPath, relPath string) (string, error) {
 	return g.run(repoPath, "diff", "--", relPath)
 }
 
+func (g *GitAdapter) Status(repositoryID, repoPath string) (models.GitStatus, error) {
+	branch, _ := g.CurrentBranch(repoPath)
+	out, err := g.run(repoPath, "status", "--porcelain=v1", "-b")
+	if err != nil {
+		return models.GitStatus{}, err
+	}
+	status := models.GitStatus{RepositoryID: repositoryID, Branch: branch, Changes: []models.GitChange{}}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "## ") {
+			parseBranchLine(&status, strings.TrimPrefix(line, "## "))
+			continue
+		}
+		change := parseChangeLine(line)
+		if change.Path == "" {
+			continue
+		}
+		status.Changes = append(status.Changes, change)
+		if change.Conflict {
+			status.Conflicted = true
+		}
+		if change.Staged || change.Status == models.GitChangeModified || change.Status == models.GitChangeDeleted || change.Status == models.GitChangeUntracked {
+			status.Dirty = true
+		}
+	}
+	return status, nil
+}
+
+func (g *GitAdapter) Fetch(repoPath string) error {
+	_, err := g.run(repoPath, "fetch", "--all", "--prune")
+	return err
+}
+
+func (g *GitAdapter) Pull(repoPath string) error {
+	_, err := g.run(repoPath, "pull", "--ff-only")
+	return err
+}
+
+func (g *GitAdapter) Push(repoPath string) error {
+	_, err := g.run(repoPath, "push")
+	return err
+}
+
+func (g *GitAdapter) Commit(repoPath, message string, paths []string) error {
+	if len(paths) == 0 {
+		return fmt.Errorf("at least one path is required")
+	}
+	args := append([]string{"add", "--"}, paths...)
+	if _, err := g.run(repoPath, args...); err != nil {
+		return err
+	}
+	_, err := g.run(repoPath, "commit", "-m", message)
+	return err
+}
+
+func (g *GitAdapter) CreateBranch(repoPath, name, startPoint string, checkout bool) error {
+	args := []string{"branch", name}
+	if strings.TrimSpace(startPoint) != "" {
+		args = append(args, startPoint)
+	}
+	if _, err := g.run(repoPath, args...); err != nil {
+		return err
+	}
+	if checkout {
+		return g.SwitchBranch(repoPath, name)
+	}
+	return nil
+}
+
+func (g *GitAdapter) SwitchBranch(repoPath, name string) error {
+	_, err := g.run(repoPath, "switch", name)
+	return err
+}
+
 func (g *GitAdapter) run(dir string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), g.timeout)
 	defer cancel()
@@ -113,4 +193,74 @@ func (g *GitAdapter) run(dir string, args ...string) (string, error) {
 		return "", fmt.Errorf("%s", msg)
 	}
 	return stdout.String(), nil
+}
+
+func parseBranchLine(status *models.GitStatus, line string) {
+	branchPart := line
+	if before, after, ok := strings.Cut(line, "..."); ok {
+		branchPart = before
+		upstream := after
+		if beforeBracket, _, ok := strings.Cut(upstream, " ["); ok {
+			upstream = beforeBracket
+		}
+		status.Upstream = strings.TrimSpace(upstream)
+	}
+	if branchPart != "" && !strings.HasPrefix(branchPart, "HEAD ") {
+		status.Branch = strings.TrimSpace(branchPart)
+	}
+	if match := regexp.MustCompile(`ahead (\d+)`).FindStringSubmatch(line); len(match) == 2 {
+		status.Ahead, _ = strconv.Atoi(match[1])
+	}
+	if match := regexp.MustCompile(`behind (\d+)`).FindStringSubmatch(line); len(match) == 2 {
+		status.Behind, _ = strconv.Atoi(match[1])
+	}
+}
+
+func parseChangeLine(line string) models.GitChange {
+	if len(line) < 4 {
+		return models.GitChange{}
+	}
+	x, y := line[0], line[1]
+	path := strings.TrimSpace(line[3:])
+	change := models.GitChange{
+		Path:     path,
+		Status:   changeStatus(x, y),
+		Staged:   x != ' ' && x != '?',
+		Conflict: isConflict(x, y),
+	}
+	if strings.Contains(path, " -> ") {
+		oldPath, newPath, _ := strings.Cut(path, " -> ")
+		change.OldPath = strings.TrimSpace(oldPath)
+		change.Path = strings.TrimSpace(newPath)
+	}
+	if change.Conflict {
+		change.Status = models.GitChangeConflicted
+	}
+	return change
+}
+
+func changeStatus(x, y byte) models.GitChangeStatus {
+	if x == '?' && y == '?' {
+		return models.GitChangeUntracked
+	}
+	code := y
+	if code == ' ' {
+		code = x
+	}
+	switch code {
+	case 'A':
+		return models.GitChangeAdded
+	case 'D':
+		return models.GitChangeDeleted
+	case 'R':
+		return models.GitChangeRenamed
+	case 'C':
+		return models.GitChangeCopied
+	default:
+		return models.GitChangeModified
+	}
+}
+
+func isConflict(x, y byte) bool {
+	return x == 'U' || y == 'U' || (x == 'A' && y == 'A') || (x == 'D' && y == 'D') || (x == 'A' && y == 'D') || (x == 'D' && y == 'A')
 }
