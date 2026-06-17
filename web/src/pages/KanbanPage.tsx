@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Filter, LockKeyhole, RotateCw, Search, X } from 'lucide-react';
+import { ChevronDown, Filter, FolderGit2, GitBranch, KanbanSquare, LockKeyhole, RotateCw, Search, X } from 'lucide-react';
 import { api, statusLabels, statusOrder } from '../lib/api';
 import type { PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
@@ -101,12 +101,24 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
 
   return (
     <section className="kanban-page">
-      <div className="page-title">
-        <div>
-          <h1>{repository?.name ?? 'Kanban'}</h1>
-          <span>{repository ? `${repository.baselineBranch} workspace` : 'No workspace selected'}</span>
+      <div className="page-title kanban-title">
+        <div className="kanban-heading">
+          <span className="title-icon"><KanbanSquare size={18} /></span>
+          <div>
+            <h1>Kanban board</h1>
+            <span>{repository?.name ?? 'No workspace selected'}</span>
+          </div>
         </div>
-      </div>
+        {repository && (
+          <div className="workspace-context" aria-label="Workspace context">
+            <span><FolderGit2 size={14} /> {repository.name}</span>
+            <span><GitBranch size={14} /> {repository.baselineBranch}</span>
+            {repository.planDirectories.slice(0, 3).map((directory) => (
+              <span key={directory}>{directory}</span>
+            ))}
+          </div>
+        )}
+        </div>
       <div className="board-toolbar">
         <label className="filter-input plan-search">
           <Search size={15} />

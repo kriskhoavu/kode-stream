@@ -266,6 +266,54 @@ select {
   margin-bottom: 14px;
 }
 
+.kanban-title {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.kanban-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.title-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
+  color: var(--blue);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.workspace-context {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.workspace-context span {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 h1,
 h2,
 p {
@@ -1445,6 +1493,10 @@ body.is-resizing-panel {
   .repo-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .workspace-context {
+    justify-content: flex-start;
   }
 
   .board-toolbar {
