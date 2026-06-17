@@ -3,7 +3,7 @@
 ## Goals
 
 - Match the product proposal in `specs/design.png`.
-- Provide a fast Kanban board for plan browsing.
+- Provide a fast Kanban board for the active workspace.
 - Provide a read-only plan workspace.
 - Provide repository management for register, edit, delete, scan, browse, and reveal actions.
 - Support structured plans and freestyle docs roots.
@@ -34,7 +34,7 @@ App
   AppShell
     TopBar
     LeftNav
-    RepositoryContext
+    WorkspaceSelector
     MainContent
   KanbanPage
     BoardToolbar
@@ -89,7 +89,8 @@ App
   - Done
 - Use compact cards like the design.
 - Show title, repository or service, branch, author when known, tags, and updated time.
-- Use repository, branch, status, author, and text filters.
+- Scope the board to the active workspace selected from the left navigation.
+- Use branch, status, author, and text filters.
 - Allow multiple selected options in each filter group.
 - Match selected options as OR within a filter group and AND across filter groups.
 - Use searchable popovers for long option lists.
@@ -126,6 +127,8 @@ App
 ## Repository Behavior
 
 - Register repositories with one or more plan directories.
+- Treat each registered repository as a workspace.
+- Switch active workspace from the left navigation instead of mixing repositories on one board.
 - Support structured roots such as `plans` and docs roots such as `docs`.
 - Display selected plan directories as badges in the input area.
 - Provide quick-add directory chips for common roots such as `plans` and `docs`.

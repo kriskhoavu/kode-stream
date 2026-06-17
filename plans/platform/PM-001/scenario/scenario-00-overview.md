@@ -7,7 +7,7 @@
 | 0   | Empty app           | The app starts with no repositories registered                            |
 | 1   | Register repository | The developer registers this repository with one or more plan directories |
 | 2   | Scan content        | The app indexes structured plans and freestyle docs roots                 |
-| 3   | Browse board        | The developer views and filters plans grouped by Kanban status            |
+| 3   | Browse board        | The developer views one workspace grouped by Kanban status                |
 | 4   | Open workspace      | The developer opens a plan or docs root and reads its documents           |
 | 5   | Use mobile board    | The developer views the board on a narrow viewport                        |
 | 6   | Manage repository   | The developer edits or removes a registered repository                    |
@@ -62,6 +62,7 @@
 ## Expected Result
 
 - The repository appears in the repository list.
+- The repository appears as a workspace in the left navigation.
 - The app shows a manual Scan action.
 - Plan directories appear as badges in the repository form.
 - The user can reveal the local path in the platform file manager.
@@ -105,19 +106,20 @@
 ## Flow
 
 1. Developer opens Kanban.
-2. Frontend loads plan summaries.
+2. Frontend loads plan summaries for the active workspace.
 3. Frontend renders columns:
    - Ideas
    - Draft
    - In Progress
    - Review
    - Done
-4. Developer filters by repository, branch, status, and text.
+4. Developer filters by branch, status, author, and text.
 5. Developer selects multiple statuses or authors in one filter.
 
 ## Expected Result
 
 - Board layout follows `specs/design.png`.
+- The board does not mix plans from other registered repositories.
 - Cards show title, repository or service, branch, author when known, and updated time.
 - Filters update the visible cards without a full page reload.
 - Multiple selections in one filter are OR-matched.

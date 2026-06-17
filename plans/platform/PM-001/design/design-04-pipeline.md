@@ -48,18 +48,19 @@ The AI agent must run this flow during UI and integration phases.
    - `DI-202602` in `In Progress`.
    - `DI-170` in `Done`.
 10. Verify docs cards show the appropriate badge when a configured docs root has Markdown without plan structure.
-11. Filter by multiple repositories, statuses, authors, branches, and text.
-12. Verify selected options use OR matching within a facet and AND matching across facets.
-13. Verify filter menus show chevrons and close on outside click.
-14. Open `PM-001`.
-15. Verify file tree, raw Markdown, preview, metadata, and diff tabs.
-16. Verify file explorer and plan info panels collapse, expand, and resize smoothly.
-17. Capture desktop screenshot.
-18. Set mobile viewport.
-19. Verify mobile board follows `specs/design.png`.
-20. Capture mobile screenshot.
-21. Register a disposable repository entry and delete it.
-22. Verify deleted repository plans disappear from the board.
+11. Switch workspace from the left navigation.
+12. Filter by multiple statuses, authors, branches, and text.
+13. Verify selected options use OR matching within a facet and AND matching across facets.
+14. Verify filter menus show chevrons and close on outside click.
+15. Open `PM-001`.
+16. Verify file tree, raw Markdown, preview, metadata, and diff tabs.
+17. Verify file explorer and plan info panels collapse, expand, and resize smoothly.
+18. Capture desktop screenshot.
+19. Set mobile viewport.
+20. Verify mobile board follows `specs/design.png`.
+21. Capture mobile screenshot.
+22. Register a disposable repository entry and delete it.
+23. Verify deleted repository plans disappear from the board.
 
 ## Phase Gate
 

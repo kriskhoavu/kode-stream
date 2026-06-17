@@ -4,7 +4,7 @@
 
 Implement a local read-only Plan Manager app.
 
-The MVP registers local Git repositories, scans one or more configured plan or documentation roots, renders plans and docs on a Kanban board, and opens a read-only workspace for plan files. It follows `specs/requirement.md` for behavior and `specs/design.png` for the visual baseline.
+The MVP registers local Git repositories as workspaces, scans one or more configured plan or documentation roots, renders the active workspace on a Kanban board, and opens a read-only workspace for plan files. It follows `specs/requirement.md` for behavior and `specs/design.png` for the visual baseline.
 
 ## Terminology Lock
 
@@ -45,6 +45,7 @@ Avoid:
 - File reads must stay inside configured plan directories.
 - PM-001 must not expose Git or file write operations.
 - Repository create, edit, delete, path browse, and path reveal actions write only app registry or cache data, not managed repositories.
+- Kanban is scoped to one active repository/workspace selected from the left navigation.
 - Kanban filters are multi-select: options are OR-matched within a filter group and AND-matched across groups.
 - UI parity means matching the proposal layout, density, navigation, and mobile behavior. Pixel-perfect matching is not required.
 
@@ -136,7 +137,7 @@ PM-001: Add plan index and read APIs
 
 - [x] React/Vite app setup.
 - [x] API client types for repositories, plans, files, and scans.
-- [x] App shell with top bar, left nav, repository tabs, search, and theme toggle.
+- [x] App shell with top bar, left nav, workspace selector, scan status, and theme toggle.
 - [x] Repository registration screen.
 - [x] Repository edit and delete controls.
 - [x] Native path browse, reveal, and drag-and-drop path support.
@@ -159,7 +160,7 @@ PM-001: Add frontend shell and API client
 
 **Deliverables:**
 
-- [x] Scalable board toolbar with repository, branch, status, author, and text filters.
+- [x] Scalable board toolbar with branch, status, author, and text filters.
 - [x] Multi-select filter popovers with OR matching within each facet.
 - [x] Selected filter chips and clear actions.
 - [x] Filter chevrons and outside-click dismissal.

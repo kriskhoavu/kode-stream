@@ -3,21 +3,20 @@ import { ChevronDown, Filter, Plus, RotateCw, Search, X } from 'lucide-react';
 import { api, statusLabels, statusOrder } from '../lib/api';
 import type { PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
-type FilterKey = 'repositories' | 'statuses' | 'branches' | 'authors';
+type FilterKey = 'statuses' | 'branches' | 'authors';
 
 type Filters = Record<FilterKey, string[]>;
 
 type FacetOption = { value: string; label: string };
 
 const emptyFilters: Filters = {
-  repositories: [],
   statuses: [],
   branches: [],
   authors: []
 };
 
-export function KanbanPage({ repositories, onOpenPlan, onRepositoriesChanged }: {
-  repositories: RepositoryConfig[];
+export function KanbanPage({ repository, onOpenPlan, onRepositoriesChanged }: {
+  repository?: RepositoryConfig;
   onOpenPlan: (planId: string) => void;
   onRepositoriesChanged: () => void;
 }) {
@@ -31,18 +30,22 @@ export function KanbanPage({ repositories, onOpenPlan, onRepositoriesChanged }: 
   const text = query;
 
   useEffect(() => {
+    if (!repository) {
+      setPlans([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    api.plans(new URLSearchParams())
+    api.plans(new URLSearchParams({ repositoryId: repository.id }))
       .then(setPlans)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [repository]);
 
   const filteredPlans = useMemo(() => filterPlans(plans, filters, text), [plans, filters, text]);
   const branches = useMemo(() => unique(plans.map((plan) => plan.branch)), [plans]);
   const authors = useMemo(() => unique(plans.map((plan) => plan.author || plan.owner || 'Unknown')), [plans]);
   const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
-    { key: 'repositories', title: 'Repositories', options: repositories.map((repo) => ({ value: repo.id, label: repo.name })) },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
     { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
     { key: 'branches', title: 'Branches', options: branches.map((branch) => ({ value: branch, label: branch })) }
@@ -56,14 +59,13 @@ export function KanbanPage({ repositories, onOpenPlan, onRepositoriesChanged }: 
   }, [filteredPlans]);
 
   const scan = async () => {
-    const target = filters.repositories[0] || repositories[0]?.id;
-    if (!target) return;
+    if (!repository) return;
     setScanState('Scanning');
     try {
-      const result = await api.scan(target);
+      const result = await api.scan(repository.id);
       setScanState(`${result.planCount} plans indexed`);
       onRepositoriesChanged();
-      setPlans(await api.plans(new URLSearchParams()));
+      setPlans(await api.plans(new URLSearchParams({ repositoryId: repository.id })));
     } catch (err) {
       setScanState(err instanceof Error ? err.message : 'Scan failed');
     }
@@ -84,11 +86,11 @@ export function KanbanPage({ repositories, onOpenPlan, onRepositoriesChanged }: 
     setQuery('');
   };
 
-  if (repositories.length === 0 && !loading) {
+  if (!repository && !loading) {
     return (
       <section className="empty-state">
         <h1>Kanban</h1>
-        <p>Register a local Git repository to scan plan directories.</p>
+        <p>Register a local Git repository to create a workspace.</p>
       </section>
     );
   }
@@ -96,7 +98,10 @@ export function KanbanPage({ repositories, onOpenPlan, onRepositoriesChanged }: 
   return (
     <section className="kanban-page">
       <div className="page-title">
-        <h1>Kanban</h1>
+        <div>
+          <h1>{repository?.name ?? 'Kanban'}</h1>
+          <span>{repository ? `${repository.baselineBranch} workspace` : 'No workspace selected'}</span>
+        </div>
         <button className="primary" disabled>
           <Plus size={16} /> New Plan
         </button>
@@ -260,7 +265,6 @@ function PlanCard({ plan, onOpen }: { plan: PlanSummary; onOpen: () => void }) {
 export function filterPlans(plans: PlanSummary[], filters: Filters, text: string): PlanSummary[] {
   const query = text.trim().toLowerCase();
   return plans.filter((plan) => {
-    if (filters.repositories.length > 0 && !filters.repositories.includes(plan.repositoryId)) return false;
     if (filters.statuses.length > 0 && !filters.statuses.includes(plan.status)) return false;
     if (filters.branches.length > 0 && !filters.branches.includes(plan.branch)) return false;
     const author = plan.author || plan.owner || 'Unknown';

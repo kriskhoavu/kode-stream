@@ -73,9 +73,10 @@ button:disabled {
 }
 
 .brand,
-.repo-tab,
+.workspace-title,
 .theme-toggle,
 .nav-button,
+.workspace-button,
 .ghost,
 .secondary,
 .primary {
@@ -96,16 +97,25 @@ button:disabled {
   font-size: 17px;
 }
 
-.repo-tabs {
-  display: flex;
-  gap: 8px;
-  min-width: 0;
-}
-
-.repo-tab {
+.workspace-title {
   color: var(--nav-text);
   background: #142033;
   padding: 0 14px;
+  min-width: 0;
+  max-width: min(420px, 34vw);
+}
+
+.workspace-title span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .filter-input {
@@ -170,6 +180,47 @@ select {
 
 .nav-button.active {
   background: #1c293b;
+}
+
+.workspace-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #26364d;
+}
+
+.workspace-list-label {
+  color: #8fa2ba;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  padding: 0 4px;
+}
+
+.workspace-button {
+  justify-content: flex-start;
+  color: inherit;
+  background: transparent;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.workspace-button.active {
+  background: #1c293b;
+}
+
+.workspace-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-empty {
+  color: #b8c7dc;
+  font-size: 13px;
+  padding: 4px;
 }
 
 .repo-status {
@@ -1236,7 +1287,6 @@ body.is-resizing-panel {
   }
 
   .left-nav,
-  .repo-tabs,
   .sync-dot {
     display: none;
   }
@@ -1244,6 +1294,10 @@ body.is-resizing-panel {
   .topbar {
     padding: 0 12px;
     gap: 10px;
+  }
+
+  .workspace-title {
+    max-width: 34vw;
   }
 
   .main-content {
@@ -1331,8 +1385,14 @@ body.is-resizing-panel {
 
 @media (max-width: 640px) {
   .brand span,
+  .workspace-title span,
   .theme-toggle span {
     display: none;
+  }
+
+  .workspace-title {
+    max-width: none;
+    padding: 0 10px;
   }
 
   .page-title,

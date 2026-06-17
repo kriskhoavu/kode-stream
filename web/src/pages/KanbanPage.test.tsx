@@ -23,7 +23,7 @@ describe('KanbanPage', () => {
       ]
     }));
 
-    render(<KanbanPage repositories={[{ id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', planDirectories: ['plans'], createdAt: new Date().toISOString() }]} onOpenPlan={() => undefined} onRepositoriesChanged={() => undefined} />);
+    render(<KanbanPage repository={{ id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', planDirectories: ['plans'], createdAt: new Date().toISOString() }} onOpenPlan={() => undefined} onRepositoriesChanged={() => undefined} />);
 
     expect(screen.getByRole('heading', { name: 'Ideas' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Draft' })).toBeInTheDocument();
@@ -62,12 +62,12 @@ describe('filterPlans', () => {
   ];
 
   it('uses OR within a facet', () => {
-    const result = filterPlans(plans, { repositories: ['r1', 'r2'], statuses: [], branches: [], authors: [] }, '');
+    const result = filterPlans(plans, { statuses: [], branches: [], authors: [] }, '');
     expect(result.map((plan) => plan.id)).toEqual(['p1', 'p2']);
   });
 
   it('uses AND across facets', () => {
-    const result = filterPlans(plans, { repositories: ['r1', 'r2'], statuses: ['done'], branches: [], authors: ['Giang'] }, '');
+    const result = filterPlans(plans, { statuses: ['done'], branches: [], authors: ['Giang'] }, '');
     expect(result.map((plan) => plan.id)).toEqual(['p2']);
   });
 });
