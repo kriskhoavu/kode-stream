@@ -1,0 +1,38 @@
+schemaVersion: 1
+
+plan:
+  ticket: PM-002
+  title: Plan Editing And Git Operations
+  service: platform
+  status: draft
+  owner: null
+  tags:
+    - plan-manager
+    - local-app
+    - editing
+    - git
+  targetDate: null
+
+documents:
+  - id: overview
+    role: overview
+    path: README.md
+    label: Overview
+  - id: scenario-overview
+    role: scenario
+    path: scenario/scenario-00-overview.md
+    label: Scenario Overview
+  - id: design-backend
+    role: design
+    track: backend
+    path: design/design-01-backend.md
+    label: Backend Design
+  - id: design-frontend
+    role: design
+    track: frontend
+    path: design/design-02-frontend.md
+    label: Frontend Design
+  - id: implementation
+    role: implementation
+    path: implementation-plan.md
+    label: Implementation Plan
