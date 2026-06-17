@@ -4,7 +4,7 @@
 
 Implement a local read-only Plan Manager app.
 
-The MVP registers local Git repositories, scans one or more configured plan or documentation roots, renders structured plans and freestyle documentation collections on a Kanban board, and opens a read-only workspace for plan files. It follows `specs/requirement.md` for behavior and `specs/design.png` for the visual baseline.
+The MVP registers local Git repositories, scans one or more configured plan or documentation roots, renders plans and docs on a Kanban board, and opens a read-only workspace for plan files. It follows `specs/requirement.md` for behavior and `specs/design.png` for the visual baseline.
 
 ## Terminology Lock
 
@@ -20,8 +20,6 @@ All code, API fields, and UI labels must use:
 - `Plan Directory`
 - `Structured Plan Root`
 - `Freestyle Docs Root`
-- `Hybrid Plan`
-- `Documentation Collection`
 - `Scan`
 - `Workspace`
 
@@ -39,8 +37,8 @@ Avoid:
 - Manual Scan rebuilds derived metadata for one repository.
 - A repository can have multiple plan directories, such as `plans`, `docs`, or `docs/plans`.
 - A structured plan root uses the `service/ticket` folder shape and usually contains `plan.yaml`.
-- A hybrid plan is a structured plan folder that is missing `plan.yaml`; the app infers metadata from folders and Markdown.
-- A freestyle docs root is indexed as a documentation collection even when it has Markdown files but no plan folder structure.
+- A structured plan folder that is missing `plan.yaml` still appears as a normal plan card with inferred metadata.
+- A freestyle docs root is indexed as a docs item even when it has Markdown files but no plan folder structure.
 - A bad plan creates a scan warning and must not fail the whole scan.
 - Keep backend boundaries between `RepositoryRegistry`, `GitAdapter`, `PlanScanner`, `PlanIndex`, `FileAccess`, and `PlanAPI`.
 - HTTP handlers must not read arbitrary filesystem paths directly.
@@ -86,8 +84,8 @@ PM-001: Add local app skeleton and repository registry
 - [x] Multiple plan directories per repository.
 - [x] `plan.yaml` parser.
 - [x] Fallback parser for folder and README metadata.
-- [x] Hybrid plan discovery for structured folders without `plan.yaml`.
-- [x] Freestyle documentation collection discovery for docs roots.
+- [x] Fallback discovery for structured folders without `plan.yaml`.
+- [x] Freestyle docs discovery for docs roots.
 - [x] Status normalization.
 - [x] Scan result warnings.
 
@@ -115,7 +113,7 @@ PM-001: Add read-only plan scanner
 - [x] File content API.
 - [x] Read-only diff API.
 - [x] Repository cache deletion when a repository is removed.
-- [x] Empty documentation collection handling in detail APIs.
+- [x] Empty docs root handling in detail APIs.
 
 **Verification:** `go test ./...`
 
@@ -161,7 +159,7 @@ PM-001: Add frontend shell and API client
 
 **Deliverables:**
 
-- [x] Scalable board toolbar with repository, branch, status, author, metadata-source, and text filters.
+- [x] Scalable board toolbar with repository, branch, status, author, and text filters.
 - [x] Multi-select filter popovers with OR matching within each facet.
 - [x] Selected filter chips and clear actions.
 - [x] Filter chevrons and outside-click dismissal.
@@ -198,7 +196,7 @@ PM-001: Add read-only Kanban board
 - [x] Markdown preview tab.
 - [x] Metadata sidebar.
 - [x] Collapsible and resizable plan info panel.
-- [x] Hybrid plan and documentation collection metadata callouts.
+- [x] Docs root metadata callouts.
 - [x] Read-only diff tab.
 
 **Verification:** `npm run typecheck && npm test`

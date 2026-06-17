@@ -139,10 +139,10 @@ export function PlanWorkspacePage({ planId, onBack }: { planId: string; onBack: 
           </div>
           {!rightCollapsed && (
             <>
-              {(plan?.metadataSource === 'fallback' || plan?.metadataSource === 'docs') && (
+              {plan?.metadataSource === 'docs' && (
                 <div className="metadata-callout">
-                  <strong>{plan.metadataSource === 'docs' ? 'Documentation collection' : 'Hybrid docs'}</strong>
-                  <span>{plan.metadataSource === 'docs' ? 'This item is a freestyle documentation folder. It is browsable even though it does not use the plan service/ticket structure.' : 'This plan was discovered from folders and markdown files. `plan.yaml` is missing, so status and metadata are inferred or incomplete.'}</span>
+                  <strong>Docs</strong>
+                  <span>This item is a documentation folder. It is browsable even though it does not use the plan service/ticket structure.</span>
                 </div>
               )}
               <dl>
@@ -150,7 +150,7 @@ export function PlanWorkspacePage({ planId, onBack }: { planId: string; onBack: 
                 <dt>Service</dt><dd>{plan?.service}</dd>
                 <dt>Branch</dt><dd>{plan?.branch}</dd>
                 <dt>Status</dt><dd>{plan?.status}</dd>
-                <dt>Metadata</dt><dd>{metadataLabel(plan?.metadataSource)}</dd>
+                <dt>Source</dt><dd>{sourceLabel(plan?.metadataSource)}</dd>
                 <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
                 <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
               </dl>
@@ -225,8 +225,6 @@ function hasFile(nodes: FileNode[]): boolean {
   return firstFile(nodes) !== null;
 }
 
-function metadataLabel(source?: string): string {
-  if (source === 'docs') return 'Documentation collection';
-  if (source === 'fallback') return 'Hybrid docs';
-  return 'plan.yaml';
+function sourceLabel(source?: string): string {
+  return source === 'docs' ? 'Docs' : 'Plan';
 }

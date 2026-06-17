@@ -47,8 +47,8 @@ The AI agent must run this flow during UI and integration phases.
    - `PM-001` under `platform`.
    - `DI-202602` in `In Progress`.
    - `DI-170` in `Done`.
-10. Verify docs or hybrid cards show the appropriate badge when a configured root has Markdown without `plan.yaml`.
-11. Filter by multiple repositories, statuses, authors, branches, metadata sources, and text.
+10. Verify docs cards show the appropriate badge when a configured docs root has Markdown without plan structure.
+11. Filter by multiple repositories, statuses, authors, branches, and text.
 12. Verify selected options use OR matching within a facet and AND matching across facets.
 13. Verify filter menus show chevrons and close on outside click.
 14. Open `PM-001`.
@@ -87,4 +87,4 @@ The AI agent must run this flow during UI and integration phases.
 | Run Playwright MCP during development             | Layout and workflow regressions are easier to catch in the browser |
 | Keep release automation out of MVP implementation | The MVP first needs stable runtime behavior                        |
 | Require local binary smoke test                   | Embedded frontend serving must be verified, not assumed            |
-| Include docs and hybrid roots in acceptance       | PM-001 now supports plan-like and freestyle documentation roots    |
+| Include docs roots in acceptance                  | PM-001 now supports plan-like and freestyle documentation roots    |

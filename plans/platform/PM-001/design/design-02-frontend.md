@@ -6,7 +6,7 @@
 - Provide a fast Kanban board for plan browsing.
 - Provide a read-only plan workspace.
 - Provide repository management for register, edit, delete, scan, browse, and reveal actions.
-- Support structured plans, hybrid plans, and freestyle documentation collections.
+- Support structured plans and freestyle docs roots.
 - Support desktop and mobile layouts.
 - Keep all write actions disabled or hidden in v1.
 
@@ -66,18 +66,18 @@ App
 
 ## UI States
 
-| Area       | State           | Behavior                                                    |
-|------------|-----------------|-------------------------------------------------------------|
-| Board      | Loading         | Show stable column skeletons                                |
-| Board      | Empty           | Show empty-state action to add repository                   |
-| Board      | Loaded          | Show five columns and counts                                |
-| Board      | Filtered empty  | Keep filters visible and show no-results text               |
-| Workspace  | Loading         | Keep shell stable and load panels independently             |
-| Workspace  | File missing    | Show file-level error                                       |
-| Workspace  | Docs collection | Show docs metadata and an empty/file-focused reading state  |
-| Repository | Invalid         | Show validation errors from backend                         |
-| Repository | Editing         | Preserve current values and allow cancel/save               |
-| Repository | Delete confirm  | Require explicit delete confirmation before removing a repo |
+| Area       | State          | Behavior                                                    |
+|------------|----------------|-------------------------------------------------------------|
+| Board      | Loading        | Show stable column skeletons                                |
+| Board      | Empty          | Show empty-state action to add repository                   |
+| Board      | Loaded         | Show five columns and counts                                |
+| Board      | Filtered empty | Keep filters visible and show no-results text               |
+| Workspace  | Loading        | Keep shell stable and load panels independently             |
+| Workspace  | File missing   | Show file-level error                                       |
+| Workspace  | Docs root      | Show docs metadata and an empty/file-focused reading state  |
+| Repository | Invalid        | Show validation errors from backend                         |
+| Repository | Editing        | Preserve current values and allow cancel/save               |
+| Repository | Delete confirm | Require explicit delete confirmation before removing a repo |
 
 ## Board Behavior
 
@@ -89,7 +89,7 @@ App
   - Done
 - Use compact cards like the design.
 - Show title, repository or service, branch, author when known, tags, and updated time.
-- Use repository, branch, status, author, metadata-source, and text filters.
+- Use repository, branch, status, author, and text filters.
 - Allow multiple selected options in each filter group.
 - Match selected options as OR within a filter group and AND across filter groups.
 - Use searchable popovers for long option lists.
@@ -118,9 +118,8 @@ App
   - images with relative paths.
   - Mermaid blocks when supported.
 - Diff tab shows read-only added, changed, and deleted lines.
-- Hybrid plans show a metadata callout explaining that metadata was inferred.
-- Documentation collections show a docs-oriented metadata callout.
-- Empty documentation collections show an empty state instead of a blank page.
+- Docs roots show a docs-oriented metadata callout.
+- Empty docs roots show an empty state instead of a blank page.
 - Commit, pull, save, and new-plan actions are hidden or disabled in v1.
 - Load file content only when the user opens a file.
 

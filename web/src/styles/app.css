@@ -255,7 +255,7 @@ h1 {
 
 .board-toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto auto minmax(120px, auto);
+  grid-template-columns: auto auto minmax(120px, 1fr);
   gap: 12px;
   margin-bottom: 12px;
   align-items: center;
@@ -518,8 +518,8 @@ select {
   box-shadow: var(--shadow);
 }
 
-.plan-card.hybrid-plan {
-  border-color: color-mix(in srgb, var(--orange) 45%, var(--line));
+.plan-card.docs-plan {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
 }
 
 .plan-card-title {
@@ -540,11 +540,6 @@ select {
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
-}
-
-.metadata-badge.hybrid {
-  background: color-mix(in srgb, var(--orange) 14%, var(--panel));
-  color: var(--orange);
 }
 
 .metadata-badge.docs {

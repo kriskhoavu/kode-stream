@@ -3,7 +3,7 @@ import { ChevronDown, Filter, Plus, RotateCw, Search, X } from 'lucide-react';
 import { api, statusLabels, statusOrder } from '../lib/api';
 import type { PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
-type FilterKey = 'repositories' | 'statuses' | 'branches' | 'authors' | 'metadata';
+type FilterKey = 'repositories' | 'statuses' | 'branches' | 'authors';
 
 type Filters = Record<FilterKey, string[]>;
 
@@ -13,8 +13,7 @@ const emptyFilters: Filters = {
   repositories: [],
   statuses: [],
   branches: [],
-  authors: [],
-  metadata: []
+  authors: []
 };
 
 export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChanged }: {
@@ -24,13 +23,12 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
   onRepositoriesChanged: () => void;
 }) {
   const [filters, setFilters] = useState<Filters>(emptyFilters);
-  const [localQuery, setLocalQuery] = useState('');
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scanState, setScanState] = useState('');
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
-  const text = query || localQuery;
+  const text = query;
 
   useEffect(() => {
     setLoading(true);
@@ -43,15 +41,13 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
   const filteredPlans = useMemo(() => filterPlans(plans, filters, text), [plans, filters, text]);
   const branches = useMemo(() => unique(plans.map((plan) => plan.branch)), [plans]);
   const authors = useMemo(() => unique(plans.map((plan) => plan.author || plan.owner || 'Unknown')), [plans]);
-  const metadataTypes = useMemo(() => unique(plans.map((plan) => metadataLabel(plan.metadataSource))), [plans]);
   const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
     { key: 'repositories', title: 'Repositories', options: repositories.map((repo) => ({ value: repo.id, label: repo.name })) },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
     { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
-    { key: 'branches', title: 'Branches', options: branches.map((branch) => ({ value: branch, label: branch })) },
-    { key: 'metadata', title: 'Type', options: metadataTypes.map((type) => ({ value: type, label: type })) }
+    { key: 'branches', title: 'Branches', options: branches.map((branch) => ({ value: branch, label: branch })) }
   ];
-  const activeFilterCount = Object.values(filters).reduce((sum, values) => sum + values.length, 0) + (text ? 1 : 0);
+  const activeFilterCount = Object.values(filters).reduce((sum, values) => sum + values.length, 0);
   const grouped = useMemo(() => {
     const map = new Map<PlanStatus, PlanSummary[]>();
     statusOrder.forEach((item) => map.set(item, []));
@@ -85,7 +81,6 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
 
   const clearFilters = () => {
     setFilters(emptyFilters);
-    setLocalQuery('');
   };
 
   if (repositories.length === 0 && !loading) {
@@ -106,10 +101,6 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
         </button>
       </div>
       <div className="board-toolbar">
-        <label className="filter-input">
-          <Search size={15} />
-          <input value={localQuery} onChange={(event) => setLocalQuery(event.target.value)} placeholder="Filter plans..." />
-        </label>
         <button className="secondary" onClick={scan}>
           <RotateCw size={16} /> Scan
         </button>
@@ -242,13 +233,11 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
 }
 
 function PlanCard({ plan, onOpen }: { plan: PlanSummary; onOpen: () => void }) {
-  const hybrid = plan.metadataSource === 'fallback';
   const docs = plan.metadataSource === 'docs';
   return (
-    <button className={hybrid || docs ? 'plan-card hybrid-plan' : 'plan-card'} onClick={onOpen}>
+    <button className={docs ? 'plan-card docs-plan' : 'plan-card'} onClick={onOpen}>
       <div className="plan-card-title">
         <strong>{plan.title}</strong>
-        {hybrid && <span className="metadata-badge hybrid">Hybrid docs</span>}
         {docs && <span className="metadata-badge docs">Docs</span>}
       </div>
       <span>{plan.service} / {plan.branch}</span>
@@ -271,7 +260,6 @@ export function filterPlans(plans: PlanSummary[], filters: Filters, text: string
     if (filters.branches.length > 0 && !filters.branches.includes(plan.branch)) return false;
     const author = plan.author || plan.owner || 'Unknown';
     if (filters.authors.length > 0 && !filters.authors.includes(author)) return false;
-    if (filters.metadata.length > 0 && !filters.metadata.includes(metadataLabel(plan.metadataSource))) return false;
     if (query && !planSearchText(plan).includes(query)) return false;
     return true;
   });
@@ -290,12 +278,6 @@ function planSearchText(plan: PlanSummary): string {
     plan.metadataSource,
     ...plan.tags
   ].filter(Boolean).join(' ').toLowerCase();
-}
-
-function metadataLabel(source: string): string {
-  if (source === 'docs') return 'Docs';
-  if (source === 'fallback') return 'Hybrid docs';
-  return 'Plan metadata';
 }
 
 function unique(values: string[]): string[] {

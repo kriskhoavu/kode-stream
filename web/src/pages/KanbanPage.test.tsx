@@ -62,12 +62,12 @@ describe('filterPlans', () => {
   ];
 
   it('uses OR within a facet', () => {
-    const result = filterPlans(plans, { repositories: ['r1', 'r2'], statuses: [], branches: [], authors: [], metadata: [] }, '');
+    const result = filterPlans(plans, { repositories: ['r1', 'r2'], statuses: [], branches: [], authors: [] }, '');
     expect(result.map((plan) => plan.id)).toEqual(['p1', 'p2']);
   });
 
   it('uses AND across facets', () => {
-    const result = filterPlans(plans, { repositories: ['r1', 'r2'], statuses: ['done'], branches: [], authors: ['Giang'], metadata: ['Docs'] }, '');
+    const result = filterPlans(plans, { repositories: ['r1', 'r2'], statuses: ['done'], branches: [], authors: ['Giang'] }, '');
     expect(result.map((plan) => plan.id)).toEqual(['p2']);
   });
 });

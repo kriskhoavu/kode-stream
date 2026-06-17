@@ -2,15 +2,15 @@
 
 ## Scenario List
 
-| #   | Title               | Description                                                                    |
-|-----|---------------------|--------------------------------------------------------------------------------|
-| 0   | Empty app           | The app starts with no repositories registered                                 |
-| 1   | Register repository | The developer registers this repository with one or more plan directories      |
-| 2   | Scan content        | The app indexes structured plans, hybrid plans, and freestyle docs roots       |
-| 3   | Browse board        | The developer views and filters plans grouped by Kanban status                 |
-| 4   | Open workspace      | The developer opens a plan or documentation collection and reads its documents |
-| 5   | Use mobile board    | The developer views the board on a narrow viewport                             |
-| 6   | Manage repository   | The developer edits or removes a registered repository                         |
+| #   | Title               | Description                                                               |
+|-----|---------------------|---------------------------------------------------------------------------|
+| 0   | Empty app           | The app starts with no repositories registered                            |
+| 1   | Register repository | The developer registers this repository with one or more plan directories |
+| 2   | Scan content        | The app indexes structured plans and freestyle docs roots                 |
+| 3   | Browse board        | The developer views and filters plans grouped by Kanban status            |
+| 4   | Open workspace      | The developer opens a plan or docs root and reads its documents           |
+| 5   | Use mobile board    | The developer views the board on a narrow viewport                        |
+| 6   | Manage repository   | The developer edits or removes a registered repository                    |
 
 ---
 
@@ -77,8 +77,8 @@
 2. Backend reads local Git metadata.
 3. Backend scans configured plan directories.
 4. Backend parses `plan.yaml` when present.
-5. Backend creates hybrid plans when structured folders are missing `plan.yaml`.
-6. Backend creates documentation collections when a docs root contains Markdown without plan structure.
+5. Backend creates normal plan cards with inferred metadata when structured folders are missing `plan.yaml`.
+6. Backend creates docs cards when a docs root contains Markdown without plan structure.
 7. Backend writes only to the Plan Manager app cache.
 
 ## Expected Result
@@ -87,8 +87,8 @@
 - `PM-001` appears under `platform`.
 - `DI-202602` and `DI-430` appear in `In Progress`.
 - Completed plans appear in `Done`.
-- Docs roots appear as documentation collections when configured.
-- Hybrid plans show inferred metadata.
+- Docs roots appear as docs cards when configured.
+- Plans without `plan.yaml` appear as normal plan cards.
 - Unknown statuses map to `Draft`.
 
 ## Edge Cases
@@ -147,7 +147,7 @@
 - File tree rows use directory and file icons.
 - File tree sorting is directory-first and natural alphabetical.
 - Markdown tables, checklists, images, and Mermaid blocks render in preview.
-- Hybrid plans and documentation collections show the appropriate metadata badge or callout.
+- Docs roots show the appropriate metadata badge or callout.
 - Raw Markdown is read-only in v1.
 - Commit, pull, save, and new-plan actions are hidden or disabled in v1.
 - The design stays close to the workspace section in `specs/design.png`.

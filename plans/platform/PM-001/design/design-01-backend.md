@@ -103,7 +103,7 @@
   - ticket from the plan folder name.
   - title from the first README heading.
   - status from implementation-plan status text when possible.
-- If a configured root contains Markdown but does not match the structured plan shape, index it as a documentation collection.
+- If a configured root contains Markdown but does not match the structured plan shape, index it as a docs item.
 - Documentation collections use `metadataSource: docs`, a docs-oriented display type, and inferred title/description from Markdown headings.
 - Map missing or unknown status to `draft`.
 - Store scan warnings and expose them in scan results.
