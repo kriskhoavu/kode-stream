@@ -1,6 +1,8 @@
 package fileaccess
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,40 +33,40 @@ func (a *Access) Read(repo models.RepositoryConfig, plan models.PlanDetail, file
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	relPath := ""
-	for _, node := range flattenTreeMust(a.Tree(repo, plan)) {
-		if node.ID == fileID {
-			relPath = node.Path
-			break
-		}
-	}
-	if relPath == "" {
-		for _, doc := range plan.Documents {
-			if fileIDForPath(doc.Path) == fileID {
-				relPath = doc.Path
-				break
-			}
-		}
-	}
-	if relPath == "" {
-		return models.FileContent{}, fmt.Errorf("file not found")
-	}
-	full, err := safeJoin(root, relPath)
+	relPath, full, err := a.resolveFile(repo, plan, root, fileID)
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	realFile, err := filepath.EvalSymlinks(full)
+	data, err := os.ReadFile(full)
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	if realFile != root && !strings.HasPrefix(realFile, root+string(filepath.Separator)) {
-		return models.FileContent{}, fmt.Errorf("file path escapes plan root")
-	}
-	data, err := os.ReadFile(realFile)
+	return fileContent(relPath, data), nil
+}
+
+func (a *Access) WriteMarkdown(repo models.RepositoryConfig, plan models.PlanDetail, input models.FileSaveInput) (models.FileContent, error) {
+	root, err := a.safePlanRoot(repo, plan)
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	return models.FileContent{ID: fileIDForPath(relPath), Path: relPath, Content: string(data), Language: language(relPath)}, nil
+	relPath, full, err := a.resolveFile(repo, plan, root, input.FileID)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	if language(relPath) != "markdown" {
+		return models.FileContent{}, fmt.Errorf("only Markdown files can be edited")
+	}
+	current, err := os.ReadFile(full)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	if input.ExpectedHash != "" && input.ExpectedHash != contentHash(current) {
+		return models.FileContent{}, fmt.Errorf("file content changed since it was loaded")
+	}
+	if err := os.WriteFile(full, []byte(input.Content), 0o644); err != nil {
+		return models.FileContent{}, err
+	}
+	return fileContent(relPath, []byte(input.Content)), nil
 }
 
 func (a *Access) safePlanRoot(repo models.RepositoryConfig, plan models.PlanDetail) (string, error) {
@@ -91,6 +93,39 @@ func (a *Access) safePlanRoot(repo models.RepositoryConfig, plan models.PlanDeta
 		return "", fmt.Errorf("plan path is outside configured plan directories")
 	}
 	return realRoot, nil
+}
+
+func (a *Access) resolveFile(repo models.RepositoryConfig, plan models.PlanDetail, root, fileID string) (string, string, error) {
+	relPath := ""
+	for _, node := range flattenTreeMust(a.Tree(repo, plan)) {
+		if node.ID == fileID {
+			relPath = node.Path
+			break
+		}
+	}
+	if relPath == "" {
+		for _, doc := range plan.Documents {
+			if fileIDForPath(doc.Path) == fileID {
+				relPath = doc.Path
+				break
+			}
+		}
+	}
+	if relPath == "" {
+		return "", "", fmt.Errorf("file not found")
+	}
+	full, err := safeJoin(root, relPath)
+	if err != nil {
+		return "", "", err
+	}
+	realFile, err := filepath.EvalSymlinks(full)
+	if err != nil {
+		return "", "", err
+	}
+	if realFile != root && !strings.HasPrefix(realFile, root+string(filepath.Separator)) {
+		return "", "", fmt.Errorf("file path escapes plan root")
+	}
+	return relPath, realFile, nil
 }
 
 func safeJoin(root, rel string) (string, error) {
@@ -213,4 +248,19 @@ func language(path string) string {
 	default:
 		return "text"
 	}
+}
+
+func fileContent(relPath string, data []byte) models.FileContent {
+	return models.FileContent{
+		ID:       fileIDForPath(relPath),
+		Path:     relPath,
+		Content:  string(data),
+		Language: language(relPath),
+		Hash:     contentHash(data),
+	}
+}
+
+func contentHash(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }

@@ -33,6 +33,49 @@ func TestReadStaysInsidePlanDirectory(t *testing.T) {
 	if content.Content != "# PM-001" {
 		t.Fatalf("content = %q", content.Content)
 	}
+	if content.Hash == "" {
+		t.Fatal("expected content hash")
+	}
+}
+
+func TestWriteMarkdownRejectsStaleHash(t *testing.T) {
+	root := t.TempDir()
+	planRoot := filepath.Join(root, "plans", "platform", "PM-001")
+	if err := os.MkdirAll(planRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(planRoot, "README.md"), []byte("# PM-001"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	access := New()
+	repo := models.RepositoryConfig{Path: root, PlanDirectories: []string{"plans"}}
+	plan := models.PlanDetail{PlanSummary: models.PlanSummary{PlanRoot: "plans/platform/PM-001"}}
+	if _, err := access.WriteMarkdown(repo, plan, models.FileSaveInput{FileID: "README_md", Content: "changed", ExpectedHash: "stale"}); err == nil {
+		t.Fatal("expected stale hash to be rejected")
+	}
+}
+
+func TestWriteMarkdownRejectsSymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	planRoot := filepath.Join(root, "plans", "platform", "PM-001")
+	if err := os.MkdirAll(planRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(root, "secret.md")
+	if err := os.WriteFile(outside, []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(planRoot, "escape.md")); err != nil {
+		t.Skipf("symlink not available: %v", err)
+	}
+
+	access := New()
+	repo := models.RepositoryConfig{Path: root, PlanDirectories: []string{"plans"}}
+	plan := models.PlanDetail{PlanSummary: models.PlanSummary{PlanRoot: "plans/platform/PM-001"}}
+	if _, err := access.WriteMarkdown(repo, plan, models.FileSaveInput{FileID: "escape_md", Content: "changed"}); err == nil {
+		t.Fatal("expected symlink escape to be rejected")
+	}
 }
 
 func TestTreeSortsDirectoriesFirstWithNaturalNames(t *testing.T) {

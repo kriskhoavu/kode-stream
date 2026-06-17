@@ -82,6 +82,7 @@ type FileContent struct {
 	Path     string `json:"path" yaml:"path"`
 	Content  string `json:"content" yaml:"content"`
 	Language string `json:"language" yaml:"language"`
+	Hash     string `json:"hash" yaml:"hash"`
 }
 
 type ScanWarning struct {

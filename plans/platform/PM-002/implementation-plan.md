@@ -70,13 +70,13 @@ PM-002: Add write-safe models
 
 **Deliverables:**
 
-- [ ] Add safe file writer that resolves file IDs through the plan file tree or document list.
-- [ ] Add Markdown file save with expected hash support.
-- [ ] Add metadata writer for `plan.yaml`.
-- [ ] Add status update writer for Kanban moves.
-- [ ] Add structured plan creator with starter `README.md`, scenario folder, design folder, implementation plan, and `plan.yaml`.
-- [ ] Rescan the affected repository after successful writes.
-- [ ] Add tests for path traversal, symlink escape, docs root behavior, metadata creation, and duplicate plan creation.
+- [x] Add safe file writer that resolves file IDs through the plan file tree or document list.
+- [x] Add Markdown file save with expected hash support.
+- [x] Add metadata writer for `plan.yaml`.
+- [x] Add status update writer for Kanban moves.
+- [x] Add structured plan creator with starter `README.md`, scenario folder, design folder, implementation plan, and `plan.yaml`.
+- [x] Rescan the affected repository after successful writes.
+- [x] Add tests for path traversal, symlink escape, docs root behavior, metadata creation, and duplicate plan creation.
 
 **Verification:** `rtk go test ./...`
 
