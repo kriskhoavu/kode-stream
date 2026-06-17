@@ -370,7 +370,11 @@ func (a *API) gitPull(w http.ResponseWriter, r *http.Request) {
 		if (status.Dirty || status.Conflicted) && !input.Confirm {
 			return fmt.Errorf("working tree has local changes; confirm to pull")
 		}
-		return a.git.Pull(repo.Path)
+		if err := a.git.Pull(repo.Path); err != nil {
+			return err
+		}
+		_, err = a.writer.RefreshRepository(repo)
+		return err
 	})
 }
 
@@ -404,6 +408,9 @@ func (a *API) gitCommit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = a.git.Commit(repo.Path, input.Message, input.Paths)
+	if err == nil {
+		_, err = a.writer.RefreshRepository(repo)
+	}
 	result := a.gitResult(repo, err)
 	status := http.StatusOK
 	if err != nil {
@@ -432,6 +439,9 @@ func (a *API) gitCreateBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = a.git.CreateBranch(repo.Path, input.Name, input.StartPoint, input.Checkout)
+	if err == nil && input.Checkout {
+		_, err = a.writer.RefreshRepository(repo)
+	}
 	writeJSON(w, statusForError(err), a.gitResult(repo, err))
 }
 
@@ -465,6 +475,9 @@ func (a *API) gitSwitchBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = a.git.SwitchBranch(repo.Path, input.Name)
+	if err == nil {
+		_, err = a.writer.RefreshRepository(repo)
+	}
 	writeJSON(w, statusForError(err), a.gitResult(repo, err))
 }
 

@@ -2,12 +2,16 @@ package planwriter
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"plan-manager/internal/fileaccess"
+	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/models"
+	"plan-manager/internal/planindex"
+	"plan-manager/internal/scanner"
 )
 
 func TestSaveMetadataCreatesPlanYAML(t *testing.T) {
@@ -98,6 +102,40 @@ func TestCreatePlanWritesStarterFiles(t *testing.T) {
 	}
 }
 
+func TestSaveMetadataRefreshesIndex(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	planRoot := filepath.Join(root, "plans", "platform", "PM-002")
+	writeFile(t, planRoot, "README.md", "# PM-002\n\nEdit plans.\n")
+
+	git := gitadapter.New()
+	idx := planindex.New(filepath.Join(t.TempDir(), "index.yaml"))
+	writer := New(fileaccess.New(), scanner.New(git), idx, nil)
+	repo := models.RepositoryConfig{ID: "repo-1", Name: "repo", Path: root, BaselineBranch: "main", PlanDirectories: []string{"plans"}}
+	plan := models.PlanDetail{PlanSummary: models.PlanSummary{
+		RepositoryID: repo.ID,
+		PlanRoot:     "plans/platform/PM-002",
+		Service:      "platform",
+		Ticket:       "PM-002",
+		Title:        "Plan Editing",
+		Status:       models.StatusDraft,
+	}}
+
+	if _, err := writer.SaveMetadata(repo, plan, models.PlanMetadataUpdateInput{Status: models.StatusDone}); err != nil {
+		t.Fatal(err)
+	}
+	plans, err := idx.Query(planindex.Query{RepositoryID: repo.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plans) != 1 {
+		t.Fatalf("plans = %d, want 1", len(plans))
+	}
+	if plans[0].Status != models.StatusDone {
+		t.Fatalf("status = %q, want done", plans[0].Status)
+	}
+}
+
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(rel))
@@ -106,5 +144,14 @@ func writeFile(t *testing.T, root, rel, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func initGitRepo(t *testing.T, root string) {
+	t.Helper()
+	cmd := exec.Command("git", "init")
+	cmd.Dir = root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init failed: %v\n%s", err, out)
 	}
 }

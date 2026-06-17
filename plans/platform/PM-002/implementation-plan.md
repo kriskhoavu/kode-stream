@@ -119,11 +119,11 @@ PM-002: Add guarded Git APIs
 
 **Deliverables:**
 
-- [ ] Ensure successful writes update the plan index and app state version.
-- [ ] Ensure Git content changes rescan the affected repository.
-- [ ] Ensure failed writes do not mutate the index.
-- [ ] Keep PM-001 read APIs stable.
-- [ ] Add tests for app state version changes after writes.
+- [x] Ensure successful writes update the plan index and app state version.
+- [x] Ensure Git content changes rescan the affected repository.
+- [x] Ensure failed writes do not mutate the index.
+- [x] Keep PM-001 read APIs stable.
+- [x] Add tests for app state version changes after writes.
 
 **Verification:** `rtk go test ./...`
 

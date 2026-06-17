@@ -138,27 +138,48 @@ func (w *Writer) CreatePlan(repo models.RepositoryConfig, input models.NewPlanIn
 	return w.refresh(repo, planRoot)
 }
 
+func (w *Writer) RefreshRepository(repo models.RepositoryConfig) (models.ScanResult, error) {
+	scannedAt := time.Now().UTC()
+	if w.scanner == nil || w.index == nil {
+		return models.ScanResult{RepositoryID: repo.ID, ScannedAt: scannedAt}, nil
+	}
+	data, err := w.scanner.Scan(repo)
+	if err != nil {
+		return models.ScanResult{}, err
+	}
+	if err := w.index.ReplaceRepository(repo.ID, data.Plans, data.Warnings, scannedAt); err != nil {
+		return models.ScanResult{}, err
+	}
+	if w.registry != nil {
+		_ = w.registry.TouchScanned(repo.ID, scannedAt)
+	}
+	return models.ScanResult{
+		RepositoryID: repo.ID,
+		ScannedAt:    scannedAt,
+		PlanCount:    len(data.Plans),
+		Warnings:     data.Warnings,
+	}, nil
+}
+
 func (w *Writer) refresh(repo models.RepositoryConfig, planRoot string) (models.WriteResult, error) {
 	scannedAt := time.Now().UTC()
 	if w.scanner == nil || w.index == nil {
 		return models.WriteResult{ScannedAt: scannedAt}, nil
 	}
+	scanResult, err := w.RefreshRepository(repo)
+	if err != nil {
+		return models.WriteResult{}, err
+	}
 	data, err := w.scanner.Scan(repo)
 	if err != nil {
 		return models.WriteResult{}, err
 	}
-	if err := w.index.ReplaceRepository(repo.ID, data.Plans, data.Warnings, scannedAt); err != nil {
-		return models.WriteResult{}, err
-	}
-	if w.registry != nil {
-		_ = w.registry.TouchScanned(repo.ID, scannedAt)
-	}
 	for _, plan := range data.Plans {
 		if plan.PlanRoot == planRoot {
-			return models.WriteResult{Plan: plan, ScannedAt: scannedAt}, nil
+			return models.WriteResult{Plan: plan, ScannedAt: scanResult.ScannedAt}, nil
 		}
 	}
-	return models.WriteResult{ScannedAt: scannedAt}, nil
+	return models.WriteResult{ScannedAt: scanResult.ScannedAt}, nil
 }
 
 type planYAML struct {
