@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Filter, FolderGit2, GitBranch, KanbanSquare, LockKeyhole, RotateCw, Search, X } from 'lucide-react';
+import { ChevronDown, Filter, FolderGit2, KanbanSquare, LockKeyhole, RotateCw, Search, X } from 'lucide-react';
 import { api, statusLabels, statusOrder } from '../lib/api';
 import type { PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
@@ -108,10 +108,8 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
             <span><FolderGit2 size={15} /> {repository?.name ?? 'No workspace selected'}</span>
           </div>
         </div>
-        {repository && (
-          <div className="workspace-context" aria-label="Workspace context">
-            <span><FolderGit2 size={14} /> {repository.name}</span>
-            <span><GitBranch size={14} /> {repository.baselineBranch}</span>
+        {repository && repository.planDirectories.length > 0 && (
+          <div className="workspace-context" aria-label="Plan sources">
             {repository.planDirectories.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
             ))}
