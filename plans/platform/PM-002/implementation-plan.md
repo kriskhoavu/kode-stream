@@ -189,14 +189,14 @@ PM-002: Add edit and Git state handling
 
 **Deliverables:**
 
-- [ ] Add Markdown editor mode to the workspace raw tab.
-- [ ] Keep preview rendering the current editor content.
-- [ ] Add metadata editor for structured plans.
-- [ ] Add Kanban status move controls.
-- [ ] Add new plan dialog.
-- [ ] Add Git status panel with changed-file selection and commit form.
-- [ ] Add fetch, pull, push, branch create, and branch switch controls.
-- [ ] Add confirmation dialogs for risky operations.
+- [x] Add Markdown editor mode to the workspace raw tab.
+- [x] Keep preview rendering the current editor content.
+- [x] Add metadata editor for structured plans.
+- [x] Add Kanban status move controls.
+- [x] Add new plan dialog.
+- [x] Add Git status panel with changed-file selection and commit form.
+- [x] Add fetch, pull, push, branch create, and branch switch controls.
+- [x] Add confirmation dialogs for risky operations.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

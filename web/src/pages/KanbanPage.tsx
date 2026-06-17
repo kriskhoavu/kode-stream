@@ -34,6 +34,10 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
   const [scanState, setScanState] = useState('');
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
   const [drawerPlanId, setDrawerPlanId] = useState('');
+  const [newPlanOpen, setNewPlanOpen] = useState(false);
+  const [newPlanDraft, setNewPlanDraft] = useState({ planDirectory: '', service: '', ticket: '', title: '', status: 'draft' as PlanStatus });
+  const [newPlanError, setNewPlanError] = useState('');
+  const [creatingPlan, setCreatingPlan] = useState(false);
   const text = query;
 
   useEffect(() => {
@@ -77,6 +81,47 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
       setPlans(await api.plans(new URLSearchParams({ repositoryId: repository.id })));
     } catch (err) {
       setScanState(err instanceof Error ? err.message : 'Scan failed');
+    }
+  };
+
+  const reloadPlans = async () => {
+    if (!repository) return;
+    setPlans(await api.plans(new URLSearchParams({ repositoryId: repository.id })));
+  };
+
+  const movePlan = async (planId: string, status: PlanStatus) => {
+    try {
+      await api.updateStatus(planId, { status });
+      await onRepositoriesChanged();
+      await reloadPlans();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Status update failed');
+    }
+  };
+
+  const createPlan = async () => {
+    if (!repository) return;
+    setCreatingPlan(true);
+    setNewPlanError('');
+    try {
+      const planDirectory = newPlanDraft.planDirectory || repository.planDirectories[0] || 'plans';
+      const result = await api.createPlan({
+        repositoryId: repository.id,
+        planDirectory,
+        service: newPlanDraft.service.trim(),
+        ticket: newPlanDraft.ticket.trim(),
+        title: newPlanDraft.title.trim(),
+        status: newPlanDraft.status
+      });
+      setNewPlanOpen(false);
+      setNewPlanDraft({ planDirectory: '', service: '', ticket: '', title: '', status: 'draft' });
+      await onRepositoriesChanged();
+      await reloadPlans();
+      onOpenPlan(result.plan.id);
+    } catch (err) {
+      setNewPlanError(err instanceof Error ? err.message : 'Plan creation failed');
+    } finally {
+      setCreatingPlan(false);
     }
   };
 
@@ -129,6 +174,9 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
         <button className="secondary" onClick={scan}>
           <RotateCw size={16} /> Scan
         </button>
+        <button className="primary" onClick={() => setNewPlanOpen(true)}>
+          + New Plan
+        </button>
         <button className="secondary" onClick={clearFilters} disabled={activeFilterCount === 0}>
           <X size={16} /> Clear
         </button>
@@ -172,10 +220,15 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
                   repository={repository}
                   onPreview={() => setDrawerPlanId(plan.id)}
                   onOpen={() => onOpenPlan(plan.id)}
+                  onMove={(status) => movePlan(plan.id, status)}
                 />
               ))}
               {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No plans</div>}
             </div>
+            <button className="new-plan-column-button" type="button" onClick={() => {
+              setNewPlanDraft((draft) => ({ ...draft, status: column, planDirectory: repository?.planDirectories[0] ?? '' }));
+              setNewPlanOpen(true);
+            }}>+ New plan</button>
           </div>
         ))}
       </div>
@@ -186,6 +239,32 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
           onClose={() => setDrawerPlanId('')}
           onOpenFull={() => onOpenPlan(drawerPlanId)}
         />
+      )}
+      {newPlanOpen && repository && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Create new plan">
+            <header>
+              <h2>New plan</h2>
+              <button type="button" className="icon-button" onClick={() => setNewPlanOpen(false)}><X size={16} /></button>
+            </header>
+            <div className="metadata-form">
+              <label>Source<select value={newPlanDraft.planDirectory || repository.planDirectories[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, planDirectory: event.target.value }))}>
+                {repository.planDirectories.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
+              </select></label>
+              <label>Service<input value={newPlanDraft.service} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, service: event.target.value }))} placeholder="platform" /></label>
+              <label>Ticket<input value={newPlanDraft.ticket} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, ticket: event.target.value }))} placeholder="PM-003" /></label>
+              <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Plan title" /></label>
+              <label>Status<select value={newPlanDraft.status} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, status: event.target.value as PlanStatus }))}>
+                {statusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
+              </select></label>
+            </div>
+            {newPlanError && <p className="error">{newPlanError}</p>}
+            <footer className="modal-actions">
+              <button type="button" className="ghost" onClick={() => setNewPlanOpen(false)}>Cancel</button>
+              <button type="button" className="primary" disabled={creatingPlan || !newPlanDraft.service || !newPlanDraft.ticket} onClick={createPlan}>{creatingPlan ? 'Creating...' : 'Create Plan'}</button>
+            </footer>
+          </section>
+        </div>
       )}
     </section>
   );
@@ -273,7 +352,7 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
   );
 }
 
-function PlanCard({ plan, repository, onPreview, onOpen }: { plan: PlanSummary; repository?: RepositoryConfig; onPreview: () => void; onOpen: () => void }) {
+function PlanCard({ plan, repository, onPreview, onOpen, onMove }: { plan: PlanSummary; repository?: RepositoryConfig; onPreview: () => void; onOpen: () => void; onMove: (status: PlanStatus) => void }) {
   const source = sourceLabel(plan, repository);
   const docs = source === 'docs';
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
@@ -300,6 +379,9 @@ function PlanCard({ plan, repository, onPreview, onOpen }: { plan: PlanSummary; 
         <time>{plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : 'No date'}</time>
       </footer>
       {plan.tags.length > 0 && <div className="tags">{plan.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}</div>}
+      <select className="status-move-select" value={plan.status} onClick={(event) => event.stopPropagation()} onChange={(event) => onMove(event.target.value as PlanStatus)} aria-label="Move plan status">
+        {statusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
+      </select>
     </article>
   );
 }

@@ -33,6 +33,10 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitLoading, setGitLoading] = useState(false);
+  const [gitMessage, setGitMessage] = useState('');
+  const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
+  const [branchName, setBranchName] = useState('');
+  const [gitBusy, setGitBusy] = useState('');
   const [diff, setDiff] = useState('');
   const [tab, setTab] = useState<Tab>('preview');
   const [error, setError] = useState('');
@@ -141,6 +145,66 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     } finally {
       setGitLoading(false);
     }
+  };
+
+  const runGitOperation = async (operation: 'fetch' | 'pull' | 'push') => {
+    if (!plan) return;
+    setGitBusy(operation);
+    setError('');
+    try {
+      const confirm = operation === 'pull' && Boolean(gitStatus?.dirty);
+      const result = operation === 'fetch'
+        ? await api.gitFetch(plan.repositoryId)
+        : operation === 'pull'
+          ? await api.gitPull(plan.repositoryId, { confirm })
+          : await api.gitPush(plan.repositoryId);
+      setGitStatus(result.status);
+      if (operation === 'pull') await onContentChanged?.();
+      if (!result.ok && result.message) setError(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `${operation} failed`);
+    } finally {
+      setGitBusy('');
+    }
+  };
+
+  const commitSelectedPaths = async () => {
+    if (!plan) return;
+    setGitBusy('commit');
+    setError('');
+    try {
+      const result = await api.gitCommit(plan.repositoryId, { message: gitMessage, paths: selectedGitPaths });
+      setGitStatus(result.status);
+      setGitMessage('');
+      setSelectedGitPaths([]);
+      await onContentChanged?.();
+      if (!result.ok && result.message) setError(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Commit failed');
+    } finally {
+      setGitBusy('');
+    }
+  };
+
+  const createAndSwitchBranch = async () => {
+    if (!plan || !branchName.trim()) return;
+    setGitBusy('branch');
+    setError('');
+    try {
+      const result = await api.createBranch(plan.repositoryId, { name: branchName.trim(), checkout: true });
+      setGitStatus(result.status);
+      setBranchName('');
+      await onContentChanged?.();
+      if (!result.ok && result.message) setError(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Branch operation failed');
+    } finally {
+      setGitBusy('');
+    }
+  };
+
+  const toggleGitPath = (path: string) => {
+    setSelectedGitPaths((current) => current.includes(path) ? current.filter((item) => item !== path) : [...current, path]);
   };
 
   const confirmDiscardChanges = () => {
@@ -264,10 +328,61 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
                 <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
                 <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
               </dl>
+              {plan?.metadataSource !== 'docs' && (
+                <div className="metadata-form">
+                  <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
+                  <label>Service<input value={metadataDraft.service ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, service: event.target.value }))} /></label>
+                  <label>Ticket<input value={metadataDraft.ticket ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, ticket: event.target.value }))} /></label>
+                  <label>Status<select value={metadataDraft.status ?? 'draft'} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, status: event.target.value as PlanDetail['status'] }))}>
+                    <option value="ideas">Ideas</option>
+                    <option value="draft">Draft</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="review">Review</option>
+                    <option value="done">Done</option>
+                  </select></label>
+                  <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
+                  <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>
+                </div>
+              )}
               <div className="workspace-actions">
                 <button className="primary" type="button" disabled={!dirtyFile || savingFile} onClick={saveFile}>{savingFile ? 'Saving...' : 'Save File'}</button>
                 <button className="secondary" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
               </div>
+              {gitStatus && (
+                <section className="git-panel">
+                  <h3>Git</h3>
+                  <div className="git-summary">
+                    <span>{gitStatus.branch}</span>
+                    <span>{gitStatus.ahead} ahead</span>
+                    <span>{gitStatus.behind} behind</span>
+                  </div>
+                  <div className="workspace-actions">
+                    <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('fetch')}>{gitBusy === 'fetch' ? 'Fetching...' : 'Fetch'}</button>
+                    <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('pull')}>{gitBusy === 'pull' ? 'Pulling...' : 'Pull'}</button>
+                    <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('push')}>{gitBusy === 'push' ? 'Pushing...' : 'Push'}</button>
+                  </div>
+                  <div className="git-changes">
+                    {gitStatus.changes.length === 0 && <span>No local changes</span>}
+                    {gitStatus.changes.map((change) => (
+                      <label key={`${change.status}-${change.path}`}>
+                        <input type="checkbox" checked={selectedGitPaths.includes(change.path)} onChange={() => toggleGitPath(change.path)} />
+                        <span>{change.status}</span>
+                        <strong>{change.path}</strong>
+                      </label>
+                    ))}
+                  </div>
+                  <textarea className="commit-message" value={gitMessage} onChange={(event) => setGitMessage(event.target.value)} placeholder="Commit message" />
+                  <button className="primary" type="button" disabled={Boolean(gitBusy) || selectedGitPaths.length === 0 || !gitMessage.trim()} onClick={commitSelectedPaths}>
+                    {gitBusy === 'commit' ? 'Committing...' : 'Commit Selected'}
+                  </button>
+                  <div className="branch-create-row">
+                    <input value={branchName} onChange={(event) => setBranchName(event.target.value)} placeholder="new-branch-name" />
+                    <button className="secondary" type="button" disabled={Boolean(gitBusy) || !branchName.trim()} onClick={createAndSwitchBranch}>
+                      {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
+                    </button>
+                  </div>
+                </section>
+              )}
               <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
               {plan?.description && <p>{plan.description}</p>}
               {plan?.warnings?.length ? (
