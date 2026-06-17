@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -35,6 +37,7 @@ func New(reg *registry.Registry, idx *planindex.Index, scan *scanner.Scanner, fi
 func (a *API) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", a.health)
+	mux.HandleFunc("GET /api/state", a.state)
 	mux.HandleFunc("GET /api/repositories", a.listRepositories)
 	mux.HandleFunc("POST /api/repositories", a.createRepository)
 	mux.HandleFunc("PUT /api/repositories/{id}", a.updateRepository)
@@ -52,6 +55,49 @@ func (a *API) Routes() http.Handler {
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (a *API) state(w http.ResponseWriter, r *http.Request) {
+	repos, err := a.registry.List()
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	plans, err := a.index.Query(planindex.Query{})
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	latest := time.Time{}
+	for _, repo := range repos {
+		if repo.CreatedAt.After(latest) {
+			latest = repo.CreatedAt
+		}
+		if !repo.LastScannedAt.IsZero() && repo.LastScannedAt.After(latest) {
+			latest = repo.LastScannedAt
+		}
+	}
+	for _, plan := range plans {
+		if plan.UpdatedAt.After(latest) {
+			latest = plan.UpdatedAt
+		}
+	}
+	payload := struct {
+		Repositories []models.RepositoryConfig `json:"repositories"`
+		Plans        []models.PlanSummary      `json:"plans"`
+	}{Repositories: repos, Plans: plans}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	sum := sha256.Sum256(data)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"version":         hex.EncodeToString(sum[:]),
+		"repositoryCount": len(repos),
+		"planCount":       len(plans),
+		"updatedAt":       latest,
+	})
 }
 
 func (a *API) listRepositories(w http.ResponseWriter, r *http.Request) {

@@ -15,10 +15,11 @@ const emptyFilters: Filters = {
   authors: []
 };
 
-export function KanbanPage({ repository, onOpenPlan, onRepositoriesChanged }: {
+export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesChanged }: {
   repository?: RepositoryConfig;
+  refreshKey: number;
   onOpenPlan: (planId: string) => void;
-  onRepositoriesChanged: () => void;
+  onRepositoriesChanged: () => void | Promise<void>;
 }) {
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [query, setQuery] = useState('');
@@ -40,7 +41,7 @@ export function KanbanPage({ repository, onOpenPlan, onRepositoriesChanged }: {
       .then(setPlans)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [repository]);
+  }, [repository, refreshKey]);
 
   const filteredPlans = useMemo(() => filterPlans(plans, filters, text), [plans, filters, text]);
   const branches = useMemo(() => unique(plans.map((plan) => plan.branch)), [plans]);

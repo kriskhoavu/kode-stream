@@ -3,7 +3,7 @@ import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, 
 import { api } from '../lib/api';
 import type { RepositoryConfig } from '../lib/types';
 
-export function RepositoriesPage({ repositories, onChanged }: { repositories: RepositoryConfig[]; onChanged: () => void }) {
+export function RepositoriesPage({ repositories, onChanged }: { repositories: RepositoryConfig[]; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('Plan Manager');
   const [path, setPath] = useState('');
   const [baselineBranch, setBaselineBranch] = useState('main');

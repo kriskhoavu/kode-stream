@@ -22,7 +22,7 @@ import type { FileContent, FileNode, PlanDetail } from '../lib/types';
 
 type Tab = 'preview' | 'raw' | 'diff';
 
-export function PlanWorkspacePage({ planId, onBack }: { planId: string; onBack: () => void }) {
+export function PlanWorkspacePage({ planId, refreshKey, onBack }: { planId: string; refreshKey: number; onBack: () => void }) {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [file, setFile] = useState<FileContent | null>(null);
@@ -36,6 +36,7 @@ export function PlanWorkspacePage({ planId, onBack }: { planId: string; onBack: 
 
   useEffect(() => {
     setError('');
+    setFile(null);
     api.plan(planId).then(setPlan).catch((err: Error) => setError(err.message));
     api.files(planId).then((tree) => {
       setFiles(tree);
@@ -43,7 +44,7 @@ export function PlanWorkspacePage({ planId, onBack }: { planId: string; onBack: 
       if (first) void openFile(first.id);
     }).catch((err: Error) => setError(err.message));
     api.diff(planId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
-  }, [planId]);
+  }, [planId, refreshKey]);
 
   const openFile = async (fileId: string) => {
     try {

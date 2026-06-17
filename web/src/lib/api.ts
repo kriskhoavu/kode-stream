@@ -1,4 +1,4 @@
-import type { FileContent, FileNode, PathSelection, PlanDetail, PlanSummary, RepositoryConfig, RepositoryInput, ScanResult } from './types';
+import type { AppState, FileContent, FileNode, PathSelection, PlanDetail, PlanSummary, RepositoryConfig, RepositoryInput, ScanResult } from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -16,6 +16,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  state: () => request<AppState>('/api/state'),
   repositories: async () => ((await request<RepositoryConfig[] | null>('/api/repositories')) ?? []).map(normalizeRepository),
   createRepository: (input: RepositoryInput) => request<RepositoryConfig>('/api/repositories', { method: 'POST', body: JSON.stringify(input) }),
   updateRepository: (id: string, input: RepositoryInput) => request<RepositoryConfig>(`/api/repositories/${id}`, { method: 'PUT', body: JSON.stringify(input) }),

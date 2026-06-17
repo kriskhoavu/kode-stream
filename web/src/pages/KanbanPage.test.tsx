@@ -23,7 +23,7 @@ describe('KanbanPage', () => {
       ]
     }));
 
-    render(<KanbanPage repository={{ id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', planDirectories: ['plans'], createdAt: new Date().toISOString() }} onOpenPlan={() => undefined} onRepositoriesChanged={() => undefined} />);
+    render(<KanbanPage repository={{ id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', planDirectories: ['plans'], createdAt: new Date().toISOString() }} refreshKey={0} onOpenPlan={() => undefined} onRepositoriesChanged={() => undefined} />);
 
     expect(screen.getByRole('heading', { name: 'Ideas' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Draft' })).toBeInTheDocument();

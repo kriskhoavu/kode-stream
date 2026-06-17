@@ -8,6 +8,8 @@ import { RepositoriesPage } from './pages/RepositoriesPage';
 
 type Route = { name: 'kanban' } | { name: 'repositories' } | { name: 'workspace'; planId: string };
 
+const contentVersionStorageKey = 'planManagerContentVersion';
+
 function routeFromLocation(): Route {
   const path = window.location.pathname;
   if (path.startsWith('/plans/')) {
@@ -24,6 +26,9 @@ export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
   const [repositories, setRepositories] = useState<RepositoryConfig[]>([]);
   const [activeRepositoryId, setActiveRepositoryId] = useState(() => localStorage.getItem('activeRepositoryId') ?? '');
+  const [contentRefreshKey, setContentRefreshKey] = useState(0);
+  const [stateVersion, setStateVersion] = useState('');
+  const [showStaleNotice, setShowStaleNotice] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -43,9 +48,60 @@ export function App() {
   };
 
   const refreshRepositories = () => api.repositories().then(setRepositories).catch(() => setRepositories([]));
+  const markStateCurrent = async (broadcast = false) => {
+    const state = await api.state();
+    setStateVersion(state.version);
+    setShowStaleNotice(false);
+    if (broadcast) {
+      localStorage.setItem(contentVersionStorageKey, `${state.version}:${Date.now()}`);
+    }
+  };
+  const refreshAppData = async (broadcast = false) => {
+    await refreshRepositories();
+    setContentRefreshKey((key) => key + 1);
+    await markStateCurrent(broadcast);
+  };
+
   useEffect(() => {
-    refreshRepositories();
+    void refreshAppData();
   }, []);
+
+  useEffect(() => {
+    const checkState = async () => {
+      if (document.hidden) return;
+      try {
+        const state = await api.state();
+        if (!stateVersion) {
+          setStateVersion(state.version);
+        } else if (state.version !== stateVersion) {
+          setShowStaleNotice(true);
+        }
+      } catch {
+        // The regular page APIs already surface request errors where needed.
+      }
+    };
+    const interval = window.setInterval(checkState, 30000);
+    const onVisibilityChange = () => {
+      if (!document.hidden) void checkState();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [stateVersion]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== contentVersionStorageKey || !event.newValue) return;
+      const version = event.newValue.split(':')[0];
+      if (stateVersion && version !== stateVersion) {
+        setShowStaleNotice(true);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [stateVersion]);
 
   useEffect(() => {
     if (repositories.length === 0) {
@@ -122,10 +178,25 @@ export function App() {
       </aside>
 
       <main className="main-content">
-        {route.name === 'kanban' && <KanbanPage repository={activeRepo} onOpenPlan={(planId) => navigate({ name: 'workspace', planId })} onRepositoriesChanged={refreshRepositories} />}
-        {route.name === 'workspace' && <PlanWorkspacePage planId={route.planId} onBack={() => navigate({ name: 'kanban' })} />}
-        {route.name === 'repositories' && <RepositoriesPage repositories={repositories} onChanged={refreshRepositories} />}
+        {route.name === 'kanban' && <KanbanPage repository={activeRepo} refreshKey={contentRefreshKey} onOpenPlan={(planId) => navigate({ name: 'workspace', planId })} onRepositoriesChanged={() => refreshAppData(true)} />}
+        {route.name === 'workspace' && <PlanWorkspacePage planId={route.planId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} />}
+        {route.name === 'repositories' && <RepositoriesPage repositories={repositories} onChanged={() => refreshAppData(true)} />}
       </main>
+
+      {showStaleNotice && (
+        <div className="stale-notice" role="status" aria-live="polite">
+          <strong>Content may have changed</strong>
+          <span>Refresh the current view to load the latest plans and repositories.</span>
+          <div>
+            <button className="primary" type="button" onClick={() => void refreshAppData()}>
+              Refresh
+            </button>
+            <button className="ghost" type="button" onClick={() => setShowStaleNotice(false)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <nav className="bottom-nav">
         <button className={route.name === 'kanban' ? 'active' : ''} onClick={() => navigate({ name: 'kanban' })}><KanbanSquare size={18} />Kanban</button>

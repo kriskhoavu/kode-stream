@@ -74,3 +74,10 @@ export interface ScanResult {
 export interface PathSelection {
   path: string;
 }
+
+export interface AppState {
+  version: string;
+  repositoryCount: number;
+  planCount: number;
+  updatedAt: string;
+}

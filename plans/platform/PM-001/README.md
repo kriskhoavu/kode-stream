@@ -38,6 +38,7 @@ The MVP is read-only for managed repositories. It does not edit plan files. It d
 | Backend  | Repository registry | Stores, updates, and deletes registered repositories in the user data directory  |
 | Backend  | Plan scanner        | Reads Git state, structured plan roots, freestyle docs roots, and Markdown files |
 | Backend  | Plan index          | Caches searchable plan summaries and document metadata                           |
+| Backend  | App state API       | Exposes a cheap version for stale-content detection                              |
 | Backend  | HTTP API            | Serves repository, plan, file, and diff data to the frontend                     |
 | Frontend | App shell           | Shows active workspace in the top bar and workspace selection in the left nav    |
 | Frontend | Kanban board        | Shows active-workspace plans by status with scalable multi-select filters        |
@@ -60,6 +61,8 @@ Developer starts Plan Manager
   -> scanner indexes structured plan folders and freestyle docs roots
   -> scanner reads plan.yaml first when present
   -> scanner falls back to folder and README parsing when plan.yaml is missing
+  -> app state version changes after registry or index updates
+  -> other tabs show a refresh popup instead of auto-reloading
   -> frontend renders board columns, filter facets, and cards
   -> developer opens a card
   -> frontend loads file tree, file content, metadata, and diff
@@ -77,6 +80,7 @@ Developer starts Plan Manager
 | Support freestyle docs roots                | Force docs into `service/ticket` structure  | General docs folders such as `docs/` should be browsable without fake tickets.                             |
 | Scope Kanban to one active workspace        | Mix all repositories on one board           | A board should represent one project workspace. Repository switching belongs in the left nav.              |
 | Use client-side multi-select board filters  | Add many query params to `/api/plans`       | The board loads cached summaries for the active workspace. Client facets give OR filters without churn.    |
+| Show stale-content prompt                   | Auto-reload pages                           | Reading and detail views should not be interrupted. Users decide when to refresh in-place.                 |
 | Keep repository edit/delete app-local       | Treat registry changes as managed repo ops  | Registry writes only touch Plan Manager data. They do not modify registered repositories.                  |
 | Do not auto fetch in v1                     | Fetch every 15 seconds                      | Fetch changes `.git` refs and can trigger credentials. Manual scan is safer for v1.                        |
 | Treat `specs/design.png` as visual baseline | Treat image as inspiration only             | The UI must not drift away from the documented proposal.                                                   |
@@ -93,6 +97,9 @@ Developer starts Plan Manager
 - Repository edit updates app registry metadata after validation.
 - Repository delete removes the app registry entry and cached plans for that repository.
 - Kanban shows one active repository/workspace at a time.
+- Registry and plan-index changes update the app state version.
+- When another tab changes content, existing tabs show a top-right refresh popup.
+- The refresh popup reloads app data in place and does not refresh the whole browser page.
 - A bad plan creates a scan warning. It must not fail the whole repository scan.
 - The app must not write to registered repositories in PM-001.
 - File reads must stay inside configured plan directories.

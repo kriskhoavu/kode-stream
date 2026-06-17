@@ -75,6 +75,7 @@ App
 | Workspace  | Loading        | Keep shell stable and load panels independently             |
 | Workspace  | File missing   | Show file-level error                                       |
 | Workspace  | Docs root      | Show docs metadata and an empty/file-focused reading state  |
+| App shell  | Content stale  | Show top-right popup with Refresh and Dismiss actions       |
 | Repository | Invalid        | Show validation errors from backend                         |
 | Repository | Editing        | Preserve current values and allow cancel/save               |
 | Repository | Delete confirm | Require explicit delete confirmation before removing a repo |
@@ -129,6 +130,9 @@ App
 - Register repositories with one or more plan directories.
 - Treat each registered repository as a workspace.
 - Switch active workspace from the left navigation instead of mixing repositories on one board.
+- Detect content changes through `/api/state`, visibility checks, and cross-tab storage events.
+- Show a stale-content popup instead of automatically reloading.
+- Refresh app data in place when the user clicks Refresh in the popup.
 - Support structured roots such as `plans` and docs roots such as `docs`.
 - Display selected plan directories as badges in the input area.
 - Provide quick-add directory chips for common roots such as `plans` and `docs`.

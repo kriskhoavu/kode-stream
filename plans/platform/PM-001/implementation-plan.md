@@ -45,6 +45,7 @@ Avoid:
 - File reads must stay inside configured plan directories.
 - PM-001 must not expose Git or file write operations.
 - Repository create, edit, delete, path browse, and path reveal actions write only app registry or cache data, not managed repositories.
+- Repository and plan-index changes expose an app state version for stale-content detection.
 - Kanban is scoped to one active repository/workspace selected from the left navigation.
 - Kanban filters are multi-select: options are OR-matched within a filter group and AND-matched across groups.
 - UI parity means matching the proposal layout, density, navigation, and mobile behavior. Pixel-perfect matching is not required.
@@ -113,6 +114,7 @@ PM-001: Add read-only plan scanner
 - [x] File tree API.
 - [x] File content API.
 - [x] Read-only diff API.
+- [x] App state version API for content-change detection.
 - [x] Repository cache deletion when a repository is removed.
 - [x] Empty docs root handling in detail APIs.
 
@@ -142,6 +144,7 @@ PM-001: Add plan index and read APIs
 - [x] Repository edit and delete controls.
 - [x] Native path browse, reveal, and drag-and-drop path support.
 - [x] Plan directory chips in the repository form.
+- [x] Top-right stale-content popup with in-app refresh.
 
 **Verification:** `npm run typecheck && npm test`
 

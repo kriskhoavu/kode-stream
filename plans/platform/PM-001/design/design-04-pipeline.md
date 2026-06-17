@@ -52,15 +52,18 @@ The AI agent must run this flow during UI and integration phases.
 12. Filter by multiple statuses, authors, branches, and text.
 13. Verify selected options use OR matching within a facet and AND matching across facets.
 14. Verify filter menus show chevrons and close on outside click.
-15. Open `PM-001`.
-16. Verify file tree, raw Markdown, preview, metadata, and diff tabs.
-17. Verify file explorer and plan info panels collapse, expand, and resize smoothly.
-18. Capture desktop screenshot.
-19. Set mobile viewport.
-20. Verify mobile board follows `specs/design.png`.
-21. Capture mobile screenshot.
-22. Register a disposable repository entry and delete it.
-23. Verify deleted repository plans disappear from the board.
+15. Open a second tab and trigger a scan or repository update.
+16. Verify the first tab shows a top-right stale-content popup and does not auto-reload.
+17. Click Refresh in the popup and verify the current view updates in place.
+18. Open `PM-001`.
+19. Verify file tree, raw Markdown, preview, metadata, and diff tabs.
+20. Verify file explorer and plan info panels collapse, expand, and resize smoothly.
+21. Capture desktop screenshot.
+22. Set mobile viewport.
+23. Verify mobile board follows `specs/design.png`.
+24. Capture mobile screenshot.
+25. Register a disposable repository entry and delete it.
+26. Verify deleted repository plans disappear from the board.
 
 ## Phase Gate
 

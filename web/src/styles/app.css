@@ -1255,6 +1255,43 @@ body.is-resizing-panel {
   color: var(--green);
 }
 
+.stale-notice {
+  position: fixed;
+  top: 76px;
+  right: 18px;
+  z-index: 40;
+  width: min(360px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.stale-notice strong {
+  font-size: 14px;
+}
+
+.stale-notice span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.stale-notice div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.stale-notice .primary,
+.stale-notice .ghost {
+  min-height: 34px;
+}
+
 .runtime-error {
   min-height: 100vh;
   display: grid;

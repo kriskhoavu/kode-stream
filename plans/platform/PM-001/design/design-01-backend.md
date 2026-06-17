@@ -77,6 +77,7 @@
 | Method | Endpoint                         | Purpose                      |
 |--------|----------------------------------|------------------------------|
 | GET    | `/api/repositories`              | List registered repositories |
+| GET    | `/api/state`                     | Load app content version     |
 | POST   | `/api/repositories`              | Register a repository        |
 | PUT    | `/api/repositories/{id}`         | Update a repository          |
 | DELETE | `/api/repositories/{id}`         | Remove a repository          |
@@ -113,6 +114,7 @@
 
 - Manual Scan rebuilds derived metadata for one repository.
 - Removing a repository removes its cached plans, warnings, and scan metadata.
+- App state version changes when repository registry or cached plan summaries change.
 - Board and list APIs read from cached summaries.
 - Plan detail APIs read cached metadata and load file content on demand.
 - Cache stores plan summaries, document metadata, scan timestamps, warnings, and errors.
