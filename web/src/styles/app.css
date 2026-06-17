@@ -559,7 +559,7 @@ h1 {
 
 .board-toolbar {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) auto auto auto minmax(80px, auto);
+  grid-template-columns: minmax(240px, 1fr) auto auto auto auto minmax(80px, auto);
   gap: 10px;
   margin-bottom: 12px;
   align-items: center;
@@ -1891,6 +1891,33 @@ body.is-resizing-panel {
   font-size: 13px;
 }
 
+.raw-editor {
+  width: 100%;
+  min-height: 620px;
+  border: 0;
+  border-radius: 0;
+  resize: vertical;
+  outline: 0;
+  padding: 24px;
+  background: color-mix(in srgb, var(--panel) 92%, var(--panel-soft));
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.edit-state-banner {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--orange) 30%, var(--line));
+  background: color-mix(in srgb, var(--orange) 9%, var(--panel));
+  color: var(--orange);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .metadata-panel dl {
   display: grid;
   grid-template-columns: 95px 1fr;
@@ -1921,6 +1948,195 @@ body.is-resizing-panel {
 
 .metadata-callout strong {
   color: var(--orange);
+}
+
+.metadata-form {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.metadata-form label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metadata-form input,
+.metadata-form select,
+.commit-message,
+.branch-create-row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0 10px;
+  outline: 0;
+}
+
+.metadata-form input:focus,
+.metadata-form select:focus,
+.commit-message:focus,
+.branch-create-row input:focus {
+  border-color: color-mix(in srgb, var(--blue) 50%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 12%, transparent);
+}
+
+.workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.workspace-actions .primary,
+.workspace-actions .secondary {
+  min-height: 34px;
+}
+
+.git-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.git-panel h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.git-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.git-summary span {
+  min-height: 26px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.git-changes {
+  display: grid;
+  gap: 6px;
+  max-height: 170px;
+  overflow: auto;
+}
+
+.git-changes > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.git-changes label {
+  display: grid;
+  grid-template-columns: 18px 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.git-changes label span {
+  color: var(--muted);
+}
+
+.git-changes label strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-message {
+  min-height: 72px;
+  padding: 9px 10px;
+  resize: vertical;
+}
+
+.branch-create-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.status-move-select {
+  min-height: 30px;
+  font-size: 12px;
+  padding: 0 8px;
+  background: var(--panel-soft);
+}
+
+.new-plan-column-button {
+  min-height: 38px;
+  margin: 0 10px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.new-plan-column-button:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 8%, var(--panel));
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(15, 23, 42, 0.32);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal-panel {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.modal-panel header,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.modal-actions {
+  justify-content: flex-end;
 }
 
 .plan-warnings {

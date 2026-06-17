@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronDown, Code2, FileText, Filter, FolderGit2, GripVertical, Info, KanbanSquare, LockKeyhole, RefreshCw, RotateCw, Search, X } from 'lucide-react';
+import { ChevronDown, Code2, FileText, Filter, FolderGit2, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, X } from 'lucide-react';
 import { marked } from 'marked';
 import { api, statusLabels, statusOrder } from '../lib/api';
 import type { FileContent, FileNode, PlanDetail, PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
@@ -180,7 +180,7 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
         <button className="secondary" onClick={clearFilters} disabled={activeFilterCount === 0}>
           <X size={16} /> Clear
         </button>
-        <span className="readonly-badge"><LockKeyhole size={15} /> Read-only</span>
+        <span className="readonly-badge"><Pencil size={15} /> Authoring</span>
         <span className="scan-state">{scanState}</span>
       </div>
       <div className="facet-bar">

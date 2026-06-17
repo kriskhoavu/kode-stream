@@ -215,13 +215,13 @@ PM-002: Add plan editing UI
 
 **Deliverables:**
 
-- [ ] Style editor, metadata, Git panel, dialogs, and new plan form to match the PM-001 shell.
-- [ ] Verify desktop and mobile layouts.
-- [ ] Verify no write control overlaps in narrow viewports.
-- [ ] Rebuild frontend assets.
-- [ ] Rebuild Go binary.
-- [ ] Restart the app on port `4317`.
-- [ ] Smoke test the running app.
+- [x] Style editor, metadata, Git panel, dialogs, and new plan form to match the PM-001 shell.
+- [x] Verify desktop and mobile layouts.
+- [x] Verify no write control overlaps in narrow viewports.
+- [x] Rebuild frontend assets.
+- [x] Rebuild Go binary.
+- [x] Restart the app on port `4317`.
+- [x] Smoke test the running app.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go build -o ./bin/plan-manager ./cmd/plan-manager`
 
