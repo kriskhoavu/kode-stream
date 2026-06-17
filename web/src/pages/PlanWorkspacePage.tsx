@@ -18,14 +18,21 @@ import {
 } from 'lucide-react';
 import { marked } from 'marked';
 import { api } from '../lib/api';
-import type { FileContent, FileNode, PlanDetail } from '../lib/types';
+import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput } from '../lib/types';
 
 type Tab = 'preview' | 'raw' | 'diff';
 
-export function PlanWorkspacePage({ planId, refreshKey, onBack }: { planId: string; refreshKey: number; onBack: () => void }) {
+export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged }: { planId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [file, setFile] = useState<FileContent | null>(null);
+  const [editorContent, setEditorContent] = useState('');
+  const [savedContent, setSavedContent] = useState('');
+  const [savingFile, setSavingFile] = useState(false);
+  const [metadataDraft, setMetadataDraft] = useState<PlanMetadataUpdateInput>({});
+  const [savingMetadata, setSavingMetadata] = useState(false);
+  const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
+  const [gitLoading, setGitLoading] = useState(false);
   const [diff, setDiff] = useState('');
   const [tab, setTab] = useState<Tab>('preview');
   const [error, setError] = useState('');
@@ -46,15 +53,52 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack }: { planId: stri
     api.diff(planId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
   }, [planId, refreshKey]);
 
+  useEffect(() => {
+    if (!plan) return;
+    setMetadataDraft({
+      title: plan.title,
+      service: plan.service,
+      ticket: plan.ticket,
+      status: plan.status,
+      owner: plan.owner ?? '',
+      tags: plan.tags
+    });
+    void loadGitStatus(plan.repositoryId);
+  }, [plan]);
+
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirtyFile && !dirtyMetadata) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  });
+
   const openFile = async (fileId: string) => {
+    if (!confirmDiscardChanges()) return;
     try {
-      setFile(await api.file(planId, fileId));
+      const nextFile = await api.file(planId, fileId);
+      setFile(nextFile);
+      setEditorContent(nextFile.content);
+      setSavedContent(nextFile.content);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File failed to load');
     }
   };
 
-  const preview = useMemo(() => ({ __html: marked.parse(file?.content ?? '') as string }), [file]);
+  const dirtyFile = file !== null && editorContent !== savedContent;
+  const dirtyMetadata = Boolean(plan) && (
+    (metadataDraft.title ?? '') !== (plan?.title ?? '') ||
+    (metadataDraft.service ?? '') !== (plan?.service ?? '') ||
+    (metadataDraft.ticket ?? '') !== (plan?.ticket ?? '') ||
+    (metadataDraft.status ?? '') !== (plan?.status ?? '') ||
+    (metadataDraft.owner ?? '') !== (plan?.owner ?? '') ||
+    (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
+  );
+  const dirty = dirtyFile || dirtyMetadata;
+  const preview = useMemo(() => ({ __html: marked.parse(editorContent || file?.content || '') as string }), [editorContent, file]);
   const hasFiles = useMemo(() => hasFile(files), [files]);
   const gridStyle = {
     '--left-panel-width': `${leftCollapsed ? 44 : leftWidth}px`,
@@ -88,19 +132,74 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack }: { planId: stri
     window.addEventListener('pointerup', onPointerUp, { once: true });
   };
 
+  const loadGitStatus = async (repositoryId: string) => {
+    setGitLoading(true);
+    try {
+      setGitStatus(await api.gitStatus(repositoryId));
+    } catch {
+      setGitStatus(null);
+    } finally {
+      setGitLoading(false);
+    }
+  };
+
+  const confirmDiscardChanges = () => {
+    if (!dirty) return true;
+    return window.confirm('Discard unsaved changes?');
+  };
+
+  const goBack = () => {
+    if (confirmDiscardChanges()) onBack();
+  };
+
+  const saveFile = async () => {
+    if (!file) return;
+    setSavingFile(true);
+    setError('');
+    try {
+      await api.saveFile(planId, file.id, { content: editorContent, expectedHash: file.hash });
+      const updated = await api.file(planId, file.id);
+      setFile(updated);
+      setEditorContent(updated.content);
+      setSavedContent(updated.content);
+      if (plan) await loadGitStatus(plan.repositoryId);
+      await onContentChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'File save failed');
+    } finally {
+      setSavingFile(false);
+    }
+  };
+
+  const saveMetadata = async () => {
+    if (!plan) return;
+    setSavingMetadata(true);
+    setError('');
+    try {
+      const result = await api.saveMetadata(planId, metadataDraft);
+      setPlan(result.plan);
+      if (plan) await loadGitStatus(plan.repositoryId);
+      await onContentChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Metadata save failed');
+    } finally {
+      setSavingMetadata(false);
+    }
+  };
+
   if (error && !plan) {
-    return <section className="empty-state"><button className="ghost" onClick={onBack}><ArrowLeft size={16} /> Back</button><p className="error">{error}</p></section>;
+    return <section className="empty-state"><button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button><p className="error">{error}</p></section>;
   }
 
   return (
     <section className="workspace-page">
       <header className="workspace-header">
-        <button className="ghost" onClick={onBack}><ArrowLeft size={16} /> Back</button>
+        <button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button>
         <div>
           <h1>{plan?.title ?? 'Loading plan'}</h1>
           <span>{plan?.service} / {plan?.branch} / {plan?.ticket}</span>
         </div>
-        <button className="secondary" disabled><RefreshCw size={16} /> Pull</button>
+        <button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button>
       </header>
       <div className="workspace-grid" style={gridStyle}>
         <aside className={leftCollapsed ? 'file-tree side-panel collapsed' : 'file-tree side-panel'}>
@@ -127,8 +226,17 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack }: { planId: stri
             <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
             <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
           </div>
+          {dirty && <div className="edit-state-banner">Unsaved changes</div>}
           {tab === 'preview' && (file ? <article className="markdown-preview" dangerouslySetInnerHTML={preview} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
-          {tab === 'raw' && <pre className="raw-markdown">{file?.content ?? (hasFiles ? 'Select a file.' : 'No files found in this plan.')}</pre>}
+          {tab === 'raw' && (
+            <textarea
+              className="raw-editor"
+              value={file ? editorContent : (hasFiles ? 'Select a file.' : 'No files found in this plan.')}
+              onChange={(event) => setEditorContent(event.target.value)}
+              disabled={!file}
+              spellCheck={false}
+            />
+          )}
           {tab === 'diff' && <pre className="diff-view">{diff}</pre>}
         </div>
         <aside className={rightCollapsed ? 'metadata-panel side-panel collapsed' : 'metadata-panel side-panel'}>
@@ -151,10 +259,15 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack }: { planId: stri
                 <dt>Service</dt><dd>{plan?.service}</dd>
                 <dt>Branch</dt><dd>{plan?.branch}</dd>
                 <dt>Status</dt><dd>{plan?.status}</dd>
+                <dt>Git</dt><dd>{gitStatus ? `${gitStatus.branch}${gitStatus.dirty ? ' · dirty' : ''}` : 'Unknown'}</dd>
                 <dt>Source</dt><dd>{sourceLabel(plan?.metadataSource)}</dd>
                 <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
                 <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
               </dl>
+              <div className="workspace-actions">
+                <button className="primary" type="button" disabled={!dirtyFile || savingFile} onClick={saveFile}>{savingFile ? 'Saving...' : 'Save File'}</button>
+                <button className="secondary" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
+              </div>
               <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
               {plan?.description && <p>{plan.description}</p>}
               {plan?.warnings?.length ? (

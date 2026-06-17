@@ -166,11 +166,11 @@ PM-002: Add frontend write API client
 
 **Deliverables:**
 
-- [ ] Add editor state for current content, saved content, dirty flag, saving state, and errors.
-- [ ] Add metadata form state and validation.
-- [ ] Add Git status state and operation state.
-- [ ] Add navigation guard for unsaved edits.
-- [ ] Integrate stale-content popup with edit sessions.
+- [x] Add editor state for current content, saved content, dirty flag, saving state, and errors.
+- [x] Add metadata form state and validation.
+- [x] Add Git status state and operation state.
+- [x] Add navigation guard for unsaved edits.
+- [x] Integrate stale-content popup with edit sessions.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

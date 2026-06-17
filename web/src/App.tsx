@@ -256,7 +256,7 @@ export function App() {
         {route.name === 'kanban' && <KanbanPage repository={activeRepo} refreshKey={contentRefreshKey} onOpenPlan={(planId) => navigate({ name: 'workspace', planId })} onRepositoriesChanged={() => refreshAppData(true)} />}
         {route.name === 'plans' && <PlansPage repository={activeRepo} refreshKey={contentRefreshKey} onOpenPlan={(planId) => navigate({ name: 'workspace', planId })} />}
         {route.name === 'branches' && <BranchesPage repository={activeRepo} refreshKey={contentRefreshKey} onOpenBranch={(branch) => navigate({ name: 'kanban' })} />}
-        {route.name === 'workspace' && <PlanWorkspacePage planId={route.planId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} />}
+        {route.name === 'workspace' && <PlanWorkspacePage planId={route.planId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppData(true)} />}
         {route.name === 'repositories' && <RepositoriesPage repositories={repositories} onChanged={() => refreshAppData(true)} />}
       </main>
 
