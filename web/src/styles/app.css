@@ -278,11 +278,20 @@ select {
   min-width: 0;
 }
 
+.kanban-heading > div {
+  display: grid;
+  gap: 5px;
+}
+
 .kanban-heading h1,
 .kanban-heading span {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.kanban-heading h1 {
+  margin-bottom: 0;
 }
 
 .kanban-heading h1 svg {
