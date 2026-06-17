@@ -1,8 +1,8 @@
 # Plan Manager Architecture
 
-This document describes the current PM-001 architecture and the PM-002 extension points.
+This document describes the current PM-002 architecture.
 
-Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git repositories, caches plan metadata in YAML files, and serves read-only plan data to the frontend.
+Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git repositories, caches plan metadata in YAML files, serves plan data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
 ## Goals
 
@@ -11,7 +11,7 @@ Plan Manager is a local web app. A Go server exposes a JSON API and serves embed
 - Show one active repository workspace at a time.
 - Support multiple plan directories per repository.
 - Support structured plans and freestyle docs.
-- Keep PM-001 read-only for managed repositories.
+- Allow explicit, guarded writes to managed repositories.
 - Keep app registry and cache outside registered repositories.
 
 ## System Context
@@ -69,25 +69,26 @@ User browser
 | Registry       | `internal/registry`     | Stores registered repositories in `repositories.yaml`           |
 | Plan index     | `internal/planindex`    | Stores cached scan results in `plan-index.yaml`                 |
 | Scanner        | `internal/scanner`      | Reads plan directories and builds plan metadata                 |
-| File access    | `internal/fileaccess`   | Builds file trees and reads files inside allowed plan roots     |
-| Git adapter    | `internal/gitadapter`   | Runs read-only Git commands with timeout                        |
+| File access    | `internal/fileaccess`   | Builds file trees and reads or writes files inside plan roots   |
+| Plan writer    | `internal/planwriter`   | Writes Markdown, metadata, status changes, and new plans        |
+| Git adapter    | `internal/gitadapter`   | Runs Git status and guarded Git commands with timeout           |
 | System dialog  | `internal/systemdialog` | Opens native folder picker and reveals local paths              |
 | Models         | `internal/models`       | Defines shared backend data structures                          |
 
 ## Frontend Components
 
-| Component           | Path                                   | Responsibility                                        |
-|---------------------|----------------------------------------|-------------------------------------------------------|
-| App shell           | `web/src/App.tsx`                      | Layout, navigation, workspace selector, refresh state |
-| API client          | `web/src/lib/api.ts`                   | Fetch wrapper and typed API calls                     |
-| Shared types        | `web/src/lib/types.ts`                 | Frontend API types                                    |
-| Kanban page         | `web/src/pages/KanbanPage.tsx`         | Board, filters, cards, preview drawer                 |
-| Repository page     | `web/src/pages/RepositoriesPage.tsx`   | Repository create, edit, delete, scan, reveal         |
-| Plan workspace page | `web/src/pages/PlanWorkspacePage.tsx`  | File tree, preview, raw Markdown, diff, metadata      |
-| Plans page          | `web/src/pages/PlansPage.tsx`          | Searchable list view for active workspace             |
-| Branches page       | `web/src/pages/BranchesPage.tsx`       | Branch summary inferred from indexed plans            |
-| Error boundary      | `web/src/components/ErrorBoundary.tsx` | Catches frontend render failures                      |
-| Styles              | `web/src/styles/app.css`               | Application layout and responsive UI                  |
+| Component           | Path                                   | Responsibility                                                    |
+|---------------------|----------------------------------------|-------------------------------------------------------------------|
+| App shell           | `web/src/App.tsx`                      | Layout, navigation, workspace selector, refresh state             |
+| API client          | `web/src/lib/api.ts`                   | Fetch wrapper and typed API calls                                 |
+| Shared types        | `web/src/lib/types.ts`                 | Frontend API types                                                |
+| Kanban page         | `web/src/pages/KanbanPage.tsx`         | Board, filters, cards, preview drawer                             |
+| Repository page     | `web/src/pages/RepositoriesPage.tsx`   | Repository create, edit, delete, scan, reveal                     |
+| Plan workspace page | `web/src/pages/PlanWorkspacePage.tsx`  | File tree, preview, Markdown editor, diff, metadata, Git controls |
+| Plans page          | `web/src/pages/PlansPage.tsx`          | Searchable list view for active workspace                         |
+| Branches page       | `web/src/pages/BranchesPage.tsx`       | Branch summary inferred from indexed plans                        |
+| Error boundary      | `web/src/components/ErrorBoundary.tsx` | Catches frontend render failures                                  |
+| Styles              | `web/src/styles/app.css`               | Application layout and responsive UI                              |
 
 ## Data Flow
 
@@ -127,6 +128,31 @@ User opens plan
   -> workspace renders file tree, preview, raw file, info, and diff
 ```
 
+### Plan Editing
+
+```text
+User edits Markdown or metadata
+  -> frontend tracks dirty state
+  -> user clicks Save
+  -> API validates repository, plan, file ID, and path scope
+  -> fileaccess or planwriter writes the repository file
+  -> scanner rescans the affected repository
+  -> plan index and /api/state version update
+  -> frontend refreshes current data and other tabs show stale-content notice
+```
+
+### Git Operations
+
+```text
+User opens Git panel
+  -> GET /api/repositories/{id}/git/status
+  -> frontend shows branch, ahead/behind, dirty files, conflicts, and path selection
+  -> user commits selected paths or runs fetch/pull/push/branch operation
+  -> API validates branch names, commit message, path scope, and dirty-state guards
+  -> Git adapter runs the command with timeout
+  -> operations that change content rescan the affected repository
+```
+
 ### Stale Content Detection
 
 ```text
@@ -139,7 +165,7 @@ Frontend polls /api/state
 
 ## Storage Design
 
-Plan Manager does not use a database server in PM-001. It uses YAML files in the OS user config directory.
+Plan Manager does not use a database server. It uses YAML files in the OS user config directory.
 
 ```text
 <user-config-dir>/plan-manager/
@@ -268,22 +294,33 @@ Status normalization maps common values into:
 
 All endpoints are local and served from `http://127.0.0.1:{port}`.
 
-| Method   | Endpoint                         | Description                                      |
-|----------|----------------------------------|--------------------------------------------------|
-| `GET`    | `/api/health`                    | Health check                                     |
-| `GET`    | `/api/state`                     | App state version, repository count, plan count  |
-| `GET`    | `/api/repositories`              | List registered repositories                     |
-| `POST`   | `/api/repositories`              | Create repository registration                   |
-| `PUT`    | `/api/repositories/{id}`         | Update repository registration                   |
-| `DELETE` | `/api/repositories/{id}`         | Delete repository registration and cached plans  |
-| `POST`   | `/api/repositories/{id}/scan`    | Scan one repository                              |
-| `GET`    | `/api/plans`                     | List cached plan summaries                       |
-| `GET`    | `/api/plans/{id}`                | Get plan detail                                  |
-| `GET`    | `/api/plans/{id}/files`          | Get safe file tree for a plan                    |
-| `GET`    | `/api/plans/{id}/files/{fileID}` | Read one plan file                               |
-| `GET`    | `/api/plans/{id}/diff`           | Get read-only Git diff for the plan root         |
-| `POST`   | `/api/system/select-directory`   | Open native directory picker                     |
-| `POST`   | `/api/system/open-path`          | Reveal a local path in the platform file manager |
+| Method   | Endpoint                              | Description                                      |
+|----------|---------------------------------------|--------------------------------------------------|
+| `GET`    | `/api/health`                         | Health check                                     |
+| `GET`    | `/api/state`                          | App state version, repository count, plan count  |
+| `GET`    | `/api/repositories`                   | List registered repositories                     |
+| `POST`   | `/api/repositories`                   | Create repository registration                   |
+| `PUT`    | `/api/repositories/{id}`              | Update repository registration                   |
+| `DELETE` | `/api/repositories/{id}`              | Delete repository registration and cached plans  |
+| `POST`   | `/api/repositories/{id}/scan`         | Scan one repository                              |
+| `GET`    | `/api/plans`                          | List cached plan summaries                       |
+| `GET`    | `/api/plans/{id}`                     | Get plan detail                                  |
+| `GET`    | `/api/plans/{id}/files`               | Get safe file tree for a plan                    |
+| `GET`    | `/api/plans/{id}/files/{fileID}`      | Read one plan file                               |
+| `POST`   | `/api/plans/{id}/files/{fileID}`      | Save one Markdown file                           |
+| `GET`    | `/api/plans/{id}/diff`                | Get read-only Git diff for the plan root         |
+| `PATCH`  | `/api/plans/{id}/metadata`            | Save structured plan metadata                    |
+| `PATCH`  | `/api/plans/{id}/status`              | Move a structured plan to another status         |
+| `POST`   | `/api/plans`                          | Create a structured plan                         |
+| `GET`    | `/api/repositories/{id}/git/status`   | Read branch, ahead/behind, and change state      |
+| `POST`   | `/api/repositories/{id}/git/fetch`    | Fetch remotes                                    |
+| `POST`   | `/api/repositories/{id}/git/pull`     | Pull with dirty-state guard                      |
+| `POST`   | `/api/repositories/{id}/git/push`     | Push current branch                              |
+| `POST`   | `/api/repositories/{id}/git/commit`   | Commit selected plan paths                       |
+| `POST`   | `/api/repositories/{id}/git/branches` | Create a branch                                  |
+| `POST`   | `/api/repositories/{id}/git/switch`   | Switch branch with dirty-state guard             |
+| `POST`   | `/api/system/select-directory`        | Open native directory picker                     |
+| `POST`   | `/api/system/open-path`               | Reveal a local path in the platform file manager |
 
 ### Query Parameters
 
@@ -327,17 +364,26 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
   "id": "README_md",
   "path": "README.md",
   "content": "# Example",
-  "language": "markdown"
+  "language": "markdown",
+  "hash": "7c9f..."
 }
 ```
 
 ## Security And Safety
 
-PM-001 safety rules:
+PM-002 safety rules:
 
 - Bind only to `127.0.0.1`.
 - Do not expose authentication or remote access.
-- Do not write to registered repositories.
+- Do not auto-save.
+- Restrict reads and writes to configured plan directories.
+- Resolve file IDs through the safe file tree or plan document list.
+- Reject path traversal and symlink escapes.
+- Use expected content hashes for Markdown saves.
+- Keep freestyle docs roots Markdown-only.
+- Stage and commit only selected paths inside configured plan directories.
+- Block pull and branch switch on dirty working trees unless confirmed.
+- Do not store Git credentials.
 - Store app config and cache outside registered repositories.
 - Validate repository roots through Git.
 - Validate baseline branches at registration.
