@@ -145,8 +145,8 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
         repo,
         directory,
         exists: result.exists,
-        card: normalizeSettingsCard(result.settings.cards[0]),
-        warnings: result.warnings.map((warning) => warning.message)
+        card: normalizeSettingsCard(result.settings?.cards?.[0]),
+        warnings: (result.warnings ?? []).map((warning) => warning.message)
       });
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Settings failed to load');

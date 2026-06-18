@@ -199,6 +199,9 @@ func (a *API) getSourceSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = repo
 	settings, exists, warnings := scanner.ReadRepositorySettings(root)
+	if warnings == nil {
+		warnings = []models.ScanWarning{}
+	}
 	writeJSON(w, http.StatusOK, models.SourceSettingsResult{
 		Directory: directory,
 		Exists:    exists,
@@ -238,7 +241,7 @@ func (a *API) saveSourceSettings(w http.ResponseWriter, r *http.Request) {
 			Directory: directory,
 			Exists:    true,
 			Settings:  settings,
-			Warnings:  scanResult.Warnings,
+			Warnings:  nonNilWarnings(scanResult.Warnings),
 		},
 		Scan: scanResult,
 	})
@@ -623,6 +626,13 @@ func (a *API) repoAndPlan(planID string) (models.RepositoryConfig, models.PlanDe
 
 func (a *API) repository(repositoryID string) (models.RepositoryConfig, bool, error) {
 	return a.registry.Get(repositoryID)
+}
+
+func nonNilWarnings(warnings []models.ScanWarning) []models.ScanWarning {
+	if warnings == nil {
+		return []models.ScanWarning{}
+	}
+	return warnings
 }
 
 func (a *API) sourceSettingsRoot(w http.ResponseWriter, r *http.Request) (models.RepositoryConfig, string, string, bool) {
