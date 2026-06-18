@@ -902,7 +902,7 @@ select {
 
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(5, minmax(238px, 1fr));
+  grid-template-columns: repeat(6, minmax(238px, 1fr));
   gap: 14px;
   min-height: 620px;
 }
@@ -918,6 +918,7 @@ select {
   box-shadow: var(--shadow-soft);
 }
 
+.kanban-column.unsorted { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 84%, #e5e7eb), var(--panel)); }
 .kanban-column.ideas { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 84%, #e0f2fe), var(--panel)); }
 .kanban-column.draft { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dbeafe), var(--panel)); }
 .kanban-column.in_progress { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #fed7aa), var(--panel)); }
@@ -2475,6 +2476,11 @@ body.is-resizing-panel {
   color: var(--muted);
 }
 
+.status-badge.unsorted {
+  background: color-mix(in srgb, #64748b 12%, var(--panel));
+  color: #475569;
+}
+
 .status-badge.ideas {
   background: color-mix(in srgb, #0ea5e9 12%, var(--panel));
   color: #0369a1;
@@ -2498,6 +2504,10 @@ body.is-resizing-panel {
 .status-badge.done {
   background: color-mix(in srgb, var(--green) 12%, var(--panel));
   color: var(--green);
+}
+
+:root[data-theme="dark"] .status-badge.unsorted {
+  color: #cbd5e1;
 }
 
 :root[data-theme="dark"] .status-badge.ideas {

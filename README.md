@@ -28,6 +28,7 @@ Current PM-002 capabilities:
 - Configure one or more plan directories.
 - Scan structured plan roots, configured document roots, and freestyle docs roots.
 - Configure `repository-settings.yaml` for a source directory so arbitrary docs layouts can be split into work item cards.
+- Keep plain unstructured docs in a dedicated `Unsorted` Kanban lane until source settings are added.
 - View one active repository workspace at a time.
 - Browse a Kanban board by status.
 - Filter by source, status, author, branch, and text.

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
 import { ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, X } from 'lucide-react';
 import { marked } from 'marked';
-import { api, statusLabels, statusOrder } from '../lib/api';
+import { api, editableStatusOrder, statusLabels, statusOrder } from '../lib/api';
 import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput, PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
 type FilterKey = 'sources' | 'statuses' | 'branches' | 'authors';
@@ -227,10 +227,12 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
               ))}
               {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No plans</div>}
             </div>
-            <button className="new-plan-column-button" type="button" onClick={() => {
-              setNewPlanDraft((draft) => ({ ...draft, status: column, planDirectory: repository?.planDirectories[0] ?? '' }));
-              setNewPlanOpen(true);
-            }}>+ New plan</button>
+            {column !== 'unsorted' && (
+              <button className="new-plan-column-button" type="button" onClick={() => {
+                setNewPlanDraft((draft) => ({ ...draft, status: column, planDirectory: repository?.planDirectories[0] ?? '' }));
+                setNewPlanOpen(true);
+              }}>+ New plan</button>
+            )}
           </div>
         ))}
       </div>
@@ -261,7 +263,7 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
               <label>Ticket<input value={newPlanDraft.ticket} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, ticket: event.target.value }))} placeholder="PM-003" /></label>
               <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Plan title" /></label>
               <label>Status<select value={newPlanDraft.status} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, status: event.target.value as PlanStatus }))}>
-                {statusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
+                {editableStatusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
               </select></label>
             </div>
             {newPlanError && <p className="error">{newPlanError}</p>}
@@ -360,7 +362,7 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
 
 function PlanCard({ plan, repository, onPreview, onOpen, onMove }: { plan: PlanSummary; repository?: RepositoryConfig; onPreview: () => void; onOpen: () => void; onMove: (status: PlanStatus) => void }) {
   const source = sourceLabel(plan, repository);
-  const docs = source === 'docs';
+  const docs = plan.metadataSource === 'docs';
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onOpen();
@@ -388,9 +390,11 @@ function PlanCard({ plan, repository, onPreview, onOpen, onMove }: { plan: PlanS
         <time>{plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : 'No date'}</time>
       </footer>
       {plan.tags.length > 0 && <div className="tags">{plan.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}</div>}
-      <select className="status-move-select" value={plan.status} onClick={(event) => event.stopPropagation()} onChange={(event) => onMove(event.target.value as PlanStatus)} aria-label="Move plan status">
-        {statusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
-      </select>
+      {plan.status !== 'unsorted' && plan.metadataSource !== 'docs' && (
+        <select className="status-move-select" value={plan.status} onClick={(event) => event.stopPropagation()} onChange={(event) => onMove(event.target.value as PlanStatus)} aria-label="Move plan status">
+          {editableStatusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
+        </select>
+      )}
     </article>
   );
 }
@@ -801,7 +805,7 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
                       <label>Service<input value={metadataDraft.service ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, service: event.target.value }))} /></label>
                       <label>Ticket<input value={metadataDraft.ticket ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, ticket: event.target.value }))} /></label>
                       <label>Status<select value={metadataDraft.status ?? 'draft'} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, status: event.target.value as PlanStatus }))}>
-                        {statusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
+                        {editableStatusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
                       </select></label>
                       <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
                       <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>

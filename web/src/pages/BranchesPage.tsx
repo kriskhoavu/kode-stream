@@ -43,7 +43,7 @@ export function BranchesPage({ repository, refreshKey, onOpenBranch }: {
         branch,
         count: 0,
         sources: [],
-        statuses: { ideas: 0, draft: 0, in_progress: 0, review: 0, done: 0 }
+        statuses: Object.fromEntries(statusOrder.map((status) => [status, 0])) as Record<PlanStatus, number>
       };
       current.count += 1;
       current.statuses[plan.status] += 1;

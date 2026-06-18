@@ -9,6 +9,7 @@ import (
 
 func TestNormalizeStatus(t *testing.T) {
 	cases := map[string]models.PlanStatus{
+		"unsorted":    models.StatusUnsorted,
 		"Ideas":       models.StatusIdeas,
 		"draft":       models.StatusDraft,
 		"in progress": models.StatusInProgress,
@@ -155,6 +156,9 @@ cards:
 	}
 	if data.Plans[0].MetadataSource != "docs" {
 		t.Fatalf("expected docs fallback, got %q", data.Plans[0].MetadataSource)
+	}
+	if data.Plans[0].Status != models.StatusUnsorted {
+		t.Fatalf("expected unsorted docs fallback, got %q", data.Plans[0].Status)
 	}
 	if len(data.Warnings) == 0 {
 		t.Fatal("expected invalid settings warning")

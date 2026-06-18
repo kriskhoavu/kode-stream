@@ -100,7 +100,7 @@ User runs a Git operation
 - If a structured plan has no `plan.yaml`, status or metadata edit creates one.
 - Source directories can opt into structured card discovery with `repository-settings.yaml`.
 - Configured source cards support metadata editing; the first metadata save creates `plan.yaml` in the matched card folder.
-- Freestyle docs roots support Markdown file editing but not structured plan metadata editing.
+- Freestyle docs roots without source settings appear in the `Unsorted` lane and support Markdown file editing but not structured plan metadata editing.
 - Commit operations must commit only selected plan paths.
 - Pull, push, and branch switch show confirmation when the working tree or branch state is risky.
 - The app does not auto-fetch in PM-002.

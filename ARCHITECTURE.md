@@ -277,7 +277,7 @@ If the file is missing or invalid, the scanner keeps the old fallback behavior f
 | `service`        | `string`   | Service or docs root label                        |
 | `ticket`         | `string`   | Ticket or docs item key                           |
 | `title`          | `string`   | Display title                                     |
-| `status`         | `string`   | `ideas`, `draft`, `in_progress`, `review`, `done` |
+| `status`         | `string`   | `unsorted`, `ideas`, `draft`, `in_progress`, `review`, `done` |
 | `owner`          | `string`   | Metadata owner                                    |
 | `author`         | `string`   | Last Git author or owner fallback                 |
 | `tags`           | `string[]` | Plan tags                                         |
@@ -321,6 +321,8 @@ Freestyle docs roots are supported when:
 - The configured root contains Markdown files, and
 - It does not contain structured plan children.
 
+Plain freestyle docs roots are assigned the `unsorted` status so the Kanban board separates unstructured sources from normal workflow columns. Once a source root has a valid `repository-settings.yaml`, matched cards use the configured status or `plan.yaml`.
+
 Metadata precedence:
 
 1. `plan.yaml`.
@@ -335,6 +337,7 @@ Status normalization maps common values into:
 - `in_progress`
 - `review`
 - `done`
+- `unsorted`
 
 ## API Endpoints
 
@@ -423,12 +426,12 @@ PM-002 safety rules:
 
 - Bind only to `127.0.0.1`.
 - Do not expose authentication or remote access.
-- Do not auto-save.
+- Autosave Markdown edits after a short debounce.
 - Restrict reads and writes to configured plan directories.
 - Resolve file IDs through the safe file tree or plan document list.
 - Reject path traversal and symlink escapes.
 - Use expected content hashes for Markdown saves.
-- Keep freestyle docs roots Markdown-only.
+- Keep plain freestyle docs roots Markdown-only and place them in `Unsorted`.
 - Stage and commit only selected paths inside configured plan directories.
 - Block pull and branch switch on dirty working trees unless confirmed.
 - Do not store Git credentials.

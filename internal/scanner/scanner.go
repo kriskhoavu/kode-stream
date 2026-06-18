@@ -73,6 +73,7 @@ func (s *Scanner) scanPlanDirectory(repo models.RepositoryConfig, branch, planDi
 			return plans, []models.ScanWarning{{PlanPath: planDir, Message: err.Error()}}
 		}
 		detail.MetadataSource = "docs"
+		detail.Status = models.StatusUnsorted
 		if detail.Title == titleFromTicket(filepath.Base(planDir)) {
 			detail.Title = titleFromDocumentRoot(planDir)
 		}
@@ -382,6 +383,8 @@ func NormalizeStatus(raw string) models.PlanStatus {
 	s = strings.ReplaceAll(s, "-", "_")
 	s = strings.ReplaceAll(s, " ", "_")
 	switch s {
+	case "unsorted", "unstructured":
+		return models.StatusUnsorted
 	case "ideas", "idea", "backlog":
 		return models.StatusIdeas
 	case "in_progress", "progress", "doing", "active":

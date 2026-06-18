@@ -126,6 +126,7 @@ function normalizeGitResult(result: GitOperationResult): GitOperationResult {
 }
 
 export const statusLabels = {
+  unsorted: 'Unsorted',
   ideas: 'Ideas',
   draft: 'Draft',
   in_progress: 'In Progress',
@@ -134,3 +135,4 @@ export const statusLabels = {
 } as const;
 
 export const statusOrder = Object.keys(statusLabels) as Array<keyof typeof statusLabels>;
+export const editableStatusOrder = statusOrder.filter((status) => status !== 'unsorted');

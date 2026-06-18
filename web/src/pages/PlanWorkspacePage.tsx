@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { marked } from 'marked';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { api } from '../lib/api';
+import { api, editableStatusOrder, statusLabels } from '../lib/api';
 import type { FileContent, FileNode, GitChange, GitChangeStatus, GitStatus, PlanDetail, PlanMetadataUpdateInput } from '../lib/types';
 
 type Tab = 'preview' | 'raw' | 'diff';
@@ -495,11 +495,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
                   <label>Service<input value={metadataDraft.service ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, service: event.target.value }))} /></label>
                   <label>Ticket<input value={metadataDraft.ticket ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, ticket: event.target.value }))} /></label>
                   <label>Status<select value={metadataDraft.status ?? 'draft'} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, status: event.target.value as PlanDetail['status'] }))}>
-                    <option value="ideas">Ideas</option>
-                    <option value="draft">Draft</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="review">Review</option>
-                    <option value="done">Done</option>
+                    {editableStatusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
                   </select></label>
                   <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
                   <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>
@@ -609,20 +605,7 @@ function StatusBadge({ status }: { status: PlanDetail['status'] }) {
 }
 
 function statusLabel(status: PlanDetail['status']): string {
-  switch (status) {
-    case 'ideas':
-      return 'Ideas';
-    case 'draft':
-      return 'Draft';
-    case 'in_progress':
-      return 'In Progress';
-    case 'review':
-      return 'Review';
-    case 'done':
-      return 'Done';
-    default:
-      return status;
-  }
+  return statusLabels[status] ?? status;
 }
 
 function autoSaveLabel(state: AutoSaveState): string {

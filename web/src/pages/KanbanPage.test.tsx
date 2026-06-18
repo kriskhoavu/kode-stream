@@ -26,6 +26,7 @@ describe('KanbanPage', () => {
 
     render(<KanbanPage repository={{ id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', planDirectories: ['plans'], createdAt: new Date().toISOString() }} refreshKey={0} onOpenPlan={() => undefined} onRepositoriesChanged={() => undefined} />);
 
+    expect(screen.getByRole('heading', { name: 'Unsorted' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Ideas' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Draft' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Plan Manager')).toBeInTheDocument());
@@ -56,7 +57,7 @@ describe('filterPlans', () => {
       service: 'docs',
       ticket: 'docs',
       title: 'Docs',
-      status: 'done',
+      status: 'unsorted',
       author: 'Giang',
       tags: ['docs'],
       metadataSource: 'docs',
@@ -71,7 +72,7 @@ describe('filterPlans', () => {
   });
 
   it('uses AND across facets', () => {
-    const result = filterPlans(plans, { sources: ['docs'], statuses: ['done'], branches: [], authors: ['Giang'] }, '', repository);
+    const result = filterPlans(plans, { sources: ['docs'], statuses: ['unsorted'], branches: [], authors: ['Giang'] }, '', repository);
     expect(result.map((plan) => plan.id)).toEqual(['p2']);
   });
 });

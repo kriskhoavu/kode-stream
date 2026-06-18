@@ -1,4 +1,4 @@
-export type PlanStatus = 'ideas' | 'draft' | 'in_progress' | 'review' | 'done';
+export type PlanStatus = 'unsorted' | 'ideas' | 'draft' | 'in_progress' | 'review' | 'done';
 
 export interface RepositoryConfig {
   id: string;

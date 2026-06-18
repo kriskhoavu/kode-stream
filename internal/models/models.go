@@ -5,6 +5,7 @@ import "time"
 type PlanStatus string
 
 const (
+	StatusUnsorted   PlanStatus = "unsorted"
 	StatusIdeas      PlanStatus = "ideas"
 	StatusDraft      PlanStatus = "draft"
 	StatusInProgress PlanStatus = "in_progress"
@@ -12,7 +13,7 @@ const (
 	StatusDone       PlanStatus = "done"
 )
 
-var StatusOrder = []PlanStatus{StatusIdeas, StatusDraft, StatusInProgress, StatusReview, StatusDone}
+var StatusOrder = []PlanStatus{StatusUnsorted, StatusIdeas, StatusDraft, StatusInProgress, StatusReview, StatusDone}
 
 type RepositoryConfig struct {
 	ID              string    `json:"id" yaml:"id"`
