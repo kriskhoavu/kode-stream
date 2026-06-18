@@ -7,6 +7,7 @@ import {
   File as FileIcon,
   FileText,
   FolderOpen,
+  GitBranch,
   GitCompare,
   GripVertical,
   Info,
@@ -23,6 +24,7 @@ import { api } from '../lib/api';
 import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput } from '../lib/types';
 
 type Tab = 'preview' | 'raw' | 'diff';
+type RightPanelTab = 'info' | 'git';
 type DiffMode = 'review' | 'raw';
 type DiffLine = { type: 'context' | 'add' | 'delete' | 'meta'; text: string; oldLine?: number; newLine?: number };
 type DiffFile = { path: string; oldPath?: string; lines: DiffLine[]; additions: number; deletions: number };
@@ -49,6 +51,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [tab, setTab] = useState<Tab>('preview');
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('info');
   const [error, setError] = useState('');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -396,6 +399,16 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
           </div>
           {!rightCollapsed && (
             <>
+              <div className="side-panel-tabs" role="tablist" aria-label="Plan side panel">
+                <button type="button" className={rightPanelTab === 'info' ? 'active' : ''} onClick={() => setRightPanelTab('info')}>
+                  <Info size={14} /> Info
+                </button>
+                <button type="button" className={rightPanelTab === 'git' ? 'active' : ''} onClick={() => setRightPanelTab('git')}>
+                  <GitBranch size={14} /> Git
+                </button>
+              </div>
+              {rightPanelTab === 'info' && (
+                <>
               {plan?.metadataSource === 'docs' && (
                 <div className="metadata-callout">
                   <strong>Docs</strong>
@@ -407,7 +420,6 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
                 <dt>Service</dt><dd>{plan?.service}</dd>
                 <dt>Branch</dt><dd>{plan?.branch}</dd>
                 <dt>Status</dt><dd>{plan?.status}</dd>
-                <dt>Git</dt><dd>{gitStatus ? `${gitStatus.branch}${gitStatus.dirty ? ' · dirty' : ''}` : 'Unknown'}</dd>
                 <dt>Source</dt><dd>{sourceLabel(plan?.metadataSource)}</dd>
                 <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
                 <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
@@ -431,7 +443,17 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
               <div className="workspace-actions">
                 <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
               </div>
-              {gitStatus && (
+              <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
+              {plan?.warnings?.length ? (
+                <div className="plan-warnings">
+                  <h3>Warnings</h3>
+                  {plan.warnings.map((warning) => <p key={`${warning.planPath ?? 'plan'}-${warning.message}`}>{warning.message}</p>)}
+                </div>
+              ) : null}
+                </>
+              )}
+              {rightPanelTab === 'git' && (
+                gitStatus ? (
                 <section className="git-panel">
                   <h3>Git</h3>
                   <div className="git-summary">
@@ -465,15 +487,13 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
                     </button>
                   </div>
                 </section>
+                ) : (
+                  <div className="metadata-callout">
+                    <strong>Git status unavailable</strong>
+                    <span>Refresh the workspace or scan the repository to load Git information.</span>
+                  </div>
+                )
               )}
-              <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
-              {plan?.description && <p>{plan.description}</p>}
-              {plan?.warnings?.length ? (
-                <div className="plan-warnings">
-                  <h3>Warnings</h3>
-                  {plan.warnings.map((warning) => <p key={`${warning.planPath ?? 'plan'}-${warning.message}`}>{warning.message}</p>)}
-                </div>
-              ) : null}
               {error && <p className="error">{error}</p>}
             </>
           )}

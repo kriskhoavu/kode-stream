@@ -2259,6 +2259,38 @@ body.is-resizing-panel {
   color: var(--orange);
 }
 
+.side-panel-tabs {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 84%, var(--panel-soft));
+  padding: 3px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin-bottom: 14px;
+}
+
+.side-panel-tabs button {
+  min-width: 0;
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.side-panel-tabs button.active {
+  background: var(--panel);
+  color: var(--blue);
+  box-shadow: var(--shadow-soft);
+}
+
 .metadata-form {
   display: grid;
   gap: 10px;
@@ -2312,9 +2344,7 @@ body.is-resizing-panel {
 .git-panel {
   display: grid;
   gap: 10px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
+  margin-top: 0;
 }
 
 .git-panel h3 {
