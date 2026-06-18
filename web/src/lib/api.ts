@@ -17,7 +17,9 @@ import type {
   PlanSummary,
   RepositoryConfig,
   RepositoryInput,
+  RepositorySettings,
   ScanResult,
+  SourceSettingsResult,
   WriteResult
 } from './types';
 
@@ -43,6 +45,13 @@ export const api = {
   updateRepository: (id: string, input: RepositoryInput) => request<RepositoryConfig>(`/api/repositories/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteRepository: (id: string) => request<{ ok: boolean }>(`/api/repositories/${id}`, { method: 'DELETE' }),
   scan: (repositoryId: string) => request<ScanResult>(`/api/repositories/${repositoryId}/scan`, { method: 'POST' }),
+  sourceSettings: (repositoryId: string, directory: string) =>
+    request<SourceSettingsResult>(`/api/repositories/${repositoryId}/source-settings?directory=${encodeURIComponent(directory)}`),
+  saveSourceSettings: (repositoryId: string, directory: string, settings: RepositorySettings) =>
+    request<SourceSettingsResult>(`/api/repositories/${repositoryId}/source-settings?directory=${encodeURIComponent(directory)}`, {
+      method: 'PUT',
+      body: JSON.stringify(settings)
+    }),
   selectDirectory: () => request<PathSelection>('/api/system/select-directory', { method: 'POST' }),
   openPath: (path: string) => request<{ ok: boolean }>('/api/system/open-path', { method: 'POST', body: JSON.stringify({ path }) }),
   plans: async (params: URLSearchParams) => ((await request<PlanSummary[] | null>(`/api/plans?${params.toString()}`)) ?? []).map(normalizePlan),

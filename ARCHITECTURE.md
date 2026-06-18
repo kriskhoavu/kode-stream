@@ -10,7 +10,7 @@ Plan Manager is a local web app. A Go server exposes a JSON API and serves embed
 - Keep planning files in Git.
 - Show one active repository workspace at a time.
 - Support multiple plan directories per repository.
-- Support structured plans and freestyle docs.
+- Support structured plans, configured document sources, and freestyle docs.
 - Allow explicit, guarded writes to managed repositories.
 - Keep app registry and cache outside registered repositories.
 
@@ -110,7 +110,8 @@ User clicks Scan
   -> POST /api/repositories/{id}/scan
   -> API loads repository config
   -> scanner reads each configured plan directory
-  -> scanner parses plan.yaml or fallback README/folder metadata
+  -> scanner reads repository-settings.yaml when present
+  -> scanner parses plan.yaml, configured source rules, or fallback README/folder metadata
   -> scanner reads Git author and update time
   -> plan index replaces that repository's cached plans
   -> registry updates lastScannedAt
@@ -128,12 +129,24 @@ User opens plan
   -> workspace renders file tree, preview, raw file, info, and diff
 ```
 
+### Source Structure Settings
+
+```text
+User opens a source directory's Structure Settings
+  -> GET /api/repositories/{id}/source-settings?directory={dir}
+  -> API reads <repo>/<dir>/repository-settings.yaml or returns defaults
+  -> user saves a path pattern and field mapping
+  -> PUT /api/repositories/{id}/source-settings?directory={dir}
+  -> API validates the pattern, writes repository-settings.yaml, rescans the repository
+  -> configured source cards appear on the Kanban board
+```
+
 ### Plan Editing
 
 ```text
 User edits Markdown or metadata
   -> frontend tracks dirty state
-  -> user clicks Save
+  -> Markdown autosaves after a short debounce, metadata saves explicitly
   -> API validates repository, plan, file ID, and path scope
   -> fileaccess or planwriter writes the repository file
   -> scanner rescans the affected repository
@@ -213,6 +226,32 @@ Stores cached plan details, scan warnings, and scan timestamps.
 
 The plan index is derived data. It can be rebuilt by scanning repositories again.
 
+### repository-settings.yaml
+
+Each configured source directory can optionally contain a repository-owned settings file:
+
+```text
+<repo>/<planDirectory>/repository-settings.yaml
+```
+
+This file lets a non-standard docs tree behave like a structured plan source. The scanner currently supports segment-based path patterns where each segment is literal text or a `{variable}`.
+
+Example:
+
+```yaml
+version: 1
+cards:
+  - pathPattern: "{service}/feature/{ticket}"
+    fields:
+      service: "{service}"
+      ticket: "{ticket}"
+      title: readme_heading
+      status: draft
+      tags: [docs]
+```
+
+If the file is missing or invalid, the scanner keeps the old fallback behavior for that source root. If a configured card later receives a metadata edit, the metadata writer creates `plan.yaml` in that card directory, and `plan.yaml` becomes the source of truth on later scans.
+
 ## Plan Data Model
 
 ### RepositoryConfig
@@ -244,7 +283,7 @@ The plan index is derived data. It can be rebuilt by scanning repositories again
 | `tags`           | `string[]` | Plan tags                                         |
 | `updatedAt`      | `string`   | Last Git update or filesystem time                |
 | `description`    | `string`   | First README paragraph                            |
-| `metadataSource` | `string`   | `plan.yaml`, `fallback`, or `docs`                |
+| `metadataSource` | `string`   | `plan.yaml`, `repository-settings`, `fallback`, or `docs` |
 | `planRoot`       | `string`   | Repository-relative plan root                     |
 
 ### PlanDetail
@@ -259,6 +298,12 @@ The plan index is derived data. It can be rebuilt by scanning repositories again
 | `counts`    | `object`         | Workspace counts such as file count              |
 
 ## Plan Discovery Rules
+
+Discovery runs per configured plan directory. The scanner checks the modes in this order:
+
+1. `repository-settings.yaml` if present and valid.
+2. Structured plan discovery.
+3. Freestyle docs fallback.
 
 Structured plan roots use:
 
@@ -279,8 +324,9 @@ Freestyle docs roots are supported when:
 Metadata precedence:
 
 1. `plan.yaml`.
-2. README heading and inferred status.
-3. Folder names and fallback defaults.
+2. `repository-settings.yaml` fields and README heading.
+3. README heading and inferred status.
+4. Folder names and fallback defaults.
 
 Status normalization maps common values into:
 
@@ -303,6 +349,8 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
 | `PUT`    | `/api/repositories/{id}`              | Update repository registration                   |
 | `DELETE` | `/api/repositories/{id}`              | Delete repository registration and cached plans  |
 | `POST`   | `/api/repositories/{id}/scan`         | Scan one repository                              |
+| `GET`    | `/api/repositories/{id}/source-settings?directory={dir}` | Read source structure settings |
+| `PUT`    | `/api/repositories/{id}/source-settings?directory={dir}` | Save source structure settings and rescan |
 | `GET`    | `/api/plans`                          | List cached plan summaries                       |
 | `GET`    | `/api/plans/{id}`                     | Get plan detail                                  |
 | `GET`    | `/api/plans/{id}/files`               | Get safe file tree for a plan                    |

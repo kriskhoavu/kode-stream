@@ -5,7 +5,7 @@
 | #   | Title                    | Description                                               |
 |-----|--------------------------|-----------------------------------------------------------|
 | 0   | Read-only baseline       | PM-001 behavior before PM-002 starts                      |
-| 1   | Edit Markdown file       | User edits and saves a plan document                      |
+| 1   | Edit Markdown file       | User edits a plan document and autosave writes it         |
 | 2   | Edit plan metadata       | User updates title, status, owner, tags, and documents    |
 | 3   | Move Kanban status       | User moves a plan card to another status column           |
 | 4   | Create new plan          | User creates a structured plan from the active workspace  |
@@ -59,20 +59,21 @@ The user edits a Markdown file and saves it to the local repository.
 ```text
 User opens a plan file
   -> frontend loads file content
-  -> user switches to edit mode
-  -> frontend tracks unsaved content
-  -> user clicks Save
-  -> PUT /api/plans/{id}/files/{fileID}
+  -> user edits raw Markdown in the details workspace or preview drawer
+  -> frontend tracks pending autosave state
+  -> frontend autosaves after a short pause
+  -> POST /api/plans/{id}/files/{fileID}
   -> backend validates file scope
   -> backend writes the file
-  -> backend rescans the repository
-  -> frontend reloads file, diff, and Git status
+  -> backend returns updated file content and hash
+  -> frontend refreshes diff and Git status
 ```
 
 ## Edge Cases
 
 - If the file no longer exists, show an error and reload the file tree.
 - If the file path escapes the plan root, reject the request.
+- If the user closes or navigates before the timer fires, flush the pending autosave first.
 - If another tab changed the plan, show the stale-content popup.
 
 ---
@@ -87,8 +88,9 @@ The user edits structured plan metadata without manually editing `plan.yaml`.
 
 ```text
 User opens metadata editor
-  -> frontend shows title, status, owner, tags, and document list
+  -> frontend shows Work Item Info fields in details or preview drawer
   -> user changes fields
+  -> user clicks Save Metadata
   -> PATCH /api/plans/{id}/metadata
   -> backend validates structured plan scope
   -> backend updates or creates plan.yaml
@@ -195,7 +197,7 @@ The user syncs the active branch with the remote.
 ```text
 User clicks Pull or Push
   -> frontend requests Git status
-  -> frontend shows confirmation if dirty or divergent
+  -> frontend sends confirmation payload when dirty or divergent state requires it
   -> POST /api/repositories/{id}/git/pull or /git/push
   -> backend runs Git
   -> backend returns stdout, stderr summary, and updated status

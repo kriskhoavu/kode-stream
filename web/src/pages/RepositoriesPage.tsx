@@ -1,8 +1,8 @@
-import { DragEvent, FormEvent, useState } from 'react';
-import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, Trash2, X } from 'lucide-react';
+import { type DragEvent, type Dispatch, type FormEvent, type SetStateAction, useState } from 'react';
+import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api } from '../lib/api';
-import type { RepositoryConfig } from '../lib/types';
+import type { RepositoryConfig, RepositorySettings, RepositorySettingsCard } from '../lib/types';
 
 export function RepositoriesPage({ repositories, onChanged }: { repositories: RepositoryConfig[]; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('Plan Manager');
@@ -15,6 +15,13 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
   const [editingId, setEditingId] = useState('');
   const [editDraft, setEditDraft] = useState({ name: '', path: '', baselineBranch: '', planDirectories: '' });
   const [repoToRemove, setRepoToRemove] = useState<RepositoryConfig | null>(null);
+  const [settingsEditor, setSettingsEditor] = useState<{
+    repo: RepositoryConfig;
+    directory: string;
+    exists: boolean;
+    card: RepositorySettingsCard;
+    warnings: string[];
+  } | null>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -129,6 +136,45 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
     }
   };
 
+  const openSourceSettings = async (repo: RepositoryConfig, directory: string) => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const result = await api.sourceSettings(repo.id, directory);
+      setSettingsEditor({
+        repo,
+        directory,
+        exists: result.exists,
+        card: normalizeSettingsCard(result.settings.cards[0]),
+        warnings: result.warnings.map((warning) => warning.message)
+      });
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Settings failed to load');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveSourceSettings = async () => {
+    if (!settingsEditor) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      const settings: RepositorySettings = {
+        version: 1,
+        cards: [settingsEditor.card]
+      };
+      const result = await api.saveSourceSettings(settingsEditor.repo.id, settingsEditor.directory, settings);
+      setSettingsEditor(null);
+      setMessage(`Structure settings saved; ${result.scan?.planCount ?? 0} plans indexed`);
+      await onChanged();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Settings failed to save');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const dropPath = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     setPathDragging(false);
@@ -220,7 +266,16 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
                       <h2>{repo.name}</h2>
                       <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} disabled={busy} title={repo.path}>{repo.path}</button>
                       <span>{repo.baselineBranch}</span>
-                      <div className="repo-directory-list">{repo.planDirectories.map((directory) => <span key={directory}>{directory}</span>)}</div>
+                      <div className="repo-directory-list">
+                        {repo.planDirectories.map((directory) => (
+                          <div className="repo-directory-chip" key={directory}>
+                            <span>{directory}</span>
+                            <button type="button" onClick={() => void openSourceSettings(repo, directory)} disabled={busy} title={`Configure ${directory}`}>
+                              <SlidersHorizontal size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div className="repo-row-actions">
                       <button className="secondary icon-action" onClick={() => revealPath(repo.path)} disabled={busy} title="Reveal">
@@ -249,6 +304,84 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
           onCancel={() => setRepoToRemove(null)}
           onConfirm={() => void removeRepo(repoToRemove)}
         />
+      )}
+      {settingsEditor && (
+        <section className="modal-backdrop" role="presentation">
+          <div className="modal-panel source-settings-modal" role="dialog" aria-modal="true" aria-label="Structure settings">
+            <header>
+              <div>
+                <h2>Structure Settings</h2>
+                <span>{settingsEditor.repo.name} / {settingsEditor.directory}</span>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setSettingsEditor(null)} disabled={busy} aria-label="Close structure settings">
+                <X size={16} />
+              </button>
+            </header>
+            <p className="modal-help">
+              Define how this source directory should be split into work item cards. If this file is removed or invalid, Plan Manager falls back to the current docs view.
+            </p>
+            {!settingsEditor.exists && <div className="metadata-callout"><strong>No settings file yet</strong><span>Saving creates repository-settings.yaml inside this source directory.</span></div>}
+            {settingsEditor.warnings.length > 0 && (
+              <div className="plan-warnings">
+                <h3>Warnings</h3>
+                {settingsEditor.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+              </div>
+            )}
+            <div className="metadata-form source-settings-form">
+              <label>
+                Path Pattern
+                <input
+                  value={settingsEditor.card.pathPattern}
+                  onChange={(event) => updateSettingsCard(setSettingsEditor, { pathPattern: event.target.value })}
+                  placeholder="{service}/feature/{ticket}"
+                />
+              </label>
+              <div className="repo-field-grid">
+                <label>
+                  Service
+                  <input value={settingsEditor.card.fields.service} onChange={(event) => updateSettingsField(setSettingsEditor, 'service', event.target.value)} placeholder="{service}" />
+                </label>
+                <label>
+                  Ticket
+                  <input value={settingsEditor.card.fields.ticket} onChange={(event) => updateSettingsField(setSettingsEditor, 'ticket', event.target.value)} placeholder="{ticket}" />
+                </label>
+              </div>
+              <div className="repo-field-grid">
+                <label>
+                  Title
+                  <input value={settingsEditor.card.fields.title ?? ''} onChange={(event) => updateSettingsField(setSettingsEditor, 'title', event.target.value)} placeholder="readme_heading" />
+                </label>
+                <label>
+                  Default Status
+                  <select value={settingsEditor.card.fields.status ?? 'draft'} onChange={(event) => updateSettingsField(setSettingsEditor, 'status', event.target.value)}>
+                    <option value="ideas">Ideas</option>
+                    <option value="draft">Draft</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="review">Review</option>
+                    <option value="done">Done</option>
+                  </select>
+                </label>
+              </div>
+              <div className="repo-field-grid">
+                <label>
+                  Owner
+                  <input value={settingsEditor.card.fields.owner ?? ''} onChange={(event) => updateSettingsField(setSettingsEditor, 'owner', event.target.value)} placeholder="{owner} or a name" />
+                </label>
+                <label>
+                  Tags
+                  <input value={(settingsEditor.card.fields.tags ?? []).join(', ')} onChange={(event) => updateSettingsField(setSettingsEditor, 'tags', event.target.value)} placeholder="docs, discovery" />
+                </label>
+              </div>
+            </div>
+            <footer className="modal-actions">
+              <button className="secondary" type="button" onClick={() => setSettingsEditor(null)} disabled={busy}>Cancel</button>
+              <button className="primary" type="button" onClick={() => void saveSourceSettings()} disabled={busy}>
+                <SlidersHorizontal size={15} />
+                {busy ? 'Saving...' : 'Save and Scan'}
+              </button>
+            </footer>
+          </div>
+        </section>
       )}
     </section>
   );
@@ -311,4 +444,58 @@ function addPlanDirectory(value: string, directory: string): string {
 
 function removePlanDirectory(value: string, directory: string): string {
   return parsePlanDirectories(value).filter((item) => item !== directory).join(', ');
+}
+
+function normalizeSettingsCard(card?: RepositorySettingsCard): RepositorySettingsCard {
+  return {
+    pathPattern: card?.pathPattern || '{service}/feature/{ticket}',
+    fields: {
+      service: card?.fields?.service || '{service}',
+      ticket: card?.fields?.ticket || '{ticket}',
+      title: card?.fields?.title || 'readme_heading',
+      status: card?.fields?.status || 'draft',
+      owner: card?.fields?.owner || '',
+      tags: Array.isArray(card?.fields?.tags) ? card.fields.tags : ['docs']
+    }
+  };
+}
+
+function updateSettingsCard(
+  setSettingsEditor: Dispatch<SetStateAction<{
+    repo: RepositoryConfig;
+    directory: string;
+    exists: boolean;
+    card: RepositorySettingsCard;
+    warnings: string[];
+  } | null>>,
+  patch: Partial<RepositorySettingsCard>
+) {
+  setSettingsEditor((current) => current ? { ...current, card: { ...current.card, ...patch } } : current);
+}
+
+function updateSettingsField(
+  setSettingsEditor: Dispatch<SetStateAction<{
+    repo: RepositoryConfig;
+    directory: string;
+    exists: boolean;
+    card: RepositorySettingsCard;
+    warnings: string[];
+  } | null>>,
+  field: keyof RepositorySettingsCard['fields'],
+  value: string
+) {
+  setSettingsEditor((current) => {
+    if (!current) return current;
+    const nextValue = field === 'tags' ? value.split(',').map((item) => item.trim()).filter(Boolean) : value;
+    return {
+      ...current,
+      card: {
+        ...current.card,
+        fields: {
+          ...current.card.fields,
+          [field]: nextValue
+        }
+      }
+    };
+  });
 }

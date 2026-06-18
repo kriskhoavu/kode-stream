@@ -17,6 +17,33 @@ export interface RepositoryInput {
   planDirectories: string[];
 }
 
+export interface RepositorySettings {
+  version: number;
+  cards: RepositorySettingsCard[];
+}
+
+export interface RepositorySettingsCard {
+  pathPattern: string;
+  fields: RepositorySettingsFields;
+}
+
+export interface RepositorySettingsFields {
+  service: string;
+  ticket: string;
+  title?: string;
+  status?: string;
+  owner?: string;
+  tags?: string[];
+}
+
+export interface SourceSettingsResult {
+  directory: string;
+  exists: boolean;
+  settings: RepositorySettings;
+  warnings: { planPath?: string; message: string }[];
+  scan?: ScanResult;
+}
+
 export interface PlanSummary {
   id: string;
   repositoryId: string;

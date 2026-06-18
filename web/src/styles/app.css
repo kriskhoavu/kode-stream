@@ -1019,20 +1019,48 @@ select {
   font-size: 14px;
 }
 
+.card-badges {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 46%;
+  min-width: 0;
+}
+
+.badge-separator {
+  color: var(--line);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .plan-card-ticket {
   justify-self: start;
   color: var(--muted);
   font-size: 12px;
 }
 
+.service-badge,
 .source-badge {
   border-radius: 999px;
   padding: 2px 7px;
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: var(--panel-soft);
+}
+
+.service-badge {
+  color: var(--muted);
+  max-width: 76px;
+}
+
+.source-badge {
   color: var(--blue);
+  max-width: 76px;
 }
 
 .source-badge.docs {
@@ -1080,7 +1108,7 @@ select {
   right: 0;
   bottom: 0;
   z-index: 46;
-  width: min(var(--drawer-width, 560px), calc(100vw - 24px));
+  width: min(var(--drawer-width, 1120px), calc(100vw - 24px));
   background: var(--panel);
   border-left: 1px solid var(--line);
   box-shadow: -18px 0 42px rgba(17, 24, 39, .1);
@@ -1167,9 +1195,18 @@ body.is-resizing-drawer {
   min-height: 0;
   overflow: auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 210px;
-  gap: 18px;
-  padding: 18px 24px 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: 20px;
+  padding: 20px 24px 24px;
+  align-items: stretch;
+}
+
+.plan-drawer.compact .plan-drawer-body {
+  grid-template-columns: 1fr;
+}
+
+.plan-drawer.compact .drawer-meta {
+  display: none;
 }
 
 .drawer-main,
@@ -1202,12 +1239,39 @@ body.is-resizing-drawer {
   overflow-wrap: anywhere;
 }
 
+.drawer-file-picker {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.drawer-file-picker select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0 10px;
+}
+
 .drawer-tabs {
-  height: 42px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-tabs > div {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
 }
 
 .drawer-tabs button {
@@ -1230,8 +1294,8 @@ body.is-resizing-drawer {
 .drawer-markdown,
 .drawer-raw,
 .drawer-empty {
-  min-height: 320px;
-  max-height: 56vh;
+  min-height: 440px;
+  max-height: none;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1261,6 +1325,22 @@ body.is-resizing-drawer {
   font-size: 13px;
 }
 
+.drawer-raw-editor {
+  width: 100%;
+  min-height: 440px;
+  resize: vertical;
+  outline: 0;
+  color: var(--text);
+}
+
+.drawer-file-note {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .drawer-empty {
   display: grid;
   place-items: center;
@@ -1272,10 +1352,13 @@ body.is-resizing-drawer {
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel) 88%, var(--panel-soft));
   padding: 14px;
-  align-self: start;
+  align-self: stretch;
+  min-height: 0;
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 12px;
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 .drawer-meta h3 {
@@ -1284,9 +1367,22 @@ body.is-resizing-drawer {
   gap: 7px;
 }
 
+.drawer-work-item .side-panel-tabs {
+  margin-bottom: 2px;
+}
+
+.drawer-work-item-content {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding-right: 2px;
+}
+
 .drawer-meta dl {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
+  grid-template-columns: 82px minmax(0, 1fr);
   gap: 9px;
   font-size: 13px;
 }
@@ -1298,6 +1394,33 @@ body.is-resizing-drawer {
 .drawer-meta dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.drawer-git-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.drawer-git-panel .git-changes label {
+  grid-template-columns: 18px 64px minmax(0, 1fr);
+}
+
+.drawer-metadata-form {
+  margin: 4px 0 0;
+}
+
+.drawer-git-panel .workspace-actions {
+  margin: 0;
+}
+
+.drawer-git-panel .workspace-actions .secondary,
+.drawer-git-panel .primary {
+  min-height: 34px;
+  font-size: 12px;
+}
+
+.drawer-git-panel .branch-create-row {
+  grid-template-columns: 1fr;
 }
 
 .avatar {
@@ -1478,13 +1601,44 @@ body.is-resizing-drawer {
 }
 
 .directory-chips button,
-.repo-directory-list span {
+.repo-directory-chip span {
   border-radius: 999px;
   background: var(--panel-soft);
   color: var(--blue);
   min-height: 26px;
   padding: 0 8px;
   font-size: 12px;
+}
+
+.repo-directory-chip {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-soft);
+}
+
+.repo-directory-chip span {
+  background: transparent;
+}
+
+.repo-directory-chip button {
+  width: 28px;
+  min-height: 26px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.repo-directory-chip button:hover {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 9%, transparent);
 }
 
 .directory-chips button {
@@ -1557,7 +1711,7 @@ body.is-resizing-drawer {
   overflow-wrap: anywhere;
 }
 
-.repo-directory-list span {
+.repo-directory-list > span {
   color: var(--blue);
 }
 
@@ -2611,8 +2765,23 @@ body.is-resizing-panel {
   font-size: 18px;
 }
 
+.modal-panel header span,
+.modal-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .modal-actions {
   justify-content: flex-end;
+}
+
+.source-settings-modal {
+  width: min(720px, 100%);
+}
+
+.source-settings-form {
+  gap: 12px;
 }
 
 .plan-warnings {

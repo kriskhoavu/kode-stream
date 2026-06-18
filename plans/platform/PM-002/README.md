@@ -28,6 +28,7 @@ Users can edit Markdown files, update plan metadata, create new plans, move card
 |------------------|----------------------------------------------------------------------------|-----------------------------|
 | Repository       | A local Git repository registered in Plan Manager                          | `RepositoryConfig`          |
 | Plan Directory   | A configured scan root such as `plans`, `docs`, or `docs/plans`            | `planDirectories`           |
+| Source Settings  | Optional `repository-settings.yaml` in a plan directory that maps arbitrary folders to cards | `RepositorySettings` |
 | Plan             | A ticket-level planning folder or docs item                                | `PlanSummary`, `PlanDetail` |
 | Plan Metadata    | Machine-readable plan fields stored in `plan.yaml`                         | `PlanMetadataUpdateInput`   |
 | Edit Session     | The frontend state for one open file or metadata form with unsaved changes | editor state                |
@@ -43,13 +44,14 @@ Users can edit Markdown files, update plan metadata, create new plans, move card
 |----------|------------------|-------------------------------------------------------------------------------|
 | Backend  | Safe file writer | Writes editable files only inside configured plan directories                 |
 | Backend  | Metadata writer  | Creates and updates `plan.yaml` without changing unrelated fields             |
+| Backend  | Source settings  | Reads and writes `repository-settings.yaml`, then rescans configured sources  |
 | Backend  | Plan creator     | Creates a structured plan folder with starter documents                       |
 | Backend  | Git adapter      | Runs guarded Git write operations with clear status and errors                |
 | Backend  | HTTP API         | Exposes plan edit, status move, new plan, and Git operation endpoints         |
-| Frontend | Editor state     | Tracks selected file, content, dirty state, save state, and conflict warnings |
-| Frontend | Workspace editor | Adds Markdown editing, preview, metadata editing, and save controls           |
-| Frontend | Kanban actions   | Moves status and opens new-plan flows from the board                          |
-| Frontend | Git controls     | Shows branch and dirty state, then runs guarded Git operations                |
+| Frontend | Editor state     | Tracks selected file, content, dirty state, autosave state, and conflict warnings |
+| Frontend | Workspace editor | Adds Markdown editing, preview, autosave, metadata editing, and Work Item controls |
+| Frontend | Kanban actions   | Moves status and opens new-plan flows from the board                             |
+| Frontend | Git controls     | Shows branch and dirty state, then runs guarded Git operations in details and drawer |
 
 ## Data Flow
 
@@ -57,13 +59,13 @@ Users can edit Markdown files, update plan metadata, create new plans, move card
 User opens a plan
   -> frontend loads plan detail, files, file content, diff, and Git status
   -> user edits Markdown or metadata
-  -> frontend marks the edit session dirty
-  -> user saves
+  -> frontend autosaves Markdown after a short pause
+  -> user explicitly saves metadata when metadata fields change
   -> backend validates repository, plan ID, file ID, and path scope
-  -> backend writes file or plan.yaml
-  -> backend rescans the affected repository
-  -> plan index and app state version update
-  -> frontend refreshes board, workspace, and stale-content state
+  -> backend writes the file or plan.yaml
+  -> file saves return the updated file hash immediately
+  -> metadata/status/new-plan writes refresh the affected repository index
+  -> frontend refreshes diff, Git status, board, workspace, and stale-content state as needed
 
 User runs a Git operation
   -> frontend requests Git status
@@ -81,8 +83,8 @@ User runs a Git operation
 | Keep PM-001 read APIs stable          | Replace read APIs with edit APIs        | Existing board and workspace behavior should not regress.                 |
 | Add guarded write APIs                | Let frontend write files directly       | Backend guards are needed for path scope, Git state, and clear errors.    |
 | Edit Markdown and metadata in PM-002  | Markdown only, metadata only            | A useful authoring MVP needs both content and board metadata changes.     |
-| Treat docs roots as Markdown-only     | Force docs roots to use `plan.yaml`     | Freestyle docs should stay simple and should not need fake plan metadata. |
-| Rescan after writes                   | Patch the in-memory index only          | A scan keeps fallback parsing, Git dates, authors, and warnings aligned.  |
+| Keep freestyle docs simple, but configurable | Force all docs roots to use `plan.yaml` | Plain docs should still work as one card. When users want cards, `repository-settings.yaml` describes the source layout. |
+| Rescan after metadata/status/Git writes | Patch the in-memory index only        | A scan keeps fallback parsing, Git dates, authors, and warnings aligned. File autosave keeps the editor fast by returning the updated file/hash directly. |
 | Guard and confirm risky Git actions   | Strict blocking, power-user passthrough | Users need useful Git operations without accidental data loss.            |
 | Keep Git credential handling external | Store tokens in Plan Manager            | Local Git already owns credentials. The app should not store secrets.     |
 
@@ -90,16 +92,21 @@ User runs a Git operation
 
 - PM-002 supports the full authoring MVP.
 - It includes edit, status move, new plan, commit, pull, push, fetch, branch create, and branch switch.
+- Markdown file edits autosave in both the plan workspace and Kanban preview drawer.
+- The Kanban preview drawer exposes the same Work Item Info/Git editing surface as the details view.
 - Write operations must stay inside the active repository and configured plan directories.
 - File write requests use file IDs from the file tree or document list.
 - Metadata writes update `plan.yaml` for structured plans.
 - If a structured plan has no `plan.yaml`, status or metadata edit creates one.
+- Source directories can opt into structured card discovery with `repository-settings.yaml`.
+- Configured source cards support metadata editing; the first metadata save creates `plan.yaml` in the matched card folder.
 - Freestyle docs roots support Markdown file editing but not structured plan metadata editing.
 - Commit operations must commit only selected plan paths.
 - Pull, push, and branch switch show confirmation when the working tree or branch state is risky.
 - The app does not auto-fetch in PM-002.
 - The app never stores Git credentials.
-- After a successful write or Git content change, the app rescans the affected repository.
+- File autosave returns the updated `FileContent` and hash without a full rescan.
+- Metadata, status, new-plan, pull, commit, and branch operations refresh the affected repository state.
 - The stale-content popup from PM-001 remains the cross-tab notification model.
 
 ## Documents

@@ -46,6 +46,8 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("PUT /api/repositories/{id}", a.updateRepository)
 	mux.HandleFunc("DELETE /api/repositories/{id}", a.deleteRepository)
 	mux.HandleFunc("POST /api/repositories/{id}/scan", a.scanRepository)
+	mux.HandleFunc("GET /api/repositories/{id}/source-settings", a.getSourceSettings)
+	mux.HandleFunc("PUT /api/repositories/{id}/source-settings", a.saveSourceSettings)
 	mux.HandleFunc("GET /api/plans", a.listPlans)
 	mux.HandleFunc("GET /api/plans/{id}", a.planDetail)
 	mux.HandleFunc("GET /api/plans/{id}/files", a.planFiles)
@@ -187,6 +189,58 @@ func (a *API) scanRepository(w http.ResponseWriter, r *http.Request) {
 		ScannedAt:    scannedAt,
 		PlanCount:    len(data.Plans),
 		Warnings:     data.Warnings,
+	})
+}
+
+func (a *API) getSourceSettings(w http.ResponseWriter, r *http.Request) {
+	repo, root, directory, ok := a.sourceSettingsRoot(w, r)
+	if !ok {
+		return
+	}
+	_ = repo
+	settings, exists, warnings := scanner.ReadRepositorySettings(root)
+	writeJSON(w, http.StatusOK, models.SourceSettingsResult{
+		Directory: directory,
+		Exists:    exists,
+		Settings:  settings,
+		Warnings:  warnings,
+	})
+}
+
+func (a *API) saveSourceSettings(w http.ResponseWriter, r *http.Request) {
+	repo, root, directory, ok := a.sourceSettingsRoot(w, r)
+	if !ok {
+		return
+	}
+	var settings models.RepositorySettings
+	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if warnings := scanner.ValidateRepositorySettings(settings); len(warnings) > 0 {
+		writeError(w, http.StatusBadRequest, warnings[0].Message)
+		return
+	}
+	if err := scanner.WriteRepositorySettings(root, settings); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	scanResult, err := a.writer.RefreshRepository(repo)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		models.SourceSettingsResult
+		Scan models.ScanResult `json:"scan" yaml:"scan"`
+	}{
+		SourceSettingsResult: models.SourceSettingsResult{
+			Directory: directory,
+			Exists:    true,
+			Settings:  settings,
+			Warnings:  scanResult.Warnings,
+		},
+		Scan: scanResult,
 	})
 }
 
@@ -569,6 +623,45 @@ func (a *API) repoAndPlan(planID string) (models.RepositoryConfig, models.PlanDe
 
 func (a *API) repository(repositoryID string) (models.RepositoryConfig, bool, error) {
 	return a.registry.Get(repositoryID)
+}
+
+func (a *API) sourceSettingsRoot(w http.ResponseWriter, r *http.Request) (models.RepositoryConfig, string, string, bool) {
+	repo, ok, err := a.registry.Get(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return models.RepositoryConfig{}, "", "", false
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "repository not found")
+		return models.RepositoryConfig{}, "", "", false
+	}
+	directory := filepath.ToSlash(filepath.Clean(strings.TrimSpace(r.URL.Query().Get("directory"))))
+	if directory == "." || directory == "" || filepath.IsAbs(directory) || strings.HasPrefix(directory, "../") || directory == ".." {
+		writeError(w, http.StatusBadRequest, "source directory is invalid")
+		return models.RepositoryConfig{}, "", "", false
+	}
+	allowed := false
+	for _, planDirectory := range repo.PlanDirectories {
+		if directory == planDirectory {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		writeError(w, http.StatusBadRequest, "source directory is not registered")
+		return models.RepositoryConfig{}, "", "", false
+	}
+	root := filepath.Join(repo.Path, filepath.FromSlash(directory))
+	info, err := os.Stat(root)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return models.RepositoryConfig{}, "", "", false
+	}
+	if !info.IsDir() {
+		writeError(w, http.StatusBadRequest, "source directory is not a directory")
+		return models.RepositoryConfig{}, "", "", false
+	}
+	return repo, root, directory, true
 }
 
 func (a *API) gitResult(repo models.RepositoryConfig, opErr error) models.GitOperationResult {

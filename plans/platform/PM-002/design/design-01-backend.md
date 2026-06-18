@@ -16,6 +16,7 @@ The backend remains the only layer that can write to registered repositories. It
 | `PlanMetadataUpdateInput` | `title`, `status`, `owner`, `tags`, `documents`                           | Update structured plan metadata        |
 | `PlanStatusUpdateInput`   | `status`                                                                  | Move a plan across Kanban columns      |
 | `PlanCreateInput`         | `planDirectory`, `service`, `ticket`, `title`, `status`, `owner`, `tags`  | Create a structured plan               |
+| `RepositorySettings`      | `version`, `cards`, `pathPattern`, field mappings                         | Configure source directory card discovery |
 | `GitStatus`               | `branch`, `dirty`, `conflicted`, `changes`, `ahead`, `behind`, `upstream` | Describe current Git state             |
 | `GitCommitInput`          | `message`, `paths`                                                        | Commit selected plan paths             |
 | `GitOperationResult`      | `ok`, `message`, `status`, `output`                                       | Return a Git operation result          |
@@ -35,10 +36,12 @@ The backend remains the only layer that can write to registered repositories. It
 
 | Method  | Endpoint                              | Request                   | Response             |
 |---------|---------------------------------------|---------------------------|----------------------|
-| `PUT`   | `/api/plans/{id}/files/{fileID}`      | `PlanFileUpdateInput`     | `FileContent`        |
+| `POST`  | `/api/plans/{id}/files/{fileID}`      | `PlanFileUpdateInput`     | `FileContent`        |
 | `PATCH` | `/api/plans/{id}/metadata`            | `PlanMetadataUpdateInput` | `PlanDetail`         |
 | `PATCH` | `/api/plans/{id}/status`              | `PlanStatusUpdateInput`   | `PlanSummary`        |
 | `POST`  | `/api/repositories/{id}/plans`        | `PlanCreateInput`         | `PlanDetail`         |
+| `GET`   | `/api/repositories/{id}/source-settings?directory={dir}` | none       | `SourceSettingsResult` |
+| `PUT`   | `/api/repositories/{id}/source-settings?directory={dir}` | `RepositorySettings` | `SourceSettingsResult` |
 | `GET`   | `/api/repositories/{id}/git/status`   | none                      | `GitStatus`          |
 | `POST`  | `/api/repositories/{id}/git/fetch`    | none                      | `GitOperationResult` |
 | `POST`  | `/api/repositories/{id}/git/pull`     | confirmation payload      | `GitOperationResult` |
@@ -53,9 +56,10 @@ The backend remains the only layer that can write to registered repositories. It
 |---------------------|------------------------------------------------------------------------|
 | Safe file writer    | Resolves file IDs and writes content inside the plan root only         |
 | Metadata writer     | Updates or creates `plan.yaml` for structured plans                    |
+| Source settings     | Reads, validates, writes, and scans `repository-settings.yaml`         |
 | Plan creator        | Creates starter folders and documents for new structured plans         |
 | Git operation guard | Checks dirty state, conflicts, divergence, and selected path scope     |
-| Scan refresher      | Rescans the affected repository after successful writes or Git changes |
+| Scan refresher      | Rescans the affected repository after metadata, status, new-plan, or Git content changes |
 
 ## Write Guard Rules
 
@@ -65,7 +69,7 @@ The backend remains the only layer that can write to registered repositories. It
 - Reject absolute paths and `..` paths.
 - Reject symlink escapes.
 - Reject writes outside configured plan directories.
-- Reject status and metadata edits for freestyle docs roots.
+- Reject status and metadata edits for freestyle docs roots unless they are configured source cards.
 - Reject branch switch, pull, and push when the repository has conflicts.
 - Require explicit confirmation for dirty branch switch, dirty pull, and divergent push.
 - Never run `git reset`, `git clean`, `git push --force`, or checkout commands that discard changes.
@@ -87,7 +91,7 @@ Each method uses a timeout and returns stdout or stderr as a concise message.
 
 ## Rescan Behavior
 
-- File save rescans the repository.
+- File save returns updated `FileContent` and hash without a full repository rescan.
 - Metadata save rescans the repository.
 - Status move rescans the repository.
 - New plan creation rescans the repository.

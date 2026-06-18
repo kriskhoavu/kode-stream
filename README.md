@@ -26,13 +26,14 @@ Current PM-002 capabilities:
 
 - Register local Git repositories.
 - Configure one or more plan directories.
-- Scan structured plan roots and freestyle docs roots.
+- Scan structured plan roots, configured document roots, and freestyle docs roots.
+- Configure `repository-settings.yaml` for a source directory so arbitrary docs layouts can be split into work item cards.
 - View one active repository workspace at a time.
 - Browse a Kanban board by status.
 - Filter by source, status, author, branch, and text.
 - Open a preview drawer from a board card.
 - Open a plan workspace with file tree, Markdown preview, Markdown editor, plan info, and diff.
-- Edit Markdown files.
+- Edit Markdown files with autosave.
 - Edit structured plan metadata.
 - Move plan status from the board or metadata form.
 - Create new structured plans.
@@ -179,16 +180,32 @@ Examples:
 - Linux: usually `~/.config/plan-manager/`
 - Windows: usually `%AppData%\plan-manager\`
 
-Registered repositories are not used as app storage. PM-002 writes only when the user runs an explicit save, status move, new-plan, commit, pull, push, or branch operation.
+Registered repositories are not used for app registry or cache storage. PM-002 writes to them only when the user edits Markdown, changes metadata or status, creates a plan, saves source structure settings, commits, pulls, pushes, or runs a branch operation.
+
+Source directories may also contain an optional `repository-settings.yaml`. This file is owned by the repository and describes how a non-standard source root should be split into cards:
+
+```yaml
+version: 1
+cards:
+  - pathPattern: "{service}/feature/{ticket}"
+    fields:
+      service: "{service}"
+      ticket: "{ticket}"
+      title: readme_heading
+      status: draft
+      tags: [docs]
+```
+
+If the settings file is missing or invalid, the scanner falls back to the existing freestyle docs behavior.
 
 ## Current Safety Model
 
 - The app binds to `127.0.0.1`.
-- PM-002 write operations are explicit. There is no auto-save.
+- Markdown edits autosave after a short debounce.
 - Registry and cache writes go to the app config directory.
 - File reads and writes are restricted to configured plan directories.
 - Markdown writes use expected content hashes to detect stale edits.
-- Metadata writes are limited to structured plans.
+- Metadata writes are limited to structured plans and configured source cards. A configured source card without `plan.yaml` gets one when metadata is saved.
 - Commit operations stage only selected paths inside configured plan directories.
 - Pull and branch switch block dirty working trees unless the request confirms the risk.
 - No credentials are stored.

@@ -12,10 +12,12 @@ Add API client methods:
 
 | Method           | Endpoint                                   | Purpose                     |
 |------------------|--------------------------------------------|-----------------------------|
-| `saveFile`       | `PUT /api/plans/{id}/files/{fileID}`       | Save Markdown content       |
+| `saveFile`       | `POST /api/plans/{id}/files/{fileID}`      | Autosave Markdown content   |
 | `updateMetadata` | `PATCH /api/plans/{id}/metadata`           | Save plan metadata          |
 | `updateStatus`   | `PATCH /api/plans/{id}/status`             | Move Kanban status          |
 | `createPlan`     | `POST /api/repositories/{id}/plans`        | Create a structured plan    |
+| `sourceSettings` | `GET /api/repositories/{id}/source-settings?directory={dir}` | Load source structure settings |
+| `saveSourceSettings` | `PUT /api/repositories/{id}/source-settings?directory={dir}` | Save source structure settings |
 | `gitStatus`      | `GET /api/repositories/{id}/git/status`    | Load dirty and branch state |
 | `gitFetch`       | `POST /api/repositories/{id}/git/fetch`    | Fetch refs                  |
 | `gitPull`        | `POST /api/repositories/{id}/git/pull`     | Pull guarded changes        |
@@ -28,22 +30,22 @@ Add API client methods:
 
 | State Area         | Responsibility                                                    |
 |--------------------|-------------------------------------------------------------------|
-| Editor state       | Current file content, saved content, dirty flag, save state       |
+| Editor state       | Current file content, saved content, dirty flag, autosave state   |
 | Metadata form      | Editable plan metadata and validation errors                      |
 | Git status state   | Branch, dirty changes, conflicts, ahead/behind, current operation |
 | New plan form      | Source root, service, ticket, title, owner, tags, and validation  |
+| Source settings    | Selected repository/source root, path pattern, field mappings, warnings |
 | Confirmation state | Risky operation dialog type, message, and confirm action          |
 
-## Workspace Editing
+## Workspace And Drawer Editing
 
-- The raw tab becomes an editor when the user clicks Edit.
+- The raw tab is editable in both the full details workspace and Kanban preview drawer.
 - Preview keeps rendering the current editor content.
-- Save writes the current file.
-- Cancel restores the last saved content.
-- Unsaved changes show a clear dirty marker.
-- Navigating away with unsaved changes shows a browser-level and in-app confirmation.
-- Metadata editor lives in the right panel or a focused modal.
-- Freestyle docs show Markdown editing but hide metadata editing.
+- Markdown changes autosave after a short pause and show pending/saving/saved/error state.
+- Navigating away flushes pending Markdown changes instead of showing routine discard prompts.
+- Metadata editor lives in the Work Item Info tab and keeps an explicit Save Metadata action.
+- The Work Item Git tab exposes branch status, changed-file selection, commit, fetch, pull, push, and branch create controls.
+- Freestyle docs show Markdown editing but hide metadata editing unless a valid source settings file maps them into configured cards.
 
 ## Kanban Editing
 
@@ -52,6 +54,9 @@ Add API client methods:
 - Failed status move restores the old column.
 - Docs cards do not expose status move.
 - `New Plan` opens a modal tied to the active repository and source root.
+- Clicking a card opens a large resizable preview drawer.
+- The preview drawer includes Preview, Raw, Diff, and a right-side Work Item panel.
+- The Work Item panel hides at compact drawer widths and stretches full height when visible.
 
 ## Git Controls
 
@@ -67,13 +72,15 @@ Add API client methods:
 ```text
 PlanWorkspacePage
   -> MarkdownEditor
-  -> MetadataEditor
-  -> GitStatusPanel
+  -> WorkItemPanel
   -> ConfirmOperationDialog
 
 KanbanPage
   -> StatusMoveControl
   -> NewPlanDialog
+  -> PlanPreviewDrawer
+     -> MarkdownEditor
+     -> WorkItemPanel
 
 App shell
   -> BranchSelector
@@ -82,7 +89,7 @@ App shell
 
 ## UX Rules
 
-- Do not auto-save.
+- Autosave Markdown file edits after a short pause.
 - Do not auto-fetch.
 - Do not hide dirty state.
 - Disable write controls while a save or Git operation is running.
@@ -96,6 +103,7 @@ App shell
 |----------------------------|-----------------------------------------------------------------|
 | Edit in the workspace      | Users already inspect files there, so editing stays contextual. |
 | Keep preview live          | Markdown authors need fast feedback.                            |
+| Autosave Markdown edits    | File edits are frequent and Git is the durable review boundary. |
 | Use guarded confirmations  | Risky Git actions need friction without blocking normal edits.  |
 | Commit selected paths only | Repositories may contain unrelated local work.                  |
-| Keep docs metadata hidden  | Freestyle docs do not have structured plan fields.              |
+| Keep plain docs metadata hidden | Freestyle docs do not have structured plan fields unless source settings provide a card mapping. |

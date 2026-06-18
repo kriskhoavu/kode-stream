@@ -31,6 +31,32 @@ type RepositoryInput struct {
 	PlanDirectories []string `json:"planDirectories" yaml:"planDirectories"`
 }
 
+type RepositorySettings struct {
+	Version int                      `json:"version" yaml:"version"`
+	Cards   []RepositorySettingsCard `json:"cards" yaml:"cards"`
+}
+
+type RepositorySettingsCard struct {
+	PathPattern string                   `json:"pathPattern" yaml:"pathPattern"`
+	Fields      RepositorySettingsFields `json:"fields" yaml:"fields"`
+}
+
+type RepositorySettingsFields struct {
+	Service string   `json:"service" yaml:"service"`
+	Ticket  string   `json:"ticket" yaml:"ticket"`
+	Title   string   `json:"title,omitempty" yaml:"title,omitempty"`
+	Status  string   `json:"status,omitempty" yaml:"status,omitempty"`
+	Owner   string   `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Tags    []string `json:"tags,omitempty" yaml:"tags,omitempty"`
+}
+
+type SourceSettingsResult struct {
+	Directory string             `json:"directory" yaml:"directory"`
+	Exists    bool               `json:"exists" yaml:"exists"`
+	Settings  RepositorySettings `json:"settings" yaml:"settings"`
+	Warnings  []ScanWarning      `json:"warnings" yaml:"warnings"`
+}
+
 type PlanSummary struct {
 	ID             string     `json:"id" yaml:"id"`
 	RepositoryID   string     `json:"repositoryId" yaml:"repositoryId"`

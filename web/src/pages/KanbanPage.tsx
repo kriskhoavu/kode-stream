@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronDown, Code2, FileText, Filter, FolderGit2, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, X } from 'lucide-react';
+import type { CSSProperties, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
+import { ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, X } from 'lucide-react';
 import { marked } from 'marked';
 import { api, statusLabels, statusOrder } from '../lib/api';
-import type { FileContent, FileNode, PlanDetail, PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
+import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput, PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
 type FilterKey = 'sources' | 'statuses' | 'branches' | 'authors';
 
@@ -12,6 +12,8 @@ type Filters = Record<FilterKey, string[]>;
 type FacetOption = { value: string; label: string };
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
+type DrawerSideTab = 'info' | 'git';
+type DrawerFileOption = { id: string; path: string; label: string };
 
 const emptyFilters: Filters = {
   sources: [],
@@ -238,6 +240,10 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
           refreshKey={refreshKey}
           onClose={() => setDrawerPlanId('')}
           onOpenFull={() => onOpenPlan(drawerPlanId)}
+          onChanged={async () => {
+            await onRepositoriesChanged();
+            await reloadPlans();
+          }}
         />
       )}
       {newPlanOpen && repository && (
@@ -368,9 +374,12 @@ function PlanCard({ plan, repository, onPreview, onOpen, onMove }: { plan: PlanS
     }}>
       <div className="plan-card-title">
         <button type="button" className="plan-card-link plan-card-heading" onClick={navigate}>{plan.title}</button>
-        {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
+        <span className="card-badges">
+          {plan.service && <span className="service-badge">{plan.service}</span>}
+          {plan.service && source && <span className="badge-separator">|</span>}
+          {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
+        </span>
       </div>
-      <span>{plan.service} / {plan.branch}</span>
       <button type="button" className="plan-card-link plan-card-ticket" onClick={navigate}>{plan.ticket}</button>
       <p>{plan.description || plan.ticket}</p>
       <footer>
@@ -386,23 +395,62 @@ function PlanCard({ plan, repository, onPreview, onOpen, onMove }: { plan: PlanS
   );
 }
 
-function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull }: { planId: string; refreshKey: number; onClose: () => void; onOpenFull: () => void }) {
+function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged }: { planId: string; refreshKey: number; onClose: () => void; onOpenFull: () => void; onChanged: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [file, setFile] = useState<FileContent | null>(null);
+  const [editorContent, setEditorContent] = useState('');
+  const [savedContent, setSavedContent] = useState('');
+  const [savingFile, setSavingFile] = useState(false);
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
+  const [metadataDraft, setMetadataDraft] = useState<PlanMetadataUpdateInput>({});
+  const [savingMetadata, setSavingMetadata] = useState(false);
   const [diff, setDiff] = useState('');
   const [tab, setTab] = useState<DrawerTab>('preview');
+  const [sideTab, setSideTab] = useState<DrawerSideTab>('info');
+  const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
+  const [gitMessage, setGitMessage] = useState('');
+  const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
+  const [branchName, setBranchName] = useState('');
+  const [gitBusy, setGitBusy] = useState('');
   const [error, setError] = useState('');
-  const [width, setWidth] = useState(560);
+  const [width, setWidth] = useState(1120);
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const autoSaveSettledTimerRef = useRef<number | null>(null);
+  const autoSaveRefreshTimerRef = useRef<number | null>(null);
   const drawerStyle = { '--drawer-width': `${width}px` } as CSSProperties & Record<'--drawer-width', string>;
+  const compact = width < 700;
+  const dirtyFile = file !== null && editorContent !== savedContent;
+  const fileOptions = useMemo(() => flattenFileOptions(files), [files]);
+  const dirtyMetadata = Boolean(plan) && (
+    (metadataDraft.title ?? '') !== (plan?.title ?? '') ||
+    (metadataDraft.service ?? '') !== (plan?.service ?? '') ||
+    (metadataDraft.ticket ?? '') !== (plan?.ticket ?? '') ||
+    (metadataDraft.status ?? '') !== (plan?.status ?? '') ||
+    (metadataDraft.owner ?? '') !== (plan?.owner ?? '') ||
+    (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
+  );
+
+  const clearDrawerAutoSaveTimers = () => {
+    clearTimeoutRef(autoSaveTimerRef);
+    clearTimeoutRef(autoSaveSettledTimerRef);
+    clearTimeoutRef(autoSaveRefreshTimerRef);
+  };
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      if (!dirtyFile) {
+        onClose();
+        return;
+      }
+      void saveDrawerFileNow().then((saved) => {
+        if (saved) onClose();
+      });
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  }, [dirtyFile, editorContent, file, onClose, savedContent]);
 
   useEffect(() => {
     let active = true;
@@ -410,20 +458,32 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull }: { planId
     setFile(null);
     setFiles([]);
     setDiff('');
+    setGitStatus(null);
     setError('');
     api.plan(planId).then((payload) => {
-      if (active) setPlan(payload);
+      if (!active) return;
+      setPlan(payload);
+      api.gitStatus(payload.repositoryId).then((status) => {
+        if (active) setGitStatus(status);
+      }).catch(() => {
+        if (active) setGitStatus(null);
+      });
     }).catch((err: Error) => {
       if (active) setError(err.message);
     });
     api.files(planId).then(async (tree) => {
       if (!active) return;
       setFiles(tree);
-      const first = firstFile(tree);
-      if (first) {
+      const previewFile = preferredPreviewFile(tree);
+      if (previewFile) {
         try {
-          const content = await api.file(planId, first.id);
-          if (active) setFile(content);
+          const content = await api.file(planId, previewFile.id);
+          if (active) {
+            setFile(content);
+            setEditorContent(content.content);
+            setSavedContent(content.content);
+            setAutoSaveState('idle');
+          }
         } catch (err) {
           if (active) setError(err instanceof Error ? err.message : 'File failed to load');
         }
@@ -438,10 +498,201 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull }: { planId
     });
     return () => {
       active = false;
+      clearDrawerAutoSaveTimers();
     };
   }, [planId, refreshKey]);
 
-  const preview = useMemo(() => ({ __html: marked.parse(file?.content ?? '') as string }), [file]);
+  useEffect(() => {
+    if (!plan) return;
+    setMetadataDraft({
+      title: plan.title,
+      service: plan.service,
+      ticket: plan.ticket,
+      status: plan.status,
+      owner: plan.owner ?? '',
+      tags: plan.tags
+    });
+  }, [plan]);
+
+  useEffect(() => {
+    if (!file) {
+      setAutoSaveState('idle');
+      return;
+    }
+    if (editorContent === savedContent) {
+      if (autoSaveState === 'pending') setAutoSaveState('idle');
+      return;
+    }
+    if (savingFile) {
+      setAutoSaveState('pending');
+      return;
+    }
+    clearTimeoutRef(autoSaveTimerRef);
+    setAutoSaveState('pending');
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      void saveDrawerFile(file, editorContent);
+    }, 900);
+    return () => clearTimeoutRef(autoSaveTimerRef);
+  }, [file, editorContent, savedContent, savingFile]);
+
+  const preview = useMemo(() => ({ __html: marked.parse(editorContent || file?.content || '') as string }), [editorContent, file]);
+
+  const saveDrawerFileNow = async () => {
+    if (!file || editorContent === savedContent) return true;
+    return saveDrawerFile(file, editorContent);
+  };
+
+  const saveDrawerFile = async (targetFile: FileContent, content: string) => {
+    clearTimeoutRef(autoSaveTimerRef);
+    clearTimeoutRef(autoSaveSettledTimerRef);
+    setSavingFile(true);
+    setAutoSaveState('saving');
+    setError('');
+    try {
+      const updated = await api.saveFile(planId, targetFile.id, { content, expectedHash: targetFile.hash });
+      setFile(updated);
+      setSavedContent(content);
+      setAutoSaveState('saved');
+      autoSaveSettledTimerRef.current = window.setTimeout(() => setAutoSaveState('idle'), 1400);
+      clearTimeoutRef(autoSaveRefreshTimerRef);
+      autoSaveRefreshTimerRef.current = window.setTimeout(() => {
+        api.diff(planId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
+        if (plan) void loadGitStatus(plan.repositoryId);
+      }, 600);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'File save failed');
+      setAutoSaveState('error');
+      return false;
+    } finally {
+      setSavingFile(false);
+    }
+  };
+
+  const loadDrawerFile = async (fileId: string) => {
+    try {
+      const content = await api.file(planId, fileId);
+      setFile(content);
+      setEditorContent(content.content);
+      setSavedContent(content.content);
+      setAutoSaveState('idle');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'File failed to load');
+    }
+  };
+
+  const selectDrawerFile = async (fileId: string) => {
+    if (!fileId || fileId === file?.id) return;
+    if (dirtyFile && !(await saveDrawerFileNow())) return;
+    await loadDrawerFile(fileId);
+  };
+
+  const closeDrawer = () => {
+    if (!dirtyFile) {
+      onClose();
+      return;
+    }
+    void saveDrawerFileNow().then((saved) => {
+      if (saved) onClose();
+    });
+  };
+
+  const openFullDetails = () => {
+    if (!dirtyFile) {
+      onOpenFull();
+      return;
+    }
+    void saveDrawerFileNow().then((saved) => {
+      if (saved) onOpenFull();
+    });
+  };
+
+  const loadGitStatus = async (repositoryId: string) => {
+    try {
+      setGitStatus(await api.gitStatus(repositoryId));
+    } catch {
+      setGitStatus(null);
+    }
+  };
+
+  const saveMetadata = async () => {
+    if (!plan) return;
+    setSavingMetadata(true);
+    setError('');
+    try {
+      const result = await api.saveMetadata(planId, metadataDraft);
+      setPlan(result.plan);
+      await loadGitStatus(plan.repositoryId);
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Metadata save failed');
+    } finally {
+      setSavingMetadata(false);
+    }
+  };
+
+  const runGitOperation = async (operation: 'fetch' | 'pull' | 'push') => {
+    if (!plan) return;
+    setGitBusy(operation);
+    setError('');
+    try {
+      const confirm = operation === 'pull' && Boolean(gitStatus?.dirty);
+      const result = operation === 'fetch'
+        ? await api.gitFetch(plan.repositoryId)
+        : operation === 'pull'
+          ? await api.gitPull(plan.repositoryId, { confirm })
+          : await api.gitPush(plan.repositoryId);
+      setGitStatus(result.status);
+      if (operation === 'pull') {
+        await onChanged();
+      }
+      if (!result.ok && result.message) setError(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `${operation} failed`);
+    } finally {
+      setGitBusy('');
+    }
+  };
+
+  const toggleGitPath = (path: string) => {
+    setSelectedGitPaths((current) => current.includes(path) ? current.filter((item) => item !== path) : [...current, path]);
+  };
+
+  const commitSelectedPaths = async () => {
+    if (!plan) return;
+    setGitBusy('commit');
+    setError('');
+    try {
+      const result = await api.gitCommit(plan.repositoryId, { message: gitMessage, paths: selectedGitPaths });
+      setGitStatus(result.status);
+      setGitMessage('');
+      setSelectedGitPaths([]);
+      await onChanged();
+      api.diff(planId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
+      if (!result.ok && result.message) setError(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Commit failed');
+    } finally {
+      setGitBusy('');
+    }
+  };
+
+  const createAndSwitchBranch = async () => {
+    if (!plan || !branchName.trim()) return;
+    setGitBusy('branch');
+    setError('');
+    try {
+      const result = await api.createBranch(plan.repositoryId, { name: branchName.trim(), checkout: true });
+      setGitStatus(result.status);
+      setBranchName('');
+      await onChanged();
+      if (!result.ok && result.message) setError(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Branch operation failed');
+    } finally {
+      setGitBusy('');
+    }
+  };
 
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -450,7 +701,7 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull }: { planId
 
     const onPointerMove = (moveEvent: PointerEvent) => {
       const delta = startX - moveEvent.clientX;
-      setWidth(Math.min(920, Math.max(420, startingWidth + delta)));
+      setWidth(Math.min(1120, Math.max(460, startingWidth + delta)));
     };
 
     const onPointerUp = () => {
@@ -466,8 +717,8 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull }: { planId
 
   return (
     <>
-      <button className="drawer-scrim" type="button" aria-label="Close preview" onClick={onClose} />
-      <aside className="plan-drawer" style={drawerStyle} aria-label="Plan preview">
+      <button className="drawer-scrim" type="button" aria-label="Close preview" onClick={closeDrawer} />
+      <aside className={compact ? 'plan-drawer compact' : 'plan-drawer'} style={drawerStyle} aria-label="Plan preview">
         <button className="drawer-resize-handle" type="button" aria-label="Resize preview panel" onPointerDown={startResize}>
           <GripVertical size={16} />
         </button>
@@ -478,8 +729,8 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull }: { planId
             <p>{plan ? `${plan.service} / ${plan.branch}` : ''}</p>
           </div>
           <div className="drawer-actions">
-            <button type="button" className="secondary" onClick={onOpenFull}>Open details</button>
-            <button type="button" className="icon-button" aria-label="Close preview" onClick={onClose}><X size={16} /></button>
+            <button type="button" className="secondary" onClick={openFullDetails}>Open details</button>
+            <button type="button" className="icon-button" aria-label="Close preview" onClick={closeDrawer}><X size={16} /></button>
           </div>
         </header>
         {error && <p className="error drawer-error">{error}</p>}
@@ -492,26 +743,118 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull }: { planId
               </section>
             )}
             <section className="drawer-section">
+              <label className="drawer-file-picker">
+                <span>Document</span>
+                <select value={file?.id ?? ''} onChange={(event) => void selectDrawerFile(event.target.value)} disabled={fileOptions.length === 0}>
+                  {fileOptions.length === 0 && <option value="">No files available</option>}
+                  {fileOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+              </label>
               <div className="drawer-tabs">
-                <button className={tab === 'preview' ? 'active' : ''} type="button" onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
-                <button className={tab === 'raw' ? 'active' : ''} type="button" onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
-                <button className={tab === 'diff' ? 'active' : ''} type="button" onClick={() => setTab('diff')}><RefreshCw size={15} /> Diff</button>
+                <div>
+                  <button className={tab === 'preview' ? 'active' : ''} type="button" onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
+                  <button className={tab === 'raw' ? 'active' : ''} type="button" onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
+                  <button className={tab === 'diff' ? 'active' : ''} type="button" onClick={() => setTab('diff')}><RefreshCw size={15} /> Diff</button>
+                </div>
+                <span className={`autosave-state ${autoSaveState}`}>{autoSaveLabel(autoSaveState)}</span>
               </div>
+              {dirtyFile && <div className="edit-state-banner">{autoSaveLabel(autoSaveState)}</div>}
               {tab === 'preview' && (file ? <article className="drawer-markdown" dangerouslySetInnerHTML={preview} /> : <div className="drawer-empty">No readable file selected.</div>)}
-              {tab === 'raw' && <pre className="drawer-raw">{file?.content ?? 'No readable file selected.'}</pre>}
+              {tab === 'raw' && (
+                <textarea
+                  className="drawer-raw drawer-raw-editor"
+                  value={file ? editorContent : 'No readable file selected.'}
+                  onChange={(event) => setEditorContent(event.target.value)}
+                  disabled={!file}
+                  spellCheck={false}
+                />
+              )}
               {tab === 'diff' && <pre className="drawer-raw">{diff || 'Loading diff...'}</pre>}
+              <div className="drawer-file-note">{file?.path ?? 'No file selected'}</div>
             </section>
           </section>
-          <aside className="drawer-meta">
-            <h3><Info size={15} /> Details</h3>
-            <dl>
-              <dt>Repository</dt><dd>{plan?.repositoryName ?? '-'}</dd>
-              <dt>Status</dt><dd>{plan?.status ?? '-'}</dd>
-              <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
-              <dt>Source</dt><dd>{metadataSourceLabel(plan?.metadataSource)}</dd>
-              <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
-            </dl>
-            {(plan?.tags?.length ?? 0) > 0 && <div className="tags">{plan?.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}
+          <aside className="drawer-meta drawer-work-item">
+            <h3><Info size={15} /> Work Item</h3>
+            <div className="side-panel-tabs" role="tablist" aria-label="Work item side panel">
+              <button type="button" className={sideTab === 'info' ? 'active' : ''} onClick={() => setSideTab('info')}>
+                <Info size={14} /> Info
+              </button>
+              <button type="button" className={sideTab === 'git' ? 'active' : ''} onClick={() => setSideTab('git')}>
+                <GitBranch size={14} /> Git
+              </button>
+            </div>
+            <div className="drawer-work-item-content">
+              {sideTab === 'info' && (
+                <>
+                  <dl>
+                    <dt>Repository</dt><dd>{plan?.repositoryName ?? '-'}</dd>
+                    <dt>Service</dt><dd>{plan?.service ?? '-'}</dd>
+                    <dt>Branch</dt><dd>{plan?.branch ?? '-'}</dd>
+                    <dt>Status</dt><dd>{plan?.status ? <DrawerStatusBadge status={plan.status} /> : '-'}</dd>
+                    <dt>Source</dt><dd>{metadataSourceLabel(plan?.metadataSource)}</dd>
+                    <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
+                    <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
+                  </dl>
+                  {plan?.metadataSource !== 'docs' && (
+                    <div className="metadata-form drawer-metadata-form">
+                      <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
+                      <label>Service<input value={metadataDraft.service ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, service: event.target.value }))} /></label>
+                      <label>Ticket<input value={metadataDraft.ticket ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, ticket: event.target.value }))} /></label>
+                      <label>Status<select value={metadataDraft.status ?? 'draft'} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, status: event.target.value as PlanStatus }))}>
+                        {statusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
+                      </select></label>
+                      <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
+                      <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>
+                    </div>
+                  )}
+                  <div className="workspace-actions">
+                    <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
+                  </div>
+                  {(plan?.tags?.length ?? 0) > 0 && <div className="tags">{plan?.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}
+                </>
+              )}
+              {sideTab === 'git' && (
+                gitStatus ? (
+                  <section className="drawer-git-panel">
+                  <div className="git-summary">
+                    <span>{gitStatus.branch}</span>
+                    <span>{gitStatus.ahead} ahead</span>
+                    <span>{gitStatus.behind} behind</span>
+                  </div>
+                  <div className="workspace-actions">
+                    <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('fetch')}>{gitBusy === 'fetch' ? 'Fetching...' : 'Fetch'}</button>
+                    <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('pull')}>{gitBusy === 'pull' ? 'Pulling...' : 'Pull'}</button>
+                    <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('push')}>{gitBusy === 'push' ? 'Pushing...' : 'Push'}</button>
+                  </div>
+                  <div className="git-changes">
+                    {gitStatus.changes.length === 0 && <span>No local changes</span>}
+                    {gitStatus.changes.map((change) => (
+                      <label key={`${change.status}-${change.path}`}>
+                        <input type="checkbox" checked={selectedGitPaths.includes(change.path)} onChange={() => toggleGitPath(change.path)} />
+                        <span>{change.status}</span>
+                        <strong>{change.path}</strong>
+                      </label>
+                    ))}
+                  </div>
+                  <textarea className="commit-message" value={gitMessage} onChange={(event) => setGitMessage(event.target.value)} placeholder="Commit message" />
+                  <button className="primary" type="button" disabled={Boolean(gitBusy) || selectedGitPaths.length === 0 || !gitMessage.trim()} onClick={commitSelectedPaths}>
+                    {gitBusy === 'commit' ? 'Committing...' : 'Commit Selected'}
+                  </button>
+                  <div className="branch-create-row">
+                    <input value={branchName} onChange={(event) => setBranchName(event.target.value)} placeholder="new-branch-name" />
+                    <button className="secondary" type="button" disabled={Boolean(gitBusy) || !branchName.trim()} onClick={createAndSwitchBranch}>
+                      {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
+                    </button>
+                  </div>
+                </section>
+                ) : (
+                  <div className="metadata-callout">
+                    <strong>Git status unavailable</strong>
+                    <span>Open details to run Git actions.</span>
+                  </div>
+                )
+              )}
+            </div>
           </aside>
         </div>
       </aside>
@@ -577,8 +920,59 @@ function firstFile(nodes: FileNode[]): FileNode | null {
   return null;
 }
 
+function preferredPreviewFile(nodes: FileNode[]): FileNode | null {
+  return findReadme(nodes, true) ?? findReadme(nodes, false) ?? firstFile(nodes);
+}
+
+function flattenFileOptions(nodes: FileNode[], parentPath = ''): DrawerFileOption[] {
+  return nodes.flatMap((node) => {
+    const path = parentPath ? `${parentPath}/${node.name}` : node.name;
+    if (node.type === 'file') {
+      return [{ id: node.id, path: node.path || path, label: node.path || path }];
+    }
+    return flattenFileOptions(node.children ?? [], path);
+  });
+}
+
+function findReadme(nodes: FileNode[], rootOnly: boolean): FileNode | null {
+  for (const node of nodes) {
+    if (node.type === 'file' && node.name.toLowerCase() === 'readme.md') return node;
+    if (!rootOnly && node.type === 'directory') {
+      const child = findReadme(node.children ?? [], false);
+      if (child) return child;
+    }
+  }
+  return null;
+}
+
 function metadataSourceLabel(source?: string): string {
   return source === 'docs' ? 'Docs' : 'Plan';
+}
+
+function DrawerStatusBadge({ status }: { status: PlanStatus }) {
+  return <span className={`status-badge ${status}`}>{statusLabels[status]}</span>;
+}
+
+function autoSaveLabel(state: 'idle' | 'pending' | 'saving' | 'saved' | 'error'): string {
+  switch (state) {
+    case 'pending':
+      return 'Autosave pending';
+    case 'saving':
+      return 'Saving...';
+    case 'saved':
+      return 'Saved';
+    case 'error':
+      return 'Autosave failed';
+    case 'idle':
+    default:
+      return 'Autosave on';
+  }
+}
+
+function clearTimeoutRef(ref: MutableRefObject<number | null>) {
+  if (ref.current === null) return;
+  window.clearTimeout(ref.current);
+  ref.current = null;
 }
 
 function unique(values: string[]): string[] {

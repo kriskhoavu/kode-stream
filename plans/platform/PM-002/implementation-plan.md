@@ -26,21 +26,24 @@ Avoid:
 - `Project` for registered repositories.
 - `Task` for plans.
 - `Sync` when the operation is specifically `Scan`, `Fetch`, `Pull`, or `Push`.
-- `Auto Save` because PM-002 saves only when the user clicks Save.
+- `Manual File Save` for Markdown content; PM-002 autosaves file edits and keeps explicit save only for metadata.
 
 ## Implementation Clarifications
 
 - PM-002 is a full authoring MVP.
 - It supports Markdown editing, metadata editing, status moves, new plan creation, commit, pull, push, fetch, branch create, and branch switch.
+- Markdown file edits autosave in both the details workspace and Kanban preview drawer.
+- The Kanban preview drawer provides the same Work Item Info/Git editing controls as the details workspace.
 - Write APIs must validate repository scope, plan scope, file scope, and symlink safety.
-- Freestyle docs roots support Markdown editing only.
+- Freestyle docs roots support Markdown editing only unless a valid `repository-settings.yaml` maps them into configured source cards.
 - Structured plans support Markdown and metadata editing.
 - Structured plans without `plan.yaml` can get a generated `plan.yaml` when metadata or status changes.
+- Configured source cards without `plan.yaml` can also get a generated `plan.yaml` when metadata or status changes.
 - Commit operations stage and commit only selected plan paths.
 - Pull, push, and branch switch use guard-and-confirm behavior.
 - The app does not add background auto-fetch.
 - The app never stores Git credentials.
-- After successful content writes, the affected repository is rescanned.
+- File autosave returns the updated file hash directly; metadata, status, new-plan, and Git content changes refresh affected repository state.
 
 ## Backend Phases
 
@@ -74,8 +77,10 @@ PM-002: Add write-safe models
 - [x] Add Markdown file save with expected hash support.
 - [x] Add metadata writer for `plan.yaml`.
 - [x] Add status update writer for Kanban moves.
+- [x] Add source settings reader/writer for `repository-settings.yaml`.
 - [x] Add structured plan creator with starter `README.md`, scenario folder, design folder, implementation plan, and `plan.yaml`.
-- [x] Rescan the affected repository after successful writes.
+- [x] Return updated file content/hash directly after Markdown autosave.
+- [x] Rescan the affected repository after metadata, status, and new-plan writes.
 - [x] Add tests for path traversal, symlink escape, docs root behavior, metadata creation, and duplicate plan creation.
 
 **Verification:** `rtk go test ./...`
@@ -99,6 +104,7 @@ PM-002: Add safe plan write services
 - [x] Add write guards for conflicts, dirty state, divergence, and selected path scope.
 - [x] Add repository Git API endpoints.
 - [x] Add plan file, metadata, status, and new plan API endpoints.
+- [x] Add source settings API endpoints for reading, writing, validating, and rescanning configured source roots.
 - [x] Return clear operation results with updated Git status.
 - [x] Add tests for guarded operation behavior and API errors.
 
@@ -119,8 +125,9 @@ PM-002: Add guarded Git APIs
 
 **Deliverables:**
 
-- [x] Ensure successful writes update the plan index and app state version.
+- [x] Ensure metadata, status, and new-plan writes update the plan index and app state version.
 - [x] Ensure Git content changes rescan the affected repository.
+- [x] Keep Markdown autosave fast by refreshing file hash, diff, and Git status without blocking on a full scan.
 - [x] Ensure failed writes do not mutate the index.
 - [x] Keep PM-001 read APIs stable.
 - [x] Add tests for app state version changes after writes.
@@ -146,6 +153,7 @@ PM-002: Refresh index after writes
 
 - [x] Add frontend types for edit inputs, Git status, Git changes, Git operation results, and branch operations.
 - [x] Add API client methods for file save, metadata save, status update, new plan, Git status, fetch, pull, push, commit, branch create, and branch switch.
+- [x] Add frontend types and API client methods for source structure settings.
 - [x] Normalize optional response fields.
 - [x] Add focused API client tests where current test setup supports them.
 
@@ -178,7 +186,7 @@ PM-002: Add frontend write API client
 ```text
 PM-002: Add edit and Git state handling
 
-- Track unsaved file and metadata changes
+- Track autosaved file changes and unsaved metadata changes
 - Add Git status state
 - Add navigation guards for dirty edit sessions
 ```
@@ -190,8 +198,11 @@ PM-002: Add edit and Git state handling
 **Deliverables:**
 
 - [x] Add Markdown editor mode to the workspace raw tab.
+- [x] Add Markdown editing to the Kanban preview drawer raw tab.
 - [x] Keep preview rendering the current editor content.
 - [x] Add metadata editor for structured plans.
+- [x] Add repository source settings editor for configuring path patterns and field mappings.
+- [x] Add Work Item Info/Git controls to the Kanban preview drawer.
 - [x] Add Kanban status move controls.
 - [x] Add new plan dialog.
 - [x] Add Git status panel with changed-file selection and commit form.
