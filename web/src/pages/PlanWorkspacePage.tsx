@@ -6,11 +6,14 @@ import {
   Code2,
   File as FileIcon,
   FileText,
+  FilePlus2,
   FolderOpen,
   GitBranch,
   GitCompare,
   GripVertical,
   Info,
+  PencilLine,
+  TriangleAlert,
   RotateCcw,
   PanelLeftClose,
   PanelLeftOpen,
@@ -21,7 +24,7 @@ import {
 import { marked } from 'marked';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api } from '../lib/api';
-import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput } from '../lib/types';
+import type { FileContent, FileNode, GitChange, GitChangeStatus, GitStatus, PlanDetail, PlanMetadataUpdateInput } from '../lib/types';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'git';
@@ -29,6 +32,7 @@ type DiffMode = 'review' | 'raw';
 type DiffLine = { type: 'context' | 'add' | 'delete' | 'meta'; text: string; oldLine?: number; newLine?: number };
 type DiffFile = { path: string; oldPath?: string; lines: DiffLine[]; additions: number; deletions: number };
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
+type TreeFileState = GitChangeStatus | 'unsaved';
 
 export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged }: { planId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
@@ -137,6 +141,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const selectedGitPath = useMemo(() => currentGitPath(plan, file), [plan, file]);
   const selectedFileHasDiff = Boolean(selectedGitPath && diffFiles.some((item) => item.path === selectedGitPath || item.oldPath === selectedGitPath));
   const hasFiles = useMemo(() => hasFile(files), [files]);
+  const fileStateByPath = useMemo(() => buildFileStateMap(plan, gitStatus, file, dirtyFile), [plan, gitStatus, file, dirtyFile]);
   const gridStyle = {
     '--left-panel-width': `${leftCollapsed ? 44 : leftWidth}px`,
     '--right-panel-width': `${rightCollapsed ? 44 : rightWidth}px`,
@@ -350,7 +355,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
           </div>
           {!leftCollapsed && (
             <div className="file-tree-list">
-              {files.map((node) => <TreeNode node={node} key={node.id} onOpen={openFile} activeId={file?.id} depth={0} />)}
+              {files.map((node) => <TreeNode node={node} key={node.id} onOpen={openFile} activeId={file?.id} depth={0} fileStateByPath={fileStateByPath} />)}
             </div>
           )}
           {!leftCollapsed && (
@@ -621,7 +626,7 @@ function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, rever
   );
 }
 
-function TreeNode({ node, onOpen, activeId, depth }: { node: FileNode; onOpen: (id: string) => void; activeId?: string; depth: number }) {
+function TreeNode({ node, onOpen, activeId, depth, fileStateByPath }: { node: FileNode; onOpen: (id: string) => void; activeId?: string; depth: number; fileStateByPath: Map<string, TreeFileState> }) {
   const indent = { '--tree-indent': `${depth * 14}px` } as CSSProperties & Record<'--tree-indent', string>;
 
   if (node.type === 'directory') {
@@ -633,18 +638,31 @@ function TreeNode({ node, onOpen, activeId, depth }: { node: FileNode; onOpen: (
           <span className="tree-label">{node.name}</span>
         </summary>
         <div className="tree-children">
-          {node.children?.map((child) => <TreeNode node={child} key={child.id} onOpen={onOpen} activeId={activeId} depth={depth + 1} />)}
+          {node.children?.map((child) => <TreeNode node={child} key={child.id} onOpen={onOpen} activeId={activeId} depth={depth + 1} fileStateByPath={fileStateByPath} />)}
         </div>
       </details>
     );
   }
+  const state = fileStateByPath.get(normalizePath(node.path));
   return (
     <button className={activeId === node.id ? 'tree-row tree-file active' : 'tree-row tree-file'} style={indent} title={node.path} onClick={() => onOpen(node.id)}>
       <span className="tree-spacer" />
       <FileIcon className="tree-icon" size={16} />
       <span className="tree-label">{node.name}</span>
+      {state && <FileStateIcon state={state} />}
     </button>
   );
+}
+
+function FileStateIcon({ state }: { state: TreeFileState }) {
+  const label = treeFileStateLabel(state);
+  if (state === 'added' || state === 'untracked') {
+    return <FilePlus2 className={`tree-state-icon ${state}`} size={14} aria-label={label} />;
+  }
+  if (state === 'conflicted') {
+    return <TriangleAlert className={`tree-state-icon ${state}`} size={14} aria-label={label} />;
+  }
+  return <PencilLine className={`tree-state-icon ${state}`} size={14} aria-label={label} />;
 }
 
 function firstFile(nodes: FileNode[]): FileNode | null {
@@ -667,6 +685,57 @@ function sourceLabel(source?: string): string {
 function currentGitPath(plan: PlanDetail | null, file: FileContent | null): string {
   if (!plan?.planRoot || !file?.path) return '';
   return `${plan.planRoot.replace(/\/$/, '')}/${file.path.replace(/^\//, '')}`;
+}
+
+function buildFileStateMap(plan: PlanDetail | null, gitStatus: GitStatus | null, file: FileContent | null, dirtyFile: boolean): Map<string, TreeFileState> {
+  const stateByPath = new Map<string, TreeFileState>();
+  const planRoot = normalizePath(plan?.planRoot ?? '');
+  for (const change of gitStatus?.changes ?? []) {
+    const localPath = localPlanPath(planRoot, change);
+    if (localPath) stateByPath.set(localPath, change.status);
+  }
+  if (dirtyFile && file?.path) {
+    stateByPath.set(normalizePath(file.path), 'unsaved');
+  }
+  return stateByPath;
+}
+
+function localPlanPath(planRoot: string, change: GitChange): string {
+  const path = normalizePath(change.path);
+  const oldPath = normalizePath(change.oldPath ?? '');
+  return stripPlanRoot(path, planRoot) || stripPlanRoot(oldPath, planRoot);
+}
+
+function stripPlanRoot(path: string, planRoot: string): string {
+  if (!path) return '';
+  if (!planRoot) return path;
+  if (path === planRoot) return '';
+  return path.startsWith(`${planRoot}/`) ? path.slice(planRoot.length + 1) : '';
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
+function treeFileStateLabel(state: TreeFileState): string {
+  switch (state) {
+    case 'added':
+    case 'untracked':
+      return 'New file not committed';
+    case 'unsaved':
+      return 'Unsaved editor changes';
+    case 'conflicted':
+      return 'File has conflicts';
+    case 'deleted':
+      return 'Deleted file';
+    case 'renamed':
+      return 'Renamed file';
+    case 'copied':
+      return 'Copied file';
+    case 'modified':
+    default:
+      return 'Modified file not committed';
+  }
 }
 
 function parseGitDiff(diff: string): DiffFile[] {
