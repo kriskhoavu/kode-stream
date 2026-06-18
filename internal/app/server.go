@@ -14,8 +14,8 @@ import (
 	"plan-manager/internal/config"
 	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/gitadapter"
-	"plan-manager/internal/planindex"
-	"plan-manager/internal/planwriter"
+	"plan-manager/internal/itemindex"
+	"plan-manager/internal/itemwriter"
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
 	"plan-manager/internal/systemdialog"
@@ -39,10 +39,10 @@ func NewServer(port int) (*Server, error) {
 	}
 	git := gitadapter.New()
 	reg := registry.New(paths.RegistryFile, git)
-	idx := planindex.New(paths.PlanIndexFile)
+	idx := itemindex.New(paths.PlanIndexFile)
 	scan := scanner.New(git)
 	files := fileaccess.New()
-	writer := planwriter.New(files, scan, idx, reg)
+	writer := itemwriter.New(files, scan, idx, reg)
 	apiHandler := api.New(reg, idx, scan, files, writer, git, systemdialog.New())
 
 	mux := http.NewServeMux()

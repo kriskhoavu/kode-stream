@@ -16,17 +16,17 @@ func TestSafeJoinRejectsTraversal(t *testing.T) {
 
 func TestReadStaysInsidePlanDirectory(t *testing.T) {
 	root := t.TempDir()
-	planRoot := filepath.Join(root, "plans", "platform", "PM-001")
-	if err := os.MkdirAll(planRoot, 0o755); err != nil {
+	itemRoot := filepath.Join(root, "items", "platform", "PM-001")
+	if err := os.MkdirAll(itemRoot, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(planRoot, "README.md"), []byte("# PM-001"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(itemRoot, "README.md"), []byte("# PM-001"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	access := New()
-	repo := models.RepositoryConfig{Path: root, PlanDirectories: []string{"plans"}}
-	plan := models.PlanDetail{PlanSummary: models.PlanSummary{PlanRoot: "plans/platform/PM-001"}}
-	content, err := access.Read(repo, plan, "README_md")
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
+	content, err := access.Read(workspace, item, "README_md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,47 +40,47 @@ func TestReadStaysInsidePlanDirectory(t *testing.T) {
 
 func TestWriteMarkdownRejectsStaleHash(t *testing.T) {
 	root := t.TempDir()
-	planRoot := filepath.Join(root, "plans", "platform", "PM-001")
-	if err := os.MkdirAll(planRoot, 0o755); err != nil {
+	itemRoot := filepath.Join(root, "items", "platform", "PM-001")
+	if err := os.MkdirAll(itemRoot, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(planRoot, "README.md"), []byte("# PM-001"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(itemRoot, "README.md"), []byte("# PM-001"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	access := New()
-	repo := models.RepositoryConfig{Path: root, PlanDirectories: []string{"plans"}}
-	plan := models.PlanDetail{PlanSummary: models.PlanSummary{PlanRoot: "plans/platform/PM-001"}}
-	if _, err := access.WriteMarkdown(repo, plan, models.FileSaveInput{FileID: "README_md", Content: "changed", ExpectedHash: "stale"}); err == nil {
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
+	if _, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: "README_md", Content: "changed", ExpectedHash: "stale"}); err == nil {
 		t.Fatal("expected stale hash to be rejected")
 	}
 }
 
 func TestWriteMarkdownRejectsSymlinkEscape(t *testing.T) {
 	root := t.TempDir()
-	planRoot := filepath.Join(root, "plans", "platform", "PM-001")
-	if err := os.MkdirAll(planRoot, 0o755); err != nil {
+	itemRoot := filepath.Join(root, "items", "platform", "PM-001")
+	if err := os.MkdirAll(itemRoot, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	outside := filepath.Join(root, "secret.md")
 	if err := os.WriteFile(outside, []byte("secret"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(outside, filepath.Join(planRoot, "escape.md")); err != nil {
+	if err := os.Symlink(outside, filepath.Join(itemRoot, "escape.md")); err != nil {
 		t.Skipf("symlink not available: %v", err)
 	}
 
 	access := New()
-	repo := models.RepositoryConfig{Path: root, PlanDirectories: []string{"plans"}}
-	plan := models.PlanDetail{PlanSummary: models.PlanSummary{PlanRoot: "plans/platform/PM-001"}}
-	if _, err := access.WriteMarkdown(repo, plan, models.FileSaveInput{FileID: "escape_md", Content: "changed"}); err == nil {
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
+	if _, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: "escape_md", Content: "changed"}); err == nil {
 		t.Fatal("expected symlink escape to be rejected")
 	}
 }
 
 func TestTreeSortsDirectoriesFirstWithNaturalNames(t *testing.T) {
 	root := t.TempDir()
-	planRoot := filepath.Join(root, "plans", "platform", "PM-001")
+	itemRoot := filepath.Join(root, "items", "platform", "PM-001")
 	for _, rel := range []string{
 		"README.md",
 		"file-10.md",
@@ -89,7 +89,7 @@ func TestTreeSortsDirectoriesFirstWithNaturalNames(t *testing.T) {
 		"design/design-2.md",
 		"scenario/scenario-1.md",
 	} {
-		path := filepath.Join(planRoot, filepath.FromSlash(rel))
+		path := filepath.Join(itemRoot, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -99,9 +99,9 @@ func TestTreeSortsDirectoriesFirstWithNaturalNames(t *testing.T) {
 	}
 
 	access := New()
-	repo := models.RepositoryConfig{Path: root, PlanDirectories: []string{"plans"}}
-	plan := models.PlanDetail{PlanSummary: models.PlanSummary{PlanRoot: "plans/platform/PM-001"}}
-	tree, err := access.Tree(repo, plan)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
+	tree, err := access.Tree(workspace, item)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,20 +20,20 @@ func New() *Access {
 	return &Access{}
 }
 
-func (a *Access) Tree(repo models.RepositoryConfig, plan models.PlanDetail) ([]models.FileNode, error) {
-	root, err := a.safePlanRoot(repo, plan)
+func (a *Access) Tree(workspace models.WorkspaceConfig, item models.ItemDetail) ([]models.FileNode, error) {
+	root, err := a.safeItemPath(workspace, item)
 	if err != nil {
 		return nil, err
 	}
 	return buildTreeFromDir(root, "")
 }
 
-func (a *Access) Read(repo models.RepositoryConfig, plan models.PlanDetail, fileID string) (models.FileContent, error) {
-	root, err := a.safePlanRoot(repo, plan)
+func (a *Access) Read(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) (models.FileContent, error) {
+	root, err := a.safeItemPath(workspace, item)
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	relPath, full, err := a.resolveFile(repo, plan, root, fileID)
+	relPath, full, err := a.resolveFile(workspace, item, root, fileID)
 	if err != nil {
 		return models.FileContent{}, err
 	}
@@ -44,12 +44,12 @@ func (a *Access) Read(repo models.RepositoryConfig, plan models.PlanDetail, file
 	return fileContent(relPath, data), nil
 }
 
-func (a *Access) WriteMarkdown(repo models.RepositoryConfig, plan models.PlanDetail, input models.FileSaveInput) (models.FileContent, error) {
-	root, err := a.safePlanRoot(repo, plan)
+func (a *Access) WriteMarkdown(workspace models.WorkspaceConfig, item models.ItemDetail, input models.FileSaveInput) (models.FileContent, error) {
+	root, err := a.safeItemPath(workspace, item)
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	relPath, full, err := a.resolveFile(repo, plan, root, input.FileID)
+	relPath, full, err := a.resolveFile(workspace, item, root, input.FileID)
 	if err != nil {
 		return models.FileContent{}, err
 	}
@@ -69,17 +69,17 @@ func (a *Access) WriteMarkdown(repo models.RepositoryConfig, plan models.PlanDet
 	return fileContent(relPath, []byte(input.Content)), nil
 }
 
-func (a *Access) RelativePath(repo models.RepositoryConfig, plan models.PlanDetail, fileID string) (string, error) {
-	root, err := a.safePlanRoot(repo, plan)
+func (a *Access) RelativePath(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) (string, error) {
+	root, err := a.safeItemPath(workspace, item)
 	if err != nil {
 		return "", err
 	}
-	relPath, _, err := a.resolveFile(repo, plan, root, fileID)
+	relPath, _, err := a.resolveFile(workspace, item, root, fileID)
 	return relPath, err
 }
 
-func (a *Access) safePlanRoot(repo models.RepositoryConfig, plan models.PlanDetail) (string, error) {
-	root, err := safeJoin(repo.Path, plan.PlanRoot)
+func (a *Access) safeItemPath(workspace models.WorkspaceConfig, item models.ItemDetail) (string, error) {
+	root, err := safeJoin(workspace.Path, item.ItemPath)
 	if err != nil {
 		return "", err
 	}
@@ -88,8 +88,8 @@ func (a *Access) safePlanRoot(repo models.RepositoryConfig, plan models.PlanDeta
 		return "", err
 	}
 	allowed := false
-	for _, dir := range repo.PlanDirectories {
-		allowedRoot, err := filepath.EvalSymlinks(filepath.Join(repo.Path, filepath.FromSlash(dir)))
+	for _, dir := range workspace.Sources {
+		allowedRoot, err := filepath.EvalSymlinks(filepath.Join(workspace.Path, filepath.FromSlash(dir)))
 		if err != nil {
 			continue
 		}
@@ -99,21 +99,21 @@ func (a *Access) safePlanRoot(repo models.RepositoryConfig, plan models.PlanDeta
 		}
 	}
 	if !allowed {
-		return "", fmt.Errorf("plan path is outside configured plan directories")
+		return "", fmt.Errorf("item path is outside configured sources")
 	}
 	return realRoot, nil
 }
 
-func (a *Access) resolveFile(repo models.RepositoryConfig, plan models.PlanDetail, root, fileID string) (string, string, error) {
+func (a *Access) resolveFile(workspace models.WorkspaceConfig, item models.ItemDetail, root, fileID string) (string, string, error) {
 	relPath := ""
-	for _, node := range flattenTreeMust(a.Tree(repo, plan)) {
+	for _, node := range flattenTreeMust(a.Tree(workspace, item)) {
 		if node.ID == fileID {
 			relPath = node.Path
 			break
 		}
 	}
 	if relPath == "" {
-		for _, doc := range plan.Documents {
+		for _, doc := range item.Documents {
 			if fileIDForPath(doc.Path) == fileID {
 				relPath = doc.Path
 				break
@@ -132,7 +132,7 @@ func (a *Access) resolveFile(repo models.RepositoryConfig, plan models.PlanDetai
 		return "", "", err
 	}
 	if realFile != root && !strings.HasPrefix(realFile, root+string(filepath.Separator)) {
-		return "", "", fmt.Errorf("file path escapes plan root")
+		return "", "", fmt.Errorf("file path escapes item root")
 	}
 	return relPath, realFile, nil
 }

@@ -1,0 +1,157 @@
+package itemwriter
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"plan-manager/internal/fileaccess"
+	"plan-manager/internal/gitadapter"
+	"plan-manager/internal/itemindex"
+	"plan-manager/internal/models"
+	"plan-manager/internal/scanner"
+)
+
+func TestSaveMetadataCreatesPlanYAML(t *testing.T) {
+	root := t.TempDir()
+	itemRoot := filepath.Join(root, "items", "platform", "PM-002")
+	if err := os.MkdirAll(itemRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, itemRoot, "README.md", "# PM-002\n")
+
+	writer := New(fileaccess.New(), nil, nil, nil)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{
+		ItemPath:   "items/platform/PM-002",
+		Scope:      "platform",
+		Identifier: "PM-002",
+		Title:      "Item Editing",
+		Status:     models.StatusDraft,
+	}}
+
+	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusInProgress, Owner: "Khoa Vu", Tags: []string{"items", "items", "edit"}}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(itemRoot, "item.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{"identifier: PM-002", "status: in_progress", "owner: Khoa Vu", "- items", "- edit"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("item.yaml missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestSaveMetadataRejectsDocsRoot(t *testing.T) {
+	writer := New(fileaccess.New(), nil, nil, nil)
+	workspace := models.WorkspaceConfig{Path: t.TempDir(), Sources: []string{"docs"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "docs", MetadataSource: "docs"}}
+	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); err == nil {
+		t.Fatal("expected docs root metadata edit to be rejected")
+	}
+}
+
+func TestCreateItemRejectsDuplicate(t *testing.T) {
+	root := t.TempDir()
+	existing := filepath.Join(root, "items", "platform", "PM-002")
+	if err := os.MkdirAll(existing, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	writer := New(fileaccess.New(), nil, nil, nil)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	_, err := writer.CreateItem(workspace, models.NewItemInput{
+		Source:     "items",
+		Scope:      "platform",
+		Identifier: "PM-002",
+		Title:      "Item Editing",
+	})
+	if err == nil {
+		t.Fatal("expected duplicate item to be rejected")
+	}
+}
+
+func TestCreateItemWritesStarterFiles(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "items"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	writer := New(fileaccess.New(), nil, nil, nil)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	if _, err := writer.CreateItem(workspace, models.NewItemInput{
+		Source:     "items",
+		Scope:      "platform",
+		Identifier: "PM-003",
+		Title:      "Next Item",
+		Status:     models.StatusIdeas,
+		Tags:       []string{"platform"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, rel := range []string{"README.md", "scenario/scenario-00-overview.md", "design/design-01-backend.md", "design/design-02-frontend.md", "implementation-item.md", "item.yaml"} {
+		if _, err := os.Stat(filepath.Join(root, "items", "platform", "PM-003", filepath.FromSlash(rel))); err != nil {
+			t.Fatalf("expected %s: %v", rel, err)
+		}
+	}
+}
+
+func TestSaveMetadataRefreshesIndex(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	itemRoot := filepath.Join(root, "items", "platform", "PM-002")
+	writeFile(t, itemRoot, "README.md", "# PM-002\n\nEdit items.\n")
+
+	git := gitadapter.New()
+	idx := itemindex.New(filepath.Join(t.TempDir(), "index.yaml"))
+	writer := New(fileaccess.New(), scanner.New(git), idx, nil)
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "workspace", Path: root, BaselineBranch: "main", Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{
+		WorkspaceID: workspace.ID,
+		ItemPath:    "items/platform/PM-002",
+		Scope:       "platform",
+		Identifier:  "PM-002",
+		Title:       "Item Editing",
+		Status:      models.StatusDraft,
+	}}
+
+	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); err != nil {
+		t.Fatal(err)
+	}
+	items, err := idx.Query(itemindex.Query{WorkspaceID: workspace.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("items = %d, want 1", len(items))
+	}
+	if items[0].Status != models.StatusDone {
+		t.Fatalf("status = %q, want done", items[0].Status)
+	}
+}
+
+func writeFile(t *testing.T, root, rel, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func initGitRepo(t *testing.T, root string) {
+	t.Helper()
+	cmd := exec.Command("git", "init")
+	cmd.Dir = root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init failed: %v\n%s", err, out)
+	}
+}

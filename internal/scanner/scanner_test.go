@@ -8,7 +8,7 @@ import (
 )
 
 func TestNormalizeStatus(t *testing.T) {
-	cases := map[string]models.PlanStatus{
+	cases := map[string]models.ItemStatus{
 		"unsorted":    models.StatusUnsorted,
 		"Ideas":       models.StatusIdeas,
 		"draft":       models.StatusDraft,
@@ -28,7 +28,7 @@ func TestNormalizeStatus(t *testing.T) {
 func TestFallbackDocumentsOrdersKnownPlanFiles(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "README.md", "# Test\n")
-	writeTestFile(t, root, "implementation-plan.md", "# Plan\n")
+	writeTestFile(t, root, "implementation-item.md", "# Item\n")
 	writeTestFile(t, root, "scenario/scenario-00-overview.md", "# Scenario\n")
 	writeTestFile(t, root, "design/design-01-backend.md", "# Backend\n")
 
@@ -43,8 +43,8 @@ func TestFallbackDocumentsOrdersKnownPlanFiles(t *testing.T) {
 	if roles["README.md"] != "overview" {
 		t.Fatalf("README role = %q", roles["README.md"])
 	}
-	if roles["implementation-plan.md"] != "implementation" {
-		t.Fatalf("implementation role = %q", roles["implementation-plan.md"])
+	if roles["implementation-item.md"] != "implementation" {
+		t.Fatalf("implementation role = %q", roles["implementation-item.md"])
 	}
 }
 
@@ -73,14 +73,14 @@ func TestDocumentCollectionDetection(t *testing.T) {
 
 func TestStructuredPlanDirectoryDoesNotScanAsDocumentCollection(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, root, "api/DI-1/README.md", "# Plan\n")
+	writeTestFile(t, root, "api/DI-1/README.md", "# Item\n")
 	entries, err := osReadDir(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if shouldScanAsDocumentCollection(root, entries) {
-		t.Fatal("structured plan root should not scan as one document collection")
+		t.Fatal("structured item root should not scan as one document collection")
 	}
 }
 
@@ -93,13 +93,13 @@ func TestNestedFreestyleDocsStillScanAsDocumentCollection(t *testing.T) {
 	}
 
 	if !shouldScanAsDocumentCollection(root, entries) {
-		t.Fatal("nested freestyle docs should not look like structured plan folders")
+		t.Fatal("nested freestyle docs should not look like structured item folders")
 	}
 }
 
 func TestSourceSettingsModeDetectsStructuredRoot(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, root, "api/DI-1/README.md", "# Plan\n")
+	writeTestFile(t, root, "api/DI-1/README.md", "# Item\n")
 
 	if got := SourceSettingsMode(root); got != "structured" {
 		t.Fatalf("SourceSettingsMode() = %q, want structured", got)
@@ -115,106 +115,106 @@ func TestSourceSettingsModeDetectsUnstructuredRoot(t *testing.T) {
 	}
 }
 
-func TestRepositorySettingsSplitsFreestyleDocsIntoCards(t *testing.T) {
+func TestSourceStructureSettingsSplitsFreestyleDocsIntoCards(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, root, "docs/repository-settings.yaml", `version: 1
+	writeTestFile(t, root, "docs/workspace-settings.yaml", `version: 1
 cards:
-  - pathPattern: "{service}/feature/{ticket}"
+  - pathPattern: "{scope}/feature/{identifier}"
     fields:
-      service: "{service}"
-      ticket: "{ticket}"
+      scope: "{scope}"
+      identifier: "{identifier}"
       title: readme_heading
       status: in_progress
-      tags: [docs, "{service}"]
+      tags: [docs, "{scope}"]
 `)
 	writeTestFile(t, root, "docs/api/feature/DI-101/README.md", "# API Search\n\nSearch docs.\n")
 	writeTestFile(t, root, "docs/webapp/feature/DI-202/README.md", "# Web UI\n\nUI docs.\n")
 
-	data, err := New(gitadapter.New()).Scan(models.RepositoryConfig{
-		ID: "repo", Name: "Repo", Path: root, BaselineBranch: "main", PlanDirectories: []string{"docs"},
+	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(data.Plans) != 2 {
-		t.Fatalf("expected 2 configured cards, got %d (%v)", len(data.Plans), data.Warnings)
+	if len(data.Items) != 2 {
+		t.Fatalf("expected 2 configured cards, got %d (%v)", len(data.Items), data.Warnings)
 	}
-	plans := map[string]models.PlanDetail{}
-	for _, plan := range data.Plans {
-		plans[plan.Ticket] = plan
+	items := map[string]models.ItemDetail{}
+	for _, item := range data.Items {
+		items[item.Identifier] = item
 	}
-	api := plans["DI-101"]
-	if api.Service != "api" || api.Title != "API Search" || api.Status != models.StatusInProgress || api.MetadataSource != "repository-settings" {
-		t.Fatalf("unexpected configured plan: %+v", api.PlanSummary)
+	api := items["DI-101"]
+	if api.Scope != "api" || api.Title != "API Search" || api.Status != models.StatusInProgress || api.MetadataSource != "workspace-settings" {
+		t.Fatalf("unexpected configured item: %+v", api.ItemSummary)
 	}
 	if len(api.Tags) != 2 || api.Tags[0] != "docs" || api.Tags[1] != "api" {
 		t.Fatalf("unexpected tags: %#v", api.Tags)
 	}
 }
 
-func TestInvalidRepositorySettingsFallsBackToDocsCollection(t *testing.T) {
+func TestInvalidSourceStructureSettingsFallsBackToDocsCollection(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, root, "docs/repository-settings.yaml", `version: 1
+	writeTestFile(t, root, "docs/workspace-settings.yaml", `version: 1
 cards:
-  - pathPattern: "{service}/{ticket}"
+  - pathPattern: "{scope}/{identifier}"
     fields:
-      service: "{missing}"
-      ticket: "{ticket}"
+      scope: "{missing}"
+      identifier: "{identifier}"
 `)
 	writeTestFile(t, root, "docs/a12/guide.md", "# Guide\n\nDocs.\n")
 
-	data, err := New(gitadapter.New()).Scan(models.RepositoryConfig{
-		ID: "repo", Name: "Repo", Path: root, BaselineBranch: "main", PlanDirectories: []string{"docs"},
+	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(data.Plans) != 1 {
-		t.Fatalf("expected fallback docs card, got %d", len(data.Plans))
+	if len(data.Items) != 1 {
+		t.Fatalf("expected fallback docs card, got %d", len(data.Items))
 	}
-	if data.Plans[0].MetadataSource != "docs" {
-		t.Fatalf("expected docs fallback, got %q", data.Plans[0].MetadataSource)
+	if data.Items[0].MetadataSource != "docs" {
+		t.Fatalf("expected docs fallback, got %q", data.Items[0].MetadataSource)
 	}
-	if data.Plans[0].Status != models.StatusUnsorted {
-		t.Fatalf("expected unsorted docs fallback, got %q", data.Plans[0].Status)
+	if data.Items[0].Status != models.StatusUnsorted {
+		t.Fatalf("expected unsorted docs fallback, got %q", data.Items[0].Status)
 	}
 	if len(data.Warnings) == 0 {
 		t.Fatal("expected invalid settings warning")
 	}
 }
 
-func TestRepositorySettingsDoNotOverridePlanYAML(t *testing.T) {
+func TestSourceStructureSettingsDoNotOverridePlanYAML(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, root, "docs/repository-settings.yaml", `version: 1
+	writeTestFile(t, root, "docs/workspace-settings.yaml", `version: 1
 cards:
-  - pathPattern: "{service}/feature/{ticket}"
+  - pathPattern: "{scope}/feature/{identifier}"
     fields:
-      service: "{service}"
-      ticket: "{ticket}"
+      scope: "{scope}"
+      identifier: "{identifier}"
       title: "Configured"
       status: done
       tags: [docs]
 `)
 	writeTestFile(t, root, "docs/api/feature/DI-101/README.md", "# README Title\n")
-	writeTestFile(t, root, "docs/api/feature/DI-101/plan.yaml", `plan:
-  ticket: DI-101
+	writeTestFile(t, root, "docs/api/feature/DI-101/item.yaml", `item:
+  identifier: DI-101
   title: YAML Title
-  service: backend
+  scope: backend
   status: review
 `)
 
-	data, err := New(gitadapter.New()).Scan(models.RepositoryConfig{
-		ID: "repo", Name: "Repo", Path: root, BaselineBranch: "main", PlanDirectories: []string{"docs"},
+	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(data.Plans) != 1 {
-		t.Fatalf("expected 1 plan, got %d", len(data.Plans))
+	if len(data.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(data.Items))
 	}
-	plan := data.Plans[0]
-	if plan.MetadataSource != "plan.yaml" || plan.Service != "backend" || plan.Title != "YAML Title" || plan.Status != models.StatusReview {
-		t.Fatalf("plan.yaml should win over repository settings: %+v", plan.PlanSummary)
+	item := data.Items[0]
+	if item.MetadataSource != "item.yaml" || item.Scope != "backend" || item.Title != "YAML Title" || item.Status != models.StatusReview {
+		t.Fatalf("item.yaml should win over workspace settings: %+v", item.ItemSummary)
 	}
 }
 

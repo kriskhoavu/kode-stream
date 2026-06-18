@@ -1,53 +1,53 @@
 import { useEffect, useMemo, useState } from 'react';
 import { GitBranch, FolderGit2, Search } from 'lucide-react';
 import { api, statusLabels, statusOrder } from '../lib/api';
-import type { PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
+import type { ItemStatus, ItemSummary, WorkspaceConfig } from '../lib/types';
 
 type BranchGroup = {
   branch: string;
   count: number;
   sources: string[];
-  statuses: Record<PlanStatus, number>;
+  statuses: Record<ItemStatus, number>;
   latest?: string;
 };
 
-export function BranchesPage({ repository, refreshKey, onOpenBranch }: {
-  repository?: RepositoryConfig;
+export function BranchesPage({ workspace, refreshKey, onOpenBranch }: {
+  workspace?: WorkspaceConfig;
   refreshKey: number;
   onOpenBranch: (branch: string) => void;
 }) {
-  const [plans, setPlans] = useState<PlanSummary[]>([]);
+  const [items, setPlans] = useState<ItemSummary[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!repository) {
+    if (!workspace) {
       setPlans([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     setError('');
-    api.plans(new URLSearchParams({ repositoryId: repository.id }))
+    api.items(new URLSearchParams({ workspaceId: workspace.id }))
       .then(setPlans)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [repository, refreshKey]);
+  }, [workspace, refreshKey]);
 
   const branches = useMemo(() => {
     const groups = new Map<string, BranchGroup>();
-    plans.forEach((plan) => {
+    items.forEach((plan) => {
       const branch = plan.branch || 'unknown';
       const current = groups.get(branch) ?? {
         branch,
         count: 0,
         sources: [],
-        statuses: Object.fromEntries(statusOrder.map((status) => [status, 0])) as Record<PlanStatus, number>
+        statuses: Object.fromEntries(statusOrder.map((status) => [status, 0])) as Record<ItemStatus, number>
       };
       current.count += 1;
       current.statuses[plan.status] += 1;
-      const source = sourceRoot(plan, repository);
+      const source = sourceRoot(plan, workspace);
       if (source && !current.sources.includes(source)) current.sources.push(source);
       if (plan.updatedAt && (!current.latest || new Date(plan.updatedAt) > new Date(current.latest))) {
         current.latest = plan.updatedAt;
@@ -55,7 +55,7 @@ export function BranchesPage({ repository, refreshKey, onOpenBranch }: {
       groups.set(branch, current);
     });
     return Array.from(groups.values()).sort((a, b) => a.branch.localeCompare(b.branch, undefined, { numeric: true, sensitivity: 'base' }));
-  }, [plans, repository]);
+  }, [items, workspace]);
 
   const filteredBranches = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -63,11 +63,11 @@ export function BranchesPage({ repository, refreshKey, onOpenBranch }: {
     return branches.filter((branch) => [branch.branch, ...branch.sources].join(' ').toLowerCase().includes(text));
   }, [branches, query]);
 
-  if (!repository && !loading) {
+  if (!workspace && !loading) {
     return (
       <section className="empty-state">
         <h1>Branches</h1>
-        <p>Register a local Git repository to browse branch summaries.</p>
+        <p>Register a local Git workspace to browse branch summaries.</p>
       </section>
     );
   }
@@ -77,7 +77,7 @@ export function BranchesPage({ repository, refreshKey, onOpenBranch }: {
       <div className="page-title list-title">
         <div>
           <h1><GitBranch size={22} /> Branches</h1>
-          <span><FolderGit2 size={15} /> {repository?.name ?? 'No workspace selected'}</span>
+          <span><FolderGit2 size={15} /> {workspace?.name ?? 'No workspace selected'}</span>
         </div>
       </div>
       <label className="filter-input list-search">
@@ -94,7 +94,7 @@ export function BranchesPage({ repository, refreshKey, onOpenBranch }: {
           <button type="button" className="branch-card" key={branch.branch} onClick={() => onOpenBranch(branch.branch)}>
             <div className="branch-card-header">
               <strong><GitBranch size={16} /> {branch.branch}</strong>
-              <span>{branch.count} plan{branch.count === 1 ? '' : 's'}</span>
+              <span>{branch.count} item{branch.count === 1 ? '' : 's'}</span>
             </div>
             <div className="branch-sources">
               {branch.sources.map((source) => <span key={source}>{source}</span>)}
@@ -113,8 +113,8 @@ export function BranchesPage({ repository, refreshKey, onOpenBranch }: {
   );
 }
 
-function sourceRoot(plan: PlanSummary, repository?: RepositoryConfig): string {
-  const root = plan.planRoot ?? '';
-  const directories = repository?.planDirectories ?? [];
-  return directories.find((directory) => root === directory || root.startsWith(`${directory}/`)) ?? root.split('/')[0] ?? 'plans';
+function sourceRoot(plan: ItemSummary, workspace?: WorkspaceConfig): string {
+  const root = plan.itemPath ?? '';
+  const directories = workspace?.sources ?? [];
+  return directories.find((directory) => root === directory || root.startsWith(`${directory}/`)) ?? root.split('/')[0] ?? 'items';
 }

@@ -22,7 +22,7 @@ func New() *GitAdapter {
 	return &GitAdapter{timeout: 5 * time.Second}
 }
 
-func (g *GitAdapter) RepositoryRoot(path string) (string, error) {
+func (g *GitAdapter) WorkspaceRoot(path string) (string, error) {
 	out, err := g.run(path, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", err
@@ -30,13 +30,13 @@ func (g *GitAdapter) RepositoryRoot(path string) (string, error) {
 	return filepath.Clean(strings.TrimSpace(out)), nil
 }
 
-func (g *GitAdapter) ValidateBranch(repoPath, branch string) error {
-	_, err := g.run(repoPath, "show-ref", "--verify", "refs/heads/"+branch)
+func (g *GitAdapter) ValidateBranch(workspacePath, branch string) error {
+	_, err := g.run(workspacePath, "show-ref", "--verify", "refs/heads/"+branch)
 	return err
 }
 
-func (g *GitAdapter) CurrentBranch(repoPath string) (string, error) {
-	out, err := g.run(repoPath, "branch", "--show-current")
+func (g *GitAdapter) CurrentBranch(workspacePath string) (string, error) {
+	out, err := g.run(workspacePath, "branch", "--show-current")
 	if err != nil {
 		return "", err
 	}
@@ -47,8 +47,8 @@ func (g *GitAdapter) CurrentBranch(repoPath string) (string, error) {
 	return branch, nil
 }
 
-func (g *GitAdapter) ListBranches(repoPath string) ([]string, error) {
-	out, err := g.run(repoPath, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+func (g *GitAdapter) ListBranches(workspacePath string) ([]string, error) {
+	out, err := g.run(workspacePath, "for-each-ref", "--format=%(refname:short)", "refs/heads")
 	if err != nil {
 		return nil, err
 	}
@@ -62,12 +62,12 @@ func (g *GitAdapter) ListBranches(repoPath string) ([]string, error) {
 	return branches, nil
 }
 
-func (g *GitAdapter) BranchForTicket(repoPath, ticket string) string {
+func (g *GitAdapter) BranchForIdentifier(workspacePath, ticket string) string {
 	ticket = strings.ToLower(strings.TrimSpace(ticket))
 	if ticket == "" {
 		return ""
 	}
-	branches, err := g.ListBranches(repoPath)
+	branches, err := g.ListBranches(workspacePath)
 	if err != nil {
 		return ""
 	}
@@ -79,16 +79,16 @@ func (g *GitAdapter) BranchForTicket(repoPath, ticket string) string {
 	return ""
 }
 
-func (g *GitAdapter) LastAuthor(repoPath, relPath string) string {
-	out, err := g.run(repoPath, "log", "-1", "--format=%an", "--", relPath)
+func (g *GitAdapter) LastAuthor(workspacePath, relPath string) string {
+	out, err := g.run(workspacePath, "log", "-1", "--format=%an", "--", relPath)
 	if err != nil {
 		return ""
 	}
 	return strings.TrimSpace(out)
 }
 
-func (g *GitAdapter) LastUpdate(repoPath, relPath string) time.Time {
-	out, err := g.run(repoPath, "log", "-1", "--format=%cI", "--", relPath)
+func (g *GitAdapter) LastUpdate(workspacePath, relPath string) time.Time {
+	out, err := g.run(workspacePath, "log", "-1", "--format=%cI", "--", relPath)
 	if err == nil {
 		if t, parseErr := time.Parse(time.RFC3339, strings.TrimSpace(out)); parseErr == nil {
 			return t
@@ -97,17 +97,17 @@ func (g *GitAdapter) LastUpdate(repoPath, relPath string) time.Time {
 	return time.Time{}
 }
 
-func (g *GitAdapter) Diff(repoPath, relPath string) (string, error) {
-	return g.run(repoPath, "diff", "--", relPath)
+func (g *GitAdapter) Diff(workspacePath, relPath string) (string, error) {
+	return g.run(workspacePath, "diff", "--", relPath)
 }
 
-func (g *GitAdapter) Status(repositoryID, repoPath string) (models.GitStatus, error) {
-	branch, _ := g.CurrentBranch(repoPath)
-	out, err := g.run(repoPath, "status", "--porcelain=v1", "-b")
+func (g *GitAdapter) Status(workspaceID, workspacePath string) (models.GitStatus, error) {
+	branch, _ := g.CurrentBranch(workspacePath)
+	out, err := g.run(workspacePath, "status", "--porcelain=v1", "-b")
 	if err != nil {
 		return models.GitStatus{}, err
 	}
-	status := models.GitStatus{RepositoryID: repositoryID, Branch: branch, Changes: []models.GitChange{}}
+	status := models.GitStatus{WorkspaceID: workspaceID, Branch: branch, Changes: []models.GitChange{}}
 	for _, line := range strings.Split(out, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
@@ -131,58 +131,58 @@ func (g *GitAdapter) Status(repositoryID, repoPath string) (models.GitStatus, er
 	return status, nil
 }
 
-func (g *GitAdapter) Fetch(repoPath string) error {
-	_, err := g.run(repoPath, "fetch", "--all", "--prune")
+func (g *GitAdapter) Fetch(workspacePath string) error {
+	_, err := g.run(workspacePath, "fetch", "--all", "--prune")
 	return err
 }
 
-func (g *GitAdapter) Pull(repoPath string) error {
-	_, err := g.run(repoPath, "pull", "--ff-only")
+func (g *GitAdapter) Pull(workspacePath string) error {
+	_, err := g.run(workspacePath, "pull", "--ff-only")
 	return err
 }
 
-func (g *GitAdapter) Push(repoPath string) error {
-	_, err := g.run(repoPath, "push")
+func (g *GitAdapter) Push(workspacePath string) error {
+	_, err := g.run(workspacePath, "push")
 	return err
 }
 
-func (g *GitAdapter) Commit(repoPath, message string, paths []string) error {
+func (g *GitAdapter) Commit(workspacePath, message string, paths []string) error {
 	if len(paths) == 0 {
 		return fmt.Errorf("at least one path is required")
 	}
 	args := append([]string{"add", "--"}, paths...)
-	if _, err := g.run(repoPath, args...); err != nil {
+	if _, err := g.run(workspacePath, args...); err != nil {
 		return err
 	}
-	_, err := g.run(repoPath, "commit", "-m", message)
+	_, err := g.run(workspacePath, "commit", "-m", message)
 	return err
 }
 
-func (g *GitAdapter) RevertPaths(repoPath string, paths []string) error {
+func (g *GitAdapter) RevertPaths(workspacePath string, paths []string) error {
 	if len(paths) == 0 {
 		return fmt.Errorf("at least one path is required")
 	}
 	args := append([]string{"restore", "--source=HEAD", "--staged", "--worktree", "--"}, paths...)
-	_, err := g.run(repoPath, args...)
+	_, err := g.run(workspacePath, args...)
 	return err
 }
 
-func (g *GitAdapter) CreateBranch(repoPath, name, startPoint string, checkout bool) error {
+func (g *GitAdapter) CreateBranch(workspacePath, name, startPoint string, checkout bool) error {
 	args := []string{"branch", name}
 	if strings.TrimSpace(startPoint) != "" {
 		args = append(args, startPoint)
 	}
-	if _, err := g.run(repoPath, args...); err != nil {
+	if _, err := g.run(workspacePath, args...); err != nil {
 		return err
 	}
 	if checkout {
-		return g.SwitchBranch(repoPath, name)
+		return g.SwitchBranch(workspacePath, name)
 	}
 	return nil
 }
 
-func (g *GitAdapter) SwitchBranch(repoPath, name string) error {
-	_, err := g.run(repoPath, "switch", name)
+func (g *GitAdapter) SwitchBranch(workspacePath, name string) error {
+	_, err := g.run(workspacePath, "switch", name)
 	return err
 }
 

@@ -1083,13 +1083,13 @@ select {
   font-weight: 800;
 }
 
-.plan-card-ticket {
+.plan-card-identifier {
   justify-self: start;
   color: var(--muted);
   font-size: 12px;
 }
 
-.service-badge,
+.scope-badge,
 .source-badge {
   border-radius: 999px;
   padding: 2px 7px;
@@ -1102,7 +1102,7 @@ select {
   background: var(--panel-soft);
 }
 
-.service-badge {
+.scope-badge {
   color: var(--muted);
   max-width: 76px;
 }
@@ -1296,14 +1296,75 @@ body.is-resizing-drawer {
   font-weight: 700;
 }
 
-.drawer-file-picker select {
+.file-menu-control {
+  position: relative;
+}
+
+.file-menu-trigger {
   width: 100%;
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
   color: var(--text);
-  padding: 0 10px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.file-menu-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-menu-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: transform 150ms ease;
+}
+
+.file-menu-chevron.open {
+  transform: rotate(180deg);
+}
+
+.file-menu-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 5px;
+  display: grid;
+  gap: 2px;
+}
+
+.file-menu-popover button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  padding: 0 8px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-menu-popover button:hover,
+.file-menu-popover button.active {
+  background: var(--panel-soft);
+  color: var(--blue);
 }
 
 .drawer-tabs {
@@ -1527,11 +1588,14 @@ body.is-resizing-drawer {
   white-space: nowrap;
 }
 
+.workspaces-layout,
 .repositories-layout {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .repo-create-panel,
@@ -1544,6 +1608,7 @@ body.is-resizing-drawer {
 
 .repo-create-panel {
   display: grid;
+  align-content: start;
   gap: 14px;
   padding: 16px;
 }
@@ -1571,6 +1636,11 @@ body.is-resizing-drawer {
   font-size: 13px;
 }
 
+.workspaces-layout .repo-create-panel,
+.workspaces-layout .repo-list-panel {
+  min-height: 100%;
+}
+
 .repo-field,
 .repo-field-grid {
   min-width: 0;
@@ -1587,6 +1657,7 @@ body.is-resizing-drawer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
   gap: 12px;
+  align-items: start;
 }
 
 .repo-field input {
@@ -1605,6 +1676,11 @@ body.is-resizing-drawer {
   border-radius: 8px;
   background: var(--panel);
   padding: 6px;
+}
+
+.repo-field-grid > .repo-field .directory-input {
+  min-height: 54px;
+  align-content: center;
 }
 
 .directory-input input {
@@ -1802,6 +1878,7 @@ body.is-resizing-drawer {
   border-radius: 8px;
 }
 
+.workspaces-page,
 .workspace-page {
   height: calc(100vh - 118px);
   min-height: 680px;
@@ -2599,12 +2676,12 @@ body.is-resizing-panel {
   color: var(--orange);
 }
 
-.metadata-callout.source-settings-supported {
+.metadata-callout.source-structure-supported {
   border-color: color-mix(in srgb, var(--green) 36%, var(--line));
   background: color-mix(in srgb, var(--green) 9%, var(--panel));
 }
 
-.metadata-callout.source-settings-supported strong {
+.metadata-callout.source-structure-supported strong {
   color: var(--green);
 }
 
@@ -2777,11 +2854,72 @@ body.is-resizing-panel {
   gap: 8px;
 }
 
-.status-move-select {
+.status-move-control {
+  position: relative;
+  display: block;
+}
+
+.status-move-trigger {
+  width: 100%;
   min-height: 30px;
   font-size: 12px;
-  padding: 0 8px;
+  padding: 0 12px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   background: var(--panel-soft);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-move-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-move-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: transform 150ms ease;
+}
+
+.status-move-chevron.open {
+  transform: rotate(180deg);
+}
+
+.status-move-popover {
+  position: absolute;
+  z-index: 25;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 5px;
+  display: grid;
+  gap: 2px;
+}
+
+.status-move-popover button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  padding: 0 8px;
+  text-align: left;
+}
+
+.status-move-popover button:hover,
+.status-move-popover button.active {
+  background: var(--panel-soft);
+  color: var(--blue);
 }
 
 .new-plan-column-button {
@@ -2848,11 +2986,11 @@ body.is-resizing-panel {
   justify-content: flex-end;
 }
 
-.source-settings-modal {
+.source-structure-modal {
   width: min(720px, 100%);
 }
 
-.source-settings-form {
+.source-structure-form {
   gap: 12px;
 }
 
@@ -3023,6 +3161,7 @@ body.is-resizing-panel {
     order: 0;
   }
 
+  .workspaces-layout,
   .repositories-layout,
   .repo-field-grid {
     grid-template-columns: 1fr;

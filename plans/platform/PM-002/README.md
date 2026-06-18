@@ -4,53 +4,57 @@
 
 PM-002 turns Plan Manager from a read-only browser into a safe local authoring tool.
 
-Users can edit Markdown files, update plan metadata, create new plans, move cards across the Kanban board, and run guarded Git operations from the app. The app still runs locally. It still writes only to registered repositories that the user selected.
+Users can edit Markdown files, update item metadata, create new items, move cards across the Kanban board, and run guarded Git operations from the app. The app still runs locally. It still writes only to registered workspaces that the user selected.
 
 ## Related Plans
 
-| Ticket                        | Relationship   | Key Context                                                                                  |
+| Item                          | Relationship   | Key Context                                                                                  |
 |-------------------------------|----------------|----------------------------------------------------------------------------------------------|
 | [PM-001](../PM-001/README.md) | Parent feature | PM-001 created the read-only registry, scanner, plan index, Kanban board, and plan workspace |
 
 ### What PM-001 Established
 
-- **Repository**: a local Git repository registered as a workspace.
-- **Plan Directory**: a configured scan root such as `plans` or `docs`.
-- **Plan**: a ticket-level folder shown on the board and in the workspace.
-- **Freestyle Docs Root**: a Markdown docs folder that does not use the service/ticket shape.
+- **Workspace**: a local Git repository registered in Plan Manager.
+- **Source**: a configured scan root such as `plans` or `docs`.
+- **Item**: a planning folder or docs item shown on the board and in the workspace.
+- **Scope**: optional item grouping, currently stored as `service`.
+- **Identifier**: optional stable item key, currently stored as `ticket`.
+- **Freestyle Docs Root**: a Markdown docs folder that does not use the scope/identifier shape.
 - **Read-only boundary**: all PM-001 plan and Git APIs only read target repositories.
 - **File access guard**: all file reads must stay inside configured plan directories.
 - **App state version**: registry or index changes update `/api/state`.
 
 ## Glossary
 
-| Term             | Meaning                                                                    | Maps To (code)              |
-|------------------|----------------------------------------------------------------------------|-----------------------------|
-| Repository       | A local Git repository registered in Plan Manager                          | `RepositoryConfig`          |
-| Plan Directory   | A configured scan root such as `plans`, `docs`, or `docs/plans`            | `planDirectories`           |
-| Source Settings  | Optional `repository-settings.yaml` in a plan directory that maps arbitrary folders to cards | `RepositorySettings` |
-| Plan             | A ticket-level planning folder or docs item                                | `PlanSummary`, `PlanDetail` |
-| Plan Metadata    | Machine-readable plan fields stored in `plan.yaml`                         | `PlanMetadataUpdateInput`   |
-| Edit Session     | The frontend state for one open file or metadata form with unsaved changes | editor state                |
-| Dirty State      | Local Git state with modified, staged, untracked, or conflicting files     | `GitStatus`                 |
-| Write Guard      | Backend checks that block unsafe file writes and risky Git operations      | file writer, Git adapter    |
-| Git Operation    | A guarded local Git action such as fetch, pull, push, commit, or switch    | `GitOperationResult`        |
-| Commit Draft     | User-entered commit message and selected plan paths                        | `GitCommitInput`            |
-| Branch Operation | Branch create or branch switch from the active repository                  | branch request models       |
+| Term             | Meaning                                                                              | Maps To (code)              |
+|------------------|--------------------------------------------------------------------------------------|-----------------------------|
+| Workspace        | A local Git repository registered in Plan Manager                                    | `RepositoryConfig`          |
+| Source           | A configured scan root such as `plans`, `docs`, or `docs/plans`                      | `planDirectories`           |
+| Source Structure | Optional `repository-settings.yaml` in a source that maps arbitrary folders to cards | `RepositorySettings`        |
+| Item             | A planning folder or docs item                                                       | `PlanSummary`, `PlanDetail` |
+| Scope            | Optional item grouping, currently stored as `service`                                | `service`                   |
+| Identifier       | Optional stable item key, currently stored as `ticket`                               | `ticket`                    |
+| Item Metadata    | Machine-readable item fields stored in `plan.yaml`                                   | `PlanMetadataUpdateInput`   |
+| Edit Session     | The frontend state for one open file or metadata form with unsaved changes           | editor state                |
+| Dirty State      | Local Git state with modified, staged, untracked, or conflicting files               | `GitStatus`                 |
+| Write Guard      | Backend checks that block unsafe file writes and risky Git operations                | file writer, Git adapter    |
+| Git Operation    | A guarded local Git action such as fetch, pull, push, commit, or switch              | `GitOperationResult`        |
+| Commit Draft     | User-entered commit message and selected item paths                                  | `GitCommitInput`            |
+| Branch Operation | Branch create or branch switch from the active repository                            | branch request models       |
 
 ## Components
 
-| Layer    | Component        | Purpose                                                                       |
-|----------|------------------|-------------------------------------------------------------------------------|
-| Backend  | Safe file writer | Writes editable files only inside configured plan directories                 |
-| Backend  | Metadata writer  | Creates and updates `plan.yaml` without changing unrelated fields             |
-| Backend  | Source settings  | Reads and writes `repository-settings.yaml`, then rescans configured sources  |
-| Backend  | Plan creator     | Creates a structured plan folder with starter documents                       |
-| Backend  | Git adapter      | Runs guarded Git write operations with clear status and errors                |
-| Backend  | HTTP API         | Exposes plan edit, status move, new plan, and Git operation endpoints         |
-| Frontend | Editor state     | Tracks selected file, content, dirty state, autosave state, and conflict warnings |
-| Frontend | Workspace editor | Adds Markdown editing, preview, autosave, metadata editing, and Work Item controls |
-| Frontend | Kanban actions   | Moves status and opens new-plan flows from the board                             |
+| Layer    | Component        | Purpose                                                                              |
+|----------|------------------|--------------------------------------------------------------------------------------|
+| Backend  | Safe file writer | Writes editable files only inside configured sources                                 |
+| Backend  | Metadata writer  | Creates and updates `plan.yaml` without changing unrelated fields                    |
+| Backend  | Source settings  | Reads and writes `repository-settings.yaml`, then rescans configured sources         |
+| Backend  | Plan creator     | Creates a structured item folder with starter documents                              |
+| Backend  | Git adapter      | Runs guarded Git write operations with clear status and errors                       |
+| Backend  | HTTP API         | Exposes item edit, status move, new item, and Git operation endpoints                |
+| Frontend | Editor state     | Tracks selected file, content, dirty state, autosave state, and conflict warnings    |
+| Frontend | Workspace editor | Adds Markdown editing, preview, autosave, metadata editing, and Work Item controls   |
+| Frontend | Kanban actions   | Moves status and opens new-item flows from the board                                 |
 | Frontend | Git controls     | Shows branch and dirty state, then runs guarded Git operations in details and drawer |
 
 ## Data Flow
@@ -78,15 +82,15 @@ User runs a Git operation
 
 ## Design Decisions
 
-| Decision                              | Alternatives Considered                 | Rationale                                                                 |
-|---------------------------------------|-----------------------------------------|---------------------------------------------------------------------------|
-| Keep PM-001 read APIs stable          | Replace read APIs with edit APIs        | Existing board and workspace behavior should not regress.                 |
-| Add guarded write APIs                | Let frontend write files directly       | Backend guards are needed for path scope, Git state, and clear errors.    |
-| Edit Markdown and metadata in PM-002  | Markdown only, metadata only            | A useful authoring MVP needs both content and board metadata changes.     |
-| Keep freestyle docs simple, but configurable | Force all docs roots to use `plan.yaml` | Plain docs should still work as one card. When users want cards, `repository-settings.yaml` describes the source layout. |
-| Rescan after metadata/status/Git writes | Patch the in-memory index only        | A scan keeps fallback parsing, Git dates, authors, and warnings aligned. File autosave keeps the editor fast by returning the updated file/hash directly. |
-| Guard and confirm risky Git actions   | Strict blocking, power-user passthrough | Users need useful Git operations without accidental data loss.            |
-| Keep Git credential handling external | Store tokens in Plan Manager            | Local Git already owns credentials. The app should not store secrets.     |
+| Decision                                     | Alternatives Considered                 | Rationale                                                                                                                                                 |
+|----------------------------------------------|-----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Keep PM-001 read APIs stable                 | Replace read APIs with edit APIs        | Existing board and workspace behavior should not regress.                                                                                                 |
+| Add guarded write APIs                       | Let frontend write files directly       | Backend guards are needed for path scope, Git state, and clear errors.                                                                                    |
+| Edit Markdown and metadata in PM-002         | Markdown only, metadata only            | A useful authoring MVP needs both content and board metadata changes.                                                                                     |
+| Keep freestyle docs simple, but configurable | Force all docs roots to use `plan.yaml` | Plain docs should still work as one card. When users want cards, `repository-settings.yaml` describes the source layout.                                  |
+| Rescan after metadata/status/Git writes      | Patch the in-memory index only          | A scan keeps fallback parsing, Git dates, authors, and warnings aligned. File autosave keeps the editor fast by returning the updated file/hash directly. |
+| Guard and confirm risky Git actions          | Strict blocking, power-user passthrough | Users need useful Git operations without accidental data loss.                                                                                            |
+| Keep Git credential handling external        | Store tokens in Plan Manager            | Local Git already owns credentials. The app should not store secrets.                                                                                     |
 
 ## Implementation Clarifications
 
@@ -96,7 +100,7 @@ User runs a Git operation
 - The Kanban preview drawer exposes the same Work Item Info/Git editing surface as the details view.
 - Write operations must stay inside the active repository and configured plan directories.
 - File write requests use file IDs from the file tree or document list.
-- Metadata writes update `plan.yaml` for structured plans.
+- Metadata writes update `plan.yaml` for structured items.
 - If a structured plan has no `plan.yaml`, status or metadata edit creates one.
 - Source directories can opt into structured card discovery with `repository-settings.yaml`.
 - Configured source cards support metadata editing; the first metadata save creates `plan.yaml` in the matched card folder.

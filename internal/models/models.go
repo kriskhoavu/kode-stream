@@ -2,94 +2,94 @@ package models
 
 import "time"
 
-type PlanStatus string
+type ItemStatus string
 
 const (
-	StatusUnsorted   PlanStatus = "unsorted"
-	StatusIdeas      PlanStatus = "ideas"
-	StatusDraft      PlanStatus = "draft"
-	StatusInProgress PlanStatus = "in_progress"
-	StatusReview     PlanStatus = "review"
-	StatusDone       PlanStatus = "done"
+	StatusUnsorted   ItemStatus = "unsorted"
+	StatusIdeas      ItemStatus = "ideas"
+	StatusDraft      ItemStatus = "draft"
+	StatusInProgress ItemStatus = "in_progress"
+	StatusReview     ItemStatus = "review"
+	StatusDone       ItemStatus = "done"
 )
 
-var StatusOrder = []PlanStatus{StatusUnsorted, StatusIdeas, StatusDraft, StatusInProgress, StatusReview, StatusDone}
+var StatusOrder = []ItemStatus{StatusUnsorted, StatusIdeas, StatusDraft, StatusInProgress, StatusReview, StatusDone}
 
-type RepositoryConfig struct {
-	ID              string    `json:"id" yaml:"id"`
-	Name            string    `json:"name" yaml:"name"`
-	Path            string    `json:"path" yaml:"path"`
-	BaselineBranch  string    `json:"baselineBranch" yaml:"baselineBranch"`
-	PlanDirectories []string  `json:"planDirectories" yaml:"planDirectories"`
-	CreatedAt       time.Time `json:"createdAt" yaml:"createdAt"`
-	LastScannedAt   time.Time `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
+type WorkspaceConfig struct {
+	ID             string    `json:"id" yaml:"id"`
+	Name           string    `json:"name" yaml:"name"`
+	Path           string    `json:"path" yaml:"path"`
+	BaselineBranch string    `json:"baselineBranch" yaml:"baselineBranch"`
+	Sources        []string  `json:"sources" yaml:"sources"`
+	CreatedAt      time.Time `json:"createdAt" yaml:"createdAt"`
+	LastScannedAt  time.Time `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
 }
 
-type RepositoryInput struct {
-	Name            string   `json:"name" yaml:"name"`
-	Path            string   `json:"path" yaml:"path"`
-	BaselineBranch  string   `json:"baselineBranch" yaml:"baselineBranch"`
-	PlanDirectories []string `json:"planDirectories" yaml:"planDirectories"`
+type WorkspaceInput struct {
+	Name           string   `json:"name" yaml:"name"`
+	Path           string   `json:"path" yaml:"path"`
+	BaselineBranch string   `json:"baselineBranch" yaml:"baselineBranch"`
+	Sources        []string `json:"sources" yaml:"sources"`
 }
 
-type RepositorySettings struct {
-	Version int                      `json:"version" yaml:"version"`
-	Cards   []RepositorySettingsCard `json:"cards" yaml:"cards"`
+type SourceStructureSettings struct {
+	Version int                   `json:"version" yaml:"version"`
+	Cards   []SourceStructureCard `json:"cards" yaml:"cards"`
 }
 
-type RepositorySettingsCard struct {
-	PathPattern string                   `json:"pathPattern" yaml:"pathPattern"`
-	Fields      RepositorySettingsFields `json:"fields" yaml:"fields"`
+type SourceStructureCard struct {
+	PathPattern string                `json:"pathPattern" yaml:"pathPattern"`
+	Fields      SourceStructureFields `json:"fields" yaml:"fields"`
 }
 
-type RepositorySettingsFields struct {
-	Service string   `json:"service" yaml:"service"`
-	Ticket  string   `json:"ticket" yaml:"ticket"`
-	Title   string   `json:"title,omitempty" yaml:"title,omitempty"`
-	Status  string   `json:"status,omitempty" yaml:"status,omitempty"`
-	Owner   string   `json:"owner,omitempty" yaml:"owner,omitempty"`
-	Tags    []string `json:"tags,omitempty" yaml:"tags,omitempty"`
+type SourceStructureFields struct {
+	Scope      string   `json:"scope" yaml:"scope"`
+	Identifier string   `json:"identifier" yaml:"identifier"`
+	Title      string   `json:"title,omitempty" yaml:"title,omitempty"`
+	Status     string   `json:"status,omitempty" yaml:"status,omitempty"`
+	Owner      string   `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Tags       []string `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
 type SourceSettingsResult struct {
-	Directory string             `json:"directory" yaml:"directory"`
-	Exists    bool               `json:"exists" yaml:"exists"`
-	Mode      string             `json:"mode" yaml:"mode"`
-	Settings  RepositorySettings `json:"settings" yaml:"settings"`
-	Warnings  []ScanWarning      `json:"warnings" yaml:"warnings"`
+	Directory string                  `json:"directory" yaml:"directory"`
+	Exists    bool                    `json:"exists" yaml:"exists"`
+	Mode      string                  `json:"mode" yaml:"mode"`
+	Settings  SourceStructureSettings `json:"settings" yaml:"settings"`
+	Warnings  []ScanWarning           `json:"warnings" yaml:"warnings"`
 }
 
-type PlanSummary struct {
+type ItemSummary struct {
 	ID             string     `json:"id" yaml:"id"`
-	RepositoryID   string     `json:"repositoryId" yaml:"repositoryId"`
-	RepositoryName string     `json:"repositoryName" yaml:"repositoryName"`
+	WorkspaceID    string     `json:"workspaceId" yaml:"workspaceId"`
+	WorkspaceName  string     `json:"workspaceName" yaml:"workspaceName"`
 	Branch         string     `json:"branch" yaml:"branch"`
-	Service        string     `json:"service" yaml:"service"`
-	Ticket         string     `json:"ticket" yaml:"ticket"`
+	Scope          string     `json:"scope" yaml:"scope"`
+	Identifier     string     `json:"identifier" yaml:"identifier"`
 	Title          string     `json:"title" yaml:"title"`
-	Status         PlanStatus `json:"status" yaml:"status"`
+	Status         ItemStatus `json:"status" yaml:"status"`
 	Owner          string     `json:"owner,omitempty" yaml:"owner,omitempty"`
 	Author         string     `json:"author,omitempty" yaml:"author,omitempty"`
 	Tags           []string   `json:"tags" yaml:"tags"`
 	UpdatedAt      time.Time  `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
 	Description    string     `json:"description,omitempty" yaml:"description,omitempty"`
 	MetadataSource string     `json:"metadataSource" yaml:"metadataSource"`
-	PlanRoot       string     `json:"planRoot,omitempty" yaml:"planRoot,omitempty"`
+	ItemPath       string     `json:"itemPath,omitempty" yaml:"itemPath,omitempty"`
 }
 
-type PlanDetail struct {
-	PlanSummary
-	Documents []PlanDocument      `json:"documents" yaml:"documents"`
+type ItemDetail struct {
+	ItemSummary
+	Documents []ItemDocument      `json:"documents" yaml:"documents"`
 	Metadata  map[string]any      `json:"metadata" yaml:"metadata"`
 	Warnings  []ScanWarning       `json:"warnings,omitempty" yaml:"warnings,omitempty"`
-	Counts    PlanWorkspaceCounts `json:"counts" yaml:"counts"`
+	Counts    ItemWorkspaceCounts `json:"counts" yaml:"counts"`
 }
 
-type PlanWorkspaceCounts struct {
+type ItemWorkspaceCounts struct {
 	Files int `json:"files" yaml:"files"`
 }
 
-type PlanDocument struct {
+type ItemDocument struct {
 	ID    string `json:"id" yaml:"id"`
 	Role  string `json:"role" yaml:"role"`
 	Track string `json:"track,omitempty" yaml:"track,omitempty"`
@@ -114,15 +114,15 @@ type FileContent struct {
 }
 
 type ScanWarning struct {
-	PlanPath string `json:"planPath,omitempty" yaml:"planPath,omitempty"`
+	ItemPath string `json:"itemPath,omitempty" yaml:"itemPath,omitempty"`
 	Message  string `json:"message" yaml:"message"`
 }
 
 type ScanResult struct {
-	RepositoryID string        `json:"repositoryId" yaml:"repositoryId"`
-	ScannedAt    time.Time     `json:"scannedAt" yaml:"scannedAt"`
-	PlanCount    int           `json:"planCount" yaml:"planCount"`
-	Warnings     []ScanWarning `json:"warnings" yaml:"warnings"`
+	WorkspaceID string        `json:"workspaceId" yaml:"workspaceId"`
+	ScannedAt   time.Time     `json:"scannedAt" yaml:"scannedAt"`
+	ItemCount   int           `json:"itemCount" yaml:"itemCount"`
+	Warnings    []ScanWarning `json:"warnings" yaml:"warnings"`
 }
 
 type FileSaveInput struct {
@@ -131,32 +131,32 @@ type FileSaveInput struct {
 	ExpectedHash string `json:"expectedHash,omitempty" yaml:"expectedHash,omitempty"`
 }
 
-type PlanMetadataUpdateInput struct {
-	Title   string     `json:"title,omitempty" yaml:"title,omitempty"`
-	Service string     `json:"service,omitempty" yaml:"service,omitempty"`
-	Ticket  string     `json:"ticket,omitempty" yaml:"ticket,omitempty"`
-	Status  PlanStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	Owner   string     `json:"owner,omitempty" yaml:"owner,omitempty"`
-	Tags    []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
+type ItemMetadataUpdateInput struct {
+	Title      string     `json:"title,omitempty" yaml:"title,omitempty"`
+	Scope      string     `json:"scope,omitempty" yaml:"scope,omitempty"`
+	Identifier string     `json:"identifier,omitempty" yaml:"identifier,omitempty"`
+	Status     ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Owner      string     `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Tags       []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
-type PlanStatusUpdateInput struct {
-	Status PlanStatus `json:"status" yaml:"status"`
+type ItemStatusUpdateInput struct {
+	Status ItemStatus `json:"status" yaml:"status"`
 }
 
-type NewPlanInput struct {
-	RepositoryID  string     `json:"repositoryId" yaml:"repositoryId"`
-	PlanDirectory string     `json:"planDirectory" yaml:"planDirectory"`
-	Service       string     `json:"service" yaml:"service"`
-	Ticket        string     `json:"ticket" yaml:"ticket"`
-	Title         string     `json:"title" yaml:"title"`
-	Status        PlanStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	Owner         string     `json:"owner,omitempty" yaml:"owner,omitempty"`
-	Tags          []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
+type NewItemInput struct {
+	WorkspaceID string     `json:"workspaceId" yaml:"workspaceId"`
+	Source      string     `json:"source" yaml:"source"`
+	Scope       string     `json:"scope" yaml:"scope"`
+	Identifier  string     `json:"identifier" yaml:"identifier"`
+	Title       string     `json:"title" yaml:"title"`
+	Status      ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Owner       string     `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Tags        []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
 type WriteResult struct {
-	Plan      PlanDetail `json:"plan" yaml:"plan"`
+	Item      ItemDetail `json:"item" yaml:"item"`
 	ScannedAt time.Time  `json:"scannedAt" yaml:"scannedAt"`
 }
 
@@ -181,14 +181,14 @@ type GitChange struct {
 }
 
 type GitStatus struct {
-	RepositoryID string      `json:"repositoryId" yaml:"repositoryId"`
-	Branch       string      `json:"branch" yaml:"branch"`
-	Upstream     string      `json:"upstream,omitempty" yaml:"upstream,omitempty"`
-	Ahead        int         `json:"ahead" yaml:"ahead"`
-	Behind       int         `json:"behind" yaml:"behind"`
-	Dirty        bool        `json:"dirty" yaml:"dirty"`
-	Conflicted   bool        `json:"conflicted" yaml:"conflicted"`
-	Changes      []GitChange `json:"changes" yaml:"changes"`
+	WorkspaceID string      `json:"workspaceId" yaml:"workspaceId"`
+	Branch      string      `json:"branch" yaml:"branch"`
+	Upstream    string      `json:"upstream,omitempty" yaml:"upstream,omitempty"`
+	Ahead       int         `json:"ahead" yaml:"ahead"`
+	Behind      int         `json:"behind" yaml:"behind"`
+	Dirty       bool        `json:"dirty" yaml:"dirty"`
+	Conflicted  bool        `json:"conflicted" yaml:"conflicted"`
+	Changes     []GitChange `json:"changes" yaml:"changes"`
 }
 
 type GitCommitInput struct {

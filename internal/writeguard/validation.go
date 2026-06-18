@@ -14,13 +14,13 @@ var (
 	ticketNamePattern  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[A-Za-z0-9][A-Za-z0-9._-]*$`)
 )
 
-func ValidateStatus(status models.PlanStatus) error {
+func ValidateStatus(status models.ItemStatus) error {
 	for _, allowed := range models.StatusOrder {
 		if status == allowed {
 			return nil
 		}
 	}
-	return fmt.Errorf("invalid plan status %q", status)
+	return fmt.Errorf("invalid item status %q", status)
 }
 
 func ValidateBranchName(branch string) error {
@@ -59,7 +59,7 @@ func ValidateCommitMessage(message string) error {
 	}
 }
 
-func ValidateServiceName(service string) error {
+func ValidateScopeName(service string) error {
 	service = strings.TrimSpace(service)
 	switch {
 	case service == "":
@@ -75,7 +75,7 @@ func ValidateServiceName(service string) error {
 	}
 }
 
-func ValidateTicketName(ticket string) error {
+func ValidateIdentifierName(ticket string) error {
 	ticket = strings.TrimSpace(ticket)
 	switch {
 	case ticket == "":

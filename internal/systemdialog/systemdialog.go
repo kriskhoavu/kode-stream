@@ -20,20 +20,20 @@ func New() *Dialog {
 func (d *Dialog) SelectDirectory() (string, error) {
 	switch runtime.GOOS {
 	case "darwin":
-		out, err := exec.Command("osascript", "-e", `POSIX path of (choose folder with prompt "Select repository folder")`).Output()
+		out, err := exec.Command("osascript", "-e", `POSIX path of (choose folder with prompt "Select workspace folder")`).Output()
 		if err != nil {
 			return "", errors.New("directory selection cancelled")
 		}
 		return cleanSelectedPath(string(out))
 	case "windows":
-		script := `Add-Type -AssemblyName System.Windows.Forms; $dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = "Select repository folder"; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Write($dialog.SelectedPath) }`
+		script := `Add-Type -AssemblyName System.Windows.Forms; $dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = "Select workspace folder"; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Write($dialog.SelectedPath) }`
 		out, err := exec.Command("powershell", "-NoProfile", "-STA", "-Command", script).Output()
 		if err != nil {
 			return "", errors.New("directory selection cancelled")
 		}
 		return cleanSelectedPath(string(out))
 	default:
-		if path, err := selectWithCommand("zenity", "--file-selection", "--directory", "--title=Select repository folder"); err == nil {
+		if path, err := selectWithCommand("zenity", "--file-selection", "--directory", "--title=Select workspace folder"); err == nil {
 			return path, nil
 		}
 		if path, err := selectWithCommand("kdialog", "--getexistingdirectory", "."); err == nil {

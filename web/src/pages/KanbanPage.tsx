@@ -2,10 +2,13 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
 import { ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, SlidersHorizontal, X } from 'lucide-react';
 import { marked } from 'marked';
-import { api, editableStatusOrder, statusLabels, statusOrder } from '../lib/api';
-import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput, PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
+import { FileMenu } from '../components/FileMenu';
+import { StatusMenu } from '../components/StatusMenu';
+import { api, statusLabels, statusOrder } from '../lib/api';
+import type { FileContent, FileNode, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemSummary, WorkspaceConfig } from '../lib/types';
+import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
 
-type FilterKey = 'sources' | 'services' | 'statuses' | 'branches' | 'authors';
+type FilterKey = 'sources' | 'scopes' | 'statuses' | 'branches' | 'authors';
 
 type Filters = Record<FilterKey, string[]>;
 
@@ -17,88 +20,88 @@ type DrawerFileOption = { id: string; path: string; label: string };
 
 const emptyFilters: Filters = {
   sources: [],
-  services: [],
+  scopes: [],
   statuses: [],
   branches: [],
   authors: []
 };
 
-export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesChanged, onOpenRepositories }: {
-  repository?: RepositoryConfig;
+export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
+  workspace?: WorkspaceConfig;
   refreshKey: number;
-  onOpenPlan: (planId: string) => void;
-  onRepositoriesChanged: () => void | Promise<void>;
-  onOpenRepositories?: () => void;
+  onOpenPlan: (itemId: string) => void;
+  onWorkspacesChanged: () => void | Promise<void>;
+  onOpenWorkspaces?: () => void;
 }) {
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [query, setQuery] = useState('');
-  const [plans, setPlans] = useState<PlanSummary[]>([]);
+  const [items, setPlans] = useState<ItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scanState, setScanState] = useState('');
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
   const [drawerPlanId, setDrawerPlanId] = useState('');
   const [newPlanOpen, setNewPlanOpen] = useState(false);
-  const [newPlanDraft, setNewPlanDraft] = useState({ planDirectory: '', service: '', ticket: '', title: '', status: 'draft' as PlanStatus });
+  const [newPlanDraft, setNewPlanDraft] = useState({ source: '', scope: '', identifier: '', title: '', status: 'draft' as ItemStatus });
   const [newPlanError, setNewPlanError] = useState('');
   const [creatingPlan, setCreatingPlan] = useState(false);
   const text = query;
 
   useEffect(() => {
-    if (!repository) {
+    if (!workspace) {
       setPlans([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    api.plans(new URLSearchParams({ repositoryId: repository.id }))
+    api.items(new URLSearchParams({ workspaceId: workspace.id }))
       .then(setPlans)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [repository, refreshKey]);
+  }, [workspace, refreshKey]);
 
-  const sourceOptions = useMemo(() => sourceFacetOptions(plans, repository), [plans, repository]);
-  const filteredPlans = useMemo(() => filterPlans(plans, filters, text, repository), [plans, filters, text, repository]);
-  const services = useMemo(() => unique(plans.map((plan) => plan.service || 'Unknown')), [plans]);
-  const branches = useMemo(() => unique(plans.map((plan) => plan.branch)), [plans]);
-  const authors = useMemo(() => unique(plans.map((plan) => plan.author || plan.owner || 'Unknown')), [plans]);
+  const sourceOptions = useMemo(() => sourceFacetOptions(items, workspace), [items, workspace]);
+  const filteredPlans = useMemo(() => filterPlans(items, filters, text, workspace), [items, filters, text, workspace]);
+  const services = useMemo(() => unique(items.map((plan) => plan.scope || 'Unknown')), [items]);
+  const branches = useMemo(() => unique(items.map((plan) => plan.branch)), [items]);
+  const authors = useMemo(() => unique(items.map((plan) => plan.author || plan.owner || 'Unknown')), [items]);
   const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
     { key: 'sources', title: 'Source', options: sourceOptions },
-    { key: 'services', title: 'Service', options: services.map((service) => ({ value: service, label: service })) },
+    { key: 'scopes', title: labels.scope, options: services.map((scope) => ({ value: scope, label: scope })) },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
     { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
     { key: 'branches', title: 'Branches', options: branches.map((branch) => ({ value: branch, label: branch })) }
   ];
   const activeFilterCount = Object.values(filters).reduce((sum, values) => sum + values.length, 0) + (text ? 1 : 0);
   const grouped = useMemo(() => {
-    const map = new Map<PlanStatus, PlanSummary[]>();
+    const map = new Map<ItemStatus, ItemSummary[]>();
     statusOrder.forEach((item) => map.set(item, []));
     filteredPlans.forEach((plan) => map.get(plan.status)?.push(plan));
     return map;
   }, [filteredPlans]);
 
   const scan = async () => {
-    if (!repository) return;
+    if (!workspace) return;
     setScanState('Scanning');
     try {
-      const result = await api.scan(repository.id);
-      setScanState(`${result.planCount} plans indexed`);
-      onRepositoriesChanged();
-      setPlans(await api.plans(new URLSearchParams({ repositoryId: repository.id })));
+      const result = await api.scan(workspace.id);
+      setScanState(`${result.itemCount} items indexed`);
+      onWorkspacesChanged();
+      setPlans(await api.items(new URLSearchParams({ workspaceId: workspace.id })));
     } catch (err) {
       setScanState(err instanceof Error ? err.message : 'Scan failed');
     }
   };
 
   const reloadPlans = async () => {
-    if (!repository) return;
-    setPlans(await api.plans(new URLSearchParams({ repositoryId: repository.id })));
+    if (!workspace) return;
+    setPlans(await api.items(new URLSearchParams({ workspaceId: workspace.id })));
   };
 
-  const movePlan = async (planId: string, status: PlanStatus) => {
+  const movePlan = async (itemId: string, status: ItemStatus) => {
     try {
-      await api.updateStatus(planId, { status });
-      await onRepositoriesChanged();
+      await api.updateStatus(itemId, { status });
+      await onWorkspacesChanged();
       await reloadPlans();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Status update failed');
@@ -106,26 +109,26 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
   };
 
   const createPlan = async () => {
-    if (!repository) return;
+    if (!workspace) return;
     setCreatingPlan(true);
     setNewPlanError('');
     try {
-      const planDirectory = newPlanDraft.planDirectory || repository.planDirectories[0] || 'plans';
-      const result = await api.createPlan({
-        repositoryId: repository.id,
-        planDirectory,
-        service: newPlanDraft.service.trim(),
-        ticket: newPlanDraft.ticket.trim(),
+      const source = newPlanDraft.source || workspace.sources[0] || 'plans';
+      const result = await api.createItem({
+        workspaceId: workspace.id,
+        source,
+        scope: newPlanDraft.scope.trim(),
+        identifier: newPlanDraft.identifier.trim(),
         title: newPlanDraft.title.trim(),
         status: newPlanDraft.status
       });
       setNewPlanOpen(false);
-      setNewPlanDraft({ planDirectory: '', service: '', ticket: '', title: '', status: 'draft' });
-      await onRepositoriesChanged();
+      setNewPlanDraft({ source: '', scope: '', identifier: '', title: '', status: 'draft' });
+      await onWorkspacesChanged();
       await reloadPlans();
-      onOpenPlan(result.plan.id);
+      onOpenPlan(result.item.id);
     } catch (err) {
-      setNewPlanError(err instanceof Error ? err.message : 'Plan creation failed');
+      setNewPlanError(err instanceof Error ? err.message : 'Item creation failed');
     } finally {
       setCreatingPlan(false);
     }
@@ -146,11 +149,11 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
     setQuery('');
   };
 
-  if (!repository && !loading) {
+  if (!workspace && !loading) {
     return (
       <section className="empty-state">
         <h1>Kanban</h1>
-        <p>Register a local Git repository to create a workspace.</p>
+        <p>Register a local Git workspace to create a board.</p>
       </section>
     );
   }
@@ -161,12 +164,12 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
         <div className="kanban-heading">
           <div>
             <h1><KanbanSquare size={22} /> Kanban board</h1>
-            <span><FolderGit2 size={15} /> {repository?.name ?? 'No workspace selected'}</span>
+            <span><FolderGit2 size={15} /> {workspace?.name ?? 'No workspace selected'}</span>
           </div>
         </div>
-        {repository && repository.planDirectories.length > 0 && (
-          <div className="workspace-context" aria-label="Plan sources">
-            {repository.planDirectories.slice(0, 3).map((directory) => (
+        {workspace && workspace.sources.length > 0 && (
+          <div className="workspace-context" aria-label="Sources">
+            {workspace.sources.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
             ))}
           </div>
@@ -175,13 +178,13 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
       <div className="board-toolbar">
         <label className="filter-input plan-search">
           <Search size={15} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search plans..." />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search items..." />
         </label>
         <button className="secondary" onClick={scan}>
           <RotateCw size={16} /> Scan
         </button>
         <button className="primary" onClick={() => setNewPlanOpen(true)}>
-          + New Plan
+          + New Item
         </button>
         <button className="secondary" onClick={clearFilters} disabled={activeFilterCount === 0}>
           <X size={16} /> Clear
@@ -205,7 +208,7 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
       </div>
       <SelectedFilters facets={facetConfig} filters={filters} onRemove={toggleFilter} />
       <div className="filter-summary">
-        <span>{filteredPlans.length} of {plans.length} items</span>
+        <span>{filteredPlans.length} of {items.length} items</span>
         {activeFilterCount > 0 && <span>{activeFilterCount} active filters</span>}
       </div>
       {error && <p className="error">{error}</p>}
@@ -223,24 +226,24 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
                 {!loading && grouped.get(column)?.map((plan) => (
                   <PlanCard
                     key={plan.id}
-                    plan={plan}
-                    repository={repository}
+                    item={plan}
+                    workspace={workspace}
                     onPreview={() => setDrawerPlanId(plan.id)}
                     onOpen={() => onOpenPlan(plan.id)}
                     onMove={(status) => movePlan(plan.id, status)}
                   />
                 ))}
-                {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No plans</div>}
+                {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No items</div>}
               </div>
               {column !== 'unsorted' && (
                 <button className="new-plan-column-button" type="button" onClick={() => {
-                  setNewPlanDraft((draft) => ({ ...draft, status: column, planDirectory: repository?.planDirectories[0] ?? '' }));
+                  setNewPlanDraft((draft) => ({ ...draft, status: column, source: workspace?.sources[0] ?? '' }));
                   setNewPlanOpen(true);
-                }}>+ New plan</button>
+                }}>+ New item</button>
               )}
             </div>
             {column === 'unsorted' && (
-              <button className="kanban-separator" type="button" onClick={onOpenRepositories} disabled={!onOpenRepositories} title="Configure source structure">
+              <button className="kanban-separator" type="button" onClick={onOpenWorkspaces} disabled={!onOpenWorkspaces} title="Configure source structure">
                 <span className="separator-arrow">▶</span>
                 <span className="separator-count">{grouped.get('unsorted')?.length ?? 0}</span>
                 <span className="separator-label">Configure source structure</span>
@@ -252,38 +255,36 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
       </div>
       {drawerPlanId && (
         <PlanPreviewDrawer
-          planId={drawerPlanId}
+          itemId={drawerPlanId}
           refreshKey={refreshKey}
           onClose={() => setDrawerPlanId('')}
           onOpenFull={() => onOpenPlan(drawerPlanId)}
           onChanged={async () => {
-            await onRepositoriesChanged();
+            await onWorkspacesChanged();
             await reloadPlans();
           }}
         />
       )}
-      {newPlanOpen && repository && (
+      {newPlanOpen && workspace && (
         <div className="modal-backdrop" role="presentation">
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Create new plan">
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Create new item">
             <header>
-              <h2>New plan</h2>
+              <h2>New item</h2>
               <button type="button" className="icon-button" onClick={() => setNewPlanOpen(false)}><X size={16} /></button>
             </header>
             <div className="metadata-form">
-              <label>Source<select value={newPlanDraft.planDirectory || repository.planDirectories[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, planDirectory: event.target.value }))}>
-                {repository.planDirectories.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
+              <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
+                {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
               </select></label>
-              <label>Service<input value={newPlanDraft.service} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, service: event.target.value }))} placeholder="platform" /></label>
-              <label>Ticket<input value={newPlanDraft.ticket} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, ticket: event.target.value }))} placeholder="PM-003" /></label>
-              <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Plan title" /></label>
-              <label>Status<select value={newPlanDraft.status} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, status: event.target.value as PlanStatus }))}>
-                {editableStatusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
-              </select></label>
+              <label>{labels.scope}<input value={newPlanDraft.scope} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, scope: event.target.value }))} placeholder="platform" /></label>
+              <label>{labels.identifier}<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="PM-003" /></label>
+              <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Item title" /></label>
+              <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
             </div>
             {newPlanError && <p className="error">{newPlanError}</p>}
             <footer className="modal-actions">
               <button type="button" className="ghost" onClick={() => setNewPlanOpen(false)}>Cancel</button>
-              <button type="button" className="primary" disabled={creatingPlan || !newPlanDraft.service || !newPlanDraft.ticket} onClick={createPlan}>{creatingPlan ? 'Creating...' : 'Create Plan'}</button>
+              <button type="button" className="primary" disabled={creatingPlan || !newPlanDraft.scope || !newPlanDraft.identifier} onClick={createPlan}>{creatingPlan ? 'Creating...' : 'Create Item'}</button>
             </footer>
           </section>
         </div>
@@ -374,8 +375,8 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
   );
 }
 
-function PlanCard({ plan, repository, onPreview, onOpen, onMove }: { plan: PlanSummary; repository?: RepositoryConfig; onPreview: () => void; onOpen: () => void; onMove: (status: PlanStatus) => void }) {
-  const source = sourceLabel(plan, repository);
+function PlanCard({ item: plan, workspace, onPreview, onOpen, onMove }: { item: ItemSummary; workspace?: WorkspaceConfig; onPreview: () => void; onOpen: () => void; onMove: (status: ItemStatus) => void }) {
+  const source = sourceLabel(plan, workspace);
   const docs = plan.metadataSource === 'docs';
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -391,37 +392,35 @@ function PlanCard({ plan, repository, onPreview, onOpen, onMove }: { plan: PlanS
       <div className="plan-card-title">
         <button type="button" className="plan-card-link plan-card-heading" onClick={navigate}>{plan.title}</button>
         <span className="card-badges">
-          {plan.service && <span className="service-badge">{plan.service}</span>}
-          {plan.service && source && <span className="badge-separator">|</span>}
+          {plan.scope && <span className="scope-badge">{plan.scope}</span>}
+          {plan.scope && source && <span className="badge-separator">|</span>}
           {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
         </span>
       </div>
-      <button type="button" className="plan-card-link plan-card-ticket" onClick={navigate}>{plan.ticket}</button>
-      <p>{plan.description || plan.ticket}</p>
+      <span className="plan-card-identifier">{plan.identifier}</span>
+      <p>{plan.description || plan.identifier}</p>
       <footer>
         <span className="avatar">{(plan.author || plan.owner || '?').slice(0, 1).toUpperCase()}</span>
         <span>{plan.author || plan.owner || 'Unknown'}</span>
         <time>{plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : 'No date'}</time>
       </footer>
-      {plan.tags.length > 0 && <div className="tags">{plan.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}</div>}
+      {plan.tags.length > 0 && <div className="tags">{plan.tags.slice(0, 3).map((tag: string) => <span key={tag}>{tag}</span>)}</div>}
       {plan.status !== 'unsorted' && plan.metadataSource !== 'docs' && (
-        <select className="status-move-select" value={plan.status} onClick={(event) => event.stopPropagation()} onChange={(event) => onMove(event.target.value as PlanStatus)} aria-label="Move plan status">
-          {editableStatusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
-        </select>
+        <StatusMenu value={plan.status} onChange={onMove} ariaLabel="Move item status" />
       )}
     </article>
   );
 }
 
-function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged }: { planId: string; refreshKey: number; onClose: () => void; onOpenFull: () => void; onChanged: () => void | Promise<void> }) {
-  const [plan, setPlan] = useState<PlanDetail | null>(null);
+function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged }: { itemId: string; refreshKey: number; onClose: () => void; onOpenFull: () => void; onChanged: () => void | Promise<void> }) {
+  const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [file, setFile] = useState<FileContent | null>(null);
   const [editorContent, setEditorContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
   const [savingFile, setSavingFile] = useState(false);
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
-  const [metadataDraft, setMetadataDraft] = useState<PlanMetadataUpdateInput>({});
+  const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [diff, setDiff] = useState('');
   const [tab, setTab] = useState<DrawerTab>('preview');
@@ -442,8 +441,8 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
   const fileOptions = useMemo(() => flattenFileOptions(files), [files]);
   const dirtyMetadata = Boolean(plan) && (
     (metadataDraft.title ?? '') !== (plan?.title ?? '') ||
-    (metadataDraft.service ?? '') !== (plan?.service ?? '') ||
-    (metadataDraft.ticket ?? '') !== (plan?.ticket ?? '') ||
+    (metadataDraft.scope ?? '') !== (plan?.scope ?? '') ||
+    (metadataDraft.identifier ?? '') !== (plan?.identifier ?? '') ||
     (metadataDraft.status ?? '') !== (plan?.status ?? '') ||
     (metadataDraft.owner ?? '') !== (plan?.owner ?? '') ||
     (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
@@ -478,10 +477,10 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
     setDiff('');
     setGitStatus(null);
     setError('');
-    api.plan(planId).then((payload) => {
+    api.item(itemId).then((payload) => {
       if (!active) return;
       setPlan(payload);
-      api.gitStatus(payload.repositoryId).then((status) => {
+      api.gitStatus(payload.workspaceId).then((status) => {
         if (active) setGitStatus(status);
       }).catch(() => {
         if (active) setGitStatus(null);
@@ -489,13 +488,13 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
     }).catch((err: Error) => {
       if (active) setError(err.message);
     });
-    api.files(planId).then(async (tree) => {
+    api.files(itemId).then(async (tree) => {
       if (!active) return;
       setFiles(tree);
       const previewFile = preferredPreviewFile(tree);
       if (previewFile) {
         try {
-          const content = await api.file(planId, previewFile.id);
+          const content = await api.file(itemId, previewFile.id);
           if (active) {
             setFile(content);
             setEditorContent(content.content);
@@ -509,7 +508,7 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
     }).catch((err: Error) => {
       if (active) setError(err.message);
     });
-    api.diff(planId).then((payload) => {
+    api.diff(itemId).then((payload) => {
       if (active) setDiff(payload.diff || 'No local changes.');
     }).catch(() => {
       if (active) setDiff('No diff available.');
@@ -518,14 +517,14 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
       active = false;
       clearDrawerAutoSaveTimers();
     };
-  }, [planId, refreshKey]);
+  }, [itemId, refreshKey]);
 
   useEffect(() => {
     if (!plan) return;
     setMetadataDraft({
       title: plan.title,
-      service: plan.service,
-      ticket: plan.ticket,
+      scope: plan.scope,
+      identifier: plan.identifier,
       status: plan.status,
       owner: plan.owner ?? '',
       tags: plan.tags
@@ -567,15 +566,15 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
     setAutoSaveState('saving');
     setError('');
     try {
-      const updated = await api.saveFile(planId, targetFile.id, { content, expectedHash: targetFile.hash });
+      const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash });
       setFile(updated);
       setSavedContent(content);
       setAutoSaveState('saved');
       autoSaveSettledTimerRef.current = window.setTimeout(() => setAutoSaveState('idle'), 1400);
       clearTimeoutRef(autoSaveRefreshTimerRef);
       autoSaveRefreshTimerRef.current = window.setTimeout(() => {
-        api.diff(planId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
-        if (plan) void loadGitStatus(plan.repositoryId);
+        api.diff(itemId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
+        if (plan) void loadGitStatus(plan.workspaceId);
       }, 600);
       return true;
     } catch (err) {
@@ -589,7 +588,7 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
 
   const loadDrawerFile = async (fileId: string) => {
     try {
-      const content = await api.file(planId, fileId);
+      const content = await api.file(itemId, fileId);
       setFile(content);
       setEditorContent(content.content);
       setSavedContent(content.content);
@@ -625,9 +624,9 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
     });
   };
 
-  const loadGitStatus = async (repositoryId: string) => {
+  const loadGitStatus = async (workspaceId: string) => {
     try {
-      setGitStatus(await api.gitStatus(repositoryId));
+      setGitStatus(await api.gitStatus(workspaceId));
     } catch {
       setGitStatus(null);
     }
@@ -638,9 +637,9 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
     setSavingMetadata(true);
     setError('');
     try {
-      const result = await api.saveMetadata(planId, metadataDraft);
-      setPlan(result.plan);
-      await loadGitStatus(plan.repositoryId);
+      const result = await api.saveMetadata(itemId, metadataDraft);
+      setPlan(result.item);
+      await loadGitStatus(plan.workspaceId);
       await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Metadata save failed');
@@ -656,10 +655,10 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
     try {
       const confirm = operation === 'pull' && Boolean(gitStatus?.dirty);
       const result = operation === 'fetch'
-        ? await api.gitFetch(plan.repositoryId)
+        ? await api.gitFetch(plan.workspaceId)
         : operation === 'pull'
-          ? await api.gitPull(plan.repositoryId, { confirm })
-          : await api.gitPush(plan.repositoryId);
+          ? await api.gitPull(plan.workspaceId, { confirm })
+          : await api.gitPush(plan.workspaceId);
       setGitStatus(result.status);
       if (operation === 'pull') {
         await onChanged();
@@ -681,12 +680,12 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
     setGitBusy('commit');
     setError('');
     try {
-      const result = await api.gitCommit(plan.repositoryId, { message: gitMessage, paths: selectedGitPaths });
+      const result = await api.gitCommit(plan.workspaceId, { message: gitMessage, paths: selectedGitPaths });
       setGitStatus(result.status);
       setGitMessage('');
       setSelectedGitPaths([]);
       await onChanged();
-      api.diff(planId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
+      api.diff(itemId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
       if (!result.ok && result.message) setError(result.message);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Commit failed');
@@ -700,7 +699,7 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
     setGitBusy('branch');
     setError('');
     try {
-      const result = await api.createBranch(plan.repositoryId, { name: branchName.trim(), checkout: true });
+      const result = await api.createBranch(plan.workspaceId, { name: branchName.trim(), checkout: true });
       setGitStatus(result.status);
       setBranchName('');
       await onChanged();
@@ -736,15 +735,15 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
   return (
     <>
       <button className="drawer-scrim" type="button" aria-label="Close preview" onClick={closeDrawer} />
-      <aside className={compact ? 'plan-drawer compact' : 'plan-drawer'} style={drawerStyle} aria-label="Plan preview">
+      <aside className={compact ? 'plan-drawer compact' : 'plan-drawer'} style={drawerStyle} aria-label="Item preview">
         <button className="drawer-resize-handle" type="button" aria-label="Resize preview panel" onPointerDown={startResize}>
           <GripVertical size={16} />
         </button>
         <header className="plan-drawer-header">
           <div>
-            <span className="drawer-kicker">{plan?.ticket ?? 'Loading'}</span>
-            <h2>{plan?.title ?? 'Loading plan'}</h2>
-            <p>{plan ? `${plan.service} / ${plan.branch}` : ''}</p>
+            <span className="drawer-kicker">{plan?.identifier ?? 'Loading'}</span>
+            <h2>{plan?.title ?? 'Loading item'}</h2>
+            <p>{plan ? `${plan.scope} / ${plan.branch}` : ''}</p>
           </div>
           <div className="drawer-actions">
             <button type="button" className="secondary" onClick={openFullDetails}>Open details</button>
@@ -763,10 +762,7 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
             <section className="drawer-section">
               <label className="drawer-file-picker">
                 <span>Document</span>
-                <select value={file?.id ?? ''} onChange={(event) => void selectDrawerFile(event.target.value)} disabled={fileOptions.length === 0}>
-                  {fileOptions.length === 0 && <option value="">No files available</option>}
-                  {fileOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-                </select>
+                <FileMenu value={file?.id ?? ''} options={fileOptions} onChange={selectDrawerFile} />
               </label>
               <div className="drawer-tabs">
                 <div>
@@ -805,22 +801,21 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
               {sideTab === 'info' && (
                 <>
                   <dl>
-                    <dt>Repository</dt><dd>{plan?.repositoryName ?? '-'}</dd>
-                    <dt>Service</dt><dd>{plan?.service ?? '-'}</dd>
+                    <dt>{labels.workspace}</dt><dd>{plan?.workspaceName ?? '-'}</dd>
+                    <dt>{labels.scope}</dt><dd>{plan?.scope ?? '-'}</dd>
+                    <dt>{labels.identifier}</dt><dd>{plan?.identifier ?? '-'}</dd>
                     <dt>Branch</dt><dd>{plan?.branch ?? '-'}</dd>
                     <dt>Status</dt><dd>{plan?.status ? <DrawerStatusBadge status={plan.status} /> : '-'}</dd>
-                    <dt>Source</dt><dd>{metadataSourceLabel(plan?.metadataSource)}</dd>
+                    <dt>Metadata</dt><dd>{metadataSourceLabel(plan?.metadataSource)}</dd>
                     <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
                     <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
                   </dl>
                   {plan?.metadataSource !== 'docs' && (
                     <div className="metadata-form drawer-metadata-form">
                       <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
-                      <label>Service<input value={metadataDraft.service ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, service: event.target.value }))} /></label>
-                      <label>Ticket<input value={metadataDraft.ticket ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, ticket: event.target.value }))} /></label>
-                      <label>Status<select value={metadataDraft.status ?? 'draft'} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, status: event.target.value as PlanStatus }))}>
-                        {editableStatusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
-                      </select></label>
+                      <label>{labels.scope}<input value={metadataDraft.scope ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, scope: event.target.value }))} /></label>
+                      <label>{labels.identifier}<input value={metadataDraft.identifier ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, identifier: event.target.value }))} /></label>
+                      <label>Status<StatusMenu value={metadataDraft.status ?? 'draft'} onChange={(status) => setMetadataDraft((draft) => ({ ...draft, status }))} /></label>
                       <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
                       <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>
                     </div>
@@ -880,12 +875,12 @@ function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull, onChanged 
   );
 }
 
-export function filterPlans(plans: PlanSummary[], filters: Filters, text: string, repository?: RepositoryConfig): PlanSummary[] {
+export function filterPlans(items: ItemSummary[], filters: Filters, text: string, workspace?: WorkspaceConfig): ItemSummary[] {
   const query = text.trim().toLowerCase();
-  return plans.filter((plan) => {
-    if (filters.sources.length > 0 && !filters.sources.includes(sourceRoot(plan, repository))) return false;
-    const service = plan.service || 'Unknown';
-    if (filters.services.length > 0 && !filters.services.includes(service)) return false;
+  return items.filter((plan) => {
+    if (filters.sources.length > 0 && !filters.sources.includes(sourceRoot(plan, workspace))) return false;
+    const scope = plan.scope || 'Unknown';
+    if (filters.scopes.length > 0 && !filters.scopes.includes(scope)) return false;
     if (filters.statuses.length > 0 && !filters.statuses.includes(plan.status)) return false;
     if (filters.branches.length > 0 && !filters.branches.includes(plan.branch)) return false;
     const author = plan.author || plan.owner || 'Unknown';
@@ -895,20 +890,20 @@ export function filterPlans(plans: PlanSummary[], filters: Filters, text: string
   });
 }
 
-function sourceFacetOptions(plans: PlanSummary[], repository?: RepositoryConfig): FacetOption[] {
-  const roots = new Set(plans.map((plan) => sourceRoot(plan, repository)).filter(Boolean));
+function sourceFacetOptions(items: ItemSummary[], workspace?: WorkspaceConfig): FacetOption[] {
+  const roots = new Set(items.map((plan) => sourceRoot(plan, workspace)).filter(Boolean));
   return Array.from(roots)
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
     .map((root) => ({ value: root, label: root }));
 }
 
-function sourceLabel(plan: PlanSummary, repository?: RepositoryConfig): string {
-  return sourceRoot(plan, repository);
+function sourceLabel(plan: ItemSummary, workspace?: WorkspaceConfig): string {
+  return sourceRoot(plan, workspace);
 }
 
-function sourceRoot(plan: PlanSummary, repository?: RepositoryConfig): string {
-  const root = plan.planRoot || '';
-  const directories = repository?.planDirectories ?? [];
+function sourceRoot(plan: ItemSummary, workspace?: WorkspaceConfig): string {
+  const root = plan.itemPath || '';
+  const directories = workspace?.sources ?? [];
   const matched = directories
     .filter((directory) => root === directory || root.startsWith(`${directory}/`))
     .sort((a, b) => b.length - a.length)[0];
@@ -916,13 +911,13 @@ function sourceRoot(plan: PlanSummary, repository?: RepositoryConfig): string {
   return root.split('/').filter(Boolean)[0] ?? '';
 }
 
-function planSearchText(plan: PlanSummary): string {
+function planSearchText(plan: ItemSummary): string {
   return [
     plan.title,
-    plan.ticket,
-    plan.service,
+    plan.identifier,
+    plan.scope,
     plan.branch,
-    plan.repositoryName,
+    plan.workspaceName,
     plan.author,
     plan.owner,
     plan.description,
@@ -966,10 +961,10 @@ function findReadme(nodes: FileNode[], rootOnly: boolean): FileNode | null {
 }
 
 function metadataSourceLabel(source?: string): string {
-  return source === 'docs' ? 'Docs' : 'Plan';
+  return genericMetadataSourceLabel(source);
 }
 
-function DrawerStatusBadge({ status }: { status: PlanStatus }) {
+function DrawerStatusBadge({ status }: { status: ItemStatus }) {
   return <span className={`status-badge ${status}`}>{statusLabels[status]}</span>;
 }
 

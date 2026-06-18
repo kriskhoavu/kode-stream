@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { filterPlans, KanbanPage } from './KanbanPage';
-import type { PlanSummary } from '../lib/types';
+import type { ItemSummary } from '../lib/types';
 
 describe('KanbanPage', () => {
   it('renders status columns from cached plan summaries', async () => {
@@ -10,74 +10,74 @@ describe('KanbanPage', () => {
       json: async () => [
         {
           id: 'p1',
-          repositoryId: 'r1',
-          repositoryName: 'Discovery',
+          workspaceId: 'r1',
+          workspaceName: 'Discovery',
           branch: 'main',
-          service: 'platform',
-          ticket: 'PM-001',
-          title: 'Plan Manager',
+          scope: 'platform',
+          identifier: 'PM-001',
+          title: 'Item Manager',
           status: 'draft',
           tags: ['readonly'],
           metadataSource: 'plan.yaml',
-          planRoot: 'plans/platform/PM-001'
+          itemPath: 'items/platform/PM-001'
         }
       ]
     }));
 
-    render(<KanbanPage repository={{ id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', planDirectories: ['plans'], createdAt: new Date().toISOString() }} refreshKey={0} onOpenPlan={() => undefined} onRepositoriesChanged={() => undefined} />);
+    render(<KanbanPage workspace={{ id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', sources: ['items'], createdAt: new Date().toISOString() }} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
     expect(screen.getByRole('heading', { name: 'Unsorted' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Ideas' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Draft' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Plan Manager')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Item Manager')).toBeInTheDocument());
   });
 });
 
 describe('filterPlans', () => {
-  const plans: PlanSummary[] = [
+  const items: ItemSummary[] = [
     {
       id: 'p1',
-      repositoryId: 'r1',
-      repositoryName: 'Discovery',
+      workspaceId: 'r1',
+      workspaceName: 'Discovery',
       branch: 'main',
-      service: 'api',
-      ticket: 'DI-1',
-      title: 'API Plan',
+      scope: 'api',
+      identifier: 'DI-1',
+      title: 'API Item',
       status: 'draft',
       author: 'Khoa',
       tags: [],
       metadataSource: 'plan.yaml',
-      planRoot: 'plans/api/DI-1'
+      itemPath: 'items/api/DI-1'
     },
     {
       id: 'p2',
-      repositoryId: 'r2',
-      repositoryName: 'Docs',
+      workspaceId: 'r2',
+      workspaceName: 'Docs',
       branch: 'feature/docs',
-      service: 'docs',
-      ticket: 'docs',
+      scope: 'docs',
+      identifier: 'docs',
       title: 'Docs',
       status: 'unsorted',
       author: 'Giang',
       tags: ['docs'],
       metadataSource: 'docs',
-      planRoot: 'docs'
+      itemPath: 'docs'
     }
   ];
-  const repository = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', planDirectories: ['plans', 'docs'], createdAt: new Date().toISOString() };
+  const workspace = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', sources: ['items', 'docs'], createdAt: new Date().toISOString() };
 
   it('uses OR within a facet', () => {
-    const result = filterPlans(plans, { sources: ['plans', 'docs'], services: [], statuses: [], branches: [], authors: [] }, '', repository);
+    const result = filterPlans(items, { sources: ['items', 'docs'], scopes: [], statuses: [], branches: [], authors: [] }, '', workspace);
     expect(result.map((plan) => plan.id)).toEqual(['p1', 'p2']);
   });
 
-  it('filters by service', () => {
-    const result = filterPlans(plans, { sources: [], services: ['api'], statuses: [], branches: [], authors: [] }, '', repository);
+  it('filters by scope', () => {
+    const result = filterPlans(items, { sources: [], scopes: ['api'], statuses: [], branches: [], authors: [] }, '', workspace);
     expect(result.map((plan) => plan.id)).toEqual(['p1']);
   });
 
   it('uses AND across facets', () => {
-    const result = filterPlans(plans, { sources: ['docs'], services: ['docs'], statuses: ['unsorted'], branches: [], authors: ['Giang'] }, '', repository);
+    const result = filterPlans(items, { sources: ['docs'], scopes: ['docs'], statuses: ['unsorted'], branches: [], authors: ['Giang'] }, '', workspace);
     expect(result.map((plan) => plan.id)).toEqual(['p2']);
   });
 });

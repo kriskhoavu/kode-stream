@@ -23,8 +23,10 @@ import {
 } from 'lucide-react';
 import { marked } from 'marked';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { api, editableStatusOrder, statusLabels } from '../lib/api';
-import type { FileContent, FileNode, GitChange, GitChangeStatus, GitStatus, PlanDetail, PlanMetadataUpdateInput } from '../lib/types';
+import { StatusMenu } from '../components/StatusMenu';
+import { api, statusLabels } from '../lib/api';
+import type { FileContent, FileNode, GitChange, GitChangeStatus, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../lib/types';
+import { labels, metadataSourceLabel } from '../lib/vocabulary';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'git';
@@ -35,15 +37,15 @@ type PendingConfirm = { title: string; message: string; confirmLabel: string; da
 type TreeFileState = GitChangeStatus | 'unsaved';
 type AutoSaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
 
-export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged }: { planId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
-  const [plan, setPlan] = useState<PlanDetail | null>(null);
+export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged }: { itemId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
+  const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [file, setFile] = useState<FileContent | null>(null);
   const [editorContent, setEditorContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
   const [savingFile, setSavingFile] = useState(false);
   const [autoSaveState, setAutoSaveState] = useState<AutoSaveState>('idle');
-  const [metadataDraft, setMetadataDraft] = useState<PlanMetadataUpdateInput>({});
+  const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitLoading, setGitLoading] = useState(false);
@@ -77,26 +79,26 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   useEffect(() => {
     setError('');
     setFile(null);
-    api.plan(planId).then(setPlan).catch((err: Error) => setError(err.message));
-    api.files(planId).then((tree) => {
+    api.item(itemId).then(setPlan).catch((err: Error) => setError(err.message));
+    api.files(itemId).then((tree) => {
       setFiles(tree);
       const first = firstFile(tree);
       if (first) void openFile(first.id);
     }).catch((err: Error) => setError(err.message));
     void loadDiff();
-  }, [planId, refreshKey]);
+  }, [itemId, refreshKey]);
 
   useEffect(() => {
     if (!plan) return;
     setMetadataDraft({
       title: plan.title,
-      service: plan.service,
-      ticket: plan.ticket,
+      scope: plan.scope,
+      identifier: plan.identifier,
       status: plan.status,
       owner: plan.owner ?? '',
       tags: plan.tags
     });
-    void loadGitStatus(plan.repositoryId);
+    void loadGitStatus(plan.workspaceId);
   }, [plan]);
 
   useEffect(() => {
@@ -111,7 +113,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
 
   const loadFile = async (fileId: string) => {
     try {
-      const nextFile = await api.file(planId, fileId);
+      const nextFile = await api.file(itemId, fileId);
       setFile(nextFile);
       setEditorContent(nextFile.content);
       setSavedContent(nextFile.content);
@@ -142,8 +144,8 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const dirtyFile = file !== null && editorContent !== savedContent;
   const dirtyMetadata = Boolean(plan) && (
     (metadataDraft.title ?? '') !== (plan?.title ?? '') ||
-    (metadataDraft.service ?? '') !== (plan?.service ?? '') ||
-    (metadataDraft.ticket ?? '') !== (plan?.ticket ?? '') ||
+    (metadataDraft.scope ?? '') !== (plan?.scope ?? '') ||
+    (metadataDraft.identifier ?? '') !== (plan?.identifier ?? '') ||
     (metadataDraft.status ?? '') !== (plan?.status ?? '') ||
     (metadataDraft.owner ?? '') !== (plan?.owner ?? '') ||
     (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
@@ -215,10 +217,10 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     window.addEventListener('pointerup', onPointerUp, { once: true });
   };
 
-  const loadGitStatus = async (repositoryId: string) => {
+  const loadGitStatus = async (workspaceId: string) => {
     setGitLoading(true);
     try {
-      setGitStatus(await api.gitStatus(repositoryId));
+      setGitStatus(await api.gitStatus(workspaceId));
     } catch {
       setGitStatus(null);
     } finally {
@@ -228,7 +230,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
 
   const loadDiff = async () => {
     try {
-      const payload = await api.diff(planId);
+      const payload = await api.diff(itemId);
       setDiff(payload.diff || '');
     } catch {
       setDiff('');
@@ -242,10 +244,10 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     try {
       const confirm = operation === 'pull' && Boolean(gitStatus?.dirty);
       const result = operation === 'fetch'
-        ? await api.gitFetch(plan.repositoryId)
+        ? await api.gitFetch(plan.workspaceId)
         : operation === 'pull'
-          ? await api.gitPull(plan.repositoryId, { confirm })
-          : await api.gitPush(plan.repositoryId);
+          ? await api.gitPull(plan.workspaceId, { confirm })
+          : await api.gitPush(plan.workspaceId);
       setGitStatus(result.status);
       if (operation === 'pull') await onContentChanged?.();
       if (!result.ok && result.message) setError(result.message);
@@ -261,7 +263,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     setGitBusy('commit');
     setError('');
     try {
-      const result = await api.gitCommit(plan.repositoryId, { message: gitMessage, paths: selectedGitPaths });
+      const result = await api.gitCommit(plan.workspaceId, { message: gitMessage, paths: selectedGitPaths });
       setGitStatus(result.status);
       setGitMessage('');
       setSelectedGitPaths([]);
@@ -279,7 +281,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     setGitBusy('branch');
     setError('');
     try {
-      const result = await api.createBranch(plan.repositoryId, { name: branchName.trim(), checkout: true });
+      const result = await api.createBranch(plan.workspaceId, { name: branchName.trim(), checkout: true });
       setGitStatus(result.status);
       setBranchName('');
       await onContentChanged?.();
@@ -328,7 +330,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     setAutoSaveState('saving');
     setError('');
     try {
-      const updated = await api.saveFile(planId, targetFile.id, { content, expectedHash: targetFile.hash });
+      const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash });
       setFile(updated);
       setSavedContent(content);
       setAutoSaveState('saved');
@@ -347,7 +349,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const scheduleFileChangeRefresh = () => {
     clearTimer(autoSaveRefreshTimerRef);
     autoSaveRefreshTimerRef.current = window.setTimeout(() => {
-      if (plan) void loadGitStatus(plan.repositoryId);
+      if (plan) void loadGitStatus(plan.workspaceId);
       void loadDiff();
     }, 700);
   };
@@ -357,13 +359,13 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     setRevertingFile(true);
     setError('');
     try {
-      await api.revertFile(planId, file.id);
-      const updated = await api.file(planId, file.id);
+      await api.revertFile(itemId, file.id);
+      const updated = await api.file(itemId, file.id);
       setFile(updated);
       setEditorContent(updated.content);
       setSavedContent(updated.content);
       await loadDiff();
-      await loadGitStatus(plan.repositoryId);
+      await loadGitStatus(plan.workspaceId);
       await onContentChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Revert failed');
@@ -378,9 +380,9 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     setSavingMetadata(true);
     setError('');
     try {
-      const result = await api.saveMetadata(planId, metadataDraft);
-      setPlan(result.plan);
-      if (plan) await loadGitStatus(plan.repositoryId);
+      const result = await api.saveMetadata(itemId, metadataDraft);
+      setPlan(result.item);
+      if (plan) await loadGitStatus(plan.workspaceId);
       await onContentChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Metadata save failed');
@@ -398,8 +400,8 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
       <header className="workspace-header">
         <button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button>
         <div>
-          <h1>{plan?.title ?? 'Loading plan'}</h1>
-          <span>{plan?.service} / {plan?.branch} / {plan?.ticket}</span>
+          <h1>{plan?.title ?? 'Loading item'}</h1>
+          <span>{plan?.scope} / {plan?.branch} / {plan?.identifier}</span>
         </div>
         <button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button>
       </header>
@@ -458,13 +460,13 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
         <aside className={rightCollapsed ? 'metadata-panel side-panel collapsed' : 'metadata-panel side-panel'}>
           <div className="panel-header">
             <h2><Info size={16} /> Work Item</h2>
-            <button className="icon-button" type="button" title={rightCollapsed ? 'Expand plan info' : 'Collapse plan info'} onClick={() => setRightCollapsed((value) => !value)}>
+            <button className="icon-button" type="button" title={rightCollapsed ? 'Expand item info' : 'Collapse item info'} onClick={() => setRightCollapsed((value) => !value)}>
               {rightCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
             </button>
           </div>
           {!rightCollapsed && (
             <>
-              <div className="side-panel-tabs" role="tablist" aria-label="Plan side panel">
+              <div className="side-panel-tabs" role="tablist" aria-label="Item side panel">
                 <button type="button" className={rightPanelTab === 'info' ? 'active' : ''} onClick={() => setRightPanelTab('info')}>
                   <Info size={14} /> Info
                 </button>
@@ -477,26 +479,25 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
               {plan?.metadataSource === 'docs' && (
                 <div className="metadata-callout">
                   <strong>Docs</strong>
-                  <span>This item is a documentation folder. It is browsable even though it does not use the plan service/ticket structure.</span>
+                  <span>This item is a documentation folder. It is browsable even though it does not use a scope/identifier structure.</span>
                 </div>
               )}
               <dl>
-                <dt>Repository</dt><dd>{plan?.repositoryName}</dd>
-                <dt>Service</dt><dd>{plan?.service}</dd>
+                <dt>{labels.workspace}</dt><dd>{plan?.workspaceName}</dd>
+                <dt>{labels.scope}</dt><dd>{plan?.scope}</dd>
+                <dt>{labels.identifier}</dt><dd>{plan?.identifier}</dd>
                 <dt>Branch</dt><dd>{plan?.branch}</dd>
                 <dt>Status</dt><dd>{plan?.status && <StatusBadge status={plan.status} />}</dd>
-                <dt>Source</dt><dd>{sourceLabel(plan?.metadataSource)}</dd>
+                <dt>Metadata</dt><dd>{metadataSourceLabel(plan?.metadataSource)}</dd>
                 <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
                 <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
               </dl>
               {plan?.metadataSource !== 'docs' && (
                 <div className="metadata-form">
                   <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
-                  <label>Service<input value={metadataDraft.service ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, service: event.target.value }))} /></label>
-                  <label>Ticket<input value={metadataDraft.ticket ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, ticket: event.target.value }))} /></label>
-                  <label>Status<select value={metadataDraft.status ?? 'draft'} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, status: event.target.value as PlanDetail['status'] }))}>
-                    {editableStatusOrder.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
-                  </select></label>
+                  <label>{labels.scope}<input value={metadataDraft.scope ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, scope: event.target.value }))} /></label>
+                  <label>{labels.identifier}<input value={metadataDraft.identifier ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, identifier: event.target.value }))} /></label>
+                  <label>Status<StatusMenu value={(metadataDraft.status ?? 'draft') as ItemStatus} onChange={(status) => setMetadataDraft((draft) => ({ ...draft, status }))} /></label>
                   <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
                   <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>
                 </div>
@@ -508,7 +509,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
               {plan?.warnings?.length ? (
                 <div className="plan-warnings">
                   <h3>Warnings</h3>
-                  {plan.warnings.map((warning) => <p key={`${warning.planPath ?? 'plan'}-${warning.message}`}>{warning.message}</p>)}
+                  {plan.warnings.map((warning) => <p key={`${warning.itemPath ?? 'plan'}-${warning.message}`}>{warning.message}</p>)}
                 </div>
               ) : null}
                 </>
@@ -551,7 +552,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
                 ) : (
                   <div className="metadata-callout">
                     <strong>Git status unavailable</strong>
-                    <span>Refresh the workspace or scan the repository to load Git information.</span>
+                    <span>Refresh the workspace or scan the source to load Git information.</span>
                   </div>
                 )
               )}
@@ -559,7 +560,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
             </>
           )}
           {!rightCollapsed && (
-            <button className="panel-resize-handle panel-resize-handle-right" type="button" aria-label="Resize plan info panel" onPointerDown={(event) => startResize('right', event)}>
+            <button className="panel-resize-handle panel-resize-handle-right" type="button" aria-label="Resize item info panel" onPointerDown={(event) => startResize('right', event)}>
               <GripVertical size={16} />
             </button>
           )}
@@ -595,16 +596,16 @@ function EmptyDocumentState({ hasFiles }: { hasFiles: boolean }) {
     <div className="document-empty">
       <FileText size={22} />
       <strong>{hasFiles ? 'Select a file' : 'No files found'}</strong>
-      <span>{hasFiles ? 'Choose a file from the explorer to preview its content.' : 'This plan folder does not contain any readable files yet.'}</span>
+      <span>{hasFiles ? 'Choose a file from the explorer to preview its content.' : 'This item folder does not contain any readable files yet.'}</span>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: PlanDetail['status'] }) {
+function StatusBadge({ status }: { status: ItemDetail['status'] }) {
   return <span className={`status-badge ${status}`}>{statusLabel(status)}</span>;
 }
 
-function statusLabel(status: PlanDetail['status']): string {
+function statusLabel(status: ItemDetail['status']): string {
   return statusLabels[status] ?? status;
 }
 
@@ -739,20 +740,16 @@ function hasFile(nodes: FileNode[]): boolean {
   return firstFile(nodes) !== null;
 }
 
-function sourceLabel(source?: string): string {
-  return source === 'docs' ? 'Docs' : 'Plan';
+function currentGitPath(plan: ItemDetail | null, file: FileContent | null): string {
+  if (!plan?.itemPath || !file?.path) return '';
+  return `${plan.itemPath.replace(/\/$/, '')}/${file.path.replace(/^\//, '')}`;
 }
 
-function currentGitPath(plan: PlanDetail | null, file: FileContent | null): string {
-  if (!plan?.planRoot || !file?.path) return '';
-  return `${plan.planRoot.replace(/\/$/, '')}/${file.path.replace(/^\//, '')}`;
-}
-
-function buildFileStateMap(plan: PlanDetail | null, gitStatus: GitStatus | null, file: FileContent | null, dirtyFile: boolean): Map<string, TreeFileState> {
+function buildFileStateMap(plan: ItemDetail | null, gitStatus: GitStatus | null, file: FileContent | null, dirtyFile: boolean): Map<string, TreeFileState> {
   const stateByPath = new Map<string, TreeFileState>();
-  const planRoot = normalizePath(plan?.planRoot ?? '');
+  const itemPath = normalizePath(plan?.itemPath ?? '');
   for (const change of gitStatus?.changes ?? []) {
-    const localPath = localPlanPath(planRoot, change);
+    const localPath = localItemPath(itemPath, change);
     if (localPath) stateByPath.set(localPath, change.status);
   }
   if (dirtyFile && file?.path) {
@@ -761,17 +758,17 @@ function buildFileStateMap(plan: PlanDetail | null, gitStatus: GitStatus | null,
   return stateByPath;
 }
 
-function localPlanPath(planRoot: string, change: GitChange): string {
+function localItemPath(itemPath: string, change: GitChange): string {
   const path = normalizePath(change.path);
   const oldPath = normalizePath(change.oldPath ?? '');
-  return stripPlanRoot(path, planRoot) || stripPlanRoot(oldPath, planRoot);
+  return stripItemPath(path, itemPath) || stripItemPath(oldPath, itemPath);
 }
 
-function stripPlanRoot(path: string, planRoot: string): string {
+function stripItemPath(path: string, itemPath: string): string {
   if (!path) return '';
-  if (!planRoot) return path;
-  if (path === planRoot) return '';
-  return path.startsWith(`${planRoot}/`) ? path.slice(planRoot.length + 1) : '';
+  if (!itemPath) return path;
+  if (path === itemPath) return '';
+  return path.startsWith(`${itemPath}/`) ? path.slice(itemPath.length + 1) : '';
 }
 
 function normalizePath(path: string): string {

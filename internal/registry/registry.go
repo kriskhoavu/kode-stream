@@ -19,7 +19,7 @@ type Registry struct {
 	mu      sync.RWMutex
 	path    string
 	git     *gitadapter.GitAdapter
-	records []models.RepositoryConfig
+	records []models.WorkspaceConfig
 	loaded  bool
 }
 
@@ -27,84 +27,84 @@ func New(path string, git *gitadapter.GitAdapter) *Registry {
 	return &Registry{path: path, git: git}
 }
 
-func (r *Registry) List() ([]models.RepositoryConfig, error) {
+func (r *Registry) List() ([]models.WorkspaceConfig, error) {
 	if err := r.load(); err != nil {
 		return nil, err
 	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if len(r.records) == 0 {
-		return []models.RepositoryConfig{}, nil
+		return []models.WorkspaceConfig{}, nil
 	}
-	records := append([]models.RepositoryConfig(nil), r.records...)
+	records := append([]models.WorkspaceConfig(nil), r.records...)
 	for i := range records {
-		if records[i].PlanDirectories == nil {
-			records[i].PlanDirectories = []string{}
+		if records[i].Sources == nil {
+			records[i].Sources = []string{}
 		}
 	}
 	return records, nil
 }
 
-func (r *Registry) Get(id string) (models.RepositoryConfig, bool, error) {
+func (r *Registry) Get(id string) (models.WorkspaceConfig, bool, error) {
 	if err := r.load(); err != nil {
-		return models.RepositoryConfig{}, false, err
+		return models.WorkspaceConfig{}, false, err
 	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	for _, repo := range r.records {
-		if repo.ID == id {
-			return repo, true, nil
+	for _, workspace := range r.records {
+		if workspace.ID == id {
+			return workspace, true, nil
 		}
 	}
-	return models.RepositoryConfig{}, false, nil
+	return models.WorkspaceConfig{}, false, nil
 }
 
-func (r *Registry) Create(input models.RepositoryInput) (models.RepositoryConfig, error) {
+func (r *Registry) Create(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
 	if err := r.load(); err != nil {
-		return models.RepositoryConfig{}, err
+		return models.WorkspaceConfig{}, err
 	}
-	repo, err := r.validate(input)
+	workspace, err := r.validate(input)
 	if err != nil {
-		return models.RepositoryConfig{}, err
+		return models.WorkspaceConfig{}, err
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, existing := range r.records {
-		if samePath(existing.Path, repo.Path) {
-			return models.RepositoryConfig{}, fmt.Errorf("repository already registered")
+		if samePath(existing.Path, workspace.Path) {
+			return models.WorkspaceConfig{}, fmt.Errorf("workspace already registered")
 		}
 	}
-	r.records = append(r.records, repo)
-	return repo, r.saveLocked()
+	r.records = append(r.records, workspace)
+	return workspace, r.saveLocked()
 }
 
-func (r *Registry) Update(id string, input models.RepositoryInput) (models.RepositoryConfig, error) {
+func (r *Registry) Update(id string, input models.WorkspaceInput) (models.WorkspaceConfig, error) {
 	if err := r.load(); err != nil {
-		return models.RepositoryConfig{}, err
+		return models.WorkspaceConfig{}, err
 	}
-	repo, err := r.validate(input)
+	workspace, err := r.validate(input)
 	if err != nil {
-		return models.RepositoryConfig{}, err
+		return models.WorkspaceConfig{}, err
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, existing := range r.records {
-		if existing.ID != id && samePath(existing.Path, repo.Path) {
-			return models.RepositoryConfig{}, fmt.Errorf("repository already registered")
+		if existing.ID != id && samePath(existing.Path, workspace.Path) {
+			return models.WorkspaceConfig{}, fmt.Errorf("workspace already registered")
 		}
 	}
 	for i, existing := range r.records {
 		if existing.ID == id {
-			repo.ID = existing.ID
-			repo.CreatedAt = existing.CreatedAt
-			repo.LastScannedAt = existing.LastScannedAt
-			r.records[i] = repo
-			return repo, r.saveLocked()
+			workspace.ID = existing.ID
+			workspace.CreatedAt = existing.CreatedAt
+			workspace.LastScannedAt = existing.LastScannedAt
+			r.records[i] = workspace
+			return workspace, r.saveLocked()
 		}
 	}
-	return models.RepositoryConfig{}, fmt.Errorf("repository not found")
+	return models.WorkspaceConfig{}, fmt.Errorf("workspace not found")
 }
 
 func (r *Registry) Delete(id string) error {
@@ -119,7 +119,7 @@ func (r *Registry) Delete(id string) error {
 			return r.saveLocked()
 		}
 	}
-	return fmt.Errorf("repository not found")
+	return fmt.Errorf("workspace not found")
 }
 
 func (r *Registry) TouchScanned(id string, scannedAt time.Time) error {
@@ -134,13 +134,13 @@ func (r *Registry) TouchScanned(id string, scannedAt time.Time) error {
 			return r.saveLocked()
 		}
 	}
-	return fmt.Errorf("repository not found")
+	return fmt.Errorf("workspace not found")
 }
 
-func (r *Registry) validate(input models.RepositoryInput) (models.RepositoryConfig, error) {
+func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
-		return models.RepositoryConfig{}, errors.New("repository name is required")
+		return models.WorkspaceConfig{}, errors.New("workspace name is required")
 	}
 	branch := strings.TrimSpace(input.BaselineBranch)
 	if branch == "" {
@@ -148,40 +148,37 @@ func (r *Registry) validate(input models.RepositoryInput) (models.RepositoryConf
 	}
 	path, err := filepath.Abs(expandHome(strings.TrimSpace(input.Path)))
 	if err != nil || path == "" {
-		return models.RepositoryConfig{}, errors.New("repository path is invalid")
+		return models.WorkspaceConfig{}, errors.New("workspace path is invalid")
 	}
-	root, err := r.git.RepositoryRoot(path)
+	root, err := r.git.WorkspaceRoot(path)
 	if err != nil {
-		return models.RepositoryConfig{}, fmt.Errorf("not a Git repository: %w", err)
+		return models.WorkspaceConfig{}, fmt.Errorf("not a Git workspace: %w", err)
 	}
 	if err := r.git.ValidateBranch(root, branch); err != nil {
-		return models.RepositoryConfig{}, fmt.Errorf("baseline branch is invalid: %w", err)
+		return models.WorkspaceConfig{}, fmt.Errorf("baseline branch is invalid: %w", err)
 	}
-	dirs := input.PlanDirectories
-	if len(dirs) == 0 {
-		dirs = []string{"plans"}
-	}
+	dirs := input.Sources
 	cleanDirs := make([]string, 0, len(dirs))
 	for _, dir := range dirs {
 		clean := filepath.Clean(strings.TrimSpace(dir))
 		if clean == "." || clean == "" || strings.HasPrefix(clean, "..") || filepath.IsAbs(clean) {
-			return models.RepositoryConfig{}, fmt.Errorf("plan directory %q must be relative", dir)
+			return models.WorkspaceConfig{}, fmt.Errorf("source %q must be relative", dir)
 		}
 		full := filepath.Join(root, clean)
 		stat, err := os.Stat(full)
 		if err != nil || !stat.IsDir() {
-			return models.RepositoryConfig{}, fmt.Errorf("plan directory %q does not exist", clean)
+			return models.WorkspaceConfig{}, fmt.Errorf("source %q does not exist", clean)
 		}
 		cleanDirs = append(cleanDirs, filepath.ToSlash(clean))
 	}
 
-	return models.RepositoryConfig{
-		ID:              slug(name) + "-" + shortHash(root),
-		Name:            name,
-		Path:            root,
-		BaselineBranch:  branch,
-		PlanDirectories: cleanDirs,
-		CreatedAt:       time.Now().UTC(),
+	return models.WorkspaceConfig{
+		ID:             slug(name) + "-" + shortHash(root),
+		Name:           name,
+		Path:           root,
+		BaselineBranch: branch,
+		Sources:        cleanDirs,
+		CreatedAt:      time.Now().UTC(),
 	}, nil
 }
 
@@ -193,7 +190,7 @@ func (r *Registry) load() error {
 	}
 	data, err := os.ReadFile(r.path)
 	if errors.Is(err, os.ErrNotExist) {
-		r.records = []models.RepositoryConfig{}
+		r.records = []models.WorkspaceConfig{}
 		r.loaded = true
 		return nil
 	}
@@ -202,6 +199,22 @@ func (r *Registry) load() error {
 	}
 	if err := yaml.Unmarshal(data, &r.records); err != nil {
 		return err
+	}
+	var legacy []struct {
+		ID              string    `yaml:"id"`
+		Name            string    `yaml:"name"`
+		Path            string    `yaml:"path"`
+		BaselineBranch  string    `yaml:"baselineBranch"`
+		PlanDirectories []string  `yaml:"planDirectories"`
+		CreatedAt       time.Time `yaml:"createdAt"`
+		LastScannedAt   time.Time `yaml:"lastScannedAt,omitempty"`
+	}
+	if err := yaml.Unmarshal(data, &legacy); err == nil {
+		for i := range r.records {
+			if len(r.records[i].Sources) == 0 && i < len(legacy) {
+				r.records[i].Sources = legacy[i].PlanDirectories
+			}
+		}
 	}
 	r.loaded = true
 	return nil
@@ -237,7 +250,7 @@ func slug(s string) string {
 	re := regexp.MustCompile(`[^a-z0-9]+`)
 	out := strings.Trim(re.ReplaceAllString(strings.ToLower(s), "-"), "-")
 	if out == "" {
-		return "repository"
+		return "workspace"
 	}
 	return out
 }

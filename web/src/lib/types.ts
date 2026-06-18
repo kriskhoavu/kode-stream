@@ -1,35 +1,35 @@
-export type PlanStatus = 'unsorted' | 'ideas' | 'draft' | 'in_progress' | 'review' | 'done';
+export type ItemStatus = 'unsorted' | 'ideas' | 'draft' | 'in_progress' | 'review' | 'done';
 
-export interface RepositoryConfig {
+export interface WorkspaceConfig {
   id: string;
   name: string;
   path: string;
   baselineBranch: string;
-  planDirectories: string[];
+  sources: string[];
   createdAt: string;
   lastScannedAt?: string;
 }
 
-export interface RepositoryInput {
+export interface WorkspaceInput {
   name: string;
   path: string;
   baselineBranch: string;
-  planDirectories: string[];
+  sources: string[];
 }
 
-export interface RepositorySettings {
+export interface SourceStructureSettings {
   version: number;
-  cards: RepositorySettingsCard[];
+  cards: SourceStructureCard[];
 }
 
-export interface RepositorySettingsCard {
+export interface SourceStructureCard {
   pathPattern: string;
-  fields: RepositorySettingsFields;
+  fields: SourceStructureFields;
 }
 
-export interface RepositorySettingsFields {
-  service: string;
-  ticket: string;
+export interface SourceStructureFields {
+  scope: string;
+  identifier: string;
   title?: string;
   status?: string;
   owner?: string;
@@ -40,30 +40,30 @@ export interface SourceSettingsResult {
   directory: string;
   exists: boolean;
   mode?: 'structured' | 'unstructured' | 'empty' | 'unknown';
-  settings: RepositorySettings;
-  warnings: { planPath?: string; message: string }[];
+  settings: SourceStructureSettings;
+  warnings: { itemPath?: string; message: string }[];
   scan?: ScanResult;
 }
 
-export interface PlanSummary {
+export interface ItemSummary {
   id: string;
-  repositoryId: string;
-  repositoryName: string;
+  workspaceId: string;
+  workspaceName: string;
   branch: string;
-  service: string;
-  ticket: string;
+  scope: string;
+  identifier: string;
   title: string;
-  status: PlanStatus;
+  status: ItemStatus;
   owner?: string;
   author?: string;
   tags: string[];
   updatedAt?: string;
   description?: string;
   metadataSource: string;
-  planRoot?: string;
+  itemPath?: string;
 }
 
-export interface PlanDocument {
+export interface ItemDocument {
   id: string;
   role: string;
   track?: string;
@@ -71,10 +71,10 @@ export interface PlanDocument {
   label: string;
 }
 
-export interface PlanDetail extends PlanSummary {
-  documents: PlanDocument[];
+export interface ItemDetail extends ItemSummary {
+  documents: ItemDocument[];
   metadata: Record<string, unknown>;
-  warnings?: { planPath?: string; message: string }[];
+  warnings?: { itemPath?: string; message: string }[];
   counts: { files: number };
 }
 
@@ -99,40 +99,40 @@ export interface FileSaveInput {
   expectedHash?: string;
 }
 
-export interface PlanMetadataUpdateInput {
+export interface ItemMetadataUpdateInput {
   title?: string;
-  service?: string;
-  ticket?: string;
-  status?: PlanStatus;
+  scope?: string;
+  identifier?: string;
+  status?: ItemStatus;
   owner?: string;
   tags?: string[];
 }
 
-export interface PlanStatusUpdateInput {
-  status: PlanStatus;
+export interface ItemStatusUpdateInput {
+  status: ItemStatus;
 }
 
-export interface NewPlanInput {
-  repositoryId: string;
-  planDirectory: string;
-  service: string;
-  ticket: string;
+export interface NewItemInput {
+  workspaceId: string;
+  source: string;
+  scope: string;
+  identifier: string;
   title: string;
-  status?: PlanStatus;
+  status?: ItemStatus;
   owner?: string;
   tags?: string[];
 }
 
 export interface WriteResult {
-  plan: PlanDetail;
+  item: ItemDetail;
   scannedAt: string;
 }
 
 export interface ScanResult {
-  repositoryId: string;
+  workspaceId: string;
   scannedAt: string;
-  planCount: number;
-  warnings: { planPath?: string; message: string }[];
+  itemCount: number;
+  warnings: { itemPath?: string; message: string }[];
 }
 
 export interface PathSelection {
@@ -141,8 +141,8 @@ export interface PathSelection {
 
 export interface AppState {
   version: string;
-  repositoryCount: number;
-  planCount: number;
+  workspaceCount: number;
+  itemCount: number;
   updatedAt: string;
 }
 
@@ -157,7 +157,7 @@ export interface GitChange {
 }
 
 export interface GitStatus {
-  repositoryId: string;
+  workspaceId: string;
   branch: string;
   upstream?: string;
   ahead: number;

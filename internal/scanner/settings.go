@@ -12,57 +12,88 @@ import (
 	"plan-manager/internal/models"
 )
 
-const RepositorySettingsFile = "repository-settings.yaml"
+const SourceStructureSettingsFile = "workspace-settings.yaml"
+const legacySourceStructureSettingsFile = "repository-settings.yaml"
 
 var settingVariablePattern = regexp.MustCompile(`^\{([A-Za-z][A-Za-z0-9_]*)\}$`)
 
-func DefaultRepositorySettings() models.RepositorySettings {
-	return models.RepositorySettings{
+func DefaultSourceStructureSettings() models.SourceStructureSettings {
+	return models.SourceStructureSettings{
 		Version: 1,
-		Cards: []models.RepositorySettingsCard{{
-			PathPattern: "{service}/feature/{ticket}",
-			Fields: models.RepositorySettingsFields{
-				Service: "{service}",
-				Ticket:  "{ticket}",
-				Title:   "readme_heading",
-				Status:  "draft",
-				Tags:    []string{"docs"},
+		Cards: []models.SourceStructureCard{{
+			PathPattern: "{scope}/feature/{identifier}",
+			Fields: models.SourceStructureFields{
+				Scope:      "{scope}",
+				Identifier: "{identifier}",
+				Title:      "readme_heading",
+				Status:     "draft",
+				Tags:       []string{"docs"},
 			},
 		}},
 	}
 }
 
-func BuiltInStructuredSettings() models.RepositorySettings {
-	return models.RepositorySettings{
+func BuiltInStructuredSettings() models.SourceStructureSettings {
+	return models.SourceStructureSettings{
 		Version: 1,
-		Cards: []models.RepositorySettingsCard{{
-			PathPattern: "{service}/{ticket}",
-			Fields: models.RepositorySettingsFields{
-				Service: "{service}",
-				Ticket:  "{ticket}",
-				Title:   "readme_heading",
-				Status:  "draft",
-				Tags:    []string{"plans"},
+		Cards: []models.SourceStructureCard{{
+			PathPattern: "{scope}/{identifier}",
+			Fields: models.SourceStructureFields{
+				Scope:      "{scope}",
+				Identifier: "{identifier}",
+				Title:      "readme_heading",
+				Status:     "draft",
+				Tags:       []string{"items"},
 			},
 		}},
 	}
 }
 
-func ReadRepositorySettings(root string) (models.RepositorySettings, bool, []models.ScanWarning) {
-	path := filepath.Join(root, RepositorySettingsFile)
+func ReadSourceStructureSettings(root string) (models.SourceStructureSettings, bool, []models.ScanWarning) {
+	path := filepath.Join(root, SourceStructureSettingsFile)
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return DefaultRepositorySettings(), false, nil
+		path = filepath.Join(root, legacySourceStructureSettingsFile)
+		data, err = os.ReadFile(path)
+		if os.IsNotExist(err) {
+			return DefaultSourceStructureSettings(), false, nil
+		}
 	}
 	if err != nil {
-		return DefaultRepositorySettings(), false, []models.ScanWarning{{PlanPath: filepath.ToSlash(path), Message: err.Error()}}
+		return DefaultSourceStructureSettings(), false, []models.ScanWarning{{ItemPath: filepath.ToSlash(path), Message: err.Error()}}
 	}
-	var settings models.RepositorySettings
+	var settings models.SourceStructureSettings
 	if err := yaml.Unmarshal(data, &settings); err != nil {
-		return DefaultRepositorySettings(), true, []models.ScanWarning{{PlanPath: RepositorySettingsFile, Message: "invalid repository settings: " + err.Error()}}
+		return DefaultSourceStructureSettings(), true, []models.ScanWarning{{ItemPath: SourceStructureSettingsFile, Message: "invalid workspace settings: " + err.Error()}}
 	}
-	warnings := ValidateRepositorySettings(settings)
+	applyLegacySourceFields(data, &settings)
+	warnings := ValidateSourceStructureSettings(settings)
 	return settings, true, warnings
+}
+
+func applyLegacySourceFields(data []byte, settings *models.SourceStructureSettings) {
+	var legacy struct {
+		Cards []struct {
+			Fields struct {
+				Service string `yaml:"scope"`
+				Ticket  string `yaml:"identifier"`
+			} `yaml:"fields"`
+		} `yaml:"cards"`
+	}
+	if err := yaml.Unmarshal(data, &legacy); err != nil {
+		return
+	}
+	for i := range settings.Cards {
+		if i >= len(legacy.Cards) {
+			break
+		}
+		if settings.Cards[i].Fields.Scope == "" {
+			settings.Cards[i].Fields.Scope = legacy.Cards[i].Fields.Service
+		}
+		if settings.Cards[i].Fields.Identifier == "" {
+			settings.Cards[i].Fields.Identifier = legacy.Cards[i].Fields.Ticket
+		}
+	}
 }
 
 func SourceSettingsMode(root string) string {
@@ -70,7 +101,7 @@ func SourceSettingsMode(root string) string {
 	if err != nil {
 		return "unknown"
 	}
-	if hasStructuredPlanChildren(root, entries) {
+	if hasStructuredItemChildren(root, entries) {
 		return "structured"
 	}
 	if hasMarkdownFiles(root) {
@@ -79,34 +110,34 @@ func SourceSettingsMode(root string) string {
 	return "empty"
 }
 
-func WriteRepositorySettings(root string, settings models.RepositorySettings) error {
-	if warnings := ValidateRepositorySettings(settings); len(warnings) > 0 {
+func WriteSourceStructureSettings(root string, settings models.SourceStructureSettings) error {
+	if warnings := ValidateSourceStructureSettings(settings); len(warnings) > 0 {
 		return errors.New(warnings[0].Message)
 	}
 	data, err := yaml.Marshal(settings)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(root, RepositorySettingsFile), data, 0o644)
+	return os.WriteFile(filepath.Join(root, SourceStructureSettingsFile), data, 0o644)
 }
 
-func ValidateRepositorySettings(settings models.RepositorySettings) []models.ScanWarning {
+func ValidateSourceStructureSettings(settings models.SourceStructureSettings) []models.ScanWarning {
 	var warnings []models.ScanWarning
 	if settings.Version != 1 {
-		warnings = append(warnings, models.ScanWarning{PlanPath: RepositorySettingsFile, Message: "repository settings version must be 1"})
+		warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: "source structure settings version must be 1"})
 	}
 	if len(settings.Cards) == 0 {
-		warnings = append(warnings, models.ScanWarning{PlanPath: RepositorySettingsFile, Message: "repository settings must define at least one card rule"})
+		warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: "source structure settings must define at least one card rule"})
 	}
 	for i, card := range settings.Cards {
 		prefix := fmt.Sprintf("card rule %d", i+1)
 		if strings.TrimSpace(card.PathPattern) == "" {
-			warnings = append(warnings, models.ScanWarning{PlanPath: RepositorySettingsFile, Message: prefix + " pathPattern is required"})
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " pathPattern is required"})
 			continue
 		}
 		segments, err := parsePathPattern(card.PathPattern)
 		if err != nil {
-			warnings = append(warnings, models.ScanWarning{PlanPath: RepositorySettingsFile, Message: prefix + " " + err.Error()})
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " " + err.Error()})
 			continue
 		}
 		variableNames := map[string]bool{}
@@ -115,19 +146,19 @@ func ValidateRepositorySettings(settings models.RepositorySettings) []models.Sca
 				variableNames[segment.variable] = true
 			}
 		}
-		if strings.TrimSpace(card.Fields.Service) == "" {
-			warnings = append(warnings, models.ScanWarning{PlanPath: RepositorySettingsFile, Message: prefix + " fields.service is required"})
-		} else if unknown := unknownTemplateVariable(card.Fields.Service, variableNames); unknown != "" {
-			warnings = append(warnings, models.ScanWarning{PlanPath: RepositorySettingsFile, Message: prefix + " fields.service references unknown variable " + unknown})
+		if strings.TrimSpace(card.Fields.Scope) == "" {
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.scope is required"})
+		} else if unknown := unknownTemplateVariable(card.Fields.Scope, variableNames); unknown != "" {
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.scope references unknown variable " + unknown})
 		}
-		if strings.TrimSpace(card.Fields.Ticket) == "" {
-			warnings = append(warnings, models.ScanWarning{PlanPath: RepositorySettingsFile, Message: prefix + " fields.ticket is required"})
-		} else if unknown := unknownTemplateVariable(card.Fields.Ticket, variableNames); unknown != "" {
-			warnings = append(warnings, models.ScanWarning{PlanPath: RepositorySettingsFile, Message: prefix + " fields.ticket references unknown variable " + unknown})
+		if strings.TrimSpace(card.Fields.Identifier) == "" {
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.identifier is required"})
+		} else if unknown := unknownTemplateVariable(card.Fields.Identifier, variableNames); unknown != "" {
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.identifier references unknown variable " + unknown})
 		}
 		for _, value := range append([]string{card.Fields.Title, card.Fields.Status, card.Fields.Owner}, card.Fields.Tags...) {
 			if unknown := unknownTemplateVariable(value, variableNames); unknown != "" {
-				warnings = append(warnings, models.ScanWarning{PlanPath: RepositorySettingsFile, Message: prefix + " references unknown variable " + unknown})
+				warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " references unknown variable " + unknown})
 			}
 		}
 	}

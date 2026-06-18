@@ -2,25 +2,28 @@ import { type DragEvent, type Dispatch, type FormEvent, type SetStateAction, use
 import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api } from '../lib/api';
-import type { RepositoryConfig, RepositorySettings, RepositorySettingsCard } from '../lib/types';
+import type { WorkspaceConfig, SourceStructureSettings, SourceStructureCard } from '../lib/types';
+import { labels } from '../lib/vocabulary';
 
-export function RepositoriesPage({ repositories, onChanged }: { repositories: RepositoryConfig[]; onChanged: () => void | Promise<void> }) {
+const DEFAULT_SOURCES = ['specs', 'docs', 'plans'];
+
+export function WorkspacesPage({ workspaces, onChanged }: { workspaces: WorkspaceConfig[]; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('Plan Manager');
   const [path, setPath] = useState('');
   const [baselineBranch, setBaselineBranch] = useState('main');
-  const [planDirectories, setPlanDirectories] = useState('plans');
+  const [sources, setSources] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
-  const [editDraft, setEditDraft] = useState({ name: '', path: '', baselineBranch: '', planDirectories: '' });
-  const [repoToRemove, setRepoToRemove] = useState<RepositoryConfig | null>(null);
+  const [editDraft, setEditDraft] = useState({ name: '', path: '', baselineBranch: '', sources: '' });
+  const [repoToRemove, setRepoToRemove] = useState<WorkspaceConfig | null>(null);
   const [settingsEditor, setSettingsEditor] = useState<{
-    repo: RepositoryConfig;
+    repo: WorkspaceConfig;
     directory: string;
     exists: boolean;
     mode?: string;
-    card: RepositorySettingsCard;
+    card: SourceStructureCard;
     warnings: string[];
   } | null>(null);
 
@@ -29,17 +32,17 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
     setBusy(true);
     setMessage('');
     try {
-      await api.createRepository({
+      await api.createWorkspace({
         name,
         path,
         baselineBranch,
-        planDirectories: parsePlanDirectories(planDirectories)
+        sources: parseSources(sources)
       });
-      setMessage('Repository registered');
+      setMessage('Workspace registered');
       setName('');
       setPath('');
       setBaselineBranch('main');
-      setPlanDirectories('plans');
+      setSources('');
       onChanged();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Registration failed');
@@ -48,12 +51,12 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
     }
   };
 
-  const scan = async (repo: RepositoryConfig) => {
+  const scan = async (repo: WorkspaceConfig) => {
     setBusy(true);
     setMessage(`Scanning ${repo.name}`);
     try {
       const result = await api.scan(repo.id);
-      setMessage(`${result.planCount} plans indexed`);
+      setMessage(`${result.itemCount} items indexed`);
       onChanged();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Scan failed');
@@ -62,29 +65,29 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
     }
   };
 
-  const startEdit = (repo: RepositoryConfig) => {
+  const startEdit = (repo: WorkspaceConfig) => {
     setEditingId(repo.id);
     setEditDraft({
       name: repo.name,
       path: repo.path,
       baselineBranch: repo.baselineBranch,
-      planDirectories: repo.planDirectories.join(', ')
+      sources: repo.sources.join(', ')
     });
     setMessage('');
   };
 
-  const saveEdit = async (repo: RepositoryConfig) => {
+  const saveEdit = async (repo: WorkspaceConfig) => {
     setBusy(true);
     setMessage('');
     try {
-      await api.updateRepository(repo.id, {
+      await api.updateWorkspace(repo.id, {
         name: editDraft.name,
         path: editDraft.path,
         baselineBranch: editDraft.baselineBranch,
-        planDirectories: parsePlanDirectories(editDraft.planDirectories)
+        sources: parseSources(editDraft.sources)
       });
       setEditingId('');
-      setMessage('Repository updated');
+      setMessage('Workspace updated');
       onChanged();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Update failed');
@@ -93,13 +96,13 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
     }
   };
 
-  const removeRepo = async (repo: RepositoryConfig) => {
+  const removeRepo = async (repo: WorkspaceConfig) => {
     setBusy(true);
     setMessage('');
     try {
-      await api.deleteRepository(repo.id);
+      await api.deleteWorkspace(repo.id);
       setEditingId('');
-      setMessage('Repository removed');
+      setMessage('Workspace removed');
       onChanged();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Remove failed');
@@ -137,17 +140,17 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
     }
   };
 
-  const openSourceSettings = async (repo: RepositoryConfig, directory: string) => {
+  const openSourceSettings = async (repo: WorkspaceConfig, directory: string) => {
     setBusy(true);
     setMessage('');
     try {
-      const result = await api.sourceSettings(repo.id, directory);
+      const result = await api.sourceStructure(repo.id, directory);
       setSettingsEditor({
         repo,
         directory,
         exists: result.exists,
         mode: result.mode,
-        card: normalizeSettingsCard(result.settings?.cards?.[0]),
+        card: normalizeSettingsCard(result.settings?.cards?.[0], directory),
         warnings: (result.warnings ?? []).map((warning) => warning.message)
       });
     } catch (err) {
@@ -162,13 +165,13 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
     setBusy(true);
     setMessage('');
     try {
-      const settings: RepositorySettings = {
+      const settings: SourceStructureSettings = {
         version: 1,
-        cards: [settingsEditor.card]
+        cards: [withInferredCompatibilityFields(settingsEditor.card, settingsEditor.directory)]
       };
-      const result = await api.saveSourceSettings(settingsEditor.repo.id, settingsEditor.directory, settings);
+      const result = await api.saveSourceStructure(settingsEditor.repo.id, settingsEditor.directory, settings);
       setSettingsEditor(null);
-      setMessage(`Structure settings saved; ${result.scan?.planCount ?? 0} plans indexed`);
+      setMessage(`Source structure saved; ${result.scan?.itemCount ?? 0} items indexed`);
       await onChanged();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Settings failed to save');
@@ -192,21 +195,21 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
   };
 
   return (
-    <section className="repositories-page">
+    <section className="workspaces-page">
       <div className="page-title">
         <div>
-          <h1>Repositories</h1>
-          <span>Register local Git repositories and scan plan folders.</span>
+          <h1>Workspaces</h1>
+          <span>Register local Git workspaces and scan sources.</span>
         </div>
       </div>
 
-      <div className="repositories-layout">
+      <div className="workspaces-layout">
         <form className="repo-form repo-create-panel" onSubmit={submit}>
           <header>
             <FolderGit2 size={18} />
-            <h2>Register Repository</h2>
+            <h2>Register Workspace</h2>
           </header>
-          <label className="repo-field">Repository Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Discovery" /></label>
+          <label className="repo-field">Workspace Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Discovery" /></label>
           <label
             className={pathDragging ? 'repo-field path-field dragging' : 'repo-field path-field'}
             onDragOver={(event) => {
@@ -228,10 +231,10 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
             </div>
           </label>
           <div className="repo-field-grid">
-            <label className="repo-field">Baseline Branch<input value={baselineBranch} onChange={(event) => setBaselineBranch(event.target.value)} /></label>
-            <PlanDirectoriesField value={planDirectories} onChange={setPlanDirectories} />
+            <label className="repo-field">Base Branch<input value={baselineBranch} onChange={(event) => setBaselineBranch(event.target.value)} /></label>
+            <SourcesField value={sources} onChange={setSources} />
           </div>
-          <button className="primary repo-submit" disabled={busy}><FolderGit2 size={16} /> Register Repository</button>
+          <button className="primary repo-submit" disabled={busy}><FolderGit2 size={16} /> Register Workspace</button>
           {message && <p className={message.includes('failed') || message.includes('invalid') || message.includes('cancelled') ? 'error' : 'success'}>{message}</p>}
         </form>
 
@@ -239,21 +242,21 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
           <header>
             <div>
               <h2>Registered</h2>
-              <span>{repositories.length} repositories</span>
+              <span>{workspaces.length} workspaces</span>
             </div>
           </header>
           <div className="repo-list">
-            {repositories.map((repo) => (
+            {workspaces.map((repo) => (
               <article className="repo-row" key={repo.id}>
                 <div className="repo-row-icon"><HardDrive size={18} /></div>
                 {editingId === repo.id ? (
                   <>
                     <div className="repo-row-main repo-edit-form">
-                      <label className="repo-field">Repository Name<input value={editDraft.name} onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })} /></label>
+                      <label className="repo-field">Workspace Name<input value={editDraft.name} onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })} /></label>
                       <label className="repo-field">Local Path<input value={editDraft.path} onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })} /></label>
                       <div className="repo-field-grid">
-                        <label className="repo-field">Baseline Branch<input value={editDraft.baselineBranch} onChange={(event) => setEditDraft({ ...editDraft, baselineBranch: event.target.value })} /></label>
-                        <PlanDirectoriesField value={editDraft.planDirectories} onChange={(value) => setEditDraft({ ...editDraft, planDirectories: value })} />
+                        <label className="repo-field">Base Branch<input value={editDraft.baselineBranch} onChange={(event) => setEditDraft({ ...editDraft, baselineBranch: event.target.value })} /></label>
+                        <SourcesField value={editDraft.sources} onChange={(value) => setEditDraft({ ...editDraft, sources: value })} />
                       </div>
                     </div>
                     <div className="repo-row-actions">
@@ -269,7 +272,7 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
                       <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} disabled={busy} title={repo.path}>{repo.path}</button>
                       <span>{repo.baselineBranch}</span>
                       <div className="repo-directory-list">
-                        {repo.planDirectories.map((directory) => (
+                        {repo.sources.map((directory) => (
                           <div className="repo-directory-chip" key={directory}>
                             <span className="repo-directory-name">{directory}</span>
                             <button type="button" onClick={() => void openSourceSettings(repo, directory)} disabled={busy} aria-label={`Configure ${directory}`} title={`Configure ${directory}`}>
@@ -292,14 +295,14 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
                 )}
               </article>
             ))}
-            {repositories.length === 0 && <div className="empty-inline repo-empty"><CheckCircle2 size={18} /> No repositories registered.</div>}
+            {workspaces.length === 0 && <div className="empty-inline repo-empty"><CheckCircle2 size={18} /> No workspaces registered.</div>}
           </div>
         </div>
       </div>
       {repoToRemove && (
         <ConfirmDialog
-          title="Remove repository"
-          message={`Remove ${repoToRemove.name}? Cached plans for this repository will be removed from the board.`}
+          title="Remove workspace"
+          message={`Remove ${repoToRemove.name}? Cached items for this workspace will be removed from the board.`}
           confirmLabel={busy ? 'Removing...' : 'Remove'}
           busy={busy}
           danger
@@ -309,29 +312,29 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
       )}
       {settingsEditor && (
         <section className="modal-backdrop" role="presentation">
-          <div className="modal-panel source-settings-modal" role="dialog" aria-modal="true" aria-label="Structure settings">
+          <div className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
             <header>
               <div>
-                <h2>Structure Settings</h2>
+                <h2>{labels.sourceStructure}</h2>
                 <span>{settingsEditor.repo.name} / {settingsEditor.directory}</span>
               </div>
-              <button className="icon-button" type="button" onClick={() => setSettingsEditor(null)} disabled={busy} aria-label="Close structure settings">
+              <button className="icon-button" type="button" onClick={() => setSettingsEditor(null)} disabled={busy} aria-label="Close source structure">
                 <X size={16} />
               </button>
             </header>
             <p className="modal-help">
-              Define how this source directory should be split into work item cards. If this file is removed or invalid, Plan Manager falls back to the current docs view.
+              Define how this source should be split into item cards. Scope and identifier are inferred from the path pattern.
             </p>
             {!settingsEditor.exists && settingsEditor.mode === 'structured' && (
-              <div className="metadata-callout source-settings-supported">
+              <div className="metadata-callout source-structure-supported">
                 <strong>Built-in structure detected</strong>
-                <span>This source already follows the supported service/ticket layout. Saving here creates an optional override.</span>
+                <span>This source already follows the supported scope/identifier layout. Saving here creates an optional override.</span>
               </div>
             )}
             {!settingsEditor.exists && settingsEditor.mode !== 'structured' && (
               <div className="metadata-callout">
                 <strong>No settings file yet</strong>
-                <span>Saving creates repository-settings.yaml inside this source directory.</span>
+                <span>Saving creates workspace-settings.yaml inside this source.</span>
               </div>
             )}
             {settingsEditor.warnings.length > 0 && (
@@ -340,25 +343,15 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
                 {settingsEditor.warnings.map((warning) => <p key={warning}>{warning}</p>)}
               </div>
             )}
-            <div className="metadata-form source-settings-form">
+            <div className="metadata-form source-structure-form">
               <label>
                 Path Pattern
                 <input
                   value={settingsEditor.card.pathPattern}
                   onChange={(event) => updateSettingsCard(setSettingsEditor, { pathPattern: event.target.value })}
-                  placeholder="{service}/feature/{ticket}"
+                  placeholder="{scope}/feature/{identifier}"
                 />
               </label>
-              <div className="repo-field-grid">
-                <label>
-                  Service
-                  <input value={settingsEditor.card.fields.service} onChange={(event) => updateSettingsField(setSettingsEditor, 'service', event.target.value)} placeholder="{service}" />
-                </label>
-                <label>
-                  Ticket
-                  <input value={settingsEditor.card.fields.ticket} onChange={(event) => updateSettingsField(setSettingsEditor, 'ticket', event.target.value)} placeholder="{ticket}" />
-                </label>
-              </div>
               <div className="repo-field-grid">
                 <label>
                   Title
@@ -400,26 +393,31 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
   );
 }
 
-function PlanDirectoriesField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const directories = parsePlanDirectories(value);
+function SourcesField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const directories = parseSources(value);
+  const customDirectories = directories.filter((directory) => !DEFAULT_SOURCES.includes(directory));
+
   return (
-    <label className="repo-field">Plan Directories
+    <label className="repo-field">{labels.sources}
       <div className="directory-input">
-        <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="plans, docs" />
         <div className="directory-chips">
-          {directories.map((directory) => (
-            <button type="button" key={directory} onClick={() => onChange(removePlanDirectory(value, directory))}>
+          {DEFAULT_SOURCES.map((directory) => {
+            const selected = directories.includes(directory);
+            return (
+              <button type="button" className={selected ? undefined : 'add-directory-chip'} key={directory} onClick={() => onChange(toggleSource(value, directory))}>
+                {selected ? <X size={13} /> : <Plus size={13} />}
+                {directory}
+              </button>
+            );
+          })}
+          {customDirectories.map((directory) => (
+            <button type="button" key={directory} onClick={() => onChange(removeSource(value, directory))}>
               {directory}
               <X size={13} />
             </button>
           ))}
-          {['plans', 'docs'].filter((directory) => !directories.includes(directory)).map((directory) => (
-            <button type="button" className="add-directory-chip" key={directory} onClick={() => onChange(addPlanDirectory(value, directory))}>
-              <Plus size={13} />
-              {directory}
-            </button>
-          ))}
         </div>
+        <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="Add source" />
       </div>
     </label>
   );
@@ -447,56 +445,101 @@ function lastPathSegment(value: string): string {
   return value.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
 }
 
-export function parsePlanDirectories(value: string): string[] {
+export function parseSources(value: string): string[] {
   return Array.from(new Set(value.split(',').map((item) => item.trim()).filter(Boolean)));
 }
 
-function addPlanDirectory(value: string, directory: string): string {
-  return [...parsePlanDirectories(value), directory].join(', ');
+function addSource(value: string, directory: string): string {
+  return [...parseSources(value), directory].join(', ');
 }
 
-function removePlanDirectory(value: string, directory: string): string {
-  return parsePlanDirectories(value).filter((item) => item !== directory).join(', ');
+function removeSource(value: string, directory: string): string {
+  return parseSources(value).filter((item) => item !== directory).join(', ');
 }
 
-function normalizeSettingsCard(card?: RepositorySettingsCard): RepositorySettingsCard {
-  return {
-    pathPattern: card?.pathPattern || '{service}/feature/{ticket}',
+function toggleSource(value: string, directory: string): string {
+  const sources = parseSources(value);
+  return sources.includes(directory) ? removeSource(value, directory) : addSource(value, directory);
+}
+
+function normalizeSettingsCard(card?: SourceStructureCard, directory = 'source'): SourceStructureCard {
+  const legacyFields = card?.fields as SourceStructureCard['fields'] & { service?: string; ticket?: string } | undefined;
+  return withInferredCompatibilityFields({
+    pathPattern: genericTemplate(card?.pathPattern || '{scope}/feature/{identifier}'),
     fields: {
-      service: card?.fields?.service || '{service}',
-      ticket: card?.fields?.ticket || '{ticket}',
+      scope: genericTemplate(legacyFields?.scope || legacyFields?.service || '{scope}'),
+      identifier: genericTemplate(legacyFields?.identifier || legacyFields?.ticket || '{identifier}'),
       title: card?.fields?.title || 'readme_heading',
       status: card?.fields?.status || 'draft',
       owner: card?.fields?.owner || '',
       tags: Array.isArray(card?.fields?.tags) ? card.fields.tags : ['docs']
     }
+  }, directory);
+}
+
+function genericTemplate(value: string): string {
+  return value.replaceAll('{service}', '{scope}').replaceAll('{ticket}', '{identifier}');
+}
+
+function withInferredCompatibilityFields(card: SourceStructureCard, directory: string): SourceStructureCard {
+  return {
+    ...card,
+    fields: {
+      ...card.fields,
+      ...inferCompatibilityFields(card.pathPattern, directory)
+    }
   };
+}
+
+export function inferCompatibilityFields(pathPattern: string, directory: string): Pick<SourceStructureCard['fields'], 'scope' | 'identifier'> {
+  const variables = Array.from(new Set(Array.from(pathPattern.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)).map((match) => match[1])));
+  const sourceName = lastPathSegment(directory) || 'source';
+  const scopeVariable = preferredVariable(variables, ['scope', 'service']) ?? (variables.length > 1 ? variables[0] : '');
+  const identifierVariable = preferredVariable(variables, ['identifier', 'ticket']) ?? (variables.length > 1 ? variables[variables.length - 1] : variables[0] ?? '');
+  return {
+    scope: scopeVariable ? `{${scopeVariable}}` : sourceName,
+    identifier: identifierVariable ? `{${identifierVariable}}` : lastLiteralPathSegment(pathPattern) || sourceName
+  };
+}
+
+function preferredVariable(variables: string[], preferred: string[]): string | undefined {
+  return preferred.find((name) => variables.includes(name));
+}
+
+function lastLiteralPathSegment(pathPattern: string): string {
+  return pathPattern.split('/').map((segment) => segment.trim()).filter(Boolean).filter((segment) => !segment.includes('{') && !segment.includes('}')).at(-1) ?? '';
 }
 
 function updateSettingsCard(
   setSettingsEditor: Dispatch<SetStateAction<{
-    repo: RepositoryConfig;
+    repo: WorkspaceConfig;
     directory: string;
     exists: boolean;
     mode?: string;
-    card: RepositorySettingsCard;
+    card: SourceStructureCard;
     warnings: string[];
   } | null>>,
-  patch: Partial<RepositorySettingsCard>
+  patch: Partial<SourceStructureCard>
 ) {
-  setSettingsEditor((current) => current ? { ...current, card: { ...current.card, ...patch } } : current);
+  setSettingsEditor((current) => {
+    if (!current) return current;
+    return {
+      ...current,
+      card: withInferredCompatibilityFields({ ...current.card, ...patch }, current.directory)
+    };
+  });
 }
 
 function updateSettingsField(
   setSettingsEditor: Dispatch<SetStateAction<{
-    repo: RepositoryConfig;
+    repo: WorkspaceConfig;
     directory: string;
     exists: boolean;
     mode?: string;
-    card: RepositorySettingsCard;
+    card: SourceStructureCard;
     warnings: string[];
   } | null>>,
-  field: keyof RepositorySettingsCard['fields'],
+  field: keyof SourceStructureCard['fields'],
   value: string
 ) {
   setSettingsEditor((current) => {

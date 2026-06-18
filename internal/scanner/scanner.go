@@ -22,7 +22,7 @@ type Scanner struct {
 }
 
 type ScanData struct {
-	Plans    []models.PlanDetail
+	Items    []models.ItemDetail
 	Warnings []models.ScanWarning
 }
 
@@ -30,96 +30,96 @@ func New(git *gitadapter.GitAdapter) *Scanner {
 	return &Scanner{git: git}
 }
 
-func (s *Scanner) Scan(repo models.RepositoryConfig) (ScanData, error) {
-	branch, err := s.git.CurrentBranch(repo.Path)
+func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
+	branch, err := s.git.CurrentBranch(workspace.Path)
 	if err != nil {
-		branch = repo.BaselineBranch
+		branch = workspace.BaselineBranch
 	}
 	var out ScanData
-	for _, planDir := range repo.PlanDirectories {
-		root := filepath.Join(repo.Path, filepath.FromSlash(planDir))
-		plans, warnings := s.scanPlanDirectory(repo, branch, planDir, root)
-		out.Plans = append(out.Plans, plans...)
+	for _, source := range workspace.Sources {
+		root := filepath.Join(workspace.Path, filepath.FromSlash(source))
+		items, warnings := s.scanItemDirectory(workspace, branch, source, root)
+		out.Items = append(out.Items, items...)
 		out.Warnings = append(out.Warnings, warnings...)
 	}
-	sort.Slice(out.Plans, func(i, j int) bool {
-		return out.Plans[i].UpdatedAt.After(out.Plans[j].UpdatedAt)
+	sort.Slice(out.Items, func(i, j int) bool {
+		return out.Items[i].UpdatedAt.After(out.Items[j].UpdatedAt)
 	})
 	return out, nil
 }
 
-func (s *Scanner) scanPlanDirectory(repo models.RepositoryConfig, branch, planDir, root string) ([]models.PlanDetail, []models.ScanWarning) {
-	var plans []models.PlanDetail
+func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, source, root string) ([]models.ItemDetail, []models.ScanWarning) {
+	var items []models.ItemDetail
 	var warnings []models.ScanWarning
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		return plans, []models.ScanWarning{{PlanPath: planDir, Message: err.Error()}}
+		return items, []models.ScanWarning{{ItemPath: source, Message: err.Error()}}
 	}
-	settings, hasSettings, settingsWarnings := ReadRepositorySettings(root)
+	settings, hasSettings, settingsWarnings := ReadSourceStructureSettings(root)
 	if hasSettings {
 		warnings = append(warnings, settingsWarnings...)
 		if len(settingsWarnings) == 0 {
-			configuredPlans, configuredWarnings := s.scanConfiguredPlanDirectory(repo, branch, planDir, root, settings)
+			configuredItems, configuredWarnings := s.scanConfiguredItemDirectory(workspace, branch, source, root, settings)
 			warnings = append(warnings, configuredWarnings...)
-			if len(configuredPlans) > 0 {
-				return configuredPlans, warnings
+			if len(configuredItems) > 0 {
+				return configuredItems, warnings
 			}
-			warnings = append(warnings, models.ScanWarning{PlanPath: planDir, Message: "repository settings did not match any card directories; using fallback scan"})
+			warnings = append(warnings, models.ScanWarning{ItemPath: source, Message: "workspace settings did not match any card directories; using fallback scan"})
 		}
 	}
 	if shouldScanAsDocumentCollection(root, entries) {
-		detail, planWarnings, err := s.parsePlan(repo, branch, filepath.Base(planDir), filepath.Base(planDir), filepath.ToSlash(planDir), root)
+		detail, itemWarnings, err := s.parseItem(workspace, branch, filepath.Base(source), filepath.Base(source), filepath.ToSlash(source), root)
 		if err != nil {
-			return plans, []models.ScanWarning{{PlanPath: planDir, Message: err.Error()}}
+			return items, []models.ScanWarning{{ItemPath: source, Message: err.Error()}}
 		}
 		detail.MetadataSource = "docs"
 		detail.Status = models.StatusUnsorted
-		if detail.Title == titleFromTicket(filepath.Base(planDir)) {
-			detail.Title = titleFromDocumentRoot(planDir)
+		if detail.Title == titleFromIdentifier(filepath.Base(source)) {
+			detail.Title = titleFromDocumentRoot(source)
 		}
 		detail.Tags = append(detail.Tags, "docs")
-		return []models.PlanDetail{detail}, append(warnings, planWarnings...)
+		return []models.ItemDetail{detail}, append(warnings, itemWarnings...)
 	}
-	for _, serviceEntry := range entries {
-		if !serviceEntry.IsDir() || strings.HasPrefix(serviceEntry.Name(), ".") {
+	for _, scopeEntry := range entries {
+		if !scopeEntry.IsDir() || strings.HasPrefix(scopeEntry.Name(), ".") {
 			continue
 		}
-		serviceRoot := filepath.Join(root, serviceEntry.Name())
-		tickets, err := os.ReadDir(serviceRoot)
+		scopeRoot := filepath.Join(root, scopeEntry.Name())
+		tickets, err := os.ReadDir(scopeRoot)
 		if err != nil {
-			warnings = append(warnings, models.ScanWarning{PlanPath: filepath.ToSlash(filepath.Join(planDir, serviceEntry.Name())), Message: err.Error()})
+			warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(filepath.Join(source, scopeEntry.Name())), Message: err.Error()})
 			continue
 		}
-		for _, ticketEntry := range tickets {
-			if !ticketEntry.IsDir() || strings.HasPrefix(ticketEntry.Name(), ".") {
+		for _, identifierEntry := range tickets {
+			if !identifierEntry.IsDir() || strings.HasPrefix(identifierEntry.Name(), ".") {
 				continue
 			}
-			planRoot := filepath.Join(serviceRoot, ticketEntry.Name())
-			relPlanRoot := filepath.ToSlash(filepath.Join(planDir, serviceEntry.Name(), ticketEntry.Name()))
-			planBranch := branch
-			if matchedBranch := s.git.BranchForTicket(repo.Path, ticketEntry.Name()); matchedBranch != "" {
-				planBranch = matchedBranch
+			itemRoot := filepath.Join(scopeRoot, identifierEntry.Name())
+			relItemPath := filepath.ToSlash(filepath.Join(source, scopeEntry.Name(), identifierEntry.Name()))
+			itemBranch := branch
+			if matchedBranch := s.git.BranchForIdentifier(workspace.Path, identifierEntry.Name()); matchedBranch != "" {
+				itemBranch = matchedBranch
 			}
-			detail, planWarnings, err := s.parsePlan(repo, planBranch, serviceEntry.Name(), ticketEntry.Name(), relPlanRoot, planRoot)
+			detail, itemWarnings, err := s.parseItem(workspace, itemBranch, scopeEntry.Name(), identifierEntry.Name(), relItemPath, itemRoot)
 			if err != nil {
-				warnings = append(warnings, models.ScanWarning{PlanPath: relPlanRoot, Message: err.Error()})
+				warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 				continue
 			}
-			warnings = append(warnings, planWarnings...)
-			plans = append(plans, detail)
+			warnings = append(warnings, itemWarnings...)
+			items = append(items, detail)
 		}
 	}
-	return plans, warnings
+	return items, warnings
 }
 
-func (s *Scanner) scanConfiguredPlanDirectory(repo models.RepositoryConfig, branch, planDir, root string, settings models.RepositorySettings) ([]models.PlanDetail, []models.ScanWarning) {
-	var plans []models.PlanDetail
+func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, branch, source, root string, settings models.SourceStructureSettings) ([]models.ItemDetail, []models.ScanWarning) {
+	var items []models.ItemDetail
 	var warnings []models.ScanWarning
 	seen := map[string]bool{}
 	for _, card := range settings.Cards {
 		segments, err := parsePathPattern(card.PathPattern)
 		if err != nil {
-			warnings = append(warnings, models.ScanWarning{PlanPath: planDir, Message: err.Error()})
+			warnings = append(warnings, models.ScanWarning{ItemPath: source, Message: err.Error()})
 			continue
 		}
 		for _, match := range matchPatternDirectories(root, segments) {
@@ -127,44 +127,44 @@ func (s *Scanner) scanConfiguredPlanDirectory(repo models.RepositoryConfig, bran
 				continue
 			}
 			seen[match.path] = true
-			service := renderSettingsTemplate(card.Fields.Service, match.captures)
-			ticket := renderSettingsTemplate(card.Fields.Ticket, match.captures)
-			if strings.TrimSpace(service) == "" || strings.TrimSpace(ticket) == "" {
-				warnings = append(warnings, models.ScanWarning{PlanPath: filepath.ToSlash(match.path), Message: "repository settings produced an empty service or ticket"})
+			scope := renderSettingsTemplate(card.Fields.Scope, match.captures)
+			identifier := renderSettingsTemplate(card.Fields.Identifier, match.captures)
+			if strings.TrimSpace(scope) == "" || strings.TrimSpace(identifier) == "" {
+				warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(match.path), Message: "workspace settings produced an empty scope or identifier"})
 				continue
 			}
 			relFromRoot, err := filepath.Rel(root, match.path)
 			if err != nil {
-				warnings = append(warnings, models.ScanWarning{PlanPath: filepath.ToSlash(match.path), Message: err.Error()})
+				warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(match.path), Message: err.Error()})
 				continue
 			}
-			relPlanRoot := filepath.ToSlash(filepath.Join(planDir, relFromRoot))
-			planBranch := branch
-			if matchedBranch := s.git.BranchForTicket(repo.Path, ticket); matchedBranch != "" {
-				planBranch = matchedBranch
+			relItemPath := filepath.ToSlash(filepath.Join(source, relFromRoot))
+			itemBranch := branch
+			if matchedBranch := s.git.BranchForIdentifier(workspace.Path, identifier); matchedBranch != "" {
+				itemBranch = matchedBranch
 			}
-			detail, planWarnings, err := s.parsePlan(repo, planBranch, service, ticket, relPlanRoot, match.path)
+			detail, itemWarnings, err := s.parseItem(workspace, itemBranch, scope, identifier, relItemPath, match.path)
 			if err != nil {
-				warnings = append(warnings, models.ScanWarning{PlanPath: relPlanRoot, Message: err.Error()})
+				warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 				continue
 			}
-			warnings = append(warnings, planWarnings...)
-			if detail.MetadataSource != "plan.yaml" {
-				applyRepositorySettings(&detail, card, match.captures)
+			warnings = append(warnings, itemWarnings...)
+			if detail.MetadataSource != "item.yaml" {
+				applySourceStructureSettings(&detail, card, match.captures)
 			}
-			plans = append(plans, detail)
+			items = append(items, detail)
 		}
 	}
-	return plans, warnings
+	return items, warnings
 }
 
-type repositorySettingsMatch struct {
+type workspaceSettingsMatch struct {
 	path     string
 	captures map[string]string
 }
 
-func matchPatternDirectories(root string, segments []pathPatternSegment) []repositorySettingsMatch {
-	var matches []repositorySettingsMatch
+func matchPatternDirectories(root string, segments []pathPatternSegment) []workspaceSettingsMatch {
+	var matches []workspaceSettingsMatch
 	var walk func(path string, depth int, captures map[string]string)
 	walk = func(path string, depth int, captures map[string]string) {
 		if depth == len(segments) {
@@ -173,7 +173,7 @@ func matchPatternDirectories(root string, segments []pathPatternSegment) []repos
 				for key, value := range captures {
 					copied[key] = value
 				}
-				matches = append(matches, repositorySettingsMatch{path: path, captures: copied})
+				matches = append(matches, workspaceSettingsMatch{path: path, captures: copied})
 			}
 			return
 		}
@@ -205,11 +205,11 @@ func matchPatternDirectories(root string, segments []pathPatternSegment) []repos
 	return matches
 }
 
-func applyRepositorySettings(detail *models.PlanDetail, card models.RepositorySettingsCard, captures map[string]string) {
+func applySourceStructureSettings(detail *models.ItemDetail, card models.SourceStructureCard, captures map[string]string) {
 	fields := card.Fields
-	detail.MetadataSource = "repository-settings"
-	detail.Service = renderSettingsTemplate(fields.Service, captures)
-	detail.Ticket = renderSettingsTemplate(fields.Ticket, captures)
+	detail.MetadataSource = "workspace-settings"
+	detail.Scope = renderSettingsTemplate(fields.Scope, captures)
+	detail.Identifier = renderSettingsTemplate(fields.Identifier, captures)
 	if title := strings.TrimSpace(renderSettingsTemplate(fields.Title, captures)); title != "" && title != "readme_heading" {
 		detail.Title = title
 	}
@@ -237,7 +237,7 @@ func applyRepositorySettings(detail *models.PlanDetail, card models.RepositorySe
 	if detail.Metadata == nil {
 		detail.Metadata = map[string]any{}
 	}
-	detail.Metadata["repositorySettings"] = map[string]any{
+	detail.Metadata["workspaceSettings"] = map[string]any{
 		"pathPattern": card.PathPattern,
 		"captures":    captures,
 	}
@@ -252,23 +252,23 @@ func renderSettingsTemplate(value string, captures map[string]string) string {
 }
 
 func shouldScanAsDocumentCollection(root string, entries []fs.DirEntry) bool {
-	if hasMarkdownFiles(root) && !hasStructuredPlanChildren(root, entries) {
+	if hasMarkdownFiles(root) && !hasStructuredItemChildren(root, entries) {
 		return true
 	}
 	return false
 }
 
-func hasStructuredPlanChildren(root string, entries []fs.DirEntry) bool {
-	for _, serviceEntry := range entries {
-		if !serviceEntry.IsDir() || strings.HasPrefix(serviceEntry.Name(), ".") {
+func hasStructuredItemChildren(root string, entries []fs.DirEntry) bool {
+	for _, scopeEntry := range entries {
+		if !scopeEntry.IsDir() || strings.HasPrefix(scopeEntry.Name(), ".") {
 			continue
 		}
-		tickets, err := os.ReadDir(filepath.Join(root, serviceEntry.Name()))
+		tickets, err := os.ReadDir(filepath.Join(root, scopeEntry.Name()))
 		if err != nil {
 			continue
 		}
-		for _, ticketEntry := range tickets {
-			if ticketEntry.IsDir() && !strings.HasPrefix(ticketEntry.Name(), ".") && isPlanFolder(filepath.Join(root, serviceEntry.Name(), ticketEntry.Name()), ticketEntry.Name()) {
+		for _, identifierEntry := range tickets {
+			if identifierEntry.IsDir() && !strings.HasPrefix(identifierEntry.Name(), ".") && isItemFolder(filepath.Join(root, scopeEntry.Name(), identifierEntry.Name()), identifierEntry.Name()) {
 				return true
 			}
 		}
@@ -276,7 +276,10 @@ func hasStructuredPlanChildren(root string, entries []fs.DirEntry) bool {
 	return false
 }
 
-func isPlanFolder(path, name string) bool {
+func isItemFolder(path, name string) bool {
+	if _, err := os.Stat(filepath.Join(path, "item.yaml")); err == nil {
+		return true
+	}
 	if _, err := os.Stat(filepath.Join(path, "plan.yaml")); err == nil {
 		return true
 	}
@@ -284,101 +287,114 @@ func isPlanFolder(path, name string) bool {
 }
 
 type planYAML struct {
-	Plan struct {
-		Ticket  string   `yaml:"ticket"`
-		Title   string   `yaml:"title"`
-		Service string   `yaml:"service"`
-		Status  string   `yaml:"status"`
-		Owner   string   `yaml:"owner"`
-		Tags    []string `yaml:"tags"`
-	} `yaml:"plan"`
-	Documents []models.PlanDocument `yaml:"documents"`
+	Item struct {
+		Identifier string   `yaml:"identifier"`
+		Title      string   `yaml:"title"`
+		Scope      string   `yaml:"scope"`
+		Status     string   `yaml:"status"`
+		Owner      string   `yaml:"owner"`
+		Tags       []string `yaml:"tags"`
+	} `yaml:"item"`
+	Documents []models.ItemDocument `yaml:"documents"`
 }
 
-func (s *Scanner) parsePlan(repo models.RepositoryConfig, branch, service, ticket, relPlanRoot, planRoot string) (models.PlanDetail, []models.ScanWarning, error) {
+func (s *Scanner) parseItem(workspace models.WorkspaceConfig, branch, scope, identifier, relItemPath, itemRoot string) (models.ItemDetail, []models.ScanWarning, error) {
 	var warnings []models.ScanWarning
 	metaSource := "fallback"
-	title := titleFromTicket(ticket)
+	title := titleFromIdentifier(identifier)
 	status := models.StatusDraft
 	owner := ""
 	tags := []string{}
-	documents := []models.PlanDocument{}
+	documents := []models.ItemDocument{}
 	metadata := map[string]any{}
 
-	if data, err := os.ReadFile(filepath.Join(planRoot, "plan.yaml")); err == nil {
-		parsed := parsePlanYAML(string(data))
-		metaSource = "plan.yaml"
-		if parsed.Plan.Ticket != "" {
-			ticket = parsed.Plan.Ticket
+	if data, source, err := readItemYAML(itemRoot); err == nil {
+		parsed := parseItemYAML(string(data))
+		metaSource = source
+		if parsed.Item.Identifier != "" {
+			identifier = parsed.Item.Identifier
 		}
-		if parsed.Plan.Service != "" {
-			service = parsed.Plan.Service
+		if parsed.Item.Scope != "" {
+			scope = parsed.Item.Scope
 		}
-		if parsed.Plan.Title != "" {
-			title = parsed.Plan.Title
+		if parsed.Item.Title != "" {
+			title = parsed.Item.Title
 		}
-		owner = parsed.Plan.Owner
-		status = NormalizeStatus(parsed.Plan.Status)
-		if parsed.Plan.Tags != nil {
-			tags = parsed.Plan.Tags
+		owner = parsed.Item.Owner
+		status = NormalizeStatus(parsed.Item.Status)
+		if parsed.Item.Tags != nil {
+			tags = parsed.Item.Tags
 		}
 		documents = normalizeDocuments(parsed.Documents)
-		metadata["plan"] = parsed.Plan
+		metadata["item"] = parsed.Item
 	} else if !errors.Is(err, os.ErrNotExist) {
-		warnings = append(warnings, models.ScanWarning{PlanPath: relPlanRoot, Message: err.Error()})
+		warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 	}
 
-	readme := filepath.Join(planRoot, "README.md")
+	readme := filepath.Join(itemRoot, "README.md")
 	description := ""
 	if data, err := os.ReadFile(readme); err == nil {
 		if metaSource == "fallback" {
 			if h := firstHeading(string(data)); h != "" {
 				title = h
 			}
-			status = inferStatus(planRoot)
+			status = inferStatus(itemRoot)
 		}
 		description = firstParagraph(string(data))
 	}
 	if len(documents) == 0 {
-		documents = fallbackDocuments(planRoot)
+		documents = fallbackDocuments(itemRoot)
 	}
-	fileCount := countMarkdownFiles(planRoot)
-	relForGit := filepath.ToSlash(relPlanRoot)
-	updated := s.git.LastUpdate(repo.Path, relForGit)
+	fileCount := countMarkdownFiles(itemRoot)
+	relForGit := filepath.ToSlash(relItemPath)
+	updated := s.git.LastUpdate(workspace.Path, relForGit)
 	if updated.IsZero() {
-		updated = latestModTime(planRoot)
+		updated = latestModTime(itemRoot)
 	}
 
-	summary := models.PlanSummary{
-		ID:             stablePlanID(repo.ID, branch, relPlanRoot),
-		RepositoryID:   repo.ID,
-		RepositoryName: repo.Name,
+	summary := models.ItemSummary{
+		ID:             stablePlanID(workspace.ID, branch, relItemPath),
+		WorkspaceID:    workspace.ID,
+		WorkspaceName:  workspace.Name,
 		Branch:         branch,
-		Service:        service,
-		Ticket:         ticket,
+		Scope:          scope,
+		Identifier:     identifier,
 		Title:          title,
 		Status:         status,
 		Owner:          owner,
-		Author:         s.git.LastAuthor(repo.Path, relForGit),
+		Author:         s.git.LastAuthor(workspace.Path, relForGit),
 		Tags:           tags,
 		UpdatedAt:      updated,
 		Description:    description,
 		MetadataSource: metaSource,
-		PlanRoot:       relPlanRoot,
+		ItemPath:       relItemPath,
 	}
 	if summary.Author == "" && owner != "" {
 		summary.Author = owner
 	}
-	return models.PlanDetail{
-		PlanSummary: summary,
+	return models.ItemDetail{
+		ItemSummary: summary,
 		Documents:   documents,
 		Metadata:    metadata,
 		Warnings:    warnings,
-		Counts:      models.PlanWorkspaceCounts{Files: fileCount},
+		Counts:      models.ItemWorkspaceCounts{Files: fileCount},
 	}, warnings, nil
 }
 
-func NormalizeStatus(raw string) models.PlanStatus {
+func readItemYAML(root string) ([]byte, string, error) {
+	if data, err := os.ReadFile(filepath.Join(root, "item.yaml")); err == nil {
+		return data, "item.yaml", nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, "", err
+	}
+	data, err := os.ReadFile(filepath.Join(root, "plan.yaml"))
+	if err != nil {
+		return nil, "", err
+	}
+	return data, "plan.yaml", nil
+}
+
+func NormalizeStatus(raw string) models.ItemStatus {
 	s := strings.ToLower(strings.TrimSpace(raw))
 	s = strings.ReplaceAll(s, "-", "_")
 	s = strings.ReplaceAll(s, " ", "_")
@@ -398,7 +414,7 @@ func NormalizeStatus(raw string) models.PlanStatus {
 	}
 }
 
-func normalizeDocuments(docs []models.PlanDocument) []models.PlanDocument {
+func normalizeDocuments(docs []models.ItemDocument) []models.ItemDocument {
 	for i := range docs {
 		if docs[i].ID == "" {
 			docs[i].ID = fileID(docs[i].Path)
@@ -411,10 +427,10 @@ func normalizeDocuments(docs []models.PlanDocument) []models.PlanDocument {
 	return docs
 }
 
-func parsePlanYAML(data string) planYAML {
+func parseItemYAML(data string) planYAML {
 	var parsed planYAML
 	section := ""
-	var current *models.PlanDocument
+	var current *models.ItemDocument
 	for _, raw := range strings.Split(data, "\n") {
 		if strings.TrimSpace(raw) == "" || strings.HasPrefix(strings.TrimSpace(raw), "#") {
 			continue
@@ -422,36 +438,36 @@ func parsePlanYAML(data string) planYAML {
 		indent := len(raw) - len(strings.TrimLeft(raw, " "))
 		line := strings.TrimSpace(raw)
 		switch line {
-		case "plan:":
-			section = "plan"
+		case "item:", "plan:":
+			section = "item"
 			continue
 		case "documents:":
 			section = "documents"
 			continue
 		}
-		if section == "plan" && indent >= 2 {
+		if section == "item" && indent >= 2 {
 			key, value, ok := splitYAMLPair(line)
 			if !ok {
 				continue
 			}
 			switch key {
-			case "ticket":
-				parsed.Plan.Ticket = value
+			case "identifier", "ticket":
+				parsed.Item.Identifier = value
 			case "title":
-				parsed.Plan.Title = value
-			case "service":
-				parsed.Plan.Service = value
+				parsed.Item.Title = value
+			case "scope", "service":
+				parsed.Item.Scope = value
 			case "status":
-				parsed.Plan.Status = value
+				parsed.Item.Status = value
 			case "owner":
-				parsed.Plan.Owner = value
+				parsed.Item.Owner = value
 			case "tags":
-				parsed.Plan.Tags = parseYAMLList(value)
+				parsed.Item.Tags = parseYAMLList(value)
 			}
 			continue
 		}
 		if section == "documents" && strings.HasPrefix(line, "- ") {
-			parsed.Documents = append(parsed.Documents, models.PlanDocument{})
+			parsed.Documents = append(parsed.Documents, models.ItemDocument{})
 			current = &parsed.Documents[len(parsed.Documents)-1]
 			line = strings.TrimSpace(strings.TrimPrefix(line, "- "))
 			if key, value, ok := splitYAMLPair(line); ok {
@@ -504,7 +520,7 @@ func parseYAMLList(value string) []string {
 	return out
 }
 
-func assignDocumentField(doc *models.PlanDocument, key, value string) {
+func assignDocumentField(doc *models.ItemDocument, key, value string) {
 	switch key {
 	case "id":
 		doc.ID = value
@@ -519,13 +535,13 @@ func assignDocumentField(doc *models.PlanDocument, key, value string) {
 	}
 }
 
-func fallbackDocuments(planRoot string) []models.PlanDocument {
-	docs := []models.PlanDocument{}
-	_ = filepath.WalkDir(planRoot, func(path string, d fs.DirEntry, err error) error {
+func fallbackDocuments(itemRoot string) []models.ItemDocument {
+	docs := []models.ItemDocument{}
+	_ = filepath.WalkDir(itemRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
 			return nil
 		}
-		rel, _ := filepath.Rel(planRoot, path)
+		rel, _ := filepath.Rel(itemRoot, path)
 		role := "other"
 		relSlash := filepath.ToSlash(rel)
 		if relSlash == "README.md" {
@@ -534,10 +550,10 @@ func fallbackDocuments(planRoot string) []models.PlanDocument {
 			role = "scenario"
 		} else if strings.HasPrefix(relSlash, "design/") {
 			role = "design"
-		} else if relSlash == "implementation-plan.md" {
+		} else if relSlash == "implementation-item.md" {
 			role = "implementation"
 		}
-		docs = append(docs, models.PlanDocument{
+		docs = append(docs, models.ItemDocument{
 			ID: fileID(relSlash), Role: role, Path: relSlash, Label: labelFromPath(relSlash),
 		})
 		return nil
@@ -546,8 +562,8 @@ func fallbackDocuments(planRoot string) []models.PlanDocument {
 	return docs
 }
 
-func inferStatus(planRoot string) models.PlanStatus {
-	data, err := os.ReadFile(filepath.Join(planRoot, "implementation-plan.md"))
+func inferStatus(itemRoot string) models.ItemStatus {
+	data, err := os.ReadFile(filepath.Join(itemRoot, "implementation-item.md"))
 	if err != nil {
 		return models.StatusDraft
 	}
@@ -582,12 +598,12 @@ func firstParagraph(markdown string) string {
 	return ""
 }
 
-func titleFromTicket(ticket string) string {
-	return strings.ReplaceAll(ticket, "-", " ")
+func titleFromIdentifier(identifier string) string {
+	return strings.ReplaceAll(identifier, "-", " ")
 }
 
-func titleFromDocumentRoot(planDir string) string {
-	base := filepath.Base(filepath.Clean(filepath.FromSlash(planDir)))
+func titleFromDocumentRoot(source string) string {
+	base := filepath.Base(filepath.Clean(filepath.FromSlash(source)))
 	if base == "." || base == string(filepath.Separator) {
 		return "Documentation"
 	}
@@ -636,8 +652,8 @@ func naturalParts(input string) []naturalPart {
 	return parts
 }
 
-func stablePlanID(repoID, branch, relPlanRoot string) string {
-	key := repoID + "|" + branch + "|" + relPlanRoot
+func stablePlanID(repoID, branch, relItemPath string) string {
+	key := repoID + "|" + branch + "|" + relItemPath
 	var h uint32 = 2166136261
 	for _, b := range []byte(key) {
 		h ^= uint32(b)

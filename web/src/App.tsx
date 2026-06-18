@@ -1,30 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, ChevronDown, GitBranch, KanbanSquare, ListChecks, Moon, Plus, Sun, Boxes, FolderGit2 } from 'lucide-react';
 import { api } from './lib/api';
-import type { RepositoryConfig } from './lib/types';
+import type { WorkspaceConfig } from './lib/types';
 import { BranchesPage } from './pages/BranchesPage';
 import { KanbanPage } from './pages/KanbanPage';
-import { PlansPage } from './pages/PlansPage';
-import { PlanWorkspacePage } from './pages/PlanWorkspacePage';
-import { RepositoriesPage } from './pages/RepositoriesPage';
+import { ItemsPage } from './pages/ItemsPage';
+import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
+import { WorkspacesPage } from './pages/WorkspacesPage';
+import { labels } from './lib/vocabulary';
 
-type Route = { name: 'kanban' } | { name: 'plans' } | { name: 'branches' } | { name: 'repositories' } | { name: 'workspace'; planId: string };
+type Route = { name: 'kanban' } | { name: 'items' } | { name: 'branches' } | { name: 'workspaces' } | { name: 'workspace'; itemId: string };
 
-const contentVersionStorageKey = 'planManagerContentVersion';
+const contentVersionStorageKey = 'itemManagerContentVersion';
 
 function routeFromLocation(): Route {
   const path = window.location.pathname;
-  if (path.startsWith('/plans/')) {
-    return { name: 'workspace', planId: decodeURIComponent(path.split('/')[2] ?? '') };
+  if (path.startsWith('/items/')) {
+    return { name: 'workspace', itemId: decodeURIComponent(path.split('/')[2] ?? '') };
   }
-  if (path === '/plans') {
-    return { name: 'plans' };
+  if (path === '/items') {
+    return { name: 'items' };
   }
   if (path.startsWith('/branches')) {
     return { name: 'branches' };
   }
-  if (path.startsWith('/repositories')) {
-    return { name: 'repositories' };
+  if (path.startsWith('/workspaces')) {
+    return { name: 'workspaces' };
   }
   return { name: 'kanban' };
 }
@@ -32,8 +33,8 @@ function routeFromLocation(): Route {
 export function App() {
   const [route, setRoute] = useState<Route>(routeFromLocation);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
-  const [repositories, setRepositories] = useState<RepositoryConfig[]>([]);
-  const [activeRepositoryId, setActiveRepositoryId] = useState(() => localStorage.getItem('activeRepositoryId') ?? '');
+  const [workspaces, setWorkspaces] = useState<WorkspaceConfig[]>([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => localStorage.getItem('activeWorkspaceId') ?? '');
   const [contentRefreshKey, setContentRefreshKey] = useState(0);
   const [stateVersion, setStateVersion] = useState('');
   const [showStaleNotice, setShowStaleNotice] = useState(false);
@@ -52,12 +53,12 @@ export function App() {
   }, []);
 
   const navigate = (next: Route) => {
-    const path = next.name === 'workspace' ? `/plans/${encodeURIComponent(next.planId)}` : next.name === 'repositories' ? '/repositories' : next.name === 'plans' ? '/plans' : next.name === 'branches' ? '/branches' : '/kanban';
+    const path = next.name === 'workspace' ? `/items/${encodeURIComponent(next.itemId)}` : next.name === 'workspaces' ? '/workspaces' : next.name === 'items' ? '/items' : next.name === 'branches' ? '/branches' : '/kanban';
     history.pushState(null, '', path);
     setRoute(next);
   };
 
-  const refreshRepositories = () => api.repositories().then(setRepositories).catch(() => setRepositories([]));
+  const refreshWorkspaces = () => api.workspaces().then(setWorkspaces).catch(() => setWorkspaces([]));
   const markStateCurrent = async (broadcast = false) => {
     const state = await api.state();
     setStateVersion(state.version);
@@ -67,12 +68,12 @@ export function App() {
     }
   };
   const refreshAppData = async (broadcast = false) => {
-    await refreshRepositories();
+    await refreshWorkspaces();
     setContentRefreshKey((key) => key + 1);
     await markStateCurrent(broadcast);
   };
   const refreshAppStateOnly = async (broadcast = false) => {
-    await refreshRepositories();
+    await refreshWorkspaces();
     await markStateCurrent(broadcast);
   };
 
@@ -118,17 +119,17 @@ export function App() {
   }, [stateVersion]);
 
   useEffect(() => {
-    if (repositories.length === 0) {
-      setActiveRepositoryId('');
-      localStorage.removeItem('activeRepositoryId');
+    if (workspaces.length === 0) {
+      setActiveWorkspaceId('');
+      localStorage.removeItem('activeWorkspaceId');
       return;
     }
-    if (!repositories.some((repo) => repo.id === activeRepositoryId)) {
-      const nextId = repositories[0].id;
-      setActiveRepositoryId(nextId);
-      localStorage.setItem('activeRepositoryId', nextId);
+    if (!workspaces.some((repo) => repo.id === activeWorkspaceId)) {
+      const nextId = workspaces[0].id;
+      setActiveWorkspaceId(nextId);
+      localStorage.setItem('activeWorkspaceId', nextId);
     }
-  }, [activeRepositoryId, repositories]);
+  }, [activeWorkspaceId, workspaces]);
 
   useEffect(() => {
     if (!workspaceMenuOpen) return;
@@ -148,14 +149,14 @@ export function App() {
     };
   }, [workspaceMenuOpen]);
 
-  const selectWorkspace = (repo: RepositoryConfig) => {
-    setActiveRepositoryId(repo.id);
-    localStorage.setItem('activeRepositoryId', repo.id);
+  const selectWorkspace = (repo: WorkspaceConfig) => {
+    setActiveWorkspaceId(repo.id);
+    localStorage.setItem('activeWorkspaceId', repo.id);
     setWorkspaceMenuOpen(false);
     navigate({ name: 'kanban' });
   };
 
-  const activeRepo = repositories.find((repo) => repo.id === activeRepositoryId) ?? repositories[0];
+  const activeRepo = workspaces.find((repo) => repo.id === activeWorkspaceId) ?? workspaces[0];
   const lastSync = useMemo(() => {
     if (!activeRepo?.lastScannedAt) return 'Not scanned';
     return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(
@@ -174,13 +175,13 @@ export function App() {
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>
           <NavButton active={route.name === 'kanban'} onClick={() => navigate({ name: 'kanban' })} icon={<KanbanSquare size={18} />} label="Kanban" />
-          <NavButton active={route.name === 'plans'} onClick={() => navigate({ name: 'plans' })} icon={<ListChecks size={18} />} label="Plans" />
+          <NavButton active={route.name === 'items'} onClick={() => navigate({ name: 'items' })} icon={<ListChecks size={18} />} label={labels.items} />
           <NavButton active={route.name === 'branches'} onClick={() => navigate({ name: 'branches' })} icon={<GitBranch size={18} />} label="Branches" />
-          <NavButton active={route.name === 'repositories'} onClick={() => navigate({ name: 'repositories' })} icon={<FolderGit2 size={18} />} label="Repositories" />
+          <NavButton active={route.name === 'workspaces'} onClick={() => navigate({ name: 'workspaces' })} icon={<FolderGit2 size={18} />} label={labels.workspaces} />
         </div>
         <div className="workspace-list">
-          <span className="workspace-list-label">Repositories</span>
-          {repositories.map((repo) => (
+          <span className="workspace-list-label">Workspaces</span>
+          {workspaces.map((repo) => (
             <button
               className={repo.id === activeRepo?.id ? 'workspace-button active' : 'workspace-button'}
               key={repo.id}
@@ -191,11 +192,11 @@ export function App() {
               <span>{repo.name}</span>
             </button>
           ))}
-          {repositories.length === 0 && <span className="workspace-empty">No repositories registered</span>}
+          {workspaces.length === 0 && <span className="workspace-empty">No workspaces registered</span>}
         </div>
-        <button className="add-repository-button" type="button" onClick={() => navigate({ name: 'repositories' })}>
+        <button className="add-repository-button" type="button" onClick={() => navigate({ name: 'workspaces' })}>
           <Plus size={16} />
-          Add Repository
+          Add Workspace
         </button>
         <div className="repo-status">
           <span className="repo-status-label">Last scan</span>
@@ -213,11 +214,11 @@ export function App() {
           {workspaceMenuOpen && (
             <div className="workspace-menu" role="menu">
               <div className="workspace-menu-header">
-                <strong>Repositories</strong>
-                <span>{repositories.length} workspace{repositories.length === 1 ? '' : 's'}</span>
+                <strong>Workspaces</strong>
+                <span>{workspaces.length} workspace{workspaces.length === 1 ? '' : 's'}</span>
               </div>
               <div className="workspace-menu-list">
-                {repositories.map((repo) => (
+                {workspaces.map((repo) => (
                   <button
                     className={repo.id === activeRepo?.id ? 'workspace-menu-item active' : 'workspace-menu-item'}
                     key={repo.id}
@@ -229,18 +230,18 @@ export function App() {
                     <FolderGit2 size={16} />
                     <span>
                       <strong>{repo.name}</strong>
-                      <small>{repo.baselineBranch} · {repo.planDirectories.join(', ') || 'plans'}</small>
+                      <small>{repo.baselineBranch} · {repo.sources.join(', ') || 'plans'}</small>
                     </span>
                   </button>
                 ))}
-                {repositories.length === 0 && <span className="workspace-menu-empty">No repositories registered</span>}
+                {workspaces.length === 0 && <span className="workspace-menu-empty">No workspaces registered</span>}
               </div>
               <button className="workspace-menu-add" type="button" onClick={() => {
                 setWorkspaceMenuOpen(false);
-                navigate({ name: 'repositories' });
+                navigate({ name: 'workspaces' });
               }}>
                 <Plus size={15} />
-                Add or manage repositories
+                Add or manage workspaces
               </button>
             </div>
           )}
@@ -259,23 +260,23 @@ export function App() {
       <main className="main-content">
         {route.name === 'kanban' && (
           <KanbanPage
-            repository={activeRepo}
+            workspace={activeRepo}
             refreshKey={contentRefreshKey}
-            onOpenPlan={(planId) => navigate({ name: 'workspace', planId })}
-            onRepositoriesChanged={() => refreshAppData(true)}
-            onOpenRepositories={() => navigate({ name: 'repositories' })}
+            onOpenPlan={(itemId) => navigate({ name: 'workspace', itemId })}
+            onWorkspacesChanged={() => refreshAppData(true)}
+            onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
           />
         )}
-        {route.name === 'plans' && <PlansPage repository={activeRepo} refreshKey={contentRefreshKey} onOpenPlan={(planId) => navigate({ name: 'workspace', planId })} />}
-        {route.name === 'branches' && <BranchesPage repository={activeRepo} refreshKey={contentRefreshKey} onOpenBranch={(branch) => navigate({ name: 'kanban' })} />}
-        {route.name === 'workspace' && <PlanWorkspacePage planId={route.planId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly(true)} />}
-        {route.name === 'repositories' && <RepositoriesPage repositories={repositories} onChanged={() => refreshAppData(true)} />}
+        {route.name === 'items' && <ItemsPage workspace={activeRepo} refreshKey={contentRefreshKey} onOpenPlan={(itemId) => navigate({ name: 'workspace', itemId })} />}
+        {route.name === 'branches' && <BranchesPage workspace={activeRepo} refreshKey={contentRefreshKey} onOpenBranch={(branch) => navigate({ name: 'kanban' })} />}
+        {route.name === 'workspace' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly(true)} />}
+        {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData(true)} />}
       </main>
 
       {showStaleNotice && (
         <div className="stale-notice" role="status" aria-live="polite">
           <strong>Content may have changed</strong>
-          <span>Refresh the current view to load the latest plans and repositories.</span>
+          <span>Refresh the current view to load the latest items and workspaces.</span>
           <div>
             <button className="primary" type="button" onClick={() => void refreshAppData()}>
               Refresh
@@ -289,9 +290,9 @@ export function App() {
 
       <nav className="bottom-nav">
         <button className={route.name === 'kanban' ? 'active' : ''} onClick={() => navigate({ name: 'kanban' })}><KanbanSquare size={18} />Kanban</button>
-        <button className={route.name === 'plans' ? 'active' : ''} onClick={() => navigate({ name: 'plans' })}><ListChecks size={18} />Plans</button>
+        <button className={route.name === 'items' ? 'active' : ''} onClick={() => navigate({ name: 'items' })}><ListChecks size={18} />Items</button>
         <button className={route.name === 'branches' ? 'active' : ''} onClick={() => navigate({ name: 'branches' })}><GitBranch size={18} />Branches</button>
-        <button className={route.name === 'repositories' ? 'active' : ''} onClick={() => navigate({ name: 'repositories' })}><FolderGit2 size={18} />Repos</button>
+        <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
       </nav>
     </div>
   );

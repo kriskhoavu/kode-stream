@@ -7,21 +7,21 @@ import (
 	"plan-manager/internal/models"
 )
 
-func TestFallbackPlanRoot(t *testing.T) {
-	repo := models.RepositoryConfig{PlanDirectories: []string{"plans"}}
-	plan := models.PlanDetail{PlanSummary: models.PlanSummary{Service: "api", Ticket: "DI-170"}}
+func TestFallbackItemPath(t *testing.T) {
+	workspace := models.WorkspaceConfig{Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{Scope: "api", Identifier: "DI-170"}}
 
-	got := fallbackPlanRoot(repo, plan)
-	if got != "plans/api/DI-170" {
-		t.Fatalf("fallbackPlanRoot() = %q", got)
+	got := fallbackItemPath(workspace, item)
+	if got != "items/api/DI-170" {
+		t.Fatalf("fallbackItemPath() = %q", got)
 	}
 }
 
-func TestFallbackPlanRootRequiresPlanDirectory(t *testing.T) {
-	plan := models.PlanDetail{PlanSummary: models.PlanSummary{Service: "api", Ticket: "DI-170"}}
+func TestFallbackItemPathRequiresPlanDirectory(t *testing.T) {
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{Scope: "api", Identifier: "DI-170"}}
 
-	if got := fallbackPlanRoot(models.RepositoryConfig{}, plan); got != "" {
-		t.Fatalf("fallbackPlanRoot() = %q, want empty", got)
+	if got := fallbackItemPath(models.WorkspaceConfig{}, item); got != "" {
+		t.Fatalf("fallbackItemPath() = %q, want empty", got)
 	}
 }
 
@@ -37,35 +37,35 @@ func TestFirstMarkdownParagraphReturnsFullParagraph(t *testing.T) {
 	}
 }
 
-func TestNormalizePlanDetailUsesEmptyCollections(t *testing.T) {
-	plan := normalizePlanDetail(models.PlanDetail{})
-	if plan.Tags == nil {
+func TestNormalizeItemDetailUsesEmptyCollections(t *testing.T) {
+	item := normalizeItemDetail(models.ItemDetail{})
+	if item.Tags == nil {
 		t.Fatal("tags should be an empty slice, got nil")
 	}
-	if plan.Documents == nil {
+	if item.Documents == nil {
 		t.Fatal("documents should be an empty slice, got nil")
 	}
-	if plan.Metadata == nil {
+	if item.Metadata == nil {
 		t.Fatal("metadata should be an empty map, got nil")
 	}
 }
 
-func TestValidateGitPathsStaysInsidePlanDirectories(t *testing.T) {
-	repo := models.RepositoryConfig{PlanDirectories: []string{"plans", "docs"}}
-	if err := validateGitPaths(repo, []string{"plans/platform/PM-002/README.md", "docs/guide.md"}); err != nil {
+func TestValidateGitPathsStaysInsideSources(t *testing.T) {
+	workspace := models.WorkspaceConfig{Sources: []string{"items", "docs"}}
+	if err := validateGitPaths(workspace, []string{"items/platform/PM-002/README.md", "docs/guide.md"}); err != nil {
 		t.Fatalf("expected paths to be valid: %v", err)
 	}
 }
 
 func TestValidateGitPathsRejectsEscapesAndUnregisteredPaths(t *testing.T) {
-	repo := models.RepositoryConfig{PlanDirectories: []string{"plans"}}
+	workspace := models.WorkspaceConfig{Sources: []string{"items"}}
 	for _, paths := range [][]string{
 		{},
 		{"../secret.md"},
 		{"/tmp/secret.md"},
 		{"src/main.go"},
 	} {
-		if err := validateGitPaths(repo, paths); err == nil {
+		if err := validateGitPaths(workspace, paths); err == nil {
 			t.Fatalf("expected %#v to be rejected", paths)
 		}
 	}
