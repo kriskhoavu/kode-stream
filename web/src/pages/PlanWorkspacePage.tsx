@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, MutableRefObject } from 'react';
 import {
   ArrowLeft,
   ChevronDown,
@@ -33,6 +33,7 @@ type DiffLine = { type: 'context' | 'add' | 'delete' | 'meta'; text: string; old
 type DiffFile = { path: string; oldPath?: string; lines: DiffLine[]; additions: number; deletions: number };
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
 type TreeFileState = GitChangeStatus | 'unsaved';
+type AutoSaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
 
 export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged }: { planId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
@@ -41,6 +42,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const [editorContent, setEditorContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
   const [savingFile, setSavingFile] = useState(false);
+  const [autoSaveState, setAutoSaveState] = useState<AutoSaveState>('idle');
   const [metadataDraft, setMetadataDraft] = useState<PlanMetadataUpdateInput>({});
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
@@ -62,6 +64,15 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const [leftWidth, setLeftWidth] = useState(300);
   const [rightWidth, setRightWidth] = useState(300);
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const autoSaveRefreshTimerRef = useRef<number | null>(null);
+  const autoSaveSettledTimerRef = useRef<number | null>(null);
+
+  const clearAutoSaveTimers = () => {
+    clearTimer(autoSaveTimerRef);
+    clearTimer(autoSaveRefreshTimerRef);
+    clearTimer(autoSaveSettledTimerRef);
+  };
 
   useEffect(() => {
     setError('');
@@ -90,7 +101,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirtyFile && !dirtyMetadata) return;
+      if (!dirtyMetadata) return;
       event.preventDefault();
       event.returnValue = '';
     };
@@ -104,16 +115,17 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
       setFile(nextFile);
       setEditorContent(nextFile.content);
       setSavedContent(nextFile.content);
+      setAutoSaveState('idle');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File failed to load');
     }
   };
 
   const openFile = async (fileId: string) => {
-    if (dirty) {
+    if (dirtyMetadata) {
       setPendingConfirm({
         title: 'Discard changes',
-        message: 'Discard unsaved changes and open another file?',
+        message: 'Discard unsaved metadata changes and open another file?',
         confirmLabel: 'Discard',
         danger: true,
         onConfirm: () => {
@@ -123,6 +135,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
       });
       return;
     }
+    if (dirtyFile && !(await saveCurrentFileNow())) return;
     await loadFile(fileId);
   };
 
@@ -135,7 +148,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     (metadataDraft.owner ?? '') !== (plan?.owner ?? '') ||
     (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
   );
-  const dirty = dirtyFile || dirtyMetadata;
+  const dirty = dirtyMetadata;
   const preview = useMemo(() => ({ __html: marked.parse(editorContent || file?.content || '') as string }), [editorContent, file]);
   const diffFiles = useMemo(() => parseGitDiff(diff), [diff]);
   const selectedGitPath = useMemo(() => currentGitPath(plan, file), [plan, file]);
@@ -146,6 +159,31 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     '--left-panel-width': `${leftCollapsed ? 44 : leftWidth}px`,
     '--right-panel-width': `${rightCollapsed ? 44 : rightWidth}px`,
   } as CSSProperties & Record<'--left-panel-width' | '--right-panel-width', string>;
+
+  useEffect(() => () => {
+    clearAutoSaveTimers();
+  }, []);
+
+  useEffect(() => {
+    if (!file) {
+      setAutoSaveState('idle');
+      return;
+    }
+    if (editorContent === savedContent) {
+      if (autoSaveState === 'pending') setAutoSaveState('idle');
+      return;
+    }
+    if (savingFile) {
+      setAutoSaveState('pending');
+      return;
+    }
+    clearTimer(autoSaveTimerRef);
+    setAutoSaveState('pending');
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      void saveFileContent(file, editorContent);
+    }, 900);
+    return () => clearTimer(autoSaveTimerRef);
+  }, [file, editorContent, savedContent, savingFile]);
 
   const startResize = (side: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -258,13 +296,17 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   };
 
   const goBack = () => {
-    if (!dirty) {
-      onBack();
-      return;
+    if (dirtyFile) {
+      void saveCurrentFileNow().then((saved) => {
+        if (!saved || dirtyMetadata) return;
+        onBack();
+      });
+      if (!dirtyMetadata) return;
     }
+    if (!dirty) return onBack();
     setPendingConfirm({
       title: 'Discard changes',
-      message: 'Discard unsaved changes and return to the board?',
+      message: 'Discard unsaved metadata changes and return to the board?',
       confirmLabel: 'Discard',
       danger: true,
       onConfirm: () => {
@@ -274,24 +316,40 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     });
   };
 
-  const saveFile = async () => {
-    if (!file) return;
+  const saveCurrentFileNow = async () => {
+    if (!file || editorContent === savedContent) return true;
+    return saveFileContent(file, editorContent);
+  };
+
+  const saveFileContent = async (targetFile: FileContent, content: string) => {
+    clearTimer(autoSaveTimerRef);
+    clearTimer(autoSaveSettledTimerRef);
     setSavingFile(true);
+    setAutoSaveState('saving');
     setError('');
     try {
-      await api.saveFile(planId, file.id, { content: editorContent, expectedHash: file.hash });
-      const updated = await api.file(planId, file.id);
+      const updated = await api.saveFile(planId, targetFile.id, { content, expectedHash: targetFile.hash });
       setFile(updated);
-      setEditorContent(updated.content);
-      setSavedContent(updated.content);
-      if (plan) await loadGitStatus(plan.repositoryId);
-      await loadDiff();
-      await onContentChanged?.();
+      setSavedContent(content);
+      setAutoSaveState('saved');
+      autoSaveSettledTimerRef.current = window.setTimeout(() => setAutoSaveState('idle'), 1600);
+      scheduleFileChangeRefresh();
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File save failed');
+      setAutoSaveState('error');
+      return false;
     } finally {
       setSavingFile(false);
     }
+  };
+
+  const scheduleFileChangeRefresh = () => {
+    clearTimer(autoSaveRefreshTimerRef);
+    autoSaveRefreshTimerRef.current = window.setTimeout(() => {
+      if (plan) void loadGitStatus(plan.repositoryId);
+      void loadDiff();
+    }, 700);
   };
 
   const revertFile = async () => {
@@ -371,11 +429,9 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
               <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
               <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
             </div>
-            <button className="save-action save-file-tab-action" type="button" disabled={!dirtyFile || savingFile} onClick={saveFile}>
-              {savingFile ? 'Saving...' : 'Save File'}
-            </button>
+            <span className={`autosave-state ${autoSaveState}`}>{autoSaveLabel(autoSaveState)}</span>
           </div>
-          {dirty && <div className="edit-state-banner">Unsaved changes</div>}
+          {(dirtyMetadata || dirtyFile || autoSaveState !== 'idle') && <div className="edit-state-banner">{dirtyMetadata ? 'Unsaved metadata changes' : autoSaveLabel(autoSaveState)}</div>}
           {tab === 'preview' && (file ? <article className="markdown-preview" dangerouslySetInnerHTML={preview} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
           {tab === 'raw' && (
             <textarea
@@ -567,6 +623,28 @@ function statusLabel(status: PlanDetail['status']): string {
     default:
       return status;
   }
+}
+
+function autoSaveLabel(state: AutoSaveState): string {
+  switch (state) {
+    case 'pending':
+      return 'Autosave pending';
+    case 'saving':
+      return 'Saving...';
+    case 'saved':
+      return 'Saved';
+    case 'error':
+      return 'Autosave failed';
+    case 'idle':
+    default:
+      return 'Autosave on';
+  }
+}
+
+function clearTimer(ref: MutableRefObject<number | null>) {
+  if (ref.current === null) return;
+  window.clearTimeout(ref.current);
+  ref.current = null;
 }
 
 function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, reverting, onModeChange, onRevertFile }: {

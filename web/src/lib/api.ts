@@ -50,7 +50,7 @@ export const api = {
   files: async (id: string) => (await request<FileNode[] | null>(`/api/plans/${id}/files`)) ?? [],
   file: (id: string, fileId: string) => request<FileContent>(`/api/plans/${id}/files/${fileId}`),
   saveFile: (id: string, fileId: string, input: FileSaveInput) =>
-    request<WriteResult>(`/api/plans/${id}/files/${fileId}`, { method: 'POST', body: JSON.stringify(input) }),
+    request<FileContent>(`/api/plans/${id}/files/${fileId}`, { method: 'POST', body: JSON.stringify(input) }),
   revertFile: (id: string, fileId: string) =>
     request<ScanResult>(`/api/plans/${id}/files/${fileId}/revert`, { method: 'POST' }),
   saveMetadata: (id: string, input: PlanMetadataUpdateInput) =>

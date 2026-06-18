@@ -1922,13 +1922,41 @@ body.is-resizing-panel {
   box-shadow: 0 14px 26px rgba(79, 70, 229, 0.28);
 }
 
-.save-file-tab-action {
-  flex: none;
-  min-width: 112px;
-}
-
 .save-metadata-action {
   min-width: 138px;
+}
+
+.autosave-state {
+  flex: none;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.autosave-state.pending,
+.autosave-state.saving {
+  border-color: color-mix(in srgb, var(--orange) 36%, var(--line));
+  background: color-mix(in srgb, var(--orange) 9%, var(--panel));
+  color: var(--orange);
+}
+
+.autosave-state.saved {
+  border-color: color-mix(in srgb, var(--green) 36%, var(--line));
+  background: color-mix(in srgb, var(--green) 9%, var(--panel));
+  color: var(--green);
+}
+
+.autosave-state.error {
+  border-color: color-mix(in srgb, #dc2626 36%, var(--line));
+  background: color-mix(in srgb, #dc2626 9%, var(--panel));
+  color: #dc2626;
 }
 
 .tab-list button.active {

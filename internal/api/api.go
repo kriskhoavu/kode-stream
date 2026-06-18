@@ -281,7 +281,7 @@ func (a *API) savePlanFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input.FileID = r.PathValue("fileID")
-	result, err := a.writer.SaveMarkdown(repo, plan, input)
+	result, err := a.files.WriteMarkdown(repo, plan, input)
 	respond(w, result, err)
 }
 
