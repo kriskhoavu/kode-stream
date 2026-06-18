@@ -1649,8 +1649,7 @@ body.is-resizing-drawer {
   gap: 6px;
 }
 
-.directory-chips button,
-.repo-directory-chip span {
+.directory-chips button {
   border-radius: 999px;
   background: var(--panel-soft);
   color: var(--blue);
@@ -1662,23 +1661,28 @@ body.is-resizing-drawer {
 .repo-directory-chip {
   display: inline-flex;
   align-items: center;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel-soft);
+  gap: 7px;
+  min-height: 30px;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, var(--blue));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-soft) 74%, var(--panel));
+  padding: 3px 4px 3px 10px;
+  color: var(--muted);
 }
 
-.repo-directory-chip span {
-  background: transparent;
+.repo-directory-name {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
 }
 
 .repo-directory-chip button {
-  width: 28px;
-  min-height: 26px;
-  border: 0;
-  border-left: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
+  width: 24px;
+  min-height: 24px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 76%, transparent);
   color: var(--muted);
   display: grid;
   place-items: center;
@@ -1687,7 +1691,8 @@ body.is-resizing-drawer {
 
 .repo-directory-chip button:hover {
   color: var(--blue);
-  background: color-mix(in srgb, var(--blue) 9%, transparent);
+  border-color: color-mix(in srgb, var(--blue) 28%, var(--line));
+  background: color-mix(in srgb, var(--blue) 9%, var(--panel));
 }
 
 .directory-chips button {

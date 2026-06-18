@@ -269,9 +269,9 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
                       <div className="repo-directory-list">
                         {repo.planDirectories.map((directory) => (
                           <div className="repo-directory-chip" key={directory}>
-                            <span>{directory}</span>
-                            <button type="button" onClick={() => void openSourceSettings(repo, directory)} disabled={busy} title={`Configure ${directory}`}>
-                              <SlidersHorizontal size={13} />
+                            <span className="repo-directory-name">{directory}</span>
+                            <button type="button" onClick={() => void openSourceSettings(repo, directory)} disabled={busy} aria-label={`Configure ${directory}`} title={`Configure ${directory}`}>
+                              <SlidersHorizontal size={12} />
                             </button>
                           </div>
                         ))}
