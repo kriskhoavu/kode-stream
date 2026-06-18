@@ -199,12 +199,17 @@ func (a *API) getSourceSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = repo
 	settings, exists, warnings := scanner.ReadRepositorySettings(root)
+	mode := scanner.SourceSettingsMode(root)
+	if !exists && mode == "structured" {
+		settings = scanner.BuiltInStructuredSettings()
+	}
 	if warnings == nil {
 		warnings = []models.ScanWarning{}
 	}
 	writeJSON(w, http.StatusOK, models.SourceSettingsResult{
 		Directory: directory,
 		Exists:    exists,
+		Mode:      mode,
 		Settings:  settings,
 		Warnings:  warnings,
 	})
@@ -240,6 +245,7 @@ func (a *API) saveSourceSettings(w http.ResponseWriter, r *http.Request) {
 		SourceSettingsResult: models.SourceSettingsResult{
 			Directory: directory,
 			Exists:    true,
+			Mode:      scanner.SourceSettingsMode(root),
 			Settings:  settings,
 			Warnings:  nonNilWarnings(scanResult.Warnings),
 		},

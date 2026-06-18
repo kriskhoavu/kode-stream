@@ -54,6 +54,7 @@ type RepositorySettingsFields struct {
 type SourceSettingsResult struct {
 	Directory string             `json:"directory" yaml:"directory"`
 	Exists    bool               `json:"exists" yaml:"exists"`
+	Mode      string             `json:"mode" yaml:"mode"`
 	Settings  RepositorySettings `json:"settings" yaml:"settings"`
 	Warnings  []ScanWarning      `json:"warnings" yaml:"warnings"`
 }

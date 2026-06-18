@@ -2599,6 +2599,15 @@ body.is-resizing-panel {
   color: var(--orange);
 }
 
+.metadata-callout.source-settings-supported {
+  border-color: color-mix(in srgb, var(--green) 36%, var(--line));
+  background: color-mix(in srgb, var(--green) 9%, var(--panel));
+}
+
+.metadata-callout.source-settings-supported strong {
+  color: var(--green);
+}
+
 .side-panel-tabs {
   min-height: 38px;
   border: 1px solid var(--line);

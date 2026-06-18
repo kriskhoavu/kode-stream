@@ -32,6 +32,22 @@ func DefaultRepositorySettings() models.RepositorySettings {
 	}
 }
 
+func BuiltInStructuredSettings() models.RepositorySettings {
+	return models.RepositorySettings{
+		Version: 1,
+		Cards: []models.RepositorySettingsCard{{
+			PathPattern: "{service}/{ticket}",
+			Fields: models.RepositorySettingsFields{
+				Service: "{service}",
+				Ticket:  "{ticket}",
+				Title:   "readme_heading",
+				Status:  "draft",
+				Tags:    []string{"plans"},
+			},
+		}},
+	}
+}
+
 func ReadRepositorySettings(root string) (models.RepositorySettings, bool, []models.ScanWarning) {
 	path := filepath.Join(root, RepositorySettingsFile)
 	data, err := os.ReadFile(path)
@@ -47,6 +63,20 @@ func ReadRepositorySettings(root string) (models.RepositorySettings, bool, []mod
 	}
 	warnings := ValidateRepositorySettings(settings)
 	return settings, true, warnings
+}
+
+func SourceSettingsMode(root string) string {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return "unknown"
+	}
+	if hasStructuredPlanChildren(root, entries) {
+		return "structured"
+	}
+	if hasMarkdownFiles(root) {
+		return "unstructured"
+	}
+	return "empty"
 }
 
 func WriteRepositorySettings(root string, settings models.RepositorySettings) error {

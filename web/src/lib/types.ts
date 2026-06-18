@@ -39,6 +39,7 @@ export interface RepositorySettingsFields {
 export interface SourceSettingsResult {
   directory: string;
   exists: boolean;
+  mode?: 'structured' | 'unstructured' | 'empty' | 'unknown';
   settings: RepositorySettings;
   warnings: { planPath?: string; message: string }[];
   scan?: ScanResult;

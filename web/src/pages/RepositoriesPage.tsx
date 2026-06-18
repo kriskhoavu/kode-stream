@@ -19,6 +19,7 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
     repo: RepositoryConfig;
     directory: string;
     exists: boolean;
+    mode?: string;
     card: RepositorySettingsCard;
     warnings: string[];
   } | null>(null);
@@ -145,6 +146,7 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
         repo,
         directory,
         exists: result.exists,
+        mode: result.mode,
         card: normalizeSettingsCard(result.settings?.cards?.[0]),
         warnings: (result.warnings ?? []).map((warning) => warning.message)
       });
@@ -320,7 +322,18 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
             <p className="modal-help">
               Define how this source directory should be split into work item cards. If this file is removed or invalid, Plan Manager falls back to the current docs view.
             </p>
-            {!settingsEditor.exists && <div className="metadata-callout"><strong>No settings file yet</strong><span>Saving creates repository-settings.yaml inside this source directory.</span></div>}
+            {!settingsEditor.exists && settingsEditor.mode === 'structured' && (
+              <div className="metadata-callout source-settings-supported">
+                <strong>Built-in structure detected</strong>
+                <span>This source already follows the supported service/ticket layout. Saving here creates an optional override.</span>
+              </div>
+            )}
+            {!settingsEditor.exists && settingsEditor.mode !== 'structured' && (
+              <div className="metadata-callout">
+                <strong>No settings file yet</strong>
+                <span>Saving creates repository-settings.yaml inside this source directory.</span>
+              </div>
+            )}
             {settingsEditor.warnings.length > 0 && (
               <div className="plan-warnings">
                 <h3>Warnings</h3>
@@ -465,6 +478,7 @@ function updateSettingsCard(
     repo: RepositoryConfig;
     directory: string;
     exists: boolean;
+    mode?: string;
     card: RepositorySettingsCard;
     warnings: string[];
   } | null>>,
@@ -478,6 +492,7 @@ function updateSettingsField(
     repo: RepositoryConfig;
     directory: string;
     exists: boolean;
+    mode?: string;
     card: RepositorySettingsCard;
     warnings: string[];
   } | null>>,

@@ -97,6 +97,24 @@ func TestNestedFreestyleDocsStillScanAsDocumentCollection(t *testing.T) {
 	}
 }
 
+func TestSourceSettingsModeDetectsStructuredRoot(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "api/DI-1/README.md", "# Plan\n")
+
+	if got := SourceSettingsMode(root); got != "structured" {
+		t.Fatalf("SourceSettingsMode() = %q, want structured", got)
+	}
+}
+
+func TestSourceSettingsModeDetectsUnstructuredRoot(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "notes/guide.md", "# Guide\n")
+
+	if got := SourceSettingsMode(root); got != "unstructured" {
+		t.Fatalf("SourceSettingsMode() = %q, want unstructured", got)
+	}
+}
+
 func TestRepositorySettingsSplitsFreestyleDocsIntoCards(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "docs/repository-settings.yaml", `version: 1
