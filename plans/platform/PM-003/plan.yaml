@@ -1,0 +1,43 @@
+schemaVersion: 1
+
+plan:
+  ticket: PM-003
+  title: Technical Architecture Refactoring
+  service: platform
+  status: draft
+  owner: null
+  tags:
+    - plan-manager
+    - architecture
+    - refactoring
+    - maintainability
+  targetDate: null
+
+documents:
+  - id: overview
+    role: overview
+    path: README.md
+    label: Overview
+  - id: scenario-overview
+    role: scenario
+    path: scenario/scenario-00-overview.md
+    label: Scenario Overview
+  - id: design-architecture
+    role: design
+    track: architecture
+    path: design/design-01-architecture.md
+    label: Architecture Design
+  - id: design-backend
+    role: design
+    track: backend
+    path: design/design-02-backend.md
+    label: Backend Design
+  - id: design-frontend
+    role: design
+    track: frontend
+    path: design/design-03-frontend.md
+    label: Frontend Design
+  - id: implementation
+    role: implementation
+    path: implementation-plan.md
+    label: Implementation Plan
