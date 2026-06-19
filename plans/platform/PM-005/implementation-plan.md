@@ -13,7 +13,7 @@ Add global search, saved filters, recent items, and quick navigation. Use the ex
 | B3    | Search APIs                  | ✅     |
 | B4    | Backend Tests                | ✅     |
 | F1    | API Types And Client Methods | ✅     |
-| F2    | Search State And Keyboard    |        |
+| F2    | Search State And Keyboard    | ✅     |
 | F3    | Search And Filter UI         |        |
 | F4    | Styling And Verification     |        |
 
@@ -132,10 +132,10 @@ PM-005: Add search frontend API client
 
 **Deliverables:**
 
-- [ ] Add `useGlobalSearch`.
-- [ ] Add `useQuickSwitcher`.
-- [ ] Add keyboard shortcut handling.
-- [ ] Add result selection and route navigation behavior.
+- [x] Add `useGlobalSearch`.
+- [x] Add `useQuickSwitcher`.
+- [x] Add keyboard shortcut handling.
+- [x] Add result selection and route navigation behavior.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
