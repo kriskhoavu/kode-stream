@@ -10,7 +10,7 @@ Add local audit events, workspace health checks, safer operation feedback, and s
 |-------|------------------------------|--------|
 | B1    | Audit Domain And Storage     | ✅     |
 | B2    | Health And Safety Services   | ✅     |
-| B3    | Application Integration      |        |
+| B3    | Application Integration      | ✅     |
 | B4    | Reliability Tests            |        |
 | F1    | API Types And Client Methods |        |
 | F2    | Health And Audit State       |        |
@@ -67,10 +67,10 @@ PM-004: Add workspace health and safety services
 
 **Deliverables:**
 
-- [ ] Add `GET /api/workspaces/{id}/health`.
-- [ ] Add `GET /api/audit-events`.
-- [ ] Log scan, save, metadata, status, and Git events.
-- [ ] Add recovery hints for blocked stale writes and risky Git states.
+- [x] Add `GET /api/workspaces/{id}/health`.
+- [x] Add `GET /api/audit-events`.
+- [x] Log scan, save, metadata, status, and Git events.
+- [x] Add recovery hints for blocked stale writes and risky Git states.
 
 **Verification:** `rtk go test ./...`
 

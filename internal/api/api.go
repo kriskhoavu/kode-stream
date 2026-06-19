@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"plan-manager/internal/application/apperrors"
 	appgit "plan-manager/internal/application/git"
+	apphealth "plan-manager/internal/application/health"
 	appitem "plan-manager/internal/application/item"
 	appworkspace "plan-manager/internal/application/workspace"
+	"plan-manager/internal/audit"
 	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
@@ -22,18 +26,26 @@ import (
 )
 
 type API struct {
-	workspaces *appworkspace.Service
-	items      *appitem.Service
-	gitOps     *appgit.Service
-	dialog     *systemdialog.Dialog
+	workspaces    *appworkspace.Service
+	items         *appitem.Service
+	gitOps        *appgit.Service
+	dialog        *systemdialog.Dialog
+	audit         *audit.Store
+	healthService *apphealth.Service
 }
 
 func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog) *API {
+	return NewWithReliability(reg, idx, scan, files, writer, git, dialog, nil, nil)
+}
+
+func NewWithReliability(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog, auditStore *audit.Store, healthService *apphealth.Service) *API {
 	return &API{
-		workspaces: appworkspace.New(reg, idx, scan, writer),
-		items:      appitem.New(reg, idx, files, writer, git),
-		gitOps:     appgit.New(reg, writer, git),
-		dialog:     dialog,
+		workspaces:    appworkspace.New(reg, idx, scan, writer),
+		items:         appitem.New(reg, idx, files, writer, git),
+		gitOps:        appgit.New(reg, writer, git),
+		dialog:        dialog,
+		audit:         auditStore,
+		healthService: healthService,
 	}
 }
 
@@ -41,11 +53,13 @@ func (a *API) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", a.health)
 	mux.HandleFunc("GET /api/state", a.state)
+	mux.HandleFunc("GET /api/audit-events", a.auditEvents)
 	mux.HandleFunc("GET /api/workspaces", a.listWorkspaces)
 	mux.HandleFunc("POST /api/workspaces", a.createWorkspace)
 	mux.HandleFunc("PUT /api/workspaces/{id}", a.updateWorkspace)
 	mux.HandleFunc("DELETE /api/workspaces/{id}", a.deleteWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
+	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
 	mux.HandleFunc("PUT /api/workspaces/{id}/source-structure", a.saveSourceStructure)
 	mux.HandleFunc("GET /api/items", a.listItems)
@@ -77,6 +91,51 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 func (a *API) state(w http.ResponseWriter, r *http.Request) {
 	state, err := a.workspaces.State()
 	respond(w, state, err)
+}
+
+func (a *API) auditEvents(w http.ResponseWriter, r *http.Request) {
+	if a.audit == nil {
+		writeJSON(w, http.StatusOK, []models.AuditEvent{})
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	events, err := a.audit.Recent(limit * 2)
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	workspaceID := r.URL.Query().Get("workspaceId")
+	if workspaceID != "" {
+		filtered := make([]models.AuditEvent, 0, limit)
+		for _, event := range events {
+			if event.WorkspaceID == workspaceID {
+				filtered = append(filtered, event)
+				if len(filtered) == limit {
+					break
+				}
+			}
+		}
+		events = filtered
+	} else if len(events) > limit {
+		events = events[:limit]
+	}
+	writeJSON(w, http.StatusOK, events)
+}
+
+func (a *API) workspaceHealth(w http.ResponseWriter, r *http.Request) {
+	if a.healthService == nil {
+		writeError(w, http.StatusServiceUnavailable, "workspace health is unavailable")
+		return
+	}
+	result, err := a.healthService.Check(r.PathValue("id"))
+	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+	respond(w, result, err)
 }
 
 func (a *API) listWorkspaces(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +181,9 @@ func (a *API) deleteWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) scanWorkspace(w http.ResponseWriter, r *http.Request) {
+	started := time.Now()
 	result, err := a.workspaces.Scan(r.PathValue("id"))
+	a.record(r.PathValue("id"), "", "scan", "Workspace scan completed.", nil, started, err)
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
@@ -201,7 +262,8 @@ func (a *API) itemDiff(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) saveItemFile(w http.ResponseWriter, r *http.Request) {
-	if _, err := a.items.Detail(r.PathValue("id")); errors.Is(err, apperrors.ErrItemNotFound) {
+	item, detailErr := a.items.Detail(r.PathValue("id"))
+	if errors.Is(detailErr, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
 	}
@@ -210,7 +272,9 @@ func (a *API) saveItemFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	started := time.Now()
 	result, err := a.items.SaveFile(r.PathValue("id"), r.PathValue("fileID"), input)
+	a.record(item.WorkspaceID, item.ID, "save_file", "File saved.", []string{result.Path}, started, err)
 	respond(w, result, err)
 }
 
@@ -229,7 +293,10 @@ func (a *API) saveItemMetadata(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	item, _ := a.items.Detail(r.PathValue("id"))
+	started := time.Now()
 	result, err := a.items.SaveMetadata(r.PathValue("id"), input)
+	a.record(item.WorkspaceID, item.ID, "save_metadata", "Item metadata saved.", []string{item.ItemPath}, started, err)
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
@@ -243,7 +310,10 @@ func (a *API) updateItemStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	item, _ := a.items.Detail(r.PathValue("id"))
+	started := time.Now()
 	result, err := a.items.UpdateStatus(r.PathValue("id"), input)
+	a.record(item.WorkspaceID, item.ID, "update_status", "Item status updated.", []string{item.ItemPath}, started, err)
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
@@ -275,15 +345,15 @@ func (a *API) gitStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) gitFetch(w http.ResponseWriter, r *http.Request) {
-	a.gitOperation(w, r, a.gitOps.Fetch)
+	a.gitOperation(w, r, "git_fetch", a.gitOps.Fetch)
 }
 
 func (a *API) gitPull(w http.ResponseWriter, r *http.Request) {
-	a.gitOperation(w, r, a.gitOps.Pull)
+	a.gitOperation(w, r, "git_pull", a.gitOps.Pull)
 }
 
 func (a *API) gitPush(w http.ResponseWriter, r *http.Request) {
-	a.gitOperation(w, r, a.gitOps.Push)
+	a.gitOperation(w, r, "git_push", a.gitOps.Push)
 }
 
 func (a *API) gitCommit(w http.ResponseWriter, r *http.Request) {
@@ -292,7 +362,10 @@ func (a *API) gitCommit(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	respondGitResult(w, a.gitOps.Commit(r.PathValue("id"), input))
+	started := time.Now()
+	result := withRecoveryHint(a.gitOps.Commit(r.PathValue("id"), input))
+	a.recordGit(r.PathValue("id"), "git_commit", input.Paths, started, result)
+	respondGitResult(w, result)
 }
 
 func (a *API) gitCreateBranch(w http.ResponseWriter, r *http.Request) {
@@ -301,7 +374,10 @@ func (a *API) gitCreateBranch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	respondGitResult(w, a.gitOps.CreateBranch(r.PathValue("id"), input))
+	started := time.Now()
+	result := withRecoveryHint(a.gitOps.CreateBranch(r.PathValue("id"), input))
+	a.recordGit(r.PathValue("id"), "git_create_branch", nil, started, result)
+	respondGitResult(w, result)
 }
 
 func (a *API) gitSwitchBranch(w http.ResponseWriter, r *http.Request) {
@@ -310,15 +386,47 @@ func (a *API) gitSwitchBranch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	respondGitResult(w, a.gitOps.SwitchBranch(r.PathValue("id"), input))
+	started := time.Now()
+	result := withRecoveryHint(a.gitOps.SwitchBranch(r.PathValue("id"), input))
+	a.recordGit(r.PathValue("id"), "git_switch_branch", nil, started, result)
+	respondGitResult(w, result)
 }
 
-func (a *API) gitOperation(w http.ResponseWriter, r *http.Request, run func(string, models.GitOperationInput) models.GitOperationResult) {
+func (a *API) gitOperation(w http.ResponseWriter, r *http.Request, operation string, run func(string, models.GitOperationInput) models.GitOperationResult) {
 	var input models.GitOperationInput
 	if r.Body != nil {
 		_ = json.NewDecoder(r.Body).Decode(&input)
 	}
-	respondGitResult(w, run(r.PathValue("id"), input))
+	started := time.Now()
+	result := withRecoveryHint(run(r.PathValue("id"), input))
+	a.recordGit(r.PathValue("id"), operation, nil, started, result)
+	respondGitResult(w, result)
+}
+
+func (a *API) recordGit(workspaceID, operation string, paths []string, started time.Time, result models.GitOperationResult) {
+	var err error
+	if !result.OK {
+		err = errors.New(result.Message)
+	}
+	a.record(workspaceID, "", operation, "Git operation completed.", paths, started, err)
+}
+
+func (a *API) record(workspaceID, itemID, operation, message string, paths []string, started time.Time, opErr error) {
+	if a.audit == nil {
+		return
+	}
+	status := models.AuditStatusSuccess
+	errorMessage := ""
+	if opErr != nil {
+		status = models.AuditStatusFailed
+		errorMessage = opErr.Error()
+		message = "Operation failed."
+		if recoveryHint(errorMessage) != "" {
+			status = models.AuditStatusBlocked
+			message = "Operation blocked."
+		}
+	}
+	_, _ = a.audit.Append(models.AuditEvent{WorkspaceID: workspaceID, ItemID: itemID, Operation: operation, Status: status, Message: message, Paths: paths, DurationMS: time.Since(started).Milliseconds(), Error: errorMessage})
 }
 
 func (a *API) selectDirectory(w http.ResponseWriter, r *http.Request) {
@@ -404,6 +512,13 @@ func respondGitResult(w http.ResponseWriter, result models.GitOperationResult) {
 	writeJSON(w, statusForErrorFromResult(result), result)
 }
 
+func withRecoveryHint(result models.GitOperationResult) models.GitOperationResult {
+	if !result.OK && result.RecoveryHint == "" {
+		result.RecoveryHint = recoveryHint(result.Message)
+	}
+	return result
+}
+
 func statusForErrorFromResult(result models.GitOperationResult) int {
 	if !result.OK {
 		return http.StatusBadRequest
@@ -421,7 +536,27 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	if strings.TrimSpace(message) == "" {
 		message = http.StatusText(status)
 	}
-	writeJSON(w, status, map[string]string{"error": message})
+	payload := map[string]string{"error": message}
+	if hint := recoveryHint(message); hint != "" {
+		payload["recoveryHint"] = hint
+	}
+	writeJSON(w, status, payload)
+}
+
+func recoveryHint(message string) string {
+	lower := strings.ToLower(message)
+	switch {
+	case strings.Contains(lower, "changed since it was loaded"):
+		return "Reload the file to review the latest content, then apply your changes again."
+	case strings.Contains(lower, "local changes"):
+		return "Review local changes, then confirm the operation or commit them first."
+	case strings.Contains(lower, "conflict"):
+		return "Resolve or abort the current Git operation before continuing."
+	case strings.Contains(lower, "outside configured sources"), strings.Contains(lower, "path escapes"):
+		return "Choose a path inside a configured workspace source."
+	default:
+		return ""
+	}
 }
 
 func Log(next http.Handler) http.Handler {

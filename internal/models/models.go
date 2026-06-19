@@ -261,7 +261,8 @@ type BranchSwitchInput struct {
 }
 
 type GitOperationResult struct {
-	OK      bool      `json:"ok" yaml:"ok"`
-	Message string    `json:"message,omitempty" yaml:"message,omitempty"`
-	Status  GitStatus `json:"status" yaml:"status"`
+	OK           bool      `json:"ok" yaml:"ok"`
+	Message      string    `json:"message,omitempty" yaml:"message,omitempty"`
+	RecoveryHint string    `json:"recoveryHint,omitempty" yaml:"recoveryHint,omitempty"`
+	Status       GitStatus `json:"status" yaml:"status"`
 }

@@ -9,6 +9,7 @@ type Paths struct {
 	Dir            string
 	RegistryFile   string
 	PlanIndexFile  string
+	AuditLogFile   string
 	FrontendAssets string
 }
 
@@ -25,6 +26,7 @@ func ResolvePaths() (Paths, error) {
 		Dir:           dir,
 		RegistryFile:  filepath.Join(dir, "workspaces.yaml"),
 		PlanIndexFile: filepath.Join(dir, "item-index.yaml"),
+		AuditLogFile:  filepath.Join(dir, "audit-log.jsonl"),
 	}
 	copyLegacyFile(filepath.Join(dir, "repositories.yaml"), paths.RegistryFile)
 	copyLegacyFile(filepath.Join(dir, "plan-index.yaml"), paths.PlanIndexFile)

@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"plan-manager/internal/api"
+	"plan-manager/internal/application/health"
+	"plan-manager/internal/audit"
 	"plan-manager/internal/config"
 	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/gitadapter"
@@ -43,7 +45,9 @@ func NewServer(port int) (*Server, error) {
 	scan := scanner.New(git)
 	files := fileaccess.New()
 	writer := itemwriter.New(files, scan, idx, reg)
-	apiHandler := api.New(reg, idx, scan, files, writer, git, systemdialog.New())
+	auditStore := audit.New(paths.AuditLogFile)
+	healthService := health.New(reg, idx, git)
+	apiHandler := api.NewWithReliability(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())
