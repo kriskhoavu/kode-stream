@@ -9,7 +9,7 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 | Phase | Name                                    | Status |
 |-------|-----------------------------------------|--------|
 | A1    | Characterization And Baseline           | Done   |
-| B1    | Backend Application Services            |        |
+| B1    | Backend Application Services            | Done   |
 | B2    | Scanner And Path Guard Separation       |        |
 | B3    | Backend Performance Improvements        |        |
 | F1    | Frontend App State And API Modules      |        |
@@ -43,11 +43,11 @@ PM-003: Add architecture refactor characterization tests
 
 **Deliverables:**
 
-- [ ] Add workspace, item, and Git application services.
-- [ ] Move orchestration from API handlers into services.
-- [ ] Keep all existing HTTP routes and DTOs unchanged.
-- [ ] Add service tests with fake dependencies.
-- [ ] Keep `internal/app` wiring simple and explicit.
+- [x] Add workspace, item, and Git application services.
+- [x] Move orchestration from API handlers into services.
+- [x] Keep all existing HTTP routes and DTOs unchanged.
+- [x] Add service tests with fake dependencies.
+- [x] Keep `internal/app` wiring simple and explicit.
 
 **Verification:** `rtk go test ./...`
 
