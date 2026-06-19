@@ -11,7 +11,7 @@ Add global search, saved filters, recent items, and quick navigation. Use the ex
 | B1    | Search Domain And Ranking    | ✅     |
 | B2    | Saved Filters And Recents    | ✅     |
 | B3    | Search APIs                  | ✅     |
-| B4    | Backend Tests                |        |
+| B4    | Backend Tests                | ✅     |
 | F1    | API Types And Client Methods |        |
 | F2    | Search State And Keyboard    |        |
 | F3    | Search And Filter UI         |        |
@@ -89,10 +89,10 @@ PM-005: Add search and navigation APIs
 
 **Deliverables:**
 
-- [ ] Add API tests for search queries.
-- [ ] Add workspace-scoped and all-workspace search tests.
-- [ ] Add saved filter validation tests.
-- [ ] Add recent item ordering tests.
+- [x] Add API tests for search queries.
+- [x] Add workspace-scoped and all-workspace search tests.
+- [x] Add saved filter validation tests.
+- [x] Add recent item ordering tests.
 
 **Verification:** `rtk go test ./...`
 

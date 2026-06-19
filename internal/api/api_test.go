@@ -12,11 +12,13 @@ import (
 	"time"
 
 	apphealth "plan-manager/internal/application/health"
+	appsearch "plan-manager/internal/application/search"
 	"plan-manager/internal/audit"
 	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
 	"plan-manager/internal/models"
+	"plan-manager/internal/navigation"
 	"plan-manager/internal/registry"
 )
 
@@ -243,6 +245,90 @@ func TestGitCommitRejectsPathOutsideConfiguredSources(t *testing.T) {
 	}
 	if response.Code != http.StatusBadRequest || payload.OK {
 		t.Fatalf("status = %d, payload = %#v", response.Code, payload)
+	}
+}
+
+func TestSearchEndpointSupportsAllAndWorkspaceScopedQueries(t *testing.T) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{{ItemSummary: models.ItemSummary{ID: "one", WorkspaceID: workspace.ID, Identifier: "PM-005", Title: "Search"}}}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.ReplaceWorkspace("other", []models.ItemDetail{{ItemSummary: models.ItemSummary{ID: "two", WorkspaceID: "other", Identifier: "PM-005", Title: "Other search"}}}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	apiHandler.search = appsearch.New(idx)
+
+	for _, test := range []struct {
+		path string
+		want int
+	}{{"/api/search?q=PM-005", 2}, {"/api/search?q=PM-005&workspaceId=" + workspace.ID, 1}} {
+		request := httptest.NewRequest(http.MethodGet, test.path, nil)
+		response := httptest.NewRecorder()
+		apiHandler.Routes().ServeHTTP(response, request)
+		var results []models.SearchResult
+		if err := json.Unmarshal(response.Body.Bytes(), &results); err != nil {
+			t.Fatal(err)
+		}
+		if response.Code != http.StatusOK || len(results) != test.want {
+			t.Fatalf("GET %s status=%d results=%#v", test.path, response.Code, results)
+		}
+	}
+}
+
+func TestSavedFilterEndpointsValidateCreateListAndDelete(t *testing.T) {
+	apiHandler, _, _, _ := reliabilityTestAPI(t)
+	dir := t.TempDir()
+	apiHandler.navigation = navigation.New(filepath.Join(dir, "filters.yaml"), filepath.Join(dir, "recents.yaml"))
+
+	invalid := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(invalid, httptest.NewRequest(http.MethodPost, "/api/saved-filters", strings.NewReader(`{"name":"","route":"https://example.com"}`)))
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid status = %d", invalid.Code)
+	}
+
+	createdResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(createdResponse, httptest.NewRequest(http.MethodPost, "/api/saved-filters", strings.NewReader(`{"name":"Drafts","route":"/kanban","filters":{"statuses":["draft"]}}`)))
+	var created models.SavedFilter
+	if err := json.Unmarshal(createdResponse.Body.Bytes(), &created); err != nil || created.ID == "" {
+		t.Fatalf("created = %#v, err=%v", created, err)
+	}
+	listResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(listResponse, httptest.NewRequest(http.MethodGet, "/api/saved-filters", nil))
+	var filters []models.SavedFilter
+	if err := json.Unmarshal(listResponse.Body.Bytes(), &filters); err != nil || len(filters) != 1 {
+		t.Fatalf("filters = %#v, err=%v", filters, err)
+	}
+	deleteResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(deleteResponse, httptest.NewRequest(http.MethodDelete, "/api/saved-filters/"+created.ID, nil))
+	if deleteResponse.Code != http.StatusOK {
+		t.Fatalf("delete status = %d", deleteResponse.Code)
+	}
+}
+
+func TestRecentItemEndpointOrdersLatestOpenFirst(t *testing.T) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
+	dir := t.TempDir()
+	apiHandler.navigation = navigation.New(filepath.Join(dir, "filters.yaml"), filepath.Join(dir, "recents.yaml"))
+	items := []models.ItemDetail{
+		{ItemSummary: models.ItemSummary{ID: "one", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name, Identifier: "PM-001", Title: "One", ItemPath: "plans/one"}},
+		{ItemSummary: models.ItemSummary{ID: "two", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name, Identifier: "PM-002", Title: "Two", ItemPath: "plans/two"}},
+	}
+	if err := idx.ReplaceWorkspace(workspace.ID, items, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"one", "two", "one"} {
+		response := httptest.NewRecorder()
+		apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/recent-items", strings.NewReader(`{"itemId":"`+id+`"}`)))
+		if response.Code != http.StatusOK {
+			t.Fatalf("record %s status=%d body=%s", id, response.Code, response.Body.String())
+		}
+		time.Sleep(time.Millisecond)
+	}
+	response := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/recent-items", nil))
+	var recents []models.RecentItem
+	if err := json.Unmarshal(response.Body.Bytes(), &recents); err != nil || len(recents) != 2 || recents[0].ItemID != "one" {
+		t.Fatalf("recents = %#v, err=%v", recents, err)
 	}
 }
 
