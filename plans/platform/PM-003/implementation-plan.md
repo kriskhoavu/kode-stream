@@ -13,7 +13,7 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 | B2    | Scanner And Path Guard Separation       | Done   |
 | B3    | Backend Performance Improvements        | Done   |
 | F1    | Frontend App State And API Modules      | Done   |
-| F2    | Frontend Feature Hooks And Components   |        |
+| F2    | Frontend Feature Hooks And Components   | Done   |
 | F3    | Frontend Styles And Render Performance  |        |
 | D1    | Architecture Documentation Finalization |        |
 
@@ -135,10 +135,12 @@ PM-003: Extract frontend app state and API modules
 
 **Deliverables:**
 
-- [ ] Extract Kanban filters, drawer behavior, and card actions into hooks and components.
-- [ ] Extract item workspace autosave, metadata, diff, file tree, and Git behavior into hooks and components.
-- [ ] Extract workspace forms and source settings editor into smaller modules.
-- [ ] Preserve rendered class names and markup structure unless tests prove no visual change.
+- [x] Extract Kanban filters, drawer behavior, and card actions into hooks and components.
+- [x] Extract item workspace autosave, metadata, diff, file tree, and Git behavior into hooks and components.
+- [x] Extract workspace forms and source settings editor into smaller modules.
+- [x] Preserve rendered class names and markup structure unless tests prove no visual change.
+
+**Implementation Note:** PM-003 extracts pure feature logic first: Kanban filtering/source labels, item workspace diff parsing, and workspace source settings helpers. JSX and class names stay in place for visual stability.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

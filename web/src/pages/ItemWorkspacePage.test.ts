@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseGitDiff } from './ItemWorkspacePage';
+import { parseGitDiff } from '../shared/domain/diff';
 
 describe('parseGitDiff', () => {
   it('parses additions and deletions with line numbers', () => {
