@@ -12,12 +12,14 @@ import (
 
 	"plan-manager/internal/api"
 	"plan-manager/internal/application/health"
+	appsearch "plan-manager/internal/application/search"
 	"plan-manager/internal/audit"
 	"plan-manager/internal/config"
 	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
 	"plan-manager/internal/itemwriter"
+	"plan-manager/internal/navigation"
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
 	"plan-manager/internal/systemdialog"
@@ -47,7 +49,9 @@ func NewServer(port int) (*Server, error) {
 	writer := itemwriter.New(files, scan, idx, reg)
 	auditStore := audit.New(paths.AuditLogFile)
 	healthService := health.New(reg, idx, git)
-	apiHandler := api.NewWithReliability(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService)
+	searchService := appsearch.New(idx)
+	navigationStore := navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile)
+	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())

@@ -10,7 +10,7 @@ Add global search, saved filters, recent items, and quick navigation. Use the ex
 |-------|------------------------------|--------|
 | B1    | Search Domain And Ranking    | ✅     |
 | B2    | Saved Filters And Recents    | ✅     |
-| B3    | Search APIs                  |        |
+| B3    | Search APIs                  | ✅     |
 | B4    | Backend Tests                |        |
 | F1    | API Types And Client Methods |        |
 | F2    | Search State And Keyboard    |        |
@@ -67,10 +67,10 @@ PM-005: Add saved filters and recent items
 
 **Deliverables:**
 
-- [ ] Add `GET /api/search`.
-- [ ] Add saved filter CRUD endpoints.
-- [ ] Add recent item endpoints.
-- [ ] Return stable frontend routes in search results.
+- [x] Add `GET /api/search`.
+- [x] Add saved filter CRUD endpoints.
+- [x] Add recent item endpoints.
+- [x] Return stable frontend routes in search results.
 
 **Verification:** `rtk go test ./...`
 
