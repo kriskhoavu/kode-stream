@@ -11,7 +11,7 @@ Add local audit events, workspace health checks, safer operation feedback, and s
 | B1    | Audit Domain And Storage     | ✅     |
 | B2    | Health And Safety Services   | ✅     |
 | B3    | Application Integration      | ✅     |
-| B4    | Reliability Tests            |        |
+| B4    | Reliability Tests            | ✅     |
 | F1    | API Types And Client Methods |        |
 | F2    | Health And Audit State       |        |
 | F3    | Safety Feedback UI           |        |
@@ -89,10 +89,10 @@ PM-004: Integrate audit and health APIs
 
 **Deliverables:**
 
-- [ ] Add endpoint characterization tests for health and audit APIs.
-- [ ] Add stale-file and Git-blocking tests.
-- [ ] Add path safety regression tests around new safety checks.
-- [ ] Add config corruption tests for audit reads.
+- [x] Add endpoint characterization tests for health and audit APIs.
+- [x] Add stale-file and Git-blocking tests.
+- [x] Add path safety regression tests around new safety checks.
+- [x] Add config corruption tests for audit reads.
 
 **Verification:** `rtk go test ./...`
 

@@ -4,13 +4,20 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	apphealth "plan-manager/internal/application/health"
+	"plan-manager/internal/audit"
+	"plan-manager/internal/fileaccess"
+	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
 	"plan-manager/internal/models"
+	"plan-manager/internal/registry"
 )
 
 func TestFallbackItemPath(t *testing.T) {
@@ -141,4 +148,133 @@ func TestRoutesMissingItemReturnsNotFoundJSON(t *testing.T) {
 	if payload["error"] != "item not found" {
 		t.Fatalf("error = %q", payload["error"])
 	}
+}
+
+func TestReliabilityEndpointsReturnWorkspaceHealthAndRecentAuditEvents(t *testing.T) {
+	apiHandler, workspace, _, auditStore := reliabilityTestAPI(t)
+	if _, err := auditStore.Append(models.AuditEvent{WorkspaceID: workspace.ID, Operation: "scan", Status: models.AuditStatusSuccess, Message: "Scanned"}); err != nil {
+		t.Fatal(err)
+	}
+
+	healthRequest := httptest.NewRequest(http.MethodGet, "/api/workspaces/"+workspace.ID+"/health", nil)
+	healthResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(healthResponse, healthRequest)
+	if healthResponse.Code != http.StatusOK {
+		t.Fatalf("health status = %d, body = %s", healthResponse.Code, healthResponse.Body.String())
+	}
+	var workspaceHealth models.WorkspaceHealth
+	if err := json.Unmarshal(healthResponse.Body.Bytes(), &workspaceHealth); err != nil {
+		t.Fatal(err)
+	}
+	if workspaceHealth.WorkspaceID != workspace.ID || workspaceHealth.Summary != models.HealthStatusOK {
+		t.Fatalf("health = %#v", workspaceHealth)
+	}
+
+	auditRequest := httptest.NewRequest(http.MethodGet, "/api/audit-events?workspaceId="+workspace.ID+"&limit=1", nil)
+	auditResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(auditResponse, auditRequest)
+	var events []models.AuditEvent
+	if err := json.Unmarshal(auditResponse.Body.Bytes(), &events); err != nil {
+		t.Fatal(err)
+	}
+	if auditResponse.Code != http.StatusOK || len(events) != 1 || events[0].Operation != "scan" {
+		t.Fatalf("audit status = %d, events = %#v", auditResponse.Code, events)
+	}
+}
+
+func TestSaveFileStaleHashReturnsRecoveryHintAndAuditEvent(t *testing.T) {
+	apiHandler, workspace, idx, auditStore := reliabilityTestAPI(t)
+	itemPath := "plans/platform/PM-004"
+	if err := os.MkdirAll(filepath.Join(workspace.Path, itemPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace.Path, itemPath, "README.md"), []byte("# Current\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{{ItemSummary: models.ItemSummary{ID: "item-1", WorkspaceID: workspace.ID, ItemPath: itemPath, Title: "PM-004", Identifier: "PM-004", Scope: "platform"}}}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	body := strings.NewReader(`{"content":"# Changed\n","expectedHash":"stale"}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/items/item-1/files/README_md", body)
+	response := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(response, request)
+
+	var payload map[string]string
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusBadRequest || payload["recoveryHint"] == "" {
+		t.Fatalf("status = %d, payload = %#v", response.Code, payload)
+	}
+	events, err := auditStore.Recent(1)
+	if err != nil || len(events) != 1 || events[0].Status != models.AuditStatusBlocked {
+		t.Fatalf("events = %#v, err = %v", events, err)
+	}
+}
+
+func TestGitPullDirtyTreeReturnsRecoveryHint(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	if err := os.WriteFile(filepath.Join(workspace.Path, "plans", "dirty.md"), []byte("dirty"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/git/pull", strings.NewReader(`{}`))
+	response := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(response, request)
+
+	var payload models.GitOperationResult
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusBadRequest || payload.OK || payload.RecoveryHint == "" {
+		t.Fatalf("status = %d, payload = %#v", response.Code, payload)
+	}
+}
+
+func TestGitCommitRejectsPathOutsideConfiguredSources(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	body := strings.NewReader(`{"message":"test","paths":["../secret.md"]}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/git/commit", body)
+	response := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(response, request)
+
+	var payload models.GitOperationResult
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusBadRequest || payload.OK {
+		t.Fatalf("status = %d, payload = %#v", response.Code, payload)
+	}
+}
+
+func reliabilityTestAPI(t *testing.T) (*API, models.WorkspaceConfig, *itemindex.Index, *audit.Store) {
+	t.Helper()
+	root := t.TempDir()
+	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	commit := exec.Command("git", "-C", root, "commit", "--allow-empty", "-m", "init")
+	commit.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if output, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v: %s", err, output)
+	}
+	if err := os.Mkdir(filepath.Join(root, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(t.TempDir(), "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(filepath.Join(t.TempDir(), "item-index.yaml"))
+	if err := idx.ReplaceWorkspace(workspace.ID, nil, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.TouchScanned(workspace.ID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	workspace, _, _ = reg.Get(workspace.ID)
+	auditStore := audit.New(filepath.Join(t.TempDir(), "audit-log.jsonl"))
+	healthService := apphealth.New(reg, idx, git)
+	return NewWithReliability(reg, idx, nil, fileaccess.New(), nil, git, nil, auditStore, healthService), workspace, idx, auditStore
 }
