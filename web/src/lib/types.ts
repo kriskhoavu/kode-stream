@@ -30,6 +30,37 @@ export interface WorkspaceHealth {
   summary: HealthStatus;
 }
 
+export interface SearchResult {
+  id: string;
+  type: 'item' | 'workspace' | 'branch' | 'savedFilter';
+  title: string;
+  subtitle: string;
+  context: string;
+  workspaceId?: string;
+  itemId?: string;
+  route: string;
+  score: number;
+}
+
+export interface SavedFilter {
+  id: string;
+  name: string;
+  route: string;
+  workspaceId?: string;
+  filters: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecentItem {
+  itemId: string;
+  workspaceId: string;
+  title: string;
+  subtitle?: string;
+  route: string;
+  openedAt: string;
+}
+
 export interface WorkspaceConfig {
   id: string;
   name: string;

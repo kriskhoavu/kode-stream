@@ -13,6 +13,9 @@ import type {
   HealthCheck,
   NewItemInput,
   PathSelection,
+  RecentItem,
+  SavedFilter,
+  SearchResult,
   ItemDetail,
   ItemMetadataUpdateInput,
   ItemStatusUpdateInput,
@@ -53,6 +56,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   state: () => request<AppState>('/api/state'),
+  search: async (params: { q: string; workspaceId?: string; types?: string[]; limit?: number }) => {
+    const query = new URLSearchParams({ q: params.q });
+    if (params.workspaceId) query.set('workspaceId', params.workspaceId);
+    if (params.types?.length) query.set('types', params.types.join(','));
+    if (params.limit) query.set('limit', String(params.limit));
+    return ((await request<SearchResult[] | null>(`/api/search?${query.toString()}`)) ?? []).map(normalizeSearchResult);
+  },
+  savedFilters: async () => ((await request<SavedFilter[] | null>('/api/saved-filters')) ?? []).map(normalizeSavedFilter),
+  saveFilter: (filter: Pick<SavedFilter, 'name' | 'route' | 'filters'> & Partial<Pick<SavedFilter, 'id' | 'workspaceId'>>) =>
+    request<SavedFilter>('/api/saved-filters', { method: 'POST', body: JSON.stringify(filter) }).then(normalizeSavedFilter),
+  deleteFilter: (id: string) => request<{ ok: boolean }>(`/api/saved-filters/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  recentItems: async (limit = 10) => ((await request<RecentItem[] | null>(`/api/recent-items?limit=${limit}`)) ?? []).map(normalizeRecentItem),
+  recordRecentItem: (itemId: string) => request<{ ok: boolean }>('/api/recent-items', { method: 'POST', body: JSON.stringify({ itemId }) }),
   auditEvents: async (params: { workspaceId?: string; limit?: number } = {}) => {
     const query = new URLSearchParams();
     if (params.workspaceId) query.set('workspaceId', params.workspaceId);
@@ -161,6 +177,24 @@ function normalizeWorkspaceHealth(health: WorkspaceHealth): WorkspaceHealth {
     summary: normalizeHealthStatus(health.summary),
     checks: (Array.isArray(health.checks) ? health.checks : []).map(normalizeHealthCheck)
   };
+}
+
+function normalizeSearchResult(result: SearchResult): SearchResult {
+  return {
+    ...result,
+    type: ['workspace', 'branch', 'savedFilter'].includes(result.type) ? result.type : 'item',
+    subtitle: result.subtitle ?? '',
+    context: result.context ?? '',
+    score: result.score ?? 0
+  };
+}
+
+function normalizeSavedFilter(filter: SavedFilter): SavedFilter {
+  return { ...filter, filters: filter.filters ?? {} };
+}
+
+function normalizeRecentItem(item: RecentItem): RecentItem {
+  return { ...item, subtitle: item.subtitle ?? '', route: item.route || `/items/${encodeURIComponent(item.itemId)}` };
 }
 
 function normalizeHealthCheck(check: HealthCheck): HealthCheck {

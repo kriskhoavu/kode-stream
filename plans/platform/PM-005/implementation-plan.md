@@ -12,7 +12,7 @@ Add global search, saved filters, recent items, and quick navigation. Use the ex
 | B2    | Saved Filters And Recents    | ✅     |
 | B3    | Search APIs                  | ✅     |
 | B4    | Backend Tests                | ✅     |
-| F1    | API Types And Client Methods |        |
+| F1    | API Types And Client Methods | ✅     |
 | F2    | Search State And Keyboard    |        |
 | F3    | Search And Filter UI         |        |
 | F4    | Styling And Verification     |        |
@@ -111,9 +111,9 @@ PM-005: Add search API regression tests
 
 **Deliverables:**
 
-- [ ] Add frontend types for search results, saved filters, and recent items.
-- [ ] Add API client methods.
-- [ ] Add response normalization tests.
+- [x] Add frontend types for search results, saved filters, and recent items.
+- [x] Add API client methods.
+- [x] Add response normalization tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
