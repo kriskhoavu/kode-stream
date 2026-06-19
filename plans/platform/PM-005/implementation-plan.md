@@ -8,7 +8,7 @@ Add global search, saved filters, recent items, and quick navigation. Use the ex
 
 | Phase | Name                         | Status |
 |-------|------------------------------|--------|
-| B1    | Search Domain And Ranking    |        |
+| B1    | Search Domain And Ranking    | ✅     |
 | B2    | Saved Filters And Recents    |        |
 | B3    | Search APIs                  |        |
 | B4    | Backend Tests                |        |
@@ -23,10 +23,10 @@ Add global search, saved filters, recent items, and quick navigation. Use the ex
 
 **Deliverables:**
 
-- [ ] Add `SearchQuery` and `SearchResult` models.
-- [ ] Add search service over `itemindex`.
-- [ ] Add simple ranking for identifier, title, scope, workspace, branch, tags, and description.
-- [ ] Add tests for ranking and limits.
+- [x] Add `SearchQuery` and `SearchResult` models.
+- [x] Add search service over `itemindex`.
+- [x] Add simple ranking for identifier, title, scope, workspace, branch, tags, and description.
+- [x] Add tests for ranking and limits.
 
 **Verification:** `rtk go test ./...`
 
@@ -191,4 +191,3 @@ PM-005: Finalize search navigation UI
 - Verify keyboard and mobile behavior
 - Update embedded frontend build
 ```
-

@@ -51,6 +51,25 @@ type SafetyCheck struct {
 	RecoveryHint string `json:"recoveryHint,omitempty" yaml:"recoveryHint,omitempty"`
 }
 
+type SearchQuery struct {
+	Text        string   `json:"q" yaml:"q"`
+	WorkspaceID string   `json:"workspaceId,omitempty" yaml:"workspaceId,omitempty"`
+	Types       []string `json:"types,omitempty" yaml:"types,omitempty"`
+	Limit       int      `json:"limit,omitempty" yaml:"limit,omitempty"`
+}
+
+type SearchResult struct {
+	ID          string `json:"id" yaml:"id"`
+	Type        string `json:"type" yaml:"type"`
+	Title       string `json:"title" yaml:"title"`
+	Subtitle    string `json:"subtitle" yaml:"subtitle"`
+	Context     string `json:"context" yaml:"context"`
+	WorkspaceID string `json:"workspaceId,omitempty" yaml:"workspaceId,omitempty"`
+	ItemID      string `json:"itemId,omitempty" yaml:"itemId,omitempty"`
+	Route       string `json:"route" yaml:"route"`
+	Score       int    `json:"score" yaml:"score"`
+}
+
 type ItemStatus string
 
 const (
