@@ -23,6 +23,34 @@ type AuditEvent struct {
 	Error       string      `json:"error,omitempty" yaml:"error,omitempty"`
 }
 
+type HealthStatus string
+
+const (
+	HealthStatusOK      HealthStatus = "ok"
+	HealthStatusWarning HealthStatus = "warning"
+	HealthStatusFailed  HealthStatus = "failed"
+)
+
+type HealthCheck struct {
+	Name         string       `json:"name" yaml:"name"`
+	Status       HealthStatus `json:"status" yaml:"status"`
+	Message      string       `json:"message" yaml:"message"`
+	RecoveryHint string       `json:"recoveryHint,omitempty" yaml:"recoveryHint,omitempty"`
+}
+
+type WorkspaceHealth struct {
+	WorkspaceID string        `json:"workspaceId" yaml:"workspaceId"`
+	CheckedAt   time.Time     `json:"checkedAt" yaml:"checkedAt"`
+	Checks      []HealthCheck `json:"checks" yaml:"checks"`
+	Summary     HealthStatus  `json:"summary" yaml:"summary"`
+}
+
+type SafetyCheck struct {
+	OK           bool   `json:"ok" yaml:"ok"`
+	Message      string `json:"message,omitempty" yaml:"message,omitempty"`
+	RecoveryHint string `json:"recoveryHint,omitempty" yaml:"recoveryHint,omitempty"`
+}
+
 type ItemStatus string
 
 const (

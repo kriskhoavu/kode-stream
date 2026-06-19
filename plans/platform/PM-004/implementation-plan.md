@@ -9,7 +9,7 @@ Add local audit events, workspace health checks, safer operation feedback, and s
 | Phase | Name                         | Status |
 |-------|------------------------------|--------|
 | B1    | Audit Domain And Storage     | ✅     |
-| B2    | Health And Safety Services   |        |
+| B2    | Health And Safety Services   | ✅     |
 | B3    | Application Integration      |        |
 | B4    | Reliability Tests            |        |
 | F1    | API Types And Client Methods |        |
@@ -45,10 +45,10 @@ PM-004: Add local audit event storage
 
 **Deliverables:**
 
-- [ ] Add workspace health service.
-- [ ] Check workspace path, sources, Git root, branch, file permissions, and index state.
-- [ ] Add safety service for common operation preflight checks.
-- [ ] Add tests for healthy, warning, and failed states.
+- [x] Add workspace health service.
+- [x] Check workspace path, sources, Git root, branch, file permissions, and index state.
+- [x] Add safety service for common operation preflight checks.
+- [x] Add tests for healthy, warning, and failed states.
 
 **Verification:** `rtk go test ./...`
 
