@@ -9,11 +9,11 @@ import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { labels } from './lib/vocabulary';
 
-type Route = { name: 'kanban' } | { name: 'items' } | { name: 'branches' } | { name: 'workspaces' } | { name: 'workspace'; itemId: string };
+export type Route = { name: 'kanban' } | { name: 'items' } | { name: 'branches' } | { name: 'workspaces' } | { name: 'workspace'; itemId: string };
 
 const contentVersionStorageKey = 'itemManagerContentVersion';
 
-function routeFromLocation(): Route {
+export function routeFromLocation(): Route {
   const path = window.location.pathname;
   if (path.startsWith('/items/')) {
     return { name: 'workspace', itemId: decodeURIComponent(path.split('/')[2] ?? '') };

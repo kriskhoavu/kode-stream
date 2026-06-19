@@ -218,6 +218,51 @@ cards:
 	}
 }
 
+func TestStructuredSourceScanCharacterization(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "plans/platform/PM-003/README.md", "# Technical Architecture Refactoring\n\nImprove internals.\n")
+	writeTestFile(t, root, "plans/platform/PM-003/design/design-01-architecture.md", "# Architecture\n")
+	writeTestFile(t, root, "plans/platform/PM-003/scenario/scenario-00-overview.md", "# Scenario\n")
+	writeTestFile(t, root, "plans/platform/PM-003/item.yaml", `schemaVersion: 1
+item:
+  ticket: PM-003
+  title: YAML Architecture Title
+  service: platform
+  status: review
+  tags:
+    - architecture
+    - refactoring
+documents:
+  - id: overview
+    role: overview
+    path: README.md
+    label: Overview
+`)
+
+	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"plans"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data.Items) != 1 {
+		t.Fatalf("expected 1 structured item, got %d (%v)", len(data.Items), data.Warnings)
+	}
+	item := data.Items[0]
+	if item.Scope != "platform" || item.Identifier != "PM-003" || item.Title != "YAML Architecture Title" {
+		t.Fatalf("unexpected structured item identity: %+v", item.ItemSummary)
+	}
+	if item.Status != models.StatusReview || item.MetadataSource != "item.yaml" {
+		t.Fatalf("unexpected structured item metadata: %+v", item.ItemSummary)
+	}
+	if len(item.Documents) != 1 || item.Documents[0].Path != "README.md" {
+		t.Fatalf("unexpected documents: %#v", item.Documents)
+	}
+	if item.Counts.Files != 3 {
+		t.Fatalf("file count = %d, want 3", item.Counts.Files)
+	}
+}
+
 func writeTestFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := root + "/" + rel

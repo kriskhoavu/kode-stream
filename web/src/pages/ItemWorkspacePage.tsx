@@ -796,7 +796,7 @@ function treeFileStateLabel(state: TreeFileState): string {
   }
 }
 
-function parseGitDiff(diff: string): DiffFile[] {
+export function parseGitDiff(diff: string): DiffFile[] {
   const files: DiffFile[] = [];
   let current: DiffFile | null = null;
   let oldLine = 0;

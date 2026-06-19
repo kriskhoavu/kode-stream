@@ -8,7 +8,7 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 
 | Phase | Name                                    | Status |
 |-------|-----------------------------------------|--------|
-| A1    | Characterization And Baseline           |        |
+| A1    | Characterization And Baseline           | Done   |
 | B1    | Backend Application Services            |        |
 | B2    | Scanner And Path Guard Separation       |        |
 | B3    | Backend Performance Improvements        |        |
@@ -21,10 +21,10 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 
 **Deliverables:**
 
-- [ ] Add backend characterization tests for key API response shapes and error statuses.
-- [ ] Add scanner fixture tests for structured sources, configured sources, freestyle docs, and item YAML precedence.
-- [ ] Add frontend helper tests for route parsing, filters, diff parsing, source parsing, and source settings inference.
-- [ ] Record current build, test, and bundle baseline.
+- [x] Add backend characterization tests for key API response shapes and error statuses.
+- [x] Add scanner fixture tests for structured sources, configured sources, freestyle docs, and item YAML precedence.
+- [x] Add frontend helper tests for route parsing, filters, diff parsing, source parsing, and source settings inference.
+- [x] Record current build, test, and bundle baseline.
 
 **Verification:** `rtk go test ./... && rtk npm run typecheck && rtk npm test -- --run && rtk npm run build`
 
@@ -201,4 +201,3 @@ PM-003: Finalize architecture documentation
 - Stop and add tests when a behavior difference is found.
 - Prefer facade-preserving moves before package renames.
 - Keep full scan fallback until targeted refresh has enough coverage.
-

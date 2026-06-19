@@ -1,9 +1,15 @@
 package api
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"plan-manager/internal/itemindex"
 	"plan-manager/internal/models"
 )
 
@@ -68,5 +74,71 @@ func TestValidateGitPathsRejectsEscapesAndUnregisteredPaths(t *testing.T) {
 		if err := validateGitPaths(workspace, paths); err == nil {
 			t.Fatalf("expected %#v to be rejected", paths)
 		}
+	}
+}
+
+func TestRoutesListItemsPreservesJSONShape(t *testing.T) {
+	dir := t.TempDir()
+	idx := itemindex.New(filepath.Join(dir, "item-index.yaml"))
+	updatedAt := time.Date(2026, 6, 20, 1, 2, 3, 0, time.UTC)
+	if err := idx.ReplaceWorkspace("workspace-1", []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{
+			ID:             "item-1",
+			WorkspaceID:    "workspace-1",
+			WorkspaceName:  "Workspace",
+			Branch:         "main",
+			Scope:          "platform",
+			Identifier:     "PM-003",
+			Title:          "Architecture",
+			Status:         models.StatusDraft,
+			UpdatedAt:      updatedAt,
+			Description:    "Refactor architecture",
+			MetadataSource: "item.yaml",
+			ItemPath:       "plans/platform/PM-003",
+		},
+	}}, nil, updatedAt); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/items?workspaceId=workspace-1&q=architecture", nil)
+	res := httptest.NewRecorder()
+	New(nil, idx, nil, nil, nil, nil, nil).Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
+	}
+	var items []models.ItemSummary
+	if err := json.Unmarshal(res.Body.Bytes(), &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one item, got %d", len(items))
+	}
+	item := items[0]
+	if item.ID != "item-1" || item.Identifier != "PM-003" || item.Status != models.StatusDraft || item.MetadataSource != "item.yaml" {
+		t.Fatalf("unexpected item response: %+v", item)
+	}
+	if item.Tags == nil {
+		t.Fatal("tags should be normalized to an empty array")
+	}
+}
+
+func TestRoutesMissingItemReturnsNotFoundJSON(t *testing.T) {
+	dir := t.TempDir()
+	idx := itemindex.New(filepath.Join(dir, "item-index.yaml"))
+	req := httptest.NewRequest(http.MethodGet, "/api/items/missing", nil)
+	res := httptest.NewRecorder()
+
+	New(nil, idx, nil, nil, nil, nil, nil).Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
+	}
+	var payload map[string]string
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["error"] != "item not found" {
+		t.Fatalf("error = %q", payload["error"])
 	}
 }
