@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MutableRefObject } from 'react';
 import {
   ArrowLeft,
@@ -688,7 +688,7 @@ function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, rever
   );
 }
 
-function TreeNode({ node, onOpen, activeId, depth, fileStateByPath }: { node: FileNode; onOpen: (id: string) => void; activeId?: string; depth: number; fileStateByPath: Map<string, TreeFileState> }) {
+const TreeNode = memo(function TreeNode({ node, onOpen, activeId, depth, fileStateByPath }: { node: FileNode; onOpen: (id: string) => void; activeId?: string; depth: number; fileStateByPath: Map<string, TreeFileState> }) {
   const indent = { '--tree-indent': `${depth * 14}px` } as CSSProperties & Record<'--tree-indent', string>;
 
   if (node.type === 'directory') {
@@ -714,7 +714,7 @@ function TreeNode({ node, onOpen, activeId, depth, fileStateByPath }: { node: Fi
       {state && <FileStateIcon state={state} />}
     </button>
   );
-}
+});
 
 function FileStateIcon({ state }: { state: TreeFileState }) {
   const label = treeFileStateLabel(state);

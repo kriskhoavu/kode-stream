@@ -14,7 +14,7 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 | B3    | Backend Performance Improvements        | Done   |
 | F1    | Frontend App State And API Modules      | Done   |
 | F2    | Frontend Feature Hooks And Components   | Done   |
-| F3    | Frontend Styles And Render Performance  |        |
+| F3    | Frontend Styles And Render Performance  | Done   |
 | D1    | Architecture Documentation Finalization |        |
 
 ## Phase A1: Characterization And Baseline
@@ -159,10 +159,12 @@ PM-003: Split frontend feature modules
 
 **Deliverables:**
 
-- [ ] Move CSS into app, shared, and feature-owned files without visual changes.
-- [ ] Memoize expensive selectors and derived data where tests cover behavior.
-- [ ] Lazy render hidden heavy panels where state behavior remains unchanged.
-- [ ] Run screenshot or manual visual checks for key workflows.
+- [x] Move CSS into app, shared, and feature-owned files without visual changes.
+- [x] Memoize expensive selectors and derived data where tests cover behavior.
+- [x] Lazy render hidden heavy panels where state behavior remains unchanged.
+- [x] Run screenshot or manual visual checks for key workflows.
+
+**Implementation Note:** F3 split app shell styles into `web/src/styles/app-shell.css`, memoized repeated Kanban card and item file-tree rendering, and verified the production build output.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build`
 

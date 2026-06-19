@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
 import { ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, SlidersHorizontal, X } from 'lucide-react';
 import { marked } from 'marked';
@@ -365,7 +365,7 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
   );
 }
 
-function PlanCard({ item: plan, workspace, onPreview, onOpen, onMove }: { item: ItemSummary; workspace?: WorkspaceConfig; onPreview: () => void; onOpen: () => void; onMove: (status: ItemStatus) => void }) {
+const PlanCard = memo(function PlanCard({ item: plan, workspace, onPreview, onOpen, onMove }: { item: ItemSummary; workspace?: WorkspaceConfig; onPreview: () => void; onOpen: () => void; onMove: (status: ItemStatus) => void }) {
   const source = sourceLabel(plan, workspace);
   const docs = plan.metadataSource === 'docs';
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
@@ -400,7 +400,7 @@ function PlanCard({ item: plan, workspace, onPreview, onOpen, onMove }: { item: 
       )}
     </article>
   );
-}
+});
 
 function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged }: { itemId: string; refreshKey: number; onClose: () => void; onOpenFull: () => void; onChanged: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
