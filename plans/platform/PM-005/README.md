@@ -2,6 +2,12 @@
 
 PM-005 improves how users find items across workspaces. It adds global search, saved filters, keyboard-friendly navigation, and better item discovery. It uses the existing item index first. It does not require a database server.
 
+## Implementation Status
+
+Implemented. The backend provides ranked item search, saved-filter and recent-item storage, APIs, and regression tests. The frontend provides the quick switcher, keyboard selection, recent items, and Kanban saved views.
+
+Verification: `go test ./...`, `npm run typecheck`, `npm test -- --run`, and `npm run build`.
+
 ## Related Plans
 
 | Ticket                        | Relationship   | Key Context                                                                             |
@@ -58,4 +64,3 @@ User opens global search
 - [Backend Design](design/design-01-backend.md)
 - [Frontend Design](design/design-02-frontend.md)
 - [Implementation Plan](implementation-plan.md)
-

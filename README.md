@@ -22,7 +22,7 @@ It solves these problems:
 
 The long-term vision is a local authoring workspace for Git-based planning.
 
-Current PM-002 capabilities:
+Current capabilities:
 
 - Register local Git workspaces as workspaces.
 - Configure one or more sources.
@@ -43,6 +43,10 @@ Current PM-002 capabilities:
 - Edit and delete workspace registrations.
 - Reveal local paths in Finder, Windows Explorer, or the Linux file manager.
 - Show a stale-content popup when app state changes in another tab.
+- Inspect workspace health and recent local operation activity.
+- Search indexed items across one or all workspaces with keyboard navigation.
+- Save and restore Kanban filter views.
+- Reopen recently viewed items from global search.
 
 See [plans/platform/PM-002/README.md](plans/platform/PM-002/README.md).
 
@@ -72,6 +76,10 @@ internal/gitadapter/       Git status and guarded Git commands
 internal/models/           Shared backend models
 internal/itemindex/        YAML-backed item summary cache
 internal/itemwriter/       Safe Markdown, metadata, status, and new-item writes
+internal/audit/            Append-only local operation event storage
+internal/navigation/       Saved filter and recent item storage
+internal/application/health/  Workspace health checks
+internal/application/search/  Ranked item index search
 internal/registry/         YAML-backed workspace registry
 internal/scanner/          Item and docs scanner
 internal/systemdialog/     Native folder picker and path reveal
@@ -173,6 +181,9 @@ Plan Manager stores its app data in the OS user config directory:
 <user-config-dir>/plan-manager/
   workspaces.yaml
   item-index.yaml
+  audit-log.jsonl
+  saved-filters.yaml
+  recent-items.yaml
 ```
 
 Examples:

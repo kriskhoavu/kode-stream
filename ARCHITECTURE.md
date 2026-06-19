@@ -1,6 +1,6 @@
 # Plan Manager Architecture
 
-This document describes the current PM-003 architecture.
+This document describes the current architecture after PM-003, PM-004, and PM-005.
 
 Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
@@ -58,6 +58,9 @@ User browser
 │                                │  │                           │
 │ workspaces.yaml                │  │ plans/                    │
 │ item-index.yaml                │  │ docs/                     │
+│ audit-log.jsonl                │  │                           │
+│ saved-filters.yaml             │  │                           │
+│ recent-items.yaml              │  │                           │
 └────────────────────────────────┘  └───────────────────────────┘
 ```
 
@@ -73,6 +76,11 @@ User browser
 | Config               | `internal/config`                | Resolves OS user config path                                    |
 | Registry             | `internal/registry`              | Stores registered workspaces in `workspaces.yaml`               |
 | Item index           | `internal/itemindex`             | Stores cached item scan results in `item-index.yaml`            |
+| Audit store          | `internal/audit`                 | Appends and reads local operation events in JSONL               |
+| Navigation store     | `internal/navigation`            | Stores saved filters and recent items in YAML                   |
+| Health service       | `internal/application/health`    | Runs read-only workspace, source, Git, and index checks         |
+| Safety service       | `internal/application/safety`    | Centralizes write path and Git preflight decisions              |
+| Search service       | `internal/application/search`    | Ranks indexed item matches without scanning workspaces          |
 | Scanner              | `internal/scanner`               | Reads sources and builds item metadata                          |
 | Scanner metadata     | `internal/scanner/metadata_*`    | Parses `item.yaml`, legacy `plan.yaml`, and document metadata   |
 | Scanner settings     | `internal/scanner/source_*`      | Matches source structure settings to item folders               |
@@ -95,6 +103,9 @@ User browser
 | Shared domain helpers     | `web/src/shared/domain`                | Reusable diff parsing and domain helpers                          |
 | Feature helpers           | `web/src/features/*`                   | Kanban filtering and workspace source settings helper logic       |
 | Shared types              | `web/src/lib/types.ts`                 | Frontend API types                                                |
+| Reliability hooks         | `web/src/features/reliability`         | Workspace health and activity loading and refresh                 |
+| Search hooks              | `web/src/features/search`              | Debounced search, quick switcher, and keyboard navigation         |
+| Search dialog             | `web/src/components/SearchDialog.tsx`  | Global search, grouped results, and recent items                  |
 | Kanban page               | `web/src/pages/KanbanPage.tsx`         | Board, cards, and preview drawer composition                      |
 | Workspace page            | `web/src/pages/WorkspacesPage.tsx`     | Workspace create, edit, delete, scan, reveal                      |
 | Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`  | File tree, preview, Markdown editor, diff, metadata, Git controls |
@@ -111,6 +122,8 @@ User browser
 - Shared path checks belong in `internal/security/pathguard`.
 - Frontend pages may use feature and shared modules.
 - `web/src/shared/*` must not import page modules.
+- Search reads the item index and must not trigger workspace scans.
+- Audit, saved filters, and recents stay in the user config directory.
 - `web/src/lib/api.ts` remains a compatibility facade over `web/src/shared/api`.
 
 ## PM-003 Refactoring Notes
@@ -216,6 +229,9 @@ Plan Manager does not use a database server. It uses YAML files in the OS user c
 <user-config-dir>/plan-manager/
   workspaces.yaml
   item-index.yaml
+  audit-log.jsonl
+  saved-filters.yaml
+  recent-items.yaml
 ```
 
 ### workspaces.yaml
@@ -383,11 +399,19 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
 |----------|---------------------------------------------------------|--------------------------------------------------|
 | `GET`    | `/api/health`                                           | Health check                                     |
 | `GET`    | `/api/state`                                            | App state version, workspace count, item count   |
+| `GET`    | `/api/audit-events`                                     | Recent local operation events                    |
+| `GET`    | `/api/search`                                           | Ranked indexed item search                       |
+| `GET`    | `/api/saved-filters`                                    | List saved Kanban filter views                   |
+| `POST`   | `/api/saved-filters`                                    | Create or update a saved filter                  |
+| `DELETE` | `/api/saved-filters/{id}`                               | Delete a saved filter                            |
+| `GET`    | `/api/recent-items`                                     | List recently opened items                       |
+| `POST`   | `/api/recent-items`                                     | Record an opened item                            |
 | `GET`    | `/api/workspaces`                                       | List registered workspaces                       |
 | `POST`   | `/api/workspaces`                                       | Create workspace registration                    |
 | `PUT`    | `/api/workspaces/{id}`                                  | Update workspace registration                    |
 | `DELETE` | `/api/workspaces/{id}`                                  | Delete workspace registration and cached items   |
 | `POST`   | `/api/workspaces/{id}/scan`                             | Scan one workspace                               |
+| `GET`    | `/api/workspaces/{id}/health`                           | Read workspace health checks                     |
 | `GET`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Read source structure settings                   |
 | `PUT`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Save source structure settings and rescan        |
 | `GET`    | `/api/items`                                            | List cached item summaries                       |

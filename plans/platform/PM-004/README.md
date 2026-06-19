@@ -2,6 +2,12 @@
 
 PM-004 makes Plan Manager safer to use when it reads files, writes files, and runs Git commands. It adds local audit history, stronger operation feedback, workspace health checks, and better stale-file protection. It does not add cloud storage.
 
+## Implementation Status
+
+Implemented. The backend provides audit storage, health and safety services, API integration, and regression tests. The frontend provides health, activity, recovery guidance, and responsive operational panels.
+
+Verification: `go test ./...`, `npm run typecheck`, `npm test -- --run`, and `npm run build`.
+
 ## Related Plans
 
 | Ticket                        | Relationship   | Key Context                                                                                 |
@@ -61,4 +67,3 @@ User runs an operation
 - [Backend Design](design/design-01-backend.md)
 - [Frontend Design](design/design-02-frontend.md)
 - [Implementation Plan](implementation-plan.md)
-
