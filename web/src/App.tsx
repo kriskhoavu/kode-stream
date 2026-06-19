@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, ChevronDown, GitBranch, KanbanSquare, ListChecks, Moon, Plus, Sun, Boxes, FolderGit2 } from 'lucide-react';
+import { Bell, ChevronDown, GitBranch, KanbanSquare, ListChecks, Moon, Plus, Search, Sun, Boxes, FolderGit2 } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
@@ -10,6 +10,8 @@ import { ItemsPage } from './pages/ItemsPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { ActivityPanel } from './components/ReliabilityPanels';
+import { SearchDialog } from './components/SearchDialog';
+import { useQuickSwitcher } from './features/search/hooks';
 import { labels } from './lib/vocabulary';
 
 export function App() {
@@ -30,6 +32,7 @@ export function App() {
   } = useAppState();
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const quickSwitcher = useQuickSwitcher();
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -137,6 +140,9 @@ export function App() {
           )}
         </div>
         <div className="topbar-actions">
+          <button className="search-trigger" type="button" onClick={() => quickSwitcher.setOpen(true)} aria-label="Search">
+            <Search size={16} /><span>Search</span>
+          </button>
           <button className="icon-button topbar-icon" type="button" aria-label="Recent activity" aria-expanded={activityOpen} onClick={() => setActivityOpen((open) => !open)}>
             <Bell size={17} />
           </button>
@@ -148,6 +154,10 @@ export function App() {
       </header>
 
       {activityOpen && <ActivityPanel workspaceId={activeRepo?.id} onClose={() => setActivityOpen(false)} />}
+      {quickSwitcher.open && <SearchDialog workspaceId={activeRepo?.id} onClose={quickSwitcher.close} onNavigate={(path) => {
+        history.pushState(null, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }} />}
 
       <main className="main-content">
         {route.name === 'kanban' && (

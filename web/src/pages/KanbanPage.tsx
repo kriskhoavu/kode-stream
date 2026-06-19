@@ -1,11 +1,11 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, SlidersHorizontal, X } from 'lucide-react';
+import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { marked } from 'marked';
 import { FileMenu } from '../components/FileMenu';
 import { StatusMenu } from '../components/StatusMenu';
 import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
-import type { FileContent, FileNode, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemSummary, WorkspaceConfig } from '../lib/types';
+import type { FileContent, FileNode, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemSummary, SavedFilter, WorkspaceConfig } from '../lib/types';
 import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/kanban/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/kanban/filtering';
@@ -36,6 +36,9 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   const [newPlanDraft, setNewPlanDraft] = useState({ source: '', scope: '', identifier: '', title: '', status: 'draft' as ItemStatus });
   const [newPlanError, setNewPlanError] = useState('');
   const [creatingPlan, setCreatingPlan] = useState(false);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const [saveFilterOpen, setSaveFilterOpen] = useState(false);
+  const [saveFilterName, setSaveFilterName] = useState('');
   const text = query;
 
   useEffect(() => {
@@ -50,6 +53,12 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [workspace, refreshKey]);
+
+  useEffect(() => {
+    api.savedFilters()
+      .then((saved) => setSavedFilters(saved.filter((filter) => !filter.workspaceId || filter.workspaceId === workspace?.id)))
+      .catch(() => setSavedFilters([]));
+  }, [workspace?.id]);
 
   const sourceOptions = useMemo(() => sourceFacetOptions(items, workspace), [items, workspace]);
   const filteredPlans = useMemo(() => filterPlans(items, filters, text, workspace), [items, filters, text, workspace]);
@@ -143,6 +152,30 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     setQuery('');
   };
 
+  const saveCurrentFilter = async () => {
+    if (!saveFilterName.trim()) return;
+    const saved = await api.saveFilter({
+      name: saveFilterName.trim(),
+      route: '/kanban',
+      workspaceId: workspace?.id,
+      filters: { filters, query }
+    });
+    setSavedFilters((current) => [saved, ...current]);
+    setSaveFilterName('');
+    setSaveFilterOpen(false);
+  };
+
+  const applySavedFilter = (saved: SavedFilter) => {
+    const value = saved.filters as { filters?: Partial<Filters>; query?: string };
+    setFilters({ ...emptyFilters, ...(value.filters ?? {}) });
+    setQuery(value.query ?? '');
+  };
+
+  const deleteSavedFilter = async (id: string) => {
+    await api.deleteFilter(id);
+    setSavedFilters((current) => current.filter((filter) => filter.id !== id));
+  };
+
   if (!workspace && !loading) {
     return (
       <section className="empty-state">
@@ -198,6 +231,21 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
             onToggle={(value) => toggleFilter(facet.key, value)}
             onClear={() => setFilters((current) => ({ ...current, [facet.key]: [] }))}
           />
+        ))}
+      </div>
+      <div className="saved-filter-bar">
+        <button className="secondary" type="button" onClick={() => setSaveFilterOpen((open) => !open)}><BookmarkPlus size={15} /> Save view</button>
+        {saveFilterOpen && (
+          <div className="save-filter-form">
+            <input value={saveFilterName} onChange={(event) => setSaveFilterName(event.target.value)} placeholder="View name" />
+            <button className="primary" type="button" disabled={!saveFilterName.trim()} onClick={() => void saveCurrentFilter()}>Save</button>
+          </div>
+        )}
+        {savedFilters.map((saved) => (
+          <span className="saved-filter" key={saved.id}>
+            <button type="button" onClick={() => applySavedFilter(saved)}>{saved.name}</button>
+            <button type="button" onClick={() => void deleteSavedFilter(saved.id)} aria-label={`Delete ${saved.name}`} title={`Delete ${saved.name}`}><Trash2 size={12} /></button>
+          </span>
         ))}
       </div>
       <SelectedFilters facets={facetConfig} filters={filters} onRemove={toggleFilter} />

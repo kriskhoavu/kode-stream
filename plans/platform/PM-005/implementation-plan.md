@@ -14,7 +14,7 @@ Add global search, saved filters, recent items, and quick navigation. Use the ex
 | B4    | Backend Tests                | ✅     |
 | F1    | API Types And Client Methods | ✅     |
 | F2    | Search State And Keyboard    | ✅     |
-| F3    | Search And Filter UI         |        |
+| F3    | Search And Filter UI         | ✅     |
 | F4    | Styling And Verification     |        |
 
 ## Backend Phases
@@ -154,10 +154,10 @@ PM-005: Add search state and keyboard navigation
 
 **Deliverables:**
 
-- [ ] Add global search dialog.
-- [ ] Add grouped result rendering.
-- [ ] Add saved filter controls on Kanban.
-- [ ] Add recent item section.
+- [x] Add global search dialog.
+- [x] Add grouped result rendering.
+- [x] Add saved filter controls on Kanban.
+- [x] Add recent item section.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
