@@ -140,38 +140,12 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 }
 
 func (w *Writer) RefreshWorkspace(workspace models.WorkspaceConfig) (models.ScanResult, error) {
-	scannedAt := time.Now().UTC()
-	if w.scanner == nil || w.index == nil {
-		return models.ScanResult{WorkspaceID: workspace.ID, ScannedAt: scannedAt}, nil
-	}
-	data, err := w.scanner.Scan(workspace)
-	if err != nil {
-		return models.ScanResult{}, err
-	}
-	if err := w.index.ReplaceWorkspace(workspace.ID, data.Items, data.Warnings, scannedAt); err != nil {
-		return models.ScanResult{}, err
-	}
-	if w.registry != nil {
-		_ = w.registry.TouchScanned(workspace.ID, scannedAt)
-	}
-	return models.ScanResult{
-		WorkspaceID: workspace.ID,
-		ScannedAt:   scannedAt,
-		ItemCount:   len(data.Items),
-		Warnings:    data.Warnings,
-	}, nil
+	result, _, err := w.refreshWorkspaceData(workspace)
+	return result, err
 }
 
 func (w *Writer) refresh(workspace models.WorkspaceConfig, itemRoot string) (models.WriteResult, error) {
-	scannedAt := time.Now().UTC()
-	if w.scanner == nil || w.index == nil {
-		return models.WriteResult{ScannedAt: scannedAt}, nil
-	}
-	scanResult, err := w.RefreshWorkspace(workspace)
-	if err != nil {
-		return models.WriteResult{}, err
-	}
-	data, err := w.scanner.Scan(workspace)
+	scanResult, data, err := w.refreshWorkspaceData(workspace)
 	if err != nil {
 		return models.WriteResult{}, err
 	}
@@ -181,6 +155,29 @@ func (w *Writer) refresh(workspace models.WorkspaceConfig, itemRoot string) (mod
 		}
 	}
 	return models.WriteResult{ScannedAt: scanResult.ScannedAt}, nil
+}
+
+func (w *Writer) refreshWorkspaceData(workspace models.WorkspaceConfig) (models.ScanResult, scanner.ScanData, error) {
+	scannedAt := time.Now().UTC()
+	if w.scanner == nil || w.index == nil {
+		return models.ScanResult{WorkspaceID: workspace.ID, ScannedAt: scannedAt}, scanner.ScanData{}, nil
+	}
+	data, err := w.scanner.Scan(workspace)
+	if err != nil {
+		return models.ScanResult{}, scanner.ScanData{}, err
+	}
+	if err := w.index.ReplaceWorkspace(workspace.ID, data.Items, data.Warnings, scannedAt); err != nil {
+		return models.ScanResult{}, scanner.ScanData{}, err
+	}
+	if w.registry != nil {
+		_ = w.registry.TouchScanned(workspace.ID, scannedAt)
+	}
+	return models.ScanResult{
+		WorkspaceID: workspace.ID,
+		ScannedAt:   scannedAt,
+		ItemCount:   len(data.Items),
+		Warnings:    data.Warnings,
+	}, data, nil
 }
 
 type planYAML struct {

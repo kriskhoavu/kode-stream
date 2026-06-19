@@ -11,7 +11,7 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 | A1    | Characterization And Baseline           | Done   |
 | B1    | Backend Application Services            | Done   |
 | B2    | Scanner And Path Guard Separation       | Done   |
-| B3    | Backend Performance Improvements        |        |
+| B3    | Backend Performance Improvements        | Done   |
 | F1    | Frontend App State And API Modules      |        |
 | F2    | Frontend Feature Hooks And Components   |        |
 | F3    | Frontend Styles And Render Performance  |        |
@@ -88,11 +88,13 @@ PM-003: Separate scanner internals and path guards
 
 **Deliverables:**
 
-- [ ] Add targeted item refresh for metadata and status writes where safe.
-- [ ] Add scanner cache or skip logic for unchanged source roots.
-- [ ] Batch Git metadata lookup if scan tests show stable output.
-- [ ] Keep full workspace scan fallback for uncertain cases.
-- [ ] Add regression tests around cache invalidation.
+- [x] Add targeted item refresh for metadata and status writes where safe.
+- [x] Add scanner cache or skip logic for unchanged source roots.
+- [x] Batch Git metadata lookup if scan tests show stable output.
+- [x] Keep full workspace scan fallback for uncertain cases.
+- [x] Add regression tests around cache invalidation.
+
+**Implementation Note:** PM-003 keeps the full workspace scan as the correctness path. The performance change removes the duplicate post-write scan by reusing the scan data already produced during refresh, and it lists Git branches once per scan instead of once per item identifier.
 
 **Verification:** `rtk go test ./...`
 

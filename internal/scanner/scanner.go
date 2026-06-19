@@ -35,10 +35,11 @@ func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
 	if err != nil {
 		branch = workspace.BaselineBranch
 	}
+	branchForIdentifier := s.branchMatcher(workspace.Path)
 	var out ScanData
 	for _, source := range workspace.Sources {
 		root := filepath.Join(workspace.Path, filepath.FromSlash(source))
-		items, warnings := s.scanItemDirectory(workspace, branch, source, root)
+		items, warnings := s.scanItemDirectory(workspace, branch, source, root, branchForIdentifier)
 		out.Items = append(out.Items, items...)
 		out.Warnings = append(out.Warnings, warnings...)
 	}
@@ -48,7 +49,26 @@ func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
 	return out, nil
 }
 
-func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, source, root string) ([]models.ItemDetail, []models.ScanWarning) {
+func (s *Scanner) branchMatcher(workspacePath string) func(string) string {
+	branches, err := s.git.ListBranches(workspacePath)
+	if err != nil {
+		return func(string) string { return "" }
+	}
+	return func(identifier string) string {
+		identifier = strings.ToLower(strings.TrimSpace(identifier))
+		if identifier == "" {
+			return ""
+		}
+		for _, branch := range branches {
+			if strings.Contains(strings.ToLower(branch), identifier) {
+				return branch
+			}
+		}
+		return ""
+	}
+}
+
+func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, source, root string, branchForIdentifier func(string) string) ([]models.ItemDetail, []models.ScanWarning) {
 	var items []models.ItemDetail
 	var warnings []models.ScanWarning
 	entries, err := os.ReadDir(root)
@@ -59,7 +79,7 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 	if hasSettings {
 		warnings = append(warnings, settingsWarnings...)
 		if len(settingsWarnings) == 0 {
-			configuredItems, configuredWarnings := s.scanConfiguredItemDirectory(workspace, branch, source, root, settings)
+			configuredItems, configuredWarnings := s.scanConfiguredItemDirectory(workspace, branch, source, root, settings, branchForIdentifier)
 			warnings = append(warnings, configuredWarnings...)
 			if len(configuredItems) > 0 {
 				return configuredItems, warnings
@@ -97,7 +117,7 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 			itemRoot := filepath.Join(scopeRoot, identifierEntry.Name())
 			relItemPath := filepath.ToSlash(filepath.Join(source, scopeEntry.Name(), identifierEntry.Name()))
 			itemBranch := branch
-			if matchedBranch := s.git.BranchForIdentifier(workspace.Path, identifierEntry.Name()); matchedBranch != "" {
+			if matchedBranch := branchForIdentifier(identifierEntry.Name()); matchedBranch != "" {
 				itemBranch = matchedBranch
 			}
 			detail, itemWarnings, err := s.parseItem(workspace, itemBranch, scopeEntry.Name(), identifierEntry.Name(), relItemPath, itemRoot)
@@ -112,7 +132,7 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 	return items, warnings
 }
 
-func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, branch, source, root string, settings models.SourceStructureSettings) ([]models.ItemDetail, []models.ScanWarning) {
+func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, branch, source, root string, settings models.SourceStructureSettings, branchForIdentifier func(string) string) ([]models.ItemDetail, []models.ScanWarning) {
 	var items []models.ItemDetail
 	var warnings []models.ScanWarning
 	seen := map[string]bool{}
@@ -140,7 +160,7 @@ func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, 
 			}
 			relItemPath := filepath.ToSlash(filepath.Join(source, relFromRoot))
 			itemBranch := branch
-			if matchedBranch := s.git.BranchForIdentifier(workspace.Path, identifier); matchedBranch != "" {
+			if matchedBranch := branchForIdentifier(identifier); matchedBranch != "" {
 				itemBranch = matchedBranch
 			}
 			detail, itemWarnings, err := s.parseItem(workspace, itemBranch, scope, identifier, relItemPath, match.path)
