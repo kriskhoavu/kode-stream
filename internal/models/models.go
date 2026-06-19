@@ -2,6 +2,27 @@ package models
 
 import "time"
 
+type AuditStatus string
+
+const (
+	AuditStatusSuccess AuditStatus = "success"
+	AuditStatusBlocked AuditStatus = "blocked"
+	AuditStatusFailed  AuditStatus = "failed"
+)
+
+type AuditEvent struct {
+	ID          string      `json:"id" yaml:"id"`
+	Time        time.Time   `json:"time" yaml:"time"`
+	WorkspaceID string      `json:"workspaceId,omitempty" yaml:"workspaceId,omitempty"`
+	ItemID      string      `json:"itemId,omitempty" yaml:"itemId,omitempty"`
+	Operation   string      `json:"operation" yaml:"operation"`
+	Status      AuditStatus `json:"status" yaml:"status"`
+	Message     string      `json:"message" yaml:"message"`
+	Paths       []string    `json:"paths" yaml:"paths"`
+	DurationMS  int64       `json:"durationMs" yaml:"durationMs"`
+	Error       string      `json:"error,omitempty" yaml:"error,omitempty"`
+}
+
 type ItemStatus string
 
 const (

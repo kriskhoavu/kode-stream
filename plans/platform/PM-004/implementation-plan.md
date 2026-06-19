@@ -8,7 +8,7 @@ Add local audit events, workspace health checks, safer operation feedback, and s
 
 | Phase | Name                         | Status |
 |-------|------------------------------|--------|
-| B1    | Audit Domain And Storage     |        |
+| B1    | Audit Domain And Storage     | ✅     |
 | B2    | Health And Safety Services   |        |
 | B3    | Application Integration      |        |
 | B4    | Reliability Tests            |        |
@@ -23,10 +23,10 @@ Add local audit events, workspace health checks, safer operation feedback, and s
 
 **Deliverables:**
 
-- [ ] Add `AuditEvent` models.
-- [ ] Add local JSONL audit store in the app config directory.
-- [ ] Add append and recent-event read methods.
-- [ ] Add tests for append, read order, and malformed lines.
+- [x] Add `AuditEvent` models.
+- [x] Add local JSONL audit store in the app config directory.
+- [x] Add append and recent-event read methods.
+- [x] Add tests for append, read order, and malformed lines.
 
 **Verification:** `rtk go test ./...`
 
@@ -192,4 +192,3 @@ PM-004: Finalize reliability UI
 - Verify responsive layout
 - Update embedded frontend build
 ```
-
