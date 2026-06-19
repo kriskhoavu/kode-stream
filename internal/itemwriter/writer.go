@@ -13,6 +13,7 @@ import (
 	"plan-manager/internal/models"
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
+	"plan-manager/internal/security/pathguard"
 	"plan-manager/internal/writeguard"
 )
 
@@ -301,17 +302,7 @@ func safeItemPath(workspace models.WorkspaceConfig, item models.ItemDetail) (str
 }
 
 func safeJoin(root, rel string) (string, error) {
-	clean := filepath.Clean(filepath.FromSlash(rel))
-	if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
-		return "", fmt.Errorf("invalid path")
-	}
-	full := filepath.Join(root, clean)
-	absRoot, _ := filepath.Abs(root)
-	absFull, _ := filepath.Abs(full)
-	if absFull != absRoot && !strings.HasPrefix(absFull, absRoot+string(filepath.Separator)) {
-		return "", fmt.Errorf("path escapes root")
-	}
-	return absFull, nil
+	return pathguard.SafeJoin(root, rel)
 }
 
 func isDocsRoot(item models.ItemDetail) bool {

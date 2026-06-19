@@ -2,14 +2,13 @@ package git
 
 import (
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"plan-manager/internal/application/apperrors"
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemwriter"
 	"plan-manager/internal/models"
 	"plan-manager/internal/registry"
+	"plan-manager/internal/security/pathguard"
 	"plan-manager/internal/writeguard"
 )
 
@@ -139,24 +138,5 @@ func (s *Service) result(workspace models.WorkspaceConfig, opErr error) models.G
 }
 
 func ValidatePaths(workspace models.WorkspaceConfig, paths []string) error {
-	if len(paths) == 0 {
-		return fmt.Errorf("at least one path is required")
-	}
-	for _, path := range paths {
-		clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(path)))
-		if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "../") || clean == ".." {
-			return fmt.Errorf("path %q is invalid", path)
-		}
-		allowed := false
-		for _, dir := range workspace.Sources {
-			if clean == dir || strings.HasPrefix(clean, dir+"/") {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return fmt.Errorf("path %q is outside configured sources", path)
-		}
-	}
-	return nil
+	return pathguard.ValidateSourcePaths(workspace.Sources, paths)
 }

@@ -10,7 +10,7 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 |-------|-----------------------------------------|--------|
 | A1    | Characterization And Baseline           | Done   |
 | B1    | Backend Application Services            | Done   |
-| B2    | Scanner And Path Guard Separation       |        |
+| B2    | Scanner And Path Guard Separation       | Done   |
 | B3    | Backend Performance Improvements        |        |
 | F1    | Frontend App State And API Modules      |        |
 | F2    | Frontend Feature Hooks And Components   |        |
@@ -66,10 +66,10 @@ PM-003: Extract backend application services
 
 **Deliverables:**
 
-- [ ] Split scanner traversal, source settings matching, metadata parsing, and item assembly behind the existing scanner facade.
-- [ ] Add `internal/security/pathguard` for safe joins, symlink checks, source scope checks, and selected Git path validation.
-- [ ] Replace duplicated path helpers one caller at a time.
-- [ ] Keep all existing scanner and write guard tests passing.
+- [x] Split scanner traversal, source settings matching, metadata parsing, and item assembly behind the existing scanner facade.
+- [x] Add `internal/security/pathguard` for safe joins, symlink checks, source scope checks, and selected Git path validation.
+- [x] Replace duplicated path helpers one caller at a time.
+- [x] Keep all existing scanner and write guard tests passing.
 
 **Verification:** `rtk go test ./...`
 
