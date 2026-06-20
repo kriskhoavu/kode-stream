@@ -25,7 +25,7 @@ All code and UI text must use these names:
 | B4    | Backend Regression Tests             | ✅     |
 | F1    | Viewer Types And Rendering Pipeline  | ✅     |
 | F2    | Structured And Source Views          | ✅     |
-| F3    | Shared Viewer Integration            |        |
+| F3    | Shared Viewer Integration            | ✅     |
 | F4    | Security, Performance, And Visual QA |        |
 
 ## Backend Phases
@@ -170,12 +170,12 @@ PM-006: Add structured data and source views
 
 **Deliverables:**
 
-- [ ] Add the `ContentViewer` orchestrator and local error boundary.
-- [ ] Integrate it into `ItemWorkspacePage`.
-- [ ] Integrate it into the Kanban preview drawer.
-- [ ] Remove direct `marked.parse()` and duplicate preview output.
-- [ ] Preserve Preview, Raw, Diff, autosave, and file selection behavior.
-- [ ] Add page integration tests for both surfaces.
+- [x] Add the `ContentViewer` orchestrator and local error boundary.
+- [x] Integrate it into `ItemWorkspacePage`.
+- [x] Integrate it into the Kanban preview drawer.
+- [x] Remove direct `marked.parse()` and duplicate preview output.
+- [x] Preserve Preview, Raw, Diff, autosave, and file selection behavior.
+- [x] Add shared viewer integration tests and run both page regression suites.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

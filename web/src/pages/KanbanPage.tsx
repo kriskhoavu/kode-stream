@@ -1,9 +1,9 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
 import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
-import { marked } from 'marked';
 import { FileMenu } from '../components/FileMenu';
 import { StatusMenu } from '../components/StatusMenu';
+import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
 import type { FileContent, FileNode, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemSummary, SavedFilter, WorkspaceConfig } from '../lib/types';
 import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
@@ -594,8 +594,6 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     return () => clearTimeoutRef(autoSaveTimerRef);
   }, [file, editorContent, savedContent, savingFile]);
 
-  const preview = useMemo(() => ({ __html: marked.parse(editorContent || file?.content || '') as string }), [editorContent, file]);
-
   const saveDrawerFileNow = async () => {
     if (!file || editorContent === savedContent) return true;
     return saveDrawerFile(file, editorContent);
@@ -820,13 +818,13 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                 <span className={`autosave-state ${autoSaveState}`}>{autoSaveLabel(autoSaveState)}</span>
               </div>
               {dirtyFile && <div className="edit-state-banner">{autoSaveLabel(autoSaveState)}</div>}
-              {tab === 'preview' && (file ? <article className="drawer-markdown" dangerouslySetInnerHTML={preview} /> : <div className="drawer-empty">No readable file selected.</div>)}
+              {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} compact /> : <div className="drawer-empty">No readable file selected.</div>)}
               {tab === 'raw' && (
                 <textarea
                   className="drawer-raw drawer-raw-editor"
                   value={file ? editorContent : 'No readable file selected.'}
                   onChange={(event) => setEditorContent(event.target.value)}
-                  disabled={!file}
+                  disabled={!file || !file.editable}
                   spellCheck={false}
                 />
               )}

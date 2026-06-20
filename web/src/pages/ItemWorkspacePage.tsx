@@ -21,9 +21,9 @@ import {
   PanelRightOpen,
   RefreshCw,
 } from 'lucide-react';
-import { marked } from 'marked';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StatusMenu } from '../components/StatusMenu';
+import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels } from '../lib/api';
 import type { FileContent, FileNode, GitChange, GitChangeStatus, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../lib/types';
 import { labels, metadataSourceLabel } from '../lib/vocabulary';
@@ -165,7 +165,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
   );
   const dirty = dirtyMetadata;
-  const preview = useMemo(() => ({ __html: marked.parse(editorContent || file?.content || '') as string }), [editorContent, file]);
   const diffFiles = useMemo(() => parseGitDiff(diff), [diff]);
   const selectedGitPath = useMemo(() => currentGitPath(plan, file), [plan, file]);
   const selectedFileHasDiff = Boolean(selectedGitPath && diffFiles.some((item) => item.path === selectedGitPath || item.oldPath === selectedGitPath));
@@ -454,13 +453,13 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
             <span className={`autosave-state ${autoSaveState}`}>{autoSaveLabel(autoSaveState)}</span>
           </div>
           {(dirtyMetadata || dirtyFile || autoSaveState !== 'idle') && <div className="edit-state-banner">{dirtyMetadata ? 'Unsaved metadata changes' : autoSaveLabel(autoSaveState)}</div>}
-          {tab === 'preview' && (file ? <article className="markdown-preview" dangerouslySetInnerHTML={preview} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
+          {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
           {tab === 'raw' && (
             <textarea
               className="raw-editor"
               value={file ? editorContent : (hasFiles ? 'Select a file.' : 'No files found in this plan.')}
               onChange={(event) => setEditorContent(event.target.value)}
-              disabled={!file}
+              disabled={!file || !file.editable}
               spellCheck={false}
             />
           )}
