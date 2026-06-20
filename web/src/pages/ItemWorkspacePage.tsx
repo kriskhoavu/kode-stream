@@ -30,22 +30,17 @@ import { labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile, DiffLine } from '../shared/domain/diff';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
+import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'git';
 type DiffMode = 'review' | 'raw';
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
 type TreeFileState = GitChangeStatus | 'unsaved';
-type AutoSaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
 
 export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged }: { itemId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
-  const [file, setFile] = useState<FileContent | null>(null);
-  const [editorContent, setEditorContent] = useState('');
-  const [savedContent, setSavedContent] = useState('');
-  const [savingFile, setSavingFile] = useState(false);
-  const [autoSaveState, setAutoSaveState] = useState<AutoSaveState>('idle');
   const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
@@ -68,15 +63,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const [leftWidth, setLeftWidth] = useState(300);
   const [rightWidth, setRightWidth] = useState(300);
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
-  const autoSaveTimerRef = useRef<number | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
-  const autoSaveSettledTimerRef = useRef<number | null>(null);
-
-  const clearAutoSaveTimers = () => {
-    clearTimer(autoSaveTimerRef);
-    clearTimer(autoSaveRefreshTimerRef);
-    clearTimer(autoSaveSettledTimerRef);
-  };
 
   const showOperationError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -89,10 +76,20 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     setRecoveryHint(result.recoveryHint ?? '');
   };
 
+  const editor = useFileEditorSession({
+    save: (targetFile, content) => api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash }),
+    onSaved: () => {
+      scheduleFileChangeRefresh();
+      notifyReliabilityChanged();
+    },
+    onError: (caught) => showOperationError(caught, 'File save failed')
+  });
+  const { file, content: editorContent, setContent: setEditorContent, dirty: dirtyFile, state: autoSaveState } = editor;
+
   useEffect(() => {
     setError('');
     setRecoveryHint('');
-    setFile(null);
+    editor.open(null);
     api.item(itemId).then(setPlan).catch((err: Error) => setError(err.message));
     api.files(itemId).then((tree) => {
       setFiles(tree);
@@ -128,10 +125,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const loadFile = async (fileId: string) => {
     try {
       const nextFile = await api.file(itemId, fileId);
-      setFile(nextFile);
-      setEditorContent(nextFile.content);
-      setSavedContent(nextFile.content);
-      setAutoSaveState('idle');
+      editor.open(nextFile);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File failed to load');
     }
@@ -151,11 +145,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
       });
       return;
     }
-    if (dirtyFile && !(await saveCurrentFileNow())) return;
+    if (dirtyFile && !(await editor.saveNow())) return;
     await loadFile(fileId);
   };
 
-  const dirtyFile = file !== null && editorContent !== savedContent;
   const dirtyMetadata = Boolean(plan) && (
     (metadataDraft.title ?? '') !== (plan?.title ?? '') ||
     (metadataDraft.scope ?? '') !== (plan?.scope ?? '') ||
@@ -176,29 +169,8 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   } as CSSProperties & Record<'--left-panel-width' | '--right-panel-width', string>;
 
   useEffect(() => () => {
-    clearAutoSaveTimers();
+    clearTimer(autoSaveRefreshTimerRef);
   }, []);
-
-  useEffect(() => {
-    if (!file) {
-      setAutoSaveState('idle');
-      return;
-    }
-    if (editorContent === savedContent) {
-      if (autoSaveState === 'pending') setAutoSaveState('idle');
-      return;
-    }
-    if (savingFile) {
-      setAutoSaveState('pending');
-      return;
-    }
-    clearTimer(autoSaveTimerRef);
-    setAutoSaveState('pending');
-    autoSaveTimerRef.current = window.setTimeout(() => {
-      void saveFileContent(file, editorContent);
-    }, 900);
-    return () => clearTimer(autoSaveTimerRef);
-  }, [file, editorContent, savedContent, savingFile]);
 
   const startResize = (side: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -315,7 +287,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
 
   const goBack = () => {
     if (dirtyFile) {
-      void saveCurrentFileNow().then((saved) => {
+      void editor.saveNow().then((saved) => {
         if (!saved || dirtyMetadata) return;
         onBack();
       });
@@ -334,36 +306,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     });
   };
 
-  const saveCurrentFileNow = async () => {
-    if (!file || editorContent === savedContent) return true;
-    return saveFileContent(file, editorContent);
-  };
-
-  const saveFileContent = async (targetFile: FileContent, content: string) => {
-    clearTimer(autoSaveTimerRef);
-    clearTimer(autoSaveSettledTimerRef);
-    setSavingFile(true);
-    setAutoSaveState('saving');
-    setError('');
-    setRecoveryHint('');
-    try {
-      const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash });
-      setFile(updated);
-      setSavedContent(content);
-      setAutoSaveState('saved');
-      autoSaveSettledTimerRef.current = window.setTimeout(() => setAutoSaveState('idle'), 1600);
-      scheduleFileChangeRefresh();
-      notifyReliabilityChanged();
-      return true;
-    } catch (err) {
-      showOperationError(err, 'File save failed');
-      setAutoSaveState('error');
-      return false;
-    } finally {
-      setSavingFile(false);
-    }
-  };
-
   const scheduleFileChangeRefresh = () => {
     clearTimer(autoSaveRefreshTimerRef);
     autoSaveRefreshTimerRef.current = window.setTimeout(() => {
@@ -379,9 +321,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     try {
       await api.revertFile(itemId, file.id);
       const updated = await api.file(itemId, file.id);
-      setFile(updated);
-      setEditorContent(updated.content);
-      setSavedContent(updated.content);
+      editor.open(updated);
       await loadDiff();
       await loadGitStatus(plan.workspaceId);
       await onContentChanged?.();
@@ -637,22 +577,6 @@ function StatusBadge({ status }: { status: ItemDetail['status'] }) {
 
 function statusLabel(status: ItemDetail['status']): string {
   return statusLabels[status] ?? status;
-}
-
-function autoSaveLabel(state: AutoSaveState): string {
-  switch (state) {
-    case 'pending':
-      return 'Autosave pending';
-    case 'saving':
-      return 'Saving...';
-    case 'saved':
-      return 'Saved';
-    case 'error':
-      return 'Autosave failed';
-    case 'idle':
-    default:
-      return 'Autosave on';
-  }
 }
 
 function clearTimer(ref: MutableRefObject<number | null>) {

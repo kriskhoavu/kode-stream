@@ -28,7 +28,7 @@ All code and UI text must use these names:
 | B3    | Workspace File APIs                  | ✅     |
 | B4    | Backend Safety And Scale Tests       | ✅     |
 | F1    | Types, API, And Explorer Route       | ✅     |
-| F2    | Tree State And Shared Editor Session |        |
+| F2    | Tree State And Shared Editor Session | ✅     |
 | F3    | Filesystem Explorer And Editor UI    |        |
 | F4    | Styling, Performance, And QA         |        |
 
@@ -160,16 +160,18 @@ PM-007: Add workspace explorer contracts and route
 
 **Deliverables:**
 
-- [ ] Add global workspace roots and all-workspace item decoration loading.
-- [ ] Add lazy directory cache keyed by workspace, path, and ignored mode.
-- [ ] Add pure visible-tree flattening, filtering, and item decoration helpers.
-- [ ] Add route-backed selection and local expansion persistence.
-- [ ] Add ignored-file preference and cache invalidation on refresh.
-- [ ] Extract `useFileEditorSession` from item details without behavior changes.
-- [ ] Adapt item details to the shared editor session.
-- [ ] Add roving focus and tree keyboard behavior.
-- [ ] Evaluate and record the virtualization dependency decision.
-- [ ] Add helper, hook, editor, and item detail regression tests.
+- [x] Add global workspace roots and all-workspace item decoration loading.
+- [x] Add lazy directory cache keyed by workspace, path, and ignored mode.
+- [x] Add pure visible-tree flattening, filtering, and item decoration helpers.
+- [x] Add route-backed selection and local expansion persistence.
+- [x] Add ignored-file preference and cache invalidation on refresh.
+- [x] Extract `useFileEditorSession` from item details without behavior changes.
+- [x] Adapt item details to the shared editor session.
+- [x] Add roving focus and tree keyboard behavior.
+- [x] Evaluate and record the virtualization dependency decision.
+- [x] Add helper, hook, editor, and item detail regression tests.
+
+**Virtualization decision:** Do not add a dependency. Lazy expansion bounds the initial row count, and the flattened rows are memoized. Revisit virtualization if browser measurements exceed 1,000 visible rows or frame time exceeds 16 ms.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
