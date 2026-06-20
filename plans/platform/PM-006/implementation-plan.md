@@ -22,7 +22,7 @@ All code and UI text must use these names:
 | B1    | File Classification And Limits       | ✅     |
 | B2    | Viewer API Metadata                  | ✅     |
 | B3    | Guarded Read Integration             | ✅     |
-| B4    | Backend Regression Tests             |        |
+| B4    | Backend Regression Tests             | ✅     |
 | F1    | Viewer Types And Rendering Pipeline  |        |
 | F2    | Structured And Source Views          |        |
 | F3    | Shared Viewer Integration            |        |
@@ -102,10 +102,10 @@ PM-006: Integrate guarded viewer file reads
 
 **Deliverables:**
 
-- [ ] Cover Markdown, HTML, JSON, YAML, code, text, and unsupported files.
-- [ ] Cover binary, invalid UTF-8, symlink, and maximum-size cases.
-- [ ] Prove existing file tree, read, save, hash, and API routes remain stable.
-- [ ] Run the complete backend suite.
+- [x] Cover Markdown, HTML, JSON, YAML, code, text, and unsupported files.
+- [x] Cover binary, invalid UTF-8, symlink, and maximum-size cases.
+- [x] Prove existing file tree, read, save, hash, and API routes remain stable.
+- [x] Run the complete backend suite.
 
 **Verification:** `rtk go test ./...`
 

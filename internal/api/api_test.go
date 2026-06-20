@@ -214,6 +214,45 @@ func TestSaveFileStaleHashReturnsRecoveryHintAndAuditEvent(t *testing.T) {
 	}
 }
 
+func TestFileContentRouteReturnsViewerMetadataAndRejectsBinary(t *testing.T) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
+	itemPath := "plans/platform/PM-006"
+	itemRoot := filepath.Join(workspace.Path, itemPath)
+	if err := os.MkdirAll(itemRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(itemRoot, "README.md"), []byte("# Viewer\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(itemRoot, "image.bin"), []byte{'P', 0, 'N', 'G'}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-viewer", WorkspaceID: workspace.ID, ItemPath: itemPath, Title: "PM-006", Identifier: "PM-006", Scope: "platform"}}
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+
+	markdownResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(markdownResponse, httptest.NewRequest(http.MethodGet, "/api/items/item-viewer/files/README_md", nil))
+	var content models.FileContent
+	if err := json.Unmarshal(markdownResponse.Body.Bytes(), &content); err != nil {
+		t.Fatal(err)
+	}
+	if markdownResponse.Code != http.StatusOK || content.Kind != models.FileKindMarkdown || !content.Editable || content.SizeBytes == 0 {
+		t.Fatalf("status = %d, content = %+v", markdownResponse.Code, content)
+	}
+
+	binaryResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(binaryResponse, httptest.NewRequest(http.MethodGet, "/api/items/item-viewer/files/image_bin", nil))
+	var payload map[string]string
+	if err := json.Unmarshal(binaryResponse.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if binaryResponse.Code != http.StatusBadRequest || payload["error"] != fileaccess.ErrUnsupportedContent.Error() {
+		t.Fatalf("status = %d, payload = %#v", binaryResponse.Code, payload)
+	}
+}
+
 func TestGitPullDirtyTreeReturnsRecoveryHint(t *testing.T) {
 	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
 	if err := os.WriteFile(filepath.Join(workspace.Path, "plans", "dirty.md"), []byte("dirty"), 0o644); err != nil {
