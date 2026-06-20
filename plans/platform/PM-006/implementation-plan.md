@@ -24,7 +24,7 @@ All code and UI text must use these names:
 | B3    | Guarded Read Integration             | ✅     |
 | B4    | Backend Regression Tests             | ✅     |
 | F1    | Viewer Types And Rendering Pipeline  | ✅     |
-| F2    | Structured And Source Views          |        |
+| F2    | Structured And Source Views          | ✅     |
 | F3    | Shared Viewer Integration            |        |
 | F4    | Security, Performance, And Visual QA |        |
 
@@ -147,11 +147,11 @@ PM-006: Add secure rich content renderers
 
 **Deliverables:**
 
-- [ ] Add JSON and safe YAML parsing.
-- [ ] Add bounded, accessible structured tree nodes.
-- [ ] Add source syntax highlighting and plain-text fallback.
-- [ ] Add copy, line number, and wrapping controls.
-- [ ] Add parse-error and large-file fallback states.
+- [x] Add JSON and safe YAML parsing.
+- [x] Add bounded, accessible structured tree nodes.
+- [x] Add source syntax highlighting and plain-text fallback.
+- [x] Add copy, line number, and wrapping controls.
+- [x] Add parse-error and large-file fallback states.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
