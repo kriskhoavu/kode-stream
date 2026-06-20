@@ -23,7 +23,7 @@ All code and UI text must use these names:
 | B2    | Viewer API Metadata                  | ✅     |
 | B3    | Guarded Read Integration             | ✅     |
 | B4    | Backend Regression Tests             | ✅     |
-| F1    | Viewer Types And Rendering Pipeline  |        |
+| F1    | Viewer Types And Rendering Pipeline  | ✅     |
 | F2    | Structured And Source Views          |        |
 | F3    | Shared Viewer Integration            |        |
 | F4    | Security, Performance, And Visual QA |        |
@@ -124,11 +124,11 @@ PM-006: Add viewer backend regression tests
 
 **Deliverables:**
 
-- [ ] Add `FileKind`, `ViewerMode`, and extended `FileContent` types.
-- [ ] Add renderer dependencies with a reviewed lockfile diff.
-- [ ] Build the sanitized GFM, KaTeX, and fenced-code pipeline.
-- [ ] Build the sanitized sandboxed HTML preview.
-- [ ] Add malicious-content and rendering tests.
+- [x] Add `FileKind`, `ViewerMode`, and extended `FileContent` types.
+- [x] Add renderer dependencies with a reviewed lockfile diff.
+- [x] Build the sanitized GFM, KaTeX, and fenced-code pipeline.
+- [x] Build the sanitized sandboxed HTML preview.
+- [x] Add malicious-content and rendering tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

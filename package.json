@@ -7,19 +7,33 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "dompurify": "^3.4.11",
+    "highlight.js": "^11.11.1",
+    "katex": "^0.17.0",
     "lucide-react": "^0.468.0",
     "marked": "^15.0.6",
-    "vite": "^6.0.7",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "rehype-external-links": "^3.0.0",
+    "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
+    "rehype-sanitize": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "unified": "^11.0.5",
+    "vite": "^6.0.7",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8",
-    "jsdom": "^25.0.1"
+    "vitest": "^2.1.8"
   }
 }

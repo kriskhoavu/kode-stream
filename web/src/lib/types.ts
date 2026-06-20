@@ -147,12 +147,18 @@ export interface FileNode {
   children?: FileNode[];
 }
 
+export type FileKind = 'markdown' | 'html' | 'json' | 'yaml' | 'code' | 'text' | 'unsupported';
+
 export interface FileContent {
   id: string;
   path: string;
   content: string;
   language: string;
   hash: string;
+  kind: FileKind;
+  sizeBytes: number;
+  truncated?: boolean;
+  editable: boolean;
 }
 
 export interface FileSaveInput {
