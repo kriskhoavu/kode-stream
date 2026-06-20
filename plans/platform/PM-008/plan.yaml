@@ -4,7 +4,7 @@ plan:
   ticket: PM-008
   title: Explorer Productivity Enhancements
   service: platform
-  status: draft
+  status: implemented
   owner: null
   tags:
     - plan-manager

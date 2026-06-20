@@ -86,8 +86,8 @@ User browser
 | Scanner metadata       | `internal/scanner/metadata_*`         | Parses `item.yaml`, legacy `plan.yaml`, and document metadata         |
 | Scanner settings       | `internal/scanner/source_*`           | Matches source structure settings to item folders                     |
 | File access            | `internal/fileaccess`                 | Builds file trees, classifies bounded text reads, and writes Markdown |
-| Workspace file access  | `internal/workspacefiles`             | Lists lazy root-relative directories and guards workspace file paths  |
-| Workspace file service | `internal/application/workspacefiles` | Coordinates reads, saves, diffs, reverts, audit, and targeted refresh |
+| Workspace file access  | `internal/workspacefiles`             | Lists, searches, creates, renames, and guards workspace paths         |
+| Workspace file service | `internal/application/workspacefiles` | Coordinates file actions, Git state, audit, and targeted refresh      |
 | Item writer            | `internal/itemwriter`                 | Writes Markdown, metadata, status changes, and new items              |
 | Path guard             | `internal/security/pathguard`         | Shared safe-join and configured-source path validation                |
 | Git adapter            | `internal/gitadapter`                 | Runs Git status and guarded Git commands with timeout                 |
@@ -96,30 +96,30 @@ User browser
 
 ## Frontend Components
 
-| Component                 | Path                                      | Responsibility                                                    |
-|---------------------------|-------------------------------------------|-------------------------------------------------------------------|
-| App shell                 | `web/src/App.tsx`                         | Layout and navigation composition                                 |
-| App state                 | `web/src/app/useAppState.ts`              | Workspace, theme, refresh, route, and stale-content state         |
-| Router helpers            | `web/src/app/router.ts`                   | Browser path parsing and path generation                          |
-| API facade                | `web/src/lib/api.ts`                      | Compatibility export for existing feature imports                 |
-| Shared API implementation | `web/src/shared/api`                      | Fetch wrapper, endpoint methods, and response normalization       |
-| Shared domain helpers     | `web/src/shared/domain`                   | Reusable diff parsing and domain helpers                          |
-| Feature helpers           | `web/src/features/*`                      | Kanban filtering and workspace source settings helper logic       |
-| Shared types              | `web/src/lib/types.ts`                    | Frontend API types                                                |
-| Reliability hooks         | `web/src/features/reliability`            | Workspace health and activity loading and refresh                 |
-| Search hooks              | `web/src/features/search`                 | Debounced search, quick switcher, and keyboard navigation         |
-| Content viewer            | `web/src/features/content-viewer`         | Secure Markdown, HTML, JSON, YAML, code, and text rendering       |
-| File editor session       | `web/src/features/file-editor`            | Shared Markdown autosave, stale-write, and settled-save state     |
-| Workspace explorer        | `web/src/features/workspace-explorer`     | Lazy tree cache, flattening, decorations, selection, and keyboard |
-| Search dialog             | `web/src/components/SearchDialog.tsx`     | Global search, grouped results, and recent items                  |
-| Kanban page               | `web/src/pages/KanbanPage.tsx`            | Board, cards, and preview drawer composition                      |
-| Workspace page            | `web/src/pages/WorkspacesPage.tsx`        | Workspace create, edit, delete, scan, reveal                      |
-| Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`     | File tree, preview, Markdown editor, diff, metadata, Git controls |
-| Explorer page             | `web/src/pages/WorkspaceExplorerPage.tsx` | Global filesystem tree, file editor, and context inspector        |
-| Items page                | `web/src/pages/ItemsPage.tsx`             | Searchable list view for active workspace                         |
-| Branches page             | `web/src/pages/BranchesPage.tsx`          | Branch summary inferred from indexed items                        |
-| Error boundary            | `web/src/components/ErrorBoundary.tsx`    | Catches frontend render failures                                  |
-| Styles                    | `web/src/styles`                          | Global styles plus app-shell stylesheet                           |
+| Component                 | Path                                      | Responsibility                                                     |
+|---------------------------|-------------------------------------------|--------------------------------------------------------------------|
+| App shell                 | `web/src/App.tsx`                         | Layout and navigation composition                                  |
+| App state                 | `web/src/app/useAppState.ts`              | Workspace, theme, refresh, route, and stale-content state          |
+| Router helpers            | `web/src/app/router.ts`                   | Browser path parsing and path generation                           |
+| API facade                | `web/src/lib/api.ts`                      | Compatibility export for existing feature imports                  |
+| Shared API implementation | `web/src/shared/api`                      | Fetch wrapper, endpoint methods, and response normalization        |
+| Shared domain helpers     | `web/src/shared/domain`                   | Reusable diff parsing and domain helpers                           |
+| Feature helpers           | `web/src/features/*`                      | Kanban filtering and workspace source settings helper logic        |
+| Shared types              | `web/src/lib/types.ts`                    | Frontend API types                                                 |
+| Reliability hooks         | `web/src/features/reliability`            | Workspace health and activity loading and refresh                  |
+| Search hooks              | `web/src/features/search`                 | Debounced search, quick switcher, and keyboard navigation          |
+| Content viewer            | `web/src/features/content-viewer`         | Secure Markdown, HTML, JSON, YAML, code, and text rendering        |
+| File editor session       | `web/src/features/file-editor`            | Shared Markdown autosave, stale-write, and settled-save state      |
+| Workspace explorer        | `web/src/features/workspace-explorer`     | Lazy tree, path search, Git markers, mutations, and keyboard state |
+| Search dialog             | `web/src/components/SearchDialog.tsx`     | Global search, grouped results, and recent items                   |
+| Kanban page               | `web/src/pages/KanbanPage.tsx`            | Board, cards, and preview drawer composition                       |
+| Workspace page            | `web/src/pages/WorkspacesPage.tsx`        | Workspace create, edit, delete, scan, reveal                       |
+| Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`     | File tree, preview, Markdown editor, diff, metadata, Git controls  |
+| Explorer page             | `web/src/pages/WorkspaceExplorerPage.tsx` | Global filesystem tree, file editor, and context inspector         |
+| Items page                | `web/src/pages/ItemsPage.tsx`             | Searchable list view for active workspace                          |
+| Branches page             | `web/src/pages/BranchesPage.tsx`          | Branch summary inferred from indexed items                         |
+| Error boundary            | `web/src/components/ErrorBoundary.tsx`    | Catches frontend render failures                                   |
+| Styles                    | `web/src/styles`                          | Global styles plus app-shell stylesheet                            |
 
 ## Dependency Rules
 
@@ -235,6 +235,24 @@ User opens /explorer
   -> Markdown uses the shared editor session and required content hash
   -> successful saves and reverts append audit events
   -> configured-source changes trigger a targeted workspace refresh
+```
+
+### Explorer Productivity
+
+```text
+User searches unloaded paths
+  -> bounded workspace traversal skips .git, ignored paths, and outside symlinks
+  -> selecting a result expands ancestors and updates route selection
+
+User creates or renames a path
+  -> workspacefiles validates names, source, parent, and destination
+  -> exclusive create or no-overwrite rename changes the workspace
+  -> audit records success or blocked operation
+  -> configured sources and affected directory caches refresh
+
+Explorer loads Git path state
+  -> one workspace Git status call returns normalized changes
+  -> frontend aggregates child state to directory rows
 ```
 
 ### Git Operations

@@ -15,7 +15,7 @@ Add bounded path search, Git tree decorations, guarded Markdown and directory cr
 | F1    | Types And API Clients            | ✅     |
 | F2    | Search, Git, And Mutation State  | ✅     |
 | F3    | Explorer Productivity UI         | ✅     |
-| F4    | Responsive Styling And Final QA  |        |
+| F4    | Responsive Styling And Final QA  | ✅     |
 
 ## Backend Phases
 
@@ -175,10 +175,12 @@ PM-008: Add Explorer productivity controls
 
 **Deliverables:**
 
-- [ ] Add feature-owned responsive search, marker, menu, and dialog styles.
-- [ ] Verify keyboard, mobile, light, and dark states.
-- [ ] Run backend, frontend, dependency, and production-build checks.
-- [ ] Update architecture and PM-008 documents.
+- [x] Add feature-owned responsive search, marker, menu, and dialog styles.
+- [x] Verify keyboard, mobile, light, and dark states.
+- [x] Run backend, frontend, dependency, and production-build checks.
+- [x] Update architecture and PM-008 documents.
+
+**QA record:** 133 Go tests and 56 frontend tests pass. TypeScript, dependency integrity, production build, and post-build Go tests pass. The initial JavaScript bundle is 310.40 kB (90.01 kB gzip). Explorer remains lazy-loaded at 25.16 kB (7.95 kB gzip). Responsive and theme states are covered by feature CSS and component behavior. The in-app browser was unavailable, so no live screenshots were captured.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go test ./...`
 
@@ -193,11 +195,11 @@ PM-008: Finalize Explorer productivity UX
 
 ## Post-Implementation Checklist
 
-- [ ] Confirm no operation can expose or modify `.git`.
-- [ ] Confirm search and rename cannot follow outside symlinks.
-- [ ] Confirm create and rename never overwrite a destination.
-- [ ] Confirm ignored mode controls search and tree behavior consistently.
-- [ ] Confirm Git status uses one call per workspace refresh.
-- [ ] Confirm item editor and PM-007 Explorer regressions pass.
-- [ ] Run full backend and frontend suites.
-- [ ] Run the production build and record bundle output.
+- [x] Confirm no operation can expose or modify `.git`.
+- [x] Confirm search and rename cannot follow outside symlinks.
+- [x] Confirm create and rename never overwrite a destination.
+- [x] Confirm ignored mode controls search and tree behavior consistently.
+- [x] Confirm Git status uses one call per workspace refresh.
+- [x] Confirm item editor and PM-007 Explorer regressions pass.
+- [x] Run full backend and frontend suites.
+- [x] Run the production build and record bundle output.

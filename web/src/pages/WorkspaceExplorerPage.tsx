@@ -37,13 +37,13 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [leftWidth, setLeftWidth] = useState(() => boundedNumber(localStorage.getItem('workspaceExplorer.leftWidth'), 340));
   const [rightWidth, setRightWidth] = useState(() => boundedNumber(localStorage.getItem('workspaceExplorer.rightWidth'), 300));
-  const [searchAll, setSearchAll] = useState(false);
+  const [searchAll, setSearchAll] = useState(!location?.workspaceId);
   const [searchIndex, setSearchIndex] = useState(0);
   const [pathDialog, setPathDialog] = useState<PathDialog | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const workspace = workspaces.find((item) => item.id === location?.workspaceId);
   const selectedRow = explorer.rows.find((row) => explorerNodeId(row.workspaceId, row.node.path) === explorer.selection?.nodeId);
-  const pathSearch = useWorkspacePathSearch({ workspaceId: searchAll ? undefined : location?.workspaceId, includeIgnored: explorer.showIgnored });
+  const pathSearch = useWorkspacePathSearch({ workspaceId: searchAll || !location?.workspaceId ? undefined : location.workspaceId, includeIgnored: explorer.showIgnored });
   const mutations = useWorkspacePathMutations(async (result) => {
     await explorer.invalidateDirectories(result.workspaceId, result.invalidatedPaths);
     await explorer.expandToPath(result.workspaceId, result.path, result.type);
@@ -207,9 +207,14 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
       <div className="explorer-grid" style={gridStyle} ref={gridRef}>
         <aside className="explorer-tree-panel">
           <div className="explorer-toolbar">
-            <label><Search size={15} /><input aria-label="Search workspace paths" value={pathSearch.query} onChange={(event) => { pathSearch.setQuery(event.target.value); setSearchIndex(0); }} placeholder="Search workspace paths" /></label>
-            <select aria-label="Path search scope" value={searchAll ? 'all' : 'current'} onChange={(event) => setSearchAll(event.target.value === 'all')}>
-              <option value="current">Current</option><option value="all">All</option>
+            <label><Search size={15} /><input aria-label="Search workspace paths" value={pathSearch.query} onChange={(event) => { pathSearch.setQuery(event.target.value); setSearchIndex(0); }} onKeyDown={(event) => {
+              if (event.key === 'ArrowDown' && pathSearch.results.length) { event.preventDefault(); setSearchIndex((index) => Math.min(index + 1, pathSearch.results.length - 1)); }
+              if (event.key === 'ArrowUp' && pathSearch.results.length) { event.preventDefault(); setSearchIndex((index) => Math.max(index - 1, 0)); }
+              if (event.key === 'Enter' && pathSearch.results.length) { event.preventDefault(); void openSearchResult(pathSearch.results[searchIndex] ?? pathSearch.results[0]); }
+              if (event.key === 'Escape') { pathSearch.setQuery(''); setSearchIndex(0); }
+            }} placeholder="Search workspace paths" /></label>
+            <select aria-label="Path search scope" value={searchAll || !location?.workspaceId ? 'all' : 'current'} onChange={(event) => setSearchAll(event.target.value === 'all')}>
+              <option value="current" disabled={!location?.workspaceId}>Current</option><option value="all">All</option>
             </select>
             <button className={explorer.showIgnored ? 'icon-button active' : 'icon-button'} type="button" title="Show ignored files" onClick={() => explorer.setShowIgnored(!explorer.showIgnored)}><Settings2 size={16} /></button>
           </div>

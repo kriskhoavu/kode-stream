@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft
+Done
 
 ## User Story
 
@@ -42,20 +42,20 @@ PM-007 supports safe browsing, preview, Markdown editing, and revert. It does no
 
 ## Acceptance Criteria
 
-- [ ] Search finds matching unloaded paths in the selected scope.
-- [ ] Search results include workspace, relative path, type, and match context.
-- [ ] Search never returns `.git` or outside-symlink content.
-- [ ] Ignored results follow the Explorer ignored-file preference.
-- [ ] Selecting a result expands its ancestors and opens the target.
-- [ ] Loaded tree rows show normalized Git state without per-row Git processes.
-- [ ] Conflict state is visually distinct and keyboard-accessible.
-- [ ] Users can create Markdown files and directories from a selected directory.
-- [ ] Users can rename a selected file or directory after confirmation.
-- [ ] Create and rename reject invalid, protected, or occupied destinations.
-- [ ] Failed operations do not leave partial files or stale selected paths.
-- [ ] Successful operations update route selection, tree caches, audit history, and affected item data.
-- [ ] Existing PM-007 autosave, stale-hash, diff, revert, and responsive behavior remains unchanged.
-- [ ] Backend, frontend, and production-build checks pass.
+- [x] Search finds matching unloaded paths in the selected scope.
+- [x] Search results include workspace, relative path, type, and match context.
+- [x] Search never returns `.git` or outside-symlink content.
+- [x] Ignored results follow the Explorer ignored-file preference.
+- [x] Selecting a result expands its ancestors and opens the target.
+- [x] Loaded tree rows show normalized Git state without per-row Git processes.
+- [x] Conflict state is visually distinct and keyboard-accessible.
+- [x] Users can create Markdown files and directories from a selected directory.
+- [x] Users can rename a selected file or directory after confirmation.
+- [x] Create and rename reject invalid, protected, or occupied destinations.
+- [x] Failed operations do not leave partial files or stale selected paths.
+- [x] Successful operations update route selection, tree caches, audit history, and affected item data.
+- [x] Existing PM-007 autosave, stale-hash, diff, revert, and responsive behavior remains unchanged.
+- [x] Backend, frontend, and production-build checks pass.
 
 ## API Proposal
 
