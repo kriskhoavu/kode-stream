@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { renderMarkdown } from './MarkdownPreview';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { MarkdownPreview, renderMarkdown } from './MarkdownPreview';
 
 describe('renderMarkdown', () => {
   it('renders GFM, KaTeX, and highlighted code', async () => {
@@ -35,5 +36,14 @@ const value = 1;
 
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noreferrer noopener"');
+  });
+
+  it('copies the original fenced code', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    render(<MarkdownPreview content={'```typescript\nconst value = 1;\n```'} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy code block' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('const value = 1;\n'));
   });
 });

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import DOMPurify from 'dompurify';
 
 const blockedResourceAttributes = ['src', 'srcset', 'poster', 'action', 'formaction'];
@@ -17,6 +18,9 @@ export function sanitizeHtmlDocument(content: string): string {
     const style = element.getAttribute('style');
     if (style && /url\s*\(|@import/i.test(style)) element.removeAttribute('style');
   }
+  for (const style of document.querySelectorAll('style')) {
+    if (/url\s*\(|@import/i.test(style.textContent ?? '')) style.remove();
+  }
 
   const csp = document.createElement('meta');
   csp.httpEquiv = 'Content-Security-Policy';
@@ -26,6 +30,6 @@ export function sanitizeHtmlDocument(content: string): string {
 }
 
 export function HtmlPreview({ content }: { content: string }) {
-  const source = sanitizeHtmlDocument(content);
+  const source = useMemo(() => sanitizeHtmlDocument(content), [content]);
   return <iframe className="content-viewer-html" title="HTML preview" sandbox="" srcDoc={source} />;
 }

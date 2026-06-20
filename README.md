@@ -47,6 +47,7 @@ Current capabilities:
 - Search indexed items across one or all workspaces with keyboard navigation.
 - Save and restore Kanban filter views.
 - Reopen recently viewed items from global search.
+- Preview Markdown, KaTeX, HTML, JSON, YAML, source code, and plain text through one secure viewer.
 
 See [plans/platform/PM-002/README.md](plans/platform/PM-002/README.md).
 
@@ -59,7 +60,7 @@ See [plans/platform/PM-002/README.md](plans/platform/PM-002/README.md).
 | Build        | Vite 6                                  | Frontend build and dev server                |
 | Language     | TypeScript 5                            | Frontend type safety                         |
 | Tests        | Vitest, React Testing Library, Go test  | Unit and UI behavior checks                  |
-| Markdown     | marked                                  | Markdown preview rendering                   |
+| Content      | Unified, KaTeX, highlight.js, YAML      | Safe rich file previews                      |
 | Icons        | lucide-react                            | UI icons                                     |
 | Storage      | YAML files in user config directory     | Registry and item index cache                |
 | Distribution | Go binary with embedded frontend assets | Local app runtime                            |
@@ -84,6 +85,7 @@ internal/registry/         YAML-backed workspace registry
 internal/scanner/          Item and docs scanner
 internal/systemdialog/     Native folder picker and path reveal
 web/src/                   React app source
+web/src/features/content-viewer/  Shared rich content rendering and controls
 internal/app/frontend/     Embedded production frontend assets
 plans/                     Product and implementation plans
 specs/                     Product requirements and design references

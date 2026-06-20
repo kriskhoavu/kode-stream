@@ -1,6 +1,6 @@
 # Plan Manager Architecture
 
-This document describes the current architecture after PM-003, PM-004, and PM-005.
+This document describes the current architecture after PM-003 through PM-006.
 
 Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
@@ -66,30 +66,30 @@ User browser
 
 ## Backend Components
 
-| Component            | Package                          | Responsibility                                                  |
-|----------------------|----------------------------------|-----------------------------------------------------------------|
-| CLI entrypoint       | `cmd/plan-manager`               | Parses `serve` command and port flag                            |
-| Server               | `internal/app`                   | Resolves app paths, wires dependencies, serves API and frontend |
-| HTTP API             | `internal/api`                   | Defines routes, decodes requests, encodes responses             |
-| Application services | `internal/application/*`         | Coordinates workspace, item, and Git use cases                  |
-| App errors           | `internal/application/apperrors` | Shared not-found sentinels across services and HTTP             |
-| Config               | `internal/config`                | Resolves OS user config path                                    |
-| Registry             | `internal/registry`              | Stores registered workspaces in `workspaces.yaml`               |
-| Item index           | `internal/itemindex`             | Stores cached item scan results in `item-index.yaml`            |
-| Audit store          | `internal/audit`                 | Appends and reads local operation events in JSONL               |
-| Navigation store     | `internal/navigation`            | Stores saved filters and recent items in YAML                   |
-| Health service       | `internal/application/health`    | Runs read-only workspace, source, Git, and index checks         |
-| Safety service       | `internal/application/safety`    | Centralizes write path and Git preflight decisions              |
-| Search service       | `internal/application/search`    | Ranks indexed item matches without scanning workspaces          |
-| Scanner              | `internal/scanner`               | Reads sources and builds item metadata                          |
-| Scanner metadata     | `internal/scanner/metadata_*`    | Parses `item.yaml`, legacy `plan.yaml`, and document metadata   |
-| Scanner settings     | `internal/scanner/source_*`      | Matches source structure settings to item folders               |
-| File access          | `internal/fileaccess`            | Builds file trees and reads or writes files inside item paths   |
-| Item writer          | `internal/itemwriter`            | Writes Markdown, metadata, status changes, and new items        |
-| Path guard           | `internal/security/pathguard`    | Shared safe-join and configured-source path validation          |
-| Git adapter          | `internal/gitadapter`            | Runs Git status and guarded Git commands with timeout           |
-| System dialog        | `internal/systemdialog`          | Opens native folder picker and reveals local paths              |
-| Models               | `internal/models`                | Defines stable API DTOs and shared data structures              |
+| Component            | Package                          | Responsibility                                                        |
+|----------------------|----------------------------------|-----------------------------------------------------------------------|
+| CLI entrypoint       | `cmd/plan-manager`               | Parses `serve` command and port flag                                  |
+| Server               | `internal/app`                   | Resolves app paths, wires dependencies, serves API and frontend       |
+| HTTP API             | `internal/api`                   | Defines routes, decodes requests, encodes responses                   |
+| Application services | `internal/application/*`         | Coordinates workspace, item, and Git use cases                        |
+| App errors           | `internal/application/apperrors` | Shared not-found sentinels across services and HTTP                   |
+| Config               | `internal/config`                | Resolves OS user config path                                          |
+| Registry             | `internal/registry`              | Stores registered workspaces in `workspaces.yaml`                     |
+| Item index           | `internal/itemindex`             | Stores cached item scan results in `item-index.yaml`                  |
+| Audit store          | `internal/audit`                 | Appends and reads local operation events in JSONL                     |
+| Navigation store     | `internal/navigation`            | Stores saved filters and recent items in YAML                         |
+| Health service       | `internal/application/health`    | Runs read-only workspace, source, Git, and index checks               |
+| Safety service       | `internal/application/safety`    | Centralizes write path and Git preflight decisions                    |
+| Search service       | `internal/application/search`    | Ranks indexed item matches without scanning workspaces                |
+| Scanner              | `internal/scanner`               | Reads sources and builds item metadata                                |
+| Scanner metadata     | `internal/scanner/metadata_*`    | Parses `item.yaml`, legacy `plan.yaml`, and document metadata         |
+| Scanner settings     | `internal/scanner/source_*`      | Matches source structure settings to item folders                     |
+| File access          | `internal/fileaccess`            | Builds file trees, classifies bounded text reads, and writes Markdown |
+| Item writer          | `internal/itemwriter`            | Writes Markdown, metadata, status changes, and new items              |
+| Path guard           | `internal/security/pathguard`    | Shared safe-join and configured-source path validation                |
+| Git adapter          | `internal/gitadapter`            | Runs Git status and guarded Git commands with timeout                 |
+| System dialog        | `internal/systemdialog`          | Opens native folder picker and reveals local paths                    |
+| Models               | `internal/models`                | Defines stable API DTOs and shared data structures                    |
 
 ## Frontend Components
 
@@ -105,6 +105,7 @@ User browser
 | Shared types              | `web/src/lib/types.ts`                 | Frontend API types                                                |
 | Reliability hooks         | `web/src/features/reliability`         | Workspace health and activity loading and refresh                 |
 | Search hooks              | `web/src/features/search`              | Debounced search, quick switcher, and keyboard navigation         |
+| Content viewer            | `web/src/features/content-viewer`      | Secure Markdown, HTML, JSON, YAML, code, and text rendering       |
 | Search dialog             | `web/src/components/SearchDialog.tsx`  | Global search, grouped results, and recent items                  |
 | Kanban page               | `web/src/pages/KanbanPage.tsx`         | Board, cards, and preview drawer composition                      |
 | Workspace page            | `web/src/pages/WorkspacesPage.tsx`     | Workspace create, edit, delete, scan, reveal                      |
@@ -125,6 +126,8 @@ User browser
 - Search reads the item index and must not trigger workspace scans.
 - Audit, saved filters, and recents stay in the user config directory.
 - `web/src/lib/api.ts` remains a compatibility facade over `web/src/shared/api`.
+- Workspace file content is untrusted. Rich renderers must sanitize output or render escaped React text.
+- Standalone HTML must stay in an iframe sandbox without script or same-origin permissions.
 
 ## PM-003 Refactoring Notes
 
@@ -171,7 +174,22 @@ User opens item
   -> GET /api/items/{id}/files
   -> GET /api/items/{id}/files/{fileID}
   -> GET /api/items/{id}/diff
+  -> file access classifies text and applies response limits
+  -> shared content viewer lazy-loads the matching safe renderer
   -> workspace renders file tree, preview, raw file, info, and diff
+```
+
+### Rich Content Preview
+
+```text
+Selected workspace file
+  -> backend path and symlink guards
+  -> binary detection, file kind, language, size, and bounded text response
+  -> ContentViewer selects rendered, tree, or source mode
+  -> Markdown uses sanitized GFM, KaTeX, and code highlighting
+  -> HTML uses DOM sanitization, CSP, and an empty iframe sandbox
+  -> JSON and YAML render as escaped bounded React trees
+  -> source uses escaped syntax highlighting with copy and wrap controls
 ```
 
 ### Source Structure Settings

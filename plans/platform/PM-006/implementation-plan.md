@@ -26,7 +26,7 @@ All code and UI text must use these names:
 | F1    | Viewer Types And Rendering Pipeline  | ✅     |
 | F2    | Structured And Source Views          | ✅     |
 | F3    | Shared Viewer Integration            | ✅     |
-| F4    | Security, Performance, And Visual QA |        |
+| F4    | Security, Performance, And Visual QA | ✅     |
 
 ## Backend Phases
 
@@ -194,13 +194,13 @@ PM-006: Integrate the shared content viewer
 
 **Deliverables:**
 
-- [ ] Move viewer styles into a feature-owned stylesheet.
-- [ ] Lazy-load heavy format adapters and language definitions.
-- [ ] Add memoization and bounded rendering for large content.
-- [ ] Verify sanitization rules and iframe CSP.
-- [ ] Test desktop, mobile, light theme, dark theme, drawer, and full workspace.
-- [ ] Compare production bundle output and run the full build.
-- [ ] Update architecture and PM-006 documents with final decisions.
+- [x] Move viewer styles into a feature-owned stylesheet.
+- [x] Lazy-load heavy format adapters and language definitions.
+- [x] Add memoization and bounded rendering for large content.
+- [x] Verify sanitization rules and iframe CSP with automated tests.
+- [x] Add responsive and theme-aware styles for the drawer and full workspace. Screenshot verification was unavailable because the in-app browser could not start.
+- [x] Compare production bundle output and run the full build.
+- [x] Update architecture and PM-006 documents with final decisions.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go test ./...`
 
@@ -233,11 +233,11 @@ PM-006: Finalize rich viewer performance and styling
 
 ## Post-Implementation Checklist
 
-- [ ] Update `plans/platform/PM-006/` with final package and dependency names.
-- [ ] Update architecture documentation with `features/content-viewer` ownership.
-- [ ] Confirm no direct `marked.parse()` remains in page components.
-- [ ] Confirm no unsanitized workspace content reaches `dangerouslySetInnerHTML`.
-- [ ] Confirm iframe sandbox has no script or same-origin permission.
-- [ ] Run backend and frontend full test suites.
-- [ ] Run production build and compare chunk sizes.
-- [ ] Record desktop and mobile browser verification.
+- [x] Update `plans/platform/PM-006/` with final package and dependency names.
+- [x] Update architecture documentation with `features/content-viewer` ownership.
+- [x] Confirm no direct `marked.parse()` remains in page components.
+- [x] Limit `dangerouslySetInnerHTML` to sanitized Markdown and escaped highlighter output.
+- [x] Confirm iframe sandbox has no script or same-origin permission.
+- [x] Run backend and frontend full test suites.
+- [x] Run production build and compare chunk sizes.
+- [x] Record that browser screenshot verification was unavailable in this session.

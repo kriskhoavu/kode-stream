@@ -20,8 +20,7 @@ import sql from 'highlight.js/lib/languages/sql';
 import typescript from 'highlight.js/lib/languages/typescript';
 import xml from 'highlight.js/lib/languages/xml';
 import yaml from 'highlight.js/lib/languages/yaml';
-
-export const richPreviewThresholdBytes = 1 << 20;
+import { richPreviewThresholdBytes } from '../types';
 
 const languages = { bash, c, cpp, csharp, css, dockerfile, go, java, javascript, json, kotlin, makefile, python, ruby, rust, sql, typescript, xml, yaml };
 for (const [name, definition] of Object.entries(languages)) hljs.registerLanguage(name, definition);

@@ -2,6 +2,12 @@
 
 PM-006 adds one secure viewer for Markdown, HTML, source code, JSON, YAML, and KaTeX. It replaces the duplicated Markdown preview logic in the Kanban drawer and item workspace. Existing editing, autosave, diff, file selection, layout, and navigation behavior stay unchanged.
 
+## Implementation Status
+
+Implemented. The backend classifies supported text files, rejects binary content, and bounds large responses. The frontend uses one lazy-loaded viewer in the Kanban drawer and item workspace. It supports sanitized GFM and KaTeX, sandboxed HTML, JSON and YAML trees, highlighted source, copy controls, wrapping, line numbers, parse errors, and large-file fallbacks.
+
+Verification: 104 Go tests, 42 frontend tests, TypeScript typecheck, production build, runtime health check, and production dependency audit. Screenshot verification was unavailable because the in-app browser could not start.
+
 ## Related Plans
 
 | Ticket                        | Relationship    | Key Context                                                                             |

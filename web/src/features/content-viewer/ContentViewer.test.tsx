@@ -23,22 +23,22 @@ describe('ContentViewer', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Viewer' })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
-    expect(screen.getByText('# Viewer')).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Viewer'));
   });
 
-  it('uses structured mode for JSON and preserves source fallback', () => {
+  it('uses structured mode for JSON and preserves source fallback', async () => {
     render(<ContentViewer file={file({ id: 'data_json', path: 'data.json', kind: 'json', language: 'json', editable: false })} content='{"enabled":true}' />);
 
-    expect(screen.getByText('enabled:')).toBeInTheDocument();
+    expect(await screen.findByText('enabled:')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
-    expect(document.querySelector('.source-line-content')).toHaveTextContent('{"enabled":true}');
+    await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('{"enabled":true}'));
   });
 
-  it('does not run rich renderers for large files', () => {
+  it('does not run rich renderers for large files', async () => {
     render(<ContentViewer file={file({ sizeBytes: 2 << 20 })} content="# Large" />);
 
     expect(screen.getByText('Rich preview is paused for this large file.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open source' }));
-    expect(screen.getByText('# Large')).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Large'));
   });
 });

@@ -1,5 +1,7 @@
 import type { FileContent, FileKind } from '../../lib/types';
 
+export const richPreviewThresholdBytes = 1 << 20;
+
 export type ViewerMode = 'rendered' | 'structured' | 'source';
 
 export interface ContentViewerProps {
