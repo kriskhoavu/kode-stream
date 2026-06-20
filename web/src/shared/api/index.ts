@@ -24,9 +24,15 @@ import type {
   WorkspaceInput,
   WorkspaceHealth,
   WorkspaceDirectoryListing,
+  WorkspaceDirectoryCreateInput,
+  WorkspaceFileCreateInput,
   WorkspaceFileRevertInput,
   WorkspaceFileSaveInput,
   WorkspaceFileWriteResult,
+  WorkspacePathGitState,
+  WorkspacePathMutationResult,
+  WorkspacePathRenameInput,
+  WorkspacePathSearchResponse,
   WorkspaceTreeEntry,
   SourceStructureSettings,
   ScanResult,
@@ -100,6 +106,21 @@ export const api = {
     const listing = await request<WorkspaceDirectoryListing>(`/api/workspaces/${encodeURIComponent(workspaceId)}/tree?${query.toString()}`);
     return normalizeWorkspaceDirectoryListing(listing);
   },
+  searchWorkspacePaths: async (params: { q: string; workspaceId?: string; includeIgnored?: boolean }) => {
+    const query = new URLSearchParams({ q: params.q });
+    if (params.workspaceId) query.set('workspaceId', params.workspaceId);
+    if (params.includeIgnored) query.set('includeIgnored', 'true');
+    const response = await request<WorkspacePathSearchResponse>(`/api/workspaces/files/search?${query.toString()}`);
+    return { ...response, results: Array.isArray(response.results) ? response.results : [], truncated: Boolean(response.truncated) };
+  },
+  workspacePathGitStates: async (workspaceId: string) =>
+    (await request<WorkspacePathGitState[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/path-status`) ?? []).map(normalizeWorkspacePathGitState),
+  createWorkspaceFile: (workspaceId: string, input: WorkspaceFileCreateInput) =>
+    request<WorkspacePathMutationResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/files`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeWorkspacePathMutationResult),
+  createWorkspaceDirectory: (workspaceId: string, input: WorkspaceDirectoryCreateInput) =>
+    request<WorkspacePathMutationResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/directories`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeWorkspacePathMutationResult),
+  renameWorkspacePath: (workspaceId: string, input: WorkspacePathRenameInput) =>
+    request<WorkspacePathMutationResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/paths/rename`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeWorkspacePathMutationResult),
   workspaceFile: (workspaceId: string, path: string) =>
     request<FileContent>(`/api/workspaces/${encodeURIComponent(workspaceId)}/files?path=${encodeURIComponent(path)}`),
   saveWorkspaceFile: (workspaceId: string, input: WorkspaceFileSaveInput) =>
@@ -163,6 +184,14 @@ function normalizeWorkspaceTreeEntry(entry: WorkspaceTreeEntry): WorkspaceTreeEn
     hidden: Boolean(entry.hidden),
     editable: Boolean(entry.editable)
   };
+}
+
+function normalizeWorkspacePathGitState(state: WorkspacePathGitState): WorkspacePathGitState {
+  return { ...state, staged: Boolean(state.staged), conflict: Boolean(state.conflict) };
+}
+
+function normalizeWorkspacePathMutationResult(result: WorkspacePathMutationResult): WorkspacePathMutationResult {
+  return { ...result, invalidatedPaths: Array.isArray(result.invalidatedPaths) ? result.invalidatedPaths : [], refreshed: Boolean(result.refreshed) };
 }
 
 function normalizeItem(item: ItemSummary): ItemSummary {

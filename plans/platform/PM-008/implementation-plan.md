@@ -12,7 +12,7 @@ Add bounded path search, Git tree decorations, guarded Markdown and directory cr
 | B2    | Path Search And Git State Domain | ✅     |
 | B3    | Application Service And APIs     | ✅     |
 | B4    | Backend Safety And Scale Tests   | ✅     |
-| F1    | Types And API Clients            |        |
+| F1    | Types And API Clients            | ✅     |
 | F2    | Search, Git, And Mutation State  |        |
 | F3    | Explorer Productivity UI         |        |
 | F4    | Responsive Styling And Final QA  |        |
@@ -112,9 +112,9 @@ PM-008: Add Explorer productivity regression tests
 
 **Deliverables:**
 
-- [ ] Add search, Git state, create, rename, and mutation result types.
-- [ ] Add normalized API client methods.
-- [ ] Add API contract tests.
+- [x] Add search, Git state, create, rename, and mutation result types.
+- [x] Add normalized API client methods.
+- [x] Add API contract tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

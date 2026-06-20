@@ -202,6 +202,54 @@ export interface WorkspaceFileWriteResult {
   refreshed: boolean;
 }
 
+export interface WorkspacePathSearchResult {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  ignored: boolean;
+  context: string;
+}
+
+export interface WorkspacePathSearchResponse {
+  results: WorkspacePathSearchResult[];
+  truncated: boolean;
+}
+
+export interface WorkspacePathGitState {
+  path: string;
+  oldPath?: string;
+  status: GitChangeStatus;
+  staged: boolean;
+  conflict: boolean;
+}
+
+export interface WorkspaceFileCreateInput {
+  parentPath: string;
+  name: string;
+  content: string;
+}
+
+export interface WorkspaceDirectoryCreateInput {
+  parentPath: string;
+  name: string;
+}
+
+export interface WorkspacePathRenameInput {
+  path: string;
+  destinationPath: string;
+}
+
+export interface WorkspacePathMutationResult {
+  workspaceId: string;
+  path: string;
+  type: 'file' | 'directory';
+  invalidatedPaths: string[];
+  refreshed: boolean;
+}
+
 export interface ItemMetadataUpdateInput {
   title?: string;
   scope?: string;

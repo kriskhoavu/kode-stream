@@ -49,6 +49,22 @@ describe('shared api facade', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/workspaces/w1/files?path=docs%2Fa%20b.md', expect.any(Object));
   });
 
+  it('normalizes Explorer productivity responses', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ truncated: 0 }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ path: 'README.md', status: 'modified' }] })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ workspaceId: 'w1', path: 'docs/new.md', type: 'file' }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api.searchWorkspacePaths({ q: 'read me', workspaceId: 'w1', includeIgnored: true })).resolves.toEqual({ results: [], truncated: false });
+    await expect(api.workspacePathGitStates('w1')).resolves.toEqual([{ path: 'README.md', status: 'modified', staged: false, conflict: false }]);
+    await expect(api.createWorkspaceFile('w1', { parentPath: 'docs', name: 'new.md', content: '' })).resolves.toEqual({
+      workspaceId: 'w1', path: 'docs/new.md', type: 'file', invalidatedPaths: [], refreshed: false
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/workspaces/files/search?q=read+me&workspaceId=w1&includeIgnored=true', expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/workspaces/w1/files', expect.objectContaining({ method: 'POST' }));
+  });
+
   it('normalizes audit and workspace health responses', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
