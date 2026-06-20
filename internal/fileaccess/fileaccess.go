@@ -239,16 +239,16 @@ func fileIDForPath(path string) string {
 }
 
 func fileContent(relPath string, data []byte) models.FileContent {
-	classification := classifyPath(relPath)
+	classification := ClassifyPath(relPath)
 	return models.FileContent{
 		ID:        fileIDForPath(relPath),
 		Path:      relPath,
 		Content:   string(data),
-		Language:  classification.language,
+		Language:  classification.Language,
 		Hash:      contentHash(data),
-		Kind:      classification.kind,
+		Kind:      classification.Kind,
 		SizeBytes: int64(len(data)),
-		Editable:  classification.kind == FileKindMarkdown,
+		Editable:  classification.Kind == FileKindMarkdown,
 	}
 }
 

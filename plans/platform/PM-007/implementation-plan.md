@@ -23,7 +23,7 @@ All code and UI text must use these names:
 
 | Phase | Name                                 | Status |
 |-------|--------------------------------------|--------|
-| B1    | Workspace Path And Directory Domain  |        |
+| B1    | Workspace Path And Directory Domain  | ✅     |
 | B2    | Workspace File Application Service   |        |
 | B3    | Workspace File APIs                  |        |
 | B4    | Backend Safety And Scale Tests       |        |
@@ -38,12 +38,12 @@ All code and UI text must use these names:
 
 **Deliverables:**
 
-- [ ] Add workspace directory listing, tree entry, save input, and revert input models.
-- [ ] Add workspace-root path validation with traversal, absolute, `.git`, and symlink guards.
-- [ ] Extract or export one shared PM-006 file classification policy.
-- [ ] Add one-level directory listing with directory-first natural sorting.
-- [ ] Add batched Git-ignore detection and `includeIgnored` behavior.
-- [ ] Cover hidden files, empty directories, nested paths, and special filenames.
+- [x] Add workspace directory listing, tree entry, save input, and revert input models.
+- [x] Add workspace-root path validation with traversal, absolute, `.git`, and symlink guards.
+- [x] Extract or export one shared PM-006 file classification policy.
+- [x] Add one-level directory listing with directory-first natural sorting.
+- [x] Add batched Git-ignore detection and `includeIgnored` behavior.
+- [x] Cover hidden files, empty directories, nested paths, and special filenames.
 
 **Verification:** `rtk go test ./internal/workspacefiles ./internal/fileaccess ./internal/security/pathguard`
 

@@ -26,12 +26,12 @@ func TestClassifyPath(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.path, func(t *testing.T) {
-			classification := classifyPath(test.path)
-			if classification.kind != test.kind {
-				t.Fatalf("kind = %q, want %q", classification.kind, test.kind)
+			classification := ClassifyPath(test.path)
+			if classification.Kind != test.kind {
+				t.Fatalf("kind = %q, want %q", classification.Kind, test.kind)
 			}
-			if classification.language != test.language {
-				t.Fatalf("language = %q, want %q", classification.language, test.language)
+			if classification.Language != test.language {
+				t.Fatalf("language = %q, want %q", classification.Language, test.language)
 			}
 		})
 	}

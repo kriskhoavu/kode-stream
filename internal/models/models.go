@@ -216,6 +216,37 @@ type FileContent struct {
 	Editable  bool     `json:"editable" yaml:"editable"`
 }
 
+type WorkspaceDirectoryListing struct {
+	WorkspaceID string               `json:"workspaceId" yaml:"workspaceId"`
+	Path        string               `json:"path" yaml:"path"`
+	Entries     []WorkspaceTreeEntry `json:"entries" yaml:"entries"`
+	HiddenCount int                  `json:"hiddenCount" yaml:"hiddenCount"`
+}
+
+type WorkspaceTreeEntry struct {
+	ID          string   `json:"id" yaml:"id"`
+	Name        string   `json:"name" yaml:"name"`
+	Path        string   `json:"path" yaml:"path"`
+	Type        string   `json:"type" yaml:"type"`
+	HasChildren bool     `json:"hasChildren" yaml:"hasChildren"`
+	Ignored     bool     `json:"ignored" yaml:"ignored"`
+	Hidden      bool     `json:"hidden" yaml:"hidden"`
+	Kind        FileKind `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Language    string   `json:"language,omitempty" yaml:"language,omitempty"`
+	SizeBytes   int64    `json:"sizeBytes,omitempty" yaml:"sizeBytes,omitempty"`
+	Editable    bool     `json:"editable" yaml:"editable"`
+}
+
+type WorkspaceFileSaveInput struct {
+	Path         string `json:"path" yaml:"path"`
+	Content      string `json:"content" yaml:"content"`
+	ExpectedHash string `json:"expectedHash" yaml:"expectedHash"`
+}
+
+type WorkspaceFileRevertInput struct {
+	Path string `json:"path" yaml:"path"`
+}
+
 type ScanWarning struct {
 	ItemPath string `json:"itemPath,omitempty" yaml:"itemPath,omitempty"`
 	Message  string `json:"message" yaml:"message"`

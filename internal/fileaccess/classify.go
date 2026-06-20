@@ -25,12 +25,12 @@ const (
 	binarySampleBytes               = 8 << 10
 )
 
-type fileClassification struct {
-	kind     FileKind
-	language string
+type Classification struct {
+	Kind     FileKind
+	Language string
 }
 
-var extensionClassifications = map[string]fileClassification{
+var extensionClassifications = map[string]Classification{
 	".c":          {FileKindCode, "c"},
 	".cc":         {FileKindCode, "cpp"},
 	".conf":       {FileKindText, "text"},
@@ -66,12 +66,12 @@ var extensionClassifications = map[string]fileClassification{
 	".yml":        {FileKindYAML, "yaml"},
 }
 
-var specialFileClassifications = map[string]fileClassification{
+var specialFileClassifications = map[string]Classification{
 	"dockerfile": {FileKindCode, "dockerfile"},
 	"makefile":   {FileKindCode, "makefile"},
 }
 
-func classifyPath(path string) fileClassification {
+func ClassifyPath(path string) Classification {
 	name := strings.ToLower(filepath.Base(path))
 	if classification, ok := specialFileClassifications[name]; ok {
 		return classification
@@ -79,11 +79,11 @@ func classifyPath(path string) fileClassification {
 	if classification, ok := extensionClassifications[strings.ToLower(filepath.Ext(name))]; ok {
 		return classification
 	}
-	return fileClassification{kind: FileKindText, language: "text"}
+	return Classification{Kind: FileKindText, Language: "text"}
 }
 
 func language(path string) string {
-	return classifyPath(path).language
+	return ClassifyPath(path).Language
 }
 
 func isBinary(data []byte) bool {
