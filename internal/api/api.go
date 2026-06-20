@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	appitem "plan-manager/internal/application/item"
 	appsearch "plan-manager/internal/application/search"
 	appworkspace "plan-manager/internal/application/workspace"
+	appworkspacefiles "plan-manager/internal/application/workspacefiles"
 	"plan-manager/internal/audit"
 	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/gitadapter"
@@ -26,17 +28,19 @@ import (
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
 	"plan-manager/internal/systemdialog"
+	workspaceaccess "plan-manager/internal/workspacefiles"
 )
 
 type API struct {
-	workspaces    *appworkspace.Service
-	items         *appitem.Service
-	gitOps        *appgit.Service
-	dialog        *systemdialog.Dialog
-	audit         *audit.Store
-	healthService *apphealth.Service
-	search        *appsearch.Service
-	navigation    *navigation.Store
+	workspaces     *appworkspace.Service
+	items          *appitem.Service
+	gitOps         *appgit.Service
+	dialog         *systemdialog.Dialog
+	audit          *audit.Store
+	healthService  *apphealth.Service
+	search         *appsearch.Service
+	navigation     *navigation.Store
+	workspaceFiles *appworkspacefiles.Service
 }
 
 func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog) *API {
@@ -48,15 +52,20 @@ func NewWithReliability(reg *registry.Registry, idx *itemindex.Index, scan *scan
 }
 
 func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog, auditStore *audit.Store, healthService *apphealth.Service, searchService *appsearch.Service, navigationStore *navigation.Store) *API {
+	var refresher appworkspacefiles.Refresher
+	if writer != nil {
+		refresher = writer
+	}
 	return &API{
-		workspaces:    appworkspace.New(reg, idx, scan, writer),
-		items:         appitem.New(reg, idx, files, writer, git),
-		gitOps:        appgit.New(reg, writer, git),
-		dialog:        dialog,
-		audit:         auditStore,
-		healthService: healthService,
-		search:        searchService,
-		navigation:    navigationStore,
+		workspaces:     appworkspace.New(reg, idx, scan, writer),
+		items:          appitem.New(reg, idx, files, writer, git),
+		gitOps:         appgit.New(reg, writer, git),
+		dialog:         dialog,
+		audit:          auditStore,
+		healthService:  healthService,
+		search:         searchService,
+		navigation:     navigationStore,
+		workspaceFiles: appworkspacefiles.New(reg, workspaceaccess.New(), git, auditStore, refresher),
 	}
 }
 
@@ -79,6 +88,11 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
 	mux.HandleFunc("PUT /api/workspaces/{id}/source-structure", a.saveSourceStructure)
+	mux.HandleFunc("GET /api/workspaces/{id}/tree", a.workspaceTree)
+	mux.HandleFunc("GET /api/workspaces/{id}/files", a.workspaceFile)
+	mux.HandleFunc("PUT /api/workspaces/{id}/files", a.saveWorkspaceFile)
+	mux.HandleFunc("GET /api/workspaces/{id}/files/diff", a.workspaceFileDiff)
+	mux.HandleFunc("POST /api/workspaces/{id}/files/revert", a.revertWorkspaceFile)
 	mux.HandleFunc("GET /api/items", a.listItems)
 	mux.HandleFunc("GET /api/items/{id}", a.itemDetail)
 	mux.HandleFunc("GET /api/items/{id}/files", a.itemFiles)
@@ -338,6 +352,46 @@ func (a *API) saveSourceStructure(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := a.workspaces.SaveSourceStructure(r.PathValue("id"), r.URL.Query().Get("directory"), settings)
 	respondWorkspaceResult(w, result, err)
+}
+
+func (a *API) workspaceTree(w http.ResponseWriter, r *http.Request) {
+	includeIgnored, _ := strconv.ParseBool(r.URL.Query().Get("includeIgnored"))
+	result, err := a.workspaceFiles.List(r.PathValue("id"), r.URL.Query().Get("path"), includeIgnored)
+	respondWorkspaceFileResult(w, result, err)
+}
+
+func (a *API) workspaceFile(w http.ResponseWriter, r *http.Request) {
+	result, err := a.workspaceFiles.Read(r.PathValue("id"), r.URL.Query().Get("path"))
+	respondWorkspaceFileResult(w, result, err)
+}
+
+func (a *API) saveWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+	var input models.WorkspaceFileSaveInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.workspaceFiles.Save(r.PathValue("id"), input)
+	respondWorkspaceFileResult(w, result, err)
+}
+
+func (a *API) workspaceFileDiff(w http.ResponseWriter, r *http.Request) {
+	diff, err := a.workspaceFiles.Diff(r.PathValue("id"), r.URL.Query().Get("path"))
+	if err != nil {
+		respondWorkspaceFileResult(w, nil, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"diff": diff})
+}
+
+func (a *API) revertWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+	var input models.WorkspaceFileRevertInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.workspaceFiles.Revert(r.PathValue("id"), input)
+	respondWorkspaceFileResult(w, result, err)
 }
 
 func (a *API) listItems(w http.ResponseWriter, r *http.Request) {
@@ -632,6 +686,19 @@ func respondWorkspaceResult(w http.ResponseWriter, data any, err error) {
 		return
 	}
 	respond(w, data, err)
+}
+
+func respondWorkspaceFileResult(w http.ResponseWriter, data any, err error) {
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, data)
+	case errors.Is(err, apperrors.ErrWorkspaceNotFound), errors.Is(err, os.ErrNotExist):
+		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, workspaceaccess.ErrHashRequired), errors.Is(err, workspaceaccess.ErrStaleContent):
+		writeError(w, http.StatusConflict, workspaceaccess.ErrStaleContent.Error())
+	default:
+		writeError(w, http.StatusBadRequest, err.Error())
+	}
 }
 
 func respondGitResult(w http.ResponseWriter, result models.GitOperationResult) {

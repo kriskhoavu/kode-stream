@@ -25,7 +25,7 @@ All code and UI text must use these names:
 |-------|--------------------------------------|--------|
 | B1    | Workspace Path And Directory Domain  | ✅     |
 | B2    | Workspace File Application Service   | ✅     |
-| B3    | Workspace File APIs                  |        |
+| B3    | Workspace File APIs                  | ✅     |
 | B4    | Backend Safety And Scale Tests       |        |
 | F1    | Types, API, And Explorer Route       |        |
 | F2    | Tree State And Shared Editor Session |        |
@@ -87,13 +87,13 @@ PM-007: Add workspace file application service
 
 **Deliverables:**
 
-- [ ] Add `GET /api/workspaces/{id}/tree`.
-- [ ] Add `GET` and `PUT /api/workspaces/{id}/files`.
-- [ ] Add `GET /api/workspaces/{id}/files/diff`.
-- [ ] Add `POST /api/workspaces/{id}/files/revert`.
-- [ ] Wire workspace file service in app startup and API construction.
-- [ ] Map not-found, protected-path, unsupported, stale-hash, and Git errors.
-- [ ] Keep existing item file APIs unchanged.
+- [x] Add `GET /api/workspaces/{id}/tree`.
+- [x] Add `GET` and `PUT /api/workspaces/{id}/files`.
+- [x] Add `GET /api/workspaces/{id}/files/diff`.
+- [x] Add `POST /api/workspaces/{id}/files/revert`.
+- [x] Wire workspace file service in app startup and API construction.
+- [x] Map not-found, protected-path, unsupported, stale-hash, and Git errors.
+- [x] Keep existing item file APIs unchanged.
 
 **Verification:** `rtk go test ./internal/api ./internal/app`
 

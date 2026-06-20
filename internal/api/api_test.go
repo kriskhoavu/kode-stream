@@ -253,6 +253,87 @@ func TestFileContentRouteReturnsViewerMetadataAndRejectsBinary(t *testing.T) {
 	}
 }
 
+func TestWorkspaceTreeAndFileRoutes(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	if err := os.WriteFile(filepath.Join(workspace.Path, "README.md"), []byte("# Explorer\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	treeResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(treeResponse, httptest.NewRequest(http.MethodGet, "/api/workspaces/"+workspace.ID+"/tree", nil))
+	var listing models.WorkspaceDirectoryListing
+	if err := json.Unmarshal(treeResponse.Body.Bytes(), &listing); err != nil {
+		t.Fatal(err)
+	}
+	if treeResponse.Code != http.StatusOK || listing.WorkspaceID != workspace.ID || len(listing.Entries) == 0 {
+		t.Fatalf("tree status=%d listing=%#v", treeResponse.Code, listing)
+	}
+
+	fileResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(fileResponse, httptest.NewRequest(http.MethodGet, "/api/workspaces/"+workspace.ID+"/files?path=README.md", nil))
+	var content models.FileContent
+	if err := json.Unmarshal(fileResponse.Body.Bytes(), &content); err != nil {
+		t.Fatal(err)
+	}
+	if fileResponse.Code != http.StatusOK || content.Kind != models.FileKindMarkdown || content.Content != "# Explorer\n" {
+		t.Fatalf("file status=%d content=%#v", fileResponse.Code, content)
+	}
+}
+
+func TestWorkspaceFileSaveDiffRevertAndErrorMapping(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	path := filepath.Join(workspace.Path, "README.md")
+	if err := os.WriteFile(path, []byte("# Original\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commit := exec.Command("git", "-C", workspace.Path, "add", "README.md")
+	if output, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v: %s", err, output)
+	}
+	commit = exec.Command("git", "-C", workspace.Path, "commit", "-m", "add readme")
+	commit.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if output, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v: %s", err, output)
+	}
+
+	readResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(readResponse, httptest.NewRequest(http.MethodGet, "/api/workspaces/"+workspace.ID+"/files?path=README.md", nil))
+	var current models.FileContent
+	if err := json.Unmarshal(readResponse.Body.Bytes(), &current); err != nil {
+		t.Fatal(err)
+	}
+	saveBody := strings.NewReader(`{"path":"README.md","content":"# Changed\n","expectedHash":"` + current.Hash + `"}`)
+	saveResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(saveResponse, httptest.NewRequest(http.MethodPut, "/api/workspaces/"+workspace.ID+"/files", saveBody))
+	if saveResponse.Code != http.StatusOK {
+		t.Fatalf("save status=%d body=%s", saveResponse.Code, saveResponse.Body.String())
+	}
+
+	diffResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(diffResponse, httptest.NewRequest(http.MethodGet, "/api/workspaces/"+workspace.ID+"/files/diff?path=README.md", nil))
+	if diffResponse.Code != http.StatusOK || !strings.Contains(diffResponse.Body.String(), "Changed") {
+		t.Fatalf("diff status=%d body=%s", diffResponse.Code, diffResponse.Body.String())
+	}
+
+	revertResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(revertResponse, httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/files/revert", strings.NewReader(`{"path":"README.md"}`)))
+	if revertResponse.Code != http.StatusOK {
+		t.Fatalf("revert status=%d body=%s", revertResponse.Code, revertResponse.Body.String())
+	}
+
+	conflictResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(conflictResponse, httptest.NewRequest(http.MethodPut, "/api/workspaces/"+workspace.ID+"/files", strings.NewReader(`{"path":"README.md","content":"x","expectedHash":"stale"}`)))
+	if conflictResponse.Code != http.StatusConflict {
+		t.Fatalf("conflict status=%d body=%s", conflictResponse.Code, conflictResponse.Body.String())
+	}
+
+	missingResponse := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(missingResponse, httptest.NewRequest(http.MethodGet, "/api/workspaces/missing/files?path=README.md", nil))
+	if missingResponse.Code != http.StatusNotFound {
+		t.Fatalf("missing status=%d body=%s", missingResponse.Code, missingResponse.Body.String())
+	}
+}
+
 func TestGitPullDirtyTreeReturnsRecoveryHint(t *testing.T) {
 	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
 	if err := os.WriteFile(filepath.Join(workspace.Path, "plans", "dirty.md"), []byte("dirty"), 0o644); err != nil {

@@ -98,7 +98,7 @@ func (g *GitAdapter) LastUpdate(workspacePath, relPath string) time.Time {
 }
 
 func (g *GitAdapter) Diff(workspacePath, relPath string) (string, error) {
-	return g.run(workspacePath, "diff", "--", relPath)
+	return g.run(workspacePath, "diff", "--no-ext-diff", "--", relPath)
 }
 
 func (g *GitAdapter) Status(workspaceID, workspacePath string) (models.GitStatus, error) {
