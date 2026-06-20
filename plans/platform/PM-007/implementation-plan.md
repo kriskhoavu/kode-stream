@@ -24,7 +24,7 @@ All code and UI text must use these names:
 | Phase | Name                                 | Status |
 |-------|--------------------------------------|--------|
 | B1    | Workspace Path And Directory Domain  | ✅     |
-| B2    | Workspace File Application Service   |        |
+| B2    | Workspace File Application Service   | ✅     |
 | B3    | Workspace File APIs                  |        |
 | B4    | Backend Safety And Scale Tests       |        |
 | F1    | Types, API, And Explorer Route       |        |
@@ -62,13 +62,13 @@ PM-007: Add guarded workspace directory access
 
 **Deliverables:**
 
-- [ ] Add `internal/application/workspacefiles.Service`.
-- [ ] Add classified workspace file reads with PM-006 limits.
-- [ ] Add Markdown-only atomic writes with required expected hashes.
-- [ ] Preserve file permissions where supported.
-- [ ] Add selected-file diff and revert operations.
-- [ ] Add audit events and targeted configured-source refresh decisions.
-- [ ] Add service tests for read, save, diff, revert, audit, and refresh behavior.
+- [x] Add `internal/application/workspacefiles.Service`.
+- [x] Add classified workspace file reads with PM-006 limits.
+- [x] Add Markdown-only atomic writes with required expected hashes.
+- [x] Preserve file permissions where supported.
+- [x] Add selected-file diff and revert operations.
+- [x] Add audit events and targeted configured-source refresh decisions.
+- [x] Add service tests for read, save, diff, revert, audit, and refresh behavior.
 
 **Verification:** `rtk go test ./internal/application/workspacefiles`
 

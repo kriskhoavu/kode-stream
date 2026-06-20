@@ -20,6 +20,9 @@ var (
 	ErrInvalidPath   = errors.New("invalid workspace path")
 	ErrProtectedPath = errors.New("protected workspace path")
 	ErrOutsideRoot   = errors.New("workspace path escapes root")
+	ErrHashRequired  = errors.New("expected hash is required")
+	ErrStaleContent  = errors.New("file content changed since it was loaded")
+	ErrMarkdownOnly  = errors.New("only Markdown files can be edited")
 )
 
 type IgnoreChecker interface {
@@ -90,6 +93,63 @@ func (a *Access) List(workspace models.WorkspaceConfig, path string, includeIgno
 
 func (a *Access) ResolveFile(workspace models.WorkspaceConfig, path string) (string, string, error) {
 	return resolve(workspace.Path, path, false)
+}
+
+func (a *Access) Read(workspace models.WorkspaceConfig, path string) (models.FileContent, error) {
+	clean, full, err := a.ResolveFile(workspace, path)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	return fileaccess.ReadFileContent(clean, full)
+}
+
+func (a *Access) WriteMarkdown(workspace models.WorkspaceConfig, input models.WorkspaceFileSaveInput) (models.FileContent, error) {
+	if strings.TrimSpace(input.ExpectedHash) == "" {
+		return models.FileContent{}, ErrHashRequired
+	}
+	clean, full, err := a.ResolveFile(workspace, input.Path)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	if fileaccess.ClassifyPath(clean).Kind != models.FileKindMarkdown {
+		return models.FileContent{}, ErrMarkdownOnly
+	}
+	current, err := os.ReadFile(full)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	if fileaccess.ContentHash(current) != input.ExpectedHash {
+		return models.FileContent{}, ErrStaleContent
+	}
+	info, err := os.Stat(full)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	temp, err := os.CreateTemp(filepath.Dir(full), ".plan-manager-*")
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	tempName := temp.Name()
+	defer os.Remove(tempName)
+	if err := temp.Chmod(info.Mode().Perm()); err != nil {
+		temp.Close()
+		return models.FileContent{}, err
+	}
+	if _, err := temp.WriteString(input.Content); err != nil {
+		temp.Close()
+		return models.FileContent{}, err
+	}
+	if err := temp.Sync(); err != nil {
+		temp.Close()
+		return models.FileContent{}, err
+	}
+	if err := temp.Close(); err != nil {
+		return models.FileContent{}, err
+	}
+	if err := os.Rename(tempName, full); err != nil {
+		return models.FileContent{}, err
+	}
+	return fileaccess.ReadFileContent(clean, full)
 }
 
 func treeEntry(root, relPath string, entry os.DirEntry, ignored bool) (models.WorkspaceTreeEntry, bool) {

@@ -247,6 +247,11 @@ type WorkspaceFileRevertInput struct {
 	Path string `json:"path" yaml:"path"`
 }
 
+type WorkspaceFileWriteResult struct {
+	File      FileContent `json:"file" yaml:"file"`
+	Refreshed bool        `json:"refreshed" yaml:"refreshed"`
+}
+
 type ScanWarning struct {
 	ItemPath string `json:"itemPath,omitempty" yaml:"itemPath,omitempty"`
 	Message  string `json:"message" yaml:"message"`

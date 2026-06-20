@@ -299,7 +299,15 @@ func readFileContent(relPath, fullPath string) (models.FileContent, error) {
 	return content, nil
 }
 
+func ReadFileContent(relPath, fullPath string) (models.FileContent, error) {
+	return readFileContent(relPath, fullPath)
+}
+
 func contentHash(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
+}
+
+func ContentHash(data []byte) string {
+	return contentHash(data)
 }
