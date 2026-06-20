@@ -26,7 +26,7 @@ All code and UI text must use these names:
 | B1    | Workspace Path And Directory Domain  | ✅     |
 | B2    | Workspace File Application Service   | ✅     |
 | B3    | Workspace File APIs                  | ✅     |
-| B4    | Backend Safety And Scale Tests       |        |
+| B4    | Backend Safety And Scale Tests       | ✅     |
 | F1    | Types, API, And Explorer Route       |        |
 | F2    | Tree State And Shared Editor Session |        |
 | F3    | Filesystem Explorer And Editor UI    |        |
@@ -112,12 +112,12 @@ PM-007: Add workspace tree and file APIs
 
 **Deliverables:**
 
-- [ ] Cover traversal, `.git`, outside symlink, wrong type, and missing paths.
-- [ ] Cover ignored entry visibility and batch Git behavior.
-- [ ] Cover Markdown hash conflicts, atomic saves, permissions, and audit events.
-- [ ] Cover binary and non-Markdown write rejection.
-- [ ] Add a large immediate-directory test and prove deep trees remain unloaded.
-- [ ] Run the complete backend suite.
+- [x] Cover traversal, `.git`, outside symlink, wrong type, and missing paths.
+- [x] Cover ignored entry visibility and batch Git behavior.
+- [x] Cover Markdown hash conflicts, atomic saves, permissions, and audit events.
+- [x] Cover binary and non-Markdown write rejection.
+- [x] Add a large immediate-directory test and prove deep trees remain unloaded.
+- [x] Run the complete backend suite.
 
 **Verification:** `rtk go test ./...`
 
