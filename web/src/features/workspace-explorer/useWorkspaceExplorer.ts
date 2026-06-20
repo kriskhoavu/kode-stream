@@ -70,10 +70,21 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
     }
   }, [expandedNodeIds, loadDirectory]);
 
+  const collapseAll = useCallback(() => {
+    setExpandedNodeIds(new Set());
+    localStorage.setItem(expandedStorageKey, '[]');
+  }, []);
+
+  useEffect(() => {
+    for (const workspace of workspaces) {
+      if (expandedNodeIds.has(explorerNodeId(workspace.id, ''))) void loadDirectory(workspace.id, '');
+    }
+  }, [expandedNodeIds, loadDirectory, workspaces]);
+
   const select = useCallback((workspaceId: string, path: string) => onLocationChange?.({ workspaceId, path: path || undefined }), [onLocationChange]);
   const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter }), [cache, decorations, expandedNodeIds, filter, showIgnored, workspaces]);
 
-  return { rows, cache, decorations, expandedNodeIds, showIgnored, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, toggleExpanded, loadDirectory, refresh, select };
+  return { rows, cache, decorations, expandedNodeIds, showIgnored, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, toggleExpanded, loadDirectory, refresh, collapseAll, select };
 }
 
 function readExpanded(): Set<string> {

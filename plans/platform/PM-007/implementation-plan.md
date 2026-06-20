@@ -29,7 +29,7 @@ All code and UI text must use these names:
 | B4    | Backend Safety And Scale Tests       | ✅     |
 | F1    | Types, API, And Explorer Route       | ✅     |
 | F2    | Tree State And Shared Editor Session | ✅     |
-| F3    | Filesystem Explorer And Editor UI    |        |
+| F3    | Filesystem Explorer And Editor UI    | ✅     |
 | F4    | Styling, Performance, And QA         |        |
 
 ## Backend Phases
@@ -190,15 +190,15 @@ PM-007: Add explorer state and shared file editor
 
 **Deliverables:**
 
-- [ ] Add `WorkspaceExplorerPage`, toolbar, tree, and workspace/directory/file rows.
-- [ ] Add enriched item directory rows with Open details.
-- [ ] Add `WorkspaceFileEditor` with breadcrumbs and Preview, Raw, and Diff.
-- [ ] Reuse PM-006 for previews and shared session for Markdown autosave.
-- [ ] Add stale-content recovery, immediate save before selection, and revert confirmation.
-- [ ] Add file, item, Git, warning, and health inspector sections.
-- [ ] Add Open Kanban, copy path, reveal, collapse, ignored toggle, and refresh actions.
-- [ ] Add resizable and collapsible pane behavior.
-- [ ] Add component and integration tests.
+- [x] Add `WorkspaceExplorerPage`, toolbar, tree, and workspace/directory/file rows.
+- [x] Add enriched item directory rows with Open details.
+- [x] Add `WorkspaceFileEditor` with breadcrumbs and Preview, Raw, and Diff.
+- [x] Reuse PM-006 for previews and shared session for Markdown autosave.
+- [x] Add stale-content recovery, immediate save before selection, and revert confirmation.
+- [x] Add file, item, Git, warning, and health inspector sections.
+- [x] Add Open Kanban, copy path, reveal, collapse, ignored toggle, and refresh actions.
+- [x] Add resizable and collapsible pane behavior.
+- [x] Add component and integration tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

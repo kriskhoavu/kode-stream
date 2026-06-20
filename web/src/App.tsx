@@ -175,7 +175,7 @@ export function App() {
         {route.name === 'branches' && <BranchesPage workspace={activeRepo} refreshKey={contentRefreshKey} onOpenBranch={(branch) => navigate({ name: 'kanban' })} />}
         {route.name === 'workspace' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly(true)} />}
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData(true)} />}
-        {route.name === 'explorer' && <WorkspaceExplorerPage workspaces={workspaces} location={route.location} onOpenKanban={selectWorkspace} />}
+        {route.name === 'explorer' && <WorkspaceExplorerPage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenKanban={selectWorkspace} />}
       </main>
 
       {showStaleNotice && (
