@@ -237,19 +237,6 @@ func fileIDForPath(path string) string {
 	return strings.NewReplacer("/", "__", ".", "_").Replace(path)
 }
 
-func language(path string) string {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".md", ".markdown":
-		return "markdown"
-	case ".yaml", ".yml":
-		return "yaml"
-	case ".json":
-		return "json"
-	default:
-		return "text"
-	}
-}
-
 func fileContent(relPath string, data []byte) models.FileContent {
 	return models.FileContent{
 		ID:       fileIDForPath(relPath),

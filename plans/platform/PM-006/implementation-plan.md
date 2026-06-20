@@ -19,7 +19,7 @@ All code and UI text must use these names:
 
 | Phase | Name                                 | Status |
 |-------|--------------------------------------|--------|
-| B1    | File Classification And Limits       |        |
+| B1    | File Classification And Limits       | ✅     |
 | B2    | Viewer API Metadata                  |        |
 | B3    | Guarded Read Integration             |        |
 | B4    | Backend Regression Tests             |        |
@@ -34,11 +34,11 @@ All code and UI text must use these names:
 
 **Deliverables:**
 
-- [ ] Add `FileKind` constants.
-- [ ] Move extension and special-filename mapping into `internal/fileaccess/classify.go`.
-- [ ] Add syntax language mapping for common code formats.
-- [ ] Add binary detection and named size thresholds.
-- [ ] Add table tests for classification and boundary behavior.
+- [x] Add `FileKind` constants.
+- [x] Move extension and special-filename mapping into `internal/fileaccess/classify.go`.
+- [x] Add syntax language mapping for common code formats.
+- [x] Add binary detection and named size thresholds.
+- [x] Add table tests for classification and boundary behavior.
 
 **Verification:** `rtk go test ./internal/fileaccess`
 
