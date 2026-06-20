@@ -14,7 +14,7 @@ Add bounded path search, Git tree decorations, guarded Markdown and directory cr
 | B4    | Backend Safety And Scale Tests   | ✅     |
 | F1    | Types And API Clients            | ✅     |
 | F2    | Search, Git, And Mutation State  | ✅     |
-| F3    | Explorer Productivity UI         |        |
+| F3    | Explorer Productivity UI         | ✅     |
 | F4    | Responsive Styling And Final QA  |        |
 
 ## Backend Phases
@@ -153,12 +153,12 @@ PM-008: Add Explorer productivity state
 
 **Deliverables:**
 
-- [ ] Add search results with keyboard navigation.
-- [ ] Add accessible Git state markers to tree rows.
-- [ ] Add create file and directory dialogs.
-- [ ] Add confirmed rename dialog.
-- [ ] Save pending Markdown before rename.
-- [ ] Add component and integration tests.
+- [x] Add search results with keyboard navigation.
+- [x] Add accessible Git state markers to tree rows.
+- [x] Add create file and directory dialogs.
+- [x] Add confirmed rename dialog.
+- [x] Save pending Markdown before rename.
+- [x] Add component and integration tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
