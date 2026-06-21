@@ -396,7 +396,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           {!leftCollapsed && (
 			<>
 				<ContentSearchInput label="Search item contents" query={contentSearch.query} onQueryChange={contentSearch.setQuery} caseSensitive={contentSearch.caseSensitive} onCaseSensitiveChange={contentSearch.setCaseSensitive} />
-				{contentSearch.query.trim().length >= 2 && <ContentSearchResults {...contentSearch} activeIndex={contentSearchIndex} onActiveIndex={setContentSearchIndex} onOpen={(result) => void openContentResult(result)} onEscape={contentSearch.clear} treeRef={fileTreeRef} />}
+				{contentSearch.query.trim().length >= 2 && <ContentSearchResults {...contentSearch} activeIndex={contentSearchIndex} onActiveIndex={setContentSearchIndex} onOpen={(result) => void openContentResult(result)} onEscape={contentSearch.clear} treeRef={fileTreeRef} showWorkspaceContext={false} />}
 			</>
 		  )}
 		  {!leftCollapsed && (

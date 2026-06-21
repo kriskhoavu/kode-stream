@@ -16,6 +16,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | F2    | Tree Mode And Search State           | ✅     |
 | F3    | Item And Explorer Search UI          | ✅     |
 | F4    | Styling, Accessibility, And Final QA | ✅     |
+| F5    | Compact Search Result UX             | ✅     |
 
 ## Backend Phases
 
@@ -192,6 +193,29 @@ PM-009: Finalize scoped content search UX
 - Add responsive and accessible search styling
 - Complete safety and regression verification
 - Update architecture and planning documents
+```
+
+### Phase F5: Compact Search Result UX
+
+**Deliverables:**
+
+- [x] Keep file names and line numbers on one compact header row.
+- [x] Collapse long paths to the nearest two parent directories.
+- [x] Clamp snippets to two lines and 120 characters while retaining the match.
+- [x] Remove repeated column metadata from every result row.
+- [x] Show at most 20 results and ask users to refine broader queries.
+- [x] Preserve full path and column context for assistive technology and tooltips.
+- [x] Add compact-result regression tests.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run`
+
+**Draft Commit:**
+```text
+PM-009: Compact content search results
+
+- Reduce repeated metadata in narrow panels
+- Clamp paths, snippets, and visible result counts
+- Preserve keyboard and accessible result context
 ```
 
 ## Post-Implementation Checklist
