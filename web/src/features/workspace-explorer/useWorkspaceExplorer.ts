@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ExplorerLocation } from '../../app/router';
 import { api } from '../../lib/api';
-import type { WorkspaceConfig } from '../../lib/types';
+import type { ExplorerTreeMode, WorkspaceConfig } from '../../lib/types';
 import { buildItemDecorations, directoryCacheKey, explorerNodeId, flattenVisibleTree } from './tree';
 import type { DirectoryCacheEntry, ExplorerSelection } from './types';
 import { ancestorDirectoryPaths, buildWorkspaceGitStateMap } from './productivity';
@@ -9,10 +9,12 @@ import type { WorkspacePathGitState } from '../../lib/types';
 
 const expandedStorageKey = 'workspaceExplorer.expandedNodeIds';
 const ignoredStorageKey = 'workspaceExplorer.showIgnored';
+const modeStorageKey = 'workspaceExplorer.treeMode';
 
 export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: ExplorerLocation, onLocationChange?: (location?: ExplorerLocation) => void) {
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() => readExpanded());
   const [showIgnored, setShowIgnoredState] = useState(() => localStorage.getItem(ignoredStorageKey) === 'true');
+	const [mode, setModeState] = useState<ExplorerTreeMode>(() => location?.mode ?? readMode());
   const [cache, setCache] = useState<Map<string, DirectoryCacheEntry>>(new Map());
   const [decorations, setDecorations] = useState(() => new Map());
   const [filter, setFilter] = useState('');
@@ -49,7 +51,8 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
   }, [cache, location]);
 
   const loadDirectory = useCallback(async (workspaceId: string, path: string, force = false) => {
-    const key = directoryCacheKey(workspaceId, path, showIgnored);
+		if (mode === 'sources' && path === '') return;
+		const key = directoryCacheKey(workspaceId, path, showIgnored, mode);
     if (!force && ['loading', 'loaded'].includes(cache.get(key)?.state ?? '')) return;
     setCache((current) => new Map(current).set(key, { state: 'loading', entries: [], hiddenCount: 0 }));
     try {
@@ -58,7 +61,17 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
     } catch (error) {
       setCache((current) => new Map(current).set(key, { state: 'error', entries: [], hiddenCount: 0, error: error instanceof Error ? error.message : 'Directory failed to load' }));
     }
-  }, [cache, showIgnored]);
+	}, [cache, mode, showIgnored]);
+
+	const setMode = useCallback((value: ExplorerTreeMode) => {
+		setModeState(value);
+		localStorage.setItem(modeStorageKey, value);
+		onLocationChange?.({ ...location, mode: value });
+	}, [location, onLocationChange]);
+
+	useEffect(() => {
+		if (location?.mode && location.mode !== mode) setModeState(location.mode);
+	}, [location?.mode, mode]);
 
   const toggleExpanded = useCallback((workspaceId: string, path: string) => {
     const id = explorerNodeId(workspaceId, path);
@@ -93,8 +106,10 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
     setCache((current) => {
       const next = new Map(current);
       for (const path of paths) {
-        next.delete(directoryCacheKey(workspaceId, path, false));
-        next.delete(directoryCacheKey(workspaceId, path, true));
+			for (const treeMode of ['sources', 'all'] as const) {
+				next.delete(directoryCacheKey(workspaceId, path, false, treeMode));
+				next.delete(directoryCacheKey(workspaceId, path, true, treeMode));
+			}
       }
       return next;
     });
@@ -140,9 +155,13 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
     directoryPaths.forEach((path) => void loadDirectory(location.workspaceId!, path));
   }, [loadDirectory, location?.path, location?.workspaceId]);
 
-  const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter }), [cache, decorations, expandedNodeIds, filter, showIgnored, workspaces]);
+	const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter, mode }), [cache, decorations, expandedNodeIds, filter, mode, showIgnored, workspaces]);
 
-  return { rows, cache, decorations, gitStateByPath, expandedNodeIds, showIgnored, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, toggleExpanded, loadDirectory, refresh, collapseAll, select, invalidateDirectories, expandToPath };
+	return { rows, cache, decorations, gitStateByPath, expandedNodeIds, showIgnored, mode, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, setMode, toggleExpanded, loadDirectory, refresh, collapseAll, select, invalidateDirectories, expandToPath };
+}
+
+function readMode(): ExplorerTreeMode {
+	return localStorage.getItem(modeStorageKey) === 'all' ? 'all' : 'sources';
 }
 
 function readExpanded(): Set<string> {

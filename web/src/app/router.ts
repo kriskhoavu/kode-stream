@@ -1,6 +1,9 @@
+import type { ExplorerTreeMode } from '../lib/types';
+
 export interface ExplorerLocation {
   workspaceId?: string;
   path?: string;
+	mode?: ExplorerTreeMode;
 }
 
 export type Route =
@@ -50,12 +53,15 @@ export function explorerLocationFromSearch(search: string): ExplorerLocation | u
   const query = new URLSearchParams(search);
   const workspaceId = query.get('workspaceId')?.trim() || undefined;
   const path = query.get('path')?.trim() || undefined;
-  return workspaceId || path ? { workspaceId, path } : undefined;
+	const rawMode = query.get('mode');
+	const mode = rawMode === 'all' || rawMode === 'sources' ? rawMode : undefined;
+	return workspaceId || path || mode ? { workspaceId, path, mode } : undefined;
 }
 
 export function explorerPath(location?: ExplorerLocation): string {
   const query = new URLSearchParams();
   if (location?.workspaceId) query.set('workspaceId', location.workspaceId);
   if (location?.path) query.set('path', location.path);
+	if (location?.mode) query.set('mode', location.mode);
   return query.size ? `/explorer?${query.toString()}` : '/explorer';
 }

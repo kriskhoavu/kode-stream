@@ -1,12 +1,12 @@
-import type { ItemSummary, WorkspaceConfig, WorkspaceTreeEntry } from '../../lib/types';
+import type { ExplorerTreeMode, ItemSummary, WorkspaceConfig, WorkspaceTreeEntry } from '../../lib/types';
 import type { DirectoryCacheEntry, ExplorerItemDecoration, VisibleExplorerRow, WorkspaceRootNode } from './types';
 
 export function explorerNodeId(workspaceId: string, path: string): string {
   return `${workspaceId}:${normalizeExplorerPath(path)}`;
 }
 
-export function directoryCacheKey(workspaceId: string, path: string, includeIgnored: boolean): string {
-  return `${explorerNodeId(workspaceId, path)}:${includeIgnored ? 'ignored' : 'visible'}`;
+export function directoryCacheKey(workspaceId: string, path: string, includeIgnored: boolean, mode: ExplorerTreeMode = 'all'): string {
+	return `${explorerNodeId(workspaceId, path)}:${mode}:${includeIgnored ? 'ignored' : 'visible'}`;
 }
 
 export function buildItemDecorations(items: ItemSummary[]): Map<string, ExplorerItemDecoration> {
@@ -33,6 +33,7 @@ export function flattenVisibleTree({
   includeIgnored,
   decorations,
   filter = ''
+	, mode = 'all'
 }: {
   workspaces: WorkspaceConfig[];
   expandedNodeIds: Set<string>;
@@ -40,11 +41,15 @@ export function flattenVisibleTree({
   includeIgnored: boolean;
   decorations: Map<string, ExplorerItemDecoration>;
   filter?: string;
+	mode?: ExplorerTreeMode;
 }): VisibleExplorerRow[] {
   const rows: VisibleExplorerRow[] = [];
   const query = filter.trim().toLocaleLowerCase();
   const appendChildren = (workspaceId: string, parentPath: string, parentId: string, level: number) => {
-    const children = cache.get(directoryCacheKey(workspaceId, parentPath, includeIgnored))?.entries ?? [];
+		const workspace = workspaces.find((item) => item.id === workspaceId);
+		const children = mode === 'sources' && parentPath === ''
+			? configuredSourceEntries(workspace)
+			: cache.get(directoryCacheKey(workspaceId, parentPath, includeIgnored, mode))?.entries ?? [];
     children.forEach((entry, index) => {
       const id = explorerNodeId(workspaceId, entry.path);
       const row: VisibleExplorerRow = {
@@ -68,6 +73,22 @@ export function flattenVisibleTree({
     if (expandedNodeIds.has(id)) appendChildren(workspace.id, '', id, 1);
   });
   return rows;
+}
+
+export function configuredSourceEntries(workspace?: WorkspaceConfig): WorkspaceTreeEntry[] {
+	return (workspace?.sources ?? []).map((path) => {
+		const normalized = normalizeExplorerPath(path);
+		return {
+			id: `source:${normalized}`,
+			name: normalized,
+			path: normalized,
+			type: 'directory',
+			hasChildren: true,
+			ignored: false,
+			hidden: false,
+			editable: false
+		};
+	});
 }
 
 function matchesRow(row: VisibleExplorerRow, query: string): boolean {

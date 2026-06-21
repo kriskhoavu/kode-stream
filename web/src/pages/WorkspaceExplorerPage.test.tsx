@@ -30,7 +30,7 @@ describe('WorkspaceExplorerPage', () => {
   });
 
   it('loads one directory when a workspace root expands', async () => {
-    const { container } = render(<WorkspaceExplorerPage workspaces={[workspace]} onLocationChange={vi.fn()} onOpenKanban={vi.fn()} />);
+		const { container } = render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} onOpenKanban={vi.fn()} />);
     fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
     await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', '', false));
     expect(await screen.findByText('README.md')).toBeInTheDocument();

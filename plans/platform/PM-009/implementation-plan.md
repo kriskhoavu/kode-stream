@@ -13,7 +13,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | B3    | Item And Explorer Search APIs        | ✅     |
 | B4    | Search Safety And Scale Tests        | ✅     |
 | F1    | Types And Content Search Clients     | ✅     |
-| F2    | Tree Mode And Search State           |        |
+| F2    | Tree Mode And Search State           | ✅     |
 | F3    | Item And Explorer Search UI          |        |
 | F4    | Styling, Accessibility, And Final QA |        |
 
@@ -132,12 +132,12 @@ PM-009: Add content search frontend contracts
 
 **Deliverables:**
 
-- [ ] Add reusable debounced content-search state.
-- [ ] Add stale-response and query-reset behavior.
-- [ ] Add Configured Sources default and persisted All Files mode.
-- [ ] Add mode-specific tree cache keys and source root composition.
-- [ ] Add selected match context and result-opening helpers.
-- [ ] Add hook and pure-helper tests.
+- [x] Add reusable debounced content-search state.
+- [x] Add stale-response and query-reset behavior.
+- [x] Add Configured Sources default and persisted All Files mode.
+- [x] Add mode-specific tree cache keys and source root composition.
+- [x] Add selected match context and result-opening helpers.
+- [x] Add hook and pure-helper tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

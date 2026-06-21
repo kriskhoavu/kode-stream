@@ -27,4 +27,12 @@ describe('workspace explorer tree', () => {
     expect(treeKeyboardAction('ArrowRight', rows, 0, new Set())).toEqual({ activeIndex: 0, toggleNodeId: 'ws:' });
     expect(treeKeyboardAction('Enter', rows, 0, new Set()).select?.workspaceId).toBe('ws');
   });
+
+	it('composes configured sources separately from all-files cache entries', () => {
+		const configured = { ...workspace, sources: ['plans', 'docs/guides'] };
+		const expanded = new Set([explorerNodeId('ws', '')]);
+		const rows = flattenVisibleTree({ workspaces: [configured], expandedNodeIds: expanded, cache: new Map(), includeIgnored: false, decorations: new Map(), mode: 'sources' });
+		expect(rows.map((row) => row.node.path)).toEqual(['', 'plans', 'docs/guides']);
+		expect(directoryCacheKey('ws', 'plans', false, 'sources')).not.toBe(directoryCacheKey('ws', 'plans', false, 'all'));
+	});
 });

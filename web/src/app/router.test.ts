@@ -23,5 +23,7 @@ describe('router', () => {
     expect(routeFromLocation()).toEqual({ name: 'explorer', location: { workspaceId: 'ws-1', path: 'docs/guide.md' } });
     expect(explorerLocationFromSearch('?path=README.md')).toEqual({ path: 'README.md' });
     expect(explorerPath()).toBe('/explorer');
+		expect(explorerLocationFromSearch('?mode=all')).toEqual({ mode: 'all' });
+		expect(explorerPath({ workspaceId: 'ws', mode: 'sources' })).toBe('/explorer?workspaceId=ws&mode=sources');
   });
 });
