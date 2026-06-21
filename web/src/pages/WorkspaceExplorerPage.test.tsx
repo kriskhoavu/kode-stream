@@ -37,6 +37,43 @@ describe('WorkspaceExplorerPage', () => {
     expect(await screen.findByText('README.md')).toBeInTheDocument();
   });
 
+  it('toggles folders from their names without folder-level Git badges', async () => {
+    apiMock.workspaceTree.mockImplementation((_workspaceId: string, path: string) => Promise.resolve({
+      workspaceId: 'ws', path, hiddenCount: 0, entries: path === ''
+        ? [{ id: 'docs', name: 'docs', path: 'docs', type: 'directory', hasChildren: true, ignored: false, hidden: false, editable: false }]
+        : [{ id: 'guide', name: 'guide.md', path: 'docs/guide.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }]
+    }));
+    apiMock.workspacePathGitStates.mockResolvedValue([{ path: 'docs/guide.md', status: 'untracked', conflict: false }]);
+    const { container } = render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} onOpenKanban={vi.fn()} />);
+    fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
+    const folderButton = await screen.findByRole('button', { name: 'docs' });
+    expect(folderButton.closest('.explorer-tree-row')?.querySelector('.explorer-git-state')).toBeNull();
+    fireEvent.click(folderButton);
+    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
+    expect(await screen.findByText('guide.md')).toBeInTheDocument();
+    fireEvent.click(folderButton);
+    expect(folderButton.closest('[role="treeitem"]')).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('enables Raw mode for editable text files', async () => {
+    apiMock.workspaceTree.mockResolvedValue({ workspaceId: 'ws', path: '', hiddenCount: 0, entries: [
+      { id: 'main_go', name: 'main.go', path: 'main.go', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'code' }
+    ] });
+    apiMock.workspaceFile.mockResolvedValue({ id: 'main_go', path: 'main.go', content: 'package main\n', language: 'go', hash: 'hash', kind: 'code', sizeBytes: 13, editable: true, truncated: false });
+    apiMock.workspaceFileDiff.mockResolvedValue({ diff: '' });
+    const onLocationChange = vi.fn();
+    const { container, rerender } = render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={onLocationChange} onOpenKanban={vi.fn()} />);
+    fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
+    fireEvent.click(await screen.findByRole('button', { name: 'main.go' }));
+    await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', path: 'main.go' }));
+    rerender(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'main.go', mode: 'all' }} onLocationChange={onLocationChange} onOpenKanban={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Raw/i }));
+    const editor = container.querySelector('.raw-editor') as HTMLTextAreaElement;
+    await waitFor(() => expect(editor).toBeEnabled());
+    fireEvent.change(editor, { target: { value: 'package planmanager\n' } });
+    expect(editor).toHaveValue('package planmanager\n');
+  });
+
   it('keeps Open Kanban explicit for a selected workspace root', async () => {
     const onOpenKanban = vi.fn();
     render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={vi.fn()} onOpenKanban={onOpenKanban} />);

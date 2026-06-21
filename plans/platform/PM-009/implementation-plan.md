@@ -20,6 +20,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | F5    | Compact Search Result UX             | ✅     |
 | F6    | Unified Explorer Search              | ✅     |
 | F7    | Shared Explorer Result Cards         | ✅     |
+| F8    | Explorer Tree Interaction            | ✅     |
 
 ## Backend Phases
 
@@ -285,6 +286,26 @@ PM-009: Unify Explorer search result cards
 - Preserve result type and location context
 ```
 
+### Phase F8: Explorer Tree Interaction
+
+**Deliverables:**
+
+- [x] Expand and collapse directories from either the arrow or folder name.
+- [x] Keep Git status badges on file rows instead of aggregating them onto folders.
+- [x] Label supported Raw-mode files as editable text.
+- [x] Add Explorer interaction and Raw editor regression coverage.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run`
+
+**Draft Commit:**
+```text
+PM-009: Align Explorer tree interactions
+
+- Toggle directories from folder names and arrows
+- Keep Git state markers scoped to file rows
+- Cover Raw text editing in Explorer
+```
+
 ## Post-Implementation Checklist
 
 - [x] Confirm item search cannot read sibling item directories.
@@ -293,7 +314,7 @@ PM-009: Unify Explorer search result cards
 - [x] Confirm `.git`, outside symlinks, and binary files are excluded.
 - [x] Confirm ignored preference matches tree and search behavior.
 - [x] Confirm path-name search remains functional in unified results.
-- [x] Confirm result selection preserves pending Markdown safely.
+- [x] Confirm result selection preserves pending text edits safely.
 - [x] Run full backend and frontend suites.
 - [x] Run production build and record bundle output.
 
