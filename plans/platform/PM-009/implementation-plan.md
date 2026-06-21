@@ -11,7 +11,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | B1    | Content Search Domain And Budgets    | ✅     |
 | B2    | Scope Resolution And Application     | ✅     |
 | B3    | Item And Explorer Search APIs        | ✅     |
-| B4    | Search Safety And Scale Tests        |        |
+| B4    | Search Safety And Scale Tests        | ✅     |
 | F1    | Types And Content Search Clients     |        |
 | F2    | Tree Mode And Search State           |        |
 | F3    | Item And Explorer Search UI          |        |
@@ -89,11 +89,11 @@ PM-009: Add scoped content search APIs
 
 **Deliverables:**
 
-- [ ] Cover sibling item and unconfigured-directory isolation.
-- [ ] Cover `.git`, ignored paths, outside symlinks, and binary files.
-- [ ] Cover large files, changing files, unreadable files, and invalid UTF-8.
-- [ ] Cover result, file, byte, and cancellation limits.
-- [ ] Run the complete backend suite.
+- [x] Cover sibling item and unconfigured-directory isolation.
+- [x] Cover `.git`, ignored paths, outside symlinks, and binary files.
+- [x] Cover large files, changing files, unreadable files, and invalid UTF-8.
+- [x] Cover result, file, byte, and cancellation limits.
+- [x] Run the complete backend suite.
 
 **Verification:** `rtk go test ./...`
 
