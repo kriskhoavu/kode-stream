@@ -218,6 +218,43 @@ export interface WorkspacePathSearchResponse {
   truncated: boolean;
 }
 
+export type ExplorerTreeMode = 'sources' | 'all';
+
+export interface WorkspaceContentSearchResult {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  itemId?: string;
+  path: string;
+  fileId?: string;
+  name: string;
+  kind: FileKind;
+  language: string;
+  lineNumber: number;
+  columnStart: number;
+  columnEnd: number;
+  snippet: string;
+  ignored: boolean;
+}
+
+export interface WorkspaceContentSearchResponse {
+  results: WorkspaceContentSearchResult[];
+  truncated: boolean;
+  filesVisited: number;
+  bytesRead: number;
+  skippedFiles: number;
+}
+
+export interface ContentSearchSelection {
+  workspaceId: string;
+  itemId?: string;
+  path: string;
+  fileId?: string;
+  lineNumber: number;
+  columnStart: number;
+  columnEnd: number;
+}
+
 export interface WorkspacePathGitState {
   path: string;
   oldPath?: string;

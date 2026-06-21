@@ -12,7 +12,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | B2    | Scope Resolution And Application     | ✅     |
 | B3    | Item And Explorer Search APIs        | ✅     |
 | B4    | Search Safety And Scale Tests        | ✅     |
-| F1    | Types And Content Search Clients     |        |
+| F1    | Types And Content Search Clients     | ✅     |
 | F2    | Tree Mode And Search State           |        |
 | F3    | Item And Explorer Search UI          |        |
 | F4    | Styling, Accessibility, And Final QA |        |
@@ -112,10 +112,10 @@ PM-009: Add content search regression tests
 
 **Deliverables:**
 
-- [ ] Add tree-mode and content-search types.
-- [ ] Add normalized item and Explorer API methods.
-- [ ] Encode mode, workspace, ignored, and case options.
-- [ ] Add API client tests.
+- [x] Add tree-mode and content-search types.
+- [x] Add normalized item and Explorer API methods.
+- [x] Encode mode, workspace, ignored, and case options.
+- [x] Add API client tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

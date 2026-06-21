@@ -24,6 +24,7 @@ import type {
   WorkspaceInput,
   WorkspaceHealth,
   WorkspaceDirectoryListing,
+	ExplorerTreeMode,
   WorkspaceDirectoryCreateInput,
   WorkspaceFileCreateInput,
   WorkspaceFileRevertInput,
@@ -33,6 +34,7 @@ import type {
   WorkspacePathMutationResult,
   WorkspacePathRenameInput,
   WorkspacePathSearchResponse,
+	WorkspaceContentSearchResponse,
   WorkspaceTreeEntry,
   SourceStructureSettings,
   ScanResult,
@@ -113,6 +115,13 @@ export const api = {
     const response = await request<WorkspacePathSearchResponse>(`/api/workspaces/files/search?${query.toString()}`);
     return { ...response, results: Array.isArray(response.results) ? response.results : [], truncated: Boolean(response.truncated) };
   },
+	searchWorkspaceContent: async (params: { q: string; mode: ExplorerTreeMode; workspaceId?: string; includeIgnored?: boolean; caseSensitive?: boolean }) => {
+		const query = contentSearchQuery(params);
+		query.set('mode', params.mode);
+		if (params.workspaceId) query.set('workspaceId', params.workspaceId);
+		if (params.includeIgnored) query.set('includeIgnored', 'true');
+		return normalizeContentSearchResponse(await request<WorkspaceContentSearchResponse>(`/api/workspaces/files/content-search?${query.toString()}`));
+	},
   workspacePathGitStates: async (workspaceId: string) =>
     (await request<WorkspacePathGitState[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/path-status`) ?? []).map(normalizeWorkspacePathGitState),
   createWorkspaceFile: (workspaceId: string, input: WorkspaceFileCreateInput) =>
@@ -134,6 +143,8 @@ export const api = {
   items: async (params: URLSearchParams) => ((await request<ItemSummary[] | null>(`/api/items?${params.toString()}`)) ?? []).map(normalizeItem),
   item: async (id: string) => normalizeItemDetail(await request<ItemDetail>(`/api/items/${id}`)),
   files: async (id: string) => (await request<FileNode[] | null>(`/api/items/${id}/files`)) ?? [],
+	searchItemContent: async (id: string, params: { q: string; caseSensitive?: boolean }) =>
+		normalizeContentSearchResponse(await request<WorkspaceContentSearchResponse>(`/api/items/${encodeURIComponent(id)}/content-search?${contentSearchQuery(params).toString()}`)),
   file: (id: string, fileId: string) => request<FileContent>(`/api/items/${id}/files/${fileId}`),
   saveFile: (id: string, fileId: string, input: FileSaveInput) =>
     request<FileContent>(`/api/items/${id}/files/${fileId}`, { method: 'POST', body: JSON.stringify(input) }),
@@ -159,6 +170,23 @@ export const api = {
   switchBranch: (workspaceId: string, input: BranchSwitchInput) =>
     request<GitOperationResult>(`/api/workspaces/${workspaceId}/git/switch`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult)
 };
+
+function contentSearchQuery(params: { q: string; caseSensitive?: boolean }): URLSearchParams {
+	const query = new URLSearchParams({ q: params.q });
+	if (params.caseSensitive) query.set('caseSensitive', 'true');
+	return query;
+}
+
+function normalizeContentSearchResponse(response: WorkspaceContentSearchResponse): WorkspaceContentSearchResponse {
+	return {
+		...response,
+		results: Array.isArray(response.results) ? response.results : [],
+		truncated: Boolean(response.truncated),
+		filesVisited: Number(response.filesVisited) || 0,
+		bytesRead: Number(response.bytesRead) || 0,
+		skippedFiles: Number(response.skippedFiles) || 0
+	};
+}
 
 function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
   return {

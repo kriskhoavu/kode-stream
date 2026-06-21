@@ -65,6 +65,22 @@ describe('shared api facade', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/workspaces/w1/files', expect.objectContaining({ method: 'POST' }));
   });
 
+  it('encodes and normalizes item and Explorer content searches', async () => {
+		const fetchMock = vi.fn()
+			.mockResolvedValueOnce({ ok: true, json: async () => ({ results: null, truncated: 1 }) })
+			.mockResolvedValueOnce({ ok: true, json: async () => ({ results: [], filesVisited: 3, bytesRead: 42, skippedFiles: 1 }) });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await expect(api.searchItemContent('item/one', { q: 'read me', caseSensitive: true })).resolves.toEqual({
+			results: [], truncated: true, filesVisited: 0, bytesRead: 0, skippedFiles: 0
+		});
+		await expect(api.searchWorkspaceContent({ q: 'needle', mode: 'sources', workspaceId: 'w1', includeIgnored: true })).resolves.toEqual({
+			results: [], truncated: false, filesVisited: 3, bytesRead: 42, skippedFiles: 1
+		});
+		expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/items/item%2Fone/content-search?q=read+me&caseSensitive=true', expect.any(Object));
+		expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/workspaces/files/content-search?q=needle&mode=sources&workspaceId=w1&includeIgnored=true', expect.any(Object));
+	});
+
   it('normalizes audit and workspace health responses', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
