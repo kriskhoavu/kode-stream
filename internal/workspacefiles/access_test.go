@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/models"
 )
 
@@ -63,6 +64,25 @@ func TestListIncludesIgnoredEntriesOnRequest(t *testing.T) {
 	}
 	if len(listing.Entries) != 1 || !listing.Entries[0].Ignored {
 		t.Fatalf("ignored entry not returned: %#v", listing.Entries)
+	}
+}
+
+func TestWriteMarkdownUpdatesTextFile(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "main.go")
+	original := []byte("package main\n")
+	mustWrite(t, path, string(original))
+
+	content, err := NewWithIgnoreChecker(nil).WriteMarkdown(models.WorkspaceConfig{Path: root}, models.WorkspaceFileSaveInput{
+		Path:         "main.go",
+		Content:      "package planmanager\n",
+		ExpectedHash: fileaccess.ContentHash(original),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !content.Editable || content.Content != "package planmanager\n" {
+		t.Fatalf("saved content = %+v", content)
 	}
 }
 

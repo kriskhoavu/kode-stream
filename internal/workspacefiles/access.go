@@ -22,7 +22,7 @@ var (
 	ErrOutsideRoot   = errors.New("workspace path escapes root")
 	ErrHashRequired  = errors.New("expected hash is required")
 	ErrStaleContent  = errors.New("file content changed since it was loaded")
-	ErrMarkdownOnly  = errors.New("only Markdown files can be edited")
+	ErrMarkdownOnly  = errors.New("only Markdown files can be created")
 )
 
 type IgnoreChecker interface {
@@ -113,11 +113,11 @@ func (a *Access) WriteMarkdown(workspace models.WorkspaceConfig, input models.Wo
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	if fileaccess.ClassifyPath(clean).Kind != models.FileKindMarkdown {
-		return models.FileContent{}, ErrMarkdownOnly
-	}
 	current, err := os.ReadFile(full)
 	if err != nil {
+		return models.FileContent{}, err
+	}
+	if err := fileaccess.ValidateEditableContent(current, []byte(input.Content)); err != nil {
 		return models.FileContent{}, err
 	}
 	if fileaccess.ContentHash(current) != input.ExpectedHash {
@@ -180,7 +180,7 @@ func treeEntry(root, relPath string, entry os.DirEntry, ignored bool) (models.Wo
 	node.Kind = classification.Kind
 	node.Language = classification.Language
 	node.SizeBytes = info.Size()
-	node.Editable = classification.Kind == models.FileKindMarkdown
+	node.Editable = fileaccess.IsEditableKind(classification.Kind)
 	return node, true
 }
 

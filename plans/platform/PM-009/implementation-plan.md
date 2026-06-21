@@ -12,6 +12,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | B2    | Scope Resolution And Application     | ✅     |
 | B3    | Item And Explorer Search APIs        | ✅     |
 | B4    | Search Safety And Scale Tests        | ✅     |
+| B5    | Safe Text File Editing               | ✅     |
 | F1    | Types And Content Search Clients     | ✅     |
 | F2    | Tree Mode And Search State           | ✅     |
 | F3    | Item And Explorer Search UI          | ✅     |
@@ -107,6 +108,26 @@ PM-009: Add content search regression tests
 - Protect item and Explorer scope boundaries
 - Exercise binary, ignore, symlink, and budget safeguards
 - Run complete backend regression coverage
+```
+
+### Phase B5: Safe Text File Editing
+
+**Deliverables:**
+
+- [x] Mark loaded text, code, and structured files as editable.
+- [x] Preserve stale-hash, path, binary, UTF-8, and response-size safeguards.
+- [x] Allow Explorer and item Raw mode saves for supported text files.
+- [x] Cover item and workspace text-file writes.
+
+**Verification:** `rtk go test ./internal/fileaccess ./internal/workspacefiles ./internal/application/item ./internal/application/workspacefiles ./internal/api`
+
+**Draft Commit:**
+```text
+PM-009: Enable safe raw text editing
+
+- Allow Raw mode to save supported text files
+- Preserve binary, size, path, and stale-hash guards
+- Cover item and workspace text-file writes
 ```
 
 ## Frontend Phases

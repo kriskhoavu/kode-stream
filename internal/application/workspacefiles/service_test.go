@@ -110,15 +110,15 @@ func TestDiffAndRevertUseOneGuardedPath(t *testing.T) {
 	}
 }
 
-func TestReadRejectsBinaryAndSaveRejectsNonMarkdown(t *testing.T) {
+func TestReadRejectsBinaryAndSaveAcceptsText(t *testing.T) {
 	service, workspace, _, _ := newTestService(t)
 	if _, err := service.Read(workspace.ID, "binary.bin"); !errors.Is(err, fileaccess.ErrUnsupportedContent) {
 		t.Fatalf("binary read error = %v", err)
 	}
 	data, _ := os.ReadFile(filepath.Join(workspace.Path, "notes.txt"))
-	_, err := service.Save(workspace.ID, models.WorkspaceFileSaveInput{Path: "notes.txt", Content: "new", ExpectedHash: fileaccess.ContentHash(data)})
-	if !errors.Is(err, workspaceaccess.ErrMarkdownOnly) {
-		t.Fatalf("text save error = %v", err)
+	saved, err := service.Save(workspace.ID, models.WorkspaceFileSaveInput{Path: "notes.txt", Content: "new", ExpectedHash: fileaccess.ContentHash(data)})
+	if err != nil || saved.File.Content != "new" || !saved.File.Editable {
+		t.Fatalf("text save = %+v, %v", saved, err)
 	}
 }
 

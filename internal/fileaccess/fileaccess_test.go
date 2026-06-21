@@ -56,6 +56,30 @@ func TestWriteMarkdownRejectsStaleHash(t *testing.T) {
 	}
 }
 
+func TestWriteMarkdownUpdatesTextFile(t *testing.T) {
+	root := t.TempDir()
+	itemRoot := filepath.Join(root, "items", "platform", "PM-001")
+	if err := os.MkdirAll(itemRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(itemRoot, "main.go")
+	original := []byte("package main\n")
+	if err := os.WriteFile(path, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	access := New()
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
+	content, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: "main_go", Content: "package planmanager\n", ExpectedHash: contentHash(original)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !content.Editable || content.Content != "package planmanager\n" {
+		t.Fatalf("saved content = %+v", content)
+	}
+}
+
 func TestWriteMarkdownRejectsSymlinkEscape(t *testing.T) {
 	root := t.TempDir()
 	itemRoot := filepath.Join(root, "items", "platform", "PM-001")

@@ -96,3 +96,14 @@ func isBinary(data []byte) bool {
 func IsBinary(data []byte) bool {
 	return isBinary(data)
 }
+
+func IsEditableKind(kind FileKind) bool {
+	return kind != FileKindUnsupported
+}
+
+func ValidateEditableContent(current, next []byte) error {
+	if int64(len(current)) > MaxTextResponseBytes || int64(len(next)) > MaxTextResponseBytes || isBinary(current) || isBinary(next) {
+		return ErrUnsupportedContent
+	}
+	return nil
+}

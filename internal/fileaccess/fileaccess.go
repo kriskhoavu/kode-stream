@@ -55,11 +55,11 @@ func (a *Access) WriteMarkdown(workspace models.WorkspaceConfig, item models.Ite
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	if language(relPath) != "markdown" {
-		return models.FileContent{}, fmt.Errorf("only Markdown files can be edited")
-	}
 	current, err := os.ReadFile(full)
 	if err != nil {
+		return models.FileContent{}, err
+	}
+	if err := ValidateEditableContent(current, []byte(input.Content)); err != nil {
 		return models.FileContent{}, err
 	}
 	if input.ExpectedHash != "" && input.ExpectedHash != contentHash(current) {
@@ -248,7 +248,7 @@ func fileContent(relPath string, data []byte) models.FileContent {
 		Hash:      contentHash(data),
 		Kind:      classification.Kind,
 		SizeBytes: int64(len(data)),
-		Editable:  classification.Kind == FileKindMarkdown,
+		Editable:  IsEditableKind(classification.Kind),
 	}
 }
 
@@ -295,7 +295,7 @@ func readFileContent(relPath, fullPath string) (models.FileContent, error) {
 	content.Hash = hash
 	content.SizeBytes = info.Size()
 	content.Truncated = truncated
-	content.Editable = content.Kind == FileKindMarkdown && !truncated
+	content.Editable = IsEditableKind(content.Kind) && !truncated
 	return content, nil
 }
 

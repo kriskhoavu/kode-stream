@@ -19,11 +19,11 @@ func TestReadFileContentReturnsViewerMetadata(t *testing.T) {
 		editable bool
 	}{
 		{"README.md", models.FileKindMarkdown, "markdown", true},
-		{"page.html", models.FileKindHTML, "html", false},
-		{"data.json", models.FileKindJSON, "json", false},
-		{"plan.yaml", models.FileKindYAML, "yaml", false},
-		{"main.go", models.FileKindCode, "go", false},
-		{"notes.txt", models.FileKindText, "text", false},
+		{"page.html", models.FileKindHTML, "html", true},
+		{"data.json", models.FileKindJSON, "json", true},
+		{"plan.yaml", models.FileKindYAML, "yaml", true},
+		{"main.go", models.FileKindCode, "go", true},
+		{"notes.txt", models.FileKindText, "text", true},
 	}
 
 	for _, test := range tests {
