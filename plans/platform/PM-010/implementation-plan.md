@@ -10,7 +10,7 @@ Add guarded local branch selection to each Explorer workspace root. Reload only 
 |-------|---------------------------------------|--------|
 | B1    | Workspace Branch Query And API        | ✅     |
 | F1    | Branch Client And Workspace State     | ✅     |
-| F2    | Explorer Branch Selector And Final QA |        |
+| F2    | Explorer Branch Selector And Final QA | ✅     |
 
 ## Backend Phases
 
@@ -62,12 +62,12 @@ PM-010: Add Explorer branch state
 
 **Deliverables:**
 
-- [ ] Render a compact branch selector on every workspace root.
-- [ ] Keep selector interaction separate from root expansion.
-- [ ] Save pending editor changes before checkout.
-- [ ] Clear switched workspace selection and unified search state.
-- [ ] Show workspace-local loading and errors.
-- [ ] Build and verify the complete application.
+- [x] Render a compact branch selector on every workspace root.
+- [x] Keep selector interaction separate from root expansion.
+- [x] Save pending editor changes before checkout.
+- [x] Clear switched workspace selection and unified search state.
+- [x] Show workspace-local loading and errors.
+- [x] Build and verify the complete application.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go test ./...`
 
@@ -82,8 +82,8 @@ PM-010: Add per-workspace branch selection
 
 ## Post-Implementation Checklist
 
-- [ ] Switching one workspace leaves other workspace roots unchanged.
-- [ ] Dirty workspaces cannot switch from Explorer.
-- [ ] Files missing on the new branch do not remain open.
-- [ ] Tree, search, Git states, and item data refresh after checkout.
-- [ ] Existing user changes remain unmodified and unstaged.
+- [x] Switching one workspace leaves other workspace roots unchanged.
+- [x] Dirty workspaces cannot switch from Explorer.
+- [x] Files missing on the new branch do not remain open.
+- [x] Tree, search, Git states, and item data refresh after checkout.
+- [x] Existing user changes remain unmodified and unstaged.

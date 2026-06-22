@@ -5,7 +5,7 @@ import { WorkspaceExplorerPage } from './WorkspaceExplorerPage';
 const apiMock = vi.hoisted(() => ({
   items: vi.fn(), workspaceTree: vi.fn(), workspaceFile: vi.fn(), workspaceFileDiff: vi.fn(),
   saveWorkspaceFile: vi.fn(), revertWorkspaceFile: vi.fn(), openPath: vi.fn(), gitStatus: vi.fn(), workspaceHealth: vi.fn(),
-	searchWorkspacePaths: vi.fn(), searchWorkspaceContent: vi.fn(), searchItemContent: vi.fn(), workspacePathGitStates: vi.fn(), createWorkspaceFile: vi.fn(), createWorkspaceDirectory: vi.fn(), renameWorkspacePath: vi.fn()
+	searchWorkspacePaths: vi.fn(), searchWorkspaceContent: vi.fn(), searchItemContent: vi.fn(), workspacePathGitStates: vi.fn(), workspaceBranches: vi.fn(), switchBranch: vi.fn(), createWorkspaceFile: vi.fn(), createWorkspaceDirectory: vi.fn(), renameWorkspacePath: vi.fn()
 }));
 
 vi.mock('../lib/api', () => ({
@@ -26,6 +26,7 @@ describe('WorkspaceExplorerPage', () => {
     apiMock.gitStatus.mockResolvedValue({ workspaceId: 'ws', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] });
     apiMock.workspaceHealth.mockResolvedValue({ workspaceId: 'ws', checkedAt: '', summary: 'ok', checks: [] });
     apiMock.workspacePathGitStates.mockResolvedValue([]);
+    apiMock.workspaceBranches.mockResolvedValue({ workspaceId: 'ws', current: 'main', branches: ['feature/explorer', 'main'] });
     apiMock.searchWorkspacePaths.mockResolvedValue({ results: [], truncated: false });
 		apiMock.searchWorkspaceContent.mockResolvedValue({ results: [], truncated: false, filesVisited: 0, bytesRead: 0, skippedFiles: 0 });
   });
@@ -35,6 +36,24 @@ describe('WorkspaceExplorerPage', () => {
     fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
     await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', '', false));
     expect(await screen.findByText('README.md')).toBeInTheDocument();
+  });
+
+  it('switches the selected workspace branch and clears its file selection', async () => {
+    apiMock.switchBranch.mockResolvedValue({
+      ok: true,
+      status: { workspaceId: 'ws', branch: 'feature/explorer', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }
+    });
+    apiMock.workspaceBranches
+      .mockResolvedValueOnce({ workspaceId: 'ws', current: 'main', branches: ['feature/explorer', 'main'] })
+      .mockResolvedValue({ workspaceId: 'ws', current: 'feature/explorer', branches: ['feature/explorer', 'main'] });
+    const onLocationChange = vi.fn();
+    render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'README.md', mode: 'all' }} onLocationChange={onLocationChange} onOpenKanban={vi.fn()} />);
+    const selector = await screen.findByRole('combobox', { name: 'Branch for Workspace' });
+
+    fireEvent.change(selector, { target: { value: 'feature/explorer' } });
+
+    await waitFor(() => expect(apiMock.switchBranch).toHaveBeenCalledWith('ws', { name: 'feature/explorer', confirm: false }));
+    await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', mode: 'all' }));
   });
 
   it('toggles folders from their names without folder-level Git badges', async () => {
@@ -123,6 +142,6 @@ describe('WorkspaceExplorerPage', () => {
 		expect(screen.queryByText('Paths')).not.toBeInTheDocument();
 		expect(screen.queryByText('Content')).not.toBeInTheDocument();
 		expect(screen.queryByLabelText('Search options')).not.toBeInTheDocument();
-		expect(screen.getAllByRole('combobox')).toHaveLength(1);
+		expect(screen.getAllByRole('combobox')).toHaveLength(2);
 	});
 });

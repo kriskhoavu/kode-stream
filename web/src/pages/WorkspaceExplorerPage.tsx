@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   ChevronDown, ChevronRight, Clipboard, Code2, Eye, File, Folder, FolderGit2, GitCompare,
@@ -12,6 +12,9 @@ import { treeKeyboardAction } from '../features/workspace-explorer/keyboard';
 import { explorerNodeId } from '../features/workspace-explorer/tree';
 import type { VisibleExplorerRow } from '../features/workspace-explorer/types';
 import { useWorkspaceExplorer } from '../features/workspace-explorer/useWorkspaceExplorer';
+import { WorkspaceBranchSelector } from '../features/workspace-explorer/WorkspaceBranchSelector';
+import { useWorkspaceBranches } from '../features/workspace-explorer/useWorkspaceBranches';
+import type { WorkspaceBranchState } from '../features/workspace-explorer/useWorkspaceBranches';
 import { useWorkspacePathSearch } from '../features/workspace-explorer/useWorkspacePathSearch';
 import { useWorkspacePathMutations } from '../features/workspace-explorer/useWorkspacePathMutations';
 import { ApiError, api } from '../lib/api';
@@ -64,6 +67,25 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
     onSaved: () => void loadDiff(),
     onError: (caught) => showError(caught, 'File save failed')
   });
+
+  const refreshAfterBranchSwitch = useCallback(async (workspaceId: string) => {
+    if (location?.workspaceId === workspaceId) {
+      editor.open(null);
+      setDiff('');
+      onLocationChange({ workspaceId, mode: explorer.mode });
+    }
+    pathSearch.setQuery('');
+    contentSearch.clear();
+    setSearchIndex(0);
+    setMatchContext(null);
+    await explorer.refreshWorkspaceBranch(workspaceId);
+  }, [contentSearch, editor, explorer, location?.workspaceId, onLocationChange, pathSearch]);
+  const workspaceBranches = useWorkspaceBranches(workspaces, refreshAfterBranchSwitch);
+
+  const switchWorkspaceBranch = async (workspace: WorkspaceConfig, branch: string) => {
+    if (location?.workspaceId === workspace.id && editor.dirty && !(await editor.saveNow())) return;
+    await workspaceBranches.switchBranch(workspace, branch);
+  };
 
   const showError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -258,7 +280,7 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
 		  {pathSearch.query.trim() && <ExplorerUnifiedSearchResults query={pathSearch.query} results={searchResults} loading={pathSearch.loading || contentSearch.loading} error={pathSearch.error || contentSearch.error} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={openUnifiedSearchResult} />}
 		  <div className="explorer-tree" ref={treeRef} role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>
             {explorer.rows.map((row, index) => (
-              <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={row.node.type === 'file' ? explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path)) : undefined} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} />
+              <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={row.node.type === 'file' ? explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path)) : undefined} branchState={workspaceBranches.states[row.workspaceId]} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} onBranchChange={(workspace, branch) => void switchWorkspaceBranch(workspace, branch)} />
             ))}
             {explorer.rows.length === 0 && <p className="explorer-empty">No matching paths.</p>}
 			{explorer.mode === 'sources' && workspaces.every((item) => item.sources.length === 0) && <button className="secondary" type="button" onClick={() => explorer.setMode('all')}>Browse All Files</button>}
@@ -300,8 +322,9 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   );
 }
 
-function ExplorerTreeRow({ row, gitState, active, selected, expanded, onFocus, onSelect, onToggle }: { row: VisibleExplorerRow; gitState?: WorkspacePathGitState; active: boolean; selected: boolean; expanded: boolean; onFocus: () => void; onSelect: () => void; onToggle: () => void }) {
+function ExplorerTreeRow({ row, gitState, branchState, active, selected, expanded, onFocus, onSelect, onToggle, onBranchChange }: { row: VisibleExplorerRow; gitState?: WorkspacePathGitState; branchState?: WorkspaceBranchState; active: boolean; selected: boolean; expanded: boolean; onFocus: () => void; onSelect: () => void; onToggle: () => void; onBranchChange: (workspace: WorkspaceConfig, branch: string) => void }) {
   const expandable = row.node.type === 'workspace' || row.node.type === 'directory';
+  const workspace = row.node.type === 'workspace' ? row.node.workspace : undefined;
   return <div className={`explorer-tree-row${selected ? ' selected' : ''}${active ? ' active' : ''}`} role="treeitem" aria-level={row.level + 1} aria-expanded={expandable ? expanded : undefined} aria-selected={selected} style={{ '--explorer-depth': row.level } as CSSProperties} onMouseEnter={onFocus}>
     <button className="explorer-row-toggle" type="button" tabIndex={-1} onClick={onToggle} disabled={!expandable}>{expandable ? (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
     <button className="explorer-row-main" type="button" tabIndex={active ? 0 : -1} onFocus={onFocus} onClick={row.node.type === 'directory' ? onToggle : onSelect}>
@@ -310,6 +333,7 @@ function ExplorerTreeRow({ row, gitState, active, selected, expanded, onFocus, o
       {row.item && <i className={`item-status-dot ${row.item.status}`} title={row.item.status} />}
       {gitState && <span className={`explorer-git-state ${gitState.status}`} aria-label={`Git status: ${gitState.status}`}>{gitState.conflict ? '!' : gitState.status.slice(0, 1).toUpperCase()}</span>}
     </button>
+    {workspace && <WorkspaceBranchSelector workspace={workspace} state={branchState} onChange={(branch) => onBranchChange(workspace, branch)} />}
   </div>;
 }
 

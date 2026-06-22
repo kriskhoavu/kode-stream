@@ -84,3 +84,11 @@ Choose another branch
 - [Backend Design](design/design-01-backend.md)
 - [Frontend Design](design/design-02-frontend.md)
 - [Implementation Plan](implementation-plan.md)
+
+## Implementation Result
+
+- Added a workspace-scoped local branch query and API.
+- Added guarded branch state and workspace-only Explorer invalidation.
+- Added one native branch selector to every Explorer workspace root.
+- Preserved dirty-tree protection and cleared branch-stale files and searches.
+- Verified 151 backend tests and 72 frontend tests.
