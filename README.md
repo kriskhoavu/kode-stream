@@ -32,6 +32,8 @@ Current capabilities:
 - View one active workspace at a time.
 - Browse a Kanban board by status.
 - Filter by source, status, author, branch, and text.
+- Browse files across all registered workspaces in Explorer.
+- Switch each Explorer workspace to a local Git branch independently.
 - Open a preview drawer from a board card.
 - Open an item workspace with file tree, Markdown preview, Markdown editor, item info, and diff.
 - Edit Markdown files with autosave.
@@ -56,7 +58,7 @@ See [plans/platform/PM-002/README.md](plans/platform/PM-002/README.md).
 | Area         | Technology                              | Purpose                                      |
 |--------------|-----------------------------------------|----------------------------------------------|
 | Backend      | Go 1.22                                 | Local HTTP API, filesystem access, Git calls |
-| Frontend     | React 19                                | App shell, Kanban, workspace, item views     |
+| Frontend     | React 19                                | App shell, Kanban, Explorer, item workspaces |
 | Build        | Vite 6                                  | Frontend build and dev server                |
 | Language     | TypeScript 5                            | Frontend type safety                         |
 | Tests        | Vitest, React Testing Library, Go test  | Unit and UI behavior checks                  |

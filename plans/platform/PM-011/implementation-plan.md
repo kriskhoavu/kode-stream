@@ -9,7 +9,7 @@ Remove duplicate Items and Branches pages while retaining item detail and Git ca
 | Phase | Name                          | Status |
 |-------|-------------------------------|--------|
 | F1    | Routes And Navigation Removal | ✅     |
-| F2    | Documentation And Final QA    |        |
+| F2    | Documentation And Final QA    | ✅     |
 
 ## Frontend Phases
 
@@ -38,10 +38,10 @@ PM-011: Remove redundant Items and Branches pages
 
 **Deliverables:**
 
-- [ ] Update README capabilities and architecture page inventory.
-- [ ] Record final PM-011 behavior.
-- [ ] Run the complete frontend and backend suites.
-- [ ] Build embedded production assets.
+- [x] Update README capabilities and architecture page inventory.
+- [x] Record final PM-011 behavior.
+- [x] Run the complete frontend and backend suites.
+- [x] Build embedded production assets.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go test ./...`
 
@@ -56,8 +56,8 @@ PM-011: Update consolidated navigation documentation
 
 ## Post-Implementation Checklist
 
-- [ ] Desktop navigation has no Items or Branches entries.
-- [ ] Mobile navigation has no Items or Branches entries.
-- [ ] `/items/{id}` still opens the item workspace.
-- [ ] `/items` and `/branches` fall back to Kanban.
-- [ ] Item search and Explorer branch controls remain functional.
+- [x] Desktop navigation has no Items or Branches entries.
+- [x] Mobile navigation has no Items or Branches entries.
+- [x] `/items/{id}` still opens the item workspace.
+- [x] `/items` and `/branches` fall back to Kanban.
+- [x] Item search and Explorer branch controls remain functional.

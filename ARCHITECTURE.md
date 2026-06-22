@@ -1,6 +1,6 @@
 # Plan Manager Architecture
 
-This document describes the current architecture after PM-003 through PM-007.
+This document describes the current architecture through PM-011.
 
 Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
@@ -118,8 +118,6 @@ User browser
 | Workspace page            | `web/src/pages/WorkspacesPage.tsx`        | Workspace create, edit, delete, scan, reveal                        |
 | Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`     | File tree, preview, Markdown editor, diff, metadata, Git controls   |
 | Explorer page             | `web/src/pages/WorkspaceExplorerPage.tsx` | Global filesystem tree, file editor, and context inspector          |
-| Items page                | `web/src/pages/ItemsPage.tsx`             | Searchable list view for active workspace                           |
-| Branches page             | `web/src/pages/BranchesPage.tsx`          | Branch summary inferred from indexed items                          |
 | Error boundary            | `web/src/components/ErrorBoundary.tsx`    | Catches frontend render failures                                    |
 | Styles                    | `web/src/styles`                          | Global styles plus app-shell stylesheet                             |
 

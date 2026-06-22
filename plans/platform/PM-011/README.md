@@ -49,3 +49,12 @@ PM-011 removes the top-level Items and Branches pages. Kanban owns item discover
 - [Scenario Overview](scenario/scenario-00-overview.md)
 - [Frontend Design](design/design-01-frontend.md)
 - [Implementation Plan](implementation-plan.md)
+
+## Implementation Result
+
+- Removed Items and Branches from desktop and mobile navigation.
+- Removed their top-level route variants and page components.
+- Kept `/items/{id}` for item workspaces opened by Kanban and search.
+- Kept item and Git branch APIs used by Kanban and Explorer.
+- Made legacy `/items` and `/branches` URLs fall back to Kanban.
+- Verified 151 backend tests and 79 frontend tests.
