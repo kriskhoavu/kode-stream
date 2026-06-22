@@ -1,5 +1,5 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
 import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { StatusMenu } from '../components/StatusMenu';
@@ -9,6 +9,7 @@ import type { FileContent, FileNode, GitStatus, ItemDetail, ItemMetadataUpdateIn
 import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/kanban/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/kanban/filtering';
+import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/kanban/dragAndDrop';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
@@ -39,6 +40,10 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [saveFilterOpen, setSaveFilterOpen] = useState(false);
   const [saveFilterName, setSaveFilterName] = useState('');
+  const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(() => new Set());
+  const [activeItemId, setActiveItemId] = useState('');
+  const [dragTargetStatus, setDragTargetStatus] = useState<ItemStatus | ''>('');
+  const suppressPreviewItemId = useRef('');
   const text = query;
 
   useEffect(() => {
@@ -79,6 +84,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     filteredPlans.forEach((plan) => map.get(plan.status)?.push(plan));
     return map;
   }, [filteredPlans]);
+  const activeItem = activeItemId ? items.find((item) => item.id === activeItemId) : undefined;
 
   const scan = async () => {
     if (!workspace) return;
@@ -99,15 +105,77 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     setPlans(await api.items(new URLSearchParams({ workspaceId: workspace.id })));
   };
 
-  const movePlan = async (itemId: string, status: ItemStatus) => {
+  const moveItem = async (itemId: string, status: ItemStatus) => {
+    const item = items.find((candidate) => candidate.id === itemId);
+    if (!item || !isItemDraggable(item) || !isDropStatus(status) || item.status === status || pendingItemIds.has(itemId)) return;
+
+    const previousStatus = item.status;
+    setError('');
+    setPlans((current) => applyItemStatus(current, itemId, status));
+    setPendingItemIds((current) => new Set(current).add(itemId));
     try {
-      await api.updateStatus(itemId, { status });
+      const result = await api.updateStatus(itemId, { status });
+      setPlans((current) => current.map((candidate) => candidate.id === itemId ? { ...candidate, ...result.item } : candidate));
       notifyReliabilityChanged();
       await onWorkspacesChanged();
-      await reloadPlans();
     } catch (err) {
+      setPlans((current) => current.map((candidate) => (
+        candidate.id === itemId && candidate.status === status ? { ...candidate, status: previousStatus } : candidate
+      )));
       setError(err instanceof Error ? err.message : 'Status update failed');
+    } finally {
+      setPendingItemIds((current) => {
+        const next = new Set(current);
+        next.delete(itemId);
+        return next;
+      });
     }
+  };
+
+  const handleCardDragStart = (event: DragEvent<HTMLElement>, itemId: string) => {
+    const item = items.find((candidate) => candidate.id === itemId);
+    if (!item || !isItemDraggable(item) || pendingItemIds.has(itemId)) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', itemId);
+    setActiveItemId(itemId);
+    suppressPreviewItemId.current = itemId;
+  };
+
+  const finishDrag = (itemId: string) => {
+    suppressPreviewItemId.current = itemId;
+    window.setTimeout(() => {
+      if (suppressPreviewItemId.current === itemId) suppressPreviewItemId.current = '';
+    }, 0);
+    setActiveItemId('');
+    setDragTargetStatus('');
+  };
+
+  const handleCardDragEnd = (itemId: string) => {
+    finishDrag(itemId);
+  };
+
+  const handleColumnDragOver = (event: DragEvent<HTMLElement>, status: ItemStatus) => {
+    if (!activeItemId || !isDropStatus(status)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (dragTargetStatus !== status) setDragTargetStatus(status);
+  };
+
+  const handleColumnDragLeave = (event: DragEvent<HTMLElement>, status: ItemStatus) => {
+    if (dragTargetStatus === status && !event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setDragTargetStatus('');
+    }
+  };
+
+  const handleColumnDrop = (event: DragEvent<HTMLElement>, status: ItemStatus) => {
+    const itemId = event.dataTransfer.getData('text/plain') || activeItemId;
+    if (!itemId || !isDropStatus(status)) return;
+    event.preventDefault();
+    setDragTargetStatus('');
+    void moveItem(itemId, status);
   };
 
   const createPlan = async () => {
@@ -253,37 +321,45 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
         <span>{filteredPlans.length} of {items.length} items</span>
         {activeFilterCount > 0 && <span>{activeFilterCount} active filters</span>}
       </div>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       <div className="kanban-board" aria-busy={loading}>
         {statusOrder.map((column) => (
           <Fragment key={column}>
-            <div className={`kanban-column ${column}`}>
-              <header>
-                <h2>{statusLabels[column]}</h2>
-                <span>{grouped.get(column)?.length ?? 0}</span>
-                <Filter size={14} />
-              </header>
-              <div className="card-stack">
-                {loading && Array.from({ length: 3 }).map((_, index) => <div className="plan-card skeleton" key={index} />)}
-                {!loading && grouped.get(column)?.map((plan) => (
-                  <PlanCard
-                    key={plan.id}
-                    item={plan}
-                    workspace={workspace}
-                    onPreview={() => setDrawerPlanId(plan.id)}
-                    onOpen={() => onOpenPlan(plan.id)}
-                    onMove={(status) => movePlan(plan.id, status)}
-                  />
-                ))}
-                {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No items</div>}
-              </div>
-              {column !== 'unsorted' && (
-                <button className="new-plan-column-button" type="button" onClick={() => {
-                  setNewPlanDraft((draft) => ({ ...draft, status: column, source: workspace?.sources[0] ?? '' }));
-                  setNewPlanOpen(true);
-                }}>+ New item</button>
-              )}
-            </div>
+            <KanbanColumn
+              status={column}
+              itemCount={grouped.get(column)?.length ?? 0}
+              loading={loading}
+              dragActive={Boolean(activeItem)}
+              dragTargetStatus={dragTargetStatus}
+              onDragOver={handleColumnDragOver}
+              onDragLeave={handleColumnDragLeave}
+              onDrop={handleColumnDrop}
+              onCreate={column === 'unsorted' ? undefined : () => {
+                setNewPlanDraft((draft) => ({ ...draft, status: column, source: workspace?.sources[0] ?? '' }));
+                setNewPlanOpen(true);
+              }}
+            >
+              {!loading && grouped.get(column)?.map((plan) => (
+                <PlanCard
+                  key={plan.id}
+                  item={plan}
+                  workspace={workspace}
+                  pending={pendingItemIds.has(plan.id)}
+                  active={activeItemId === plan.id}
+                  onDragStart={(event) => handleCardDragStart(event, plan.id)}
+                  onDragEnd={() => handleCardDragEnd(plan.id)}
+                  onPreview={() => {
+                    if (suppressPreviewItemId.current === plan.id) {
+                      suppressPreviewItemId.current = '';
+                      return;
+                    }
+                    setDrawerPlanId(plan.id);
+                  }}
+                  onOpen={() => onOpenPlan(plan.id)}
+                  onMove={(status) => moveItem(plan.id, status)}
+                />
+              ))}
+            </KanbanColumn>
             {column === 'unsorted' && (
               <button className="kanban-separator" type="button" onClick={onOpenWorkspaces} disabled={!onOpenWorkspaces} title="Configure source structure">
                 <span className="separator-arrow">▶</span>
@@ -417,22 +493,104 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
   );
 }
 
-const PlanCard = memo(function PlanCard({ item: plan, workspace, onPreview, onOpen, onMove }: { item: ItemSummary; workspace?: WorkspaceConfig; onPreview: () => void; onOpen: () => void; onMove: (status: ItemStatus) => void }) {
+function KanbanColumn({ status, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
+  status: ItemStatus;
+  itemCount: number;
+  loading: boolean;
+  dragActive: boolean;
+  dragTargetStatus: ItemStatus | '';
+  onDragOver: (event: DragEvent<HTMLElement>, status: ItemStatus) => void;
+  onDragLeave: (event: DragEvent<HTMLElement>, status: ItemStatus) => void;
+  onDrop: (event: DragEvent<HTMLElement>, status: ItemStatus) => void;
+  onCreate?: () => void;
+  children: React.ReactNode;
+}) {
+  const droppable = isDropStatus(status);
+  const classes = ['kanban-column', status];
+  if (dragActive && droppable) classes.push('drop-enabled');
+  if (dragTargetStatus === status && droppable) classes.push('drop-target');
+
+  return (
+    <div
+      className={classes.join(' ')}
+      data-status={status}
+      onDragOver={(event) => onDragOver(event, status)}
+      onDragLeave={(event) => onDragLeave(event, status)}
+      onDrop={(event) => onDrop(event, status)}
+    >
+      <header>
+        <h2>{statusLabels[status]}</h2>
+        <span>{itemCount}</span>
+        <Filter size={14} />
+      </header>
+      <div className="card-stack">
+        {loading && Array.from({ length: 3 }).map((_, index) => <div className="plan-card skeleton" key={index} />)}
+        {children}
+        {!loading && itemCount === 0 && <div className="column-empty">No items</div>}
+      </div>
+      {onCreate && <button className="new-plan-column-button" type="button" onClick={onCreate}>+ New item</button>}
+    </div>
+  );
+}
+
+const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, onDragStart, onDragEnd, onPreview, onOpen, onMove }: {
+  item: ItemSummary;
+  workspace?: WorkspaceConfig;
+  pending: boolean;
+  active: boolean;
+  onDragStart: (event: DragEvent<HTMLElement>) => void;
+  onDragEnd: () => void;
+  onPreview: () => void;
+  onOpen: () => void;
+  onMove: (status: ItemStatus) => void;
+}) {
   const source = sourceLabel(plan, workspace);
   const docs = plan.metadataSource === 'docs';
+  const draggable = isItemDraggable(plan) && !pending;
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onOpen();
   };
+  const classes = ['plan-card'];
+  if (docs) classes.push('docs-plan');
+  if (draggable) classes.push('draggable');
+  if (active) classes.push('dragging');
+  if (pending) classes.push('move-pending');
   return (
-    <article className={docs ? 'plan-card docs-plan' : 'plan-card'} onClick={onPreview} role="button" tabIndex={0} onKeyDown={(event) => {
+    <article
+      className={classes.join(' ')}
+      draggable={draggable}
+      aria-busy={pending}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onClick={onPreview}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         onPreview();
       }
-    }}>
+      }}
+    >
       <div className="plan-card-title">
-        <button type="button" className="plan-card-link plan-card-heading" onClick={navigate}>{plan.title}</button>
+        <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
+        {draggable ? (
+          <button
+            type="button"
+            className="drag-affordance"
+            aria-label="Drag card to another status"
+            title="Drag this card to another status"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span aria-hidden="true">⋮⋮</span>
+            Drag
+          </button>
+        ) : (
+          <span className="drag-affordance locked" aria-label="Card cannot be dragged" title="This card cannot be dragged">
+            Fixed
+          </span>
+        )}
         <span className="card-badges">
           {plan.scope && <span className="scope-badge">{plan.scope}</span>}
           {plan.scope && source && <span className="badge-separator">|</span>}

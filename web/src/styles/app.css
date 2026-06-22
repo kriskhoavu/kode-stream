@@ -803,6 +803,20 @@ select {
   min-width: 0;
   overflow: hidden;
   box-shadow: var(--shadow-soft);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.kanban-column.drop-enabled {
+  border-color: color-mix(in srgb, var(--blue) 32%, var(--line));
+}
+
+.kanban-column.drop-target {
+  border-color: color-mix(in srgb, var(--blue) 78%, var(--line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 18%, transparent), var(--shadow-soft);
+}
+
+.kanban-column.drop-target .card-stack {
+  background: color-mix(in srgb, var(--blue) 7%, transparent);
 }
 
 .kanban-column.unsorted { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 84%, #e5e7eb), var(--panel)); }
@@ -870,8 +884,62 @@ select {
   box-shadow: 0 14px 30px rgba(17, 24, 39, 0.1);
 }
 
+.plan-card.draggable {
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.plan-card.draggable .drag-affordance {
+  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
+  border-color: color-mix(in srgb, var(--blue) 45%, var(--line));
+  color: var(--blue);
+  cursor: grab;
+}
+
+.plan-card.draggable:hover .drag-affordance,
+.plan-card.draggable:focus-visible .drag-affordance {
+  background: color-mix(in srgb, var(--blue) 18%, var(--panel));
+  border-color: color-mix(in srgb, var(--blue) 68%, var(--line));
+}
+
+.plan-card.dragging {
+  opacity: 0.34;
+  cursor: grabbing;
+}
+
+.plan-card.move-pending {
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.drag-overlay-card {
+  width: min(280px, calc(100vw - 32px));
+  cursor: grabbing;
+  pointer-events: none;
+  transform: scale(1.02) rotate(0.4deg);
+  border-color: color-mix(in srgb, var(--blue) 58%, var(--line));
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.22);
+}
+
+.drag-overlay-card:hover {
+  transform: scale(1.02) rotate(0.4deg);
+}
+
 .plan-card.docs-plan {
   border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kanban-column,
+  .plan-card,
+  .drag-overlay-card {
+    transition: none;
+  }
+
+  .drag-overlay-card,
+  .drag-overlay-card:hover {
+    transform: none;
+  }
 }
 
 .plan-card-title {
@@ -880,6 +948,38 @@ select {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+}
+
+.drag-affordance {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 800;
+  gap: 3px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 4px 7px;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+button.drag-affordance {
+  font-family: inherit;
+}
+
+button.drag-affordance:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--blue) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.drag-affordance.locked {
+  background: color-mix(in srgb, var(--muted) 8%, var(--panel));
+  color: color-mix(in srgb, var(--muted) 88%, var(--text));
 }
 
 .plan-card-title strong,

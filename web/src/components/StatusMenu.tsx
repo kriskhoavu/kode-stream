@@ -24,7 +24,7 @@ export function StatusMenu({ value, onChange, ariaLabel = 'Change item status' }
   };
 
   return (
-    <div className="status-move-control" ref={menuRef} onClick={(event) => event.stopPropagation()}>
+    <div className="status-move-control" ref={menuRef} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
       <button type="button" className="status-move-trigger" onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-label={ariaLabel}>
         <span>{statusLabels[value]}</span>
         <ChevronDown className={open ? 'status-move-chevron open' : 'status-move-chevron'} size={15} aria-hidden="true" />
