@@ -67,14 +67,16 @@ describe('KanbanPage', () => {
 
     render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
-    const branchSelect = await screen.findByRole('combobox', { name: 'Select Kanban branch' });
+    const branchSelect = await screen.findByRole('button', { name: 'Select Kanban branch' });
     await waitFor(() => expect(screen.queryByText('Feature item')).not.toBeInTheDocument());
     expect(screen.getByText('Drag cards')).toBeInTheDocument();
     expect(screen.getByText('working tree')).toBeInTheDocument();
 
-    expect(within(branchSelect).getByRole('option', { name: 'main' })).toBeInTheDocument();
-    expect(within(branchSelect).getByRole('option', { name: 'feature/pm-012' })).toBeInTheDocument();
-    expect(within(branchSelect).getByRole('option', { name: 'release/old' })).toBeInTheDocument();
+    fireEvent.click(branchSelect);
+    const branchMenu = screen.getByRole('listbox', { name: 'Kanban branches' });
+    expect(within(branchMenu).getByRole('option', { name: 'main' })).toBeInTheDocument();
+    expect(within(branchMenu).getByRole('option', { name: 'feature/pm-012' })).toBeInTheDocument();
+    expect(within(branchMenu).getByRole('option', { name: 'release/old' })).toBeInTheDocument();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       if (url === '/api/workspaces/r1/kanban/branch') {
@@ -85,11 +87,11 @@ describe('KanbanPage', () => {
       if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main', 'feature/pm-012', 'release/old'] }));
       return Promise.resolve(response({}));
     });
-    fireEvent.change(branchSelect, { target: { value: 'feature/pm-012' } });
+    fireEvent.click(within(branchMenu).getByRole('option', { name: 'feature/pm-012' }));
 
     await waitFor(() => expect(screen.getByText('Feature item')).toBeInTheDocument());
     expect(screen.queryByText('Drag cards')).not.toBeInTheDocument();
-    expect(screen.getByText('snapshot; writes copy into main')).toBeInTheDocument();
+    expect(screen.getByText('snapshot -> main')).toBeInTheDocument();
   });
 
   it('offers the current branch selector option even when no indexed item is on it', async () => {
@@ -105,10 +107,12 @@ describe('KanbanPage', () => {
     render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
     await waitFor(() => expect(screen.queryByText('Drag cards')).not.toBeInTheDocument());
-    const branchSelect = await screen.findByRole('combobox', { name: 'Select Kanban branch' });
+    const branchSelect = await screen.findByRole('button', { name: 'Select Kanban branch' });
 
-    expect(within(branchSelect).getByRole('option', { name: 'main' })).toBeInTheDocument();
-    expect(within(branchSelect).getByRole('option', { name: 'feature/pm-012' })).toBeInTheDocument();
+    fireEvent.click(branchSelect);
+    const branchMenu = screen.getByRole('listbox', { name: 'Kanban branches' });
+    expect(within(branchMenu).getByRole('option', { name: 'main' })).toBeInTheDocument();
+    expect(within(branchMenu).getByRole('option', { name: 'feature/pm-012' })).toBeInTheDocument();
   });
 
   it('moves status optimistically and reconciles the returned item', async () => {

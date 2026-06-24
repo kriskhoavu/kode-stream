@@ -49,6 +49,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   const [workspaceBranchList, setWorkspaceBranchList] = useState<string[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
   const [branchContext, setBranchContext] = useState<BranchLoadResult | null>(null);
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const suppressPreviewRef = useRef<{ itemId: string; until: number } | null>(null);
   const text = query;
 
@@ -61,6 +62,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       setBranchContext(result);
       setSelectedBranch(result.branch);
       setPlans(result.items);
+      setBranchMenuOpen(false);
     } catch (err) {
       try {
         const fallbackItems = await api.items(new URLSearchParams({ workspaceId: workspace.id }));
@@ -68,6 +70,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
         setSelectedBranch(branch || workspace.baselineBranch);
         setPlans(fallbackItems);
         setError('');
+        setBranchMenuOpen(false);
       } catch {
         setError(err instanceof Error ? err.message : 'Failed to load branch snapshot');
         setPlans([]);
@@ -82,6 +85,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       setPlans([]);
       setBranchContext(null);
       setSelectedBranch('');
+      setBranchMenuOpen(false);
       setLoading(false);
       return;
     }
@@ -338,20 +342,41 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
         </div>
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
-            <label className={sourceMode === 'snapshot' ? 'branch-context-chip active' : 'branch-context-chip'}>
+            <div className={sourceMode === 'snapshot' ? 'branch-context-chip active' : 'branch-context-chip'}>
               <GitBranch size={14} />
               <span>Branch</span>
-              <select
-                value={selectedBranch || currentBranch}
-                onChange={(event) => void loadBranch(event.target.value, false)}
-                aria-label="Select Kanban branch"
-              >
-                {branchOptions.map((branch) => (
-                  <option value={branch} key={branch}>{branch}</option>
-                ))}
-              </select>
-              <small>{sourceMode === 'snapshot' ? `snapshot; writes copy into ${currentBranch}` : 'working tree'}</small>
-            </label>
+              <div className="branch-selector-wrap">
+                <button
+                  type="button"
+                  className="branch-picker-trigger"
+                  aria-label="Select Kanban branch"
+                  aria-haspopup="listbox"
+                  aria-expanded={branchMenuOpen}
+                  onClick={() => setBranchMenuOpen((open) => !open)}
+                >
+                  <span>{selectedBranch || currentBranch}</span>
+                  <ChevronDown size={14} />
+                </button>
+                {branchMenuOpen && (
+                  <div className="branch-picker-menu" role="listbox" aria-label="Kanban branches">
+                    {branchOptions.map((branch) => (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={branch === (selectedBranch || currentBranch)}
+                        key={branch}
+                        onClick={() => void loadBranch(branch, false)}
+                      >
+                        {branch}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <small title={sourceMode === 'snapshot' ? `Snapshot; writes copy into ${currentBranch}` : 'Working tree'}>
+                {sourceMode === 'snapshot' ? `snapshot -> ${currentBranch}` : 'working tree'}
+              </small>
+            </div>
             {workspace.sources.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
             ))}
