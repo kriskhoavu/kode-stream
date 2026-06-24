@@ -1,5 +1,7 @@
 import type { SourceStructureCard } from '../../lib/types';
 
+export type SourceStructureSegmentRole = 'scope' | 'identifier' | 'literal';
+
 export function normalizeDroppedPath(value?: string): string {
   if (!value) return '';
   const trimmed = value.trim().replace(/^["']|["']$/g, '');
@@ -30,10 +32,38 @@ export function lastPathSegment(value: string): string {
   return value.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
 }
 
+export function previewPathSegments(path: string, directory: string): string[] {
+  const pathSegments = path.split('/').map((segment) => segment.trim()).filter(Boolean);
+  const directorySegments = directory.split('/').map((segment) => segment.trim()).filter(Boolean);
+  if (directorySegments.every((segment, index) => pathSegments[index] === segment)) {
+    return pathSegments.slice(directorySegments.length);
+  }
+  return pathSegments;
+}
+
+export function applySegmentRole(pathPattern: string, sampleSegments: string[], index: number, role: SourceStructureSegmentRole): string {
+  if (index < 0) return pathPattern;
+  const segments = pathPattern.split('/').map((segment) => segment.trim()).filter(Boolean);
+  const maxLength = Math.max(segments.length, sampleSegments.length, index + 1);
+  const next = Array.from({ length: maxLength }, (_, segmentIndex) => segments[segmentIndex] || sampleSegments[segmentIndex] || 'segment');
+  if (role === 'scope') {
+    next[index] = '{scope}';
+  } else if (role === 'identifier') {
+    next[index] = '{identifier}';
+  } else {
+    next[index] = literalPathSegment(sampleSegments[index] || next[index]);
+  }
+  return next.join('/');
+}
+
 function preferredVariable(variables: string[], preferred: string[]): string | undefined {
   return preferred.find((name) => variables.includes(name));
 }
 
 function lastLiteralPathSegment(pathPattern: string): string {
   return pathPattern.split('/').map((segment) => segment.trim()).filter(Boolean).filter((segment) => !segment.includes('{') && !segment.includes('}')).at(-1) ?? '';
+}
+
+function literalPathSegment(value: string): string {
+  return value.replace(/[{}*?]/g, '').trim() || 'segment';
 }

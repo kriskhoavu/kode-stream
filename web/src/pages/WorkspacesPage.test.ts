@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inferCompatibilityFields, normalizeDroppedPath, parseSources } from './WorkspacesPage';
+import { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parseSources, previewPathSegments } from './WorkspacesPage';
 
 describe('normalizeDroppedPath', () => {
   it('decodes file URLs dropped onto the path field', () => {
@@ -41,5 +41,17 @@ describe('inferCompatibilityFields', () => {
       scope: '{service}',
       identifier: '{ticket}'
     });
+  });
+});
+
+describe('source structure path helpers', () => {
+  it('returns preview path segments relative to the source directory', () => {
+    expect(previewPathSegments('docs/api/feature/DI-101', 'docs')).toEqual(['api', 'feature', 'DI-101']);
+  });
+
+  it('applies a clicked segment role to the path pattern', () => {
+    expect(applySegmentRole('api/feature/DI-101', ['api', 'feature', 'DI-101'], 0, 'scope')).toBe('{scope}/feature/DI-101');
+    expect(applySegmentRole('{scope}/feature/DI-101', ['api', 'feature', 'DI-101'], 2, 'identifier')).toBe('{scope}/feature/{identifier}');
+    expect(applySegmentRole('{scope}/{identifier}/DI-101', ['api', 'feature', 'DI-101'], 1, 'literal')).toBe('{scope}/feature/DI-101');
   });
 });

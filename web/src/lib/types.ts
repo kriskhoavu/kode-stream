@@ -98,12 +98,32 @@ export interface SourceStructureFields {
   tags?: string[];
 }
 
+export interface SourceStructureProposal {
+  id: string;
+  label: string;
+  summary: string;
+  confidence: 'high' | 'medium' | 'low' | string;
+  card: SourceStructureCard;
+  preview: SourceStructurePreview[];
+}
+
+export interface SourceStructurePreview {
+  path: string;
+  scope: string;
+  identifier: string;
+  title: string;
+  status: ItemStatus;
+  tags: string[];
+}
+
 export interface SourceSettingsResult {
   directory: string;
   exists: boolean;
   mode?: 'structured' | 'unstructured' | 'empty' | 'unknown';
   settings: SourceStructureSettings;
   warnings: { itemPath?: string; message: string }[];
+  proposals?: SourceStructureProposal[];
+  preview?: SourceStructurePreview[];
   scan?: ScanResult;
 }
 

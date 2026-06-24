@@ -3,14 +3,25 @@ import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, 
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../lib/api';
-import type { WorkspaceConfig, SourceStructureSettings, SourceStructureCard } from '../lib/types';
+import type { WorkspaceConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal } from '../lib/types';
 import { labels } from '../lib/vocabulary';
-import { inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources } from '../features/workspaces/sourceSettings';
+import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
+import type { SourceStructureSegmentRole } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
-export { inferCompatibilityFields, normalizeDroppedPath, parseSources };
+export { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parseSources, previewPathSegments };
 
 const DEFAULT_SOURCES = ['docs', 'plans'];
+type SettingsEditorState = {
+  repo: WorkspaceConfig;
+  directory: string;
+  exists: boolean;
+  mode?: string;
+  card: SourceStructureCard;
+  warnings: string[];
+  proposals: SourceStructureProposal[];
+  preview: SourceStructurePreview[];
+};
 
 export function WorkspacesPage({ workspaces, onChanged }: { workspaces: WorkspaceConfig[]; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('Plan Manager');
@@ -23,14 +34,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [editingId, setEditingId] = useState('');
   const [editDraft, setEditDraft] = useState({ name: '', path: '', baselineBranch: '', sources: '' });
   const [repoToRemove, setRepoToRemove] = useState<WorkspaceConfig | null>(null);
-  const [settingsEditor, setSettingsEditor] = useState<{
-    repo: WorkspaceConfig;
-    directory: string;
-    exists: boolean;
-    mode?: string;
-    card: SourceStructureCard;
-    warnings: string[];
-  } | null>(null);
+  const [settingsEditor, setSettingsEditor] = useState<SettingsEditorState | null>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -157,7 +161,9 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         exists: result.exists,
         mode: result.mode,
         card: normalizeSettingsCard(result.settings?.cards?.[0], directory),
-        warnings: (result.warnings ?? []).map((warning) => warning.message)
+        warnings: (result.warnings ?? []).map((warning) => warning.message),
+        proposals: result.proposals ?? [],
+        preview: result.preview ?? []
       });
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Settings failed to load');
@@ -351,6 +357,18 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                 {settingsEditor.warnings.map((warning) => <p key={warning}>{warning}</p>)}
               </div>
             )}
+            <SourceStructureProposalList
+              proposals={settingsEditor.proposals}
+              selectedCard={settingsEditor.card}
+              onSelect={(proposal) => applySettingsProposal(setSettingsEditor, proposal)}
+            />
+            <SourceStructurePathBuilder
+              directory={settingsEditor.directory}
+              card={settingsEditor.card}
+              preview={settingsEditor.preview}
+              onRole={(index, role) => applySettingsSegmentRole(setSettingsEditor, index, role)}
+            />
+            <SourceStructurePreviewTable preview={settingsEditor.preview} />
             <div className="metadata-form source-structure-form">
               <label>
                 Path Pattern
@@ -396,6 +414,88 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             </footer>
           </div>
         </section>
+      )}
+    </section>
+  );
+}
+
+function SourceStructureProposalList({ proposals, selectedCard, onSelect }: { proposals: SourceStructureProposal[]; selectedCard: SourceStructureCard; onSelect: (proposal: SourceStructureProposal) => void }) {
+  if (proposals.length === 0) return null;
+  return (
+    <section className="source-proposals" aria-label="Source structure proposals">
+      <div className="source-structure-section-heading">
+        <strong>Suggested structures</strong>
+        <span>Choose the closest match, then adjust if needed.</span>
+      </div>
+      <div className="source-proposal-grid">
+        {proposals.map((proposal) => {
+          const selected = cardsMatch(selectedCard, proposal.card);
+          return (
+            <button className={selected ? 'source-proposal-card active' : 'source-proposal-card'} type="button" key={proposal.id} onClick={() => onSelect(proposal)}>
+              <span className="proposal-confidence">{proposal.confidence}</span>
+              <strong>{proposal.label}</strong>
+              <span>{proposal.summary}</span>
+              <small>{proposal.card.pathPattern}</small>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SourceStructurePathBuilder({ directory, card, preview, onRole }: { directory: string; card: SourceStructureCard; preview: SourceStructurePreview[]; onRole: (index: number, role: SourceStructureSegmentRole) => void }) {
+  const samplePath = preview[0]?.path ?? [directory, ...card.pathPattern.split('/')].filter(Boolean).join('/');
+  const segments = previewPathSegments(samplePath, directory);
+  if (segments.length === 0) return null;
+  return (
+    <section className="source-path-builder" aria-label="Path segment builder">
+      <div className="source-structure-section-heading">
+        <strong>Click path segments</strong>
+        <span>Mark which parts become card fields.</span>
+      </div>
+      <div className="source-segment-list">
+        {segments.map((segment, index) => (
+          <div className="source-segment-card" key={`${segment}-${index}`}>
+            <span className="source-segment-pill">{segment}</span>
+            <div className="segment-role-actions" role="group" aria-label={`Role for ${segment}`}>
+              <button type="button" onClick={() => onRole(index, 'scope')}>Scope</button>
+              <button type="button" onClick={() => onRole(index, 'identifier')}>Identifier</button>
+              <button type="button" onClick={() => onRole(index, 'literal')}>Fixed</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SourceStructurePreviewTable({ preview }: { preview: SourceStructurePreview[] }) {
+  return (
+    <section className="source-preview" aria-label="Source structure preview">
+      <div className="source-structure-section-heading">
+        <strong>Preview</strong>
+        <span>{preview.length === 0 ? 'No matching card directories yet.' : `${preview.length} sample cards`}</span>
+      </div>
+      {preview.length > 0 && (
+        <div className="source-preview-table">
+          <div className="source-preview-row heading">
+            <span>Path</span>
+            <span>Scope</span>
+            <span>Identifier</span>
+            <span>Title</span>
+            <span>Status</span>
+          </div>
+          {preview.map((row) => (
+            <div className="source-preview-row" key={row.path}>
+              <span title={row.path}>{row.path}</span>
+              <span>{row.scope}</span>
+              <span>{row.identifier}</span>
+              <span>{row.title}</span>
+              <span>{row.status}</span>
+            </div>
+          ))}
+        </div>
       )}
     </section>
   );
@@ -481,14 +581,7 @@ function withInferredCompatibilityFields(card: SourceStructureCard, directory: s
 }
 
 function updateSettingsCard(
-  setSettingsEditor: Dispatch<SetStateAction<{
-    repo: WorkspaceConfig;
-    directory: string;
-    exists: boolean;
-    mode?: string;
-    card: SourceStructureCard;
-    warnings: string[];
-  } | null>>,
+  setSettingsEditor: Dispatch<SetStateAction<SettingsEditorState | null>>,
   patch: Partial<SourceStructureCard>
 ) {
   setSettingsEditor((current) => {
@@ -501,14 +594,7 @@ function updateSettingsCard(
 }
 
 function updateSettingsField(
-  setSettingsEditor: Dispatch<SetStateAction<{
-    repo: WorkspaceConfig;
-    directory: string;
-    exists: boolean;
-    mode?: string;
-    card: SourceStructureCard;
-    warnings: string[];
-  } | null>>,
+  setSettingsEditor: Dispatch<SetStateAction<SettingsEditorState | null>>,
   field: keyof SourceStructureCard['fields'],
   value: string
 ) {
@@ -526,4 +612,44 @@ function updateSettingsField(
       }
     };
   });
+}
+
+function applySettingsProposal(
+  setSettingsEditor: Dispatch<SetStateAction<SettingsEditorState | null>>,
+  proposal: SourceStructureProposal
+) {
+  setSettingsEditor((current) => {
+    if (!current) return current;
+    return {
+      ...current,
+      card: normalizeSettingsCard(proposal.card, current.directory),
+      preview: proposal.preview
+    };
+  });
+}
+
+function applySettingsSegmentRole(
+  setSettingsEditor: Dispatch<SetStateAction<SettingsEditorState | null>>,
+  index: number,
+  role: SourceStructureSegmentRole
+) {
+  setSettingsEditor((current) => {
+    if (!current) return current;
+    const samplePath = current.preview[0]?.path ?? [current.directory, ...current.card.pathPattern.split('/')].filter(Boolean).join('/');
+    const sampleSegments = previewPathSegments(samplePath, current.directory);
+    const pathPattern = applySegmentRole(current.card.pathPattern, sampleSegments, index, role);
+    const nextCard = withInferredCompatibilityFields({ ...current.card, pathPattern }, current.directory);
+    const matchingProposal = current.proposals.find((proposal) => cardsMatch(nextCard, normalizeSettingsCard(proposal.card, current.directory)));
+    return {
+      ...current,
+      card: nextCard,
+      preview: matchingProposal?.preview ?? current.preview
+    };
+  });
+}
+
+function cardsMatch(left: SourceStructureCard, right: SourceStructureCard): boolean {
+  return left.pathPattern === right.pathPattern
+    && left.fields.scope === right.fields.scope
+    && left.fields.identifier === right.fields.identifier;
 }

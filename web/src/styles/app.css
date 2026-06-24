@@ -3330,6 +3330,150 @@ body.is-resizing-panel {
   width: min(720px, 100%);
 }
 
+.source-structure-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.source-structure-section-heading strong {
+  font-size: 13px;
+}
+
+.source-structure-section-heading span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.source-proposals,
+.source-path-builder,
+.source-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.source-proposal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.source-proposal-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 10px;
+  display: grid;
+  gap: 5px;
+  text-align: left;
+}
+
+.source-proposal-card.active {
+  border-color: color-mix(in srgb, var(--blue) 55%, var(--line));
+  background: color-mix(in srgb, var(--blue) 10%, var(--panel));
+}
+
+.source-proposal-card span,
+.source-proposal-card small {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.proposal-confidence {
+  justify-self: start;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--green) 12%, var(--panel));
+  color: var(--green) !important;
+  padding: 2px 7px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+
+.source-segment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.source-segment-card {
+  min-width: 138px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 8px;
+  display: grid;
+  gap: 7px;
+}
+
+.source-segment-pill {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.segment-role-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.segment-role-actions button {
+  min-height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.segment-role-actions button:hover {
+  color: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 45%, var(--line));
+}
+
+.source-preview-table {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.source-preview-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.4fr) minmax(72px, .7fr) minmax(84px, .8fr) minmax(100px, 1fr) minmax(70px, .6fr);
+  gap: 0;
+}
+
+.source-preview-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-top: 1px solid var(--line);
+  padding: 8px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.source-preview-row.heading > span {
+  border-top: 0;
+  background: var(--panel-soft);
+  color: var(--text);
+  font-weight: 800;
+}
+
 .source-structure-form {
   gap: 12px;
 }

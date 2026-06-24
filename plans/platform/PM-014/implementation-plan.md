@@ -9,7 +9,7 @@ Add source-derived proposals and visual previews to the Source Structure configu
 | Phase | Name                     | Status |
 |-------|--------------------------|--------|
 | B1    | Proposal And Preview API | Done   |
-| F1    | Visual Source Dialog     |        |
+| F1    | Visual Source Dialog     | Done   |
 
 ## Terminology Lock
 
@@ -43,12 +43,12 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] Extend TypeScript API types for proposals and previews.
-- [ ] Add proposal cards to the Source Structure dialog.
-- [ ] Add clickable path segment role controls for common pattern edits.
-- [ ] Add a preview table showing path, scope, identifier, title, status, and tags.
-- [ ] Keep advanced path pattern and field inputs available.
-- [ ] Add frontend tests for applying proposals and preview rendering.
+- [x] Extend TypeScript API types for proposals and previews.
+- [x] Add proposal cards to the Source Structure dialog.
+- [x] Add clickable path segment role controls for common pattern edits.
+- [x] Add a preview table showing path, scope, identifier, title, status, and tags.
+- [x] Keep advanced path pattern and field inputs available.
+- [x] Add frontend tests for applying proposals and preview rendering.
 
 **Verification:** `rtk npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces/sourceSettings.test.ts && rtk npm run build`
 
@@ -58,7 +58,7 @@ All code, fields, API params, and TS types must use:
 
 ## Post-Implementation Checklist
 
-- [ ] Confirm existing saved `workspace-settings.yaml` files still load and save.
-- [ ] Confirm freestyle docs roots still fall back to one unsorted docs card when no settings are saved.
-- [ ] Confirm proposal preview uses real README headings when present.
-- [ ] Run Markdown formatting on `plans/platform/PM-014/**/*.md`.
+- [x] Confirm existing saved `workspace-settings.yaml` files still load and save.
+- [x] Confirm freestyle docs roots still fall back to one unsorted docs card when no settings are saved.
+- [x] Confirm proposal preview uses real README headings when present.
+- [x] Run Markdown formatting on `plans/platform/PM-014/**/*.md`.
