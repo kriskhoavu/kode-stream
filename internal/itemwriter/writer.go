@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"plan-manager/internal/fileaccess"
+	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
 	"plan-manager/internal/models"
 	"plan-manager/internal/registry"
@@ -70,6 +71,81 @@ func (w *Writer) SaveMetadata(workspace models.WorkspaceConfig, item models.Item
 
 func (w *Writer) UpdateStatus(workspace models.WorkspaceConfig, item models.ItemDetail, input models.ItemStatusUpdateInput) (models.WriteResult, error) {
 	return w.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: input.Status})
+}
+
+func (w *Writer) MaterializeSnapshotItem(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) error {
+	if item.SourceMode != "snapshot" {
+		return nil
+	}
+	if strings.TrimSpace(item.BranchRef) == "" {
+		return fmt.Errorf("snapshot branch reference is missing")
+	}
+	reader := scanner.NewGitTreeSourceReader(workspace.Path, item.BranchRef, gitadapter.New())
+	scopeRoot := item.ItemPath
+	copyOneFile := item.MetadataSource == "docs"
+	if copyOneFile {
+		relPath := materializeRelativeFile(item, fileID)
+		if relPath == "" {
+			return fmt.Errorf("snapshot file is not part of the indexed item")
+		}
+		scopeRoot = filepath.ToSlash(filepath.Join(item.ItemPath, relPath))
+	}
+	var files []string
+	if copyOneFile {
+		if info, err := reader.Stat(scopeRoot); err != nil {
+			return err
+		} else if info.IsDir() {
+			return fmt.Errorf("snapshot materialization expected a file")
+		}
+		files = append(files, scopeRoot)
+	} else {
+		if err := reader.WalkDir(scopeRoot, func(path string, d scanner.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			files = append(files, path)
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("snapshot item has no files to materialize")
+	}
+	for _, rel := range files {
+		if !isInsideConfiguredSource(workspace, rel) {
+			return fmt.Errorf("materialized path is outside configured sources")
+		}
+		full, err := safeJoin(workspace.Path, rel)
+		if err != nil {
+			return err
+		}
+		if _, err := os.Stat(full); err == nil {
+			return fmt.Errorf("This snapshot item cannot be copied because files already exist in the current checkout branch. Resolve the conflict manually or switch branches first.")
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	for _, rel := range files {
+		if !isInsideConfiguredSource(workspace, rel) {
+			return fmt.Errorf("materialized path is outside configured sources")
+		}
+		data, err := reader.ReadFile(rel)
+		if err != nil {
+			return err
+		}
+		full, err := safeJoin(workspace.Path, rel)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(full, data, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewItemInput) (models.WriteResult, error) {
@@ -165,7 +241,18 @@ func (w *Writer) refreshWorkspaceData(workspace models.WorkspaceConfig) (models.
 	if err != nil {
 		return models.ScanResult{}, scanner.ScanData{}, err
 	}
-	if err := w.index.ReplaceWorkspace(workspace.ID, data.Items, data.Warnings, scannedAt); err != nil {
+	branch := workspace.BaselineBranch
+	if len(data.Items) > 0 && data.Items[0].Branch != "" {
+		branch = data.Items[0].Branch
+	}
+	if err := w.index.ReplaceWorkspaceBranch(workspace.ID, branch, data.Items, models.BranchScanMetadata{
+		WorkspaceID: workspace.ID,
+		Branch:      branch,
+		SourceMode:  "working_tree",
+		Editable:    true,
+		ScannedAt:   scannedAt,
+		Warnings:    data.Warnings,
+	}); err != nil {
 		return models.ScanResult{}, scanner.ScanData{}, err
 	}
 	if w.registry != nil {
@@ -336,6 +423,19 @@ func validateSource(workspace models.WorkspaceConfig, dir string) (string, error
 	return "", fmt.Errorf("source is not registered")
 }
 
+func isInsideConfiguredSource(workspace models.WorkspaceConfig, rel string) bool {
+	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(rel)))
+	if clean == "." || clean == "" || strings.HasPrefix(clean, "../") || filepath.IsAbs(clean) {
+		return false
+	}
+	for _, source := range workspace.Sources {
+		if clean == source || strings.HasPrefix(clean, source+"/") {
+			return true
+		}
+	}
+	return false
+}
+
 func safeItemPath(workspace models.WorkspaceConfig, item models.ItemDetail) (string, error) {
 	return safeJoin(workspace.Path, item.ItemPath)
 }
@@ -346,6 +446,19 @@ func safeJoin(root, rel string) (string, error) {
 
 func isDocsRoot(item models.ItemDetail) bool {
 	return item.MetadataSource == "docs"
+}
+
+func materializeRelativeFile(item models.ItemDetail, fileID string) string {
+	for _, doc := range item.Documents {
+		if fileIDForPath(doc.Path) == fileID {
+			return doc.Path
+		}
+	}
+	return ""
+}
+
+func fileIDForPath(path string) string {
+	return strings.NewReplacer("/", "__", ".", "_").Replace(path)
 }
 
 func cleanTags(tags []string) []string {

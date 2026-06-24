@@ -1,7 +1,7 @@
 package scanner
 
 import (
-	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,29 +14,29 @@ type workspaceSettingsMatch struct {
 	captures map[string]string
 }
 
-func matchPatternDirectories(root string, segments []pathPatternSegment) []workspaceSettingsMatch {
+func matchPatternDirectories(reader SourceReader, root string, segments []pathPatternSegment) []workspaceSettingsMatch {
 	var matches []workspaceSettingsMatch
-	var walk func(path string, depth int, captures map[string]string)
-	walk = func(path string, depth int, captures map[string]string) {
+	var walk func(current string, depth int, captures map[string]string)
+	walk = func(current string, depth int, captures map[string]string) {
 		if depth == len(segments) {
-			if info, err := os.Stat(path); err == nil && info.IsDir() {
+			if info, err := reader.Stat(current); err == nil && info.IsDir() {
 				copied := map[string]string{}
 				for key, value := range captures {
 					copied[key] = value
 				}
-				matches = append(matches, workspaceSettingsMatch{path: path, captures: copied})
+				matches = append(matches, workspaceSettingsMatch{path: current, captures: copied})
 			}
 			return
 		}
 		segment := segments[depth]
 		if segment.literal != "" {
-			next := filepath.Join(path, segment.literal)
-			if info, err := os.Stat(next); err == nil && info.IsDir() {
+			next := path.Join(current, segment.literal)
+			if info, err := reader.Stat(next); err == nil && info.IsDir() {
 				walk(next, depth+1, captures)
 			}
 			return
 		}
-		entries, err := os.ReadDir(path)
+		entries, err := reader.ReadDir(current)
 		if err != nil {
 			return
 		}
@@ -45,7 +45,7 @@ func matchPatternDirectories(root string, segments []pathPatternSegment) []works
 				continue
 			}
 			captures[segment.variable] = entry.Name()
-			walk(filepath.Join(path, entry.Name()), depth+1, captures)
+			walk(path.Join(current, entry.Name()), depth+1, captures)
 			delete(captures, segment.variable)
 		}
 	}

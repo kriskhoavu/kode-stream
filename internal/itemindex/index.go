@@ -21,10 +21,11 @@ type Index struct {
 }
 
 type state struct {
-	Items       []models.ItemDetail  `json:"items" yaml:"items"`
-	LegacyItems []models.ItemDetail  `json:"plans,omitempty" yaml:"plans,omitempty"`
-	Warnings    []models.ScanWarning `json:"warnings" yaml:"warnings"`
-	Scans       map[string]time.Time `json:"scans" yaml:"scans"`
+	Items       []models.ItemDetail                             `json:"items" yaml:"items"`
+	LegacyItems []models.ItemDetail                             `json:"plans,omitempty" yaml:"plans,omitempty"`
+	Warnings    []models.ScanWarning                            `json:"warnings" yaml:"warnings"`
+	Scans       map[string]time.Time                            `json:"scans" yaml:"scans"`
+	BranchScans map[string]map[string]models.BranchScanMetadata `json:"branchScans" yaml:"branchScans"`
 }
 
 type legacyState struct {
@@ -101,6 +102,52 @@ func (i *Index) ReplaceWorkspace(workspaceID string, items []models.ItemDetail, 
 		i.state.Scans = map[string]time.Time{}
 	}
 	i.state.Scans[workspaceID] = scannedAt
+	if i.state.BranchScans == nil {
+		i.state.BranchScans = map[string]map[string]models.BranchScanMetadata{}
+	}
+	delete(i.state.BranchScans, workspaceID)
+	return i.saveLocked()
+}
+
+func (i *Index) ReplaceWorkspaceBranch(workspaceID, branch string, items []models.ItemDetail, metadata models.BranchScanMetadata) error {
+	if err := i.load(); err != nil {
+		return err
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	next := i.state.Items[:0]
+	for _, item := range i.state.Items {
+		if item.WorkspaceID == workspaceID && item.Branch == branch {
+			continue
+		}
+		next = append(next, item)
+	}
+	i.state.Items = append(next, items...)
+	nextWarnings := i.state.Warnings[:0]
+	prefix := workspaceID + ":" + branch + ":"
+	for _, warning := range i.state.Warnings {
+		if !strings.HasPrefix(warning.ItemPath, prefix) {
+			nextWarnings = append(nextWarnings, warning)
+		}
+	}
+	for _, warning := range metadata.Warnings {
+		warning.ItemPath = prefix + warning.ItemPath
+		nextWarnings = append(nextWarnings, warning)
+	}
+	i.state.Warnings = nextWarnings
+	if i.state.Scans == nil {
+		i.state.Scans = map[string]time.Time{}
+	}
+	i.state.Scans[workspaceID] = metadata.ScannedAt
+	if i.state.BranchScans == nil {
+		i.state.BranchScans = map[string]map[string]models.BranchScanMetadata{}
+	}
+	if i.state.BranchScans[workspaceID] == nil {
+		i.state.BranchScans[workspaceID] = map[string]models.BranchScanMetadata{}
+	}
+	metadata.WorkspaceID = workspaceID
+	metadata.Branch = branch
+	i.state.BranchScans[workspaceID][branch] = metadata
 	return i.saveLocked()
 }
 
@@ -125,6 +172,7 @@ func (i *Index) DeleteWorkspace(workspaceID string) error {
 	}
 	i.state.Warnings = nextWarnings
 	delete(i.state.Scans, workspaceID)
+	delete(i.state.BranchScans, workspaceID)
 	return i.saveLocked()
 }
 
@@ -160,6 +208,23 @@ func (i *Index) Query(q Query) ([]models.ItemSummary, error) {
 	return out, nil
 }
 
+func (i *Index) BranchItems(workspaceID, branch string) ([]models.ItemSummary, error) {
+	return i.Query(Query{WorkspaceID: workspaceID, Branch: branch})
+}
+
+func (i *Index) BranchScan(workspaceID, branch string) (models.BranchScanMetadata, bool, error) {
+	if err := i.load(); err != nil {
+		return models.BranchScanMetadata{}, false, err
+	}
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	if i.state.BranchScans == nil || i.state.BranchScans[workspaceID] == nil {
+		return models.BranchScanMetadata{}, false, nil
+	}
+	metadata, ok := i.state.BranchScans[workspaceID][branch]
+	return metadata, ok, nil
+}
+
 func (i *Index) Get(id string) (models.ItemDetail, bool, error) {
 	if err := i.load(); err != nil {
 		return models.ItemDetail{}, false, err
@@ -189,7 +254,7 @@ func (i *Index) load() error {
 	}
 	data, err := os.ReadFile(i.path)
 	if errors.Is(err, os.ErrNotExist) {
-		i.state = state{Items: []models.ItemDetail{}, Warnings: []models.ScanWarning{}, Scans: map[string]time.Time{}}
+		i.state = state{Items: []models.ItemDetail{}, Warnings: []models.ScanWarning{}, Scans: map[string]time.Time{}, BranchScans: map[string]map[string]models.BranchScanMetadata{}}
 		i.loaded = true
 		return nil
 	}
@@ -211,8 +276,43 @@ func (i *Index) load() error {
 	if i.state.Scans == nil {
 		i.state.Scans = map[string]time.Time{}
 	}
+	for index := range i.state.Items {
+		if i.state.Items[index].SourceMode == "" {
+			i.state.Items[index].SourceMode = "working_tree"
+			i.state.Items[index].Editable = true
+		}
+	}
+	if i.state.BranchScans == nil {
+		i.state.BranchScans = map[string]map[string]models.BranchScanMetadata{}
+	}
+	i.migrateBranchScanMetadataLocked()
 	i.loaded = true
 	return nil
+}
+
+func (i *Index) migrateBranchScanMetadataLocked() {
+	for _, item := range i.state.Items {
+		if item.WorkspaceID == "" || item.Branch == "" {
+			continue
+		}
+		if i.state.BranchScans[item.WorkspaceID] == nil {
+			i.state.BranchScans[item.WorkspaceID] = map[string]models.BranchScanMetadata{}
+		}
+		if _, ok := i.state.BranchScans[item.WorkspaceID][item.Branch]; ok {
+			continue
+		}
+		scannedAt := i.state.Scans[item.WorkspaceID]
+		i.state.BranchScans[item.WorkspaceID][item.Branch] = models.BranchScanMetadata{
+			WorkspaceID: item.WorkspaceID,
+			Branch:      item.Branch,
+			BranchRef:   item.BranchRef,
+			Commit:      item.Commit,
+			SourceMode:  firstNonEmpty(item.SourceMode, "working_tree"),
+			Editable:    item.Editable || item.SourceMode == "" || item.SourceMode == "working_tree",
+			ScannedAt:   scannedAt,
+			Warnings:    []models.ScanWarning{},
+		}
+	}
 }
 
 func migrateLegacyState(data []byte) []models.ItemDetail {

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ItemSummary } from '../lib/types';
+import type { BranchLoadResult, ItemSummary } from '../lib/types';
 import { KanbanPage } from './KanbanPage';
 
 const workspace = { id: 'workspace-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans', 'docs'], createdAt: '2026-06-23T00:00:00Z' };
@@ -53,6 +53,45 @@ describe('Kanban card drag and drop', () => {
 
     expect(within(column('Review')).getByText('Draggable item')).toBeInTheDocument();
     await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(1));
+  });
+
+  it('asks before materializing a snapshot card dropped onto another status', async () => {
+    const snapshotItems = items.map((item) => item.id === 'item-1' ? { ...item, sourceMode: 'snapshot' as const, editable: false } : item);
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirm);
+    const fetchMock = boardFetchMock(snapshotItems);
+    vi.stubGlobal('fetch', fetchMock);
+    renderPage();
+    await screen.findByText('Draggable item');
+
+    const dataTransfer = createDataTransfer();
+    act(() => {
+      fireEvent.dragStart(cardFor('Draggable item'), { dataTransfer });
+      fireEvent.drop(column('Review'), { dataTransfer });
+    });
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('copy the whole plan at plans/platform/PM-012 into the current checkout branch'));
+    expect(within(column('Review')).getByText('Draggable item')).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(1));
+    expect(statusRequestBody(fetchMock)).toMatchObject({ status: 'review', materializeConfirmed: true });
+  });
+
+  it('leaves a snapshot card in place when drag/drop materialization is declined', async () => {
+    const snapshotItems = items.map((item) => item.id === 'item-1' ? { ...item, sourceMode: 'snapshot' as const, editable: false } : item);
+    vi.stubGlobal('confirm', vi.fn(() => false));
+    const fetchMock = boardFetchMock(snapshotItems);
+    vi.stubGlobal('fetch', fetchMock);
+    renderPage();
+    await screen.findByText('Draggable item');
+
+    const dataTransfer = createDataTransfer();
+    act(() => {
+      fireEvent.dragStart(cardFor('Draggable item'), { dataTransfer });
+      fireEvent.drop(column('Review'), { dataTransfer });
+    });
+
+    expect(within(column('Draft')).getByText('Draggable item')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(0);
   });
 
   it('treats same-column, outside, and protected drops as no-ops', async () => {
@@ -181,23 +220,47 @@ function createDataTransfer(): DataTransfer {
   };
 }
 
-function boardFetchMock() {
+function boardFetchMock(boardItems: ItemSummary[] = items) {
   return vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
-    if (url.startsWith('/api/items?')) return Promise.resolve(response(items));
+    if (url === '/api/workspaces/workspace-1/kanban/branch') return Promise.resolve(response(branchLoadResult(boardItems)));
+    if (url.startsWith('/api/items?')) return Promise.resolve(response(boardItems));
     if (url === '/api/saved-filters') return Promise.resolve(response([]));
-    if (url === '/api/items/item-1') return Promise.resolve(response({ ...items[0], documents: [], metadata: {}, counts: { files: 0 } }));
+    if (url === '/api/items/item-1') return Promise.resolve(response({ ...boardItems[0], documents: [], metadata: {}, counts: { files: 0 } }));
     if (url === '/api/items/item-1/files') return Promise.resolve(response([]));
     if (url === '/api/workspaces/workspace-1/git/status') return Promise.resolve(response({ branch: 'main', changes: [] }));
     if (url === '/api/workspaces/workspace-1/git/branches') return Promise.resolve(response({ workspaceId: 'workspace-1', current: 'main', branches: ['main'] }));
     if (isItemStatusUrl(url)) {
       return Promise.resolve(response({
-        item: { ...items[0], status: 'review', documents: [], metadata: {}, counts: { files: 1 } },
+        item: { ...boardItems[0], status: 'review', sourceMode: 'working_tree', editable: true, documents: [], metadata: {}, counts: { files: 1 } },
         scannedAt: '2026-06-23T00:00:00Z'
       }));
     }
     return Promise.resolve(response({}));
   });
+}
+
+function statusRequestBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
+  const call = fetchMock.mock.calls.find(([url]) => isItemStatusUrl(url));
+  return JSON.parse(String(call?.[1]?.body ?? '{}')) as Record<string, unknown>;
+}
+
+function branchLoadResult(items: ItemSummary[]): BranchLoadResult {
+  return {
+    workspaceId: workspace.id,
+    branch: 'main',
+    selectedBranch: 'main',
+    branchRef: 'refs/heads/main',
+    commit: '',
+    currentCheckoutBranch: 'main',
+    sourceMode: 'working_tree',
+    mode: 'working_tree',
+    editable: true,
+    scannedAt: '2026-06-23T00:00:00Z',
+    itemCount: items.length,
+    warnings: [],
+    items
+  };
 }
 
 function isItemStatusUrl(input: RequestInfo | URL): boolean {

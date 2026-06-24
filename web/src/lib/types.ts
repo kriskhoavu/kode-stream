@@ -66,6 +66,7 @@ export interface WorkspaceConfig {
   name: string;
   path: string;
   baselineBranch: string;
+  lastSelectedBranch?: string;
   sources: string[];
   createdAt: string;
   lastScannedAt?: string;
@@ -111,6 +112,10 @@ export interface ItemSummary {
   workspaceId: string;
   workspaceName: string;
   branch: string;
+  branchRef?: string;
+  commit?: string;
+  sourceMode?: SourceMode;
+  editable?: boolean;
   scope: string;
   identifier: string;
   title: string;
@@ -164,6 +169,37 @@ export interface FileContent {
 export interface FileSaveInput {
   content: string;
   expectedHash?: string;
+  materializeConfirmed?: boolean;
+}
+
+export type SourceMode = 'working_tree' | 'snapshot';
+
+export interface BranchScanMetadata {
+  workspaceId: string;
+  branch: string;
+  branchRef?: string;
+  commit?: string;
+  sourceMode?: SourceMode;
+  editable: boolean;
+  sourceConfigurationHash?: string;
+  scannedAt: string;
+  warnings: { itemPath?: string; message: string }[];
+}
+
+export interface BranchLoadResult {
+  workspaceId: string;
+  branch: string;
+  selectedBranch: string;
+  branchRef: string;
+  commit: string;
+  currentCheckoutBranch: string;
+  sourceMode: SourceMode;
+  mode: SourceMode;
+  editable: boolean;
+  scannedAt: string;
+  itemCount: number;
+  warnings: { itemPath?: string; message: string }[];
+  items: ItemSummary[];
 }
 
 export interface WorkspaceTreeEntry {
@@ -294,10 +330,12 @@ export interface ItemMetadataUpdateInput {
   status?: ItemStatus;
   owner?: string;
   tags?: string[];
+  materializeConfirmed?: boolean;
 }
 
 export interface ItemStatusUpdateInput {
   status: ItemStatus;
+  materializeConfirmed?: boolean;
 }
 
 export interface NewItemInput {

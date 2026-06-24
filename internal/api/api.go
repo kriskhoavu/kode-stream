@@ -61,7 +61,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 	}
 	workspaceFileAccess := workspaceaccess.New()
 	return &API{
-		workspaces:     appworkspace.New(reg, idx, scan, writer),
+		workspaces:     appworkspace.New(reg, idx, scan, writer, git),
 		items:          appitem.New(reg, idx, files, writer, git),
 		gitOps:         appgit.New(reg, writer, git),
 		dialog:         dialog,
@@ -90,6 +90,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("PUT /api/workspaces/{id}", a.updateWorkspace)
 	mux.HandleFunc("DELETE /api/workspaces/{id}", a.deleteWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
+	mux.HandleFunc("POST /api/workspaces/{id}/kanban/branch", a.loadKanbanBranch)
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
 	mux.HandleFunc("PUT /api/workspaces/{id}/source-structure", a.saveSourceStructure)
@@ -350,6 +351,24 @@ func (a *API) scanWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (a *API) loadKanbanBranch(w http.ResponseWriter, r *http.Request) {
+	var input models.BranchLoadInput
+	if r.Body != nil {
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+	}
+	started := time.Now()
+	result, err := a.workspaces.LoadBranch(r.PathValue("id"), input)
+	a.record(r.PathValue("id"), "", "kanban_branch_load", "Kanban branch loaded.", nil, started, err)
+	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+	respond(w, result, err)
 }
 
 func (a *API) getSourceStructure(w http.ResponseWriter, r *http.Request) {

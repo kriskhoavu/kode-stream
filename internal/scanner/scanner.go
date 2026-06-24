@@ -26,6 +26,16 @@ type ScanData struct {
 	Warnings []models.ScanWarning
 }
 
+type ScanRequest struct {
+	Workspace  models.WorkspaceConfig
+	Branch     string
+	BranchRef  string
+	Commit     string
+	SourceMode string
+	Editable   bool
+	Reader     SourceReader
+}
+
 func New(git *gitadapter.GitAdapter) *Scanner {
 	return &Scanner{git: git}
 }
@@ -35,10 +45,34 @@ func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
 	if err != nil {
 		branch = workspace.BaselineBranch
 	}
+	return s.ScanWithRequest(ScanRequest{
+		Workspace:  workspace,
+		Branch:     branch,
+		SourceMode: "working_tree",
+		Editable:   true,
+		Reader:     NewFilesystemSourceReader(workspace.Path),
+	})
+}
+
+func (s *Scanner) ScanWithRequest(request ScanRequest) (ScanData, error) {
+	workspace := request.Workspace
+	branch := request.Branch
+	if strings.TrimSpace(branch) == "" {
+		branch = workspace.BaselineBranch
+	}
+	reader := request.Reader
+	if reader == nil {
+		reader = NewFilesystemSourceReader(workspace.Path)
+	}
+	sourceMode := strings.TrimSpace(request.SourceMode)
+	if sourceMode == "" {
+		sourceMode = "working_tree"
+	}
+	request.SourceMode = sourceMode
+	request.Branch = branch
 	var out ScanData
 	for _, source := range workspace.Sources {
-		root := filepath.Join(workspace.Path, filepath.FromSlash(source))
-		items, warnings := s.scanItemDirectory(workspace, branch, source, root)
+		items, warnings := s.scanItemDirectory(request, reader, branch, sourceMode, source)
 		out.Items = append(out.Items, items...)
 		out.Warnings = append(out.Warnings, warnings...)
 	}
@@ -48,18 +82,18 @@ func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
 	return out, nil
 }
 
-func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, source, root string) ([]models.ItemDetail, []models.ScanWarning) {
+func (s *Scanner) scanItemDirectory(request ScanRequest, reader SourceReader, branch, sourceMode, source string) ([]models.ItemDetail, []models.ScanWarning) {
 	var items []models.ItemDetail
 	var warnings []models.ScanWarning
-	entries, err := os.ReadDir(root)
+	entries, err := reader.ReadDir(source)
 	if err != nil {
 		return items, []models.ScanWarning{{ItemPath: source, Message: err.Error()}}
 	}
-	settings, hasSettings, settingsWarnings := ReadSourceStructureSettings(root)
+	settings, hasSettings, settingsWarnings := ReadSourceStructureSettingsFromReader(reader, source)
 	if hasSettings {
 		warnings = append(warnings, settingsWarnings...)
 		if len(settingsWarnings) == 0 {
-			configuredItems, configuredWarnings := s.scanConfiguredItemDirectory(workspace, branch, source, root, settings)
+			configuredItems, configuredWarnings := s.scanConfiguredItemDirectory(request, reader, branch, source, settings)
 			warnings = append(warnings, configuredWarnings...)
 			if len(configuredItems) > 0 {
 				return configuredItems, warnings
@@ -67,8 +101,8 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 			warnings = append(warnings, models.ScanWarning{ItemPath: source, Message: "workspace settings did not match any card directories; using fallback scan"})
 		}
 	}
-	if shouldScanAsDocumentCollection(root, entries) {
-		detail, itemWarnings, err := s.parseItem(workspace, branch, filepath.Base(source), filepath.Base(source), filepath.ToSlash(source), root)
+	if shouldScanAsDocumentCollection(reader, source, entries) {
+		detail, itemWarnings, err := s.parseItem(request, reader, branch, filepath.Base(source), filepath.Base(source), filepath.ToSlash(source), source)
 		if err != nil {
 			return items, []models.ScanWarning{{ItemPath: source, Message: err.Error()}}
 		}
@@ -84,8 +118,8 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 		if !scopeEntry.IsDir() || strings.HasPrefix(scopeEntry.Name(), ".") {
 			continue
 		}
-		scopeRoot := filepath.Join(root, scopeEntry.Name())
-		tickets, err := os.ReadDir(scopeRoot)
+		scopeRoot := filepath.ToSlash(filepath.Join(source, scopeEntry.Name()))
+		tickets, err := reader.ReadDir(scopeRoot)
 		if err != nil {
 			warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(filepath.Join(source, scopeEntry.Name())), Message: err.Error()})
 			continue
@@ -94,9 +128,9 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 			if !identifierEntry.IsDir() || strings.HasPrefix(identifierEntry.Name(), ".") {
 				continue
 			}
-			itemRoot := filepath.Join(scopeRoot, identifierEntry.Name())
+			itemRoot := filepath.ToSlash(filepath.Join(scopeRoot, identifierEntry.Name()))
 			relItemPath := filepath.ToSlash(filepath.Join(source, scopeEntry.Name(), identifierEntry.Name()))
-			detail, itemWarnings, err := s.parseItem(workspace, branch, scopeEntry.Name(), identifierEntry.Name(), relItemPath, itemRoot)
+			detail, itemWarnings, err := s.parseItem(request, reader, branch, scopeEntry.Name(), identifierEntry.Name(), relItemPath, itemRoot)
 			if err != nil {
 				warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 				continue
@@ -108,7 +142,7 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 	return items, warnings
 }
 
-func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, branch, source, root string, settings models.SourceStructureSettings) ([]models.ItemDetail, []models.ScanWarning) {
+func (s *Scanner) scanConfiguredItemDirectory(request ScanRequest, reader SourceReader, branch, source string, settings models.SourceStructureSettings) ([]models.ItemDetail, []models.ScanWarning) {
 	var items []models.ItemDetail
 	var warnings []models.ScanWarning
 	seen := map[string]bool{}
@@ -118,7 +152,7 @@ func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, 
 			warnings = append(warnings, models.ScanWarning{ItemPath: source, Message: err.Error()})
 			continue
 		}
-		for _, match := range matchPatternDirectories(root, segments) {
+		for _, match := range matchPatternDirectories(reader, source, segments) {
 			if seen[match.path] {
 				continue
 			}
@@ -129,13 +163,13 @@ func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, 
 				warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(match.path), Message: "workspace settings produced an empty scope or identifier"})
 				continue
 			}
-			relFromRoot, err := filepath.Rel(root, match.path)
+			relFromRoot, err := filepath.Rel(filepath.FromSlash(source), filepath.FromSlash(match.path))
 			if err != nil {
 				warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(match.path), Message: err.Error()})
 				continue
 			}
 			relItemPath := filepath.ToSlash(filepath.Join(source, relFromRoot))
-			detail, itemWarnings, err := s.parseItem(workspace, branch, scope, identifier, relItemPath, match.path)
+			detail, itemWarnings, err := s.parseItem(request, reader, branch, scope, identifier, relItemPath, match.path)
 			if err != nil {
 				warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 				continue
@@ -150,24 +184,24 @@ func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, 
 	return items, warnings
 }
 
-func shouldScanAsDocumentCollection(root string, entries []fs.DirEntry) bool {
-	if hasMarkdownFiles(root) && !hasStructuredItemChildren(root, entries) {
+func shouldScanAsDocumentCollection(reader SourceReader, root string, entries []DirEntry) bool {
+	if hasMarkdownFiles(reader, root) && !hasStructuredItemChildren(reader, root, entries) {
 		return true
 	}
 	return false
 }
 
-func hasStructuredItemChildren(root string, entries []fs.DirEntry) bool {
+func hasStructuredItemChildren(reader SourceReader, root string, entries []DirEntry) bool {
 	for _, scopeEntry := range entries {
 		if !scopeEntry.IsDir() || strings.HasPrefix(scopeEntry.Name(), ".") {
 			continue
 		}
-		tickets, err := os.ReadDir(filepath.Join(root, scopeEntry.Name()))
+		tickets, err := reader.ReadDir(filepath.ToSlash(filepath.Join(root, scopeEntry.Name())))
 		if err != nil {
 			continue
 		}
 		for _, identifierEntry := range tickets {
-			if identifierEntry.IsDir() && !strings.HasPrefix(identifierEntry.Name(), ".") && isItemFolder(filepath.Join(root, scopeEntry.Name(), identifierEntry.Name()), identifierEntry.Name()) {
+			if identifierEntry.IsDir() && !strings.HasPrefix(identifierEntry.Name(), ".") && isItemFolder(reader, filepath.ToSlash(filepath.Join(root, scopeEntry.Name(), identifierEntry.Name())), identifierEntry.Name()) {
 				return true
 			}
 		}
@@ -175,14 +209,15 @@ func hasStructuredItemChildren(root string, entries []fs.DirEntry) bool {
 	return false
 }
 
-func isItemFolder(path, name string) bool {
-	if _, err := os.Stat(filepath.Join(path, "plan.yaml")); err == nil {
+func isItemFolder(reader SourceReader, path, name string) bool {
+	if _, err := reader.Stat(filepath.ToSlash(filepath.Join(path, "plan.yaml"))); err == nil {
 		return true
 	}
 	return regexp.MustCompile(`^[A-Z]+-\d+$`).MatchString(strings.ToUpper(name))
 }
 
-func (s *Scanner) parseItem(workspace models.WorkspaceConfig, branch, scope, identifier, relItemPath, itemRoot string) (models.ItemDetail, []models.ScanWarning, error) {
+func (s *Scanner) parseItem(request ScanRequest, reader SourceReader, branch, scope, identifier, relItemPath, itemRoot string) (models.ItemDetail, []models.ScanWarning, error) {
+	workspace := request.Workspace
 	var warnings []models.ScanWarning
 	metaSource := "fallback"
 	title := titleFromIdentifier(identifier)
@@ -192,7 +227,7 @@ func (s *Scanner) parseItem(workspace models.WorkspaceConfig, branch, scope, ide
 	documents := []models.ItemDocument{}
 	metadata := map[string]any{}
 
-	if data, source, err := readPlanYAML(itemRoot); err == nil {
+	if data, source, err := readPlanYAML(reader, itemRoot); err == nil {
 		parsed, parseErr := parsePlanYAML(string(data))
 		if parseErr != nil {
 			warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: parseErr.Error()})
@@ -212,32 +247,39 @@ func (s *Scanner) parseItem(workspace models.WorkspaceConfig, branch, scope, ide
 			if parsed.Plan.Tags != nil {
 				tags = parsed.Plan.Tags
 			}
-			documents = resolveDocuments(itemRoot, parsed.Documents)
+			documents = resolveDocuments(reader, itemRoot, parsed.Documents)
 			metadata["plan"] = parsed.Plan
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 	}
 
-	readme := filepath.Join(itemRoot, "README.md")
 	description := ""
-	if data, err := os.ReadFile(readme); err == nil {
+	if data, err := reader.ReadFile(filepath.ToSlash(filepath.Join(itemRoot, "README.md"))); err == nil {
 		if inferredTitle := titleFromHeading(firstHeading(string(data)), identifier); inferredTitle != "" && title == titleFromIdentifier(identifier) {
 			title = inferredTitle
 		}
 		if metaSource == "fallback" {
-			status = inferStatus(itemRoot)
+			status = inferStatus(reader, itemRoot)
 		}
 		description = firstParagraph(string(data))
 	}
 	if len(documents) == 0 {
-		documents = fallbackDocuments(itemRoot)
+		documents = fallbackDocuments(reader, itemRoot)
 	}
-	fileCount := countMarkdownFiles(itemRoot)
+	fileCount := countMarkdownFiles(reader, itemRoot)
 	relForGit := filepath.ToSlash(relItemPath)
-	updated := s.git.LastUpdate(workspace.Path, relForGit)
+	updated := time.Time{}
+	author := ""
+	if request.BranchRef != "" {
+		updated = s.git.LastUpdateAtRef(workspace.Path, request.BranchRef, relForGit)
+		author = s.git.LastAuthorAtRef(workspace.Path, request.BranchRef, relForGit)
+	} else {
+		updated = s.git.LastUpdate(workspace.Path, relForGit)
+		author = s.git.LastAuthor(workspace.Path, relForGit)
+	}
 	if updated.IsZero() {
-		updated = latestModTime(itemRoot)
+		updated = latestModTime(reader, itemRoot)
 	}
 
 	summary := models.ItemSummary{
@@ -245,12 +287,16 @@ func (s *Scanner) parseItem(workspace models.WorkspaceConfig, branch, scope, ide
 		WorkspaceID:    workspace.ID,
 		WorkspaceName:  workspace.Name,
 		Branch:         branch,
+		BranchRef:      request.BranchRef,
+		Commit:         request.Commit,
+		SourceMode:     request.SourceMode,
+		Editable:       request.Editable,
 		Scope:          scope,
 		Identifier:     identifier,
 		Title:          title,
 		Status:         status,
 		Owner:          owner,
-		Author:         s.git.LastAuthor(workspace.Path, relForGit),
+		Author:         author,
 		Tags:           tags,
 		UpdatedAt:      updated,
 		Description:    description,
@@ -269,15 +315,15 @@ func (s *Scanner) parseItem(workspace models.WorkspaceConfig, branch, scope, ide
 	}, warnings, nil
 }
 
-func fallbackDocuments(itemRoot string) []models.ItemDocument {
+func fallbackDocuments(reader SourceReader, itemRoot string) []models.ItemDocument {
 	docs := []models.ItemDocument{}
-	_ = filepath.WalkDir(itemRoot, func(path string, d fs.DirEntry, err error) error {
+	_ = reader.WalkDir(itemRoot, func(path string, d DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
 			return nil
 		}
-		rel, _ := filepath.Rel(itemRoot, path)
+		rel, _ := filepath.Rel(filepath.FromSlash(itemRoot), filepath.FromSlash(path))
 		relSlash := filepath.ToSlash(rel)
-		docs = append(docs, inferDocumentAt(itemRoot, relSlash))
+		docs = append(docs, inferDocumentAt(reader, itemRoot, relSlash))
 		return nil
 	})
 	sort.Slice(docs, func(i, j int) bool { return documentLess(docs[i], docs[j]) })
@@ -285,11 +331,11 @@ func fallbackDocuments(itemRoot string) []models.ItemDocument {
 }
 
 func InferDocuments(itemRoot string) []models.ItemDocument {
-	return fallbackDocuments(itemRoot)
+	return fallbackDocuments(NewFilesystemSourceReader(filepath.Dir(itemRoot)), filepath.Base(itemRoot))
 }
 
-func resolveDocuments(itemRoot string, overrides []models.ItemDocument) []models.ItemDocument {
-	docs := fallbackDocuments(itemRoot)
+func resolveDocuments(reader SourceReader, itemRoot string, overrides []models.ItemDocument) []models.ItemDocument {
+	docs := fallbackDocuments(reader, itemRoot)
 	byPath := make(map[string]int, len(docs))
 	for i := range docs {
 		byPath[filepath.ToSlash(docs[i].Path)] = i
@@ -322,10 +368,10 @@ func resolveDocuments(itemRoot string, overrides []models.ItemDocument) []models
 	return docs
 }
 
-func inferStatus(itemRoot string) models.ItemStatus {
-	data, err := os.ReadFile(filepath.Join(itemRoot, "implementation-plan.md"))
+func inferStatus(reader SourceReader, itemRoot string) models.ItemStatus {
+	data, err := reader.ReadFile(filepath.ToSlash(filepath.Join(itemRoot, "implementation-plan.md")))
 	if os.IsNotExist(err) {
-		data, err = os.ReadFile(filepath.Join(itemRoot, "implementation-item.md"))
+		data, err = reader.ReadFile(filepath.ToSlash(filepath.Join(itemRoot, "implementation-item.md")))
 	}
 	if err != nil {
 		return models.StatusDraft
@@ -350,7 +396,8 @@ func firstHeading(markdown string) string {
 }
 
 func InferPlanTitle(itemRoot, identifier string) string {
-	data, err := os.ReadFile(filepath.Join(itemRoot, "README.md"))
+	reader := NewFilesystemSourceReader(filepath.Dir(itemRoot))
+	data, err := reader.ReadFile(filepath.ToSlash(filepath.Join(filepath.Base(itemRoot), "README.md")))
 	if err != nil {
 		return ""
 	}
@@ -493,12 +540,12 @@ func inferDocument(path string) models.ItemDocument {
 	return doc
 }
 
-func inferDocumentAt(itemRoot, path string) models.ItemDocument {
-	doc := inferDocument(path)
+func inferDocumentAt(reader SourceReader, itemRoot, relPath string) models.ItemDocument {
+	doc := inferDocument(relPath)
 	if doc.Role != "design" || doc.Track != "" {
 		return doc
 	}
-	data, err := os.ReadFile(filepath.Join(itemRoot, filepath.FromSlash(path)))
+	data, err := reader.ReadFile(filepath.ToSlash(filepath.Join(itemRoot, filepath.FromSlash(relPath))))
 	if err != nil {
 		return doc
 	}
@@ -544,9 +591,9 @@ func documentLess(left, right models.ItemDocument) bool {
 	return naturalLess(left.Path, right.Path)
 }
 
-func countMarkdownFiles(root string) int {
+func countMarkdownFiles(reader SourceReader, root string) int {
 	count := 0
-	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	_ = reader.WalkDir(root, func(path string, d DirEntry, err error) error {
 		if err == nil && !d.IsDir() && strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
 			count++
 		}
@@ -555,9 +602,9 @@ func countMarkdownFiles(root string) int {
 	return count
 }
 
-func hasMarkdownFiles(root string) bool {
+func hasMarkdownFiles(reader SourceReader, root string) bool {
 	found := false
-	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	_ = reader.WalkDir(root, func(path string, d DirEntry, err error) error {
 		if err == nil && !d.IsDir() && strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
 			found = true
 			return fs.SkipAll
@@ -567,9 +614,9 @@ func hasMarkdownFiles(root string) bool {
 	return found
 }
 
-func latestModTime(root string) time.Time {
+func latestModTime(reader SourceReader, root string) time.Time {
 	var latest time.Time
-	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	_ = reader.WalkDir(root, func(path string, d DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil
 		}

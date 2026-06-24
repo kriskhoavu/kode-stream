@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"plan-manager/internal/application/apperrors"
@@ -53,7 +54,7 @@ func (s *Service) Detail(id string) (models.ItemDetail, error) {
 	if err != nil {
 		return models.ItemDetail{}, err
 	}
-	item.Description = FullReadmeDescription(workspace, item)
+	item.Description = s.fullDescription(workspace, item)
 	return NormalizeDetail(item), nil
 }
 
@@ -62,6 +63,9 @@ func (s *Service) Files(id string) ([]models.FileNode, error) {
 	if err != nil {
 		return nil, err
 	}
+	if item.SourceMode == "snapshot" {
+		return s.snapshotFiles(workspace, item)
+	}
 	return s.files.Tree(workspace, item)
 }
 
@@ -69,6 +73,9 @@ func (s *Service) FileContent(id, fileID string) (models.FileContent, error) {
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
 		return models.FileContent{}, err
+	}
+	if item.SourceMode == "snapshot" {
+		return s.snapshotFileContent(workspace, item, fileID)
 	}
 	return s.files.Read(workspace, item, fileID)
 }
@@ -90,6 +97,15 @@ func (s *Service) SaveFile(id, fileID string, input models.FileSaveInput) (model
 	if err != nil {
 		return models.FileContent{}, err
 	}
+	if err := s.materializeIfNeeded(workspace, item, fileID, input.MaterializeConfirmed); err != nil {
+		return models.FileContent{}, err
+	}
+	if item.SourceMode == "snapshot" {
+		item = s.workingTreeItem(workspace, item)
+	}
+	if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
+		return models.FileContent{}, err
+	}
 	input.FileID = fileID
 	return s.files.WriteMarkdown(workspace, item, input)
 }
@@ -97,6 +113,9 @@ func (s *Service) SaveFile(id, fileID string, input models.FileSaveInput) (model
 func (s *Service) RevertFile(id, fileID string, validatePaths func(models.WorkspaceConfig, []string) error) (models.ScanResult, error) {
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
+		return models.ScanResult{}, err
+	}
+	if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
 		return models.ScanResult{}, err
 	}
 	relPath, err := s.files.RelativePath(workspace, item, fileID)
@@ -118,12 +137,30 @@ func (s *Service) SaveMetadata(id string, input models.ItemMetadataUpdateInput) 
 	if err != nil {
 		return models.WriteResult{}, err
 	}
+	if err := s.materializeIfNeeded(workspace, item, "", input.MaterializeConfirmed); err != nil {
+		return models.WriteResult{}, err
+	}
+	if item.SourceMode == "snapshot" {
+		item = s.workingTreeItem(workspace, item)
+	}
+	if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
+		return models.WriteResult{}, err
+	}
 	return s.writer.SaveMetadata(workspace, item, input)
 }
 
 func (s *Service) UpdateStatus(id string, input models.ItemStatusUpdateInput) (models.WriteResult, error) {
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
+		return models.WriteResult{}, err
+	}
+	if err := s.materializeIfNeeded(workspace, item, "", input.MaterializeConfirmed); err != nil {
+		return models.WriteResult{}, err
+	}
+	if item.SourceMode == "snapshot" {
+		item = s.workingTreeItem(workspace, item)
+	}
+	if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
 		return models.WriteResult{}, err
 	}
 	return s.writer.UpdateStatus(workspace, item, input)
@@ -161,11 +198,176 @@ func (s *Service) workspaceAndItem(itemID string) (models.WorkspaceConfig, model
 	return workspace, item, nil
 }
 
+func (s *Service) materializeIfNeeded(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string, confirmed bool) error {
+	if item.SourceMode != "snapshot" {
+		return nil
+	}
+	if !confirmed {
+		return fmt.Errorf("snapshot edit requires materialization confirmation")
+	}
+	return s.writer.MaterializeSnapshotItem(workspace, item, fileID)
+}
+
+func (s *Service) requireCurrentCheckoutBranch(workspace models.WorkspaceConfig, item models.ItemDetail) error {
+	if item.SourceMode == "snapshot" {
+		return fmt.Errorf("snapshot edit requires materialization confirmation")
+	}
+	current, err := s.git.CurrentBranch(workspace.Path)
+	if err != nil {
+		return err
+	}
+	if item.Branch != "" && current != item.Branch {
+		return fmt.Errorf("item branch %q is not the current checkout branch %q", item.Branch, current)
+	}
+	return nil
+}
+
+func (s *Service) workingTreeItem(workspace models.WorkspaceConfig, item models.ItemDetail) models.ItemDetail {
+	current, err := s.git.CurrentBranch(workspace.Path)
+	if err != nil || current == "" {
+		current = workspace.BaselineBranch
+	}
+	item.Branch = current
+	item.BranchRef = ""
+	item.Commit = ""
+	item.SourceMode = "working_tree"
+	item.Editable = true
+	return item
+}
+
+func (s *Service) snapshotFiles(workspace models.WorkspaceConfig, item models.ItemDetail) ([]models.FileNode, error) {
+	entries, err := s.git.TreeWalk(workspace.Path, item.BranchRef, item.ItemPath)
+	if err != nil {
+		return nil, err
+	}
+	nodes := []models.FileNode{}
+	for _, entry := range entries {
+		if entry.Type.IsDir() {
+			continue
+		}
+		rel, err := filepath.Rel(filepath.FromSlash(item.ItemPath), filepath.FromSlash(entry.Path))
+		if err != nil {
+			continue
+		}
+		nodes = insertFileNode(nodes, filepath.ToSlash(rel))
+	}
+	sortFileNodes(nodes)
+	return nodes, nil
+}
+
+func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) (models.FileContent, error) {
+	relPath := fileIDToRelativePath(item, fileID)
+	if relPath == "" {
+		nodes, err := s.snapshotFiles(workspace, item)
+		if err != nil {
+			return models.FileContent{}, err
+		}
+		for _, node := range flattenFileNodes(nodes) {
+			if node.ID == fileID {
+				relPath = node.Path
+				break
+			}
+		}
+	}
+	if relPath == "" {
+		return models.FileContent{}, fmt.Errorf("file not found")
+	}
+	data, err := s.git.TreeReadFile(workspace.Path, item.BranchRef, filepath.ToSlash(filepath.Join(item.ItemPath, relPath)))
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	classification := fileaccess.ClassifyPath(relPath)
+	return models.FileContent{
+		ID:        fileIDForPath(relPath),
+		Path:      relPath,
+		Content:   string(data),
+		Language:  classification.Language,
+		Hash:      fileaccess.ContentHash(data),
+		Kind:      classification.Kind,
+		SizeBytes: int64(len(data)),
+		Editable:  fileaccess.IsEditableKind(classification.Kind),
+	}, nil
+}
+
+func (s *Service) fullDescription(workspace models.WorkspaceConfig, item models.ItemDetail) string {
+	if item.SourceMode == "snapshot" && item.BranchRef != "" && item.ItemPath != "" {
+		data, err := s.git.TreeReadFile(workspace.Path, item.BranchRef, filepath.ToSlash(filepath.Join(item.ItemPath, "README.md")))
+		if err == nil {
+			if description := FirstMarkdownParagraph(string(data)); description != "" {
+				return description
+			}
+		}
+	}
+	return FullReadmeDescription(workspace, item)
+}
+
 func FallbackPath(workspace models.WorkspaceConfig, item models.ItemDetail) string {
 	if len(workspace.Sources) == 0 || item.Scope == "" || item.Identifier == "" {
 		return ""
 	}
 	return filepath.ToSlash(filepath.Join(workspace.Sources[0], item.Scope, item.Identifier))
+}
+
+func insertFileNode(nodes []models.FileNode, relPath string) []models.FileNode {
+	parts := strings.Split(relPath, "/")
+	if len(parts) == 1 {
+		return append(nodes, models.FileNode{ID: fileIDForPath(relPath), Name: parts[0], Path: relPath, Type: "file"})
+	}
+	dirPath := parts[0]
+	for i := range nodes {
+		if nodes[i].Type == "directory" && nodes[i].Name == parts[0] {
+			nodes[i].Children = insertFileNode(nodes[i].Children, strings.Join(parts[1:], "/"))
+			for j := range nodes[i].Children {
+				nodes[i].Children[j].Path = filepath.ToSlash(filepath.Join(dirPath, nodes[i].Children[j].Path))
+			}
+			return nodes
+		}
+	}
+	child := insertFileNode(nil, strings.Join(parts[1:], "/"))
+	for i := range child {
+		child[i].Path = filepath.ToSlash(filepath.Join(dirPath, child[i].Path))
+	}
+	return append(nodes, models.FileNode{ID: fileIDForPath(dirPath), Name: parts[0], Path: dirPath, Type: "directory", Children: child})
+}
+
+func sortFileNodes(nodes []models.FileNode) {
+	sort.SliceStable(nodes, func(i, j int) bool {
+		if nodes[i].Type != nodes[j].Type {
+			return nodes[i].Type == "directory"
+		}
+		return nodes[i].Name < nodes[j].Name
+	})
+	for i := range nodes {
+		sortFileNodes(nodes[i].Children)
+	}
+}
+
+func flattenFileNodes(nodes []models.FileNode) []models.FileNode {
+	var out []models.FileNode
+	var walk func([]models.FileNode)
+	walk = func(in []models.FileNode) {
+		for _, node := range in {
+			if node.Type == "file" {
+				out = append(out, node)
+			}
+			walk(node.Children)
+		}
+	}
+	walk(nodes)
+	return out
+}
+
+func fileIDToRelativePath(item models.ItemDetail, fileID string) string {
+	for _, doc := range item.Documents {
+		if fileIDForPath(doc.Path) == fileID {
+			return doc.Path
+		}
+	}
+	return ""
+}
+
+func fileIDForPath(path string) string {
+	return strings.NewReplacer("/", "__", ".", "_").Replace(path)
 }
 
 func FullReadmeDescription(workspace models.WorkspaceConfig, item models.ItemDetail) string {

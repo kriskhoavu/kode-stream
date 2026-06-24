@@ -32,7 +32,8 @@ func TestFallbackDocumentsOrdersKnownPlanFiles(t *testing.T) {
 	writeTestFile(t, root, "scenario/scenario-00-overview.md", "# Scenario\n")
 	writeTestFile(t, root, "design/design-01-backend.md", "# Backend\n")
 
-	docs := fallbackDocuments(root)
+	reader := NewFilesystemSourceReader(root)
+	docs := fallbackDocuments(reader, "")
 	if len(docs) != 4 {
 		t.Fatalf("expected 4 docs, got %d", len(docs))
 	}
@@ -55,7 +56,8 @@ func TestFallbackDocumentsOrdersKnownPlanFiles(t *testing.T) {
 }
 
 func TestFallbackDocumentsReturnsEmptySliceForEmptyPlan(t *testing.T) {
-	docs := fallbackDocuments(t.TempDir())
+	reader := NewFilesystemSourceReader(t.TempDir())
+	docs := fallbackDocuments(reader, "")
 	if docs == nil {
 		t.Fatal("expected empty slice, got nil")
 	}
@@ -67,12 +69,13 @@ func TestFallbackDocumentsReturnsEmptySliceForEmptyPlan(t *testing.T) {
 func TestDocumentCollectionDetection(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "a12/guide.md", "# Guide\n")
-	entries, err := osReadDir(root)
+	reader := NewFilesystemSourceReader(root)
+	entries, err := reader.ReadDir("")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !shouldScanAsDocumentCollection(root, entries) {
+	if !shouldScanAsDocumentCollection(reader, "", entries) {
 		t.Fatal("expected freestyle markdown root to scan as document collection")
 	}
 }
@@ -80,12 +83,13 @@ func TestDocumentCollectionDetection(t *testing.T) {
 func TestStructuredPlanDirectoryDoesNotScanAsDocumentCollection(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "api/DI-1/README.md", "# Item\n")
-	entries, err := osReadDir(root)
+	reader := NewFilesystemSourceReader(root)
+	entries, err := reader.ReadDir("")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if shouldScanAsDocumentCollection(root, entries) {
+	if shouldScanAsDocumentCollection(reader, "", entries) {
 		t.Fatal("structured item root should not scan as one document collection")
 	}
 }
@@ -93,12 +97,13 @@ func TestStructuredPlanDirectoryDoesNotScanAsDocumentCollection(t *testing.T) {
 func TestNestedFreestyleDocsStillScanAsDocumentCollection(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "ai/revised/note.md", "# Note\n")
-	entries, err := osReadDir(root)
+	reader := NewFilesystemSourceReader(root)
+	entries, err := reader.ReadDir("")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !shouldScanAsDocumentCollection(root, entries) {
+	if !shouldScanAsDocumentCollection(reader, "", entries) {
 		t.Fatal("nested freestyle docs should not look like structured item folders")
 	}
 }
@@ -331,6 +336,55 @@ documents:
 	}
 	if docs[2].Track != "backend" || docs[2].Label != "Auto-Assign Enricher" {
 		t.Fatalf("sparse override was not applied: %#v", docs[2])
+	}
+}
+
+func TestScanWithRequestMatchesFilesystemAndGitTreeForCommittedContent(t *testing.T) {
+	root := newReaderGitRepo(t)
+	writeReaderGitFile(t, root, "plans/platform/PM-013/README.md", "# PM-013: Snapshot Materialization\n\nOverview.\n")
+	writeReaderGitFile(t, root, "plans/platform/PM-013/plan.yaml", "plan:\n  status: review\n  tags: [branch]\n")
+	writeReaderGitFile(t, root, "plans/platform/PM-013/design/design-01-backend.md", "# Backend\n")
+	readerGitCommit(t, root, "add plan")
+
+	workspace := models.WorkspaceConfig{ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}
+	git := gitadapter.New()
+	scan := New(git)
+	fsData, err := scan.ScanWithRequest(ScanRequest{
+		Workspace:  workspace,
+		Branch:     "main",
+		SourceMode: "working_tree",
+		Editable:   true,
+		Reader:     NewFilesystemSourceReader(root),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, commit, err := git.ResolveBranch(root, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gitData, err := scan.ScanWithRequest(ScanRequest{
+		Workspace:  workspace,
+		Branch:     "main",
+		BranchRef:  ref,
+		Commit:     commit,
+		SourceMode: "snapshot",
+		Editable:   false,
+		Reader:     NewGitTreeSourceReader(root, ref, git),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fsData.Items) != 1 || len(gitData.Items) != 1 {
+		t.Fatalf("items fs=%d git=%d warnings=%v/%v", len(fsData.Items), len(gitData.Items), fsData.Warnings, gitData.Warnings)
+	}
+	fsItem := fsData.Items[0]
+	gitItem := gitData.Items[0]
+	if fsItem.Identifier != gitItem.Identifier || fsItem.Title != gitItem.Title || fsItem.Status != gitItem.Status || fsItem.Counts.Files != gitItem.Counts.Files {
+		t.Fatalf("scan mismatch fs=%+v git=%+v", fsItem.ItemSummary, gitItem.ItemSummary)
+	}
+	if gitItem.BranchRef != ref || gitItem.Commit != commit || gitItem.SourceMode != "snapshot" || gitItem.Editable {
+		t.Fatalf("snapshot metadata not stamped: %+v", gitItem.ItemSummary)
 	}
 }
 

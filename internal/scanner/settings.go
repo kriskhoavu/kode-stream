@@ -50,11 +50,15 @@ func BuiltInStructuredSettings() models.SourceStructureSettings {
 }
 
 func ReadSourceStructureSettings(root string) (models.SourceStructureSettings, bool, []models.ScanWarning) {
-	path := filepath.Join(root, SourceStructureSettingsFile)
-	data, err := os.ReadFile(path)
+	return ReadSourceStructureSettingsFromReader(NewFilesystemSourceReader(filepath.Dir(root)), filepath.Base(root))
+}
+
+func ReadSourceStructureSettingsFromReader(reader SourceReader, root string) (models.SourceStructureSettings, bool, []models.ScanWarning) {
+	path := filepath.ToSlash(filepath.Join(root, SourceStructureSettingsFile))
+	data, err := reader.ReadFile(path)
 	if os.IsNotExist(err) {
-		path = filepath.Join(root, legacySourceStructureSettingsFile)
-		data, err = os.ReadFile(path)
+		path = filepath.ToSlash(filepath.Join(root, legacySourceStructureSettingsFile))
+		data, err = reader.ReadFile(path)
 		if os.IsNotExist(err) {
 			return DefaultSourceStructureSettings(), false, nil
 		}
@@ -97,14 +101,18 @@ func applyLegacySourceFields(data []byte, settings *models.SourceStructureSettin
 }
 
 func SourceSettingsMode(root string) string {
-	entries, err := os.ReadDir(root)
+	return SourceSettingsModeFromReader(NewFilesystemSourceReader(filepath.Dir(root)), filepath.Base(root))
+}
+
+func SourceSettingsModeFromReader(reader SourceReader, root string) string {
+	entries, err := reader.ReadDir(root)
 	if err != nil {
 		return "unknown"
 	}
-	if hasStructuredItemChildren(root, entries) {
+	if hasStructuredItemChildren(reader, root, entries) {
 		return "structured"
 	}
-	if hasMarkdownFiles(root) {
+	if hasMarkdownFiles(reader, root) {
 		return "unstructured"
 	}
 	return "empty"

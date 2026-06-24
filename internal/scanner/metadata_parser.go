@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -24,8 +23,8 @@ type planYAML struct {
 	Documents []models.ItemDocument `yaml:"documents"`
 }
 
-func readPlanYAML(root string) ([]byte, string, error) {
-	data, err := os.ReadFile(filepath.Join(root, "plan.yaml"))
+func readPlanYAML(reader SourceReader, root string) ([]byte, string, error) {
+	data, err := reader.ReadFile(filepath.ToSlash(filepath.Join(root, "plan.yaml")))
 	if err != nil {
 		return nil, "", err
 	}

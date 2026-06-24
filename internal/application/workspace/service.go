@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"plan-manager/internal/application/apperrors"
+	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
 	"plan-manager/internal/itemwriter"
 	"plan-manager/internal/models"
@@ -35,10 +36,15 @@ type Service struct {
 	index    *itemindex.Index
 	scanner  *scanner.Scanner
 	writer   *itemwriter.Writer
+	git      *gitadapter.GitAdapter
 }
 
-func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, writer *itemwriter.Writer) *Service {
-	return &Service{registry: reg, index: idx, scanner: scan, writer: writer}
+func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, writer *itemwriter.Writer, git ...*gitadapter.GitAdapter) *Service {
+	var adapter *gitadapter.GitAdapter
+	if len(git) > 0 {
+		adapter = git[0]
+	}
+	return &Service{registry: reg, index: idx, scanner: scan, writer: writer, git: adapter}
 }
 
 func (s *Service) State() (StateResult, error) {
@@ -127,6 +133,86 @@ func (s *Service) Scan(id string) (models.ScanResult, error) {
 		ItemCount:   len(data.Items),
 		Warnings:    data.Warnings,
 	}, nil
+}
+
+func (s *Service) LoadBranch(id string, input models.BranchLoadInput) (models.BranchLoadResult, error) {
+	workspace, ok, err := s.registry.Get(id)
+	if err != nil {
+		return models.BranchLoadResult{}, err
+	}
+	if !ok {
+		return models.BranchLoadResult{}, apperrors.ErrWorkspaceNotFound
+	}
+	if s.git == nil {
+		s.git = gitadapter.New()
+	}
+	currentCheckoutBranch, err := s.git.CurrentBranch(workspace.Path)
+	if err != nil {
+		return models.BranchLoadResult{}, err
+	}
+	selectedBranch := strings.TrimSpace(input.Branch)
+	if selectedBranch == "" {
+		selectedBranch = firstNonEmpty(workspace.LastSelectedBranch, workspace.BaselineBranch, currentCheckoutBranch)
+	}
+	ref, commit, err := s.git.ResolveBranch(workspace.Path, selectedBranch)
+	if err != nil {
+		return models.BranchLoadResult{}, err
+	}
+	sourceMode := "snapshot"
+	editable := false
+	reader := scanner.SourceReader(scanner.NewGitTreeSourceReader(workspace.Path, ref, s.git))
+	if selectedBranch == currentCheckoutBranch {
+		sourceMode = "working_tree"
+		editable = true
+		reader = scanner.NewFilesystemSourceReader(workspace.Path)
+	}
+	sourceHash := sourceConfigurationHash(workspace)
+	if !input.Force {
+		if metadata, ok, err := s.index.BranchScan(workspace.ID, selectedBranch); err != nil {
+			return models.BranchLoadResult{}, err
+		} else if ok && metadata.Commit == commit && metadata.SourceConfigurationHash == sourceHash {
+			items, err := s.index.BranchItems(workspace.ID, selectedBranch)
+			if err != nil {
+				return models.BranchLoadResult{}, err
+			}
+			_ = s.registry.SetLastSelectedBranch(workspace.ID, selectedBranch)
+			return branchLoadResult(workspace.ID, selectedBranch, ref, commit, currentCheckoutBranch, sourceMode, editable, metadata.ScannedAt, metadata.Warnings, items), nil
+		}
+	}
+	data, err := s.scanner.ScanWithRequest(scanner.ScanRequest{
+		Workspace:  workspace,
+		Branch:     selectedBranch,
+		BranchRef:  ref,
+		Commit:     commit,
+		SourceMode: sourceMode,
+		Editable:   editable,
+		Reader:     reader,
+	})
+	if err != nil {
+		return models.BranchLoadResult{}, err
+	}
+	scannedAt := time.Now().UTC()
+	metadata := models.BranchScanMetadata{
+		WorkspaceID:             workspace.ID,
+		Branch:                  selectedBranch,
+		BranchRef:               ref,
+		Commit:                  commit,
+		SourceMode:              sourceMode,
+		Editable:                editable,
+		SourceConfigurationHash: sourceHash,
+		ScannedAt:               scannedAt,
+		Warnings:                data.Warnings,
+	}
+	if err := s.index.ReplaceWorkspaceBranch(workspace.ID, selectedBranch, data.Items, metadata); err != nil {
+		return models.BranchLoadResult{}, err
+	}
+	_ = s.registry.TouchScanned(workspace.ID, scannedAt)
+	_ = s.registry.SetLastSelectedBranch(workspace.ID, selectedBranch)
+	items, err := s.index.BranchItems(workspace.ID, selectedBranch)
+	if err != nil {
+		return models.BranchLoadResult{}, err
+	}
+	return branchLoadResult(workspace.ID, selectedBranch, ref, commit, currentCheckoutBranch, sourceMode, editable, scannedAt, data.Warnings, items), nil
 }
 
 func (s *Service) SourceStructure(id, directory string) (models.SourceSettingsResult, error) {
@@ -223,4 +309,46 @@ func NonNilWarnings(warnings []models.ScanWarning) []models.ScanWarning {
 		return []models.ScanWarning{}
 	}
 	return warnings
+}
+
+func sourceConfigurationHash(workspace models.WorkspaceConfig) string {
+	payload := struct {
+		Sources []string `json:"sources"`
+	}{Sources: workspace.Sources}
+	data, _ := json.Marshal(payload)
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+func branchLoadResult(workspaceID, branch, ref, commit, checkout, sourceMode string, editable bool, scannedAt time.Time, warnings []models.ScanWarning, items []models.ItemSummary) models.BranchLoadResult {
+	if warnings == nil {
+		warnings = []models.ScanWarning{}
+	}
+	if items == nil {
+		items = []models.ItemSummary{}
+	}
+	return models.BranchLoadResult{
+		WorkspaceID:           workspaceID,
+		Branch:                branch,
+		SelectedBranch:        branch,
+		BranchRef:             ref,
+		Commit:                commit,
+		CurrentCheckoutBranch: checkout,
+		SourceMode:            sourceMode,
+		Mode:                  sourceMode,
+		Editable:              editable,
+		ScannedAt:             scannedAt,
+		ItemCount:             len(items),
+		Warnings:              warnings,
+		Items:                 items,
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

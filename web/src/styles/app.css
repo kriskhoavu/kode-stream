@@ -517,6 +517,25 @@ select {
   cursor: pointer;
 }
 
+.branch-context-chip select {
+  min-width: 96px;
+  max-width: 150px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  outline: none;
+  padding: 0 2px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.branch-context-chip select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--blue) 42%, transparent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 .branch-context-chip:hover,
 .branch-context-chip:focus-visible,
 .branch-context-chip.active {
@@ -3549,6 +3568,14 @@ body.is-resizing-panel {
 
   .workspace-context {
     justify-content: flex-start;
+  }
+
+  .branch-context-chip {
+    max-width: 100%;
+  }
+
+  .branch-context-chip select {
+    max-width: 190px;
   }
 
   .board-toolbar {

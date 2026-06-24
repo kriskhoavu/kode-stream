@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"plan-manager/internal/models"
@@ -41,6 +42,72 @@ func TestPathStatesNormalizesWorkspaceChanges(t *testing.T) {
 	}
 }
 
+func TestTreeReadsBranchSnapshotWithoutCheckout(t *testing.T) {
+	root := newGitRepo(t)
+	writeGitFile(t, root, "plans/main/README.md", "# Main\n")
+	gitCommit(t, root, "main item")
+	gitRun(t, root, "switch", "-c", "snapshot")
+	writeGitFile(t, root, "plans/snapshot/README.md", "# Snapshot\n")
+	writeGitFile(t, root, "plans/snapshot/design/backend.md", "# Backend\n")
+	gitCommit(t, root, "snapshot item")
+	gitRun(t, root, "switch", "main")
+
+	adapter := New()
+	ref, commit, err := adapter.ResolveBranch(root, "snapshot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ref != "refs/heads/snapshot" || commit == "" {
+		t.Fatalf("resolved branch = %q %q", ref, commit)
+	}
+
+	data, err := adapter.TreeReadFile(root, ref, "plans/snapshot/README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "# Snapshot\n" {
+		t.Fatalf("snapshot README = %q", data)
+	}
+	entries, err := adapter.TreeReadDir(root, ref, "plans/snapshot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 || entries[0].Name != "README.md" || entries[1].Name != "design" || !entries[1].Type.IsDir() {
+		t.Fatalf("entries = %#v", entries)
+	}
+	walked, err := adapter.TreeWalk(root, ref, "plans/snapshot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := make([]string, 0, len(walked))
+	filePaths := make([]string, 0, len(walked))
+	for _, entry := range walked {
+		paths = append(paths, entry.Path)
+		if !entry.Type.IsDir() {
+			filePaths = append(filePaths, entry.Path)
+		}
+	}
+	if strings.Join(paths, ",") != "plans/snapshot/README.md,plans/snapshot/design,plans/snapshot/design/backend.md" {
+		t.Fatalf("walked paths = %#v", paths)
+	}
+	if strings.Join(filePaths, ",") != "plans/snapshot/README.md,plans/snapshot/design/backend.md" {
+		t.Fatalf("walked files = %#v", filePaths)
+	}
+	if author := adapter.LastAuthorAtRef(root, ref, "plans/snapshot/README.md"); author != "Plan Manager" {
+		t.Fatalf("author = %q", author)
+	}
+	if updated := adapter.LastUpdateAtRef(root, ref, "plans/snapshot/README.md"); updated.IsZero() {
+		t.Fatal("expected update time at ref")
+	}
+	current, err := adapter.CurrentBranch(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current != "main" {
+		t.Fatalf("tree reads changed branch to %q", current)
+	}
+}
+
 func TestParseChangeLine(t *testing.T) {
 	change := parseChangeLine(" M plans/platform/PM-002/README.md")
 	if change.Path != "plans/platform/PM-002/README.md" {
@@ -58,5 +125,41 @@ func TestParseChangeLine(t *testing.T) {
 	conflicted := parseChangeLine("UU plans/platform/PM-002/README.md")
 	if conflicted.Status != models.GitChangeConflicted || !conflicted.Conflict {
 		t.Fatalf("conflicted = %#v", conflicted)
+	}
+}
+
+func newGitRepo(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	gitRun(t, root, "config", "user.name", "Plan Manager")
+	gitRun(t, root, "config", "user.email", "plan-manager@example.test")
+	return root
+}
+
+func writeGitFile(t *testing.T, root, rel, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func gitCommit(t *testing.T, root, message string) {
+	t.Helper()
+	gitRun(t, root, "add", ".")
+	gitRun(t, root, "commit", "-m", message)
+}
+
+func gitRun(t *testing.T, root string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, output)
 	}
 }

@@ -100,6 +100,7 @@ func (r *Registry) Update(id string, input models.WorkspaceInput) (models.Worksp
 			workspace.ID = existing.ID
 			workspace.CreatedAt = existing.CreatedAt
 			workspace.LastScannedAt = existing.LastScannedAt
+			workspace.LastSelectedBranch = existing.LastSelectedBranch
 			r.records[i] = workspace
 			return workspace, r.saveLocked()
 		}
@@ -131,6 +132,21 @@ func (r *Registry) TouchScanned(id string, scannedAt time.Time) error {
 	for i := range r.records {
 		if r.records[i].ID == id {
 			r.records[i].LastScannedAt = scannedAt
+			return r.saveLocked()
+		}
+	}
+	return fmt.Errorf("workspace not found")
+}
+
+func (r *Registry) SetLastSelectedBranch(id, branch string) error {
+	if err := r.load(); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.records {
+		if r.records[i].ID == id {
+			r.records[i].LastSelectedBranch = strings.TrimSpace(branch)
 			return r.saveLocked()
 		}
 	}

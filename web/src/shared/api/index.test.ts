@@ -45,6 +45,40 @@ describe('shared api facade', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/workspace%2Fone/git/branches', expect.any(Object));
   });
 
+  it('loads and normalizes a Kanban branch snapshot', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workspaceId: 'workspace/one',
+        branch: 'feature',
+        selectedBranch: 'feature',
+        branchRef: 'refs/heads/feature',
+        commit: 'abc',
+        currentCheckoutBranch: 'main',
+        mode: 'snapshot',
+        itemCount: 0,
+        warnings: null,
+        items: [{ id: 'item-1', workspaceId: 'workspace/one', workspaceName: 'Workspace', branch: 'feature', sourceMode: 'snapshot', title: 'Item', tags: null }]
+      })
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api.loadKanbanBranch('workspace/one', { branch: 'feature', force: true })).resolves.toMatchObject({
+      workspaceId: 'workspace/one',
+      branch: 'feature',
+      sourceMode: 'snapshot',
+      mode: 'snapshot',
+      currentCheckoutBranch: 'main',
+      editable: false,
+      warnings: [],
+      items: [{ id: 'item-1', sourceMode: 'snapshot', editable: false, tags: [] }]
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/workspace%2Fone/kanban/branch', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ branch: 'feature', force: true })
+    }));
+  });
+
   it('normalizes workspace directory listings and encodes file paths', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ workspaceId: 'w1', entries: [{ id: 'one', name: 'one', path: 'one', type: 'directory' }] }) })

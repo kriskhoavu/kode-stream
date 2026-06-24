@@ -103,13 +103,26 @@ const (
 var StatusOrder = []ItemStatus{StatusUnsorted, StatusIdeas, StatusDraft, StatusInProgress, StatusReview, StatusDone}
 
 type WorkspaceConfig struct {
-	ID             string    `json:"id" yaml:"id"`
-	Name           string    `json:"name" yaml:"name"`
-	Path           string    `json:"path" yaml:"path"`
-	BaselineBranch string    `json:"baselineBranch" yaml:"baselineBranch"`
-	Sources        []string  `json:"sources" yaml:"sources"`
-	CreatedAt      time.Time `json:"createdAt" yaml:"createdAt"`
-	LastScannedAt  time.Time `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
+	ID                 string    `json:"id" yaml:"id"`
+	Name               string    `json:"name" yaml:"name"`
+	Path               string    `json:"path" yaml:"path"`
+	BaselineBranch     string    `json:"baselineBranch" yaml:"baselineBranch"`
+	LastSelectedBranch string    `json:"lastSelectedBranch,omitempty" yaml:"lastSelectedBranch,omitempty"`
+	Sources            []string  `json:"sources" yaml:"sources"`
+	CreatedAt          time.Time `json:"createdAt" yaml:"createdAt"`
+	LastScannedAt      time.Time `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
+}
+
+type BranchScanMetadata struct {
+	WorkspaceID             string        `json:"workspaceId" yaml:"workspaceId"`
+	Branch                  string        `json:"branch" yaml:"branch"`
+	BranchRef               string        `json:"branchRef,omitempty" yaml:"branchRef,omitempty"`
+	Commit                  string        `json:"commit,omitempty" yaml:"commit,omitempty"`
+	SourceMode              string        `json:"sourceMode,omitempty" yaml:"sourceMode,omitempty"`
+	Editable                bool          `json:"editable" yaml:"editable"`
+	SourceConfigurationHash string        `json:"sourceConfigurationHash,omitempty" yaml:"sourceConfigurationHash,omitempty"`
+	ScannedAt               time.Time     `json:"scannedAt" yaml:"scannedAt"`
+	Warnings                []ScanWarning `json:"warnings" yaml:"warnings"`
 }
 
 type WorkspaceInput struct {
@@ -151,6 +164,10 @@ type ItemSummary struct {
 	WorkspaceID    string     `json:"workspaceId" yaml:"workspaceId"`
 	WorkspaceName  string     `json:"workspaceName" yaml:"workspaceName"`
 	Branch         string     `json:"branch" yaml:"branch"`
+	BranchRef      string     `json:"branchRef,omitempty" yaml:"branchRef,omitempty"`
+	Commit         string     `json:"commit,omitempty" yaml:"commit,omitempty"`
+	SourceMode     string     `json:"sourceMode,omitempty" yaml:"sourceMode,omitempty"`
+	Editable       bool       `json:"editable" yaml:"editable"`
 	Scope          string     `json:"scope" yaml:"scope"`
 	Identifier     string     `json:"identifier" yaml:"identifier"`
 	Title          string     `json:"title" yaml:"title"`
@@ -359,23 +376,47 @@ type ScanResult struct {
 	Warnings    []ScanWarning `json:"warnings" yaml:"warnings"`
 }
 
+type BranchLoadInput struct {
+	Branch string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	Force  bool   `json:"force,omitempty" yaml:"force,omitempty"`
+}
+
+type BranchLoadResult struct {
+	WorkspaceID           string        `json:"workspaceId" yaml:"workspaceId"`
+	Branch                string        `json:"branch" yaml:"branch"`
+	SelectedBranch        string        `json:"selectedBranch" yaml:"selectedBranch"`
+	BranchRef             string        `json:"branchRef" yaml:"branchRef"`
+	Commit                string        `json:"commit" yaml:"commit"`
+	CurrentCheckoutBranch string        `json:"currentCheckoutBranch" yaml:"currentCheckoutBranch"`
+	SourceMode            string        `json:"sourceMode" yaml:"sourceMode"`
+	Mode                  string        `json:"mode" yaml:"mode"`
+	Editable              bool          `json:"editable" yaml:"editable"`
+	ScannedAt             time.Time     `json:"scannedAt" yaml:"scannedAt"`
+	ItemCount             int           `json:"itemCount" yaml:"itemCount"`
+	Warnings              []ScanWarning `json:"warnings" yaml:"warnings"`
+	Items                 []ItemSummary `json:"items" yaml:"items"`
+}
+
 type FileSaveInput struct {
-	FileID       string `json:"fileId" yaml:"fileId"`
-	Content      string `json:"content" yaml:"content"`
-	ExpectedHash string `json:"expectedHash,omitempty" yaml:"expectedHash,omitempty"`
+	FileID               string `json:"fileId" yaml:"fileId"`
+	Content              string `json:"content" yaml:"content"`
+	ExpectedHash         string `json:"expectedHash,omitempty" yaml:"expectedHash,omitempty"`
+	MaterializeConfirmed bool   `json:"materializeConfirmed,omitempty" yaml:"materializeConfirmed,omitempty"`
 }
 
 type ItemMetadataUpdateInput struct {
-	Title      string     `json:"title,omitempty" yaml:"title,omitempty"`
-	Scope      string     `json:"scope,omitempty" yaml:"scope,omitempty"`
-	Identifier string     `json:"identifier,omitempty" yaml:"identifier,omitempty"`
-	Status     ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	Owner      string     `json:"owner,omitempty" yaml:"owner,omitempty"`
-	Tags       []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Title                string     `json:"title,omitempty" yaml:"title,omitempty"`
+	Scope                string     `json:"scope,omitempty" yaml:"scope,omitempty"`
+	Identifier           string     `json:"identifier,omitempty" yaml:"identifier,omitempty"`
+	Status               ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Owner                string     `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Tags                 []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
+	MaterializeConfirmed bool       `json:"materializeConfirmed,omitempty" yaml:"materializeConfirmed,omitempty"`
 }
 
 type ItemStatusUpdateInput struct {
-	Status ItemStatus `json:"status" yaml:"status"`
+	Status               ItemStatus `json:"status" yaml:"status"`
+	MaterializeConfirmed bool       `json:"materializeConfirmed,omitempty" yaml:"materializeConfirmed,omitempty"`
 }
 
 type NewItemInput struct {

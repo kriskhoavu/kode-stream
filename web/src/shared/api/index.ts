@@ -1,6 +1,7 @@
 import type {
   AppState,
   AuditEvent,
+  BranchLoadResult,
   BranchCreateInput,
   BranchSwitchInput,
   FileContent,
@@ -95,6 +96,11 @@ export const api = {
   updateWorkspace: (id: string, input: WorkspaceInput) => request<WorkspaceConfig>(`/api/workspaces/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
   scan: (workspaceId: string) => request<ScanResult>(`/api/workspaces/${workspaceId}/scan`, { method: 'POST' }),
+  loadKanbanBranch: (workspaceId: string, input: { branch?: string; force?: boolean } = {}) =>
+    request<BranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/kanban/branch`, {
+      method: 'POST',
+      body: JSON.stringify(input)
+    }).then(normalizeBranchLoadResult),
   workspaceHealth: (workspaceId: string) => request<WorkspaceHealth>(`/api/workspaces/${workspaceId}/health`).then(normalizeWorkspaceHealth),
   sourceStructure: (workspaceId: string, directory: string) =>
     request<SourceSettingsResult>(`/api/workspaces/${workspaceId}/source-structure?directory=${encodeURIComponent(directory)}`),
@@ -230,7 +236,45 @@ function normalizeWorkspacePathMutationResult(result: WorkspacePathMutationResul
 function normalizeItem(item: ItemSummary): ItemSummary {
   return {
     ...item,
+    sourceMode: item.sourceMode === 'snapshot' ? 'snapshot' : 'working_tree',
+    editable: Boolean(item.editable),
     tags: Array.isArray(item.tags) ? item.tags : []
+  };
+}
+
+function normalizeBranchLoadResult(result: BranchLoadResult): BranchLoadResult {
+  if (Array.isArray(result)) {
+    const items = result.map(normalizeItem);
+    const branch = items[0]?.branch ?? '';
+    return {
+      workspaceId: items[0]?.workspaceId ?? '',
+      branch,
+      selectedBranch: branch,
+      branchRef: '',
+      commit: '',
+      currentCheckoutBranch: branch,
+      sourceMode: 'working_tree',
+      mode: 'working_tree',
+      editable: true,
+      scannedAt: '',
+      itemCount: items.length,
+      warnings: [],
+      items
+    };
+  }
+  const sourceMode = result.sourceMode === 'snapshot' || result.mode === 'snapshot' ? 'snapshot' : 'working_tree';
+  const items = (Array.isArray(result.items) ? result.items : []).map(normalizeItem);
+  return {
+    ...result,
+    branch: result.branch || result.selectedBranch,
+    selectedBranch: result.selectedBranch || result.branch,
+    currentCheckoutBranch: result.currentCheckoutBranch ?? '',
+    sourceMode,
+    mode: sourceMode,
+    editable: Boolean(result.editable),
+    itemCount: Number(result.itemCount) || items.length,
+    warnings: Array.isArray(result.warnings) ? result.warnings : [],
+    items
   };
 }
 

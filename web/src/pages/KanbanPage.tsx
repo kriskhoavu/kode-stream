@@ -5,7 +5,7 @@ import { FileMenu } from '../components/FileMenu';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
-import type { FileContent, FileNode, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemSummary, SavedFilter, WorkspaceConfig } from '../lib/types';
+import type { BranchLoadResult, FileContent, FileNode, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemSummary, SavedFilter, WorkspaceConfig } from '../lib/types';
 import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/kanban/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/kanban/filtering';
@@ -47,22 +47,46 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   const [workspaceGitStatus, setWorkspaceGitStatus] = useState<GitStatus | null>(null);
   const [workspaceBranchCurrent, setWorkspaceBranchCurrent] = useState('');
   const [workspaceBranchList, setWorkspaceBranchList] = useState<string[]>([]);
-  const autoBranchFilterRef = useRef<{ workspaceId: string; branch: string } | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [branchContext, setBranchContext] = useState<BranchLoadResult | null>(null);
   const suppressPreviewRef = useRef<{ itemId: string; until: number } | null>(null);
   const text = query;
+
+  const loadBranch = async (branch = selectedBranch, force = false) => {
+    if (!workspace) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await api.loadKanbanBranch(workspace.id, { branch: branch || undefined, force });
+      setBranchContext(result);
+      setSelectedBranch(result.branch);
+      setPlans(result.items);
+    } catch (err) {
+      try {
+        const fallbackItems = await api.items(new URLSearchParams({ workspaceId: workspace.id }));
+        setBranchContext(null);
+        setSelectedBranch(branch || workspace.baselineBranch);
+        setPlans(fallbackItems);
+        setError('');
+      } catch {
+        setError(err instanceof Error ? err.message : 'Failed to load branch snapshot');
+        setPlans([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!workspace) {
       setPlans([]);
+      setBranchContext(null);
+      setSelectedBranch('');
       setLoading(false);
       return;
     }
-    setLoading(true);
-    api.items(new URLSearchParams({ workspaceId: workspace.id }))
-      .then(setPlans)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [workspace, refreshKey]);
+    void loadBranch(workspace.lastSelectedBranch || workspace.baselineBranch, false);
+  }, [workspace?.id, refreshKey]);
 
   useEffect(() => {
     api.savedFilters()
@@ -75,7 +99,6 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       setWorkspaceGitStatus(null);
       setWorkspaceBranchCurrent('');
       setWorkspaceBranchList([]);
-      autoBranchFilterRef.current = null;
       return;
     }
     let active = true;
@@ -103,37 +126,26 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   const sourceOptions = useMemo(() => sourceFacetOptions(items, workspace), [items, workspace]);
   const filteredPlans = useMemo(() => filterPlans(items, filters, text, workspace), [items, filters, text, workspace]);
   const services = useMemo(() => unique(items.map((plan) => plan.scope || 'Unknown')), [items]);
-  const indexedBranches = useMemo(() => unique(items.map((plan) => plan.branch)), [items]);
-  const currentBranch = workspaceGitStatus?.branch || workspaceBranchCurrent || workspace?.baselineBranch || 'No branch';
+  const currentBranch = branchContext?.currentCheckoutBranch || workspaceGitStatus?.branch || workspaceBranchCurrent || workspace?.baselineBranch || 'No branch';
   const branchOptions = useMemo(() => unique([
     ...workspaceBranchList,
     currentBranch,
     workspace?.baselineBranch ?? '',
-    ...indexedBranches
-  ].filter((branch) => branch && branch !== 'No branch')), [currentBranch, indexedBranches, workspace?.baselineBranch, workspaceBranchList]);
+    selectedBranch
+  ].filter((branch) => branch && branch !== 'No branch')), [currentBranch, selectedBranch, workspace?.baselineBranch, workspaceBranchList]);
   const authors = useMemo(() => unique(items.map((plan) => plan.author || plan.owner || 'Unknown')), [items]);
   const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
     { key: 'sources', title: 'Source', options: sourceOptions },
     { key: 'scopes', title: labels.scope, options: services.map((scope) => ({ value: scope, label: scope })) },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
-    { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
-    { key: 'branches', title: 'Branches', options: branchOptions.map((branch) => ({ value: branch, label: branch })) }
+    { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) }
   ];
-  const selectedBranchCount = filters.branches.length;
-  const selectedIsDefaultBranch = selectedBranchCount === 1 && filters.branches[0] === currentBranch;
   const activeFilterCount = filters.sources.length
     + filters.scopes.length
     + filters.statuses.length
     + filters.authors.length
-    + (selectedIsDefaultBranch ? 0 : selectedBranchCount)
     + (text ? 1 : 0);
-  const branchFilterLabel = selectedBranchCount === 0
-    ? 'All branches'
-    : selectedIsDefaultBranch
-      ? ''
-      : selectedBranchCount === 1
-        ? `Showing: ${filters.branches[0]}`
-        : `Showing: ${selectedBranchCount}`;
+  const sourceMode = branchContext?.sourceMode ?? 'working_tree';
   const grouped = useMemo(() => {
     const map = new Map<ItemStatus, ItemSummary[]>();
     statusOrder.forEach((item) => map.set(item, []));
@@ -142,35 +154,25 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   }, [filteredPlans]);
   const activeItem = activeItemId ? items.find((item) => item.id === activeItemId) : undefined;
 
-  useEffect(() => {
-    if (!workspace || !currentBranch || currentBranch === 'No branch') return;
-    setFilters((current) => {
-      const auto = autoBranchFilterRef.current;
-      const isPreviousAuto = auto?.workspaceId === workspace.id && current.branches.length === 1 && current.branches[0] === auto.branch;
-      const isNewWorkspace = auto?.workspaceId !== workspace.id;
-      if (!isNewWorkspace && !isPreviousAuto) return current;
-      autoBranchFilterRef.current = { workspaceId: workspace.id, branch: currentBranch };
-      return { ...current, branches: [currentBranch] };
-    });
-  }, [currentBranch, workspace]);
-
   const scan = async () => {
     if (!workspace) return;
-    setScanState('Scanning');
+    setScanState('Refreshing');
     try {
-      const result = await api.scan(workspace.id);
+      const result = await api.loadKanbanBranch(workspace.id, { branch: selectedBranch || undefined, force: true });
       notifyReliabilityChanged();
       setScanState(`${result.itemCount} items indexed`);
+      setBranchContext(result);
+      setSelectedBranch(result.branch);
+      setPlans(result.items);
       onWorkspacesChanged();
-      setPlans(await api.items(new URLSearchParams({ workspaceId: workspace.id })));
     } catch (err) {
-      setScanState(err instanceof Error ? err.message : 'Scan failed');
+      setScanState(err instanceof Error ? err.message : 'Refresh failed');
     }
   };
 
   const reloadPlans = async () => {
     if (!workspace) return;
-    setPlans(await api.items(new URLSearchParams({ workspaceId: workspace.id })));
+    await loadBranch(selectedBranch, false);
   };
 
   const moveItem = async (itemId: string, status: ItemStatus) => {
@@ -179,10 +181,12 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
 
     const previousStatus = item.status;
     setError('');
+    const materializeConfirmed = confirmSnapshotMaterialization(item, 'status');
+    if (materializeConfirmed === null) return;
     setPlans((current) => applyItemStatus(current, itemId, status));
     setPendingItemIds((current) => new Set(current).add(itemId));
     try {
-      const result = await api.updateStatus(itemId, { status });
+      const result = await api.updateStatus(itemId, { status, materializeConfirmed });
       setPlans((current) => current.map((candidate) => candidate.id === itemId ? { ...candidate, ...result.item } : candidate));
       notifyReliabilityChanged();
       await onWorkspacesChanged();
@@ -291,7 +295,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       name: saveFilterName.trim(),
       route: '/kanban',
       workspaceId: workspace?.id,
-      filters: { filters, query }
+      filters: { filters: { ...filters, branches: [] }, query }
     });
     setSavedFilters((current) => [saved, ...current]);
     setSaveFilterName('');
@@ -300,7 +304,12 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
 
   const applySavedFilter = (saved: SavedFilter) => {
     const value = saved.filters as { filters?: Partial<Filters>; query?: string };
-    setFilters({ ...emptyFilters, ...(value.filters ?? {}) });
+    const nextFilters = { ...emptyFilters, ...(value.filters ?? {}) };
+    if (nextFilters.branches.length > 0) {
+      void loadBranch(nextFilters.branches[0], false);
+      nextFilters.branches = [];
+    }
+    setFilters(nextFilters);
     setQuery(value.query ?? '');
   };
 
@@ -329,17 +338,20 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
         </div>
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
-            <button
-              type="button"
-              className={selectedBranchCount > 0 && !selectedIsDefaultBranch ? 'branch-context-chip active' : 'branch-context-chip'}
-              onClick={() => setOpenFacet(openFacet === 'branches' ? '' : 'branches')}
-              aria-label={`Open Branches filter. Current branch ${currentBranch}${branchFilterLabel ? `. ${branchFilterLabel}` : ''}`}
-            >
+            <label className={sourceMode === 'snapshot' ? 'branch-context-chip active' : 'branch-context-chip'}>
               <GitBranch size={14} />
-              <span>Current</span>
-              <strong>{currentBranch}</strong>
-              {branchFilterLabel && <small>{branchFilterLabel}</small>}
-            </button>
+              <span>Branch</span>
+              <select
+                value={selectedBranch || currentBranch}
+                onChange={(event) => void loadBranch(event.target.value, false)}
+                aria-label="Select Kanban branch"
+              >
+                {branchOptions.map((branch) => (
+                  <option value={branch} key={branch}>{branch}</option>
+                ))}
+              </select>
+              <small>{sourceMode === 'snapshot' ? `snapshot; writes copy into ${currentBranch}` : 'working tree'}</small>
+            </label>
             {workspace.sources.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
             ))}
@@ -352,9 +364,9 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search items..." />
         </label>
         <button className="secondary" onClick={scan}>
-          <RotateCw size={16} /> Scan
+          <RotateCw size={16} /> Refresh
         </button>
-        <button className="primary" onClick={() => setNewPlanOpen(true)}>
+        <button className="primary" onClick={() => setNewPlanOpen(true)} disabled={sourceMode === 'snapshot'}>
           + New Item
         </button>
         <button className="secondary" onClick={clearFilters} disabled={activeFilterCount === 0}>
@@ -567,6 +579,16 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
       ))}
     </div>
   );
+}
+
+function confirmSnapshotMaterialization(item: ItemSummary | ItemDetail | null, operation: 'file' | 'metadata' | 'status'): boolean | null {
+  if (!item || item.sourceMode !== 'snapshot') return false;
+  const scope = item.metadataSource === 'docs'
+    ? 'only this docs file'
+    : `the whole plan at ${item.itemPath || item.identifier}`;
+  const action = operation === 'status' ? 'move it' : operation === 'metadata' ? 'edit its metadata' : 'edit it';
+  const message = `This item is loaded from branch ${item.branch}. To ${action}, Plan Manager will copy ${scope} into the current checkout branch, then apply your change there.`;
+  return window.confirm(message) ? true : null;
 }
 
 function KanbanColumn({ status, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
@@ -824,7 +846,12 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setAutoSaveState('saving');
     setError('');
     try {
-      const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash });
+      const materializeConfirmed = confirmSnapshotMaterialization(plan, 'file');
+      if (materializeConfirmed === null) {
+        setAutoSaveState('idle');
+        return false;
+      }
+      const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash, materializeConfirmed });
       notifyReliabilityChanged();
       setFile(updated);
       setSavedContent(content);
@@ -896,7 +923,9 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setSavingMetadata(true);
     setError('');
     try {
-      const result = await api.saveMetadata(itemId, metadataDraft);
+      const materializeConfirmed = confirmSnapshotMaterialization(plan, 'metadata');
+      if (materializeConfirmed === null) return;
+      const result = await api.saveMetadata(itemId, { ...metadataDraft, materializeConfirmed });
       notifyReliabilityChanged();
       setPlan(result.item);
       await loadGitStatus(plan.workspaceId);

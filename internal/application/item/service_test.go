@@ -1,7 +1,10 @@
 package item
 
 import (
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,6 +67,110 @@ func TestDetailNormalizesCollectionsAndReadsFullReadmeDescription(t *testing.T) 
 	}
 }
 
+func TestSnapshotMaterializationBlocksExistingTargetFiles(t *testing.T) {
+	root := newItemGitRepo(t)
+	writeItemGitFile(t, root, "plans/platform/PM-013/README.md", "# Existing\n")
+	writeItemGitFile(t, root, "plans/platform/PM-013/plan.yaml", "plan:\n  status: draft\n")
+	itemGitCommit(t, root, "main item")
+	itemGitRun(t, root, "switch", "-c", "feature")
+	writeItemGitFile(t, root, "plans/platform/PM-013/README.md", "# Snapshot\n")
+	itemGitCommit(t, root, "snapshot item")
+	itemGitRun(t, root, "switch", "main")
+
+	registryPath := filepath.Join(t.TempDir(), "workspaces.yaml")
+	indexPath := filepath.Join(t.TempDir(), "item-index.yaml")
+	git := gitadapter.New()
+	reg := registry.New(registryPath, git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(indexPath)
+	files := fileaccess.New()
+	writer := itemwriter.New(files, scanner.New(git), idx, reg)
+	service := New(reg, idx, files, writer, git)
+	ref, commit, err := git.ResolveBranch(root, "feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.ReplaceWorkspaceBranch(workspace.ID, "feature", []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{
+			ID:             "snapshot-item",
+			WorkspaceID:    workspace.ID,
+			WorkspaceName:  workspace.Name,
+			Branch:         "feature",
+			BranchRef:      ref,
+			Commit:         commit,
+			SourceMode:     "snapshot",
+			Editable:       false,
+			Scope:          "platform",
+			Identifier:     "PM-013",
+			Title:          "Snapshot",
+			Status:         models.StatusDraft,
+			MetadataSource: "plan.yaml",
+			ItemPath:       "plans/platform/PM-013",
+		},
+	}}, models.BranchScanMetadata{ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = service.SaveMetadata("snapshot-item", models.ItemMetadataUpdateInput{Status: models.StatusReview, MaterializeConfirmed: true})
+	if err == nil || !strings.Contains(err.Error(), "files already exist") {
+		t.Fatalf("expected conflict error, got %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "plans/platform/PM-013/README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "# Existing\n" {
+		t.Fatalf("existing checkout file was overwritten: %q", data)
+	}
+}
+
+func TestWorkingTreeWriteRequiresCurrentCheckoutBranch(t *testing.T) {
+	root := newItemGitRepo(t)
+	writeItemGitFile(t, root, "plans/platform/PM-013/README.md", "# Existing\n")
+	writeItemGitFile(t, root, "plans/platform/PM-013/plan.yaml", "plan:\n  status: draft\n")
+	itemGitCommit(t, root, "main item")
+	itemGitRun(t, root, "branch", "feature")
+
+	registryPath := filepath.Join(t.TempDir(), "workspaces.yaml")
+	indexPath := filepath.Join(t.TempDir(), "item-index.yaml")
+	git := gitadapter.New()
+	reg := registry.New(registryPath, git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(indexPath)
+	files := fileaccess.New()
+	writer := itemwriter.New(files, scanner.New(git), idx, reg)
+	service := New(reg, idx, files, writer, git)
+	if err := idx.ReplaceWorkspaceBranch(workspace.ID, "feature", []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{
+			ID:             "feature-item",
+			WorkspaceID:    workspace.ID,
+			WorkspaceName:  workspace.Name,
+			Branch:         "feature",
+			SourceMode:     "working_tree",
+			Editable:       true,
+			Scope:          "platform",
+			Identifier:     "PM-013",
+			Title:          "Feature",
+			Status:         models.StatusDraft,
+			MetadataSource: "plan.yaml",
+			ItemPath:       "plans/platform/PM-013",
+		},
+	}}, models.BranchScanMetadata{ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = service.SaveMetadata("feature-item", models.ItemMetadataUpdateInput{Status: models.StatusReview})
+	if err == nil || !strings.Contains(err.Error(), "not the current checkout branch") {
+		t.Fatalf("expected current checkout branch error, got %v", err)
+	}
+}
+
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(rel))
@@ -72,5 +179,41 @@ func writeFile(t *testing.T, root, rel, content string) {
 	}
 	if err := osWriteFile(path, content); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func newItemGitRepo(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	itemGitRun(t, root, "config", "user.name", "Plan Manager")
+	itemGitRun(t, root, "config", "user.email", "plan-manager@example.test")
+	return root
+}
+
+func writeItemGitFile(t *testing.T, root, rel, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func itemGitCommit(t *testing.T, root, message string) {
+	t.Helper()
+	itemGitRun(t, root, "add", ".")
+	itemGitRun(t, root, "commit", "-m", message)
+}
+
+func itemGitRun(t *testing.T, root string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, output)
 	}
 }

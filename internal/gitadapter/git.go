@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/fs"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -16,6 +18,16 @@ import (
 
 type GitAdapter struct {
 	timeout time.Duration
+}
+
+type TreeEntry struct {
+	Name    string
+	Path    string
+	Type    fs.FileMode
+	Mode    string
+	Object  string
+	Size    int64
+	ModTime time.Time
 }
 
 func New() *GitAdapter {
@@ -33,6 +45,18 @@ func (g *GitAdapter) WorkspaceRoot(path string) (string, error) {
 func (g *GitAdapter) ValidateBranch(workspacePath, branch string) error {
 	_, err := g.run(workspacePath, "show-ref", "--verify", "refs/heads/"+branch)
 	return err
+}
+
+func (g *GitAdapter) ResolveBranch(workspacePath, branch string) (string, string, error) {
+	if err := g.ValidateBranch(workspacePath, branch); err != nil {
+		return "", "", err
+	}
+	ref := "refs/heads/" + branch
+	out, err := g.run(workspacePath, "rev-parse", "--verify", ref+"^{commit}")
+	if err != nil {
+		return "", "", err
+	}
+	return ref, strings.TrimSpace(out), nil
 }
 
 func (g *GitAdapter) CurrentBranch(workspacePath string) (string, error) {
@@ -78,6 +102,68 @@ func (g *GitAdapter) LastUpdate(workspacePath, relPath string) time.Time {
 		}
 	}
 	return time.Time{}
+}
+
+func (g *GitAdapter) LastAuthorAtRef(workspacePath, ref, relPath string) string {
+	clean, err := cleanGitTreePath(relPath)
+	if err != nil {
+		return ""
+	}
+	out, err := g.run(workspacePath, "log", "-1", "--format=%an", ref, "--", clean)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+func (g *GitAdapter) LastUpdateAtRef(workspacePath, ref, relPath string) time.Time {
+	clean, err := cleanGitTreePath(relPath)
+	if err != nil {
+		return time.Time{}
+	}
+	out, err := g.run(workspacePath, "log", "-1", "--format=%cI", ref, "--", clean)
+	if err == nil {
+		if t, parseErr := time.Parse(time.RFC3339, strings.TrimSpace(out)); parseErr == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
+func (g *GitAdapter) TreeReadDir(workspacePath, ref, relPath string) ([]TreeEntry, error) {
+	clean, err := cleanGitTreePath(relPath)
+	if err != nil {
+		return nil, err
+	}
+	out, err := g.run(workspacePath, "ls-tree", "-z", "-l", treeish(ref, clean))
+	if err != nil {
+		return nil, err
+	}
+	return parseTreeEntries(clean, out)
+}
+
+func (g *GitAdapter) TreeReadFile(workspacePath, ref, relPath string) ([]byte, error) {
+	clean, err := cleanGitTreePath(relPath)
+	if err != nil {
+		return nil, err
+	}
+	out, err := g.run(workspacePath, "show", treeish(ref, clean))
+	if err != nil {
+		return nil, err
+	}
+	return []byte(out), nil
+}
+
+func (g *GitAdapter) TreeWalk(workspacePath, ref, root string) ([]TreeEntry, error) {
+	clean, err := cleanGitTreePath(root)
+	if err != nil {
+		return nil, err
+	}
+	out, err := g.run(workspacePath, "ls-tree", "-r", "-t", "-z", "-l", treeish(ref, clean))
+	if err != nil {
+		return nil, err
+	}
+	return parseTreeEntries(clean, out)
 }
 
 func (g *GitAdapter) Diff(workspacePath, relPath string) (string, error) {
@@ -199,6 +285,70 @@ func (g *GitAdapter) run(dir string, args ...string) (string, error) {
 		return "", fmt.Errorf("%s", msg)
 	}
 	return stdout.String(), nil
+}
+
+func cleanGitTreePath(relPath string) (string, error) {
+	clean := path.Clean(strings.TrimSpace(filepath.ToSlash(relPath)))
+	if clean == "." {
+		return "", nil
+	}
+	if strings.HasPrefix(clean, "../") || clean == ".." || strings.HasPrefix(clean, "/") {
+		return "", fmt.Errorf("invalid git tree path %q", relPath)
+	}
+	return clean, nil
+}
+
+func treeish(ref, relPath string) string {
+	if strings.TrimSpace(relPath) == "" {
+		return ref + ":"
+	}
+	return ref + ":" + relPath
+}
+
+func parseTreeEntries(root, out string) ([]TreeEntry, error) {
+	if strings.Trim(out, "\x00\n\t ") == "" {
+		return []TreeEntry{}, nil
+	}
+	records := strings.Split(out, "\x00")
+	entries := make([]TreeEntry, 0, len(records))
+	for _, record := range records {
+		if record == "" {
+			continue
+		}
+		meta, entryPath, ok := strings.Cut(record, "\t")
+		if !ok {
+			return nil, fmt.Errorf("invalid ls-tree record %q", record)
+		}
+		fields := strings.Fields(meta)
+		if len(fields) < 4 {
+			return nil, fmt.Errorf("invalid ls-tree metadata %q", meta)
+		}
+		size := int64(0)
+		if fields[3] != "-" {
+			parsed, err := strconv.ParseInt(fields[3], 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			size = parsed
+		}
+		fullPath := path.Clean(path.Join(root, entryPath))
+		if root == "" {
+			fullPath = path.Clean(entryPath)
+		}
+		mode := fs.FileMode(0)
+		if fields[1] == "tree" {
+			mode = fs.ModeDir
+		}
+		entries = append(entries, TreeEntry{
+			Name:   path.Base(fullPath),
+			Path:   fullPath,
+			Type:   mode,
+			Mode:   fields[0],
+			Object: fields[2],
+			Size:   size,
+		})
+	}
+	return entries, nil
 }
 
 func parseBranchLine(status *models.GitStatus, line string) {
