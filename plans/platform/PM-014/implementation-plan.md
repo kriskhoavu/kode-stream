@@ -11,7 +11,7 @@ Add source-derived proposals and visual previews to the Source Structure configu
 | B1    | Proposal And Preview API | Done   |
 | F1    | Visual Source Dialog     | Done   |
 | B2    | Reset Source Structure   | Done   |
-| F2    | Reset Dialog Action      |        |
+| F2    | Reset Dialog Action      | Done   |
 
 ## Terminology Lock
 
@@ -77,10 +77,10 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] Add an API client method for resetting source structure.
-- [ ] Add a reset button in the Source Structure dialog when a settings file exists.
-- [ ] Confirm before reset and refresh the dialog state from the backend result.
-- [ ] Add frontend tests for reset client/helper behavior where practical.
+- [x] Add an API client method for resetting source structure.
+- [x] Add a reset button in the Source Structure dialog when a settings file exists.
+- [x] Confirm before reset and refresh the dialog state from the backend result.
+- [x] Add frontend tests for reset client/helper behavior where practical.
 
 **Verification:** `rtk npm test -- --run web/src/pages/WorkspacesPage.test.ts && rtk npm run build`
 

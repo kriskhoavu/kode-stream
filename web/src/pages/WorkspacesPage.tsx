@@ -3,7 +3,7 @@ import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, 
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../lib/api';
-import type { WorkspaceConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal } from '../lib/types';
+import type { WorkspaceConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import type { SourceStructureSegmentRole } from '../features/workspaces/sourceSettings';
@@ -155,16 +155,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     setMessage('');
     try {
       const result = await api.sourceStructure(repo.id, directory);
-      setSettingsEditor({
-        repo,
-        directory,
-        exists: result.exists,
-        mode: result.mode,
-        card: normalizeSettingsCard(result.settings?.cards?.[0], directory),
-        warnings: (result.warnings ?? []).map((warning) => warning.message),
-        proposals: result.proposals ?? [],
-        preview: result.preview ?? []
-      });
+      setSettingsEditor(settingsEditorFromResult(repo, directory, result));
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Settings failed to load');
     } finally {
@@ -188,6 +179,26 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       await onChanged();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Settings failed to save');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetSourceSettings = async () => {
+    if (!settingsEditor) return;
+    const confirmed = window.confirm(`Reset Source Structure for ${settingsEditor.directory}? This removes workspace-settings.yaml and scans the source again.`);
+    if (!confirmed) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      const { repo, directory } = settingsEditor;
+      const result = await api.resetSourceStructure(repo.id, directory);
+      notifyReliabilityChanged();
+      setSettingsEditor(settingsEditorFromResult(repo, directory, result));
+      setMessage(`Source structure reset; ${result.scan?.itemCount ?? 0} items indexed`);
+      await onChanged();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Settings reset failed');
     } finally {
       setBusy(false);
     }
@@ -406,6 +417,11 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               </div>
             </div>
             <footer className="modal-actions">
+              {settingsEditor.exists && (
+                <button className="secondary danger" type="button" onClick={() => void resetSourceSettings()} disabled={busy}>
+                  Reset config
+                </button>
+              )}
               <button className="secondary" type="button" onClick={() => setSettingsEditor(null)} disabled={busy}>Cancel</button>
               <button className="primary" type="button" onClick={() => void saveSourceSettings()} disabled={busy}>
                 <SlidersHorizontal size={15} />
@@ -549,6 +565,19 @@ function removeSource(value: string, directory: string): string {
 function toggleSource(value: string, directory: string): string {
   const sources = parseSources(value);
   return sources.includes(directory) ? removeSource(value, directory) : addSource(value, directory);
+}
+
+function settingsEditorFromResult(repo: WorkspaceConfig, directory: string, result: SourceSettingsResult): SettingsEditorState {
+  return {
+    repo,
+    directory,
+    exists: result.exists,
+    mode: result.mode,
+    card: normalizeSettingsCard(result.settings?.cards?.[0], directory),
+    warnings: (result.warnings ?? []).map((warning) => warning.message),
+    proposals: result.proposals ?? [],
+    preview: result.preview ?? []
+  };
 }
 
 function normalizeSettingsCard(card?: SourceStructureCard, directory = 'source'): SourceStructureCard {

@@ -109,6 +109,8 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(settings)
     }),
+  resetSourceStructure: (workspaceId: string, directory: string) =>
+    request<SourceSettingsResult>(`/api/workspaces/${workspaceId}/source-structure?directory=${encodeURIComponent(directory)}`, { method: 'DELETE' }),
   workspaceTree: async (workspaceId: string, path = '', includeIgnored = false) => {
     const query = new URLSearchParams({ path });
     if (includeIgnored) query.set('includeIgnored', 'true');
