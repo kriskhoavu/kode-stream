@@ -3,6 +3,7 @@ package scanner
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"plan-manager/internal/gitadapter"
@@ -132,13 +133,13 @@ func TestSourceStructureSettingsSplitsFreestyleDocsIntoCards(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "docs/workspace-settings.yaml", `version: 1
 cards:
-  - pathPattern: "{scope}/feature/{identifier}"
+  - pathPattern: "{folder}/feature/{item}"
     fields:
-      scope: "{scope}"
-      identifier: "{identifier}"
+      source: docs
+      item: "{item}"
       title: readme_heading
       status: in_progress
-      tags: [docs, "{scope}"]
+      tags: [docs, "{folder}"]
 `)
 	writeTestFile(t, root, "docs/api/feature/DI-101/README.md", "# API Search\n\nSearch docs.\n")
 	writeTestFile(t, root, "docs/webapp/feature/DI-202/README.md", "# Web UI\n\nUI docs.\n")
@@ -157,7 +158,7 @@ cards:
 		items[item.Identifier] = item
 	}
 	api := items["DI-101"]
-	if api.Scope != "api" || api.Title != "API Search" || api.Status != models.StatusInProgress || api.MetadataSource != "workspace-settings" {
+	if api.Scope != "docs" || api.Title != "API Search" || api.Status != models.StatusInProgress || api.MetadataSource != "workspace-settings" {
 		t.Fatalf("unexpected configured item: %+v", api.ItemSummary)
 	}
 	if len(api.Tags) != 2 || api.Tags[0] != "docs" || api.Tags[1] != "api" {
@@ -173,24 +174,75 @@ func TestSourceStructureProposalsPreviewRealPaths(t *testing.T) {
 
 	proposals, preview := SourceStructureProposals(reader, "docs", DefaultSourceStructureSettings())
 
-	if len(proposals) < 3 {
+	if len(proposals) == 0 {
 		t.Fatalf("expected proposal options, got %#v", proposals)
 	}
 	first := proposals[0]
-	if first.ID != "scope-feature-identifier" || first.Confidence != "high" {
+	if first.ID != "actual-folder-feature-item" || first.Confidence != "high" {
 		t.Fatalf("unexpected first proposal: %#v", first)
 	}
 	if len(first.Preview) != 2 {
 		t.Fatalf("expected 2 preview rows, got %#v", first.Preview)
 	}
-	if first.Preview[0].Path != "docs/api/feature/DI-101" || first.Preview[0].Scope != "api" || first.Preview[0].Identifier != "DI-101" || first.Preview[0].Title != "API Search" {
+	if first.Preview[0].Path != "docs/api/feature/DI-101" || first.Preview[0].Source != "docs" || first.Preview[0].Item != "DI-101" || first.Preview[0].Title != "API Search" {
 		t.Fatalf("unexpected preview row: %#v", first.Preview[0])
 	}
-	if len(first.Preview[0].Tags) != 2 || first.Preview[0].Tags[0] != "docs" || first.Preview[0].Tags[1] != "api" {
+	if len(first.Preview[0].Tags) != 1 || first.Preview[0].Tags[0] != "docs" {
 		t.Fatalf("unexpected preview tags: %#v", first.Preview[0].Tags)
 	}
 	if len(preview) != 2 {
 		t.Fatalf("expected current settings preview, got %#v", preview)
+	}
+}
+
+func TestSourceStructureProposalsDerivePatternFromActualSource(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "plans/platform/PM-014/README.md", "# PM-014: Visual Source Structure Proposals\n")
+	writeTestFile(t, root, "plans/platform/PM-015/README.md", "# PM-015: Real Suggestions\n")
+	reader := NewFilesystemSourceReader(root)
+
+	proposals, _ := SourceStructureProposals(reader, "plans", DefaultSourceStructureSettings())
+
+	if len(proposals) == 0 {
+		t.Fatal("expected proposals from actual source directories")
+	}
+	if got := proposals[0].Card.PathPattern; got != "{folder}/{item}" {
+		t.Fatalf("expected actual plans pattern first, got %q from %#v", got, proposals)
+	}
+	if got := proposals[0].Preview[0].Path; got != "plans/platform/PM-014" {
+		t.Fatalf("expected real preview path, got %q", got)
+	}
+	for _, proposal := range proposals {
+		if proposal.Card.PathPattern == "{folder}/feature/{item}" {
+			t.Fatalf("unexpected blind feature proposal for plans source: %#v", proposal)
+		}
+	}
+}
+
+func TestSourceStructureProposalsExplainTopLevelFolderWithRootMarkdown(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "docs/README.md", "# Docs\n")
+	writeTestFile(t, root, "docs/overview.md", "# Overview\n")
+	writeTestFile(t, root, "docs/a12/intro.md", "# A12\n")
+	reader := NewFilesystemSourceReader(root)
+
+	proposals, preview := SourceStructureProposals(reader, "docs", DefaultSourceStructureSettings())
+
+	if len(proposals) == 0 {
+		t.Fatal("expected proposals from actual source directories")
+	}
+	first := proposals[0]
+	if first.Label != "Top-level folders" || first.Card.PathPattern != "{item}" {
+		t.Fatalf("unexpected top-level proposal: %#v", first)
+	}
+	if len(first.Preview) != 1 || first.Preview[0].Path != "docs/a12" {
+		t.Fatalf("expected a12 preview, got %#v", first.Preview)
+	}
+	if !strings.Contains(first.Summary, "docs/a12") || !strings.Contains(first.Summary, "2 root Markdown files") {
+		t.Fatalf("expected concrete summary with root markdown note, got %q", first.Summary)
+	}
+	if len(preview) != 0 {
+		t.Fatalf("default feature preview should not match mixed docs, got %#v", preview)
 	}
 }
 

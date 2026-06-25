@@ -84,7 +84,7 @@ User browser
 | Search service         | `internal/application/search`         | Ranks indexed item matches without scanning workspaces                |
 | Scanner                | `internal/scanner`                    | Reads sources and builds item metadata                                |
 | Scanner metadata       | `internal/scanner/metadata_*`         | Parses `plan.yaml` and document metadata                              |
-| Scanner settings       | `internal/scanner/source_*`           | Matches source structure settings to item folders                     |
+| Scanner settings       | `internal/scanner/source_*`           | Matches source item settings to item folders                     |
 | File access            | `internal/fileaccess`                 | Builds file trees, classifies bounded text reads, and writes Markdown |
 | Workspace file access  | `internal/workspacefiles`             | Lists, searches, creates, renames, and guards workspace paths         |
 | Workspace file service | `internal/application/workspacefiles` | Coordinates file actions, Git state, audit, and targeted refresh      |
@@ -109,7 +109,7 @@ User browser
 | Shared types              | `web/src/lib/types.ts`                    | Frontend API types                                                  |
 | Reliability hooks         | `web/src/features/reliability`            | Workspace health and activity loading and refresh                   |
 | Search hooks              | `web/src/features/search`                 | Debounced search, quick switcher, and keyboard navigation           |
-| Content search            | `web/src/features/content-search`         | Scoped content query state, results, highlighting, and line context |
+| Content search            | `web/src/features/content-search`         | Targeted content query state, results, highlighting, and line context |
 | Content viewer            | `web/src/features/content-viewer`         | Secure Markdown, HTML, JSON, YAML, code, and text rendering         |
 | File editor session       | `web/src/features/file-editor`            | Shared Markdown autosave, stale-write, and settled-save state       |
 | Workspace explorer        | `web/src/features/workspace-explorer`     | Lazy tree, path search, Git markers, mutations, and keyboard state  |
@@ -198,10 +198,10 @@ Selected workspace file
   -> source uses escaped syntax highlighting with copy and wrap controls
 ```
 
-### Source Structure Settings
+### Source Items Settings
 
 ```text
-User opens a source's Source Structure settings
+User opens a source's Source Items settings
   -> GET /api/workspaces/{id}/source-structure?directory={dir}
   -> API reads <dir>/<dir>/workspace-settings.yaml or returns defaults
   -> user saves a path pattern and field mapping
@@ -352,9 +352,9 @@ The expected source layout is:
 ```text
 <workspace>/
 └── <configured-source>/          # e.g. plans/
-    ├── workspace-settings.yaml   # optional source structure
-    └── <scope>/
-        └── <identifier>/
+    ├── workspace-settings.yaml   # optional source items
+    └── <folder>/
+        └── <item>/
             ├── plan.yaml         # preferred plan metadata
             └── README.md
 ```
@@ -367,19 +367,19 @@ plan:
   tags: [backend, frontend]
 ```
 
-The scanner infers `scope` and `identifier` from the directory path, title from the first `README.md` heading, and documents recursively from Markdown files. It also infers document roles, tracks, labels, IDs, and display order from conventional paths such as `scenario/`, `design/`, and `implementation-plan.md`. Therefore, `plan.yaml` normally contains only workflow metadata that cannot be derived from the source tree: `status`, optional `owner`, and optional `tags`. Set `title` only when it intentionally differs from the README heading. Optional `documents` entries are sparse overrides merged by path onto discovered Markdown files; use them only when a role, track, or label cannot be inferred correctly.
+The scanner infers `source` and `item` from the directory path, title from the first `README.md` heading, and documents recursively from Markdown files. It also infers document roles, tracks, labels, IDs, and display order from conventional paths such as `scenario/`, `design/`, and `implementation-plan.md`. Therefore, `plan.yaml` normally contains only workflow metadata that cannot be derived from the source tree: `status`, optional `owner`, and optional `tags`. Set `title` only when it intentionally differs from the README heading. Optional `documents` entries are sparse overrides merged by path onto discovered Markdown files; use them only when a role, track, or label cannot be inferred correctly.
 
-This file lets a non-standard docs tree behave like a structured item source. The scanner currently supports segment-based path patterns where each segment is literal text or a `{variable}`. Generic product language uses `scope` and `identifier`; legacy `repository-settings.yaml`, `service`, and `ticket` are read for migration compatibility.
+This file lets a non-standard docs tree behave like a structured item source. The scanner currently supports segment-based path patterns where each segment is literal text or a `{variable}`. Generic product language uses `source` and `item`; legacy `repository-settings.yaml`, `service`, and `ticket` are read for migration compatibility.
 
 Example:
 
 ```yaml
 version: 1
 cards:
-  - pathPattern: "{scope}/feature/{identifier}"
+  - pathPattern: "{folder}/feature/{item}"
     fields:
-      scope: "{scope}"
-      identifier: "{identifier}"
+      source: docs
+      item: "{item}"
       title: readme_heading
       status: draft
       tags: [docs]
@@ -447,13 +447,13 @@ Discovery runs per configured source. The scanner checks the modes in this order
 Structured item roots use:
 
 ```text
-{source}/{scope}/{identifier}/
+{source}/{folder}/{item}/
 ```
 
 A folder is treated as a structured item when:
 
 - It contains `plan.yaml`, or
-- Its identifier folder matches an uppercase identifier pattern such as `DI-170`.
+- Its item folder matches an uppercase identifier pattern such as `DI-170`.
 
 Freestyle docs roots are supported when:
 
@@ -499,8 +499,8 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
 | `DELETE` | `/api/workspaces/{id}`                                  | Delete workspace registration and cached items   |
 | `POST`   | `/api/workspaces/{id}/scan`                             | Scan one workspace                               |
 | `GET`    | `/api/workspaces/{id}/health`                           | Read workspace health checks                     |
-| `GET`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Read source structure settings                   |
-| `PUT`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Save source structure settings and rescan        |
+| `GET`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Read source item settings                   |
+| `PUT`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Save source item settings and rescan        |
 | `GET`    | `/api/items`                                            | List cached item summaries                       |
 | `GET`    | `/api/items/{id}`                                       | Get item detail                                  |
 | `GET`    | `/api/items/{id}/files`                                 | Get safe file tree for an item                   |

@@ -1,8 +1,8 @@
-# Implementation Plan: PM-014 - Visual Source Structure Proposals
+# Implementation Plan: PM-014 - Visual Source Items Proposals
 
 ## Overview
 
-Add source-derived proposals and visual previews to the Source Structure configuration flow while preserving the existing `workspace-settings.yaml` save contract.
+Add source-derived proposals and visual previews to the Source Items configuration flow while preserving the existing `workspace-settings.yaml` save contract.
 
 ## Phases Summary
 
@@ -10,7 +10,7 @@ Add source-derived proposals and visual previews to the Source Structure configu
 |-------|--------------------------|--------|
 | B1    | Proposal And Preview API | Done   |
 | F1    | Visual Source Dialog     | Done   |
-| B2    | Reset Source Structure   | Done   |
+| B2    | Reset Source Items   | Done   |
 | F2    | Reset Dialog Action      | Done   |
 
 ## Terminology Lock
@@ -35,11 +35,11 @@ All code, fields, API params, and TS types must use:
 
 **Verification:** `rtk go test ./internal/scanner ./internal/application/workspace ./internal/api`
 
-**Commit:** `PM-014: Add source structure proposal API`
+**Commit:** `PM-014: Add source items proposal API`
 
 ---
 
-### Phase B2: Reset Source Structure
+### Phase B2: Reset Source Items
 
 **Deliverables:**
 
@@ -50,7 +50,7 @@ All code, fields, API params, and TS types must use:
 
 **Verification:** `rtk go test ./internal/scanner ./internal/application/workspace ./internal/api`
 
-**Commit:** `PM-014: Add source structure reset API`
+**Commit:** `PM-014: Add source items reset API`
 
 ---
 
@@ -61,15 +61,15 @@ All code, fields, API params, and TS types must use:
 **Deliverables:**
 
 - [x] Extend TypeScript API types for proposals and previews.
-- [x] Add proposal cards to the Source Structure dialog.
+- [x] Add proposal cards to the Source Items dialog.
 - [x] Add clickable path segment role controls for common pattern edits.
-- [x] Add a preview table showing path, scope, identifier, title, status, and tags.
+- [x] Add a preview table showing path, source, item, title, status, and tags.
 - [x] Keep advanced path pattern and field inputs available.
 - [x] Add frontend tests for applying proposals and preview rendering.
 
 **Verification:** `rtk npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces/sourceSettings.test.ts && rtk npm run build`
 
-**Commit:** `PM-014: Add visual source structure dialog`
+**Commit:** `PM-014: Add visual source items dialog`
 
 ---
 
@@ -77,14 +77,14 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [x] Add an API client method for resetting source structure.
-- [x] Add a reset button in the Source Structure dialog when a settings file exists.
+- [x] Add an API client method for resetting source items.
+- [x] Add a reset button in the Source Items dialog when a settings file exists.
 - [x] Confirm before reset and refresh the dialog state from the backend result.
 - [x] Add frontend tests for reset client/helper behavior where practical.
 
 **Verification:** `rtk npm test -- --run web/src/pages/WorkspacesPage.test.ts && rtk npm run build`
 
-**Commit:** `PM-014: Add source structure reset action`
+**Commit:** `PM-014: Add source items reset action`
 
 ---
 

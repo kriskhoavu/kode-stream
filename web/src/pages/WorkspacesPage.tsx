@@ -12,6 +12,7 @@ import { notifyReliabilityChanged } from '../features/reliability/hooks';
 export { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parseSources, previewPathSegments };
 
 const DEFAULT_SOURCES = ['docs', 'plans'];
+const UNSORTED_SELECTION_ID = 'unsorted';
 type SettingsEditorState = {
   repo: WorkspaceConfig;
   directory: string;
@@ -20,6 +21,8 @@ type SettingsEditorState = {
   card: SourceStructureCard;
   warnings: string[];
   proposals: SourceStructureProposal[];
+  selectedProposalId?: string;
+  unsortedPreview: SourceStructurePreview[];
   preview: SourceStructurePreview[];
 };
 
@@ -168,6 +171,19 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     setBusy(true);
     setMessage('');
     try {
+      if (settingsEditor.selectedProposalId === UNSORTED_SELECTION_ID) {
+        if (settingsEditor.exists) {
+          const result = await api.resetSourceStructure(settingsEditor.repo.id, settingsEditor.directory);
+          setMessage(`Source structure reset; ${result.scan?.itemCount ?? 0} items indexed`);
+        } else {
+          const result = await api.scan(settingsEditor.repo.id);
+          setMessage(`Source kept unsorted; ${result.itemCount} items indexed`);
+        }
+        notifyReliabilityChanged();
+        setSettingsEditor(null);
+        await onChanged();
+        return;
+      }
       const settings: SourceStructureSettings = {
         version: 1,
         cards: [withInferredCompatibilityFields(settingsEditor.card, settingsEditor.directory)]
@@ -186,7 +202,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 
   const resetSourceSettings = async () => {
     if (!settingsEditor) return;
-    const confirmed = window.confirm(`Reset Source Structure for ${settingsEditor.directory}? This removes workspace-settings.yaml and scans the source again.`);
+    const confirmed = window.confirm(`Reset Source Items for ${settingsEditor.directory}? This removes workspace-settings.yaml and scans the source again.`);
     if (!confirmed) return;
     setBusy(true);
     setMessage('');
@@ -343,17 +359,17 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                 <h2>{labels.sourceStructure}</h2>
                 <span>{settingsEditor.repo.name} / {settingsEditor.directory}</span>
               </div>
-              <button className="icon-button" type="button" onClick={() => setSettingsEditor(null)} disabled={busy} aria-label="Close source structure">
+              <button className="icon-button" type="button" onClick={() => setSettingsEditor(null)} disabled={busy} aria-label="Close source items">
                 <X size={16} />
               </button>
             </header>
             <p className="modal-help">
-              Define how this source should be split into item cards. Scope and identifier are inferred from the path pattern.
+              Define how this source should be split into Kanban items.
             </p>
             {!settingsEditor.exists && settingsEditor.mode === 'structured' && (
               <div className="metadata-callout source-structure-supported">
                 <strong>Built-in structure detected</strong>
-                <span>This source already follows the supported scope/identifier layout. Saving here creates an optional override.</span>
+                <span>This source already follows a supported item layout. Saving here creates an optional override.</span>
               </div>
             )}
             {!settingsEditor.exists && settingsEditor.mode !== 'structured' && (
@@ -370,52 +386,57 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             )}
             <SourceStructureProposalList
               proposals={settingsEditor.proposals}
-              selectedCard={settingsEditor.card}
+              selectedProposalId={settingsEditor.selectedProposalId}
               onSelect={(proposal) => applySettingsProposal(setSettingsEditor, proposal)}
+              onClear={() => clearSettingsProposal(setSettingsEditor)}
             />
-            <SourceStructurePathBuilder
-              directory={settingsEditor.directory}
-              card={settingsEditor.card}
-              preview={settingsEditor.preview}
-              onRole={(index, role) => applySettingsSegmentRole(setSettingsEditor, index, role)}
-            />
-            <SourceStructurePreviewTable preview={settingsEditor.preview} />
-            <div className="metadata-form source-structure-form">
-              <label>
-                Path Pattern
-                <input
-                  value={settingsEditor.card.pathPattern}
-                  onChange={(event) => updateSettingsCard(setSettingsEditor, { pathPattern: event.target.value })}
-                  placeholder="{scope}/feature/{identifier}"
+            <SourceStructurePreviewTable directory={settingsEditor.directory} card={settingsEditor.card} preview={settingsEditor.preview} />
+            {settingsEditor.selectedProposalId !== UNSORTED_SELECTION_ID && (
+              <>
+                <SourceStructurePathBuilder
+                  directory={settingsEditor.directory}
+                  card={settingsEditor.card}
+                  preview={settingsEditor.preview}
+                  onRole={(index, role) => applySettingsSegmentRole(setSettingsEditor, index, role)}
                 />
-              </label>
-              <div className="repo-field-grid">
+                <div className="metadata-form source-structure-form">
                 <label>
-                  Title
-                  <input value={settingsEditor.card.fields.title ?? ''} onChange={(event) => updateSettingsField(setSettingsEditor, 'title', event.target.value)} placeholder="readme_heading" />
+                  Path Pattern
+                  <input
+                    value={settingsEditor.card.pathPattern}
+                    onChange={(event) => updateSettingsCard(setSettingsEditor, { pathPattern: event.target.value })}
+                    placeholder="{folder}/feature/{item}"
+                  />
                 </label>
-                <label>
-                  Default Status
-                  <select value={settingsEditor.card.fields.status ?? 'draft'} onChange={(event) => updateSettingsField(setSettingsEditor, 'status', event.target.value)}>
-                    <option value="ideas">Ideas</option>
-                    <option value="draft">Draft</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="review">Review</option>
-                    <option value="done">Done</option>
-                  </select>
-                </label>
-              </div>
-              <div className="repo-field-grid">
-                <label>
-                  Owner
-                  <input value={settingsEditor.card.fields.owner ?? ''} onChange={(event) => updateSettingsField(setSettingsEditor, 'owner', event.target.value)} placeholder="{owner} or a name" />
-                </label>
-                <label>
-                  Tags
-                  <input value={(settingsEditor.card.fields.tags ?? []).join(', ')} onChange={(event) => updateSettingsField(setSettingsEditor, 'tags', event.target.value)} placeholder="docs, discovery" />
-                </label>
-              </div>
-            </div>
+                <div className="repo-field-grid">
+                  <label>
+                    Title
+                    <input value={settingsEditor.card.fields.title ?? ''} onChange={(event) => updateSettingsField(setSettingsEditor, 'title', event.target.value)} placeholder="readme_heading" />
+                  </label>
+                  <label>
+                    Default Status
+                    <select value={settingsEditor.card.fields.status ?? 'draft'} onChange={(event) => updateSettingsField(setSettingsEditor, 'status', event.target.value)}>
+                      <option value="ideas">Ideas</option>
+                      <option value="draft">Draft</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="review">Review</option>
+                      <option value="done">Done</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="repo-field-grid">
+                  <label>
+                    Owner
+                    <input value={settingsEditor.card.fields.owner ?? ''} onChange={(event) => updateSettingsField(setSettingsEditor, 'owner', event.target.value)} placeholder="{owner} or a name" />
+                  </label>
+                  <label>
+                    Tags
+                    <input value={(settingsEditor.card.fields.tags ?? []).join(', ')} onChange={(event) => updateSettingsField(setSettingsEditor, 'tags', event.target.value)} placeholder="docs, discovery" />
+                  </label>
+                </div>
+                </div>
+              </>
+            )}
             <footer className="modal-actions">
               {settingsEditor.exists && (
                 <button className="secondary danger" type="button" onClick={() => void resetSourceSettings()} disabled={busy}>
@@ -425,7 +446,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               <button className="secondary" type="button" onClick={() => setSettingsEditor(null)} disabled={busy}>Cancel</button>
               <button className="primary" type="button" onClick={() => void saveSourceSettings()} disabled={busy}>
                 <SlidersHorizontal size={15} />
-                {busy ? 'Saving...' : 'Save and Scan'}
+                {busy ? 'Saving...' : settingsEditor.selectedProposalId === UNSORTED_SELECTION_ID ? 'Scan Unsorted' : 'Save and Scan'}
               </button>
             </footer>
           </div>
@@ -435,17 +456,33 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   );
 }
 
-function SourceStructureProposalList({ proposals, selectedCard, onSelect }: { proposals: SourceStructureProposal[]; selectedCard: SourceStructureCard; onSelect: (proposal: SourceStructureProposal) => void }) {
+function SourceStructureProposalList({
+  proposals,
+  selectedProposalId,
+  onSelect,
+  onClear
+}: {
+  proposals: SourceStructureProposal[];
+  selectedProposalId?: string;
+  onSelect: (proposal: SourceStructureProposal) => void;
+  onClear: () => void;
+}) {
   if (proposals.length === 0) return null;
   return (
     <section className="source-proposals" aria-label="Source structure proposals">
       <div className="source-structure-section-heading">
         <strong>Suggested structures</strong>
-        <span>Choose the closest match, then adjust if needed.</span>
+        <span>Choose a structure, or keep the source unsorted.</span>
       </div>
       <div className="source-proposal-grid">
+        <button className={selectedProposalId === UNSORTED_SELECTION_ID ? 'source-proposal-card active' : 'source-proposal-card'} type="button" onClick={onClear}>
+          <span className="proposal-confidence neutral">Default</span>
+          <strong>Unsorted</strong>
+          <span>Keep this source as one unstructured item in the Unsorted lane.</span>
+          <small>No settings file</small>
+        </button>
         {proposals.map((proposal) => {
-          const selected = cardsMatch(selectedCard, proposal.card);
+          const selected = selectedProposalId === proposal.id;
           return (
             <button className={selected ? 'source-proposal-card active' : 'source-proposal-card'} type="button" key={proposal.id} onClick={() => onSelect(proposal)}>
               <span className="proposal-confidence">{proposal.confidence}</span>
@@ -475,8 +512,8 @@ function SourceStructurePathBuilder({ directory, card, preview, onRole }: { dire
           <div className="source-segment-card" key={`${segment}-${index}`}>
             <span className="source-segment-pill">{segment}</span>
             <div className="segment-role-actions" role="group" aria-label={`Role for ${segment}`}>
-              <button type="button" onClick={() => onRole(index, 'scope')}>Scope</button>
-              <button type="button" onClick={() => onRole(index, 'identifier')}>Identifier</button>
+              <button type="button" onClick={() => onRole(index, 'folder')}>Folder</button>
+              <button type="button" onClick={() => onRole(index, 'item')}>Item</button>
               <button type="button" onClick={() => onRole(index, 'literal')}>Fixed</button>
             </div>
           </div>
@@ -486,7 +523,8 @@ function SourceStructurePathBuilder({ directory, card, preview, onRole }: { dire
   );
 }
 
-function SourceStructurePreviewTable({ preview }: { preview: SourceStructurePreview[] }) {
+function SourceStructurePreviewTable({ directory, card, preview }: { directory: string; card: SourceStructureCard; preview: SourceStructurePreview[] }) {
+  const sourceFallback = true;
   return (
     <section className="source-preview" aria-label="Source structure preview">
       <div className="source-structure-section-heading">
@@ -497,16 +535,16 @@ function SourceStructurePreviewTable({ preview }: { preview: SourceStructurePrev
         <div className="source-preview-table">
           <div className="source-preview-row heading">
             <span>Path</span>
-            <span>Scope</span>
-            <span>Identifier</span>
+            <span>Source</span>
+            <span>Item</span>
             <span>Title</span>
             <span>Status</span>
           </div>
           {preview.map((row) => (
             <div className="source-preview-row" key={row.path}>
               <span title={row.path}>{row.path}</span>
-              <span>{row.scope}</span>
-              <span>{row.identifier}</span>
+              <span>{sourceFallback && (row.source ?? row.scope) === (lastPathSegment(directory) || 'source') ? <><span>{row.source ?? row.scope}</span><small>configured source</small></> : row.source ?? row.scope}</span>
+              <span>{row.item ?? row.identifier}</span>
               <span>{row.title}</span>
               <span>{row.status}</span>
             </div>
@@ -567,26 +605,48 @@ function toggleSource(value: string, directory: string): string {
   return sources.includes(directory) ? removeSource(value, directory) : addSource(value, directory);
 }
 
-function settingsEditorFromResult(repo: WorkspaceConfig, directory: string, result: SourceSettingsResult): SettingsEditorState {
+export function settingsEditorFromResult(repo: WorkspaceConfig, directory: string, result: SourceSettingsResult): SettingsEditorState {
+  const proposals = result.proposals ?? [];
+  const selectedProposal = !result.exists && proposals.length > 0 ? proposals[0] : undefined;
+  const unsortedPreview = [unsortedSourcePreview(directory)];
+  const selectedProposalId = selectedProposal?.id ?? (!result.exists ? UNSORTED_SELECTION_ID : undefined);
   return {
     repo,
     directory,
     exists: result.exists,
     mode: result.mode,
-    card: normalizeSettingsCard(result.settings?.cards?.[0], directory),
+    card: normalizeSettingsCard(selectedProposal?.card ?? result.settings?.cards?.[0], directory),
     warnings: (result.warnings ?? []).map((warning) => warning.message),
-    proposals: result.proposals ?? [],
-    preview: result.preview ?? []
+    proposals,
+    selectedProposalId,
+    unsortedPreview,
+    preview: selectedProposal?.preview ?? (!result.exists ? unsortedPreview : result.preview ?? [])
+  };
+}
+
+function unsortedSourcePreview(directory: string): SourceStructurePreview {
+  const sourceName = lastPathSegment(directory) || 'source';
+  return {
+    path: directory,
+    source: sourceName,
+    item: sourceName,
+    scope: sourceName,
+    identifier: sourceName,
+    title: sourceName,
+    status: 'unsorted',
+    tags: [sourceName]
   };
 }
 
 function normalizeSettingsCard(card?: SourceStructureCard, directory = 'source'): SourceStructureCard {
   const legacyFields = card?.fields as SourceStructureCard['fields'] & { service?: string; ticket?: string } | undefined;
   return withInferredCompatibilityFields({
-    pathPattern: genericTemplate(card?.pathPattern || '{scope}/feature/{identifier}'),
+    pathPattern: genericTemplate(card?.pathPattern || '{folder}/feature/{item}'),
     fields: {
-      scope: genericTemplate(legacyFields?.scope || legacyFields?.service || '{scope}'),
-      identifier: genericTemplate(legacyFields?.identifier || legacyFields?.ticket || '{identifier}'),
+      source: genericTemplate(legacyFields?.source || legacyFields?.scope || legacyFields?.service || directory),
+      item: genericTemplate(legacyFields?.item || legacyFields?.identifier || legacyFields?.ticket || '{item}'),
+      scope: genericTemplate(legacyFields?.source || legacyFields?.scope || legacyFields?.service || directory),
+      identifier: genericTemplate(legacyFields?.item || legacyFields?.identifier || legacyFields?.ticket || '{item}'),
       title: card?.fields?.title || 'readme_heading',
       status: card?.fields?.status || 'draft',
       owner: card?.fields?.owner || '',
@@ -596,7 +656,11 @@ function normalizeSettingsCard(card?: SourceStructureCard, directory = 'source')
 }
 
 function genericTemplate(value: string): string {
-  return value.replaceAll('{service}', '{scope}').replaceAll('{ticket}', '{identifier}');
+  return value
+    .replaceAll('{service}', '{folder}')
+    .replaceAll('{scope}', '{folder}')
+    .replaceAll('{ticket}', '{item}')
+    .replaceAll('{identifier}', '{item}');
 }
 
 function withInferredCompatibilityFields(card: SourceStructureCard, directory: string): SourceStructureCard {
@@ -604,6 +668,8 @@ function withInferredCompatibilityFields(card: SourceStructureCard, directory: s
     ...card,
     fields: {
       ...card.fields,
+      source: inferCompatibilityFields(card.pathPattern, directory).scope,
+      item: inferCompatibilityFields(card.pathPattern, directory).identifier,
       ...inferCompatibilityFields(card.pathPattern, directory)
     }
   };
@@ -617,7 +683,9 @@ function updateSettingsCard(
     if (!current) return current;
     return {
       ...current,
-      card: withInferredCompatibilityFields({ ...current.card, ...patch }, current.directory)
+      card: withInferredCompatibilityFields({ ...current.card, ...patch }, current.directory),
+      selectedProposalId: undefined,
+      preview: []
     };
   });
 }
@@ -632,6 +700,7 @@ function updateSettingsField(
     const nextValue = field === 'tags' ? value.split(',').map((item) => item.trim()).filter(Boolean) : value;
     return {
       ...current,
+      selectedProposalId: undefined,
       card: {
         ...current.card,
         fields: {
@@ -652,9 +721,20 @@ function applySettingsProposal(
     return {
       ...current,
       card: normalizeSettingsCard(proposal.card, current.directory),
+      selectedProposalId: proposal.id,
       preview: proposal.preview
     };
   });
+}
+
+function clearSettingsProposal(
+  setSettingsEditor: Dispatch<SetStateAction<SettingsEditorState | null>>
+) {
+  setSettingsEditor((current) => current ? {
+    ...current,
+    selectedProposalId: UNSORTED_SELECTION_ID,
+    preview: current.unsortedPreview
+  } : current);
 }
 
 function applySettingsSegmentRole(
@@ -672,6 +752,7 @@ function applySettingsSegmentRole(
     return {
       ...current,
       card: nextCard,
+      selectedProposalId: matchingProposal?.id,
       preview: matchingProposal?.preview ?? current.preview
     };
   });
@@ -679,6 +760,6 @@ function applySettingsSegmentRole(
 
 function cardsMatch(left: SourceStructureCard, right: SourceStructureCard): boolean {
   return left.pathPattern === right.pathPattern
-    && left.fields.scope === right.fields.scope
-    && left.fields.identifier === right.fields.identifier;
+    && (left.fields.source ?? left.fields.scope) === (right.fields.source ?? right.fields.scope)
+    && (left.fields.item ?? left.fields.identifier) === (right.fields.item ?? right.fields.identifier);
 }

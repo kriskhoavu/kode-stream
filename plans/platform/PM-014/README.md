@@ -1,6 +1,6 @@
-# PM-014: Visual Source Structure Proposals
+# PM-014: Visual Source Items Proposals
 
-PM-014 makes Source Structure configuration easier by letting Plan Manager inspect a source directory, propose likely card rules, and preview how each rule maps real paths into Kanban items before the user saves `workspace-settings.yaml`.
+PM-014 makes Source Items configuration easier by letting Plan Manager inspect a source directory, propose likely card rules, and preview how each rule maps real paths into Kanban items before the user saves `workspace-settings.yaml`.
 
 ## Related Plans
 
@@ -14,16 +14,16 @@ PM-014 makes Source Structure configuration easier by letting Plan Manager inspe
 
 | Term                      | Meaning                                                                  | Code                          |
 |---------------------------|--------------------------------------------------------------------------|-------------------------------|
-| Source Structure          | A saved rule set that maps a source directory into item cards            | `SourceStructureSettings`     |
-| Source Structure Proposal | A backend-generated candidate rule with examples and confidence          | `SourceStructureProposal`     |
-| Source Structure Preview  | Real sample paths mapped into scope, identifier, title, status, and tags | `SourceStructurePreview`      |
-| Segment Role              | A visual label applied to one path segment, such as scope or identifier  | `SourceStructureSegmentRole`  |
+| Source Items          | A saved rule set that maps a source directory into item cards            | `SourceStructureSettings`     |
+| Source Items Proposal | A backend-generated candidate rule with examples and confidence          | `SourceStructureProposal`     |
+| Source Items Preview  | Real sample paths mapped into source, item, title, status, and tags | `SourceStructurePreview`      |
+| Segment Role              | A visual label applied to one path segment, such as folder or item  | `SourceStructureSegmentRole`  |
 | Existing Settings         | A previously saved `workspace-settings.yaml` file                        | `SourceSettingsResult.exists` |
 
 ## Data Flow
 
 ```text
-Open Source Structure
+Open Source Items
   -> frontend requests GET /api/workspaces/{id}/source-structure?directory=docs
   -> backend reads existing settings and samples source paths
   -> backend returns settings, warnings, proposals, and preview rows

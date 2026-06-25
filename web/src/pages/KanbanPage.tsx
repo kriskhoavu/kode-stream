@@ -293,7 +293,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       const result = await api.createItem({
         workspaceId: workspace.id,
         source,
-        scope: newPlanDraft.scope.trim(),
+        scope: source,
         identifier: newPlanDraft.identifier.trim(),
         title: newPlanDraft.title.trim(),
         status: newPlanDraft.status
@@ -523,10 +523,10 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
               ))}
             </KanbanColumn>
             {column === 'unsorted' && (
-              <button className="kanban-separator" type="button" onClick={onOpenWorkspaces} disabled={!onOpenWorkspaces} title="Configure source structure">
+              <button className="kanban-separator" type="button" onClick={onOpenWorkspaces} disabled={!onOpenWorkspaces} title="Configure source items">
                 <span className="separator-arrow">▶</span>
                 <span className="separator-count">{grouped.get('unsorted')?.length ?? 0}</span>
-                <span className="separator-label">Configure source structure</span>
+                <span className="separator-label">Configure source items</span>
                 <SlidersHorizontal size={15} />
               </button>
             )}
@@ -556,7 +556,6 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
               <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
                 {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
               </select></label>
-              <label>{labels.scope}<input value={newPlanDraft.scope} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, scope: event.target.value }))} placeholder="platform" /></label>
               <label>{labels.identifier}<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="PM-003" /></label>
               <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Item title" /></label>
               <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
@@ -564,7 +563,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
             {newPlanError && <p className="error">{newPlanError}</p>}
             <footer className="modal-actions">
               <button type="button" className="ghost" onClick={() => setNewPlanOpen(false)}>Cancel</button>
-              <button type="button" className="primary" disabled={creatingPlan || !newPlanDraft.scope || !newPlanDraft.identifier} onClick={createPlan}>{creatingPlan ? 'Creating...' : 'Create Item'}</button>
+              <button type="button" className="primary" disabled={creatingPlan || !newPlanDraft.identifier} onClick={createPlan}>{creatingPlan ? 'Creating...' : 'Create Item'}</button>
             </footer>
           </section>
         </div>
@@ -666,11 +665,11 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
 
 function confirmSnapshotMaterialization(item: ItemSummary | ItemDetail | null, operation: 'file' | 'metadata' | 'status'): boolean | null {
   if (!item || item.sourceMode !== 'snapshot') return false;
-  const scope = item.metadataSource === 'docs'
+  const copyTarget = item.metadataSource === 'docs'
     ? 'only this docs file'
     : `the whole plan at ${item.itemPath || item.identifier}`;
   const action = operation === 'status' ? 'move it' : operation === 'metadata' ? 'edit its metadata' : 'edit it';
-  const message = `This item is loaded from branch ${item.branch}. To ${action}, Plan Manager will copy ${scope} into the current checkout branch, then apply your change there.`;
+  const message = `This item is loaded from branch ${item.branch}. To ${action}, Plan Manager will copy ${copyTarget} into the current checkout branch, then apply your change there.`;
   return window.confirm(message) ? true : null;
 }
 
@@ -727,8 +726,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
 }) {
   const source = sourceLabel(plan, workspace);
   const docs = plan.metadataSource === 'docs';
-  const showScope = Boolean(plan.scope && (!docs || plan.scope !== source));
-  const showIdentifier = !docs || plan.identifier.toLowerCase() !== plan.title.toLowerCase();
+  const showItem = !docs || plan.identifier.toLowerCase() !== plan.title.toLowerCase();
   const description = docs ? plan.description : plan.description || plan.identifier;
   const tags = docs ? plan.tags.filter((tag) => tag !== source && tag !== plan.scope && tag !== plan.identifier) : plan.tags;
   const draggable = isItemDraggable(plan) && !pending;
@@ -761,12 +759,10 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
       <div className="plan-card-title">
         <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
         <span className="card-badges">
-          {showScope && <span className="scope-badge">{plan.scope}</span>}
-          {showScope && source && <span className="badge-separator">|</span>}
           {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
         </span>
       </div>
-      {showIdentifier && <span className="plan-card-identifier">{plan.identifier}</span>}
+      {showItem && <span className="plan-card-identifier">{plan.identifier}</span>}
       {description && <p>{description}</p>}
       <footer>
         <span className="avatar">{(plan.author || plan.owner || '?').slice(0, 1).toUpperCase()}</span>
@@ -1181,7 +1177,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                 <>
                   <dl>
                     <dt>{labels.workspace}</dt><dd>{plan?.workspaceName ?? '-'}</dd>
-                    <dt>{labels.scope}</dt><dd>{plan?.scope ?? '-'}</dd>
+                    <dt>{labels.source}</dt><dd>{plan ? plan.itemPath?.split('/').filter(Boolean)[0] || plan.scope || '-' : '-'}</dd>
                     <dt>{labels.identifier}</dt><dd>{plan?.identifier ?? '-'}</dd>
                     <dt>Branch</dt><dd>{plan?.branch ?? '-'}</dd>
                     <dt>Status</dt><dd>{plan?.status ? <DrawerStatusBadge status={plan.status} /> : '-'}</dd>
@@ -1192,7 +1188,6 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                   {plan?.metadataSource !== 'docs' && (
                     <div className="metadata-form drawer-metadata-form">
                       <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
-                      <label>{labels.scope}<input value={metadataDraft.scope ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, scope: event.target.value }))} /></label>
                       <label>{labels.identifier}<input value={metadataDraft.identifier ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, identifier: event.target.value }))} /></label>
                       <label>Status<StatusMenu value={metadataDraft.status ?? 'draft'} onChange={(status) => setMetadataDraft((draft) => ({ ...draft, status }))} /></label>
                       <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>

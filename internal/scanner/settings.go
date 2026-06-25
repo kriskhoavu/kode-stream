@@ -21,13 +21,13 @@ func DefaultSourceStructureSettings() models.SourceStructureSettings {
 	return models.SourceStructureSettings{
 		Version: 1,
 		Cards: []models.SourceStructureCard{{
-			PathPattern: "{scope}/feature/{identifier}",
+			PathPattern: "{folder}/feature/{item}",
 			Fields: models.SourceStructureFields{
-				Scope:      "{scope}",
-				Identifier: "{identifier}",
-				Title:      "readme_heading",
-				Status:     "draft",
-				Tags:       []string{"docs"},
+				Source: "docs",
+				Item:   "{item}",
+				Title:  "readme_heading",
+				Status: "draft",
+				Tags:   []string{"docs"},
 			},
 		}},
 	}
@@ -37,13 +37,13 @@ func BuiltInStructuredSettings() models.SourceStructureSettings {
 	return models.SourceStructureSettings{
 		Version: 1,
 		Cards: []models.SourceStructureCard{{
-			PathPattern: "{scope}/{identifier}",
+			PathPattern: "{folder}/{item}",
 			Fields: models.SourceStructureFields{
-				Scope:      "{scope}",
-				Identifier: "{identifier}",
-				Title:      "readme_heading",
-				Status:     "draft",
-				Tags:       []string{"items"},
+				Source: "items",
+				Item:   "{item}",
+				Title:  "readme_heading",
+				Status: "draft",
+				Tags:   []string{"items"},
 			},
 		}},
 	}
@@ -81,6 +81,8 @@ func applyLegacySourceFields(data []byte, settings *models.SourceStructureSettin
 			Fields struct {
 				Service string `yaml:"scope"`
 				Ticket  string `yaml:"identifier"`
+				Source  string `yaml:"source"`
+				Item    string `yaml:"item"`
 			} `yaml:"fields"`
 		} `yaml:"cards"`
 	}
@@ -91,11 +93,11 @@ func applyLegacySourceFields(data []byte, settings *models.SourceStructureSettin
 		if i >= len(legacy.Cards) {
 			break
 		}
-		if settings.Cards[i].Fields.Scope == "" {
-			settings.Cards[i].Fields.Scope = legacy.Cards[i].Fields.Service
+		if settings.Cards[i].Fields.Source == "" {
+			settings.Cards[i].Fields.Source = firstNonEmpty(legacy.Cards[i].Fields.Source, legacy.Cards[i].Fields.Service)
 		}
-		if settings.Cards[i].Fields.Identifier == "" {
-			settings.Cards[i].Fields.Identifier = legacy.Cards[i].Fields.Ticket
+		if settings.Cards[i].Fields.Item == "" {
+			settings.Cards[i].Fields.Item = firstNonEmpty(legacy.Cards[i].Fields.Item, legacy.Cards[i].Fields.Ticket)
 		}
 	}
 }
@@ -119,6 +121,7 @@ func SourceSettingsModeFromReader(reader SourceReader, root string) string {
 }
 
 func WriteSourceStructureSettings(root string, settings models.SourceStructureSettings) error {
+	settings = normalizeSourceStructureSettingsForWrite(settings)
 	if warnings := ValidateSourceStructureSettings(settings); len(warnings) > 0 {
 		return errors.New(warnings[0].Message)
 	}
@@ -127,6 +130,17 @@ func WriteSourceStructureSettings(root string, settings models.SourceStructureSe
 		return err
 	}
 	return os.WriteFile(filepath.Join(root, SourceStructureSettingsFile), data, 0o644)
+}
+
+func normalizeSourceStructureSettingsForWrite(settings models.SourceStructureSettings) models.SourceStructureSettings {
+	for i := range settings.Cards {
+		fields := &settings.Cards[i].Fields
+		fields.Source = firstNonEmpty(fields.Source, fields.Scope)
+		fields.Item = firstNonEmpty(fields.Item, fields.Identifier)
+		fields.Scope = ""
+		fields.Identifier = ""
+	}
+	return settings
 }
 
 func RemoveSourceStructureSettings(root string) error {
@@ -164,15 +178,17 @@ func ValidateSourceStructureSettings(settings models.SourceStructureSettings) []
 				variableNames[segment.variable] = true
 			}
 		}
-		if strings.TrimSpace(card.Fields.Scope) == "" {
-			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.scope is required"})
-		} else if unknown := unknownTemplateVariable(card.Fields.Scope, variableNames); unknown != "" {
-			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.scope references unknown variable " + unknown})
+		sourceField := firstNonEmpty(card.Fields.Source, card.Fields.Scope)
+		itemField := firstNonEmpty(card.Fields.Item, card.Fields.Identifier)
+		if strings.TrimSpace(sourceField) == "" {
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.source is required"})
+		} else if unknown := unknownTemplateVariable(sourceField, variableNames); unknown != "" {
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.source references unknown variable " + unknown})
 		}
-		if strings.TrimSpace(card.Fields.Identifier) == "" {
-			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.identifier is required"})
-		} else if unknown := unknownTemplateVariable(card.Fields.Identifier, variableNames); unknown != "" {
-			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.identifier references unknown variable " + unknown})
+		if strings.TrimSpace(itemField) == "" {
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.item is required"})
+		} else if unknown := unknownTemplateVariable(itemField, variableNames); unknown != "" {
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.item references unknown variable " + unknown})
 		}
 		for _, value := range append([]string{card.Fields.Title, card.Fields.Status, card.Fields.Owner}, card.Fields.Tags...) {
 			if unknown := unknownTemplateVariable(value, variableNames); unknown != "" {
@@ -216,6 +232,15 @@ func unknownTemplateVariable(value string, known map[string]bool) string {
 	for _, match := range regexp.MustCompile(`\{([A-Za-z][A-Za-z0-9_]*)\}`).FindAllStringSubmatch(value, -1) {
 		if !known[match[1]] {
 			return "{" + match[1] + "}"
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
 		}
 	}
 	return ""

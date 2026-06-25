@@ -21,11 +21,9 @@ The MVP is read-only for managed repositories. It does not edit plan files. It d
 |----------------------|-------------------------------------------------------------------------------------|-----------------------------|
 | Workspace            | A local Git repository registered in Plan Manager                                   | `RepositoryConfig`          |
 | Source               | A configured scan root such as `plans`, `docs`, or `docs/plans`                     | `planDirectories`           |
-| Structured Item Root | An item root that usually uses scope/identifier folders, such as `plans/api/DI-170` | `PlanScanner`               |
-| Freestyle Docs Root  | A Markdown docs root that does not use scope/identifier folders                     | `metadataSource: docs`      |
+| Structured Item Root | An item root resolved from a configured source, such as `plans/api/DI-170` | `PlanScanner`               |
+| Freestyle Docs Root  | A Markdown docs root that does not use source/item folders                     | `metadataSource: docs`      |
 | Item                 | A planning folder or docs item shown on the board                                   | `PlanSummary`, `PlanDetail` |
-| Scope                | Optional item grouping, currently stored as `service`                               | `service`                   |
-| Identifier           | Optional stable item key, currently stored as `ticket`                              | `ticket`                    |
 | Item Metadata        | Optional machine-readable metadata for an item                                      | `plan.yaml`                 |
 | Document             | A Markdown file that belongs to an item or docs root                                | `PlanDocument`              |
 | Scan                 | Read-only indexing of configured sources                                            | `RepositoryScanner`         |
@@ -79,8 +77,8 @@ Developer starts Plan Manager
 | Make v1 read-only                           | Editable workspace, full Git manager        | Read-only browsing gives value first and avoids save, lock, credential, and branch mutation risks.                                  |
 | Use `plan.yaml` first                       | README-only parsing                         | Existing plans already use `plan.yaml`. It gives stable metadata. File explorer order is filesystem-based.                          |
 | Add fallback parsing                        | Require `plan.yaml`                         | Older plans and custom folders should still appear as normal plan cards with inferred metadata.                                     |
-| Support freestyle docs roots                | Force docs into scope/identifier structure  | General docs folders such as `docs/` should be browsable without fake identifiers.                                                  |
-| Scope Kanban to one active workspace        | Mix all repositories on one board           | A board should represent one project workspace. Repository switching belongs in the left nav.                                       |
+| Support freestyle docs roots                | Force docs into source/item structure  | General docs folders such as `docs/` should be browsable without fake identifiers.                                                  |
+| Limit Kanban to one active workspace        | Mix all repositories on one board           | A board should represent one project workspace. Repository switching belongs in the left nav.                                       |
 | Use client-side multi-select board filters  | Add many query params to `/api/plans`       | The board loads cached summaries for the active workspace. Source, status, author, and branch facets give OR filters without churn. |
 | Show stale-content prompt                   | Auto-reload pages                           | Reading and detail views should not be interrupted. Users decide when to refresh in-place.                                          |
 | Keep repository edit/delete app-local       | Treat registry changes as managed repo ops  | Registry writes only touch Plan Manager data. They do not modify registered repositories.                                           |
@@ -106,9 +104,9 @@ Developer starts Plan Manager
 - A bad plan creates a scan warning. It must not fail the whole repository scan.
 - The app must not write to registered repositories in PM-001.
 - File reads must stay inside configured plan directories.
-- Structured item roots usually use scope/identifier folders.
+- Structured item roots usually use source/item folders.
 - Freestyle docs roots with Markdown files are indexed as docs items.
-- The UI exposes generic content labels: Item, Source, Scope, and Identifier.
+- The UI exposes generic content labels: Item, Source, Source, and Item.
 - Kanban filters support OR within a facet and AND across facets.
 - The UI should match the layout, density, navigation, and mobile behavior of `specs/design.png`. It does not need pixel-perfect parity.
 

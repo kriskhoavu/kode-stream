@@ -464,7 +464,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
               {plan?.metadataSource === 'docs' && (
                 <div className="metadata-callout">
                   <strong>Docs</strong>
-                  <span>This item is a documentation folder. It is browsable even though it does not use a scope/identifier structure.</span>
+                  <span>This item is a documentation folder. It is browsable even though it does not use a structured source item layout.</span>
                 </div>
               )}
               <dl>

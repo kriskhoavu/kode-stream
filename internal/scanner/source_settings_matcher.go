@@ -59,8 +59,8 @@ func matchPatternDirectories(reader SourceReader, root string, segments []pathPa
 func applySourceStructureSettings(detail *models.ItemDetail, card models.SourceStructureCard, captures map[string]string) {
 	fields := card.Fields
 	detail.MetadataSource = "workspace-settings"
-	detail.Scope = renderSettingsTemplate(fields.Scope, captures)
-	detail.Identifier = renderSettingsTemplate(fields.Identifier, captures)
+	detail.Scope = renderSettingsTemplate(firstNonEmpty(fields.Source, fields.Scope), captures)
+	detail.Identifier = renderSettingsTemplate(firstNonEmpty(fields.Item, fields.Identifier), captures)
 	if title := strings.TrimSpace(renderSettingsTemplate(fields.Title, captures)); title != "" && title != "readme_heading" {
 		detail.Title = title
 	}

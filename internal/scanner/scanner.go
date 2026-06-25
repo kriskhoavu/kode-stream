@@ -157,8 +157,8 @@ func (s *Scanner) scanConfiguredItemDirectory(request ScanRequest, reader Source
 				continue
 			}
 			seen[match.path] = true
-			scope := renderSettingsTemplate(card.Fields.Scope, match.captures)
-			identifier := renderSettingsTemplate(card.Fields.Identifier, match.captures)
+			scope := renderSettingsTemplate(firstNonEmpty(card.Fields.Source, card.Fields.Scope), match.captures)
+			identifier := renderSettingsTemplate(firstNonEmpty(card.Fields.Item, card.Fields.Identifier), match.captures)
 			if strings.TrimSpace(scope) == "" || strings.TrimSpace(identifier) == "" {
 				warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(match.path), Message: "workspace settings produced an empty scope or identifier"})
 				continue

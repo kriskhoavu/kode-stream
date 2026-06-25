@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import type { ExplorerTreeMode, WorkspaceContentSearchResult } from '../../lib/types';
 
-type ContentSearchScope =
+type ContentSearchTarget =
 	| { kind: 'item'; itemId: string }
 	| { kind: 'explorer'; mode: ExplorerTreeMode; workspaceId?: string; includeIgnored: boolean };
 
-export function useContentSearch(scope: ContentSearchScope, debounceMs = 250) {
+export function useContentSearch(target: ContentSearchTarget, debounceMs = 250) {
 	const [query, setQuery] = useState('');
 	const [caseSensitive, setCaseSensitive] = useState(false);
 	const [results, setResults] = useState<WorkspaceContentSearchResult[]>([]);
@@ -14,9 +14,9 @@ export function useContentSearch(scope: ContentSearchScope, debounceMs = 250) {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
 	const requestId = useRef(0);
-	const scopeKey = scope.kind === 'item'
-		? `item:${scope.itemId}`
-		: `explorer:${scope.mode}:${scope.workspaceId ?? '*'}:${scope.includeIgnored}`;
+	const targetKey = target.kind === 'item'
+		? `item:${target.itemId}`
+		: `explorer:${target.mode}:${target.workspaceId ?? '*'}:${target.includeIgnored}`;
 
 	useEffect(() => {
 		const normalized = query.trim();
@@ -30,9 +30,9 @@ export function useContentSearch(scope: ContentSearchScope, debounceMs = 250) {
 		}
 		setLoading(true);
 		const timer = window.setTimeout(() => {
-			const request = scope.kind === 'item'
-				? api.searchItemContent(scope.itemId, { q: normalized, caseSensitive })
-				: api.searchWorkspaceContent({ q: normalized, mode: scope.mode, workspaceId: scope.workspaceId, includeIgnored: scope.includeIgnored, caseSensitive });
+			const request = target.kind === 'item'
+				? api.searchItemContent(target.itemId, { q: normalized, caseSensitive })
+				: api.searchWorkspaceContent({ q: normalized, mode: target.mode, workspaceId: target.workspaceId, includeIgnored: target.includeIgnored, caseSensitive });
 			request.then((response) => {
 				if (requestId.current !== id) return;
 				setResults(response.results);
@@ -48,7 +48,7 @@ export function useContentSearch(scope: ContentSearchScope, debounceMs = 250) {
 			});
 		}, debounceMs);
 		return () => window.clearTimeout(timer);
-	}, [caseSensitive, debounceMs, query, scopeKey]);
+	}, [caseSensitive, debounceMs, query, targetKey]);
 
 	const clear = () => setQuery('');
 	return { query, setQuery, caseSensitive, setCaseSensitive, results, truncated, loading, error, clear };

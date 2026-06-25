@@ -143,8 +143,10 @@ type SourceStructureCard struct {
 }
 
 type SourceStructureFields struct {
-	Scope      string   `json:"scope" yaml:"scope"`
-	Identifier string   `json:"identifier" yaml:"identifier"`
+	Source     string   `json:"source,omitempty" yaml:"source,omitempty"`
+	Item       string   `json:"item,omitempty" yaml:"item,omitempty"`
+	Scope      string   `json:"scope,omitempty" yaml:"scope,omitempty"`
+	Identifier string   `json:"identifier,omitempty" yaml:"identifier,omitempty"`
 	Title      string   `json:"title,omitempty" yaml:"title,omitempty"`
 	Status     string   `json:"status,omitempty" yaml:"status,omitempty"`
 	Owner      string   `json:"owner,omitempty" yaml:"owner,omitempty"`
@@ -162,6 +164,8 @@ type SourceStructureProposal struct {
 
 type SourceStructurePreview struct {
 	Path       string     `json:"path" yaml:"path"`
+	Source     string     `json:"source,omitempty" yaml:"source,omitempty"`
+	Item       string     `json:"item,omitempty" yaml:"item,omitempty"`
 	Scope      string     `json:"scope" yaml:"scope"`
 	Identifier string     `json:"identifier" yaml:"identifier"`
 	Title      string     `json:"title" yaml:"title"`

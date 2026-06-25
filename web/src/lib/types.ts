@@ -90,6 +90,8 @@ export interface SourceStructureCard {
 }
 
 export interface SourceStructureFields {
+  source?: string;
+  item?: string;
   scope: string;
   identifier: string;
   title?: string;
@@ -109,6 +111,8 @@ export interface SourceStructureProposal {
 
 export interface SourceStructurePreview {
   path: string;
+  source?: string;
+  item?: string;
   scope: string;
   identifier: string;
   title: string;

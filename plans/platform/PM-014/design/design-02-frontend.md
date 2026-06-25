@@ -1,8 +1,8 @@
-# Frontend Design: Visual Source Structure Dialog
+# Frontend Design: Visual Source Items Dialog
 
 ## Overview
 
-The Source Structure dialog becomes a visual chooser. It still exposes the raw path pattern and field inputs, but it first shows backend proposals, live preview rows, and clickable segment roles so users can configure common docs layouts without writing template syntax from memory.
+The Source Items dialog becomes a visual chooser. It still exposes the raw path pattern and field inputs, but it first shows backend proposals, live preview rows, and clickable segment roles so users can configure common docs layouts without writing template syntax from memory.
 
 ## Data Model
 
@@ -35,11 +35,11 @@ For the first implementation, these can remain in `WorkspacesPage.tsx` with extr
 
 ## UX Behavior
 
-- The top of the dialog shows proposal cards such as “Scope / feature / identifier”.
+- The top of the dialog shows proposal cards such as “Folder / feature / item”.
 - Clicking a proposal replaces the draft `SourceStructureCard`.
 - A sample path is shown as path-segment pills.
 - Segment pills can toggle role choices for `scope`, `identifier`, or literal text.
-- The preview table shows path, scope, identifier, title, status, and tags.
+- The preview table shows path, source, item, title, status, and tags.
 - Warnings remain visible before the form.
 - The raw path pattern and fields stay available under an advanced section.
 

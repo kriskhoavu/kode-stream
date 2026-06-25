@@ -1,4 +1,4 @@
-# Backend Design: Source Structure Proposals
+# Backend Design: Source Items Proposals
 
 ## Overview
 
@@ -53,9 +53,9 @@ The backend extends the existing source-structure response with source-derived p
 
 | Heuristic                  | Candidate Pattern              | Confidence |
 |----------------------------|--------------------------------|------------|
-| `scope/feature/identifier` | `{scope}/feature/{identifier}` | high       |
-| `scope/identifier`         | `{scope}/{identifier}`         | high       |
-| `identifier-only`          | `{identifier}`                 | medium     |
+| `folder/feature/item` | `{folder}/feature/{item}` | high       |
+| `source/item`         | `{folder}/{item}`         | high       |
+| `item-only`          | `{item}`                 | medium     |
 | `docs collection`          | source-level fallback card     | low        |
 
 The first version samples directories, ignores hidden folders, limits preview rows, and reads README headings only when the matched card directory contains a README-like Markdown file.

@@ -3478,6 +3478,11 @@ body.is-resizing-panel {
   letter-spacing: .02em;
 }
 
+.proposal-confidence.neutral {
+  background: color-mix(in srgb, var(--muted) 12%, var(--panel));
+  color: var(--muted) !important;
+}
+
 .source-segment-list {
   display: flex;
   flex-wrap: wrap;
@@ -3551,11 +3556,21 @@ body.is-resizing-panel {
   font-size: 11.5px;
 }
 
+.source-preview-row:not(.heading) > span {
+  display: grid;
+  gap: 1px;
+}
+
 .source-preview-row.heading > span {
   border-top: 0;
   background: var(--panel-soft);
   color: var(--text);
   font-weight: 800;
+}
+
+.source-preview-row small {
+  color: var(--muted);
+  font-size: 10.5px;
 }
 
 .source-structure-form {

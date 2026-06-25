@@ -1,4 +1,4 @@
-# Scenario 0: Visual Source Structure Setup
+# Scenario 0: Visual Source Items Setup
 
 ## Goal
 
@@ -15,9 +15,9 @@ Help a user configure a docs source into item cards by choosing a proposed struc
 ## Visual State (Before)
 
 ```text
-Source Structure
+Source Items
   No settings file yet
-  Path Pattern: {scope}/feature/{identifier}
+  Path Pattern: {folder}/feature/{item}
   Title: readme_heading
   Default Status: Draft
 ```
@@ -27,13 +27,13 @@ Source Structure
 ### Flow 0.1: Apply A Proposed Structure
 
 ```text
-User opens Source Structure
+User opens Source Items
     ↓
 Backend samples docs paths
     ↓
 Backend returns proposed rules and preview rows
     ↓
-User clicks "Scope / feature / identifier"
+User clicks "Folder / feature / item"
     ↓
 Frontend applies the proposal to the draft card
     ↓
@@ -53,13 +53,13 @@ User clicks a segment pill
     ↓
 Frontend updates the draft path pattern
     ↓
-Preview rows update to show the new scope and identifier mapping
+Preview rows update to show the new source and item mapping
 ```
 
 ## Visual State (After)
 
 ```text
-Proposal: Scope / feature / identifier
+Proposal: Folder / feature / item
 
 Preview
 docs/api/feature/DI-101 -> scope api, identifier DI-101, title API Search

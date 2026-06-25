@@ -125,10 +125,10 @@ func TestSourceStructureIncludesProposalsAndPreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Proposals) == 0 || result.Proposals[0].ID != "scope-feature-identifier" {
+	if len(result.Proposals) == 0 || result.Proposals[0].ID != "actual-folder-feature-item" {
 		t.Fatalf("unexpected proposals: %#v", result.Proposals)
 	}
-	if len(result.Preview) != 1 || result.Preview[0].Scope != "api" || result.Preview[0].Identifier != "DI-101" || result.Preview[0].Title != "API Search" {
+	if len(result.Preview) != 1 || result.Preview[0].Source != "docs" || result.Preview[0].Item != "DI-101" || result.Preview[0].Title != "API Search" {
 		t.Fatalf("unexpected preview: %#v", result.Preview)
 	}
 }

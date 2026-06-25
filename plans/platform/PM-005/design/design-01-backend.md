@@ -66,9 +66,9 @@ PM-005 adds read-only search APIs and local saved-filter storage. It uses the ex
 | Match Type          | Score |
 |---------------------|-------|
 | Exact identifier    | 100   |
-| Identifier prefix   | 90    |
+| Item prefix   | 90    |
 | Title exact words   | 80    |
-| Scope or workspace  | 60    |
+| Source or workspace  | 60    |
 | Description or tags | 40    |
 | Branch              | 30    |
 

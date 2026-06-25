@@ -17,9 +17,7 @@ Users can edit Markdown files, update item metadata, create new items, move card
 - **Workspace**: a local Git repository registered in Plan Manager.
 - **Source**: a configured scan root such as `plans` or `docs`.
 - **Item**: a planning folder or docs item shown on the board and in the workspace.
-- **Scope**: optional item grouping, currently stored as `service`.
-- **Identifier**: optional stable item key, currently stored as `ticket`.
-- **Freestyle Docs Root**: a Markdown docs folder that does not use the scope/identifier shape.
+- **Freestyle Docs Root**: a Markdown docs folder that does not use the source/item shape.
 - **Read-only boundary**: all PM-001 plan and Git APIs only read target repositories.
 - **File access guard**: all file reads must stay inside configured plan directories.
 - **App state version**: registry or index changes update `/api/state`.
@@ -30,10 +28,8 @@ Users can edit Markdown files, update item metadata, create new items, move card
 |------------------|--------------------------------------------------------------------------------------|-----------------------------|
 | Workspace        | A local Git repository registered in Plan Manager                                    | `RepositoryConfig`          |
 | Source           | A configured scan root such as `plans`, `docs`, or `docs/plans`                      | `planDirectories`           |
-| Source Structure | Optional `repository-settings.yaml` in a source that maps arbitrary folders to cards | `RepositorySettings`        |
+| Source Items | Optional `repository-settings.yaml` in a source that maps arbitrary folders to cards | `RepositorySettings`        |
 | Item             | A planning folder or docs item                                                       | `PlanSummary`, `PlanDetail` |
-| Scope            | Optional item grouping, currently stored as `service`                                | `service`                   |
-| Identifier       | Optional stable item key, currently stored as `ticket`                               | `ticket`                    |
 | Item Metadata    | Machine-readable item fields stored in `plan.yaml`                                   | `PlanMetadataUpdateInput`   |
 | Edit Session     | The frontend state for one open file or metadata form with unsaved changes           | editor state                |
 | Dirty State      | Local Git state with modified, staged, untracked, or conflicting files               | `GitStatus`                 |
@@ -105,7 +101,7 @@ User runs a Git operation
 - Source directories can opt into structured card discovery with `repository-settings.yaml`.
 - Configured source cards support metadata editing; the first metadata save creates `plan.yaml` in the matched card folder.
 - Freestyle docs roots without source settings appear in the `Unsorted` lane and support Markdown file editing but not structured plan metadata editing.
-- The Kanban board separates `Unsorted` from workflow statuses with a compact action rail that points users to source structure configuration.
+- The Kanban board separates `Unsorted` from workflow statuses with a compact action rail that points users to source items configuration.
 - Commit operations must commit only selected plan paths.
 - Pull, push, and branch switch show confirmation when the working tree or branch state is risky.
 - The app does not auto-fetch in PM-002.

@@ -5,10 +5,10 @@ export const labels = {
   sources: 'Sources',
   item: 'Item',
   items: 'Items',
-  scope: 'Scope',
-  identifier: 'Identifier',
+  scope: 'Source',
+  identifier: 'Item',
   itemPath: 'Item Path',
-  sourceStructure: 'Source Structure'
+  sourceStructure: 'Source Items'
 } as const;
 
 export function metadataSourceLabel(source?: string): string {

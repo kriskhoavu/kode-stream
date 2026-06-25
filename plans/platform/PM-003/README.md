@@ -16,7 +16,7 @@ PM-003 improves the internal architecture of Plan Manager without changing behav
 - **Workspace**: a local Git repository registered in Plan Manager.
 - **Source**: a configured scan root such as `plans`, `docs`, or `specs`.
 - **Item**: a planning folder or docs item shown in the app.
-- **Source Structure**: source-owned settings that map arbitrary folders to cards.
+- **Source Items**: source-owned settings that map arbitrary folders to cards.
 - **Write Guard**: backend checks that keep file and Git operations inside allowed paths.
 - **App State Version**: `/api/state` changes when registry or indexed item data changes.
 - **No credential storage**: Git credentials stay in the user's local Git setup.

@@ -1,6 +1,6 @@
 import type { SourceStructureCard } from '../../lib/types';
 
-export type SourceStructureSegmentRole = 'scope' | 'identifier' | 'literal';
+export type SourceStructureSegmentRole = 'folder' | 'item' | 'literal';
 
 export function normalizeDroppedPath(value?: string): string {
   if (!value) return '';
@@ -20,10 +20,9 @@ export function parseSources(value: string): string[] {
 export function inferCompatibilityFields(pathPattern: string, directory: string): Pick<SourceStructureCard['fields'], 'scope' | 'identifier'> {
   const variables = Array.from(new Set(Array.from(pathPattern.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)).map((match) => match[1])));
   const sourceName = lastPathSegment(directory) || 'source';
-  const scopeVariable = preferredVariable(variables, ['scope', 'service']) ?? (variables.length > 1 ? variables[0] : '');
-  const identifierVariable = preferredVariable(variables, ['identifier', 'ticket']) ?? (variables.length > 1 ? variables[variables.length - 1] : variables[0] ?? '');
+  const identifierVariable = preferredVariable(variables, ['item', 'identifier', 'ticket']) ?? (variables.length > 0 ? variables[variables.length - 1] : '');
   return {
-    scope: scopeVariable ? `{${scopeVariable}}` : sourceName,
+    scope: sourceName,
     identifier: identifierVariable ? `{${identifierVariable}}` : lastLiteralPathSegment(pathPattern) || sourceName
   };
 }
@@ -46,10 +45,10 @@ export function applySegmentRole(pathPattern: string, sampleSegments: string[], 
   const segments = pathPattern.split('/').map((segment) => segment.trim()).filter(Boolean);
   const maxLength = Math.max(segments.length, sampleSegments.length, index + 1);
   const next = Array.from({ length: maxLength }, (_, segmentIndex) => segments[segmentIndex] || sampleSegments[segmentIndex] || 'segment');
-  if (role === 'scope') {
-    next[index] = '{scope}';
-  } else if (role === 'identifier') {
-    next[index] = '{identifier}';
+  if (role === 'folder') {
+    next[index] = `{folder${index > 0 ? index + 1 : ''}}`;
+  } else if (role === 'item') {
+    next[index] = '{item}';
   } else {
     next[index] = literalPathSegment(sampleSegments[index] || next[index]);
   }
