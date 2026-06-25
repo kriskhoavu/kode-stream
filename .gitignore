@@ -35,6 +35,7 @@ out/
 
 ### Node ###
 node_modules/
+package-lock.json
 .npmrc
 *.tsbuildinfo
 vite.config.js
