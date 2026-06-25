@@ -12,16 +12,16 @@ PM-015 reviews the current Plan Manager backend and frontend implementation and 
 
 ## Review Findings
 
-| Area                    | Current Observation                                                                   | Improvement Direction                                                             |
-|-------------------------|---------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| Backend scan/state      | `/api/state` hashes full workspace and item payloads; scans still do repeated reads   | Add a state snapshot/version store and source-scan pipeline with reusable stages  |
-| Backend Git metadata    | Scanner asks Git for author/update data per item path                                 | Add a batch metadata provider behind the scanner facade                           |
-| Backend handlers        | `internal/api/api.go` is about 900 lines and owns every route in one file             | Split handlers by resource while keeping the same `api.API` facade and routes     |
-| Backend workspace files | Tree, search, mutation, audit, refresh, and Git state decisions are tightly coupled   | Use command/query separation and a refresh policy strategy                        |
-| Frontend pages          | `KanbanPage`, `WorkspacesPage`, and `ItemWorkspacePage` still own broad orchestration | Move data loading and user actions into feature controllers/hooks                 |
-| Frontend renderers      | Markdown rendering and source highlighting run on the main thread                     | Add async renderer adapters, bounded caches, and deferred heavy preview rendering |
-| Frontend Explorer       | `useWorkspaceExplorer` has cache, selection, tree, Git, and decoration concerns       | Split into tree store, selection controller, and provider adapters                |
-| Code conventions        | Some indentation and feature ownership are inconsistent after iterative changes       | Add package/module ownership rules and focused lint-like review checks            |
+| Area                    | Current Observation                                                                  | Improvement Direction                                                             |
+|-------------------------|--------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| Backend scan/state      | `/api/state` hashes full workspace and item payloads; scans still do repeated reads  | Add a state snapshot/version store and source-scan pipeline with reusable stages  |
+| Backend Git metadata    | Scanner asks Git for author/update data per item path                                | Add a batch metadata provider behind the scanner facade                           |
+| Backend handlers        | `internal/api/api.go` is 908 lines and owns every route in one file                  | Split handlers by resource while keeping the same `api.API` facade and routes     |
+| Backend workspace files | Tree, search, mutation, audit, refresh, and Git state decisions are tightly coupled  | Use command/query separation and a refresh policy strategy                        |
+| Frontend pages          | `KanbanPage`, `WorkspacesPage`, and `ItemWorkspacePage` are 1338, 765, and 745 lines | Move data loading and user actions into feature controllers/hooks                 |
+| Frontend renderers      | Markdown rendering and source highlighting run on the main thread                    | Add async renderer adapters, bounded caches, and deferred heavy preview rendering |
+| Frontend Explorer       | `useWorkspaceExplorer` has cache, selection, tree, Git, and decoration concerns      | Split into tree store, selection controller, and provider adapters                |
+| Code conventions        | Some indentation and feature ownership are inconsistent after iterative changes      | Add package/module ownership rules and focused lint-like review checks            |
 
 ## Glossary
 

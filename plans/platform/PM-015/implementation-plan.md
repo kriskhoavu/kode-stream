@@ -26,7 +26,7 @@ Avoid:
 
 | Phase | Name                                       | Status |
 |-------|--------------------------------------------|--------|
-| A1    | Baseline Review And Characterization       | Draft  |
+| A1    | Baseline Review And Characterization       | Done   |
 | B1    | State Snapshot And Index Hot Paths         | Draft  |
 | B2    | Scanner Pipeline And Git Metadata Provider | Draft  |
 | B3    | Workspace File Refresh Policy              | Draft  |
@@ -40,15 +40,24 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Record current largest backend and frontend files and ownership risks.
-- [ ] Capture baseline commands for backend tests, frontend tests, typecheck, and build.
-- [ ] Add missing characterization tests before behavior-preserving refactors.
-- [ ] Capture simple timing notes for `/api/state`, workspace scan, content search, and rich preview rendering on a representative local workspace.
-- [ ] Update PM-015 docs with any corrected findings from the baseline.
+- [x] Record current largest backend and frontend files and ownership risks.
+- [x] Capture baseline commands for backend tests, frontend tests, typecheck, and build.
+- [x] Add missing characterization tests before behavior-preserving refactors.
+- [x] Capture simple timing notes for `/api/state`, workspace scan, content search, and rich preview rendering on a representative local workspace.
+- [x] Update PM-015 docs with any corrected findings from the baseline.
 
 **Verification:** `rtk go test ./... && rtk npm run typecheck && rtk npm test -- --run && rtk npm run build`
 
 **Commit:** `PM-015: Capture implementation performance baseline`
+
+**A1 Baseline Notes:**
+
+- Largest backend files: `internal/api/api.go` 908 lines, `internal/scanner/scanner.go` 629 lines, `internal/application/workspace/service.go` 396 lines, `internal/workspacefiles/access.go` 323 lines, `internal/workspacefiles/content_search.go` 252 lines.
+- Largest frontend files: `web/src/pages/KanbanPage.tsx` 1338 lines, `web/src/pages/WorkspacesPage.tsx` 765 lines, `web/src/pages/ItemWorkspacePage.tsx` 745 lines, `web/src/pages/WorkspaceExplorerPage.tsx` 401 lines, `web/src/features/content-viewer/content-viewer.css` 355 lines.
+- Ownership risks: API route logic, scanner discovery/metadata, workspace file access/search/mutations, Kanban orchestration, item workspace orchestration, and content viewer rendering are the highest-risk refactor surfaces.
+- Baseline verification commands: `rtk go test ./...`, `rtk npm run typecheck`, `rtk npm test -- --run`, and `rtk npm run build`.
+- Characterization added: `/api/state` route count/version contract, Markdown sanitization and external-link policy, and large source highlighting fallback controls.
+- Timing notes on this local workspace, captured with `/usr/bin/time -p`: `/api/state` route characterization `real 2.76s` (`go test` package runtime `0.925s`), workspace scan characterization `real 2.24s` (`go test` package runtime `0.757s`), content search route characterization `real 2.64s` (`go test` package runtime `1.035s`), content viewer rich preview characterization `real 4.83s` (Vitest duration `3.55s`, test body `1.05s`).
 
 ---
 

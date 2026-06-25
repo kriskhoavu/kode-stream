@@ -108,7 +108,7 @@ describe('KanbanPage', () => {
     expect(screen.queryByText('working tree')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Source' })[0]);
     expect(container.querySelector('.facet-popover')).not.toBeNull();
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(container.querySelector('.facet-popover')).toBeNull());

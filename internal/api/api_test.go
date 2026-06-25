@@ -132,6 +132,53 @@ func TestRoutesListItemsPreservesJSONShape(t *testing.T) {
 	}
 }
 
+func TestStateRoutePreservesCountsAndVersionContract(t *testing.T) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
+
+	first := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/api/state", nil))
+	if first.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", first.Code, first.Body.String())
+	}
+	var emptyState map[string]any
+	if err := json.Unmarshal(first.Body.Bytes(), &emptyState); err != nil {
+		t.Fatal(err)
+	}
+	if emptyState["version"] == "" || emptyState["workspaceCount"].(float64) != 1 || emptyState["itemCount"].(float64) != 0 || emptyState["updatedAt"] == "" {
+		t.Fatalf("unexpected empty state: %#v", emptyState)
+	}
+
+	updatedAt := time.Date(2026, 6, 21, 2, 3, 4, 0, time.UTC)
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{
+		ID:             "item-state",
+		WorkspaceID:    workspace.ID,
+		WorkspaceName:  workspace.Name,
+		Branch:         "main",
+		Scope:          "platform",
+		Identifier:     "PM-015",
+		Title:          "State Contract",
+		Status:         models.StatusDraft,
+		UpdatedAt:      updatedAt,
+		MetadataSource: "plan.yaml",
+	}}
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{item}, nil, updatedAt); err != nil {
+		t.Fatal(err)
+	}
+
+	second := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(second, httptest.NewRequest(http.MethodGet, "/api/state", nil))
+	var indexedState map[string]any
+	if err := json.Unmarshal(second.Body.Bytes(), &indexedState); err != nil {
+		t.Fatal(err)
+	}
+	if second.Code != http.StatusOK || indexedState["workspaceCount"].(float64) != 1 || indexedState["itemCount"].(float64) != 1 {
+		t.Fatalf("status = %d, state = %#v", second.Code, indexedState)
+	}
+	if indexedState["version"] == emptyState["version"] {
+		t.Fatal("state version should change when indexed items change")
+	}
+}
+
 func TestRoutesMissingItemReturnsNotFoundJSON(t *testing.T) {
 	dir := t.TempDir()
 	idx := itemindex.New(filepath.Join(dir, "item-index.yaml"))

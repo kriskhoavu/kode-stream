@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { FileContent } from '../../lib/types';
 import { ContentViewer } from './ContentViewer';
+import { renderMarkdown } from './renderers/MarkdownPreview';
+import { SourceCodeView } from './renderers/SourceCodeView';
 
 function file(overrides: Partial<FileContent> = {}): FileContent {
   return {
@@ -21,17 +23,17 @@ describe('ContentViewer', () => {
   it('renders Markdown and switches to source', async () => {
     render(<ContentViewer file={file()} content="# Viewer" />);
 
-		await waitFor(() => expect(screen.getByRole('heading', { name: 'Viewer' })).toBeInTheDocument(), { timeout: 3000 });
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Viewer' })).toBeInTheDocument(), { timeout: 3000 });
     fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
-		await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Viewer'), { timeout: 3000 });
+    await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Viewer'), { timeout: 3000 });
   });
 
   it('uses structured mode for JSON and preserves source fallback', async () => {
     render(<ContentViewer file={file({ id: 'data_json', path: 'data.json', kind: 'json', language: 'json', editable: false })} content='{"enabled":true}' />);
 
-		expect(await screen.findByText('enabled:', {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByText('enabled:', {}, { timeout: 3000 })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
-		await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('{"enabled":true}'), { timeout: 3000 });
+    await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('{"enabled":true}'), { timeout: 3000 });
   });
 
   it('does not run rich renderers for large files', async () => {
@@ -40,5 +42,23 @@ describe('ContentViewer', () => {
     expect(screen.getByText('Rich preview is paused for this large file.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open source' }));
     await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Large'));
+  });
+
+  it('sanitizes Markdown output and marks external links', async () => {
+    const html = await renderMarkdown('<script>alert("x")</script>\n\n[Site](https://example.test)');
+    const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+
+    expect(parsed.querySelector('script')).toBeNull();
+    expect(parsed.querySelector('a')?.getAttribute('target')).toBe('_blank');
+    expect(parsed.querySelector('a')?.getAttribute('rel')).toContain('noopener');
+  });
+
+  it('pauses source highlighting for large files while preserving controls', () => {
+    render(<SourceCodeView content={`const x = "${'x'.repeat(1 << 20)}";\n<unsafe>`} language="typescript" />);
+
+    expect(screen.getByText('Highlighting paused for this large file.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Toggle line numbers' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Toggle line wrapping' })).toHaveAttribute('aria-pressed', 'false');
+    expect(document.querySelector('.source-line-content')?.textContent).toContain('const x = "');
   });
 });
