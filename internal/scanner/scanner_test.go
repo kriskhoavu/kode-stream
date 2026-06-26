@@ -13,7 +13,7 @@ import (
 func TestNormalizeStatus(t *testing.T) {
 	cases := map[string]models.ItemStatus{
 		"unsorted":    models.StatusUnsorted,
-		"Ideas":       models.StatusIdeas,
+		"Ideas":       models.StatusDraft,
 		"draft":       models.StatusDraft,
 		"in progress": models.StatusInProgress,
 		"in-review":   models.StatusReview,

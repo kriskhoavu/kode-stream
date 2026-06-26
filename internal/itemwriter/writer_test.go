@@ -135,7 +135,7 @@ func TestCreateItemWritesStarterFiles(t *testing.T) {
 		Scope:      "platform",
 		Identifier: "PM-003",
 		Title:      "Next Item",
-		Status:     models.StatusIdeas,
+		Status:     models.StatusDraft,
 		Tags:       []string{"platform"},
 	}); err != nil {
 		t.Fatal(err)

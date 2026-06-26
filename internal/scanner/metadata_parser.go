@@ -38,8 +38,6 @@ func NormalizeStatus(raw string) models.ItemStatus {
 	switch s {
 	case "unsorted", "unstructured":
 		return models.StatusUnsorted
-	case "ideas", "idea", "backlog":
-		return models.StatusIdeas
 	case "in_progress", "progress", "doing", "active":
 		return models.StatusInProgress
 	case "review", "in_review":

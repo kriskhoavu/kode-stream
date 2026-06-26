@@ -33,20 +33,29 @@ export function App() {
     lastSync
   } = useAppState();
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [appSettings, setAppSettings] = useAppSettings();
   const quickSwitcher = useQuickSwitcher();
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!workspaceMenuOpen) return;
+    if (!workspaceMenuOpen && !profileMenuOpen) return;
     const closeOnOutsideClick = (event: PointerEvent) => {
-      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(target)) {
         setWorkspaceMenuOpen(false);
+      }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setProfileMenuOpen(false);
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setWorkspaceMenuOpen(false);
+      if (event.key === 'Escape') {
+        setWorkspaceMenuOpen(false);
+        setProfileMenuOpen(false);
+      }
     };
     document.addEventListener('pointerdown', closeOnOutsideClick);
     window.addEventListener('keydown', closeOnEscape);
@@ -54,7 +63,7 @@ export function App() {
       document.removeEventListener('pointerdown', closeOnOutsideClick);
       window.removeEventListener('keydown', closeOnEscape);
     };
-  }, [workspaceMenuOpen]);
+  }, [workspaceMenuOpen, profileMenuOpen]);
 
   const selectWorkspace = (repo: WorkspaceConfig) => {
     selectWorkspaceState(repo);
@@ -78,7 +87,6 @@ export function App() {
           <NavButton active={route.name === 'kanban'} onClick={() => navigate({ name: 'kanban' })} icon={<KanbanSquare size={18} />} label="Kanban" />
           <NavButton active={route.name === 'explorer'} onClick={() => navigate({ name: 'explorer' })} icon={<FolderTree size={18} />} label="Explorer" />
           <NavButton active={route.name === 'workspaces'} onClick={() => navigate({ name: 'workspaces' })} icon={<FolderGit2 size={18} />} label={labels.workspaces} />
-          <NavButton active={route.name === 'settings'} onClick={() => navigate({ name: 'settings' })} icon={<Settings size={18} />} label="Settings" />
         </div>
         <div className="workspace-list">
           <span className="workspace-list-label">Workspaces</span>
@@ -157,7 +165,41 @@ export function App() {
           <button className="icon-button topbar-icon" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Toggle theme">
             {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
           </button>
-          <span className="user-avatar" aria-label="Current user">K</span>
+          <div className="profile-menu-wrapper" ref={profileMenuRef}>
+            <button
+              className="user-avatar profile-trigger"
+              type="button"
+              aria-label="Current user"
+              aria-haspopup="menu"
+              aria-expanded={profileMenuOpen}
+              onClick={() => {
+                setWorkspaceMenuOpen(false);
+                setProfileMenuOpen((open) => !open);
+              }}
+            >
+              K
+            </button>
+            {profileMenuOpen && (
+              <div className="profile-menu" role="menu" aria-label="User menu">
+                <div className="profile-menu-header">
+                  <strong>K</strong>
+                  <span>Signed in</span>
+                </div>
+                <button
+                  className={route.name === 'settings' ? 'profile-menu-item active' : 'profile-menu-item'}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    navigate({ name: 'settings' });
+                  }}
+                >
+                  <Settings size={15} />
+                  <span>Settings</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

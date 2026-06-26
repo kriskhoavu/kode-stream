@@ -530,7 +530,6 @@ function SourceStructurePreviewTable({ preview, onChangeField }: {
               <span>
                 <select value={row.status ?? 'draft'} onChange={(event) => onChangeField(row.path, 'status', event.target.value)}>
                   <option value="unsorted">Unsorted</option>
-                  <option value="ideas">Ideas</option>
                   <option value="draft">Draft</option>
                   <option value="in_progress">In Progress</option>
                   <option value="review">Review</option>

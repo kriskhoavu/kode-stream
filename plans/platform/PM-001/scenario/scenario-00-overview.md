@@ -108,7 +108,6 @@
 1. Developer opens Kanban.
 2. Frontend loads plan summaries for the active workspace.
 3. Frontend renders columns:
-   - Ideas
    - Draft
    - In Progress
    - Review

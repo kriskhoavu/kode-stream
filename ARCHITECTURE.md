@@ -416,7 +416,7 @@ If the file is missing or invalid, the scanner keeps the fallback behavior for t
 | `scope`          | `string`   | Compatibility key for scope                                   |
 | `identifier`     | `string`   | Compatibility key for identifier                              |
 | `title`          | `string`   | Display title                                                 |
-| `status`         | `string`   | `unsorted`, `ideas`, `draft`, `in_progress`, `review`, `done` |
+| `status`         | `string`   | `unsorted`, `draft`, `in_progress`, `review`, `done` |
 | `owner`          | `string`   | Metadata owner                                                |
 | `author`         | `string`   | Last Git author or owner fallback                             |
 | `tags`           | `string[]` | Item tags                                                     |
@@ -471,7 +471,6 @@ Metadata precedence:
 
 Status normalization maps common values into:
 
-- `ideas`
 - `draft`
 - `in_progress`
 - `review`

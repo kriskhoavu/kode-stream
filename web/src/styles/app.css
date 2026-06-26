@@ -230,6 +230,10 @@ button:disabled {
   gap: 10px;
 }
 
+.profile-menu-wrapper {
+  position: relative;
+}
+
 .topbar-icon {
   border: 0;
   background: transparent;
@@ -245,6 +249,56 @@ button:disabled {
   place-items: center;
   font-size: 13px;
   font-weight: 800;
+}
+
+.profile-trigger {
+  border: 0;
+}
+
+.profile-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 35;
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 20px 48px rgba(17, 24, 39, 0.16);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.profile-menu-header {
+  display: grid;
+  gap: 2px;
+  padding: 4px 6px 2px;
+}
+
+.profile-menu-header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.profile-menu-item {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 10px;
+  font-weight: 700;
+}
+
+.profile-menu-item:hover,
+.profile-menu-item.active {
+  background: var(--panel-soft);
 }
 
 .filter-input {
@@ -1144,7 +1198,6 @@ select:disabled {
 }
 
 .kanban-column.unsorted { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 84%, #e5e7eb), var(--panel)); }
-.kanban-column.ideas { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 84%, #e0f2fe), var(--panel)); }
 .kanban-column.draft { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dbeafe), var(--panel)); }
 .kanban-column.in_progress { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #fed7aa), var(--panel)); }
 .kanban-column.review { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #ede9fe), var(--panel)); }
@@ -3284,11 +3337,6 @@ body.is-resizing-panel {
   color: #475569;
 }
 
-.status-badge.ideas {
-  background: color-mix(in srgb, #0ea5e9 12%, var(--panel));
-  color: #0369a1;
-}
-
 .status-badge.draft {
   background: color-mix(in srgb, var(--blue) 11%, var(--panel));
   color: var(--blue);
@@ -3311,10 +3359,6 @@ body.is-resizing-panel {
 
 :root[data-theme="dark"] .status-badge.unsorted {
   color: #cbd5e1;
-}
-
-:root[data-theme="dark"] .status-badge.ideas {
-  color: #7dd3fc;
 }
 
 :root[data-theme="dark"] .status-badge.draft {

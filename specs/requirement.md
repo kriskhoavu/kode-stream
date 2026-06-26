@@ -88,7 +88,6 @@ Refresh methods:
 
 Columns:
 
-- Ideas
 - Draft
 - In Progress
 - Review

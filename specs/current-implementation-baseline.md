@@ -163,7 +163,7 @@ Scanner/index behavior must support:
 
 Status normalization must support:
 
-- `unsorted`, `ideas`, `draft`, `in_progress`, `review`, `done`
+- `unsorted`, `draft`, `in_progress`, `review`, `done`
 
 ### 5.4 Docs-Root Fallback
 
@@ -244,7 +244,7 @@ filter/query state.
 
 Board columns must follow status order:
 
-- `unsorted`, `ideas`, `draft`, `in_progress`, `review`, `done`
+- `unsorted`, `draft`, `in_progress`, `review`, `done`
 
 Card behavior requirements:
 

@@ -357,7 +357,6 @@ function normalizeHealthStatus(status: HealthCheck['status']): HealthCheck['stat
 
 export const statusLabels = {
   unsorted: 'Unsorted',
-  ideas: 'Ideas',
   draft: 'Draft',
   in_progress: 'In Progress',
   review: 'Review',

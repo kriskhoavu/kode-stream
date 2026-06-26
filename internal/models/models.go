@@ -93,14 +93,13 @@ type ItemStatus string
 
 const (
 	StatusUnsorted   ItemStatus = "unsorted"
-	StatusIdeas      ItemStatus = "ideas"
 	StatusDraft      ItemStatus = "draft"
 	StatusInProgress ItemStatus = "in_progress"
 	StatusReview     ItemStatus = "review"
 	StatusDone       ItemStatus = "done"
 )
 
-var StatusOrder = []ItemStatus{StatusUnsorted, StatusIdeas, StatusDraft, StatusInProgress, StatusReview, StatusDone}
+var StatusOrder = []ItemStatus{StatusUnsorted, StatusDraft, StatusInProgress, StatusReview, StatusDone}
 
 type WorkspaceConfig struct {
 	ID                 string    `json:"id" yaml:"id"`

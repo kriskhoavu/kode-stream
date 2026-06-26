@@ -1,4 +1,4 @@
-export type ItemStatus = 'unsorted' | 'ideas' | 'draft' | 'in_progress' | 'review' | 'done';
+export type ItemStatus = 'unsorted' | 'draft' | 'in_progress' | 'review' | 'done';
 
 export type AuditStatus = 'success' | 'blocked' | 'failed';
 export type HealthStatus = 'ok' | 'warning' | 'failed';

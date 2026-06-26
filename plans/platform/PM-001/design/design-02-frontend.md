@@ -83,7 +83,6 @@ App
 ## Board Behavior
 
 - Render columns in this order:
-  - Ideas
   - Draft
   - In Progress
   - Review
