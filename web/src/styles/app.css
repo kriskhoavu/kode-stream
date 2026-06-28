@@ -1776,7 +1776,7 @@ body.is-resizing-drawer {
 
 .recent-activity-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .recent-activity-path {
@@ -1788,22 +1788,29 @@ body.is-resizing-drawer {
   white-space: nowrap;
 }
 
+.recent-activity-day {
+  display: grid;
+  gap: 0;
+}
+
+.recent-activity-date {
+  margin: 0 0 6px;
+  color: color-mix(in srgb, var(--muted) 80%, var(--text));
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
 .recent-activity-entry {
-  border-top: 1px dashed color-mix(in srgb, var(--line) 70%, transparent);
-  padding-top: 8px;
+  border-bottom: 1px dashed color-mix(in srgb, var(--line) 70%, transparent);
+  padding: 7px 0 8px;
   display: grid;
   gap: 3px;
 }
 
-.recent-activity-entry:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.recent-activity-entry time {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
+.recent-activity-day .recent-activity-entry:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .recent-activity-entry p {
