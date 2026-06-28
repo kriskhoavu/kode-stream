@@ -491,6 +491,20 @@ type GitChange struct {
 	Conflict bool            `json:"conflict" yaml:"conflict"`
 }
 
+type GitActivityPath struct {
+	Path    string          `json:"path" yaml:"path"`
+	OldPath string          `json:"oldPath,omitempty" yaml:"oldPath,omitempty"`
+	Status  GitChangeStatus `json:"status" yaml:"status"`
+}
+
+type GitActivityEntry struct {
+	Commit      string            `json:"commit" yaml:"commit"`
+	CommittedAt time.Time         `json:"committedAt" yaml:"committedAt"`
+	Author      string            `json:"author" yaml:"author"`
+	Message     string            `json:"message" yaml:"message"`
+	Paths       []GitActivityPath `json:"paths" yaml:"paths"`
+}
+
 type GitStatus struct {
 	WorkspaceID string      `json:"workspaceId" yaml:"workspaceId"`
 	Branch      string      `json:"branch" yaml:"branch"`

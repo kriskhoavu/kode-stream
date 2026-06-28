@@ -1759,6 +1759,71 @@ body.is-resizing-drawer {
   padding-right: 2px;
 }
 
+.drawer-recent-activity {
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.drawer-recent-activity h4 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--muted) 82%, var(--text));
+}
+
+.recent-activity-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recent-activity-path {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-activity-entry {
+  border-top: 1px dashed color-mix(in srgb, var(--line) 70%, transparent);
+  padding-top: 8px;
+  display: grid;
+  gap: 3px;
+}
+
+.recent-activity-entry:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.recent-activity-entry time {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.recent-activity-entry p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.recent-activity-entry small {
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.recent-activity-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .drawer-meta dl {
   display: grid;
   grid-template-columns: 82px minmax(0, 1fr);

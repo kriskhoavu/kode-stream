@@ -2,6 +2,7 @@ import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, SetStateAction } from 'react';
 import { BookmarkPlus, Check, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GitCommitHorizontal, GripVertical, Info, KanbanSquare, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
+import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
@@ -10,6 +11,7 @@ import type {
   FileContent,
   FileNode,
   GitStatus,
+  GitActivityEntry,
   ItemDetail,
   ItemMetadataUpdateInput,
   ItemStatus,
@@ -1364,6 +1366,8 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   const [tab, setTab] = useState<DrawerTab>('preview');
   const [sideTab, setSideTab] = useState<DrawerSideTab>('info');
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
+  const [gitActivity, setGitActivity] = useState<GitActivityEntry[]>([]);
+  const [gitActivityLoading, setGitActivityLoading] = useState(false);
   const [gitMessage, setGitMessage] = useState('');
   const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
   const [branchName, setBranchName] = useState('');
@@ -1376,6 +1380,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   const drawerStyle = { '--drawer-width': `${width}px` } as CSSProperties & Record<'--drawer-width', string>;
   const compact = width < 700;
   const dirtyFile = file !== null && editorContent !== savedContent;
+  const activityPath = plan?.itemPath || '';
   const fileOptions = useMemo(() => flattenFileOptions(files), [files]);
   const dirtyMetadata = Boolean(plan) && (
     (metadataDraft.title ?? '') !== (plan?.title ?? '') ||
@@ -1574,6 +1579,26 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     }
   };
 
+  const loadGitActivity = async (workspaceId: string, path: string) => {
+    setGitActivityLoading(true);
+    try {
+      setGitActivity(await api.gitActivity(workspaceId, { path: path || undefined, limit: 8 }));
+    } catch {
+      setGitActivity([]);
+    } finally {
+      setGitActivityLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!plan) {
+      setGitActivity([]);
+      setGitActivityLoading(false);
+      return;
+    }
+    void loadGitActivity(plan.workspaceId, activityPath);
+  }, [plan?.workspaceId, activityPath]);
+
   const saveMetadata = async () => {
     if (!plan) return;
     setSavingMetadata(true);
@@ -1629,6 +1654,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
       const result = await api.gitCommit(plan.workspaceId, { message: gitMessage, paths: selectedGitPaths });
       notifyReliabilityChanged();
       setGitStatus(result.status);
+      await loadGitActivity(plan.workspaceId, activityPath);
       setGitMessage('');
       setSelectedGitPaths([]);
       await onChanged();
@@ -1771,6 +1797,10 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                     <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
                   </div>
                   {(plan?.tags?.length ?? 0) > 0 && <div className="tags">{plan?.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}
+                  <section className="drawer-recent-activity">
+                    <h4>Recent Activity</h4>
+                    <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
+                  </section>
                 </>
               )}
               {sideTab === 'git' && (

@@ -204,6 +204,44 @@ func (g *GitAdapter) Status(workspaceID, workspacePath string) (models.GitStatus
 	return status, nil
 }
 
+func (g *GitAdapter) Activity(workspacePath, relPath string, limit int) ([]models.GitActivityEntry, error) {
+	if limit <= 0 {
+		limit = 12
+	}
+	args := []string{"log", "--date=iso-strict", "--name-status", "--pretty=format:%x1e%H%x1f%cI%x1f%an%x1f%s", "-n", strconv.Itoa(limit)}
+	if strings.TrimSpace(relPath) != "" {
+		clean, err := cleanGitTreePath(relPath)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, "--", clean)
+	}
+	out, err := g.run(workspacePath, args...)
+	if err != nil {
+		message := err.Error()
+		if strings.Contains(message, "does not exist in") || strings.Contains(message, "unknown revision or path not in the working tree") {
+			return []models.GitActivityEntry{}, nil
+		}
+		return nil, err
+	}
+	if strings.TrimSpace(out) == "" {
+		return []models.GitActivityEntry{}, nil
+	}
+	entries := make([]models.GitActivityEntry, 0, limit)
+	for _, raw := range strings.Split(out, "\x1e") {
+		chunk := strings.TrimSpace(raw)
+		if chunk == "" {
+			continue
+		}
+		entry, ok := parseActivityChunk(chunk)
+		if !ok {
+			continue
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
+}
+
 func (g *GitAdapter) PathStates(workspaceID, workspacePath string) ([]models.WorkspacePathGitState, error) {
 	status, err := g.Status(workspaceID, workspacePath)
 	if err != nil {
@@ -476,6 +514,69 @@ func parseChangeLine(line string) models.GitChange {
 		change.Status = models.GitChangeConflicted
 	}
 	return change
+}
+
+func parseActivityChunk(chunk string) (models.GitActivityEntry, bool) {
+	lines := strings.Split(strings.TrimSpace(chunk), "\n")
+	if len(lines) == 0 {
+		return models.GitActivityEntry{}, false
+	}
+	meta := strings.SplitN(strings.TrimSpace(lines[0]), "\x1f", 4)
+	if len(meta) < 4 {
+		return models.GitActivityEntry{}, false
+	}
+	committedAt, err := time.Parse(time.RFC3339, strings.TrimSpace(meta[1]))
+	if err != nil {
+		committedAt = time.Time{}
+	}
+	entry := models.GitActivityEntry{
+		Commit:      strings.TrimSpace(meta[0]),
+		CommittedAt: committedAt,
+		Author:      strings.TrimSpace(meta[2]),
+		Message:     strings.TrimSpace(meta[3]),
+		Paths:       []models.GitActivityPath{},
+	}
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		statusToken, payload, found := strings.Cut(line, "\t")
+		if !found {
+			continue
+		}
+		status := activityStatus(statusToken)
+		parts := strings.Split(payload, "\t")
+		pathValue := strings.TrimSpace(parts[len(parts)-1])
+		if pathValue == "" {
+			continue
+		}
+		pathEntry := models.GitActivityPath{Path: pathValue, Status: status}
+		if (status == models.GitChangeRenamed || status == models.GitChangeCopied) && len(parts) > 1 {
+			pathEntry.OldPath = strings.TrimSpace(parts[0])
+		}
+		entry.Paths = append(entry.Paths, pathEntry)
+	}
+	return entry, true
+}
+
+func activityStatus(code string) models.GitChangeStatus {
+	trimmed := strings.TrimSpace(code)
+	if trimmed == "" {
+		return models.GitChangeModified
+	}
+	switch trimmed[0] {
+	case 'A':
+		return models.GitChangeAdded
+	case 'D':
+		return models.GitChangeDeleted
+	case 'R':
+		return models.GitChangeRenamed
+	case 'C':
+		return models.GitChangeCopied
+	default:
+		return models.GitChangeModified
+	}
 }
 
 func changeStatus(x, y byte) models.GitChangeStatus {

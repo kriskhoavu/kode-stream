@@ -424,6 +424,20 @@ export interface GitChange {
   conflict: boolean;
 }
 
+export interface GitActivityPath {
+  path: string;
+  oldPath?: string;
+  status: GitChangeStatus;
+}
+
+export interface GitActivityEntry {
+  commit: string;
+  committedAt: string;
+  author: string;
+  message: string;
+  paths: GitActivityPath[];
+}
+
 export interface GitStatus {
   workspaceId: string;
   branch: string;

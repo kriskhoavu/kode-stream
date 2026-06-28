@@ -19,10 +19,11 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels } from '../lib/api';
-import type { FileContent, FileNode, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../lib/types';
+import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../lib/types';
 import { labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile, DiffLine } from '../shared/domain/diff';
@@ -45,6 +46,8 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
+  const [gitActivity, setGitActivity] = useState<GitActivityEntry[]>([]);
+  const [gitActivityLoading, setGitActivityLoading] = useState(false);
   const [gitLoading, setGitLoading] = useState(false);
   const [gitMessage, setGitMessage] = useState('');
   const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
@@ -98,7 +101,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     api.item(itemId).then(setPlan).catch((err: Error) => setError(err.message));
     api.files(itemId).then((tree) => {
       setFiles(tree);
-      const first = firstFile(tree);
+      const first = preferredFile(tree);
       if (first) void openFile(first.id);
     }).catch((err: Error) => setError(err.message));
     void loadDiff();
@@ -179,6 +182,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const dirty = dirtyMetadata;
   const diffFiles = useMemo(() => parseGitDiff(diff), [diff]);
   const selectedGitPath = useMemo(() => currentGitPath(plan, file), [plan, file]);
+  const activityPath = plan?.itemPath || '';
   const selectedFileHasDiff = Boolean(selectedGitPath && diffFiles.some((item) => item.path === selectedGitPath || item.oldPath === selectedGitPath));
   const hasFiles = useMemo(() => hasFile(files), [files]);
   const fileStateByPath = useMemo(() => buildFileStateMap(plan, gitStatus, file, dirtyFile), [plan, gitStatus, file, dirtyFile]);
@@ -232,6 +236,26 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     }
   };
 
+  const loadGitActivity = async (workspaceId: string, path: string) => {
+    setGitActivityLoading(true);
+    try {
+      setGitActivity(await api.gitActivity(workspaceId, { path: path || undefined, limit: 8 }));
+    } catch {
+      setGitActivity([]);
+    } finally {
+      setGitActivityLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!plan) {
+      setGitActivity([]);
+      setGitActivityLoading(false);
+      return;
+    }
+    void loadGitActivity(plan.workspaceId, activityPath);
+  }, [plan?.workspaceId, activityPath]);
+
   const loadDiff = async () => {
     try {
       const payload = await api.diff(itemId);
@@ -253,6 +277,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           ? await api.gitPull(plan.workspaceId, { confirm })
           : await api.gitPush(plan.workspaceId);
       setGitStatus(result.status);
+      await loadGitActivity(plan.workspaceId, activityPath);
       if (operation === 'pull') await onContentChanged?.();
       if (!result.ok) showGitResultError(result);
       else notifyReliabilityChanged();
@@ -270,6 +295,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     try {
       const result = await api.gitCommit(plan.workspaceId, { message: gitMessage, paths: selectedGitPaths });
       setGitStatus(result.status);
+      await loadGitActivity(plan.workspaceId, activityPath);
       setGitMessage('');
       setSelectedGitPaths([]);
       await onContentChanged?.();
@@ -289,6 +315,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     try {
       const result = await api.createBranch(plan.workspaceId, { name: branchName.trim(), checkout: true });
       setGitStatus(result.status);
+      await loadGitActivity(plan.workspaceId, activityPath);
       setBranchName('');
       await onContentChanged?.();
       if (!result.ok) showGitResultError(result);
@@ -491,6 +518,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
                 <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
               </div>
               <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
+              <section className="drawer-recent-activity">
+                <h4>Recent Activity</h4>
+                <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
+              </section>
               {plan?.warnings?.length ? (
                 <div className="plan-warnings">
                   <h3>Warnings</h3>
@@ -703,6 +734,21 @@ function firstFile(nodes: FileNode[]): FileNode | null {
     if (child) return child;
   }
   return null;
+}
+
+function preferredFile(nodes: FileNode[]): FileNode | null {
+	return findReadme(nodes, true) ?? findReadme(nodes, false) ?? firstFile(nodes);
+}
+
+function findReadme(nodes: FileNode[], rootOnly: boolean): FileNode | null {
+	for (const node of nodes) {
+		if (node.type === 'file' && node.name.toLowerCase() === 'readme.md') return node;
+		if (!rootOnly && node.type === 'directory') {
+			const child = findReadme(node.children ?? [], false);
+			if (child) return child;
+		}
+	}
+	return null;
 }
 
 function hasFile(nodes: FileNode[]): boolean {

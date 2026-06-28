@@ -8,6 +8,7 @@ import type {
   FileNode,
   FileSaveInput,
   GitCommitInput,
+  GitActivityEntry,
   GitOperationInput,
   GitOperationResult,
   GitStatus,
@@ -227,6 +228,14 @@ export const api = {
   createItem: (input: NewItemInput) => request<WriteResult>('/api/items', { method: 'POST', body: JSON.stringify(input) }),
   diff: (id: string) => request<{ diff: string }>(`/api/items/${id}/diff`),
   gitStatus: (workspaceId: string) => request<GitStatus>(`/api/workspaces/${workspaceId}/git/status`).then(normalizeGitStatus),
+  gitActivity: async (workspaceId: string, params: { path?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.path) query.set('path', params.path);
+    if (params.limit) query.set('limit', String(params.limit));
+    const suffix = query.size ? `?${query.toString()}` : '';
+    const payload = await request<GitActivityEntry[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/activity${suffix}`);
+    return (Array.isArray(payload) ? payload : []).map(normalizeGitActivityEntry);
+  },
   workspaceBranches: async (workspaceId: string) => {
     const response = await request<WorkspaceBranches>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/branches`);
     return { ...response, current: response.current ?? '', branches: Array.isArray(response.branches) ? response.branches : [] };
@@ -388,6 +397,16 @@ function normalizeGitStatus(status: GitStatus): GitStatus {
     dirty: Boolean(status.dirty),
     conflicted: Boolean(status.conflicted),
     changes: Array.isArray(status.changes) ? status.changes : []
+  };
+}
+
+function normalizeGitActivityEntry(entry: GitActivityEntry): GitActivityEntry {
+  return {
+    ...entry,
+    committedAt: entry.committedAt ?? '',
+    author: entry.author ?? '',
+    message: entry.message ?? '',
+    paths: Array.isArray(entry.paths) ? entry.paths : []
   };
 }
 

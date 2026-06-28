@@ -4,7 +4,7 @@ import { WorkspaceExplorerPage } from './WorkspaceExplorerPage';
 
 const apiMock = vi.hoisted(() => ({
   items: vi.fn(), workspaceTree: vi.fn(), workspaceFile: vi.fn(), workspaceFileDiff: vi.fn(),
-  saveWorkspaceFile: vi.fn(), revertWorkspaceFile: vi.fn(), openPath: vi.fn(), gitStatus: vi.fn(), workspaceHealth: vi.fn(),
+  saveWorkspaceFile: vi.fn(), revertWorkspaceFile: vi.fn(), openPath: vi.fn(), gitStatus: vi.fn(), gitActivity: vi.fn(), workspaceHealth: vi.fn(),
 	searchWorkspacePaths: vi.fn(), searchWorkspaceContent: vi.fn(), searchItemContent: vi.fn(), workspacePathGitStates: vi.fn(), workspaceBranches: vi.fn(), switchBranch: vi.fn(), createWorkspaceFile: vi.fn(), createWorkspaceDirectory: vi.fn(), renameWorkspacePath: vi.fn()
 }));
 
@@ -24,6 +24,7 @@ describe('WorkspaceExplorerPage', () => {
       { id: 'readme', name: 'README.md', path: 'README.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }
     ] });
     apiMock.gitStatus.mockResolvedValue({ workspaceId: 'ws', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] });
+    apiMock.gitActivity.mockResolvedValue([]);
     apiMock.workspaceHealth.mockResolvedValue({ workspaceId: 'ws', checkedAt: '', summary: 'ok', checks: [] });
     apiMock.workspacePathGitStates.mockResolvedValue([]);
     apiMock.workspaceBranches.mockResolvedValue({ workspaceId: 'ws', current: 'main', branches: ['feature/explorer', 'main'] });

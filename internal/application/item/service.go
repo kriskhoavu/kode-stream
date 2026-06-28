@@ -256,25 +256,61 @@ func (s *Service) snapshotFiles(workspace models.WorkspaceConfig, item models.It
 }
 
 func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) (models.FileContent, error) {
-	relPath := fileIDToRelativePath(item, fileID)
-	if relPath == "" {
-		nodes, err := s.snapshotFiles(workspace, item)
-		if err != nil {
-			return models.FileContent{}, err
-		}
-		for _, node := range flattenFileNodes(nodes) {
-			if node.ID == fileID {
-				relPath = node.Path
-				break
-			}
-		}
+	candidates := []string{}
+	if relPath := fileIDToRelativePath(item, fileID); relPath != "" {
+		candidates = append(candidates, relPath)
 	}
-	if relPath == "" {
-		return models.FileContent{}, fmt.Errorf("file not found")
-	}
-	data, err := s.git.TreeReadFile(workspace.Path, item.BranchRef, filepath.ToSlash(filepath.Join(item.ItemPath, relPath)))
+	nodes, err := s.snapshotFiles(workspace, item)
 	if err != nil {
 		return models.FileContent{}, err
+	}
+	for _, node := range flattenFileNodes(nodes) {
+		if node.ID == fileID {
+			candidates = append(candidates, node.Path)
+			break
+		}
+	}
+
+	uniqueCandidates := make([]string, 0, len(candidates))
+	seen := map[string]struct{}{}
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		if _, exists := seen[candidate]; exists {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		uniqueCandidates = append(uniqueCandidates, candidate)
+	}
+	if len(uniqueCandidates) == 0 {
+		return models.FileContent{}, fmt.Errorf("file not found")
+	}
+
+	var (
+		data    []byte
+		relPath string
+		lastErr error
+	)
+	for _, candidate := range uniqueCandidates {
+		attempt, readErr := s.git.TreeReadFile(workspace.Path, item.BranchRef, filepath.ToSlash(filepath.Join(item.ItemPath, candidate)))
+		if readErr != nil {
+			lastErr = readErr
+			if strings.Contains(readErr.Error(), "does not exist in") {
+				continue
+			}
+			return models.FileContent{}, readErr
+		}
+		data = attempt
+		relPath = candidate
+		break
+	}
+	if relPath == "" {
+		if lastErr != nil {
+			return models.FileContent{}, lastErr
+		}
+		return models.FileContent{}, fmt.Errorf("file not found")
 	}
 	classification := fileaccess.ClassifyPath(relPath)
 	return models.FileContent{

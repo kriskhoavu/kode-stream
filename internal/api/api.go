@@ -120,6 +120,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("PATCH /api/items/{id}/status", a.updateItemStatus)
 	mux.HandleFunc("POST /api/items", a.createItem)
 	mux.HandleFunc("GET /api/workspaces/{id}/git/status", a.gitStatus)
+	mux.HandleFunc("GET /api/workspaces/{id}/git/activity", a.gitActivity)
 	mux.HandleFunc("GET /api/workspaces/{id}/git/branches", a.gitBranches)
 	mux.HandleFunc("POST /api/workspaces/{id}/git/fetch", a.gitFetch)
 	mux.HandleFunc("POST /api/workspaces/{id}/git/pull", a.gitPull)
@@ -678,6 +679,19 @@ func (a *API) gitStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, status, err)
+}
+
+func (a *API) gitActivity(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 50 {
+		limit = 12
+	}
+	entries, err := a.gitOps.Activity(r.PathValue("id"), r.URL.Query().Get("path"), limit)
+	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+	respond(w, entries, err)
 }
 
 func (a *API) gitBranches(w http.ResponseWriter, r *http.Request) {

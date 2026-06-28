@@ -146,6 +146,44 @@ func TestParseChangeLine(t *testing.T) {
 	}
 }
 
+func TestActivityReturnsRecentCommitsForPath(t *testing.T) {
+	root := newGitRepo(t)
+	writeGitFile(t, root, "docs/guide.md", "first\n")
+	gitCommit(t, root, "add guide")
+	writeGitFile(t, root, "docs/guide.md", "second\n")
+	gitCommit(t, root, "update guide")
+	writeGitFile(t, root, "README.md", "workspace\n")
+	gitCommit(t, root, "update readme")
+
+	entries, err := New().Activity(root, "docs/guide.md", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("entries = %#v", entries)
+	}
+	if entries[0].Message != "update guide" {
+		t.Fatalf("latest message = %q", entries[0].Message)
+	}
+	if len(entries[0].Paths) != 1 || entries[0].Paths[0].Path != "docs/guide.md" {
+		t.Fatalf("paths = %#v", entries[0].Paths)
+	}
+}
+
+func TestActivityReturnsEmptyForMissingPath(t *testing.T) {
+	root := newGitRepo(t)
+	writeGitFile(t, root, "README.md", "seed\n")
+	gitCommit(t, root, "seed")
+
+	entries, err := New().Activity(root, "docs/missing.md", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("entries = %#v", entries)
+	}
+}
+
 func newGitRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

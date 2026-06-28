@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { ExplorerLocation } from '../app/router';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { RecentGitActivity } from '../components/RecentGitActivity';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
 import { FileStateIcon } from '../features/file-tree/FileStateIcon';
@@ -19,7 +20,7 @@ import type { WorkspaceBranchState } from '../features/workspace-explorer/useWor
 import { useWorkspacePathSearch } from '../features/workspace-explorer/useWorkspacePathSearch';
 import { useWorkspacePathMutations } from '../features/workspace-explorer/useWorkspacePathMutations';
 import { ApiError, api } from '../lib/api';
-import type { GitStatus, ItemSummary, WorkspaceConfig, WorkspaceHealth, WorkspacePathGitState, WorkspacePathSearchResult } from '../lib/types';
+import type { GitActivityEntry, GitStatus, ItemSummary, WorkspaceConfig, WorkspaceHealth, WorkspacePathGitState, WorkspacePathSearchResult } from '../lib/types';
 import { parseGitDiff } from '../shared/domain/diff';
 import { ContentSearchResultRow, PathSearchResultRow } from '../features/content-search/ContentSearch';
 import { useContentSearch } from '../features/content-search/useContentSearch';
@@ -375,14 +376,41 @@ function ExplorerDiff({ diff, onRevert, disabled }: { diff: string; onRevert: ()
 
 function ExplorerInspector({ workspace, row, file, onOpenKanban }: { workspace?: WorkspaceConfig; row?: VisibleExplorerRow; file: ReturnType<typeof useFileEditorSession>['file']; onOpenKanban: (workspace: WorkspaceConfig, itemId?: string) => void }) {
   const [git, setGit] = useState<GitStatus | null>(null);
+  const [activity, setActivity] = useState<GitActivityEntry[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
   const [health, setHealth] = useState<WorkspaceHealth | null>(null);
   const [item, setItem] = useState<ItemSummary | null>(null);
+  const activityPath = row?.node.type === 'file' || row?.node.type === 'directory'
+    ? row.node.path
+    : file?.path || '';
   useEffect(() => {
     setGit(null); setHealth(null);
     if (!workspace) return;
     void api.gitStatus(workspace.id).then(setGit).catch(() => setGit(null));
     void api.workspaceHealth(workspace.id).then(setHealth).catch(() => setHealth(null));
   }, [workspace?.id]);
+  useEffect(() => {
+    if (!workspace) {
+      setActivity([]);
+      setActivityLoading(false);
+      return;
+    }
+    let active = true;
+    setActivityLoading(true);
+    api.gitActivity(workspace.id, { path: activityPath || undefined, limit: 8 })
+      .then((entries) => {
+        if (active) setActivity(entries);
+      })
+      .catch(() => {
+        if (active) setActivity([]);
+      })
+      .finally(() => {
+        if (active) setActivityLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [workspace?.id, activityPath]);
   useEffect(() => {
     setItem(null);
     if (row?.item) void api.items(new URLSearchParams()).then((items) => setItem(items.find((candidate) => candidate.id === row.item?.itemId) ?? null));
@@ -392,6 +420,7 @@ function ExplorerInspector({ workspace, row, file, onOpenKanban }: { workspace?:
     <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl><button className="secondary" onClick={() => onOpenKanban(workspace, row?.item?.itemId)}><KanbanSquare size={15} /> Open Kanban</button></section>
     {file && <section><h3>File</h3><dl><dt>Path</dt><dd>{file.path}</dd><dt>Kind</dt><dd>{file.kind}</dd><dt>Size</dt><dd>{file.sizeBytes.toLocaleString()} bytes</dd><dt>Editable</dt><dd>{file.editable ? 'Text' : 'Read only'}</dd></dl></section>}
     {row?.item && <section><h3>Item</h3><dl><dt>ID</dt><dd>{row.item.identifier}</dd><dt>Title</dt><dd>{row.item.title}</dd><dt>Status</dt><dd>{row.item.status}</dd><dt>Owner</dt><dd>{item?.owner || 'Unassigned'}</dd></dl><a className="secondary button-link" href={`/items/${encodeURIComponent(row.item.itemId)}`}>Open details</a></section>}
+    <section><h3>Recent Activity</h3><RecentGitActivity entries={activity} loading={activityLoading} emptyLabel="No activity found for this selection." pathLabel={activityPath || 'workspace'} /></section>
   </div>;
 }
 

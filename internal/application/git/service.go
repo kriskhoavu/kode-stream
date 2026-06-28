@@ -48,6 +48,21 @@ func (s *Service) Branches(workspaceID string) (models.WorkspaceBranches, error)
 	return normalizeWorkspaceBranches(workspace.ID, current, branches), nil
 }
 
+func (s *Service) Activity(workspaceID, relPath string, limit int) ([]models.GitActivityEntry, error) {
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	cleanPath := ""
+	if strings.TrimSpace(relPath) != "" {
+		cleanPath, err = pathguard.CleanRelative(relPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return s.git.Activity(workspace.Path, cleanPath, limit)
+}
+
 func normalizeWorkspaceBranches(workspaceID, current string, branches []string) models.WorkspaceBranches {
 	unique := make(map[string]struct{}, len(branches)+1)
 	for _, branch := range branches {
