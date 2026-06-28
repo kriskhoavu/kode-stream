@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySegmentRole, buildWorkspaceInput, inferCompatibilityFields, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, parseSources, previewPathSegments, settingsEditorFromResult } from './WorkspacesPage';
+import { applySegmentRole, buildWorkspaceInput, inferCompatibilityFields, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, parseSources, previewPathSegments, settingsEditorFromResult, workspaceRemovalMessage } from './WorkspacesPage';
 
 describe('normalizeDroppedPath', () => {
   it('decodes file URLs dropped onto the path field', () => {
@@ -161,5 +161,20 @@ describe('settingsEditorFromResult', () => {
       status: 'unsorted',
       tags: ['docs']
     }]);
+  });
+});
+
+describe('workspaceRemovalMessage', () => {
+  it('matches single workspace wording', () => {
+    expect(workspaceRemovalMessage([
+      { id: 'w1', name: 'Workspace A', path: '/repo-a', baselineBranch: 'main', sources: ['docs'], createdAt: '', clonePathManaged: true }
+    ])).toContain('Remove Workspace A?');
+  });
+
+  it('mentions managed clone folders for multi-delete', () => {
+    expect(workspaceRemovalMessage([
+      { id: 'w1', name: 'Workspace A', path: '/repo-a', baselineBranch: 'main', sources: ['docs'], createdAt: '', clonePathManaged: true },
+      { id: 'w2', name: 'Workspace B', path: '/repo-b', baselineBranch: 'main', sources: ['docs'], createdAt: '', clonePathManaged: false }
+    ])).toContain('and 1 managed cloned repository folder will be deleted');
   });
 });

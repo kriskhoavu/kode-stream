@@ -1,4 +1,4 @@
-import { type DragEvent, type Dispatch, type FormEvent, type SetStateAction, useEffect, useState } from 'react';
+import { type DragEvent, type Dispatch, type FormEvent, type SetStateAction, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
@@ -47,8 +47,22 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [editDraft, setEditDraft] = useState({ name: '', path: '', baselineBranch: '', sources: '' });
-  const [repoToRemove, setRepoToRemove] = useState<WorkspaceConfig | null>(null);
+  const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([]);
+  const [workspacesToRemove, setWorkspacesToRemove] = useState<WorkspaceConfig[] | null>(null);
   const [settingsEditor, setSettingsEditor] = useState<SettingsEditorState | null>(null);
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+
+  const selectedWorkspaces = workspaces.filter((workspace) => selectedWorkspaceIds.includes(workspace.id));
+  const allSelected = workspaces.length > 0 && selectedWorkspaces.length === workspaces.length;
+
+  useEffect(() => {
+    setSelectedWorkspaceIds((current) => current.filter((id) => workspaces.some((workspace) => workspace.id === id)));
+  }, [workspaces]);
+
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    selectAllRef.current.indeterminate = selectedWorkspaces.length > 0 && !allSelected;
+  }, [allSelected, selectedWorkspaces.length]);
 
   useEffect(() => {
     let active = true;
@@ -180,20 +194,67 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     }
   };
 
-  const removeRepo = async (repo: WorkspaceConfig) => {
+  const removeWorkspaces = async (targets: WorkspaceConfig[]) => {
+    if (targets.length === 0) {
+      setWorkspacesToRemove(null);
+      return;
+    }
     setBusy(true);
     setNotice(null);
+    let removedCount = 0;
+    let failureCount = 0;
+    const details: string[] = [];
+    const failedWorkspaceIds = new Set<string>();
     try {
-      await api.deleteWorkspace(repo.id);
+      for (const workspace of targets) {
+        try {
+          await api.deleteWorkspace(workspace.id);
+          removedCount += 1;
+        } catch (err) {
+          failureCount += 1;
+          failedWorkspaceIds.add(workspace.id);
+          details.push(`${workspace.name}: ${errorMessage(err)}`);
+        }
+      }
       setEditingId('');
-      setNotice({ tone: 'success', title: 'Workspace removed', details: [repo.name] });
-      onChanged();
-    } catch (err) {
-      setNotice({ tone: 'error', title: `Remove failed for ${repo.name}`, details: [errorMessage(err)] });
+      setSelectedWorkspaceIds((current) => Array.from(new Set(
+        current.filter((id) => !targets.some((workspace) => workspace.id === id)).concat(Array.from(failedWorkspaceIds))
+      )));
+      if (failureCount > 0) {
+        setNotice({
+          tone: 'error',
+          title: `Removed ${removedCount} workspace${removedCount === 1 ? '' : 's'} with ${failureCount} failure${failureCount === 1 ? '' : 's'}`,
+          details
+        });
+      } else {
+        setNotice({
+          tone: 'success',
+          title: removedCount === 1 ? 'Workspace removed' : `${removedCount} workspaces removed`,
+          details: targets.map((workspace) => workspace.name)
+        });
+      }
+      if (removedCount > 0) {
+        await onChanged();
+      }
     } finally {
       setBusy(false);
-      setRepoToRemove(null);
+      setWorkspacesToRemove(null);
     }
+  };
+
+  const toggleWorkspaceSelection = (workspaceId: string) => {
+    setSelectedWorkspaceIds((current) => current.includes(workspaceId)
+      ? current.filter((id) => id !== workspaceId)
+      : [...current, workspaceId]);
+  };
+
+  const toggleAllWorkspaceSelection = () => {
+    setSelectedWorkspaceIds((current) => {
+      if (workspaces.length === 0) return [];
+      const selectedCount = workspaces.filter((workspace) => current.includes(workspace.id)).length;
+      if (selectedCount === workspaces.length) return [];
+      return workspaces.map((workspace) => workspace.id);
+    });
   };
 
   const browsePath = async () => {
@@ -486,15 +547,43 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             <div>
               <h2>Registered</h2>
               <span>{workspaces.length} workspaces</span>
+              <label className="repo-select-all">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAllWorkspaceSelection}
+                  disabled={busy || workspaces.length === 0}
+                />
+                Select all ({selectedWorkspaces.length} selected)
+              </label>
             </div>
-            <button className="secondary" type="button" onClick={() => void scanAll()} disabled={busy || workspaces.length === 0}>
-              <RotateCw size={16} /> Scan all
-            </button>
+            <div className="repo-list-header-actions">
+              <button className="secondary" type="button" onClick={() => void scanAll()} disabled={busy || workspaces.length === 0}>
+                <RotateCw size={16} /> Scan all
+              </button>
+              <button
+                className="secondary danger"
+                type="button"
+                onClick={() => setWorkspacesToRemove(selectedWorkspaces)}
+                disabled={busy || selectedWorkspaces.length === 0}
+              >
+                <Trash2 size={16} /> Remove selected
+              </button>
+            </div>
           </header>
           {notice && <WorkspaceNoticePanel notice={notice} onDismiss={() => setNotice(null)} />}
           <div className="repo-list">
             {workspaces.map((repo) => (
               <article className="repo-row" key={repo.id}>
+                <label className="repo-row-select" aria-label={`Select ${repo.name}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedWorkspaceIds.includes(repo.id)}
+                    onChange={() => toggleWorkspaceSelection(repo.id)}
+                    disabled={busy}
+                  />
+                </label>
                 <div className="repo-row-icon">
                   <HardDrive size={18} />
                   <span className="repo-baseline-badge" title={`Baseline branch: ${repo.baselineBranch}`}>{repo.baselineBranch}</span>
@@ -512,7 +601,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                     <div className="repo-row-actions">
                       <button className="secondary" type="button" onClick={() => setEditingId('')} disabled={busy}>Cancel</button>
                       <button className="primary" type="button" onClick={() => saveEdit(repo)} disabled={busy}>Save</button>
-                      <button className="secondary danger" type="button" onClick={() => setRepoToRemove(repo)} disabled={busy}><Trash2 size={16} /> Remove</button>
+                      <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])} disabled={busy}><Trash2 size={16} /> Remove</button>
                     </div>
                   </>
                 ) : (
@@ -550,15 +639,15 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
           </div>
         </div>
       </div>
-      {repoToRemove && (
+      {workspacesToRemove && (
         <ConfirmDialog
-          title="Remove workspace"
-          message={`Remove ${repoToRemove.name}? Cached items will be removed from the board${repoToRemove.clonePathManaged ? ', and the managed cloned repository folder will be deleted.' : '.'}`}
-          confirmLabel={busy ? 'Removing...' : 'Remove'}
+          title={workspacesToRemove.length === 1 ? 'Remove workspace' : 'Remove selected workspaces'}
+          message={workspaceRemovalMessage(workspacesToRemove)}
+          confirmLabel={busy ? 'Removing...' : workspacesToRemove.length === 1 ? 'Remove workspace' : `Remove ${workspacesToRemove.length} workspaces`}
           busy={busy}
           danger
-          onCancel={() => setRepoToRemove(null)}
-          onConfirm={() => void removeRepo(repoToRemove)}
+          onCancel={() => setWorkspacesToRemove(null)}
+          onConfirm={() => void removeWorkspaces(workspacesToRemove)}
         />
       )}
       {settingsEditor && (
@@ -914,6 +1003,16 @@ export function inferWorkspaceNameFromRemoteURL(remoteUrl: string): string {
   if (!value) return '';
   const parsed = /[:/]([^/:?#]+?)(?:\.git)?$/.exec(value);
   return parsed?.[1] ?? '';
+}
+
+export function workspaceRemovalMessage(workspaces: WorkspaceConfig[]): string {
+  if (workspaces.length === 0) return 'No workspaces selected.';
+  if (workspaces.length === 1) {
+    const [workspace] = workspaces;
+    return `Remove ${workspace.name}? Cached items will be removed from the board${workspace.clonePathManaged ? ', and the managed cloned repository folder will be deleted.' : '.'}`;
+  }
+  const managedCloneCount = workspaces.filter((workspace) => workspace.clonePathManaged).length;
+  return `Remove ${workspaces.length} selected workspaces? Cached items will be removed from the board${managedCloneCount > 0 ? `, and ${managedCloneCount} managed cloned repository folder${managedCloneCount === 1 ? '' : 's'} will be deleted.` : '.'}`;
 }
 
 function pathFromDrop(event: DragEvent<HTMLElement>): string {
