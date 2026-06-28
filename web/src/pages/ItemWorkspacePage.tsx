@@ -186,6 +186,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const activityPath = plan?.itemPath || '';
   const selectedFileHasDiff = Boolean(selectedGitPath && diffFiles.some((item) => item.path === selectedGitPath || item.oldPath === selectedGitPath));
   const hasFiles = useMemo(() => hasFile(files), [files]);
+  const visibleWarnings = useMemo(() => visibleItemWarnings(plan), [plan]);
   const fileStateByPath = useMemo(() => buildFileStateMap(plan, gitStatus, file, dirtyFile), [plan, gitStatus, file, dirtyFile]);
   const gridStyle = {
     '--left-panel-width': `${leftCollapsed ? 44 : leftWidth}px`,
@@ -519,10 +520,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
                 <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
               </div>
               <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
-              {plan?.warnings?.length ? (
+              {visibleWarnings.length ? (
                 <div className="plan-warnings">
                   <h3>Warnings</h3>
-                  {plan.warnings.map((warning) => <p key={`${warning.itemPath ?? 'plan'}-${warning.message}`}>{warning.message}</p>)}
+                  {visibleWarnings.map((warning) => <p key={`${warning.itemPath ?? 'plan'}-${warning.message}`}>{warning.message}</p>)}
                 </div>
               ) : null}
                 </>
@@ -799,5 +800,15 @@ function normalizePath(path: string): string {
 }
 
 function readStoredToggle(key: string): boolean {
-	return localStorage.getItem(key) === '1';
+  return localStorage.getItem(key) === '1';
+}
+
+function visibleItemWarnings(plan: ItemDetail | null): { itemPath?: string; message: string }[] {
+  if (!plan?.warnings?.length) return [];
+  return plan.warnings.filter((warning) => !isIgnorableWarning(warning.message));
+}
+
+function isIgnorableWarning(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return normalized.includes("plan.yaml") && normalized.includes("does not exist in");
 }

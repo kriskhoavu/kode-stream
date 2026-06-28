@@ -523,6 +523,40 @@ func TestScanWithRequestMatchesFilesystemAndGitTreeForCommittedContent(t *testin
 	}
 }
 
+func TestScanWithRequestDocsSnapshotDoesNotWarnOnMissingPlanYAML(t *testing.T) {
+	root := newReaderGitRepo(t)
+	writeReaderGitFile(t, root, "docs/a12/a12-in-discovery.md", "# A12 in Discovery\n")
+	readerGitCommit(t, root, "add docs")
+
+	workspace := models.WorkspaceConfig{ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"}}
+	git := gitadapter.New()
+	ref, commit, err := git.ResolveBranch(root, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := New(git).ScanWithRequest(ScanRequest{
+		Workspace:  workspace,
+		Branch:     "main",
+		BranchRef:  ref,
+		Commit:     commit,
+		SourceMode: "snapshot",
+		Editable:   false,
+		Reader:     NewGitTreeSourceReader(root, ref, git),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data.Warnings) != 0 {
+		t.Fatalf("warnings = %#v", data.Warnings)
+	}
+	if len(data.Items) != 1 {
+		t.Fatalf("items = %#v", data.Items)
+	}
+	if len(data.Items[0].Warnings) != 0 {
+		t.Fatalf("item warnings = %#v", data.Items[0].Warnings)
+	}
+}
+
 func writeTestFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := root + "/" + rel

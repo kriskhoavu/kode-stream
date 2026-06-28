@@ -171,6 +171,72 @@ func TestWorkingTreeWriteRequiresCurrentCheckoutBranch(t *testing.T) {
 	}
 }
 
+func TestSnapshotFileContentResolvesNestedDocsPath(t *testing.T) {
+	root := newItemGitRepo(t)
+	writeItemGitFile(t, root, "docs/a12/a12-challenges-in-discovery-epsap.md", "# Challenge\n")
+	writeItemGitFile(t, root, "docs/a12/a12-in-discovery.md", "# Discovery\n")
+	itemGitCommit(t, root, "add docs")
+
+	registryPath := filepath.Join(t.TempDir(), "workspaces.yaml")
+	indexPath := filepath.Join(t.TempDir(), "item-index.yaml")
+	git := gitadapter.New()
+	reg := registry.New(registryPath, git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"docs"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(indexPath)
+	files := fileaccess.New()
+	writer := itemwriter.New(files, scanner.New(git), idx, reg)
+	service := New(reg, idx, files, writer, git)
+	ref, commit, err := git.ResolveBranch(root, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.ReplaceWorkspaceBranch(workspace.ID, "main", []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{
+			ID:             "snapshot-docs",
+			WorkspaceID:    workspace.ID,
+			WorkspaceName:  workspace.Name,
+			Branch:         "main",
+			BranchRef:      ref,
+			Commit:         commit,
+			SourceMode:     "snapshot",
+			Editable:       false,
+			Scope:          "docs",
+			Identifier:     "docs",
+			Title:          "Docs",
+			Status:         models.StatusUnsorted,
+			MetadataSource: "docs",
+			ItemPath:       "docs",
+		},
+		Documents: []models.ItemDocument{{Path: "a12/a12-challenges-in-discovery-epsap.md"}, {Path: "a12/a12-in-discovery.md"}},
+	}}, models.BranchScanMetadata{ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+
+	tree, err := service.Files("snapshot-docs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tree) != 1 || tree[0].Path != "a12" || len(tree[0].Children) != 2 {
+		t.Fatalf("unexpected tree: %#v", tree)
+	}
+	if tree[0].Children[0].ID != "a12__a12-challenges-in-discovery-epsap_md" {
+		t.Fatalf("unexpected file id: %q", tree[0].Children[0].ID)
+	}
+	content, err := service.FileContent("snapshot-docs", tree[0].Children[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content.Path != "a12/a12-challenges-in-discovery-epsap.md" {
+		t.Fatalf("path = %q", content.Path)
+	}
+	if !strings.Contains(content.Content, "Challenge") {
+		t.Fatalf("content = %q", content.Content)
+	}
+}
+
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(rel))

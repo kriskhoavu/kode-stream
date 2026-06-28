@@ -1,6 +1,8 @@
 package scanner
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -26,9 +28,20 @@ type planYAML struct {
 func readPlanYAML(reader SourceReader, root string) ([]byte, string, error) {
 	data, err := reader.ReadFile(filepath.ToSlash(filepath.Join(root, "plan.yaml")))
 	if err != nil {
+		if isMissingPlanYAMLError(err) {
+			return nil, "", os.ErrNotExist
+		}
 		return nil, "", err
 	}
 	return data, "plan.yaml", nil
+}
+
+func isMissingPlanYAMLError(err error) bool {
+	if errors.Is(err, os.ErrNotExist) {
+		return true
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(message, "does not exist in") || strings.Contains(message, "exists on disk, but not in")
 }
 
 func NormalizeStatus(raw string) models.ItemStatus {

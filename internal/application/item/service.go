@@ -345,25 +345,32 @@ func FallbackPath(workspace models.WorkspaceConfig, item models.ItemDetail) stri
 }
 
 func insertFileNode(nodes []models.FileNode, relPath string) []models.FileNode {
-	parts := strings.Split(relPath, "/")
-	if len(parts) == 1 {
-		return append(nodes, models.FileNode{ID: fileIDForPath(relPath), Name: parts[0], Path: relPath, Type: "file"})
+	clean := strings.Trim(filepath.ToSlash(relPath), "/")
+	if clean == "" {
+		return nodes
 	}
-	dirPath := parts[0]
+	return insertFileNodeWithPrefix(nodes, clean, "")
+}
+
+func insertFileNodeWithPrefix(nodes []models.FileNode, relPath, prefix string) []models.FileNode {
+	parts := strings.Split(relPath, "/")
+	name := parts[0]
+	currentPath := name
+	if prefix != "" {
+		currentPath = filepath.ToSlash(filepath.Join(prefix, name))
+	}
+	if len(parts) == 1 {
+		return append(nodes, models.FileNode{ID: fileIDForPath(currentPath), Name: name, Path: currentPath, Type: "file"})
+	}
+	remaining := strings.Join(parts[1:], "/")
 	for i := range nodes {
-		if nodes[i].Type == "directory" && nodes[i].Name == parts[0] {
-			nodes[i].Children = insertFileNode(nodes[i].Children, strings.Join(parts[1:], "/"))
-			for j := range nodes[i].Children {
-				nodes[i].Children[j].Path = filepath.ToSlash(filepath.Join(dirPath, nodes[i].Children[j].Path))
-			}
+		if nodes[i].Type == "directory" && nodes[i].Name == name {
+			nodes[i].Children = insertFileNodeWithPrefix(nodes[i].Children, remaining, currentPath)
 			return nodes
 		}
 	}
-	child := insertFileNode(nil, strings.Join(parts[1:], "/"))
-	for i := range child {
-		child[i].Path = filepath.ToSlash(filepath.Join(dirPath, child[i].Path))
-	}
-	return append(nodes, models.FileNode{ID: fileIDForPath(dirPath), Name: parts[0], Path: dirPath, Type: "directory", Children: child})
+	children := insertFileNodeWithPrefix(nil, remaining, currentPath)
+	return append(nodes, models.FileNode{ID: fileIDForPath(currentPath), Name: name, Path: currentPath, Type: "directory", Children: children})
 }
 
 func sortFileNodes(nodes []models.FileNode) {
