@@ -47,6 +47,7 @@ vitest.config.d.ts
 /plan-manager
 /.run/
 /internal/app/frontend/assets/
+/release/
 
 ### Docker ###
 docker-compose/dist/.env

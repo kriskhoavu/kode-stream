@@ -141,6 +141,85 @@ jobs:
           name: release-checksums
           path: out/SHA256SUMS
 
+  sign-macos:
+    needs: build
+    runs-on: macos-latest
+    if: startsWith(github.ref, 'refs/tags/v') && secrets.MACOS_CERT_P12_BASE64 != '' && secrets.MACOS_CERT_P12_PASSWORD != '' && secrets.MACOS_CODESIGN_IDENTITY != ''
+    steps:
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-darwin-*
+          path: macos-artifacts
+          merge-multiple: true
+
+      - name: Import signing certificate
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_P12_PASSWORD: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
+        run: |
+          echo "$MACOS_CERT_P12_BASE64" | base64 --decode > signing-cert.p12
+          security create-keychain -p "" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import signing-cert.p12 -k build.keychain -P "$MACOS_CERT_P12_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -s build.keychain login.keychain
+
+      - name: Sign macOS binaries
+        env:
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+        run: |
+          mkdir -p signed
+          for archive in macos-artifacts/plan-manager_*_darwin_*.tar.gz; do
+            base="$(basename "$archive" .tar.gz)"
+            workdir="$(mktemp -d)"
+            tar -xzf "$archive" -C "$workdir"
+            codesign --force --options runtime --timestamp --sign "$MACOS_CODESIGN_IDENTITY" "$workdir/plan-manager"
+            tar -C "$workdir" -czf "signed/${base}-signed.tar.gz" .
+          done
+
+      - name: Upload signed macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-darwin-signed
+          path: signed/plan-manager_*_darwin_*-signed.tar.gz
+
+  sign-windows:
+    needs: build
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/v') && secrets.WINDOWS_CERT_PFX_BASE64 != '' && secrets.WINDOWS_CERT_PASSWORD != ''
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-windows-*
+          path: windows-artifacts
+          merge-multiple: true
+
+      - name: Import certificate and sign binaries
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $certPath = Join-Path $PWD "codesign.pfx"
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+          $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source
+          New-Item -Path signed -ItemType Directory -Force | Out-Null
+          Get-ChildItem -Path windows-artifacts -Filter "plan-manager_*_windows_amd64.zip" | ForEach-Object {
+            $base = $_.BaseName
+            $work = Join-Path $PWD ("work-" + $base)
+            Expand-Archive -Path $_.FullName -DestinationPath $work -Force
+            & $signtool sign /fd SHA256 /f $certPath /p $env:WINDOWS_CERT_PASSWORD /tr "http://timestamp.digicert.com" /td SHA256 (Join-Path $work "plan-manager.exe")
+            Compress-Archive -Path (Join-Path $work "*") -DestinationPath (Join-Path $PWD "signed\$base-signed.zip") -Force
+          }
+
+      - name: Upload signed Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-signed
+          path: signed/plan-manager_*_windows_amd64-signed.zip
+
   publish:
     needs: checksums
     runs-on: ubuntu-latest
@@ -150,6 +229,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-assets
+
+      - name: Download signed macOS artifacts (optional)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: release-darwin-signed
+          path: release-assets/signed
+
+      - name: Download signed Windows artifacts (optional)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: release-windows-signed
+          path: release-assets/signed
 
       - name: Collect release files
         run: |
@@ -164,4 +257,6 @@ jobs:
           files: |
             release/plan-manager_*.tar.gz
             release/plan-manager_*.zip
+            release/plan-manager_*-signed.tar.gz
+            release/plan-manager_*-signed.zip
             release/SHA256SUMS
