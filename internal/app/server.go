@@ -14,6 +14,7 @@ import (
 	"plan-manager/internal/api"
 	"plan-manager/internal/application/aisession"
 	"plan-manager/internal/application/health"
+	appjira "plan-manager/internal/application/jira"
 	appsearch "plan-manager/internal/application/search"
 	"plan-manager/internal/audit"
 	"plan-manager/internal/config"
@@ -21,6 +22,7 @@ import (
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
 	"plan-manager/internal/itemwriter"
+	jiraclient "plan-manager/internal/jira"
 	"plan-manager/internal/navigation"
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
@@ -54,7 +56,8 @@ func NewServer(port int) (*Server, error) {
 	searchService := appsearch.New(idx)
 	navigationStore := navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile)
 	aiSessionService := aisession.New(aisettings.New(paths.AISettingsFile)).ConfigureLaunch(reg, idx, auditStore, os.TempDir())
-	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore).WithAISessions(aiSessionService)
+	jiraService := appjira.New(reg, jiraclient.New())
+	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore).WithAISessions(aiSessionService).WithJira(jiraService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())

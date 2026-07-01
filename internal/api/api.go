@@ -19,6 +19,7 @@ import (
 	appgit "plan-manager/internal/application/git"
 	apphealth "plan-manager/internal/application/health"
 	appitem "plan-manager/internal/application/item"
+	appjira "plan-manager/internal/application/jira"
 	appsearch "plan-manager/internal/application/search"
 	appworkspace "plan-manager/internal/application/workspace"
 	appworkspacefiles "plan-manager/internal/application/workspacefiles"
@@ -48,6 +49,12 @@ type API struct {
 	workspaceFiles *appworkspacefiles.Service
 	contentSearch  *appcontentsearch.Service
 	aiSessions     *appaisession.Service
+	jira           *appjira.Service
+}
+
+func (a *API) WithJira(service *appjira.Service) *API {
+	a.jira = service
+	return a
 }
 
 func (a *API) WithAISessions(service *appaisession.Service) *API {
@@ -103,6 +110,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("PUT /api/workspaces/{id}", a.updateWorkspace)
 	mux.HandleFunc("DELETE /api/workspaces/{id}", a.deleteWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
+	mux.HandleFunc("POST /api/workspaces/{id}/jira/test", a.testJiraConnection)
 	mux.HandleFunc("POST /api/workspaces/{id}/kanban/branch", a.loadKanbanBranch)
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
@@ -229,6 +237,22 @@ func (a *API) saveAISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	saved, err := a.aiSessions.Save(settings)
 	respond(w, saved, err)
+}
+
+func (a *API) testJiraConnection(w http.ResponseWriter, r *http.Request) {
+	if a.jira == nil {
+		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
+		return
+	}
+	var connection models.JiraConnection
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&connection); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.jira.TestConnection(r.Context(), r.PathValue("id"), &connection)
+	respond(w, result, err)
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
