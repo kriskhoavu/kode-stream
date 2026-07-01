@@ -298,6 +298,15 @@ func TestJiraConnectionRouteRequiresServiceAndValidBody(t *testing.T) {
 	}
 }
 
+func TestJiraAttachmentResponseHelpersAreSafe(t *testing.T) {
+	if !safeInlineMediaType("image/png") || safeInlineMediaType("text/html") || safeInlineMediaType("application/pdf") {
+		t.Fatal("unexpected inline media policy")
+	}
+	if got := sanitizeDownloadName(`../bad\"name.html`); strings.ContainsAny(got, "/\\\"") || got == "" {
+		t.Fatalf("sanitized name=%q", got)
+	}
+}
+
 func TestCreateWorkspaceSupportsRemoteClonePayload(t *testing.T) {
 	remote := t.TempDir()
 	if output, err := exec.Command("git", "init", "-b", "main", remote).CombinedOutput(); err != nil {

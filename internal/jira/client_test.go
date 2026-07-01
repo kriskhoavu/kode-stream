@@ -96,3 +96,49 @@ func TestGetIssueReportsMalformedAndTimedOutResponses(t *testing.T) {
 		t.Fatalf("timeout err=%v", err)
 	}
 }
+
+func TestGetAttachmentChecksOriginSizeAndContentType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png; charset=binary")
+		_, _ = w.Write([]byte("png"))
+	}))
+	defer server.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	connection := models.JiraConnection{DeploymentType: "server", BaseURL: server.URL, TokenEnvVar: "TOKEN"}
+	content, err := client.GetAttachment(context.Background(), connection, Attachment{ID: "1", Filename: "image.png", ContentURL: server.URL + "/file"})
+	if err != nil || string(content.Data) != "png" || content.MediaType != "image/png" {
+		t.Fatalf("content=%#v err=%v", content, err)
+	}
+	_, err = client.GetAttachment(context.Background(), connection, Attachment{ContentURL: "https://evil.example/file"})
+	if err == nil || !strings.Contains(err.Error(), "changed origin") {
+		t.Fatalf("origin err=%v", err)
+	}
+}
+
+func TestGetAttachmentRejectsDeclaredOversize(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "30000000")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	_, err := client.GetAttachment(context.Background(), models.JiraConnection{DeploymentType: "server", BaseURL: server.URL, TokenEnvVar: "TOKEN"}, Attachment{ContentURL: server.URL + "/large"})
+	if err == nil || !strings.Contains(err.Error(), "size limit") {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestGetAttachmentRejectsCrossOriginRedirect(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("secret")) }))
+	defer target.Close()
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, target.URL, http.StatusFound) }))
+	defer redirect.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	_, err := client.GetAttachment(context.Background(), models.JiraConnection{DeploymentType: "server", BaseURL: redirect.URL, TokenEnvVar: "TOKEN"}, Attachment{ContentURL: redirect.URL + "/file"})
+	if err == nil || !strings.Contains(err.Error(), "changed origin") {
+		t.Fatalf("err=%v", err)
+	}
+}

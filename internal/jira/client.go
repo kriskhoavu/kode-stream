@@ -66,6 +66,55 @@ type Issue struct {
 	Attachments []Attachment `json:"attachments"`
 }
 
+type AttachmentContent struct {
+	Data      []byte
+	MediaType string
+	Filename  string
+}
+
+const MaxAttachmentBytes int64 = 25 * 1024 * 1024
+
+func (c *Client) GetAttachment(ctx context.Context, connection models.JiraConnection, attachment Attachment) (AttachmentContent, error) {
+	target, err := url.Parse(attachment.ContentURL)
+	if err != nil || target.Scheme == "" || target.Host == "" {
+		return AttachmentContent{}, errors.New("Jira attachment URL is invalid")
+	}
+	base, _ := url.Parse(connection.BaseURL)
+	if !strings.EqualFold(target.Scheme, base.Scheme) || !strings.EqualFold(target.Host, base.Host) {
+		return AttachmentContent{}, errors.New("Jira attachment URL changed origin")
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
+	if err != nil {
+		return AttachmentContent{}, err
+	}
+	if err := c.authorize(request, connection); err != nil {
+		return AttachmentContent{}, err
+	}
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return AttachmentContent{}, fmt.Errorf("Jira attachment is unavailable: %w", err)
+	}
+	if err := responseError(response, errors.New("Jira attachment was not found")); err != nil {
+		return AttachmentContent{}, err
+	}
+	defer response.Body.Close()
+	if response.ContentLength > MaxAttachmentBytes {
+		return AttachmentContent{}, errors.New("Jira attachment exceeds the size limit")
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, MaxAttachmentBytes+1))
+	if err != nil {
+		return AttachmentContent{}, err
+	}
+	if int64(len(data)) > MaxAttachmentBytes {
+		return AttachmentContent{}, errors.New("Jira attachment exceeds the size limit")
+	}
+	mediaType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
+	if mediaType == "" {
+		mediaType = attachment.MediaType
+	}
+	return AttachmentContent{Data: data, MediaType: mediaType, Filename: attachment.Filename}, nil
+}
+
 type jiraIssueResponse struct {
 	Key    string `json:"key"`
 	Fields struct {

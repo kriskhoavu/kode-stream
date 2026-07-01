@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -133,6 +134,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /api/items/{id}/ai-sessions", a.launchAISession)
 	mux.HandleFunc("GET /api/items/{id}/jira", a.jiraIssue)
 	mux.HandleFunc("POST /api/items/{id}/jira/refresh", a.refreshJiraIssue)
+	mux.HandleFunc("GET /api/items/{id}/jira/attachments/{attachmentId}", a.jiraAttachment)
 	mux.HandleFunc("GET /api/items/{id}/files", a.itemFiles)
 	mux.HandleFunc("GET /api/items/{id}/content-search", a.itemContentSearch)
 	mux.HandleFunc("GET /api/items/{id}/files/{fileID}", a.itemFileContent)
@@ -158,7 +160,6 @@ func (a *API) Routes() http.Handler {
 	return mux
 }
 
-<<<<<<< HEAD
 func (a *API) aiSessionEligibility(w http.ResponseWriter, r *http.Request) {
 	if a.aiSessions == nil {
 		writeError(w, http.StatusServiceUnavailable, "AI session launch is unavailable")
@@ -240,6 +241,51 @@ func (a *API) saveAISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	saved, err := a.aiSessions.Save(settings)
 	respond(w, saved, err)
+}
+
+func (a *API) jiraAttachment(w http.ResponseWriter, r *http.Request) {
+	if a.jira == nil {
+		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
+		return
+	}
+	content, err := a.jira.Attachment(r.Context(), r.PathValue("id"), r.PathValue("attachmentId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	filename := sanitizeDownloadName(content.Filename)
+	disposition := "attachment"
+	if safeInlineMediaType(content.MediaType) {
+		disposition = "inline"
+	}
+	w.Header().Set("Content-Type", content.MediaType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`%s; filename=%q`, disposition, filename))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Length", strconv.Itoa(len(content.Data)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content.Data)
+}
+
+func safeInlineMediaType(value string) bool {
+	switch strings.ToLower(value) {
+	case "image/png", "image/jpeg", "image/gif", "image/webp":
+		return true
+	default:
+		return false
+	}
+}
+func sanitizeDownloadName(value string) string {
+	value = filepath.Base(strings.ReplaceAll(value, "\\", "/"))
+	value = strings.Map(func(r rune) rune {
+		if r < ' ' || r == 127 || r == '"' {
+			return -1
+		}
+		return r
+	}, value)
+	if strings.TrimSpace(value) == "" || value == "." {
+		return "attachment"
+	}
+	return value
 }
 
 func (a *API) jiraIssue(w http.ResponseWriter, r *http.Request) { a.respondJiraIssue(w, r, false) }

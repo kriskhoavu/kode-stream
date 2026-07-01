@@ -122,3 +122,38 @@ func (s *Service) Issue(ctx context.Context, itemID string, refresh bool) (Issue
 	}
 	return state, nil
 }
+
+func (s *Service) Attachment(ctx context.Context, itemID, attachmentID string) (jiraclient.AttachmentContent, error) {
+	state, err := s.Issue(ctx, itemID, false)
+	if err != nil {
+		return jiraclient.AttachmentContent{}, err
+	}
+	if state.State != "available" || state.Issue == nil {
+		return jiraclient.AttachmentContent{}, errors.New("Jira issue is unavailable")
+	}
+	var attachment *jiraclient.Attachment
+	for index := range state.Issue.Attachments {
+		if state.Issue.Attachments[index].ID == attachmentID {
+			attachment = &state.Issue.Attachments[index]
+			break
+		}
+	}
+	if attachment == nil {
+		return jiraclient.AttachmentContent{}, errors.New("Jira attachment does not belong to this issue")
+	}
+	item, found, err := s.index.Get(itemID)
+	if err != nil || !found {
+		if err != nil {
+			return jiraclient.AttachmentContent{}, err
+		}
+		return jiraclient.AttachmentContent{}, errors.New("item not found")
+	}
+	workspace, found, err := s.registry.Get(item.WorkspaceID)
+	if err != nil || !found || workspace.Jira == nil {
+		if err != nil {
+			return jiraclient.AttachmentContent{}, err
+		}
+		return jiraclient.AttachmentContent{}, errors.New("workspace not found")
+	}
+	return s.client.GetAttachment(ctx, *workspace.Jira, *attachment)
+}

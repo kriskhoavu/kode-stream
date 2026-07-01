@@ -50,6 +50,19 @@ func TestIssueReturnsTypedStatesWithoutUnrelatedLookup(t *testing.T) {
 	}
 }
 
+func TestAttachmentRejectsIDOutsideMatchedIssue(t *testing.T) {
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"key":"DI-170","fields":{"summary":"Feature","attachment":[{"id":"1","filename":"a.txt","content":"` + server.URL + `/file"}]}}`))
+	}))
+	defer server.Close()
+	service, item := jiraTestService(t, server.URL, "DI-170")
+	_, err := service.Attachment(context.Background(), item.ID, "2")
+	if err == nil {
+		t.Fatal("expected ownership rejection")
+	}
+}
+
 func jiraTestService(t *testing.T, baseURL, identifier string) (*Service, models.ItemDetail) {
 	t.Helper()
 	t.Setenv("JIRA_TEST_TOKEN", "secret")

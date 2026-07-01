@@ -10,7 +10,7 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 |-------|--------------------------|--------|
 | B1    | Connection Configuration | Done   |
 | B2    | Issue Adapters And Cache | Done   |
-| B3    | Attachment Proxy         | Draft  |
+| B3    | Attachment Proxy         | Done   |
 | F1    | Workspace Jira Settings  | Draft  |
 | F2    | Item Jira Side Panel     | Draft  |
 | V1    | Integrated Verification  | Draft  |
@@ -45,10 +45,10 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 
 **Deliverables:**
 
-- [ ] Validate issue and attachment ownership before remote access.
-- [ ] Add bounded streaming, redirect, filename, media-type, and response-header controls.
-- [ ] Add safe inline allowlist and forced-download behavior.
-- [ ] Test oversized, spoofed, redirected, timed-out, and missing attachments.
+- [x] Validate issue and attachment ownership before remote access.
+- [x] Add bounded streaming, redirect, filename, media-type, and response-header controls.
+- [x] Add safe inline allowlist and forced-download behavior.
+- [x] Test oversized, spoofed, redirected, timed-out, and missing attachments.
 
 **Verification:** `go test ./internal/jira ./internal/application/jira ./internal/api`
 
