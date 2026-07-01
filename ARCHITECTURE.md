@@ -95,6 +95,8 @@ User browser
 | System dialog          | `internal/systemdialog`               | Opens native folder picker and reveals local paths                     |
 | AI settings            | `internal/aisettings`                 | Stores provider and terminal launch templates outside workspaces       |
 | AI session service     | `internal/application/aisession`      | Detects tools, validates items, creates context, and launches sessions |
+| Jira client            | `internal/jira`                       | Authenticates and normalizes Cloud and Server/Data Center reads        |
+| Jira service           | `internal/application/jira`           | Matches items, caches issues, and guards attachment access             |
 | Models                 | `internal/models`                     | Defines stable API DTOs and shared data structures                     |
 
 ## Frontend Components
@@ -238,6 +240,17 @@ User opens an item and selects Open AI session
 ```
 
 Workspace-only starts at the workspace root without card context so the user can reference files and directories manually. Selected-card context works for any editable working-tree item and passes its workspace-relative path directly to the AI with a neutral instruction to read relevant documents and wait for the user's request. No persistent context resource is created. External tools retain their own authentication, approval, and sandbox behavior.
+
+### Read-Only Jira Integration
+
+```text
+Workspace Jira settings -> token environment variable -> connection test
+Item identifier -> exact project-key match -> Cloud or Server Jira client
+  -> normalized five-minute memory cache -> Jira item tab
+  -> explicit attachment action -> ownership check -> bounded backend proxy
+```
+
+Only Jira connection metadata is persisted with the workspace. Tokens remain in the Plan Manager process environment, and fetched issues and attachments are not written to Git or the item index. Jira descriptions render as text. Attachment responses enforce issue ownership, same-origin access, size limits, safe filenames, `nosniff`, and a narrow inline image allowlist.
 
 ### Workspace Explorer
 

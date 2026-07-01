@@ -13,7 +13,7 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 | B3    | Attachment Proxy         | Done   |
 | F1    | Workspace Jira Settings  | Done   |
 | F2    | Item Jira Side Panel     | Done   |
-| V1    | Integrated Verification  | Draft  |
+| V1    | Integrated Verification  | Done   |
 
 ## Phase B1: Connection Configuration
 
@@ -84,10 +84,10 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 
 **Deliverables:**
 
-- [ ] Exercise Cloud and Server fixture servers with representative responses.
-- [ ] Confirm secrets and Jira content do not enter Git files, indexes, logs, or audit payloads.
-- [ ] Update architecture, requirements baseline, and configuration documentation.
-- [ ] Run full backend, frontend, and production build checks.
+- [x] Exercise Cloud and Server fixture servers with representative responses.
+- [x] Confirm secrets and Jira content do not enter Git files, indexes, logs, or audit payloads.
+- [x] Update architecture, requirements baseline, and configuration documentation.
+- [x] Run full backend, frontend, and production build checks.
 
 **Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/plan-manager`
 

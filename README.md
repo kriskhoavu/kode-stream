@@ -37,6 +37,8 @@ Plan Manager addresses that gap by providing:
 - Inspect workspace health and recent operation history
 - Detect local Claude, Codex, Copilot, and OpenCode CLIs
 - Launch Terminal, iTerm2, or WezTerm with workspace-only or selected-card context
+- Connect a workspace to Jira Cloud or Jira Server/Data Center through REST APIs
+- View matching Jira tickets and safely open attachments from an item
 
 See implementation details in [plans/platform/PM-002/README.md](plans/platform/PM-002/README.md).
 
