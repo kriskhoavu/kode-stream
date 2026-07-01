@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"plan-manager/internal/models"
 )
@@ -51,5 +52,47 @@ func TestConnectionRequiresEnvironmentToken(t *testing.T) {
 	_, err := client.TestConnection(context.Background(), models.JiraConnection{TokenEnvVar: "JIRA_TOKEN"})
 	if err == nil || strings.Contains(err.Error(), "secret") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestGetIssueNormalizesCloudADFAndAttachments(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"key":"DI-170","fields":{"summary":"Search","description":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello Jira"}]}]},"status":{"name":"In Progress"},"issuetype":{"name":"Story"},"assignee":{"displayName":"Kim","accountId":"a1"},"reporter":null,"priority":{"name":"High"},"labels":["backend"],"created":"2026-01-01","updated":"2026-01-02","attachment":[{"id":"9","filename":"spec.pdf","mimeType":"application/pdf","size":12,"content":"https://files/9","author":{"displayName":"Kim"}}]}}`))
+	}))
+	defer server.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	issue, err := client.GetIssue(context.Background(), models.JiraConnection{DeploymentType: "cloud", BaseURL: server.URL, AccountEmail: "a@b.com", TokenEnvVar: "TOKEN"}, "DI-170")
+	if err != nil || issue.Description != "Hello Jira" || issue.Status != "In Progress" || len(issue.Attachments) != 1 || issue.Attachments[0].ContentURL == "" {
+		t.Fatalf("issue=%#v err=%v", issue, err)
+	}
+}
+
+func TestGetIssueNormalizesServerTextAndStatusErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "missing", http.StatusNotFound) }))
+	defer server.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	_, err := client.GetIssue(context.Background(), models.JiraConnection{DeploymentType: "server", BaseURL: server.URL, TokenEnvVar: "TOKEN"}, "DI-404")
+	if err != ErrNotFound {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestGetIssueReportsMalformedAndTimedOutResponses(t *testing.T) {
+	malformed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(`{"key":`)) }))
+	defer malformed.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	_, err := client.GetIssue(context.Background(), models.JiraConnection{DeploymentType: "server", BaseURL: malformed.URL, TokenEnvVar: "TOKEN"}, "DI-1")
+	if err == nil || !strings.Contains(err.Error(), "decode Jira issue") {
+		t.Fatalf("malformed err=%v", err)
+	}
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { time.Sleep(50 * time.Millisecond) }))
+	defer slow.Close()
+	client.httpClient.Timeout = 5 * time.Millisecond
+	_, err = client.GetIssue(context.Background(), models.JiraConnection{DeploymentType: "server", BaseURL: slow.URL, TokenEnvVar: "TOKEN"}, "DI-1")
+	if err == nil || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatalf("timeout err=%v", err)
 	}
 }

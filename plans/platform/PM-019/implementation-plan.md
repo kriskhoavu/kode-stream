@@ -9,7 +9,7 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 | Phase | Name                     | Status |
 |-------|--------------------------|--------|
 | B1    | Connection Configuration | Done   |
-| B2    | Issue Adapters And Cache | Draft  |
+| B2    | Issue Adapters And Cache | Done   |
 | B3    | Attachment Proxy         | Draft  |
 | F1    | Workspace Jira Settings  | Draft  |
 | F2    | Item Jira Side Panel     | Draft  |
@@ -32,10 +32,10 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 
 **Deliverables:**
 
-- [ ] Add normalized issue, description, person, and attachment DTOs.
-- [ ] Implement Cloud and Server/Data Center issue readers.
-- [ ] Add exact identifier matching, typed states, five-minute cache, and refresh.
-- [ ] Test ADF, Server variants, 404, authentication, authorization, timeout, and malformed responses.
+- [x] Add normalized issue, description, person, and attachment DTOs.
+- [x] Implement Cloud and Server/Data Center issue readers.
+- [x] Add exact identifier matching, typed states, five-minute cache, and refresh.
+- [x] Test ADF, Server variants, 404, authentication, authorization, timeout, and malformed responses.
 
 **Verification:** `go test ./internal/jira ./internal/application/jira ./internal/api`
 

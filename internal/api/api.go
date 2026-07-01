@@ -131,6 +131,8 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/items/{id}", a.itemDetail)
 	mux.HandleFunc("GET /api/items/{id}/ai-session-eligibility", a.aiSessionEligibility)
 	mux.HandleFunc("POST /api/items/{id}/ai-sessions", a.launchAISession)
+	mux.HandleFunc("GET /api/items/{id}/jira", a.jiraIssue)
+	mux.HandleFunc("POST /api/items/{id}/jira/refresh", a.refreshJiraIssue)
 	mux.HandleFunc("GET /api/items/{id}/files", a.itemFiles)
 	mux.HandleFunc("GET /api/items/{id}/content-search", a.itemContentSearch)
 	mux.HandleFunc("GET /api/items/{id}/files/{fileID}", a.itemFileContent)
@@ -156,6 +158,7 @@ func (a *API) Routes() http.Handler {
 	return mux
 }
 
+<<<<<<< HEAD
 func (a *API) aiSessionEligibility(w http.ResponseWriter, r *http.Request) {
 	if a.aiSessions == nil {
 		writeError(w, http.StatusServiceUnavailable, "AI session launch is unavailable")
@@ -237,6 +240,27 @@ func (a *API) saveAISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	saved, err := a.aiSessions.Save(settings)
 	respond(w, saved, err)
+}
+
+func (a *API) jiraIssue(w http.ResponseWriter, r *http.Request) { a.respondJiraIssue(w, r, false) }
+func (a *API) refreshJiraIssue(w http.ResponseWriter, r *http.Request) {
+	a.respondJiraIssue(w, r, true)
+}
+func (a *API) respondJiraIssue(w http.ResponseWriter, r *http.Request, refresh bool) {
+	if a.jira == nil {
+		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
+		return
+	}
+	result, err := a.jira.Issue(r.Context(), r.PathValue("id"), refresh)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (a *API) testJiraConnection(w http.ResponseWriter, r *http.Request) {

@@ -56,7 +56,7 @@ func NewServer(port int) (*Server, error) {
 	searchService := appsearch.New(idx)
 	navigationStore := navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile)
 	aiSessionService := aisession.New(aisettings.New(paths.AISettingsFile)).ConfigureLaunch(reg, idx, auditStore, os.TempDir())
-	jiraService := appjira.New(reg, jiraclient.New())
+	jiraService := appjira.New(reg, idx, jiraclient.New())
 	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore).WithAISessions(aiSessionService).WithJira(jiraService)
 
 	mux := http.NewServeMux()

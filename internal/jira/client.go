@@ -28,15 +28,207 @@ type Client struct {
 	getenv     func(string) string
 }
 
+var (
+	ErrAuthentication = errors.New("Jira authentication failed")
+	ErrForbidden      = errors.New("Jira access is forbidden")
+	ErrNotFound       = errors.New("Jira issue was not found")
+)
+
+type Person struct {
+	DisplayName string `json:"displayName"`
+	AccountID   string `json:"accountId,omitempty"`
+	Email       string `json:"email,omitempty"`
+}
+
+type Attachment struct {
+	ID         string `json:"id"`
+	Filename   string `json:"filename"`
+	MediaType  string `json:"mediaType"`
+	SizeBytes  int64  `json:"sizeBytes"`
+	CreatedAt  string `json:"createdAt,omitempty"`
+	Author     Person `json:"author"`
+	ContentURL string `json:"-"`
+}
+
+type Issue struct {
+	Key         string       `json:"key"`
+	Summary     string       `json:"summary"`
+	Status      string       `json:"status"`
+	Description string       `json:"description"`
+	IssueType   string       `json:"issueType"`
+	Assignee    *Person      `json:"assignee,omitempty"`
+	Reporter    *Person      `json:"reporter,omitempty"`
+	Priority    string       `json:"priority,omitempty"`
+	Labels      []string     `json:"labels"`
+	CreatedAt   string       `json:"createdAt,omitempty"`
+	UpdatedAt   string       `json:"updatedAt,omitempty"`
+	BrowserURL  string       `json:"browserUrl"`
+	Attachments []Attachment `json:"attachments"`
+}
+
+type jiraIssueResponse struct {
+	Key    string `json:"key"`
+	Fields struct {
+		Summary     string          `json:"summary"`
+		Description json.RawMessage `json:"description"`
+		Status      struct {
+			Name string `json:"name"`
+		} `json:"status"`
+		IssueType struct {
+			Name string `json:"name"`
+		} `json:"issuetype"`
+		Assignee *jiraPerson `json:"assignee"`
+		Reporter *jiraPerson `json:"reporter"`
+		Priority *struct {
+			Name string `json:"name"`
+		} `json:"priority"`
+		Labels     []string `json:"labels"`
+		Created    string   `json:"created"`
+		Updated    string   `json:"updated"`
+		Attachment []struct {
+			ID       string     `json:"id"`
+			Filename string     `json:"filename"`
+			MimeType string     `json:"mimeType"`
+			Size     int64      `json:"size"`
+			Created  string     `json:"created"`
+			Content  string     `json:"content"`
+			Author   jiraPerson `json:"author"`
+		} `json:"attachment"`
+	} `json:"fields"`
+}
+
+type jiraPerson struct {
+	DisplayName  string `json:"displayName"`
+	AccountID    string `json:"accountId"`
+	EmailAddress string `json:"emailAddress"`
+	Name         string `json:"name"`
+}
+
+func (c *Client) GetIssue(ctx context.Context, connection models.JiraConnection, key string) (Issue, error) {
+	version := "2"
+	if connection.DeploymentType == "cloud" {
+		version = "3"
+	}
+	endpoint := connection.BaseURL + "/rest/api/" + version + "/issue/" + url.PathEscape(key) + "?fields=summary,status,description,issuetype,assignee,reporter,priority,labels,created,updated,attachment"
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return Issue{}, err
+	}
+	if err := c.authorize(request, connection); err != nil {
+		return Issue{}, err
+	}
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return Issue{}, fmt.Errorf("Jira is unavailable: %w", err)
+	}
+	if err := responseError(response, ErrNotFound); err != nil {
+		return Issue{}, err
+	}
+	var payload jiraIssueResponse
+	if err := decodeBounded(response, &payload); err != nil {
+		return Issue{}, fmt.Errorf("decode Jira issue: %w", err)
+	}
+	issue := Issue{Key: payload.Key, Summary: payload.Fields.Summary, Status: payload.Fields.Status.Name, Description: normalizeDescription(payload.Fields.Description), IssueType: payload.Fields.IssueType.Name, Assignee: normalizePerson(payload.Fields.Assignee), Reporter: normalizePerson(payload.Fields.Reporter), Labels: payload.Fields.Labels, CreatedAt: payload.Fields.Created, UpdatedAt: payload.Fields.Updated, BrowserURL: connection.BaseURL + "/browse/" + url.PathEscape(payload.Key), Attachments: []Attachment{}}
+	if issue.Labels == nil {
+		issue.Labels = []string{}
+	}
+	if payload.Fields.Priority != nil {
+		issue.Priority = payload.Fields.Priority.Name
+	}
+	for _, value := range payload.Fields.Attachment {
+		issue.Attachments = append(issue.Attachments, Attachment{ID: value.ID, Filename: value.Filename, MediaType: value.MimeType, SizeBytes: value.Size, CreatedAt: value.Created, ContentURL: value.Content, Author: *normalizePerson(&value.Author)})
+	}
+	return issue, nil
+}
+
+func (c *Client) authorize(request *http.Request, connection models.JiraConnection) error {
+	token := strings.TrimSpace(c.getenv(connection.TokenEnvVar))
+	if token == "" {
+		return fmt.Errorf("Jira token environment variable %s is not available", connection.TokenEnvVar)
+	}
+	request.Header.Set("Accept", "application/json")
+	if connection.DeploymentType == "cloud" {
+		request.SetBasicAuth(connection.AccountEmail, token)
+	} else {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	return nil
+}
+
+func responseError(response *http.Response, notFound error) error {
+	if response.StatusCode >= 200 && response.StatusCode < 300 {
+		return nil
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64*1024))
+	switch response.StatusCode {
+	case http.StatusUnauthorized:
+		return ErrAuthentication
+	case http.StatusForbidden:
+		return ErrForbidden
+	case http.StatusNotFound:
+		return notFound
+	default:
+		return fmt.Errorf("Jira returned status %d", response.StatusCode)
+	}
+}
+
+func normalizePerson(value *jiraPerson) *Person {
+	if value == nil {
+		return nil
+	}
+	id := value.AccountID
+	if id == "" {
+		id = value.Name
+	}
+	return &Person{DisplayName: value.DisplayName, AccountID: id, Email: value.EmailAddress}
+}
+
+func normalizeDescription(raw json.RawMessage) string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+	var text string
+	if json.Unmarshal(raw, &text) == nil {
+		return text
+	}
+	var value any
+	if json.Unmarshal(raw, &value) != nil {
+		return ""
+	}
+	var parts []string
+	var walk func(any)
+	walk = func(node any) {
+		switch current := node.(type) {
+		case map[string]any:
+			if current["type"] == "text" {
+				if value, ok := current["text"].(string); ok {
+					parts = append(parts, value)
+				}
+			}
+			if content, ok := current["content"].([]any); ok {
+				for _, child := range content {
+					walk(child)
+				}
+				if current["type"] == "paragraph" {
+					parts = append(parts, "\n")
+				}
+			}
+		case []any:
+			for _, child := range current {
+				walk(child)
+			}
+		}
+	}
+	walk(value)
+	return strings.TrimSpace(strings.Join(parts, ""))
+}
+
 func New() *Client {
 	return &Client{httpClient: &http.Client{Timeout: 12 * time.Second, CheckRedirect: sameOriginRedirect}, getenv: os.Getenv}
 }
 
 func (c *Client) TestConnection(ctx context.Context, connection models.JiraConnection) (ConnectionTest, error) {
-	token := strings.TrimSpace(c.getenv(connection.TokenEnvVar))
-	if token == "" {
-		return ConnectionTest{}, fmt.Errorf("Jira token environment variable %s is not available", connection.TokenEnvVar)
-	}
 	version := "2"
 	if connection.DeploymentType == "cloud" {
 		version = "3"
@@ -46,11 +238,8 @@ func (c *Client) TestConnection(ctx context.Context, connection models.JiraConne
 		if err != nil {
 			return ConnectionTest{}, err
 		}
-		request.Header.Set("Accept", "application/json")
-		if connection.DeploymentType == "cloud" {
-			request.SetBasicAuth(connection.AccountEmail, token)
-		} else {
-			request.Header.Set("Authorization", "Bearer "+token)
+		if err := c.authorize(request, connection); err != nil {
+			return ConnectionTest{}, err
 		}
 		response, err := c.httpClient.Do(request)
 		if err != nil {
