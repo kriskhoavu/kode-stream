@@ -11,6 +11,7 @@ import {
   GitCompare,
   GripVertical,
   Info,
+  Ticket,
   RotateCcw,
   PanelLeftClose,
   PanelLeftOpen,
@@ -35,9 +36,10 @@ import { ContentSearchInput, ContentSearchResults } from '../features/content-se
 import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
 import { AISessionLaunchControl } from '../features/ai-session/AISessionLaunchControl';
+import { JiraItemPanel } from '../features/jira/JiraItemPanel';
 
 type Tab = 'preview' | 'raw' | 'diff';
-type RightPanelTab = 'info' | 'git';
+type RightPanelTab = 'info' | 'git' | 'jira';
 type DiffMode = 'review' | 'raw';
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
 
@@ -490,6 +492,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
                 <button type="button" className={rightPanelTab === 'git' ? 'active' : ''} onClick={() => setRightPanelTab('git')}>
                   <GitBranch size={14} /> Git
                 </button>
+                <button type="button" className={rightPanelTab === 'jira' ? 'active' : ''} onClick={() => setRightPanelTab('jira')}>
+                  <Ticket size={14} /> Jira
+                </button>
               </div>
               {rightPanelTab === 'info' && (
                 <>
@@ -584,6 +589,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
                   </div>
                 )
               )}
+              {rightPanelTab === 'jira' && <JiraItemPanel itemId={itemId} />}
               {error && (
                 <div className="operation-error">
                   <p className="error">{error}</p>

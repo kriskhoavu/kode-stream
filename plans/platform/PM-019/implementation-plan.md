@@ -12,7 +12,7 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 | B2    | Issue Adapters And Cache | Done   |
 | B3    | Attachment Proxy         | Done   |
 | F1    | Workspace Jira Settings  | Done   |
-| F2    | Item Jira Side Panel     | Draft  |
+| F2    | Item Jira Side Panel     | Done   |
 | V1    | Integrated Verification  | Draft  |
 
 ## Phase B1: Connection Configuration
@@ -71,10 +71,10 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 
 **Deliverables:**
 
-- [ ] Add independent issue-loading and refresh hook.
-- [ ] Render normalized fields and all typed issue states.
-- [ ] Add safe description view and metadata-first attachment list.
-- [ ] Test remote failure isolation, long content, refresh, and attachment errors.
+- [x] Add independent issue-loading and refresh hook.
+- [x] Render normalized fields and all typed issue states.
+- [x] Add safe description view and metadata-first attachment list.
+- [x] Test remote failure isolation, long content, refresh, and attachment errors.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/ItemWorkspacePage.test.ts web/src/features/jira`
 
