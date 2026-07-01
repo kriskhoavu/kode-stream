@@ -2,8 +2,8 @@ import { type DragEvent, type Dispatch, type FormEvent, type SetStateAction, use
 import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
-import { api } from '../lib/api';
-import type { WorkspaceConfig, WorkspaceInput, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
+import { ApiError, api } from '../lib/api';
+import type { JiraConnection, WorkspaceConfig, WorkspaceInput, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -12,6 +12,7 @@ export { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parse
 
 const DEFAULT_SOURCES = ['docs', 'plans'];
 const UNSORTED_SELECTION_ID = 'unsorted';
+const emptyJiraConnection = (): JiraConnection => ({ deploymentType: 'cloud', baseUrl: '', projectKey: '', accountEmail: '', tokenEnvVar: 'JIRA_API_TOKEN' });
 type WorkspaceNotice = {
   tone: 'success' | 'error' | 'info';
   title: string;
@@ -38,6 +39,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [cloneRoot, setCloneRoot] = useState('');
   const [baselineBranch, setBaselineBranch] = useState('master');
   const [sources, setSources] = useState('');
+  const [jira, setJira] = useState<JiraConnection | null>(null);
   const [systemConfig, setSystemConfig] = useState<SystemConfigPaths | null>(null);
   const [dataDirDraft, setDataDirDraft] = useState('');
   const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
@@ -46,7 +48,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [busy, setBusy] = useState(false);
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
-  const [editDraft, setEditDraft] = useState({ name: '', path: '', baselineBranch: '', sources: '' });
+  const [editDraft, setEditDraft] = useState<{ name: string; path: string; baselineBranch: string; sources: string; jira: JiraConnection | null }>({ name: '', path: '', baselineBranch: '', sources: '', jira: null });
   const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([]);
   const [workspacesToRemove, setWorkspacesToRemove] = useState<WorkspaceConfig[] | null>(null);
   const [settingsEditor, setSettingsEditor] = useState<SettingsEditorState | null>(null);
@@ -84,7 +86,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     setRegistrationLog('');
     setRegistrationLogOpen(false);
     try {
-      const input = buildWorkspaceInput({ name, registrationMode, path, remoteUrl, cloneRoot, baselineBranch, sources });
+      const input = buildWorkspaceInput({ name, registrationMode, path, remoteUrl, cloneRoot, baselineBranch, sources, jira });
       const result = registrationMode === 'remote_clone'
         ? await api.createWorkspaceStream(input, (chunk) => {
           setRegistrationLog((current) => `${current}${chunk}`);
@@ -103,6 +105,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       setCloneRoot(systemConfig?.cloneRootDir ?? '');
       setBaselineBranch('master');
       setSources('');
+      setJira(null);
       onChanged();
     } catch (err) {
       setNotice({ tone: 'error', title: registrationMode === 'remote_clone' ? 'Remote workspace registration failed' : 'Local workspace registration failed', details: [errorMessage(err)] });
@@ -167,7 +170,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       name: repo.name,
       path: repo.path,
       baselineBranch: repo.baselineBranch,
-      sources: repo.sources.join(', ')
+      sources: repo.sources.join(', '),
+      jira: repo.jira ? { ...repo.jira } : null
     });
     setNotice(null);
   };
@@ -182,7 +186,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         baselineBranch: editDraft.baselineBranch,
         sources: parseSources(editDraft.sources),
         registrationMode: repo.registrationMode,
-        remoteUrl: repo.remoteUrl
+        remoteUrl: repo.remoteUrl,
+        jira: editDraft.jira ?? undefined
       });
       setEditingId('');
       setNotice({ tone: 'success', title: 'Workspace updated', details: [editDraft.name || repo.name] });
@@ -530,6 +535,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             <BranchField value={baselineBranch} onChange={setBaselineBranch} />
             <SourcesField value={sources} onChange={setSources} />
           </div>
+          <JiraConnectionFields value={jira} onChange={setJira} />
           <button className="primary repo-submit" disabled={busy}><FolderGit2 size={16} /> Register Workspace</button>
           {registrationLog && (
             <section className="registration-log-panel">
@@ -597,6 +603,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                         <BranchField value={editDraft.baselineBranch} onChange={(value) => setEditDraft({ ...editDraft, baselineBranch: value })} />
                         <SourcesField value={editDraft.sources} onChange={(value) => setEditDraft({ ...editDraft, sources: value })} />
                       </div>
+                      <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />
                     </div>
                     <div className="repo-row-actions">
                       <button className="secondary" type="button" onClick={() => setEditingId('')} disabled={busy}>Cancel</button>
@@ -980,6 +987,7 @@ export function buildWorkspaceInput(input: {
   cloneRoot: string;
   baselineBranch: string;
   sources: string;
+  jira?: JiraConnection | null;
 }): WorkspaceInput {
   const payload = {
     name: input.name,
@@ -987,6 +995,7 @@ export function buildWorkspaceInput(input: {
     sources: parseSources(input.sources),
     registrationMode: input.registrationMode
   } as WorkspaceInput;
+  if (input.jira) payload.jira = normalizeJiraDraft(input.jira);
   if (input.registrationMode === 'remote_clone') {
     payload.remoteUrl = input.remoteUrl.trim();
     if (input.cloneRoot.trim()) {
@@ -996,6 +1005,33 @@ export function buildWorkspaceInput(input: {
   }
   payload.path = input.path.trim();
   return payload;
+}
+
+function normalizeJiraDraft(value: JiraConnection): JiraConnection {
+  return { deploymentType: value.deploymentType, baseUrl: value.baseUrl.trim().replace(/\/$/, ''), projectKey: value.projectKey.trim().toUpperCase(), accountEmail: value.deploymentType === 'cloud' ? value.accountEmail?.trim() : undefined, tokenEnvVar: value.tokenEnvVar.trim() };
+}
+
+function JiraConnectionFields({ value, onChange, workspaceId }: { value: JiraConnection | null; onChange: (value: JiraConnection | null) => void; workspaceId?: string }) {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState('');
+  const update = (patch: Partial<JiraConnection>) => value && onChange({ ...value, ...patch });
+  const test = async () => {
+    if (!value || !workspaceId) return;
+    setTesting(true); setResult('');
+    try { setResult((await api.testJiraConnection(workspaceId, normalizeJiraDraft(value))).message); }
+    catch (caught) { setResult(caught instanceof ApiError && caught.recoveryHint ? `${caught.message} ${caught.recoveryHint}` : errorMessage(caught)); }
+    finally { setTesting(false); }
+  };
+  return <fieldset className="jira-connection-fields">
+    <legend><label><input type="checkbox" checked={value !== null} onChange={(event) => { setResult(''); onChange(event.target.checked ? emptyJiraConnection() : null); }} /> Jira integration</label></legend>
+    {value && <>
+      <div className="registration-mode-toggle" role="radiogroup" aria-label="Jira deployment type"><button type="button" role="radio" aria-checked={value.deploymentType === 'cloud'} className={value.deploymentType === 'cloud' ? 'secondary active' : 'secondary'} onClick={() => update({ deploymentType: 'cloud' })}>Cloud</button><button type="button" role="radio" aria-checked={value.deploymentType === 'server'} className={value.deploymentType === 'server' ? 'secondary active' : 'secondary'} onClick={() => update({ deploymentType: 'server', accountEmail: '' })}>Server / Data Center</button></div>
+      <div className="repo-field-grid"><label className="repo-field">Base URL<input aria-label="Jira base URL" value={value.baseUrl} onChange={(event) => update({ baseUrl: event.target.value })} placeholder="https://company.atlassian.net" /></label><label className="repo-field">Project Key<input aria-label="Jira project key" value={value.projectKey} onChange={(event) => update({ projectKey: event.target.value.toUpperCase() })} placeholder="DI" /></label></div>
+      {value.deploymentType === 'cloud' && <label className="repo-field">Account Email<input aria-label="Jira account email" value={value.accountEmail ?? ''} onChange={(event) => update({ accountEmail: event.target.value })} /></label>}
+      <label className="repo-field">Token Environment Variable<input aria-label="Jira token environment variable" value={value.tokenEnvVar} onChange={(event) => update({ tokenEnvVar: event.target.value })} /><small>Store the token in this environment variable before starting Plan Manager.</small></label>
+      {workspaceId && <div className="jira-test-row"><button className="secondary" type="button" disabled={testing} onClick={() => void test()}>{testing ? 'Testing...' : 'Test Jira connection'}</button>{result && <span role="status">{result}</span>}</div>}
+    </>}
+  </fieldset>;
 }
 
 export function inferWorkspaceNameFromRemoteURL(remoteUrl: string): string {

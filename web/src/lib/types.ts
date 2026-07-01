@@ -73,6 +73,23 @@ export interface WorkspaceConfig {
   sources: string[];
   createdAt: string;
   lastScannedAt?: string;
+  jira?: JiraConnection;
+}
+
+export interface JiraConnection {
+  deploymentType: 'cloud' | 'server';
+  baseUrl: string;
+  projectKey: string;
+  accountEmail?: string;
+  tokenEnvVar: string;
+}
+
+export interface JiraConnectionTest {
+  ok: boolean;
+  deploymentType: 'cloud' | 'server';
+  projectKey: string;
+  message: string;
+  recoveryHint?: string;
 }
 
 export interface WorkspaceInput {
@@ -83,6 +100,7 @@ export interface WorkspaceInput {
   registrationMode?: 'local_path' | 'remote_clone';
   remoteUrl?: string;
   cloneRoot?: string;
+  jira?: JiraConnection;
 }
 
 export interface WorkspaceCreateResult {

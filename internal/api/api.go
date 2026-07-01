@@ -1178,6 +1178,14 @@ func writeError(w http.ResponseWriter, status int, message string) {
 func recoveryHint(message string) string {
 	lower := strings.ToLower(message)
 	switch {
+	case strings.Contains(lower, "jira token environment variable"):
+		return "Set the configured environment variable and restart Plan Manager."
+	case strings.Contains(lower, "jira authentication"):
+		return "Check the Jira account and token configured for this workspace."
+	case strings.Contains(lower, "jira project"):
+		return "Check the Jira project key and account permissions."
+	case strings.Contains(lower, "jira is unavailable"):
+		return "Check the Jira base URL, network access, and server availability."
 	case strings.Contains(lower, "changed since it was loaded"):
 		return "Reload the file to review the latest content, then apply your changes again."
 	case strings.Contains(lower, "local changes"):

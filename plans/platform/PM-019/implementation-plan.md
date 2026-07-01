@@ -11,7 +11,7 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 | B1    | Connection Configuration | Done   |
 | B2    | Issue Adapters And Cache | Done   |
 | B3    | Attachment Proxy         | Done   |
-| F1    | Workspace Jira Settings  | Draft  |
+| F1    | Workspace Jira Settings  | Done   |
 | F2    | Item Jira Side Panel     | Draft  |
 | V1    | Integrated Verification  | Draft  |
 
@@ -58,10 +58,10 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 
 **Deliverables:**
 
-- [ ] Add shared Jira connection types and API method.
-- [ ] Extend workspace create/edit UI with optional deployment-specific settings.
-- [ ] Add explicit connection test and state-specific recovery guidance.
-- [ ] Test validation, token-reference handling, settings persistence, and failures.
+- [x] Add shared Jira connection types and API method.
+- [x] Extend workspace create/edit UI with optional deployment-specific settings.
+- [x] Add explicit connection test and state-specific recovery guidance.
+- [x] Test validation, token-reference handling, settings persistence, and failures.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/jira-settings`
 
