@@ -657,6 +657,65 @@ button:disabled {
   color: var(--danger);
 }
 
+.storage-settings-fields {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+}
+
+.storage-settings-fields > label,
+.storage-settings-derived {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.storage-settings-path-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+}
+
+.storage-settings-path-row input,
+.storage-settings-derived code {
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 0 10px;
+}
+
+.storage-settings-derived {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.storage-settings-derived > span {
+  grid-column: 1 / -1;
+}
+
+.storage-settings-derived code {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-settings-warning,
+.settings-inline-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-inline-status {
+  padding: 18px 20px;
+}
+
 .workspace-header-actions {
   display: flex;
   align-items: center;
@@ -2511,6 +2570,32 @@ body.is-resizing-drawer {
 
 .workspace-registration-modal .data-dir-panel {
   display: none;
+}
+
+.workspace-registration-advanced {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 10px 12px;
+}
+
+.workspace-registration-advanced > button {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.workspace-registration-advanced > p {
+  margin: 8px 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workspace-registration-advanced .jira-connection-fields {
+  margin-top: 12px;
 }
 
 .workspace-detail-tabs {

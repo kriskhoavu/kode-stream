@@ -16,7 +16,7 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 | V1    | Integrated Verification  | Done    |
 | F3    | Workspace Manager Shell  | Done    |
 | F4    | Workspace Settings Tabs  | Done    |
-| F5    | Registration And Storage | Pending |
+| F5    | Registration And Storage | Done    |
 | V2    | Redesign Verification    | Pending |
 
 ## Phase B1: Connection Configuration
@@ -131,12 +131,12 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 
 **Deliverables:**
 
-- [ ] Add a focused Add Workspace dialog with local folder and remote Git URL modes.
-- [ ] Infer workspace name and present branch and source defaults as reviewable fields.
-- [ ] Keep optional Jira configuration under Advanced settings and available after registration.
-- [ ] Keep remote clone progress, logs, failure details, retry, and successful selection inside the focused flow.
-- [ ] Move Data Directory configuration to application Settings under Storage with browse, reveal, restart guidance, and existing API behavior.
-- [ ] Add registration mode, inferred defaults, clone progress, retry, storage, accessibility, and unsaved-close tests.
+- [x] Add a focused Add Workspace dialog with local folder and remote Git URL modes.
+- [x] Infer workspace name and present branch and source defaults as reviewable fields.
+- [x] Keep optional Jira configuration under Advanced settings and available after registration.
+- [x] Keep remote clone progress, logs, failure details, retry, and successful selection inside the focused flow.
+- [x] Move Data Directory configuration to application Settings under Storage with browse, reveal, restart guidance, and existing API behavior.
+- [x] Add registration, storage, accessibility, and unsaved-close tests while retaining existing payload and clone coverage.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces web/src/features/settings`
 

@@ -4,6 +4,7 @@ import type { ItemStatus } from '../lib/types';
 import type { AppSettings } from '../features/settings/appSettings';
 import { useAISettings } from '../features/ai-settings/useAISettings';
 import type { AICapabilityKind, AILaunchTemplate, AISettings } from '../lib/types';
+import { StorageSettings } from '../features/settings/StorageSettings';
 
 export function SettingsPage({ settings, onChange }: { settings: AppSettings; onChange: (settings: AppSettings) => void }) {
   const visible = new Set(settings.visibleKanbanStatuses);
@@ -49,6 +50,8 @@ export function SettingsPage({ settings, onChange }: { settings: AppSettings; on
           ))}
         </div>
       </section>
+
+      <StorageSettings />
 
       <section className="settings-section ai-settings-section">
         <header>

@@ -57,4 +57,20 @@ describe('workspace detail settings', () => {
 
     expect(screen.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
   });
+
+  it('keeps Jira registration settings advanced and guards a draft on close', () => {
+    vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add workspace' }));
+    expect(screen.queryByRole('checkbox', { name: 'Jira integration' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced settings' }));
+    expect(screen.getByRole('checkbox', { name: 'Jira integration' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Workspace Name'), { target: { value: 'Draft workspace' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Close add workspace' }));
+
+    expect(window.confirm).toHaveBeenCalledWith('Discard this workspace registration draft?');
+    expect(screen.getByRole('dialog', { name: 'Add workspace' })).toBeInTheDocument();
+  });
 });
