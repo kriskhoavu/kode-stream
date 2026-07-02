@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add an `aisession` application service, app-owned settings store, provider adapters, and macOS terminal adapters. Process execution is abstracted for testing. The service resolves items through the index and workspaces through the registry before generating any manifest or command.
+The `aisession` application service combines an app-owned settings store, provider templates, and macOS terminal adapters. Process execution is abstracted for testing. Before building a command, the service resolves the indexed item and registered workspace, validates the context mode, and checks that selected-card paths remain inside the workspace.
 
 ## Data Model
 
@@ -39,16 +39,16 @@ For `workspace_only`, the launcher omits all provider template arguments. For `c
 - Resolve the item and require `sourceMode=working_tree` and `editable=true`.
 - Resolve the canonical workspace root and require the item path to remain beneath it.
 - Resolve executables without invoking a shell and reject non-executable paths.
-- Write manifests atomically with mode `0600`; remove expired files at startup and before launch.
+- Pass the workspace-relative item path only for `card_context`; create no context resource.
 - Return stable error codes: `ai_provider_missing`, `terminal_missing`, `invalid_context_mode`, `invalid_launch_template`, `item_not_editable`, and `launch_failed`.
-- Audit success, blocked, and failed launches without arguments or manifest content.
+- Audit success, blocked, and failed launches without command arguments or prompt content.
 
 ## Terminal Adapters
 
-- macOS Terminal: open a generated mode-0700 wrapper that changes to the validated workspace and executes the argument array.
-- iTerm2: use macOS `open -a` with the validated app and wrapper paths.
+- macOS Terminal: use macOS `open -a` with a generated mode-0700 wrapper that changes to the validated workspace and executes the argument array.
+- iTerm2: use macOS `open -a` with the validated app and wrapper path.
 - WezTerm: invoke `wezterm start --cwd <workspace> -- <provider args>` as an argument array.
-- Wrapper files contain only pre-quoted validated arguments and remove themselves after process start.
+- Native-terminal wrappers live under the configured OS temporary directory, contain only pre-quoted validated arguments, remove themselves after process start, and are deleted when startup fails.
 
 ## Design Decisions
 

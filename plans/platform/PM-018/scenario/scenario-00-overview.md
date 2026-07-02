@@ -6,9 +6,9 @@
 |-----|------------------------------|-----------------------------------------------------------------|
 | 1   | Open selected-card context   | AI receives the workspace-relative card path                    |
 | 2   | Open workspace-only context  | AI opens at the workspace root without injected card context    |
-| 4   | Missing provider or terminal | Launch is blocked with an actionable capability error           |
-| 5   | Invalid custom template      | Settings reject unknown placeholders before process execution   |
-| 6   | Snapshot-only item           | Card context is disabled while workspace-only remains available |
+| 3   | Missing provider or terminal | Launch is blocked with an actionable capability error           |
+| 4   | Invalid custom template      | Settings reject unknown placeholders before process execution   |
+| 5   | Snapshot-only item           | Card context is disabled while workspace-only remains available |
 
 ## Flow 1: Launch an External Session
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Deliver provider detection, secure context generation, macOS external-terminal launch, and the configuration and item launch interfaces.
+Deliver provider detection, safe context selection, macOS external-terminal launch, and the configuration and item launch interfaces. The completed design opens at the workspace root and optionally gives the provider the selected card's workspace-relative path.
 
 ## Phases Summary
 
@@ -13,7 +13,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 | F1    | AI Settings                        | Done   |
 | F2    | Item Launch Workflow               | Done   |
 | V1    | Integrated Verification            | Done   |
-| E1    | Free Prompt Enhancement            | Done   |
+| E1    | Workspace-Only Sessions            | Done   |
 | E2    | Context-Only Session Model         | Done   |
 | E3    | Direct Card Path Handoff           | Done   |
 
@@ -35,7 +35,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 **Deliverables:**
 
 - [x] Add item eligibility and workspace containment validation.
-- [x] Generate a guarded selected-card context handoff.
+- [x] Add a guarded selected-card context handoff.
 - [x] Add provider commands, Terminal/iTerm2/WezTerm adapters, and injected process runner.
 - [x] Add launch endpoint, stable errors, audit events, and adapter tests.
 
@@ -74,7 +74,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 **Deliverables:**
 
 - [x] Verify built-in adapters with fake executables and process runners.
-- [x] Verify no manifest or wrapper is written inside a workspace.
+- [x] Verify no context resource or terminal wrapper is written inside a workspace.
 - [x] Update architecture, requirements baseline, and user documentation.
 - [x] Run full backend, frontend, and production build checks.
 
@@ -82,12 +82,12 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 
 **Commit:** `PM-018: Verify external AI session launch`
 
-## Phase E1: Free Prompt Enhancement
+## Phase E1: Workspace-Only Sessions
 
 **Deliverables:**
 
 - [x] Add workspace-only context to backend and frontend launch contracts.
-- [x] Launch the provider at the workspace root without template arguments or generated context.
+- [x] Launch the provider at the workspace root without provider prompt arguments or a context resource.
 - [x] Allow workspace-only sessions for snapshot items while retaining card-context eligibility rules.
 - [x] Explain manual file and directory references in the launch dialog.
 - [x] Test context omission, snapshot behavior, and frontend submission.
@@ -115,7 +115,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 **Deliverables:**
 
 - [x] Pass the workspace-relative card path directly to provider templates.
-- [x] Remove `/ai-context` configuration and all manifest generation.
+- [x] Remove obsolete context-resource configuration and generation.
 - [x] Keep native-terminal wrappers self-deleting under the OS temporary directory.
 - [x] Show guidance only for the selected context mode.
 - [x] Migrate legacy built-in `{contextFile}` prompts to `{itemPath}`.

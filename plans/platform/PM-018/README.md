@@ -50,7 +50,7 @@ Item workspace -> launch dialog -> capability/settings API
 | External terminal first                       | Embedded PTY               | Delivers stable interaction before owning terminal lifecycle  |
 | Pass the card path directly                   | Generate a context file    | Avoids temporary resources and lets the AI read current files |
 | Context selection does not prescribe behavior | Brainstorm/implement modes | The terminal user decides what the AI should do               |
-| Workspace-only mode omits generated context   | Empty context file         | Lets users manually reference workspace files and directories |
+| Workspace-only mode sends no initial prompt   | Empty context file         | Lets users manually reference workspace files and directories |
 | Argument arrays with approved placeholders    | Arbitrary shell command    | Reduces quoting and command-injection risk                    |
 | App-owned global settings                     | Settings in each workspace | Keeps machine-specific executable paths outside Git           |
 | macOS terminal adapters first                 | Immediate cross-platform   | Matches the current supported distribution channel            |
