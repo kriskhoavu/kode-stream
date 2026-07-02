@@ -120,7 +120,7 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 - [x] Move editable identity, path, baseline branch, and registration metadata into Overview, with destructive removal in the detail header.
 - [x] Replace source chips with source rows and retain the existing source-structure dialog through labeled Configure actions.
 - [x] Move Jira fields and connection testing into Integrations without changing existing API or secret-handling behavior.
-- [x] Keep detailed health checks and scanning in Overview while retaining a compact scan summary in the list.
+- [x] Keep detailed health checks in Overview, place scanning in the detail header, and retain a compact scan summary in the list.
 - [x] Add domain-scoped drafts, save behavior, navigation guards, keyboard tab behavior, and focused component tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces web/src/features/jira-settings web/src/components/ReliabilityPanels.test.tsx`

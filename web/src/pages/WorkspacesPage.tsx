@@ -524,7 +524,10 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                 <header className="workspace-detail-heading">
                   <div className="repo-row-icon"><HardDrive size={18} /></div>
                   <div><h2>{repo.name}</h2><span>{activeDetailTab === 'overview' ? 'Workspace details and health' : activeDetailTab === 'sources' ? 'Indexed source directories' : 'Connected services'}</span></div>
-                  <button className="secondary danger workspace-detail-remove" type="button" onClick={() => setWorkspacesToRemove([repo])}><Trash2 size={16} /> Remove</button>
+                  <div className="workspace-detail-heading-actions">
+                    <button className="secondary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all')}><RotateCw size={16} /> Scan workspace</button>
+                    <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])}><Trash2 size={16} /> Remove</button>
+                  </div>
                 </header>
 
                 {activeDetailTab === 'overview' && <section className="workspace-detail-section">
@@ -552,7 +555,6 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                     </div>
                   </>}
                   <div className="workspace-overview-health">
-                    <div className="workspace-detail-actions"><button className="secondary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all')}><RotateCw size={16} /> Scan workspace</button></div>
                     <WorkspaceHealthPanel workspaceId={repo.id} />
                   </div>
                 </section>}

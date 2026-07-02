@@ -13,7 +13,8 @@ Workspaces
 │   ├── Search and explicit bulk-selection mode
 │   └── Compact rows: name, location type, health, item count
 └── Selected workspace detail
-    ├── Overview: identity, location, branch, health, scan, registration, removal
+    ├── Header: workspace identity, Scan workspace, Remove
+    ├── Overview: identity, location, branch, health, and registration
     ├── Sources: source directories and source structure
     └── Integrations: Jira connection and connection test
 
@@ -66,7 +67,7 @@ Application Settings
 - Put `Add workspace` in the page header as the primary action and `Scan all` as secondary.
 - Use a labeled overflow menu for reveal, bulk-selection entry, and other secondary actions.
 - Do not render forms, health checks, or Jira fields inside list rows.
-- Put workspace removal at the right edge of the persistent workspace detail header and retain the existing confirmation semantics.
+- Put Scan workspace and Remove at the right edge of the persistent detail header, in that order, and retain removal confirmation semantics.
 - Show notices near the action that produced them; do not use one page-wide status for unrelated operations.
 - Track busy state per operation so scanning one workspace does not disable unrelated navigation.
 

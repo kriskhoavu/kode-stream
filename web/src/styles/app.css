@@ -2650,8 +2650,11 @@ body.is-resizing-drawer {
   font-size: 12px;
 }
 
-.workspace-detail-remove {
+.workspace-detail-heading-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .workspace-detail-section,
