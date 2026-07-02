@@ -73,6 +73,25 @@
   color: var(--text);
 }
 
+.content-viewer-image {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow: auto;
+  background: repeating-conic-gradient(var(--panel-soft) 0 25%, var(--panel) 0 50%) 50% / 20px 20px;
+}
+
+.content-viewer-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
 .content-viewer-markdown {
   flex: 1;
   min-height: 0;

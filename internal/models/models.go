@@ -264,6 +264,7 @@ const (
 	FileKindYAML        FileKind = "yaml"
 	FileKindCode        FileKind = "code"
 	FileKindText        FileKind = "text"
+	FileKindImage       FileKind = "image"
 	FileKindUnsupported FileKind = "unsupported"
 )
 

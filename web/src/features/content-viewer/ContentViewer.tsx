@@ -14,7 +14,7 @@ const SourceCodeView = lazy(() => import('./renderers/SourceCodeView').then((mod
 export const ContentViewer = memo(function ContentViewer({ file, content, compact = false }: ContentViewerProps) {
   const adapter = viewerAdapter(file.kind);
   const [mode, setMode] = useState<ViewerMode>(adapter.defaultMode);
-  const large = file.sizeBytes > richPreviewThresholdBytes;
+  const large = file.kind !== 'image' && file.sizeBytes > richPreviewThresholdBytes;
 
   useEffect(() => {
     setMode(viewerAdapter(file.kind).defaultMode);
@@ -37,6 +37,8 @@ export const ContentViewer = memo(function ContentViewer({ file, content, compac
               <strong>Rich preview is paused for this large file.</strong>
               <button type="button" className="secondary" onClick={() => setMode('source')}>Open source</button>
             </div>
+          ) : file.kind === 'image' ? (
+            <div className="content-viewer-image"><img src={content} alt={file.path} /></div>
           ) : mode === 'source' ? (
             <SourceCodeView content={content} language={file.language} truncated={file.truncated} />
           ) : file.kind === 'markdown' ? (

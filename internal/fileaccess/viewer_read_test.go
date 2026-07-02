@@ -67,6 +67,24 @@ func TestReadFileContentRejectsBinaryAndInvalidUTF8(t *testing.T) {
 	}
 }
 
+func TestReadFileContentReturnsBoundedImageDataURL(t *testing.T) {
+	data := []byte{0x89, 'P', 'N', 'G', 0, 1}
+	path := filepath.Join(t.TempDir(), "screen.png")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	content, err := readFileContent("screen.png", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content.Kind != models.FileKindImage || content.Language != "image/png" || content.Editable {
+		t.Fatalf("unexpected image metadata: %+v", content)
+	}
+	if !strings.HasPrefix(content.Content, "data:image/png;base64,") {
+		t.Fatalf("content is not an image data URL: %q", content.Content)
+	}
+}
+
 func TestReadFileContentTruncatesLargeTextOnUTF8Boundary(t *testing.T) {
 	prefix := strings.Repeat("a", int(MaxTextResponseBytes-1))
 	data := []byte(prefix + "€")

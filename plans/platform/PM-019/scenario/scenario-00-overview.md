@@ -14,9 +14,10 @@
 | 8   | Browse workspace settings      | Selecting a workspace opens its overview without expanding the list |
 | 9   | Add a local workspace          | Focused flow registers a folder with inferred defaults              |
 | 10  | Clone a remote workspace       | Focused flow clones and registers a Git repository                  |
-| 11  | Configure sources and Jira     | Settings are separated into Sources and Integrations tabs           |
+| 11  | Configure sources and Jira     | Sources stay in Overview while Jira stays in Integrations           |
 | 12  | Diagnose workspace health      | Summary remains compact and detailed checks open on demand          |
 | 13  | Change the data directory      | Global storage is configured outside workspace-specific settings    |
+| 14  | Preview local and Jira images  | Local images render and Jira thumbnails load only after expansion   |
 
 ## Flow 1: Configure and Test Jira
 
@@ -84,6 +85,20 @@ User opens application settings
   -> workspace manager remains focused on workspace-scoped concerns
 ```
 
+## Flow 7: Preview Images
+
+```text
+User opens a supported local image
+  -> backend classifies and bounds the image response
+  -> content viewer renders the image without text parsing
+
+User opens a matched Jira item
+  -> Attachments remains collapsed and no image content is requested
+  -> user expands Attachments
+  -> safe image thumbnails load through the authenticated attachment proxy
+  -> selecting a thumbnail opens the full image
+```
+
 ## Acceptance Scenarios
 
 - Workspace and item behavior remains unchanged when Jira is not configured.
@@ -100,3 +115,5 @@ User opens application settings
 - Registration supports keyboard use, progress feedback, retry, and remote-clone logs.
 - Destructive workspace removal remains separated from routine editing and requires confirmation.
 - Bulk selection is hidden until explicitly activated and is usable by keyboard.
+- Local PNG, JPEG, GIF, and WebP files render as bounded, non-editable previews.
+- Jira attachment images are not requested before the user expands Attachments.

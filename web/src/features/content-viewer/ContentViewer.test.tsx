@@ -44,6 +44,14 @@ describe('ContentViewer', () => {
     await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Large'));
   });
 
+  it('renders supported image data without a source mode', () => {
+    const dataURL = 'data:image/png;base64,iVBORw0KGgo=';
+    render(<ContentViewer file={file({ id: 'diagram_png', path: 'diagram.png', kind: 'image', language: 'image/png', editable: false })} content={dataURL} />);
+
+    expect(screen.getByRole('img', { name: 'diagram.png' })).toHaveAttribute('src', dataURL);
+    expect(screen.queryByRole('tab', { name: 'Source' })).not.toBeInTheDocument();
+  });
+
   it('sanitizes Markdown output and marks external links', async () => {
     const html = await renderMarkdown('<script>alert("x")</script>\n\n[Site](https://example.test)');
     const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');

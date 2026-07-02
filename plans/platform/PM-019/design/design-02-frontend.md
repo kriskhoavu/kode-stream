@@ -96,8 +96,17 @@ Application Settings
 - Display issue key/link, summary, status, type, people, priority, labels, timestamps, and normalized description.
 - Render descriptions through safe React nodes; do not use raw HTML injection.
 - Show state-specific messages for not configured, malformed identifier, project mismatch, missing issue, authentication, forbidden access, and outage.
-- Show attachment filename, type, size, author, and date only. Fetch content after an explicit action.
+- Keep Attachments collapsed by default and show its item count in the section heading.
+- After expansion, show filename, type, and size; load safe image thumbnails through the attachment proxy.
+- Open the full proxied image after the user selects a thumbnail. Keep non-image attachments as explicit open/download actions.
 - Attachment failures do not collapse or replace issue details.
+
+## Image Preview
+
+- Classify PNG, JPEG, GIF, and WebP as a non-editable `image` file kind.
+- Return supported local images as bounded data URLs so item and workspace viewers share one rendering contract.
+- Render images with contain sizing over a neutral checkerboard background.
+- Do not treat SVG or unknown binary files as previewable images.
 
 ## Accessibility and Layout
 

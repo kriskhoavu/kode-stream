@@ -312,17 +312,10 @@ func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item mod
 		}
 		return models.FileContent{}, fmt.Errorf("file not found")
 	}
-	classification := fileaccess.ClassifyPath(relPath)
-	return models.FileContent{
-		ID:        fileIDForPath(relPath),
-		Path:      relPath,
-		Content:   string(data),
-		Language:  classification.Language,
-		Hash:      fileaccess.ContentHash(data),
-		Kind:      classification.Kind,
-		SizeBytes: int64(len(data)),
-		Editable:  fileaccess.IsEditableKind(classification.Kind),
-	}, nil
+	if fileaccess.ClassifyPath(relPath).Kind == models.FileKindImage && int64(len(data)) > fileaccess.MaxImageResponseBytes {
+		return models.FileContent{}, fileaccess.ErrUnsupportedContent
+	}
+	return fileaccess.FileContentFromBytes(relPath, data), nil
 }
 
 func (s *Service) fullDescription(workspace models.WorkspaceConfig, item models.ItemDetail) string {

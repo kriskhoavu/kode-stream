@@ -17,6 +17,7 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 | F3    | Workspace Manager Shell  | Done    |
 | F4    | Workspace Settings Tabs  | Done    |
 | F5    | Registration And Storage | Done    |
+| F6    | Lazy Image Previews      | Done    |
 | V2    | Redesign Verification    | Pending |
 
 ## Phase B1: Connection Configuration
@@ -141,6 +142,20 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces web/src/features/settings`
 
 **Commit:** `PM-019: Add focused workspace registration and storage settings`
+
+## Phase F6: Lazy Image Previews
+
+**Deliverables:**
+
+- [x] Add bounded, non-editable PNG, JPEG, GIF, and WebP content classification.
+- [x] Render supported local images in the shared content viewer for item and workspace files.
+- [x] Keep Jira Attachments collapsed by default and defer thumbnail requests until expansion.
+- [x] Open full Jira images through the existing authenticated attachment proxy after explicit selection.
+- [x] Test local image classification/rendering and lazy Jira thumbnail behavior.
+
+**Verification:** `go test ./internal/fileaccess ./internal/application/item ./internal/api && npm run typecheck && npm test -- --run web/src/features/content-viewer web/src/features/jira`
+
+**Commit:** `PM-019: Add lazy image previews`
 
 ## Phase V2: Redesign Verification
 

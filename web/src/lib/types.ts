@@ -259,7 +259,7 @@ export interface FileNode {
   children?: FileNode[];
 }
 
-export type FileKind = 'markdown' | 'html' | 'json' | 'yaml' | 'code' | 'text' | 'unsupported';
+export type FileKind = 'markdown' | 'html' | 'json' | 'yaml' | 'code' | 'text' | 'image' | 'unsupported';
 
 export interface FileContent {
   id: string;
