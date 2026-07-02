@@ -127,6 +127,13 @@
 
 .image-preview-canvas.zoomed {
   text-align: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.image-preview-canvas.zoomed.dragging {
+  cursor: grabbing;
 }
 
 .image-preview-canvas img {

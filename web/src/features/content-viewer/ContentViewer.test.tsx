@@ -53,6 +53,14 @@ describe('ContentViewer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
     expect(screen.getByRole('button', { name: 'Reset zoom to 100%' })).toHaveTextContent('125%');
     expect(screen.getByRole('img', { name: 'diagram.png' })).toHaveStyle({ width: '125%' });
+    const canvas = document.querySelector('.image-preview-canvas') as HTMLDivElement;
+    canvas.scrollLeft = 50;
+    canvas.scrollTop = 40;
+    fireEvent(canvas, pointerEvent('pointerdown', { pointerId: 1, button: 0, clientX: 100, clientY: 100 }));
+    fireEvent(canvas, pointerEvent('pointermove', { pointerId: 1, clientX: 75, clientY: 70 }));
+    expect(canvas.scrollLeft).toBe(75);
+    expect(canvas.scrollTop).toBe(70);
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
     fireEvent.click(screen.getByRole('button', { name: 'Fit image' }));
     expect(screen.getByRole('button', { name: 'Fit image' })).toHaveAttribute('aria-pressed', 'true');
   });
@@ -83,3 +91,9 @@ describe('ContentViewer', () => {
     expect(document.querySelector('.source-line-content')?.textContent).toContain('const x = "');
   });
 });
+
+function pointerEvent(type: string, values: Record<string, number>) {
+  const event = new Event(type, { bubbles: true });
+  for (const [key, value] of Object.entries(values)) Object.defineProperty(event, key, { value });
+  return event;
+}

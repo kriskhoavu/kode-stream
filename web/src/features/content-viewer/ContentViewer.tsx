@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useEffect, useState } from 'react';
+import { lazy, memo, type PointerEvent, Suspense, useEffect, useRef, useState } from 'react';
 import { Maximize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { viewerAdapter } from './classify';
 import { ViewerErrorBoundary } from './components/ViewerErrorBoundary';
@@ -60,6 +60,8 @@ export const ContentViewer = memo(function ContentViewer({ file, content, compac
 function ImagePreview({ src, alt }: { src: string; alt: string }) {
   const [fit, setFit] = useState(true);
   const [zoom, setZoom] = useState(100);
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const changeZoom = (delta: number) => {
     setFit(false);
     setZoom((current) => Math.min(400, Math.max(25, fit ? 100 + delta : current + delta)));
@@ -68,6 +70,23 @@ function ImagePreview({ src, alt }: { src: string; alt: string }) {
     setFit(false);
     setZoom(100);
   };
+  const startPan = (event: PointerEvent<HTMLDivElement>) => {
+    if (fit || (typeof event.button === 'number' && event.button !== 0)) return;
+    dragStart.current = { x: event.clientX, y: event.clientY, left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDragging(true);
+  };
+  const pan = (event: PointerEvent<HTMLDivElement>) => {
+    if (!dragStart.current) return;
+    event.currentTarget.scrollLeft = dragStart.current.left - (event.clientX - dragStart.current.x);
+    event.currentTarget.scrollTop = dragStart.current.top - (event.clientY - dragStart.current.y);
+  };
+  const stopPan = (event: PointerEvent<HTMLDivElement>) => {
+    if (!dragStart.current) return;
+    dragStart.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    setDragging(false);
+  };
   return <div className="content-viewer-image">
     <div className="image-preview-toolbar" aria-label="Image zoom controls">
       <button type="button" aria-label="Fit image" aria-pressed={fit} className={fit ? 'active' : undefined} onClick={() => setFit(true)}><Maximize2 size={15} /> Fit</button>
@@ -75,8 +94,14 @@ function ImagePreview({ src, alt }: { src: string; alt: string }) {
       <button type="button" aria-label="Reset zoom to 100%" onClick={reset}><RotateCcw size={14} /> {fit ? 'Fit' : `${zoom}%`}</button>
       <button type="button" aria-label="Zoom in" disabled={!fit && zoom >= 400} onClick={() => changeZoom(25)}><ZoomIn size={15} /></button>
     </div>
-    <div className={fit ? 'image-preview-canvas fit' : 'image-preview-canvas zoomed'}>
-      <img src={src} alt={alt} style={fit ? undefined : { width: `${zoom}%` }} />
+    <div
+      className={fit ? 'image-preview-canvas fit' : `image-preview-canvas zoomed${dragging ? ' dragging' : ''}`}
+      onPointerDown={startPan}
+      onPointerMove={pan}
+      onPointerUp={stopPan}
+      onPointerCancel={stopPan}
+    >
+      <img src={src} alt={alt} draggable={false} style={fit ? undefined : { width: `${zoom}%` }} />
     </div>
   </div>;
 }
