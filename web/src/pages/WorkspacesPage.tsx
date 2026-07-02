@@ -31,6 +31,7 @@ type SettingsEditorState = {
   unsortedPreview: SourceStructurePreview[];
   preview: SourceStructurePreview[];
 };
+type WorkspaceDetailTab = 'overview' | 'sources' | 'integrations' | 'health';
 
 export function WorkspacesPage({ workspaces, onChanged }: { workspaces: WorkspaceConfig[]; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('Plan Manager');
@@ -57,6 +58,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [workspaceQuery, setWorkspaceQuery] = useState('');
   const [bulkMode, setBulkMode] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<WorkspaceDetailTab>('overview');
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const selectedWorkspaces = workspaces.filter((workspace) => selectedWorkspaceIds.includes(workspace.id));
@@ -189,6 +191,27 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       jira: repo.jira ? { ...repo.jira } : null
     });
     setNotice(null);
+  };
+
+  const discardEdit = () => {
+    setEditingId('');
+  };
+
+  const confirmDiscardEdit = () => !editingId || window.confirm('Discard unsaved workspace changes?');
+
+  const selectWorkspace = (workspaceId: string) => {
+    if (workspaceId === selectedWorkspaceId) return;
+    if (!confirmDiscardEdit()) return;
+    discardEdit();
+    setSelectedWorkspaceId(workspaceId);
+    setActiveDetailTab('overview');
+  };
+
+  const selectDetailTab = (tab: WorkspaceDetailTab) => {
+    if (tab === activeDetailTab) return;
+    if (!confirmDiscardEdit()) return;
+    discardEdit();
+    setActiveDetailTab(tab);
   };
 
   const saveEdit = async (repo: WorkspaceConfig) => {
@@ -449,7 +472,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
           query={workspaceQuery}
           bulkMode={bulkMode}
           onQueryChange={setWorkspaceQuery}
-          onSelect={setSelectedWorkspaceId}
+          onSelect={selectWorkspace}
           onToggleBulkMode={() => {
             setBulkMode((current) => !current);
             setSelectedWorkspaceIds([]);
@@ -474,55 +497,99 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             </button>
           </div>}
           {notice && <WorkspaceNoticePanel notice={notice} onDismiss={() => setNotice(null)} />}
+          {selectedWorkspaceId && <div className="workspace-detail-tabs" role="tablist" aria-label="Workspace settings">
+            {(['overview', 'sources', 'integrations', 'health'] as WorkspaceDetailTab[]).map((tab) => (
+              <button
+                key={tab}
+                id={`workspace-tab-${tab}`}
+                type="button"
+                role="tab"
+                aria-selected={activeDetailTab === tab}
+                aria-controls="workspace-detail-panel"
+                className={activeDetailTab === tab ? 'active' : undefined}
+                onClick={() => selectDetailTab(tab)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                  event.preventDefault();
+                  const tabs: WorkspaceDetailTab[] = ['overview', 'sources', 'integrations', 'health'];
+                  const offset = event.key === 'ArrowRight' ? 1 : -1;
+                  const nextTab = tabs[(tabs.indexOf(tab) + offset + tabs.length) % tabs.length];
+                  selectDetailTab(nextTab);
+                  requestAnimationFrame(() => document.getElementById(`workspace-tab-${nextTab}`)?.focus());
+                }}
+              >
+                {tab[0].toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>}
           <div className="repo-list">
             {workspaces.filter((repo) => repo.id === selectedWorkspaceId).map((repo) => (
-              <article className="repo-row" key={repo.id}>
-                <div className="repo-row-icon">
-                  <HardDrive size={18} />
-                  <span className="repo-baseline-badge" title={`Baseline branch: ${repo.baselineBranch}`}>{repo.baselineBranch}</span>
-                </div>
-                {editingId === repo.id ? (
-                  <>
-                    <div className="repo-row-main repo-edit-form">
+              <article id="workspace-detail-panel" className="workspace-detail-panel" key={repo.id} role="tabpanel" aria-labelledby={`workspace-tab-${activeDetailTab}`}>
+                <header className="workspace-detail-heading">
+                  <div className="repo-row-icon"><HardDrive size={18} /></div>
+                  <div><h2>{repo.name}</h2><span>{activeDetailTab === 'overview' ? 'Workspace details' : activeDetailTab === 'sources' ? 'Indexed source directories' : activeDetailTab === 'integrations' ? 'Connected services' : 'Workspace diagnostics'}</span></div>
+                </header>
+
+                {activeDetailTab === 'overview' && <section className="workspace-detail-section">
+                  {editingId === repo.id ? <>
+                    <div className="repo-edit-form">
                       <label className="repo-field">Workspace Name<input value={editDraft.name} onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })} /></label>
                       <label className="repo-field">Local Path<input value={editDraft.path} onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })} /></label>
-                      <div className="repo-field-grid">
-                        <BranchField value={editDraft.baselineBranch} onChange={(value) => setEditDraft({ ...editDraft, baselineBranch: value })} />
-                        <SourcesField value={editDraft.sources} onChange={(value) => setEditDraft({ ...editDraft, sources: value })} />
-                      </div>
-                      <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />
+                      <BranchField value={editDraft.baselineBranch} onChange={(value) => setEditDraft({ ...editDraft, baselineBranch: value })} />
                     </div>
                     <div className="repo-row-actions">
-                      <button className="secondary" type="button" onClick={() => setEditingId('')} disabled={busy}>Cancel</button>
+                      <button className="secondary" type="button" onClick={discardEdit} disabled={busy}>Cancel</button>
                       <button className="primary" type="button" onClick={() => saveEdit(repo)} disabled={busy}>Save</button>
-                      <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])} disabled={busy}><Trash2 size={16} /> Remove</button>
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="repo-row-main">
-                      <h2>{repo.name}</h2>
-                      {repo.registrationMode === 'remote_clone' && repo.remoteUrl && <span className="repo-remote-url" title={repo.remoteUrl}>{repo.remoteUrl}</span>}
-                      <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} disabled={operationBusy('workspace-form')} title={repo.path}>{repo.path}</button>
-                      <div className="repo-directory-list">
-                        {repo.sources.map((directory) => (
-                          <div className="repo-directory-chip" key={directory}>
-                            <span className="repo-directory-name">{directory}</span>
-                            <button type="button" onClick={() => void openSourceSettings(repo, directory)} disabled={operationBusy('workspace-form')} aria-label={`Configure ${directory}`} title={`Configure ${directory}`}>
-                              <SlidersHorizontal size={12} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                  </> : <>
+                    <dl className="workspace-overview-grid">
+                      <div><dt>Location</dt><dd><button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} title={repo.path}>{repo.path}</button></dd></div>
+                      <div><dt>Base branch</dt><dd>{repo.baselineBranch}</dd></div>
+                      <div><dt>Registration</dt><dd>{repo.registrationMode === 'remote_clone' ? 'Remote clone' : 'Local folder'}</dd></div>
+                      {repo.remoteUrl && <div><dt>Remote URL</dt><dd>{repo.remoteUrl}</dd></div>}
+                      <div><dt>Created</dt><dd>{repo.createdAt ? new Date(repo.createdAt).toLocaleString() : 'Unknown'}</dd></div>
+                    </dl>
+                    <div className="repo-row-actions workspace-detail-actions">
+                      <button className="secondary" type="button" onClick={() => revealPath(repo.path)}><ExternalLink size={16} /> Reveal folder</button>
+                      <button className="primary" type="button" onClick={() => startEdit(repo)}><Pencil size={16} /> Edit overview</button>
                     </div>
-                    <div className="repo-row-actions">
-                      <button className="secondary icon-action" onClick={() => revealPath(repo.path)} disabled={operationBusy('workspace-form')} title="Reveal"><ExternalLink size={16} /></button>
-                      <button className="secondary icon-action" onClick={() => startEdit(repo)} disabled={operationBusy('workspace-form')} title="Edit"><Pencil size={16} /></button>
-                      <button className="secondary" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all')}><RotateCw size={16} /> Scan</button>
+                    <div className="workspace-danger-zone">
+                      <div><strong>Remove workspace</strong><span>Remove its cached items from Plan Manager.</span></div>
+                      <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])}><Trash2 size={16} /> Remove</button>
                     </div>
-                  </>
-                )}
-                <WorkspaceHealthPanel workspaceId={repo.id} />
+                  </>}
+                </section>}
+
+                {activeDetailTab === 'sources' && <section className="workspace-detail-section">
+                  {editingId === repo.id ? <>
+                    <SourcesField value={editDraft.sources} onChange={(value) => setEditDraft({ ...editDraft, sources: value })} />
+                    <div className="repo-row-actions"><button className="secondary" type="button" onClick={discardEdit}>Cancel</button><button className="primary" type="button" onClick={() => saveEdit(repo)}>Save sources</button></div>
+                  </> : <>
+                    <div className="workspace-source-list">
+                      {repo.sources.map((directory) => <div className="workspace-source-row" key={directory}>
+                        <div><strong>{directory}</strong><span>Workspace source directory</span></div>
+                        <button className="secondary" type="button" onClick={() => void openSourceSettings(repo, directory)}><SlidersHorizontal size={15} /> Configure structure</button>
+                      </div>)}
+                      {repo.sources.length === 0 && <div className="empty-inline">No sources configured.</div>}
+                    </div>
+                    <div className="workspace-detail-actions"><button className="primary" type="button" onClick={() => startEdit(repo)}><Pencil size={16} /> Edit sources</button></div>
+                  </>}
+                </section>}
+
+                {activeDetailTab === 'integrations' && <section className="workspace-detail-section">
+                  {editingId === repo.id ? <>
+                    <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />
+                    <div className="repo-row-actions"><button className="secondary" type="button" onClick={discardEdit}>Cancel</button><button className="primary" type="button" onClick={() => saveEdit(repo)}>Save integration</button></div>
+                  </> : <div className="workspace-integration-card">
+                    <div><strong>Jira</strong><span>{repo.jira ? `${repo.jira.projectKey} · ${repo.jira.deploymentType === 'cloud' ? 'Cloud' : 'Server / Data Center'}` : 'Not configured'}</span></div>
+                    <button className="secondary" type="button" onClick={() => startEdit(repo)}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
+                  </div>}
+                </section>}
+
+                {activeDetailTab === 'health' && <section className="workspace-detail-section workspace-health-detail">
+                  <div className="workspace-detail-actions"><button className="primary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all')}><RotateCw size={16} /> Scan workspace</button></div>
+                  <WorkspaceHealthPanel workspaceId={repo.id} />
+                </section>}
               </article>
             ))}
             {workspaces.length === 0 && <div className="empty-inline repo-empty"><CheckCircle2 size={18} /> No workspaces registered.</div>}

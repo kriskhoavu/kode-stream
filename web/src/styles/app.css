@@ -2513,6 +2513,139 @@ body.is-resizing-drawer {
   display: none;
 }
 
+.workspace-detail-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.workspace-detail-tabs button {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.workspace-detail-tabs button:hover,
+.workspace-detail-tabs button.active {
+  color: var(--blue);
+}
+
+.workspace-detail-tabs button.active {
+  border-bottom-color: var(--blue);
+}
+
+.workspace-detail-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.workspace-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workspace-detail-heading h2,
+.workspace-detail-heading span {
+  margin: 0;
+}
+
+.workspace-detail-heading h2 {
+  font-size: 18px;
+}
+
+.workspace-detail-heading span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workspace-detail-section,
+.repo-edit-form {
+  display: grid;
+  gap: 14px;
+}
+
+.workspace-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.workspace-overview-grid > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.workspace-overview-grid dt {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workspace-overview-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.workspace-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.workspace-danger-zone,
+.workspace-source-row,
+.workspace-integration-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.workspace-danger-zone {
+  margin-top: 12px;
+  border-color: color-mix(in srgb, #dc2626 28%, var(--line));
+}
+
+.workspace-danger-zone > div,
+.workspace-source-row > div,
+.workspace-integration-card > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.workspace-danger-zone span,
+.workspace-source-row span,
+.workspace-integration-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workspace-source-list {
+  display: grid;
+  gap: 8px;
+}
+
+.workspace-health-detail .health-panel {
+  grid-column: auto;
+}
+
 .workspaces-left-column {
   display: flex;
   flex-direction: column;

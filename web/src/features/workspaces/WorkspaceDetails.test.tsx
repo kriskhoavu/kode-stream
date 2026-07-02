@@ -1,0 +1,60 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { api } from '../../lib/api';
+import { WorkspacesPage } from '../../pages/WorkspacesPage';
+
+vi.mock('../../lib/api', () => ({
+  api: { systemConfigPaths: vi.fn() },
+  ApiError: class ApiError extends Error { recoveryHint?: string }
+}));
+
+const workspace = {
+  id: 'workspace-1',
+  name: 'Discovery',
+  path: '/repos/discovery',
+  baselineBranch: 'main',
+  sources: ['plans', 'docs'],
+  createdAt: '2026-01-01T00:00:00Z',
+  jira: { deploymentType: 'cloud' as const, baseUrl: 'https://example.atlassian.net', projectKey: 'DI', accountEmail: 'user@example.com', tokenEnvVar: 'JIRA_TOKEN' }
+};
+
+describe('workspace detail settings', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('separates sources and integrations from overview', () => {
+    vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+
+    expect(screen.queryByText('Connect Jira')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Sources' }));
+    expect(screen.getAllByRole('button', { name: 'Configure structure' })).toHaveLength(2);
+    expect(screen.getByText('docs')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
+    expect(screen.getByText('DI · Cloud')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Configure' })).toBeInTheDocument();
+  });
+
+  it('guards tab navigation while a settings draft is open', () => {
+    vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit overview' }));
+    fireEvent.change(screen.getByLabelText('Workspace Name'), { target: { value: 'Changed' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Sources' }));
+
+    expect(window.confirm).toHaveBeenCalledWith('Discard unsaved workspace changes?');
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByDisplayValue('Changed')).toBeInTheDocument();
+  });
+
+  it('supports arrow-key navigation between settings tabs', () => {
+    vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Overview' }), { key: 'ArrowRight' });
+
+    expect(screen.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
+  });
+});

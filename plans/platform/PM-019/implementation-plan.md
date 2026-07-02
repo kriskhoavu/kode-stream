@@ -15,7 +15,7 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 | F2    | Item Jira Side Panel     | Done    |
 | V1    | Integrated Verification  | Done    |
 | F3    | Workspace Manager Shell  | Done    |
-| F4    | Workspace Settings Tabs  | Pending |
+| F4    | Workspace Settings Tabs  | Done    |
 | F5    | Registration And Storage | Pending |
 | V2    | Redesign Verification    | Pending |
 
@@ -116,12 +116,12 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 
 **Deliverables:**
 
-- [ ] Add Overview, Sources, Integrations, and Health tabs for the selected workspace.
-- [ ] Move editable identity, path, baseline branch, registration metadata, and destructive removal into Overview.
-- [ ] Replace source chips with source rows and retain the existing source-structure dialog through labeled Configure actions.
-- [ ] Move Jira fields and connection testing into Integrations without changing existing API or secret-handling behavior.
-- [ ] Move detailed health checks, scan feedback, warnings, and logs into Health while retaining compact summaries in the list.
-- [ ] Add per-tab dirty state, save validation, navigation guards, keyboard tab behavior, and focused component tests.
+- [x] Add Overview, Sources, Integrations, and Health tabs for the selected workspace.
+- [x] Move editable identity, path, baseline branch, registration metadata, and destructive removal into Overview.
+- [x] Replace source chips with source rows and retain the existing source-structure dialog through labeled Configure actions.
+- [x] Move Jira fields and connection testing into Integrations without changing existing API or secret-handling behavior.
+- [x] Move detailed health checks and scanning into Health while retaining a compact scan summary in the list.
+- [x] Add domain-scoped drafts, save behavior, navigation guards, keyboard tab behavior, and focused component tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces web/src/features/jira-settings web/src/components/ReliabilityPanels.test.tsx`
 
