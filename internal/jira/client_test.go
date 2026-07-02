@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -52,6 +54,49 @@ func TestConnectionRequiresEnvironmentToken(t *testing.T) {
 	_, err := client.TestConnection(context.Background(), models.JiraConnection{TokenEnvVar: "JIRA_TOKEN"})
 	if err == nil || strings.Contains(err.Error(), "secret") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestConnectionFallsBackToCredentialsFile(t *testing.T) {
+	home := t.TempDir()
+	credsPath := filepath.Join(home, ".creds.zsh")
+	if err := os.WriteFile(credsPath, []byte("export CC_JIRA_API_TOKEN=\"secret\"\n"), 0o600); err != nil {
+		t.Fatalf("write creds: %v", err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, token, ok := r.BasicAuth()
+		if !ok || user != "user@example.com" || token != "secret" {
+			t.Fatalf("auth=%q,%q,%v", user, token, ok)
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+	client := New()
+	client.getenv = func(string) string { return "" }
+	client.homeDir = func() (string, error) { return home, nil }
+	client.credentialFiles = []string{"~/.creds.zsh"}
+	result, err := client.TestConnection(context.Background(), models.JiraConnection{DeploymentType: "cloud", BaseURL: server.URL, ProjectKey: "DI", AccountEmail: "user@example.com", TokenEnvVar: "CC_JIRA_API_TOKEN"})
+	if err != nil || !result.OK {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+}
+
+func TestConnectionIgnoresBareCredentialsAssignments(t *testing.T) {
+	home := t.TempDir()
+	credsPath := filepath.Join(home, ".creds.zsh")
+	if err := os.WriteFile(credsPath, []byte("CC_JIRA_API_TOKEN=\"secret\"\n"), 0o600); err != nil {
+		t.Fatalf("write creds: %v", err)
+	}
+	client := New()
+	client.getenv = func(string) string { return "" }
+	client.homeDir = func() (string, error) { return home, nil }
+	client.credentialFiles = []string{"~/.creds.zsh"}
+	token, err := client.resolveToken("CC_JIRA_API_TOKEN")
+	if err != nil {
+		t.Fatalf("resolveToken err=%v", err)
+	}
+	if token != "" {
+		t.Fatalf("token=%q", token)
 	}
 }
 

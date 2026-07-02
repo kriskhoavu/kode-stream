@@ -1013,25 +1013,38 @@ function normalizeJiraDraft(value: JiraConnection): JiraConnection {
 
 function JiraConnectionFields({ value, onChange, workspaceId }: { value: JiraConnection | null; onChange: (value: JiraConnection | null) => void; workspaceId?: string }) {
   const [testing, setTesting] = useState(false);
+  const [resultTone, setResultTone] = useState<'success' | 'error' | null>(null);
   const [result, setResult] = useState('');
   const update = (patch: Partial<JiraConnection>) => value && onChange({ ...value, ...patch });
   const test = async () => {
     if (!value || !workspaceId) return;
-    setTesting(true); setResult('');
-    try { setResult((await api.testJiraConnection(workspaceId, normalizeJiraDraft(value))).message); }
-    catch (caught) { setResult(caught instanceof ApiError && caught.recoveryHint ? `${caught.message} ${caught.recoveryHint}` : errorMessage(caught)); }
-    finally { setTesting(false); }
+    setTesting(true); setResultTone(null); setResult('');
+    try {
+      const response = await api.testJiraConnection(workspaceId, normalizeJiraDraft(value));
+      setResultTone('success');
+      setResult(response.message);
+    } catch (caught) {
+      setResultTone('error');
+      setResult(caught instanceof ApiError && caught.recoveryHint ? `${caught.message} ${caught.recoveryHint}` : errorMessage(caught));
+    } finally {
+      setTesting(false);
+    }
   };
-  return <fieldset className="jira-connection-fields">
-    <legend><label><input type="checkbox" checked={value !== null} onChange={(event) => { setResult(''); onChange(event.target.checked ? emptyJiraConnection() : null); }} /> Jira integration</label></legend>
+  return <section className="jira-connection-fields">
+    <label className="repo-field jira-connection-toggle">
+      <span className="jira-connection-title">
+        <input type="checkbox" checked={value !== null} onChange={(event) => { setResultTone(null); setResult(''); onChange(event.target.checked ? emptyJiraConnection() : null); }} />
+        Jira integration
+      </span>
+    </label>
     {value && <>
       <div className="registration-mode-toggle" role="radiogroup" aria-label="Jira deployment type"><button type="button" role="radio" aria-checked={value.deploymentType === 'cloud'} className={value.deploymentType === 'cloud' ? 'secondary active' : 'secondary'} onClick={() => update({ deploymentType: 'cloud' })}>Cloud</button><button type="button" role="radio" aria-checked={value.deploymentType === 'server'} className={value.deploymentType === 'server' ? 'secondary active' : 'secondary'} onClick={() => update({ deploymentType: 'server', accountEmail: '' })}>Server / Data Center</button></div>
       <div className="repo-field-grid"><label className="repo-field">Base URL<input aria-label="Jira base URL" value={value.baseUrl} onChange={(event) => update({ baseUrl: event.target.value })} placeholder="https://company.atlassian.net" /></label><label className="repo-field">Project Key<input aria-label="Jira project key" value={value.projectKey} onChange={(event) => update({ projectKey: event.target.value.toUpperCase() })} placeholder="DI" /></label></div>
       {value.deploymentType === 'cloud' && <label className="repo-field">Account Email<input aria-label="Jira account email" value={value.accountEmail ?? ''} onChange={(event) => update({ accountEmail: event.target.value })} /></label>}
       <label className="repo-field">Token Environment Variable<input aria-label="Jira token environment variable" value={value.tokenEnvVar} onChange={(event) => update({ tokenEnvVar: event.target.value })} /><small>Store the token in this environment variable before starting Plan Manager.</small></label>
-      {workspaceId && <div className="jira-test-row"><button className="secondary" type="button" disabled={testing} onClick={() => void test()}>{testing ? 'Testing...' : 'Test Jira connection'}</button>{result && <span role="status">{result}</span>}</div>}
+      {workspaceId && <div className="jira-test-row"><button className="secondary" type="button" disabled={testing} onClick={() => void test()}>{testing ? 'Testing...' : 'Test Jira connection'}</button>{result && <span className={`jira-connection-status ${resultTone ?? 'success'}`} role="status"><span className={`jira-connection-status-dot ${resultTone ?? 'success'}`} aria-hidden="true" />{result}</span>}</div>}
     </>}
-  </fieldset>;
+  </section>;
 }
 
 export function inferWorkspaceNameFromRemoteURL(remoteUrl: string): string {

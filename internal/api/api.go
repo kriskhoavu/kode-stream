@@ -1179,7 +1179,7 @@ func recoveryHint(message string) string {
 	lower := strings.ToLower(message)
 	switch {
 	case strings.Contains(lower, "jira token environment variable"):
-		return "Set the configured environment variable and restart Plan Manager."
+		return "Set the configured environment variable or add it to ~/.creds.zsh or ~/.creds.sh, then restart Plan Manager."
 	case strings.Contains(lower, "jira authentication"):
 		return "Check the Jira account and token configured for this workspace."
 	case strings.Contains(lower, "jira project"):

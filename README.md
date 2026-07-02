@@ -187,6 +187,8 @@ Changing `dataDir` requires a restart.
 
 AI settings contain executable paths and argument templates only. Workspace-only sessions open at the workspace root without generated context, allowing manual file and directory references. Selected-card sessions pass the card's workspace-relative path directly to the AI, which can read relevant documents from that directory before waiting for the user's request. No context file or directory is created.
 
+Jira token lookup checks the running process environment first and then falls back to `~/.creds.zsh` and `~/.creds.sh` if the environment variable is missing. The file must contain an exported variable such as `export CC_JIRA_API_TOKEN="..."`.
+
 ### Data Directory Structure
 
 ```text

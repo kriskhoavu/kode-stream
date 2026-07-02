@@ -98,17 +98,54 @@
 .jira-connection-fields {
   display: grid;
   gap: 12px;
-  margin: 8px 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 14px;
+  margin: 8px 0 0;
 }
 
-.jira-connection-fields legend label,
+.jira-connection-toggle,
 .jira-test-row {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.jira-connection-toggle {
+  justify-content: space-between;
+}
+
+.jira-connection-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.jira-connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.jira-connection-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+  flex: 0 0 auto;
+}
+
+.jira-connection-status.success .jira-connection-status-dot {
+  background: var(--green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 16%, transparent);
+}
+
+.jira-connection-status.error .jira-connection-status-dot {
+  background: #dc2626;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #dc2626 16%, transparent);
 }
 
 .jira-connection-fields small,
