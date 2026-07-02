@@ -56,7 +56,7 @@ User selects attachment
 ```text
 User selects a workspace in the workspace list
   -> workspace detail opens on Overview
-  -> user selects Overview, Sources, Integrations, or Health
+  -> user selects Overview, Sources, or Integrations
   -> only the selected settings domain is rendered
   -> edits remain scoped to that domain
   -> save refreshes workspace data without losing list context
@@ -95,7 +95,7 @@ User opens application settings
 - Selecting tabs does not discard unsaved changes without warning.
 - Jira is optional and appears under the selected workspace's Integrations tab.
 - Source rows expose names, index state, and a labeled Configure action.
-- Health problems are visible in list and detail summaries without rendering every check by default.
+- Health problems are visible in the list and Overview without rendering every check by default.
 - Registration supports keyboard use, progress feedback, retry, and remote-clone logs.
 - Destructive workspace removal remains separated from routine editing and requires confirmation.
 - Bulk selection is hidden until explicitly activated and is usable by keyboard.

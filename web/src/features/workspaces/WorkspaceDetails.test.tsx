@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api';
 import { WorkspacesPage } from '../../pages/WorkspacesPage';
 
 vi.mock('../../lib/api', () => ({
-  api: { systemConfigPaths: vi.fn() },
+  api: { systemConfigPaths: vi.fn(), workspaceHealth: vi.fn() },
   ApiError: class ApiError extends Error { recoveryHint?: string }
 }));
 
@@ -19,12 +19,17 @@ const workspace = {
 };
 
 describe('workspace detail settings', () => {
+  beforeEach(() => {
+    vi.mocked(api.workspaceHealth).mockImplementation(() => new Promise(() => undefined));
+  });
   afterEach(() => vi.restoreAllMocks());
 
   it('separates sources and integrations from overview', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
     render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
 
+    expect(screen.queryByRole('tab', { name: 'Health' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Workspace health' })).toBeInTheDocument();
     expect(screen.queryByText('Connect Jira')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Sources' }));
     expect(screen.getAllByRole('button', { name: 'Configure structure' })).toHaveLength(2);

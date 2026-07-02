@@ -2,7 +2,7 @@
 
 ## Overview
 
-Keep the existing Jira item section, then replace the Workspaces page's permanent create form and expanding edit cards with a master-detail workspace manager. Workspace configuration is split into Overview, Sources, Integrations, and Health. Jira loads independently from local item detail so remote latency or failure cannot block local files, metadata, diff, or Git controls.
+Keep the existing Jira item section, then replace the Workspaces page's permanent create form and expanding edit cards with a master-detail workspace manager. Workspace configuration is split into Overview, Sources, and Integrations. Overview includes the compact workspace health summary and diagnostics. Jira loads independently from local item detail so remote latency or failure cannot block local files, metadata, diff, or Git controls.
 
 ## Information Architecture
 
@@ -13,10 +13,9 @@ Workspaces
 │   ├── Search and explicit bulk-selection mode
 │   └── Compact rows: name, location type, health, item count
 └── Selected workspace detail
-    ├── Overview: identity, location, branch, registration, removal
+    ├── Overview: identity, location, branch, health, scan, registration, removal
     ├── Sources: source directories and source structure
-    ├── Integrations: Jira connection and connection test
-    └── Health: scan state, checks, warnings, logs, and Scan
+    └── Integrations: Jira connection and connection test
 
 Application Settings
 └── Storage: data directory and managed clone directory
@@ -24,17 +23,16 @@ Application Settings
 
 ## Component Boundaries
 
-| Component               | Responsibility                                                        |
-|-------------------------|-----------------------------------------------------------------------|
-| `WorkspacesPage`        | Load page selection and coordinate list, detail, dialogs, and notices |
-| `WorkspaceList`         | Search, select, summarize, and explicitly enter bulk-selection mode   |
-| `WorkspaceDetails`      | Own active detail tab and unsaved-change navigation guard             |
-| `WorkspaceOverview`     | Edit name, path, baseline branch, and show registration metadata      |
-| `WorkspaceSources`      | List sources and open the existing source-structure editor            |
-| `WorkspaceIntegrations` | Edit optional Jira configuration and test the connection              |
-| `WorkspaceHealth`       | Show detailed checks, scan state, warnings, logs, and scan action     |
-| `AddWorkspaceDialog`    | Register a local folder or clone a remote repository                  |
-| `StorageSettings`       | Edit application-wide data and managed clone directories              |
+| Component               | Responsibility                                                         |
+|-------------------------|------------------------------------------------------------------------|
+| `WorkspacesPage`        | Load page selection and coordinate list, detail, dialogs, and notices  |
+| `WorkspaceList`         | Search, select, summarize, and explicitly enter bulk-selection mode    |
+| `WorkspaceDetails`      | Own active detail tab and unsaved-change navigation guard              |
+| `WorkspaceOverview`     | Edit identity, show registration metadata, and provide health and scan |
+| `WorkspaceSources`      | List sources and open the existing source-structure editor             |
+| `WorkspaceIntegrations` | Edit optional Jira configuration and test the connection               |
+| `AddWorkspaceDialog`    | Register a local folder or clone a remote repository                   |
+| `StorageSettings`       | Edit application-wide data and managed clone directories               |
 
 ## State Management
 

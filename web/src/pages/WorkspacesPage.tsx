@@ -31,7 +31,7 @@ type SettingsEditorState = {
   unsortedPreview: SourceStructurePreview[];
   preview: SourceStructurePreview[];
 };
-type WorkspaceDetailTab = 'overview' | 'sources' | 'integrations' | 'health';
+type WorkspaceDetailTab = 'overview' | 'sources' | 'integrations';
 
 export function WorkspacesPage({ workspaces, onChanged }: { workspaces: WorkspaceConfig[]; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('');
@@ -494,7 +494,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
           </div>}
           {notice && <WorkspaceNoticePanel notice={notice} onDismiss={() => setNotice(null)} />}
           {selectedWorkspaceId && <div className="workspace-detail-tabs" role="tablist" aria-label="Workspace settings">
-            {(['overview', 'sources', 'integrations', 'health'] as WorkspaceDetailTab[]).map((tab) => (
+            {(['overview', 'sources', 'integrations'] as WorkspaceDetailTab[]).map((tab) => (
               <button
                 key={tab}
                 id={`workspace-tab-${tab}`}
@@ -507,7 +507,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                 onKeyDown={(event) => {
                   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                   event.preventDefault();
-                  const tabs: WorkspaceDetailTab[] = ['overview', 'sources', 'integrations', 'health'];
+                  const tabs: WorkspaceDetailTab[] = ['overview', 'sources', 'integrations'];
                   const offset = event.key === 'ArrowRight' ? 1 : -1;
                   const nextTab = tabs[(tabs.indexOf(tab) + offset + tabs.length) % tabs.length];
                   selectDetailTab(nextTab);
@@ -523,7 +523,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               <article id="workspace-detail-panel" className="workspace-detail-panel" key={repo.id} role="tabpanel" aria-labelledby={`workspace-tab-${activeDetailTab}`}>
                 <header className="workspace-detail-heading">
                   <div className="repo-row-icon"><HardDrive size={18} /></div>
-                  <div><h2>{repo.name}</h2><span>{activeDetailTab === 'overview' ? 'Workspace details' : activeDetailTab === 'sources' ? 'Indexed source directories' : activeDetailTab === 'integrations' ? 'Connected services' : 'Workspace diagnostics'}</span></div>
+                  <div><h2>{repo.name}</h2><span>{activeDetailTab === 'overview' ? 'Workspace details and health' : activeDetailTab === 'sources' ? 'Indexed source directories' : 'Connected services'}</span></div>
                 </header>
 
                 {activeDetailTab === 'overview' && <section className="workspace-detail-section">
@@ -554,6 +554,10 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                       <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])}><Trash2 size={16} /> Remove</button>
                     </div>
                   </>}
+                  <div className="workspace-overview-health">
+                    <div className="workspace-detail-actions"><button className="secondary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all')}><RotateCw size={16} /> Scan workspace</button></div>
+                    <WorkspaceHealthPanel workspaceId={repo.id} />
+                  </div>
                 </section>}
 
                 {activeDetailTab === 'sources' && <section className="workspace-detail-section">
@@ -582,10 +586,6 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                   </div>}
                 </section>}
 
-                {activeDetailTab === 'health' && <section className="workspace-detail-section workspace-health-detail">
-                  <div className="workspace-detail-actions"><button className="primary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all')}><RotateCw size={16} /> Scan workspace</button></div>
-                  <WorkspaceHealthPanel workspaceId={repo.id} />
-                </section>}
               </article>
             ))}
             {workspaces.length === 0 && <div className="empty-inline repo-empty"><CheckCircle2 size={18} /> No workspaces registered.</div>}

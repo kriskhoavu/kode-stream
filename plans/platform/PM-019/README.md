@@ -29,17 +29,17 @@ Display a matching Jira ticket, safely access its attachments, and provide a sca
 
 ## Glossary
 
-| Term                       | Meaning                                                                            |
-|----------------------------|------------------------------------------------------------------------------------|
-| Jira Connection            | Per-workspace deployment, base URL, project, identity, and token reference         |
-| Deployment Type            | `cloud` or `server`                                                                |
-| Token Environment Variable | Environment variable read by the Plan Manager process                              |
-| Issue Key                  | Uppercase project key and number, such as `DI-170`                                 |
-| Normalized Issue           | Common API model produced from Cloud or Server/Data Center responses               |
-| Attachment Proxy           | Backend route that validates and streams Jira attachment content                   |
-| Workspace Manager          | Master-detail page for browsing and configuring registered workspaces              |
-| Workspace Detail           | Selected workspace view organized into Overview, Sources, Integrations, and Health |
-| Add Workspace Flow         | Focused dialog for local registration or remote cloning                            |
+| Term                       | Meaning                                                                    |
+|----------------------------|----------------------------------------------------------------------------|
+| Jira Connection            | Per-workspace deployment, base URL, project, identity, and token reference |
+| Deployment Type            | `cloud` or `server`                                                        |
+| Token Environment Variable | Environment variable read by the Plan Manager process                      |
+| Issue Key                  | Uppercase project key and number, such as `DI-170`                         |
+| Normalized Issue           | Common API model produced from Cloud or Server/Data Center responses       |
+| Attachment Proxy           | Backend route that validates and streams Jira attachment content           |
+| Workspace Manager          | Master-detail page for browsing and configuring registered workspaces      |
+| Workspace Detail           | Selected workspace view organized into Overview, Sources, and Integrations |
+| Add Workspace Flow         | Focused dialog for local registration or remote cloning                    |
 
 ## Data Flow
 

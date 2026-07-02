@@ -2727,7 +2727,13 @@ body.is-resizing-drawer {
   gap: 8px;
 }
 
-.workspace-health-detail .health-panel {
+.workspace-overview-health {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.workspace-overview-health .health-panel {
   grid-column: auto;
 }
 
