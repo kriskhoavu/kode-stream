@@ -187,3 +187,35 @@ func TestGetAttachmentRejectsCrossOriginRedirect(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+func TestAttachmentRedirectPolicyAllowsOnlyCloudMediaWithoutCredentials(t *testing.T) {
+	cloud := models.JiraConnection{DeploymentType: "cloud"}
+	policy := attachmentRedirectPolicy(cloud)
+	original, _ := http.NewRequest(http.MethodGet, "https://company.atlassian.net/attachment/1", nil)
+	media, _ := http.NewRequest(http.MethodGet, "https://api.media.atlassian.com/file/abc/binary?token=signed", nil)
+	media.Header.Set("Authorization", "Basic secret")
+	media.Header.Set("Cookie", "session=secret")
+	if err := policy(media, []*http.Request{original}); err != nil {
+		t.Fatalf("trusted cloud media redirect rejected: %v", err)
+	}
+	if media.Header.Get("Authorization") != "" || media.Header.Get("Cookie") != "" {
+		t.Fatal("credentials must not be forwarded to Atlassian media")
+	}
+
+	for name, test := range map[string]struct {
+		connection models.JiraConnection
+		target     string
+	}{
+		"arbitrary host":    {cloud, "https://evil.example/file"},
+		"media over http":   {cloud, "http://api.media.atlassian.com/file"},
+		"media with port":   {cloud, "https://api.media.atlassian.com:8443/file"},
+		"server deployment": {models.JiraConnection{DeploymentType: "server"}, "https://api.media.atlassian.com/file"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			request, _ := http.NewRequest(http.MethodGet, test.target, nil)
+			if err := attachmentRedirectPolicy(test.connection)(request, []*http.Request{original}); err == nil || !strings.Contains(err.Error(), "changed origin") {
+				t.Fatalf("redirect error = %v", err)
+			}
+		})
+	}
+}

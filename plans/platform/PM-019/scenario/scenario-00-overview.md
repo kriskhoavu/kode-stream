@@ -117,3 +117,4 @@ User opens a matched Jira item
 - Bulk selection is hidden until explicitly activated and is usable by keyboard.
 - Local PNG, JPEG, GIF, and WebP files render as bounded, non-editable previews.
 - Jira attachment images are not requested before the user expands Attachments.
+- Jira Cloud media redirects never forward the workspace authorization header or cookies.

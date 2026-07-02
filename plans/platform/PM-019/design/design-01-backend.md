@@ -35,7 +35,7 @@ Issue state values are `not_configured`, `invalid_identifier`, `project_mismatch
 - Cloud uses account email plus API token when required and parses Atlassian Document Format.
 - Server/Data Center uses PAT bearer authentication and accepts supported plain/wiki/rendered description shapes.
 - Base URLs require HTTPS except loopback addresses used by tests.
-- HTTP clients apply connection and response timeouts and never follow redirects to another origin.
+- HTTP clients apply connection and response timeouts. API requests remain same-origin; Cloud attachment requests may follow only credential-stripped HTTPS redirects to `api.media.atlassian.com`.
 
 ## Matching and Cache
 
@@ -52,7 +52,7 @@ Issue state values are `not_configured`, `invalid_identifier`, `project_mismatch
 - Apply maximum size before streaming when Jira provides a length and enforce a streamed byte limit otherwise.
 - Restrict inline preview to an explicit safe media-type allowlist; otherwise force `attachment` disposition.
 - Sanitize filenames, set `X-Content-Type-Options: nosniff`, and do not forward Jira cookies, authorization, or arbitrary headers.
-- Abort on timeout, cross-origin redirect, or mismatched response metadata.
+- Abort on timeout, mismatched response metadata, or any cross-origin redirect except the credential-stripped Atlassian Cloud media host.
 
 ## Design Decisions
 

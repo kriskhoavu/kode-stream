@@ -151,6 +151,7 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 - [x] Render supported local images in the shared content viewer for item and workspace files.
 - [x] Keep Jira Attachments collapsed by default and defer thumbnail requests until expansion.
 - [x] Open full Jira images through the existing authenticated attachment proxy after explicit selection.
+- [x] Allow credential-stripped Jira Cloud redirects only to the trusted Atlassian media host.
 - [x] Test local image classification/rendering and lazy Jira thumbnail behavior.
 
 **Verification:** `go test ./internal/fileaccess ./internal/application/item ./internal/api && npm run typecheck && npm test -- --run web/src/features/content-viewer web/src/features/jira`

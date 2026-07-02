@@ -94,7 +94,9 @@ func (c *Client) GetAttachment(ctx context.Context, connection models.JiraConnec
 	if err := c.authorize(request, connection); err != nil {
 		return AttachmentContent{}, err
 	}
-	response, err := c.httpClient.Do(request)
+	attachmentClient := *c.httpClient
+	attachmentClient.CheckRedirect = attachmentRedirectPolicy(connection)
+	response, err := attachmentClient.Do(request)
 	if err != nil {
 		return AttachmentContent{}, fmt.Errorf("Jira attachment is unavailable: %w", err)
 	}
@@ -420,6 +422,31 @@ func sameOriginRedirect(request *http.Request, via []*http.Request) error {
 		return errors.New("too many Jira redirects")
 	}
 	return nil
+}
+
+func attachmentRedirectPolicy(connection models.JiraConnection) func(*http.Request, []*http.Request) error {
+	return func(request *http.Request, via []*http.Request) error {
+		if len(via) == 0 {
+			return nil
+		}
+		if len(via) >= 5 {
+			return errors.New("too many Jira redirects")
+		}
+		if strings.EqualFold(request.URL.Scheme, via[0].URL.Scheme) && strings.EqualFold(request.URL.Host, via[0].URL.Host) {
+			return nil
+		}
+		trustedCloudMedia := strings.EqualFold(connection.DeploymentType, "cloud") &&
+			strings.EqualFold(request.URL.Scheme, "https") &&
+			strings.EqualFold(request.URL.Hostname(), "api.media.atlassian.com") &&
+			request.URL.Port() == ""
+		if !trustedCloudMedia {
+			return errors.New("Jira redirect changed origin")
+		}
+		request.Header.Del("Authorization")
+		request.Header.Del("Cookie")
+		request.Header.Del("Proxy-Authorization")
+		return nil
+	}
 }
 
 func decodeBounded(response *http.Response, target any) error {
