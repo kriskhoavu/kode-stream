@@ -4444,21 +4444,20 @@ body.is-resizing-panel {
   background: color-mix(in srgb, var(--panel) 84%, var(--panel-soft));
   padding: 3px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   margin-bottom: 14px;
   position: relative;
 }
 
-.side-panel-tabs::before {
+.side-panel-tabs button + button::before {
   content: "";
   position: absolute;
-  top: 7px;
-  bottom: 7px;
-  left: 50%;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
   width: 1px;
   background: color-mix(in srgb, var(--line) 76%, var(--muted));
-  transform: translateX(-.5px);
 }
 
 .side-panel-tabs button {
