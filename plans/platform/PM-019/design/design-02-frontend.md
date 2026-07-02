@@ -2,7 +2,7 @@
 
 ## Overview
 
-Keep the existing Jira item section, then replace the Workspaces page's permanent create form and expanding edit cards with a master-detail workspace manager. Workspace configuration is split into Overview, Sources, and Integrations. Overview includes the compact workspace health summary and diagnostics. Jira loads independently from local item detail so remote latency or failure cannot block local files, metadata, diff, or Git controls.
+Keep the existing Jira item section, then replace the Workspaces page's permanent create form and expanding edit cards with a master-detail workspace manager. Workspace configuration is split into Overview and Integrations. Overview contains collapsible General, Health, and Sources sections with consistent headings and dividers. Jira loads independently from local item detail so remote latency or failure cannot block local files, metadata, diff, or Git controls.
 
 ## Information Architecture
 
@@ -14,8 +14,10 @@ Workspaces
 │   └── Compact rows: name, location type, health, item count
 └── Selected workspace detail
     ├── Header: workspace identity, Scan workspace, Remove
-    ├── Overview: identity, location, branch, health, and registration
-    ├── Sources: source directories and source structure
+    ├── Overview
+    │   ├── General: identity, location, branch, and registration
+    │   ├── Health: checks and diagnostics
+    │   └── Sources: source directories and source structure
     └── Integrations: Jira connection and connection test
 
 Application Settings
@@ -24,16 +26,16 @@ Application Settings
 
 ## Component Boundaries
 
-| Component               | Responsibility                                                         |
-|-------------------------|------------------------------------------------------------------------|
-| `WorkspacesPage`        | Load page selection and coordinate list, detail, dialogs, and notices  |
-| `WorkspaceList`         | Search, select, summarize, and explicitly enter bulk-selection mode    |
-| `WorkspaceDetails`      | Own active detail tab and unsaved-change navigation guard              |
-| `WorkspaceOverview`     | Edit identity, show registration metadata, and provide health and scan |
-| `WorkspaceSources`      | List sources and open the existing source-structure editor             |
-| `WorkspaceIntegrations` | Edit optional Jira configuration and test the connection               |
-| `AddWorkspaceDialog`    | Register a local folder or clone a remote repository                   |
-| `StorageSettings`       | Edit application-wide data and managed clone directories               |
+| Component               | Responsibility                                                        |
+|-------------------------|-----------------------------------------------------------------------|
+| `WorkspacesPage`        | Load page selection and coordinate list, detail, dialogs, and notices |
+| `WorkspaceList`         | Search, select, summarize, and explicitly enter bulk-selection mode   |
+| `WorkspaceDetails`      | Own active detail tab and unsaved-change navigation guard             |
+| `WorkspaceOverview`     | Coordinate collapsible General, Health, and Sources sections          |
+| `WorkspaceSources`      | List sources and open the source-structure editor inside Overview     |
+| `WorkspaceIntegrations` | Edit optional Jira configuration and test the connection              |
+| `AddWorkspaceDialog`    | Register a local folder or clone a remote repository                  |
+| `StorageSettings`       | Edit application-wide data and managed clone directories              |
 
 ## State Management
 

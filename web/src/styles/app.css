@@ -2726,14 +2726,60 @@ body.is-resizing-drawer {
   gap: 8px;
 }
 
-.workspace-overview-health {
+.workspace-overview-sections {
   display: grid;
-  gap: 10px;
-  padding-top: 4px;
 }
 
-.workspace-overview-health .health-panel {
-  grid-column: auto;
+.workspace-overview-section {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+}
+
+.workspace-overview-section:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.workspace-overview-section-toggle {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0 4px;
+  font-size: 14px;
+  font-weight: 750;
+  text-align: left;
+}
+
+.workspace-overview-section-toggle:hover {
+  color: var(--blue);
+}
+
+.workspace-overview-section-content {
+  display: grid;
+  gap: 14px;
+  padding: 2px 4px 18px;
+}
+
+.workspace-health-embedded {
+  display: grid;
+  gap: 10px;
+}
+
+.workspace-health-embedded-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.workspace-health-embedded-summary button {
+  margin-left: auto;
 }
 
 .workspaces-left-column {

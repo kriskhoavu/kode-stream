@@ -38,7 +38,7 @@ Display a matching Jira ticket, safely access its attachments, and provide a sca
 | Normalized Issue           | Common API model produced from Cloud or Server/Data Center responses       |
 | Attachment Proxy           | Backend route that validates and streams Jira attachment content           |
 | Workspace Manager          | Master-detail page for browsing and configuring registered workspaces      |
-| Workspace Detail           | Selected workspace view organized into Overview, Sources, and Integrations |
+| Workspace Detail           | Selected workspace view with a sectioned Overview and Integrations tab     |
 | Add Workspace Flow         | Focused dialog for local registration or remote cloning                    |
 
 ## Data Flow

@@ -56,8 +56,9 @@ User selects attachment
 ```text
 User selects a workspace in the workspace list
   -> workspace detail opens on Overview
-  -> user selects Overview, Sources, or Integrations
-  -> only the selected settings domain is rendered
+  -> user selects Overview or Integrations
+  -> Overview provides collapsible General, Health, and Sources sections
+  -> only the selected tab and expanded sections are rendered
   -> edits remain scoped to that domain
   -> save refreshes workspace data without losing list context
 ```
