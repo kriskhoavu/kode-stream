@@ -1,4 +1,5 @@
 import { lazy, memo, Suspense, useEffect, useState } from 'react';
+import { Maximize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { viewerAdapter } from './classify';
 import { ViewerErrorBoundary } from './components/ViewerErrorBoundary';
 import { ViewerToolbar } from './components/ViewerToolbar';
@@ -38,7 +39,7 @@ export const ContentViewer = memo(function ContentViewer({ file, content, compac
               <button type="button" className="secondary" onClick={() => setMode('source')}>Open source</button>
             </div>
           ) : file.kind === 'image' ? (
-            <div className="content-viewer-image"><img src={content} alt={file.path} /></div>
+            <ImagePreview key={file.id} src={content} alt={file.path} />
           ) : mode === 'source' ? (
             <SourceCodeView content={content} language={file.language} truncated={file.truncated} />
           ) : file.kind === 'markdown' ? (
@@ -55,3 +56,27 @@ export const ContentViewer = memo(function ContentViewer({ file, content, compac
     </section>
   );
 });
+
+function ImagePreview({ src, alt }: { src: string; alt: string }) {
+  const [fit, setFit] = useState(true);
+  const [zoom, setZoom] = useState(100);
+  const changeZoom = (delta: number) => {
+    setFit(false);
+    setZoom((current) => Math.min(400, Math.max(25, fit ? 100 + delta : current + delta)));
+  };
+  const reset = () => {
+    setFit(false);
+    setZoom(100);
+  };
+  return <div className="content-viewer-image">
+    <div className="image-preview-toolbar" aria-label="Image zoom controls">
+      <button type="button" aria-label="Fit image" aria-pressed={fit} className={fit ? 'active' : undefined} onClick={() => setFit(true)}><Maximize2 size={15} /> Fit</button>
+      <button type="button" aria-label="Zoom out" disabled={!fit && zoom <= 25} onClick={() => changeZoom(-25)}><ZoomOut size={15} /></button>
+      <button type="button" aria-label="Reset zoom to 100%" onClick={reset}><RotateCcw size={14} /> {fit ? 'Fit' : `${zoom}%`}</button>
+      <button type="button" aria-label="Zoom in" disabled={!fit && zoom >= 400} onClick={() => changeZoom(25)}><ZoomIn size={15} /></button>
+    </div>
+    <div className={fit ? 'image-preview-canvas fit' : 'image-preview-canvas zoomed'}>
+      <img src={src} alt={alt} style={fit ? undefined : { width: `${zoom}%` }} />
+    </div>
+  </div>;
+}

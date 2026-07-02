@@ -149,6 +149,7 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 
 - [x] Add bounded, non-editable PNG, JPEG, GIF, and WebP content classification.
 - [x] Render supported local images in the shared content viewer for item and workspace files.
+- [x] Add bounded image zoom controls and verify the existing sandboxed HTML preview.
 - [x] Keep Jira Attachments collapsed by default and defer thumbnail requests until expansion.
 - [x] Open full Jira images through the existing authenticated attachment proxy after explicit selection.
 - [x] Allow credential-stripped Jira Cloud redirects only to the trusted Atlassian media host.

@@ -105,7 +105,8 @@ Application Settings
 
 - Classify PNG, JPEG, GIF, and WebP as a non-editable `image` file kind.
 - Return supported local images as bounded data URLs so item and workspace viewers share one rendering contract.
-- Render images with contain sizing over a neutral checkerboard background.
+- Render images with contain sizing over a neutral checkerboard background and provide Fit, zoom out, reset, and zoom in controls.
+- Keep HTML preview available through the existing sandboxed Rendered mode with a Source fallback.
 - Do not treat SVG or unknown binary files as previewable images.
 
 ## Accessibility and Layout

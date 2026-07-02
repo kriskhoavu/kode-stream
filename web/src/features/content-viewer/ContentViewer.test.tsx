@@ -50,6 +50,19 @@ describe('ContentViewer', () => {
 
     expect(screen.getByRole('img', { name: 'diagram.png' })).toHaveAttribute('src', dataURL);
     expect(screen.queryByRole('tab', { name: 'Source' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(screen.getByRole('button', { name: 'Reset zoom to 100%' })).toHaveTextContent('125%');
+    expect(screen.getByRole('img', { name: 'diagram.png' })).toHaveStyle({ width: '125%' });
+    fireEvent.click(screen.getByRole('button', { name: 'Fit image' }));
+    expect(screen.getByRole('button', { name: 'Fit image' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('renders HTML in a sandboxed preview with a source fallback', async () => {
+    render(<ContentViewer file={file({ id: 'page_html', path: 'page.html', kind: 'html', language: 'html', editable: true })} content='<h1>Preview</h1><script>alert(1)</script>' />);
+
+    expect(await screen.findByTitle('HTML preview')).toHaveAttribute('sandbox', '');
+    fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
+    await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('<h1>Preview</h1>'));
   });
 
   it('sanitizes Markdown output and marks external links', async () => {
