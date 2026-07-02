@@ -68,9 +68,10 @@ User selects a workspace in the workspace list
 
 ```text
 User selects Add workspace
-  -> dialog asks for Local folder or Remote Git URL
-  -> frontend infers name and sensible branch/source defaults
-  -> optional settings remain collapsed under Advanced settings
+  -> step 1 asks for Local folder or Remote Git URL
+  -> name, branch, sources, and remote clone root stay hidden until a location is provided
+  -> frontend infers an editable name and reveals repository settings
+  -> step 2 offers optional Jira configuration
   -> registration runs with focused progress and error feedback
   -> new workspace becomes selected in the workspace manager
 ```

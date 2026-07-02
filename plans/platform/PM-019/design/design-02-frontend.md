@@ -75,11 +75,11 @@ Application Settings
 
 ## Add Workspace Dialog
 
-- Start with a clear `Local folder` / `Remote Git URL` choice.
-- Infer the workspace name from the selected folder or repository URL.
-- Detect or suggest baseline branch and common sources where supported.
-- Keep branch and sources under reviewable defaults instead of chip-plus-free-text controls.
-- Place Jira and uncommon fields under `Advanced settings`; configuration can also be completed later.
+- Use a wider two-step wizard with visible Repository and Jira progress.
+- Step 1 starts with a clear `Local folder` / `Remote Git URL` choice and location input.
+- Keep name, baseline branch, sources, and remote clone root hidden until the current location is present.
+- Infer an editable workspace name from the selected folder or repository URL, then reveal reviewable branch and source defaults.
+- Step 2 contains optional Jira configuration; disabled Jira still permits registration and can be configured later.
 - Keep clone progress, logs, failures, and retry inside the dialog.
 - After success, close the dialog and select the newly registered workspace.
 

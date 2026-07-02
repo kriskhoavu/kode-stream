@@ -61,13 +61,15 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [bulkMode, setBulkMode] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<WorkspaceDetailTab>('overview');
-  const [registrationAdvanced, setRegistrationAdvanced] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState<1 | 2>(1);
+  const [registrationNameEdited, setRegistrationNameEdited] = useState(false);
   const [collapsedOverviewSections, setCollapsedOverviewSections] = useState<Record<OverviewSectionKey, boolean>>({ general: false, health: false, sources: false });
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const selectedWorkspaces = workspaces.filter((workspace) => selectedWorkspaceIds.includes(workspace.id));
   const allSelected = workspaces.length > 0 && selectedWorkspaces.length === workspaces.length;
   const busy = pendingOperations.length > 0;
+  const registrationLocationReady = registrationMode === 'local_path' ? Boolean(path.trim()) : Boolean(remoteUrl.trim());
   const operationBusy = (operation: string) => pendingOperations.includes(operation);
   const setBusy = (pending: boolean, operation = 'workspace-form') => {
     setPendingOperations((current) => pending
@@ -124,7 +126,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       setBaselineBranch('master');
       setSources('');
       setJira(null);
-      setRegistrationAdvanced(false);
+      setRegistrationStep(1);
+      setRegistrationNameEdited(false);
       setRegistrationOpen(false);
       setSelectedWorkspaceId(result.workspace.id);
       onChanged();
@@ -236,8 +239,15 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     setBaselineBranch('master');
     setSources('');
     setJira(null);
-    setRegistrationAdvanced(false);
+    setRegistrationStep(1);
+    setRegistrationNameEdited(false);
     setRegistrationOpen(false);
+  };
+
+  const advanceRegistration = (event: FormEvent) => {
+    event.preventDefault();
+    if (!registrationLocationReady || !name.trim()) return;
+    setRegistrationStep(2);
   };
 
   const saveEdit = async (repo: WorkspaceConfig) => {
@@ -334,9 +344,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     try {
       const selection = await api.selectDirectory();
       setPath(selection.path);
-      if (!name || name === 'Plan Manager') {
-        setName(lastPathSegment(selection.path));
-      }
+      setName(lastPathSegment(selection.path));
+      setRegistrationNameEdited(false);
     } catch (err) {
       setNotice({ tone: 'error', title: 'Directory selection failed', details: [errorMessage(err)] });
     } finally {
@@ -447,9 +456,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     const droppedPath = pathFromDrop(event);
     if (droppedPath) {
       setPath(droppedPath);
-      if (!name || name === 'Plan Manager') {
-        setName(lastPathSegment(droppedPath));
-      }
+      setName(lastPathSegment(droppedPath));
+      setRegistrationNameEdited(false);
       return;
     }
     setNotice({ tone: 'error', title: 'Drop a folder path or file URL' });
@@ -613,113 +621,60 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             <div><h2 id="add-workspace-title">Add workspace</h2><span>Register a local folder or clone a remote Git repository.</span></div>
             <button className="icon-button" type="button" onClick={closeRegistration} aria-label="Close add workspace"><X size={16} /></button>
           </header>
-          <div className="workspaces-left-column">
-          <form className="repo-form repo-create-panel" onSubmit={submit}>
-            <header>
-              <FolderGit2 size={18} />
-              <h2>Register Workspace</h2>
-            </header>
-            <label className="repo-field">Workspace Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Discovery" /></label>
-          <div className="registration-mode-toggle" role="radiogroup" aria-label="Workspace registration mode">
-            <button
-              className={registrationMode === 'local_path' ? 'secondary active' : 'secondary'}
-              type="button"
-              role="radio"
-              aria-checked={registrationMode === 'local_path'}
-              onClick={() => {
-                setRegistrationMode('local_path');
-                setPathDragging(false);
-              }}
-            >
-              Local Path
-            </button>
-            <button
-              className={registrationMode === 'remote_clone' ? 'secondary active' : 'secondary'}
-              type="button"
-              role="radio"
-              aria-checked={registrationMode === 'remote_clone'}
-              onClick={() => {
-                setRegistrationMode('remote_clone');
-                setPathDragging(false);
-                if (!cloneRoot && systemConfig?.cloneRootDir) {
-                  setCloneRoot(systemConfig.cloneRootDir);
-                }
-              }}
-            >
-              Remote Git URL
-            </button>
-          </div>
-          {registrationMode === 'local_path' ? (
-            <label
-              className={pathDragging ? 'repo-field path-field dragging' : 'repo-field path-field'}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setPathDragging(true);
-              }}
-              onDragLeave={() => setPathDragging(false)}
-              onDrop={dropPath}
-            >
-              Local Path
-              <div className="path-input-row">
-                <input value={path} onChange={(event) => setPath(event.target.value)} placeholder="/Users/me/workspace/repo" />
-                <button className="secondary icon-action" type="button" onClick={browsePath} disabled={busy} title="Browse">
-                  <FolderOpen size={16} />
-                </button>
-                <button className="secondary icon-action" type="button" onClick={() => revealPath(path)} disabled={busy || !path} title="Reveal">
-                  <ExternalLink size={16} />
-                </button>
+          <ol className="workspace-registration-steps" aria-label="Workspace registration progress">
+            <li className={registrationStep === 1 ? 'active' : 'complete'}><span>1</span><div><strong>Repository</strong><small>Location and content</small></div></li>
+            <li className={registrationStep === 2 ? 'active' : ''}><span>2</span><div><strong>Jira</strong><small>Optional integration</small></div></li>
+          </ol>
+          <form className="workspace-registration-form" onSubmit={registrationStep === 1 ? advanceRegistration : submit}>
+            {registrationStep === 1 ? <>
+              <div className="registration-mode-toggle" role="radiogroup" aria-label="Workspace registration mode">
+                <button className={registrationMode === 'local_path' ? 'secondary active' : 'secondary'} type="button" role="radio" aria-checked={registrationMode === 'local_path'} onClick={() => {
+                  setRegistrationMode('local_path'); setPathDragging(false); setRegistrationNameEdited(false); setName(lastPathSegment(path));
+                }}>Local Path</button>
+                <button className={registrationMode === 'remote_clone' ? 'secondary active' : 'secondary'} type="button" role="radio" aria-checked={registrationMode === 'remote_clone'} onClick={() => {
+                  setRegistrationMode('remote_clone'); setPathDragging(false); setRegistrationNameEdited(false); setName(inferWorkspaceNameFromRemoteURL(remoteUrl));
+                  if (!cloneRoot && systemConfig?.cloneRootDir) setCloneRoot(systemConfig.cloneRootDir);
+                }}>Remote Git URL</button>
               </div>
-            </label>
-          ) : (
-            <>
-              <label className="repo-field">Remote Git URL<input value={remoteUrl} onChange={(event) => {
-                const next = event.target.value;
-                setRemoteUrl(next);
-                if (!name || name === 'Plan Manager') {
-                  const inferred = inferWorkspaceNameFromRemoteURL(next);
-                  if (inferred) setName(inferred);
-                }
-              }} placeholder="git@bitbucket.org:team/repo.git" /></label>
-              <label className="repo-field">Clone Root
+              {registrationMode === 'local_path' ? <label className={pathDragging ? 'repo-field path-field dragging' : 'repo-field path-field'} onDragOver={(event) => { event.preventDefault(); setPathDragging(true); }} onDragLeave={() => setPathDragging(false)} onDrop={dropPath}>
+                Local Path
                 <div className="path-input-row">
-                  <input
-                    value={cloneRoot}
-                    onChange={(event) => setCloneRoot(event.target.value)}
-                    placeholder={systemConfig?.cloneRootDir ?? '/path/to/plan-manager/clone-root'}
-                  />
-                  <button className="secondary icon-action" type="button" onClick={browseCloneRoot} disabled={busy} title="Browse">
-                    <FolderOpen size={16} />
-                  </button>
-                  <button className="secondary icon-action" type="button" onClick={() => revealPath(cloneRoot)} disabled={busy || !cloneRoot} title="Reveal">
-                    <ExternalLink size={16} />
-                  </button>
+                  <input value={path} onChange={(event) => { const next = event.target.value; setPath(next); if (!registrationNameEdited) setName(lastPathSegment(next)); }} placeholder="/Users/me/workspace/repo" autoFocus />
+                  <button className="secondary icon-action" type="button" onClick={browsePath} disabled={busy} title="Browse"><FolderOpen size={16} /></button>
+                  <button className="secondary icon-action" type="button" onClick={() => revealPath(path)} disabled={busy || !path} title="Reveal"><ExternalLink size={16} /></button>
                 </div>
-              </label>
-              {systemConfig && <span className="repo-remote-default">Default clone root: {systemConfig.cloneRootDir}</span>}
-            </>
-          )}
-          <div className="repo-field-grid">
-            <BranchField value={baselineBranch} onChange={setBaselineBranch} />
-            <SourcesField value={sources} onChange={setSources} />
-          </div>
-          <section className="workspace-registration-advanced">
-            <button className="ghost" type="button" aria-expanded={registrationAdvanced} onClick={() => setRegistrationAdvanced((current) => !current)}>Advanced settings</button>
-            {registrationAdvanced && <>
-              <p>Connect Jira now, or configure integrations after registration.</p>
+              </label> : <label className="repo-field">Remote Git URL<input value={remoteUrl} onChange={(event) => {
+                const next = event.target.value; setRemoteUrl(next); if (!registrationNameEdited) setName(inferWorkspaceNameFromRemoteURL(next));
+              }} placeholder="git@bitbucket.org:team/repo.git" autoFocus /></label>}
+
+              {registrationLocationReady && <div className="workspace-registration-revealed">
+                <label className="repo-field">Workspace Name<input value={name} onChange={(event) => { setName(event.target.value); setRegistrationNameEdited(true); }} placeholder="Discovery" /></label>
+                {registrationMode === 'remote_clone' && <>
+                  <label className="repo-field">Clone Root
+                    <div className="path-input-row">
+                      <input value={cloneRoot} onChange={(event) => setCloneRoot(event.target.value)} placeholder={systemConfig?.cloneRootDir ?? '/path/to/plan-manager/clone-root'} />
+                      <button className="secondary icon-action" type="button" onClick={browseCloneRoot} disabled={busy} title="Browse"><FolderOpen size={16} /></button>
+                      <button className="secondary icon-action" type="button" onClick={() => revealPath(cloneRoot)} disabled={busy || !cloneRoot} title="Reveal"><ExternalLink size={16} /></button>
+                    </div>
+                  </label>
+                  {systemConfig && <span className="repo-remote-default">Default clone root: {systemConfig.cloneRootDir}</span>}
+                </>}
+                <div className="repo-field-grid"><BranchField value={baselineBranch} onChange={setBaselineBranch} /><SourcesField value={sources} onChange={setSources} /></div>
+              </div>}
+              <div className="workspace-registration-actions">
+                <button className="secondary" type="button" onClick={closeRegistration}>Cancel</button>
+                <button className="primary" type="submit" disabled={!registrationLocationReady || !name.trim()}>Next: Jira <span aria-hidden="true">→</span></button>
+              </div>
+            </> : <>
+              <div className="workspace-registration-step-heading"><span>Optional</span><h3>Connect Jira</h3><p>Configure Jira now, or leave it disabled and connect later from Integrations.</p></div>
               <JiraConnectionFields value={jira} onChange={setJira} />
+              {registrationLog && <section className="registration-log-panel"><button className="secondary" type="button" onClick={() => setRegistrationLogOpen((open) => !open)}>{registrationLogOpen ? 'Hide logs' : 'Show logs'}</button>{registrationLogOpen && <pre>{registrationLog}</pre>}</section>}
+              <div className="workspace-registration-actions">
+                <button className="secondary" type="button" onClick={() => setRegistrationStep(1)} disabled={busy}>Back</button>
+                <button className="primary" type="submit" disabled={busy}><FolderGit2 size={16} /> {jira ? 'Register with Jira' : 'Register workspace'}</button>
+              </div>
             </>}
-          </section>
-          <button className="primary repo-submit" disabled={busy}><FolderGit2 size={16} /> Register Workspace</button>
-          {registrationLog && (
-            <section className="registration-log-panel">
-              <button className="secondary" type="button" onClick={() => setRegistrationLogOpen((open) => !open)}>
-                {registrationLogOpen ? 'Hide logs' : 'Show logs'}
-              </button>
-              {registrationLogOpen && <pre>{registrationLog}</pre>}
-            </section>
-          )}
           </form>
-        </div>
         </div>
       </section>}
       {workspacesToRemove && (

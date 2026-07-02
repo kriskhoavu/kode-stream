@@ -2607,9 +2607,11 @@ body.is-resizing-drawer {
 }
 
 .workspace-registration-modal {
-  width: min(620px, calc(100vw - 32px));
-  max-height: min(860px, calc(100vh - 32px));
+  width: min(820px, calc(100vw - 40px));
+  max-height: min(900px, calc(100vh - 32px));
   overflow: auto;
+  gap: 18px;
+  padding: 20px;
 }
 
 .workspace-registration-modal > header {
@@ -2619,34 +2621,125 @@ body.is-resizing-drawer {
   background: var(--panel);
 }
 
-.workspace-registration-modal .data-dir-panel {
-  display: none;
+.workspace-registration-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.workspace-registration-advanced {
+.workspace-registration-steps li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-soft);
   padding: 10px 12px;
-}
-
-.workspace-registration-advanced > button {
-  width: 100%;
-  justify-content: flex-start;
-  padding: 0;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.workspace-registration-advanced > p {
-  margin: 8px 0 12px;
   color: var(--muted);
-  font-size: 12px;
 }
 
-.workspace-registration-advanced .jira-connection-fields {
-  margin-top: 12px;
+.workspace-registration-steps li > span {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workspace-registration-steps li > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.workspace-registration-steps strong,
+.workspace-registration-steps small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-registration-steps small {
+  font-size: 11px;
+}
+
+.workspace-registration-steps li.active,
+.workspace-registration-steps li.complete {
+  border-color: color-mix(in srgb, var(--blue) 42%, var(--line));
+  color: var(--text);
+}
+
+.workspace-registration-steps li.active > span,
+.workspace-registration-steps li.complete > span {
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 14%, var(--panel));
+  color: var(--blue);
+}
+
+.workspace-registration-form,
+.workspace-registration-revealed {
+  display: grid;
+  gap: 16px;
+}
+
+.workspace-registration-revealed {
+  padding-top: 4px;
+}
+
+.workspace-registration-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.workspace-registration-step-heading {
+  display: grid;
+  gap: 5px;
+  padding-bottom: 4px;
+}
+
+.workspace-registration-step-heading > span {
+  width: fit-content;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--blue);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.workspace-registration-step-heading h3,
+.workspace-registration-step-heading p {
+  margin: 0;
+}
+
+.workspace-registration-step-heading h3 {
+  font-size: 18px;
+}
+
+.workspace-registration-step-heading p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.workspace-registration-form > .jira-connection-fields {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 14px;
+  margin: 0;
 }
 
 .workspace-detail-tabs {
@@ -5329,6 +5422,24 @@ body.is-resizing-panel {
 }
 
 @media (max-width: 640px) {
+  .workspace-registration-modal {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    padding: 14px;
+  }
+
+  .workspace-registration-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-registration-actions {
+    flex-wrap: wrap;
+  }
+
+  .workspace-registration-actions button {
+    flex: 1 1 auto;
+  }
+
   .brand span,
   .workspace-title span,
   .theme-toggle span {

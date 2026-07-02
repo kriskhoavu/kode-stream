@@ -73,19 +73,37 @@ describe('workspace detail settings', () => {
     expect(screen.getByRole('tab', { name: 'Integrations' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('keeps Jira registration settings advanced and guards a draft on close', () => {
+  it('reveals repository settings after location and keeps Jira in optional step two', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add workspace' }));
+    expect(screen.queryByLabelText('Workspace Name')).not.toBeInTheDocument();
+    expect(screen.queryByText('Base Branch')).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Jira integration' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced settings' }));
+    fireEvent.change(screen.getByLabelText('Local Path'), { target: { value: '/repos/new-repo' } });
+    expect(screen.getByLabelText('Workspace Name')).toHaveValue('new-repo');
+    fireEvent.change(screen.getByLabelText('Workspace Name'), { target: { value: 'Editable name' } });
+    fireEvent.click(screen.getByRole('button', { name: /Next: Jira/ }));
     expect(screen.getByRole('checkbox', { name: 'Jira integration' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Workspace Name'), { target: { value: 'Draft workspace' } });
+    expect(screen.getByRole('button', { name: 'Register workspace' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close add workspace' }));
 
     expect(window.confirm).toHaveBeenCalledWith('Discard this workspace registration draft?');
     expect(screen.getByRole('dialog', { name: 'Add workspace' })).toBeInTheDocument();
+  });
+
+  it('reveals clone settings only after a remote URL is provided', () => {
+    vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add workspace' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Remote Git URL' }));
+    expect(screen.queryByText('Clone Root')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Remote Git URL'), { target: { value: 'git@bitbucket.org:team/remote-repo.git' } });
+
+    expect(screen.getByLabelText('Workspace Name')).toHaveValue('remote-repo');
+    expect(screen.getByText('Clone Root')).toBeInTheDocument();
   });
 });

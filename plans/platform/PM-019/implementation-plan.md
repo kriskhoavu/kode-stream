@@ -18,6 +18,7 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 | F4    | Workspace Settings Tabs  | Done    |
 | F5    | Registration And Storage | Done    |
 | F6    | Lazy Image Previews      | Done    |
+| F7    | Registration Wizard      | Done    |
 | V2    | Redesign Verification    | Pending |
 
 ## Phase B1: Connection Configuration
@@ -158,6 +159,21 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 **Verification:** `go test ./internal/fileaccess ./internal/application/item ./internal/api && npm run typecheck && npm test -- --run web/src/features/content-viewer web/src/features/jira`
 
 **Commit:** `PM-019: Add lazy image previews`
+
+## Phase F7: Registration Wizard
+
+**Deliverables:**
+
+- [x] Replace the long registration form with Repository and optional Jira steps.
+- [x] Infer an editable workspace name after local path selection or remote URL entry.
+- [x] Delay branch, sources, and remote clone-root fields until the repository location is present.
+- [x] Add Back, Next, optional Jira, registration, and draft-close behavior.
+- [x] Widen the dialog and add visible step progress for desktop and narrow layouts.
+- [x] Test local inference, remote inference, delayed fields, optional Jira, and close guarding.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces web/src/features/jira-settings && npm run build`
+
+**Commit:** `PM-019: Add two-step workspace registration`
 
 ## Phase V2: Redesign Verification
 
