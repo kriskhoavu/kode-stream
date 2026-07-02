@@ -33,8 +33,8 @@ func (r *recordingRunner) Start(name string, args []string, dir string) error {
 	return r.err
 }
 
-func TestLaunchCreatesPrivateManifestAndStartsProviderInWorkspace(t *testing.T) {
-	service, item, workspace, runner, contextDir, auditStore := launchTestService(t, true)
+func TestLaunchPassesCardPathAndStartsProviderInWorkspace(t *testing.T) {
+	service, item, workspace, runner, wrapperDir, auditStore := launchTestService(t, true)
 	eligibility, err := service.Eligibility(item.ID)
 	if err != nil || !eligibility.Editable || !eligibility.CardContextAvailable || len(eligibility.Missing) != 0 {
 		t.Fatalf("eligibility=%#v err=%v", eligibility, err)
@@ -50,27 +50,12 @@ func TestLaunchCreatesPrivateManifestAndStartsProviderInWorkspace(t *testing.T) 
 	if process.dir != workspace.Path || len(process.args) < 7 || process.args[0] != "start" || process.args[1] != "--cwd" {
 		t.Fatalf("process = %#v", process)
 	}
-	entries, err := os.ReadDir(contextDir)
-	if err != nil {
-		t.Fatal(err)
+	if !contains(process.args, item.ItemPath) || contains(process.args, filepath.Join(workspace.Path, item.ItemPath)) {
+		t.Fatalf("card path args = %#v", process.args)
 	}
-	var manifestPath string
-	for _, entry := range entries {
-		if strings.HasSuffix(entry.Name(), ".md") {
-			manifestPath = filepath.Join(contextDir, entry.Name())
-		}
-	}
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(data)
-	if !strings.Contains(text, "wait for the user's request") || !strings.Contains(text, filepath.Join(workspace.Path, item.ItemPath, "implementation-plan.md")) || strings.Contains(text, "Intent:") {
-		t.Fatalf("manifest = %s", text)
-	}
-	info, err := os.Stat(manifestPath)
-	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("manifest mode=%v err=%v", info.Mode().Perm(), err)
+	entries, err := os.ReadDir(wrapperDir)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("unexpected generated resources=%#v err=%v", entries, err)
 	}
 	events, err := auditStore.Recent(10)
 	if err != nil || len(events) != 1 || events[0].Status != models.AuditStatusSuccess || len(events[0].Paths) != 0 {
@@ -108,7 +93,7 @@ func TestLaunchRejectsSnapshotAndMissingTools(t *testing.T) {
 }
 
 func TestWorkspaceOnlyLaunchesWithoutCardContext(t *testing.T) {
-	service, item, workspace, runner, contextDir, _ := launchTestService(t, true)
+	service, item, workspace, runner, wrapperDir, _ := launchTestService(t, true)
 	item.SourceMode = "snapshot"
 	item.Editable = false
 	if err := service.launch.index.ReplaceWorkspace(item.WorkspaceID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
@@ -125,8 +110,9 @@ func TestWorkspaceOnlyLaunchesWithoutCardContext(t *testing.T) {
 	if process.dir != workspace.Path || len(process.args) != 5 || process.args[0] != "start" || process.args[4] == "" {
 		t.Fatalf("process=%#v", process)
 	}
-	if _, err := os.Stat(contextDir); !os.IsNotExist(err) {
-		t.Fatalf("free prompt created context directory: %v", err)
+	entries, err := os.ReadDir(wrapperDir)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("workspace-only created resources=%#v err=%v", entries, err)
 	}
 }
 
@@ -149,30 +135,6 @@ func TestShellQuoteKeepsCommandTextLiteral(t *testing.T) {
 	quoted := shellQuote(value)
 	if quoted != `'a'"'"' b; $(touch unsafe)'` {
 		t.Fatalf("quoted = %q", quoted)
-	}
-}
-
-func TestCleanupExpiredRemovesOldContextOnly(t *testing.T) {
-	dir := t.TempDir()
-	oldPath := filepath.Join(dir, "old.md")
-	newPath := filepath.Join(dir, "new.md")
-	for _, path := range []string{oldPath, newPath} {
-		if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	now := time.Now()
-	if err := os.Chtimes(oldPath, now.Add(-25*time.Hour), now.Add(-25*time.Hour)); err != nil {
-		t.Fatal(err)
-	}
-	if err := cleanupExpired(dir, now); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
-		t.Fatalf("old file still exists: %v", err)
-	}
-	if _, err := os.Stat(newPath); err != nil {
-		t.Fatalf("new file missing: %v", err)
 	}
 }
 
@@ -228,12 +190,21 @@ func launchTestService(t *testing.T, structured bool) (*Service, models.ItemDeta
 	}
 	auditStore := audit.New(filepath.Join(dataDir, "audit.jsonl"))
 	runner := &recordingRunner{}
-	contextDir := filepath.Join(dataDir, "ai-context")
-	service := New(store).ConfigureLaunch(reg, index, auditStore, contextDir)
+	wrapperDir := t.TempDir()
+	service := New(store).ConfigureLaunch(reg, index, auditStore, wrapperDir)
 	service.goos = "darwin"
 	service.launch.runner = runner
 	service.launch.now = func() time.Time { return time.Date(2026, 7, 2, 10, 0, 0, 0, time.UTC) }
-	return service, item, workspace, runner, contextDir, auditStore
+	return service, item, workspace, runner, wrapperDir, auditStore
+}
+
+func contains(values []string, target string) bool {
+	for _, value := range values {
+		if strings.Contains(value, target) {
+			return true
+		}
+	}
+	return false
 }
 
 func gitCommand(t *testing.T, root string, args ...string) {

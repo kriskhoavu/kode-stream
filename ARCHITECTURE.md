@@ -232,12 +232,12 @@ User opens an item and selects Open AI session
   -> frontend loads detected providers, terminals, and item eligibility
   -> user selects workspace-only or selected-card context
   -> backend validates the indexed item and registered workspace
-  -> selected-card writes a neutral path manifest; workspace-only omits it
+  -> selected-card passes the workspace-relative card path; workspace-only passes no prompt
   -> terminal adapter starts the selected AI CLI at the workspace root
   -> audit records identifiers and outcome without prompt content
 ```
 
-AI settings and generated context stay outside registered workspaces. Workspace-only starts at the workspace root without card context so the user can reference files and directories manually. Selected-card context works for any editable working-tree item, lists only existing card documents, and tells the AI to wait for the user's request. External tools retain their own authentication, approval, and sandbox behavior.
+Workspace-only starts at the workspace root without card context so the user can reference files and directories manually. Selected-card context works for any editable working-tree item and passes its workspace-relative path directly to the AI with a neutral instruction to read relevant documents and wait for the user's request. No persistent context resource is created. External tools retain their own authentication, approval, and sandbox behavior.
 
 ### Workspace Explorer
 

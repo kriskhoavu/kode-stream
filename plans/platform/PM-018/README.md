@@ -26,34 +26,34 @@ Launch an interactive AI CLI in the correct workspace with either workspace-only
 
 ## Glossary
 
-| Term             | Meaning                                                                    |
-|------------------|----------------------------------------------------------------------------|
-| AI Provider      | Supported CLI: Claude, Codex, Copilot, or OpenCode                         |
-| Terminal Adapter | Platform-specific launcher for Terminal, iTerm2, or WezTerm                |
-| Context Mode     | User-selected `workspace_only` or `card_context` handoff                   |
-| Context Manifest | App-owned Markdown file containing item metadata and repository file paths |
-| Launch Template  | Executable and argument list containing approved placeholders              |
+| Term             | Meaning                                                       |
+|------------------|---------------------------------------------------------------|
+| AI Provider      | Supported CLI: Claude, Codex, Copilot, or OpenCode            |
+| Terminal Adapter | Platform-specific launcher for Terminal, iTerm2, or WezTerm   |
+| Context Mode     | User-selected `workspace_only` or `card_context` handoff      |
+| Card Path        | Workspace-relative directory for the selected card            |
+| Launch Template  | Executable and argument list containing approved placeholders |
 
 ## Data Flow
 
 ```text
 Item workspace -> launch dialog -> capability/settings API
   -> launch request -> item and workspace validation
-  -> context manifest -> provider command -> terminal adapter
+  -> optional card path -> provider command -> terminal adapter
   -> interactive CLI session in workspace root
 ```
 
 ## Design Decisions
 
-| Decision                                       | Alternatives Considered    | Rationale                                                         |
-|------------------------------------------------|----------------------------|-------------------------------------------------------------------|
-| External terminal first                        | Embedded PTY               | Delivers stable interaction before owning terminal lifecycle      |
-| Generated manifest contains paths, not content | Concatenate every file     | Avoids prompt limits and lets the AI read current repository data |
-| Context selection does not prescribe behavior  | Brainstorm/implement modes | The terminal user decides what the AI should do                   |
-| Workspace-only mode omits generated context    | Empty context manifest     | Lets users manually reference workspace files and directories     |
-| Argument arrays with approved placeholders     | Arbitrary shell command    | Reduces quoting and command-injection risk                        |
-| App-owned global settings                      | Settings in each workspace | Keeps machine-specific executable paths outside Git               |
-| macOS terminal adapters first                  | Immediate cross-platform   | Matches the current supported distribution channel                |
+| Decision                                      | Alternatives Considered    | Rationale                                                     |
+|-----------------------------------------------|----------------------------|---------------------------------------------------------------|
+| External terminal first                       | Embedded PTY               | Delivers stable interaction before owning terminal lifecycle  |
+| Pass the card path directly                   | Generate a context file    | Avoids temporary resources and lets the AI read current files |
+| Context selection does not prescribe behavior | Brainstorm/implement modes | The terminal user decides what the AI should do               |
+| Workspace-only mode omits generated context   | Empty context file         | Lets users manually reference workspace files and directories |
+| Argument arrays with approved placeholders    | Arbitrary shell command    | Reduces quoting and command-injection risk                    |
+| App-owned global settings                     | Settings in each workspace | Keeps machine-specific executable paths outside Git           |
+| macOS terminal adapters first                 | Immediate cross-platform   | Matches the current supported distribution channel            |
 
 ## Documents
 

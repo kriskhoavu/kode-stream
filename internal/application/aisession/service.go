@@ -126,8 +126,8 @@ func (s *Service) detect(executable string) Capability {
 func mergeDefaults(saved aisettings.Settings, goos string) aisettings.Settings {
 	defaults := defaultSettings(goos)
 	for id, template := range saved.Providers {
-		if len(template.Args) == 1 && template.Args[0] == "Read {contextFile} and follow its {intent} instructions for {identifier}." {
-			template.Args[0] = "Read {contextFile}. Use it only as context and wait for the user's request."
+		if len(template.Args) == 1 && (template.Args[0] == "Read {contextFile} and follow its {intent} instructions for {identifier}." || template.Args[0] == "Read {contextFile}. Use it only as context and wait for the user's request.") {
+			template.Args[0] = "The selected card is at {itemPath}. Read that path and its relevant documents as context, then wait for the user's request."
 		}
 		defaults.Providers[id] = template
 	}
@@ -144,7 +144,7 @@ func mergeDefaults(saved aisettings.Settings, goos string) aisettings.Settings {
 }
 
 func defaultSettings(goos string) aisettings.Settings {
-	prompt := "Read {contextFile}. Use it only as context and wait for the user's request."
+	prompt := "The selected card is at {itemPath}. Read that path and its relevant documents as context, then wait for the user's request."
 	settings := aisettings.Settings{
 		Providers: map[string]aisettings.LaunchTemplate{
 			"claude":   {Enabled: true, Executable: "claude", Args: []string{prompt}},

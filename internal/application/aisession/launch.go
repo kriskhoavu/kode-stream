@@ -19,8 +19,6 @@ import (
 	"plan-manager/internal/security/pathguard"
 )
 
-const contextRetention = 24 * time.Hour
-
 type LaunchInput struct {
 	Provider    string `json:"provider"`
 	Terminal    string `json:"terminal"`
@@ -65,14 +63,13 @@ type launchDependencies struct {
 	registry   *registry.Registry
 	index      *itemindex.Index
 	audit      *audit.Store
-	contextDir string
+	wrapperDir string
 	runner     ProcessRunner
 	now        func() time.Time
 }
 
-func (s *Service) ConfigureLaunch(reg *registry.Registry, index *itemindex.Index, auditStore *audit.Store, contextDir string) *Service {
-	s.launch = &launchDependencies{registry: reg, index: index, audit: auditStore, contextDir: contextDir, runner: execRunner{}, now: time.Now}
-	_ = cleanupExpired(contextDir, time.Now())
+func (s *Service) ConfigureLaunch(reg *registry.Registry, index *itemindex.Index, auditStore *audit.Store, wrapperDir string) *Service {
+	s.launch = &launchDependencies{registry: reg, index: index, audit: auditStore, wrapperDir: wrapperDir, runner: execRunner{}, now: time.Now}
 	return s
 }
 
@@ -156,13 +153,11 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	if contextMode != "workspace_only" && contextMode != "card_context" {
 		return LaunchResult{}, launchError("invalid_context_mode", "contextMode must be workspace_only or card_context")
 	}
-	itemRoot := ""
 	if contextMode == "card_context" {
 		if item.SourceMode == "snapshot" || !item.Editable {
 			return LaunchResult{}, launchError("item_not_editable", "context-based AI sessions require an editable working-tree item")
 		}
-		var joinErr error
-		itemRoot, joinErr = pathguard.SafeJoin(workspace.Path, item.ItemPath)
+		_, joinErr := pathguard.SafeJoin(workspace.Path, item.ItemPath)
 		if joinErr != nil {
 			return LaunchResult{}, launchError("item_not_editable", "item path is outside the workspace")
 		}
@@ -187,19 +182,8 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	if !s.detect(terminal.Executable).Detected {
 		return LaunchResult{}, launchError("terminal_missing", "selected terminal executable was not found")
 	}
-	manifestPath := ""
-	if contextMode == "card_context" {
-		if cleanupErr := cleanupExpired(s.launch.contextDir, s.launch.now()); cleanupErr != nil {
-			return LaunchResult{}, launchErrorWith("launch_failed", cleanupErr)
-		}
-		var manifestErr error
-		manifestPath, manifestErr = writeContextManifest(s.launch.contextDir, workspace, item, itemRoot, s.launch.now())
-		if manifestErr != nil {
-			return LaunchResult{}, launchErrorWith("launch_failed", manifestErr)
-		}
-	}
 	values := map[string]string{
-		"workspace": workspace.Path, "contextFile": manifestPath, "itemPath": itemRoot,
+		"workspace": workspace.Path, "contextFile": item.ItemPath, "itemPath": item.ItemPath,
 		"identifier": item.Identifier, "contextMode": contextMode, "intent": contextMode,
 	}
 	providerName := expand(provider.Executable, values)
@@ -224,52 +208,22 @@ func (s *Service) startTerminal(id string, terminal aisettings.LaunchTemplate, t
 	if s.goos != "darwin" || (id != "terminal" && id != "iterm2") {
 		return launchError("terminal_missing", "selected terminal has no launch adapter on this platform")
 	}
-	wrapper, err := writeWrapper(s.launch.contextDir, workspace, providerExecutable, providerArgs)
+	wrapper, err := writeWrapper(s.launch.wrapperDir, workspace, providerExecutable, providerArgs)
 	if err != nil {
 		return err
 	}
-	return s.launch.runner.Start("/usr/bin/open", []string{"-a", terminalExecutable, wrapper}, workspace)
+	if err := s.launch.runner.Start("/usr/bin/open", []string{"-a", terminalExecutable, wrapper}, workspace); err != nil {
+		_ = os.Remove(wrapper)
+		return err
+	}
+	return nil
 }
 
-func writeContextManifest(contextDir string, workspace models.WorkspaceConfig, item models.ItemDetail, itemRoot string, now time.Time) (string, error) {
-	if err := os.MkdirAll(contextDir, 0o700); err != nil {
+func writeWrapper(wrapperDir, workspace, executable string, args []string) (string, error) {
+	if err := os.MkdirAll(wrapperDir, 0o700); err != nil {
 		return "", err
 	}
-	paths := make([]string, 0, len(item.Documents)+2)
-	for _, document := range item.Documents {
-		path, err := pathguard.SafeJoin(itemRoot, document.Path)
-		info, statErr := os.Stat(path)
-		if err == nil && statErr == nil && !info.IsDir() {
-			paths = append(paths, path)
-		}
-	}
-	for _, conventional := range []string{"plan.yaml", "implementation-plan.md"} {
-		path := filepath.Join(itemRoot, conventional)
-		if _, err := os.Stat(path); err == nil {
-			paths = append(paths, path)
-		}
-	}
-	paths = unique(paths)
-	var content strings.Builder
-	fmt.Fprintf(&content, "# Plan Manager AI Session\n\n- Item: `%s`\n- Workspace: `%s`\n- Item path: `%s`\n\n## Instructions\n\n", item.Identifier, workspace.Path, itemRoot)
-	content.WriteString("Use this manifest only to locate the selected card and its related documents. Read them as context, then wait for the user's request.\n")
-	content.WriteString("\n## Documents\n\n")
-	for _, path := range paths {
-		fmt.Fprintf(&content, "- `%s`\n", path)
-	}
-	name := fmt.Sprintf("%s-%s.md", now.UTC().Format("20060102T150405Z"), randomID())
-	path := filepath.Join(contextDir, name)
-	if err := writeAtomic(path, []byte(content.String()), 0o600); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-func writeWrapper(contextDir, workspace, executable string, args []string) (string, error) {
-	if err := os.MkdirAll(contextDir, 0o700); err != nil {
-		return "", err
-	}
-	path := filepath.Join(contextDir, "launch-"+randomID()+".command")
+	path := filepath.Join(wrapperDir, "launch-"+randomID()+".command")
 	command := "#!/bin/sh\ncd -- " + shellQuote(workspace) + " || exit 1\nself=$0\nrm -f -- \"$self\"\nexec " + shellQuote(executable)
 	for _, arg := range args {
 		command += " " + shellQuote(arg)
@@ -302,23 +256,6 @@ func writeAtomic(path string, data []byte, mode os.FileMode) error {
 	return os.Rename(temporaryPath, path)
 }
 
-func cleanupExpired(dir string, now time.Time) error {
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		info, infoErr := entry.Info()
-		if infoErr == nil && now.Sub(info.ModTime()) > contextRetention {
-			_ = os.Remove(filepath.Join(dir, entry.Name()))
-		}
-	}
-	return nil
-}
-
 func expand(value string, values map[string]string) string {
 	for key, replacement := range values {
 		value = strings.ReplaceAll(value, "{"+key+"}", replacement)
@@ -335,16 +272,6 @@ func expandAll(values []string, replacements map[string]string) []string {
 }
 
 func shellQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }
-
-func unique(values []string) []string {
-	result := values[:0]
-	for _, value := range values {
-		if len(result) == 0 || result[len(result)-1] != value {
-			result = append(result, value)
-		}
-	}
-	return result
-}
 
 func randomID() string {
 	var value [8]byte

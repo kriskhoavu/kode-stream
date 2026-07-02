@@ -28,7 +28,7 @@ describe('AISessionLaunchDialog', () => {
     vi.mocked(api.launchAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', contextMode: 'card_context', startedAt: '2026-07-02T00:00:00Z' });
     const onClose = vi.fn();
     render(<AISessionLaunchDialog itemId="item-1" onClose={onClose} onLaunched={vi.fn()} />);
-    expect(await screen.findByText(/selected card path and related document paths/i)).toBeInTheDocument();
+    expect(await screen.findByText(/selected card path will be provided/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
     await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', terminal: 'terminal', contextMode: 'card_context' }));
     expect(onClose).toHaveBeenCalled();
@@ -62,6 +62,7 @@ describe('AISessionLaunchDialog', () => {
     render(<AISessionLaunchDialog itemId="snapshot" onClose={vi.fn()} onLaunched={vi.fn()} />);
     fireEvent.click(await screen.findByLabelText(/workspace only/i));
     expect(screen.getByText(/no card context will be injected/i)).toBeInTheDocument();
+    expect(screen.queryByText(/selected card path will be provided/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
     await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('snapshot', { provider: 'codex', terminal: 'terminal', contextMode: 'workspace_only' }));
   });

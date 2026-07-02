@@ -15,6 +15,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 | V1    | Integrated Verification            | Done   |
 | E1    | Free Prompt Enhancement            | Done   |
 | E2    | Context-Only Session Model         | Done   |
+| E3    | Direct Card Path Handoff           | Done   |
 
 ## Phase B1: Capability And Settings Foundation
 
@@ -34,7 +35,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 **Deliverables:**
 
 - [x] Add item eligibility and workspace containment validation.
-- [x] Generate private context manifests and 24-hour cleanup.
+- [x] Generate a guarded selected-card context handoff.
 - [x] Add provider commands, Terminal/iTerm2/WezTerm adapters, and injected process runner.
 - [x] Add launch endpoint, stable errors, audit events, and adapter tests.
 
@@ -86,7 +87,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 **Deliverables:**
 
 - [x] Add workspace-only context to backend and frontend launch contracts.
-- [x] Launch the provider at the workspace root without template arguments or a context manifest.
+- [x] Launch the provider at the workspace root without template arguments or generated context.
 - [x] Allow workspace-only sessions for snapshot items while retaining card-context eligibility rules.
 - [x] Explain manual file and directory references in the launch dialog.
 - [x] Test context omission, snapshot behavior, and frontend submission.
@@ -101,10 +102,24 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 
 - [x] Replace behavioral intents with `workspace_only` and `card_context`.
 - [x] Remove `plan.yaml` and implementation-plan readiness requirements.
-- [x] Make card manifests neutral and instruct the AI to wait for the user.
-- [x] Include only existing related document paths.
+- [x] Make card context neutral and instruct the AI to wait for the user.
+- [x] Provide selected-card context without prescribing behavior.
 - [x] Update API, UI, migration behavior, tests, and product documentation.
 
 **Verification:** `go test ./... && npm run typecheck && npm test -- --run`
 
 **Commit:** `PM-018: Simplify AI sessions to context selection`
+
+## Phase E3: Direct Card Path Handoff
+
+**Deliverables:**
+
+- [x] Pass the workspace-relative card path directly to provider templates.
+- [x] Remove `/ai-context` configuration and all manifest generation.
+- [x] Keep native-terminal wrappers self-deleting under the OS temporary directory.
+- [x] Show guidance only for the selected context mode.
+- [x] Migrate legacy built-in `{contextFile}` prompts to `{itemPath}`.
+
+**Verification:** `go test ./... && npm run typecheck && npm test -- --run`
+
+**Commit:** `PM-018: Pass card paths directly to AI sessions`

@@ -53,7 +53,7 @@ func NewServer(port int) (*Server, error) {
 	healthService := health.New(reg, idx, git)
 	searchService := appsearch.New(idx)
 	navigationStore := navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile)
-	aiSessionService := aisession.New(aisettings.New(paths.AISettingsFile)).ConfigureLaunch(reg, idx, auditStore, paths.AIContextDir)
+	aiSessionService := aisession.New(aisettings.New(paths.AISettingsFile)).ConfigureLaunch(reg, idx, auditStore, os.TempDir())
 	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore).WithAISessions(aiSessionService)
 
 	mux := http.NewServeMux()

@@ -96,7 +96,7 @@ func TestSettingsMigratesLegacyBehaviorPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := settings.Providers["codex"].Args; len(got) != 1 || strings.Contains(got[0], "intent") || !strings.Contains(got[0], "wait for the user's request") {
+	if got := settings.Providers["codex"].Args; len(got) != 1 || strings.Contains(got[0], "intent") || strings.Contains(got[0], "contextFile") || !strings.Contains(got[0], "{itemPath}") {
 		t.Fatalf("migrated args = %#v", got)
 	}
 }

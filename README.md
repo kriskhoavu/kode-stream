@@ -183,7 +183,7 @@ dataDir: /Users/me/.plan-manager-data
 
 Changing `dataDir` requires a restart.
 
-AI settings contain executable paths and argument templates only. Workspace-only sessions open at the workspace root without generated context, allowing manual file and directory references. Selected-card sessions use private temporary manifests containing the card path and existing related document paths, then wait for the user's request. Manifests expire after 24 hours and are never written into a registered workspace.
+AI settings contain executable paths and argument templates only. Workspace-only sessions open at the workspace root without generated context, allowing manual file and directory references. Selected-card sessions pass the card's workspace-relative path directly to the AI, which can read relevant documents from that directory before waiting for the user's request. No context file or directory is created.
 
 ### Data Directory Structure
 
@@ -196,7 +196,6 @@ AI settings contain executable paths and argument templates only. Workspace-only
   saved-filters.yaml
   recent-items.yaml
   ai-settings.yaml
-  ai-context/
   clone-root/
 ```
 

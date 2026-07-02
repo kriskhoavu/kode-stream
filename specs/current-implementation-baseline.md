@@ -581,7 +581,6 @@ Required files:
 - `saved-filters.yaml`
 - `recent-items.yaml`
 - `ai-settings.yaml`
-- `ai-context/`
 
 ### 12.2 Startup Compatibility Migration
 
@@ -609,7 +608,7 @@ Item AI APIs:
 - `GET /api/items/{id}/ai-session-eligibility`
 - `POST /api/items/{id}/ai-sessions`
 
-Context mode must be `workspace_only` or `card_context`. Workspace-only opens at the registered workspace root without provider prompt arguments or a context manifest and may be used from snapshot items. Card context requires an editable working-tree item but does not require `plan.yaml`; it lists the card path and existing related documents, then waits for the user's request. Context manifests must use mode `0600`, remain under the app data directory, contain paths rather than copied repository contents, and expire after 24 hours.
+Context mode must be `workspace_only` or `card_context`. Workspace-only opens at the registered workspace root without provider prompt arguments and may be used from snapshot items. Card context requires an editable working-tree item but does not require `plan.yaml`; it passes the workspace-relative card path directly to the AI with a neutral instruction to read relevant documents and wait for the user's request. Neither mode creates a persistent context resource.
 
 Provider authentication, approvals, and sandbox behavior remain owned by the provider CLI. Audit events must not record prompts, command arguments, or manifest contents.
 

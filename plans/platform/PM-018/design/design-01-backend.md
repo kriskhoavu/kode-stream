@@ -14,15 +14,15 @@ Add an `aisession` application service, app-owned settings store, provider adapt
 | `AISessionLaunchInput`  | `provider`, `terminal`, `contextMode`                          |
 | `AISessionLaunchResult` | `accepted`, `provider`, `terminal`, `contextMode`, `startedAt` |
 
-Settings are stored in `<data-dir>/ai-settings.yaml`. Context manifests are stored under `<data-dir>/ai-context/` and never under a registered workspace.
+Settings are stored in `<data-dir>/ai-settings.yaml`. Session context is passed through validated command arguments; no context file is created.
 
 ## Template Contract
 
-Allowed placeholders are `{workspace}`, `{contextFile}`, `{itemPath}`, `{identifier}`, and `{intent}`. Each argument is expanded independently. Templates cannot specify environment overrides, redirections, pipes, command substitution, or additional working directories.
+Allowed placeholders are `{workspace}`, `{itemPath}`, `{identifier}`, and `{contextMode}`. Legacy `{contextFile}` and `{intent}` placeholders remain compatible but resolve to the card path and context mode. Each argument is expanded independently. Templates cannot specify environment overrides, redirections, pipes, command substitution, or additional working directories.
 
-Built-in provider presets start an interactive session with an initial prompt instructing the provider to read `{contextFile}`. Built-ins never add flags that bypass provider approvals or sandboxing.
+Built-in provider presets start an interactive selected-card session with an initial prompt containing `{itemPath}`. Built-ins never add flags that bypass provider approvals or sandboxing.
 
-For `workspace_only`, the launcher omits all provider template arguments and does not generate a context manifest. For `card_context`, it supplies the selected card and existing related document paths with a neutral instruction to wait for the user's request. Neither mode prescribes brainstorming or implementation.
+For `workspace_only`, the launcher omits all provider template arguments. For `card_context`, it supplies the workspace-relative card path with a neutral instruction to read relevant documents and wait for the user's request. Neither mode creates context resources or prescribes behavior.
 
 ## API Contract
 
