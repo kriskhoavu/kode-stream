@@ -1,19 +1,23 @@
-# Implementation Plan: PM-019 - Read-Only Jira Integration
+# Implementation Plan: PM-019 - Jira Integration and Workspace Settings Redesign
 
 ## Overview
 
-Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adapters, normalized issue display, and safe attachment access.
+Preserve the completed read-only Jira integration and redesign workspace management around a compact workspace list, tabbed workspace details, a focused registration flow, and separate global storage settings.
 
 ## Phases Summary
 
-| Phase | Name                     | Status |
-|-------|--------------------------|--------|
-| B1    | Connection Configuration | Done   |
-| B2    | Issue Adapters And Cache | Done   |
-| B3    | Attachment Proxy         | Done   |
-| F1    | Workspace Jira Settings  | Done   |
-| F2    | Item Jira Side Panel     | Done   |
-| V1    | Integrated Verification  | Done   |
+| Phase | Name                     | Status  |
+|-------|--------------------------|---------|
+| B1    | Connection Configuration | Done    |
+| B2    | Issue Adapters And Cache | Done    |
+| B3    | Attachment Proxy         | Done    |
+| F1    | Workspace Jira Settings  | Done    |
+| F2    | Item Jira Side Panel     | Done    |
+| V1    | Integrated Verification  | Done    |
+| F3    | Workspace Manager Shell  | Done    |
+| F4    | Workspace Settings Tabs  | Pending |
+| F5    | Registration And Storage | Pending |
+| V2    | Redesign Verification    | Pending |
 
 ## Phase B1: Connection Configuration
 
@@ -92,3 +96,62 @@ Deliver per-workspace Jira configuration, Cloud and Server/Data Center read adap
 **Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/plan-manager`
 
 **Commit:** `PM-019: Verify read-only Jira integration`
+
+## Phase F3: Workspace Manager Shell
+
+**Deliverables:**
+
+- [x] Extract workspace list behavior into a focused feature component while retaining page-level operation coordination.
+- [x] Add the master-detail page shell, compact searchable workspace list, stable selection, and responsive list-to-detail navigation.
+- [x] Add page-level `Add workspace` and `Scan all` actions without rendering creation or edit forms in the list.
+- [x] Add explicit bulk-selection mode and preserve current confirmed removal behavior.
+- [x] Replace the global busy flag with operation-scoped pending state so navigation and unrelated actions remain available.
+- [x] Add list selection, filtering, empty state, bulk mode, and operation isolation coverage.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces`
+
+**Commit:** `PM-019: Add workspace manager shell`
+
+## Phase F4: Workspace Settings Tabs
+
+**Deliverables:**
+
+- [ ] Add Overview, Sources, Integrations, and Health tabs for the selected workspace.
+- [ ] Move editable identity, path, baseline branch, registration metadata, and destructive removal into Overview.
+- [ ] Replace source chips with source rows and retain the existing source-structure dialog through labeled Configure actions.
+- [ ] Move Jira fields and connection testing into Integrations without changing existing API or secret-handling behavior.
+- [ ] Move detailed health checks, scan feedback, warnings, and logs into Health while retaining compact summaries in the list.
+- [ ] Add per-tab dirty state, save validation, navigation guards, keyboard tab behavior, and focused component tests.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces web/src/features/jira-settings web/src/components/ReliabilityPanels.test.tsx`
+
+**Commit:** `PM-019: Organize workspace settings by domain`
+
+## Phase F5: Registration And Storage
+
+**Deliverables:**
+
+- [ ] Add a focused Add Workspace dialog with local folder and remote Git URL modes.
+- [ ] Infer workspace name and present branch and source defaults as reviewable fields.
+- [ ] Keep optional Jira configuration under Advanced settings and available after registration.
+- [ ] Keep remote clone progress, logs, failure details, retry, and successful selection inside the focused flow.
+- [ ] Move Data Directory configuration to application Settings under Storage with browse, reveal, restart guidance, and existing API behavior.
+- [ ] Add registration mode, inferred defaults, clone progress, retry, storage, accessibility, and unsaved-close tests.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces web/src/features/settings`
+
+**Commit:** `PM-019: Add focused workspace registration and storage settings`
+
+## Phase V2: Redesign Verification
+
+**Deliverables:**
+
+- [ ] Verify local registration, remote cloning, editing, scanning, source configuration, Jira testing, health inspection, and removal end to end.
+- [ ] Verify keyboard navigation, focus restoration, narrow-screen navigation, long paths, empty states, errors, and unsaved-change guards.
+- [ ] Confirm existing workspace and Jira API contracts, persisted YAML, token redaction, and attachment behavior remain unchanged.
+- [ ] Update architecture, README screenshots or usage documentation, and planning documents to match final component names.
+- [ ] Run full backend, frontend, production build, and browser visual checks.
+
+**Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/plan-manager`
+
+**Commit:** `PM-019: Verify workspace settings redesign`

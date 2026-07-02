@@ -2336,6 +2336,183 @@ body.is-resizing-drawer {
   align-items: stretch;
 }
 
+.workspace-manager-page-actions,
+.workspace-manager-list-header,
+.workspace-manager-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-manager-list {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.workspace-manager-list-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.workspace-manager-search {
+  min-width: 0;
+  flex: 1;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--panel);
+}
+
+.workspace-manager-search:focus-within {
+  border-color: var(--blue);
+}
+
+.workspace-manager-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.workspace-manager-list-items {
+  min-height: 0;
+  padding: 8px;
+  overflow: auto;
+}
+
+.workspace-manager-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-radius: 8px;
+}
+
+.workspace-manager-list-item:has(.workspace-manager-checkbox) {
+  grid-template-columns: 30px minmax(0, 1fr);
+}
+
+.workspace-manager-list-item.active {
+  background: color-mix(in srgb, var(--blue) 9%, var(--panel));
+}
+
+.workspace-manager-list-item > button {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.workspace-manager-list-item > button:hover,
+.workspace-manager-list-item > button:focus-visible,
+.workspace-manager-list-item.active > button {
+  border-color: color-mix(in srgb, var(--blue) 32%, var(--line));
+}
+
+.workspace-manager-checkbox {
+  display: grid;
+  place-items: start center;
+  padding-top: 15px;
+}
+
+.workspace-manager-item-title,
+.workspace-manager-item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.workspace-manager-item-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-manager-state {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.workspace-manager-state.ok {
+  color: var(--green);
+}
+
+.workspace-manager-item-path,
+.workspace-manager-item-meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-manager-list-empty {
+  padding: 24px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.workspace-manager-detail {
+  min-width: 0;
+}
+
+.workspace-manager-detail .repo-list {
+  padding-top: 16px;
+}
+
+.workspace-manager-detail .repo-row {
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+}
+
+.workspace-manager-bulk-bar {
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-soft);
+}
+
+.workspace-manager-bulk-bar .repo-select-all {
+  margin: 0;
+}
+
+.workspace-registration-modal {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(860px, calc(100vh - 32px));
+  overflow: auto;
+}
+
+.workspace-registration-modal > header {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  background: var(--panel);
+}
+
+.workspace-registration-modal .data-dir-panel {
+  display: none;
+}
+
 .workspaces-left-column {
   display: flex;
   flex-direction: column;

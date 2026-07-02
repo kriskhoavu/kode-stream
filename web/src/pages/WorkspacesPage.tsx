@@ -7,6 +7,7 @@ import type { JiraConnection, WorkspaceConfig, WorkspaceInput, SourceStructureSe
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
+import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
 
 export { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parseSources, previewPathSegments };
 
@@ -45,20 +46,32 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
   const [registrationLog, setRegistrationLog] = useState('');
   const [registrationLogOpen, setRegistrationLogOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [pendingOperations, setPendingOperations] = useState<string[]>([]);
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [editDraft, setEditDraft] = useState<{ name: string; path: string; baselineBranch: string; sources: string; jira: JiraConnection | null }>({ name: '', path: '', baselineBranch: '', sources: '', jira: null });
   const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([]);
   const [workspacesToRemove, setWorkspacesToRemove] = useState<WorkspaceConfig[] | null>(null);
   const [settingsEditor, setSettingsEditor] = useState<SettingsEditorState | null>(null);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(workspaces[0]?.id ?? '');
+  const [workspaceQuery, setWorkspaceQuery] = useState('');
+  const [bulkMode, setBulkMode] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const selectedWorkspaces = workspaces.filter((workspace) => selectedWorkspaceIds.includes(workspace.id));
   const allSelected = workspaces.length > 0 && selectedWorkspaces.length === workspaces.length;
+  const busy = pendingOperations.length > 0;
+  const operationBusy = (operation: string) => pendingOperations.includes(operation);
+  const setBusy = (pending: boolean, operation = 'workspace-form') => {
+    setPendingOperations((current) => pending
+      ? current.includes(operation) ? current : [...current, operation]
+      : current.filter((item) => item !== operation));
+  };
 
   useEffect(() => {
     setSelectedWorkspaceIds((current) => current.filter((id) => workspaces.some((workspace) => workspace.id === id)));
+    setSelectedWorkspaceId((current) => workspaces.some((workspace) => workspace.id === current) ? current : workspaces[0]?.id ?? '');
   }, [workspaces]);
 
   useEffect(() => {
@@ -106,6 +119,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       setBaselineBranch('master');
       setSources('');
       setJira(null);
+      setRegistrationOpen(false);
       onChanged();
     } catch (err) {
       setNotice({ tone: 'error', title: registrationMode === 'remote_clone' ? 'Remote workspace registration failed' : 'Local workspace registration failed', details: [errorMessage(err)] });
@@ -119,7 +133,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   };
 
   const scan = async (repo: WorkspaceConfig) => {
-    setBusy(true);
+    const operation = `scan:${repo.id}`;
+    setBusy(true, operation);
     setNotice({ tone: 'info', title: `Scanning ${repo.name}` });
     try {
       const result = await api.scan(repo.id);
@@ -129,13 +144,13 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     } catch (err) {
       setNotice({ tone: 'error', title: `Scan failed for ${repo.name}`, details: [errorMessage(err)] });
     } finally {
-      setBusy(false);
+      setBusy(false, operation);
     }
   };
 
   const scanAll = async () => {
     if (workspaces.length === 0) return;
-    setBusy(true);
+    setBusy(true, 'scan-all');
     setNotice({ tone: 'info', title: `Scanning ${workspaces.length} workspace${workspaces.length === 1 ? '' : 's'}` });
     const details: string[] = [];
     let failures = 0;
@@ -160,7 +175,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       });
       await onChanged();
     } finally {
-      setBusy(false);
+      setBusy(false, 'scan-all');
     }
   };
 
@@ -414,12 +429,114 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       <div className="page-title">
         <div>
           <h1>Workspaces</h1>
-          <span>Register local paths or remote Git URLs, then scan sources.</span>
+          <span>Browse, configure, and scan registered workspaces.</span>
+        </div>
+        <div className="workspace-manager-page-actions">
+          <button className="secondary" type="button" onClick={() => void scanAll()} disabled={operationBusy('scan-all') || workspaces.length === 0}>
+            <RotateCw size={16} /> Scan all
+          </button>
+          <button className="primary" type="button" onClick={() => setRegistrationOpen(true)}>
+            <Plus size={16} /> Add workspace
+          </button>
         </div>
       </div>
 
       <div className="workspaces-layout">
-        <div className="workspaces-left-column">
+        <WorkspaceList
+          workspaces={workspaces}
+          selectedWorkspaceId={selectedWorkspaceId}
+          selectedWorkspaceIds={selectedWorkspaceIds}
+          query={workspaceQuery}
+          bulkMode={bulkMode}
+          onQueryChange={setWorkspaceQuery}
+          onSelect={setSelectedWorkspaceId}
+          onToggleBulkMode={() => {
+            setBulkMode((current) => !current);
+            setSelectedWorkspaceIds([]);
+          }}
+          onToggleSelection={toggleWorkspaceSelection}
+        />
+
+        <div className="repo-list-panel workspace-manager-detail">
+          {bulkMode && <div className="workspace-manager-bulk-bar">
+            <label className="repo-select-all">
+              <input
+                ref={selectAllRef}
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAllWorkspaceSelection}
+                disabled={busy || workspaces.length === 0}
+              />
+              Select all ({selectedWorkspaces.length} selected)
+            </label>
+            <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove(selectedWorkspaces)} disabled={busy || selectedWorkspaces.length === 0}>
+              <Trash2 size={16} /> Remove selected
+            </button>
+          </div>}
+          {notice && <WorkspaceNoticePanel notice={notice} onDismiss={() => setNotice(null)} />}
+          <div className="repo-list">
+            {workspaces.filter((repo) => repo.id === selectedWorkspaceId).map((repo) => (
+              <article className="repo-row" key={repo.id}>
+                <div className="repo-row-icon">
+                  <HardDrive size={18} />
+                  <span className="repo-baseline-badge" title={`Baseline branch: ${repo.baselineBranch}`}>{repo.baselineBranch}</span>
+                </div>
+                {editingId === repo.id ? (
+                  <>
+                    <div className="repo-row-main repo-edit-form">
+                      <label className="repo-field">Workspace Name<input value={editDraft.name} onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })} /></label>
+                      <label className="repo-field">Local Path<input value={editDraft.path} onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })} /></label>
+                      <div className="repo-field-grid">
+                        <BranchField value={editDraft.baselineBranch} onChange={(value) => setEditDraft({ ...editDraft, baselineBranch: value })} />
+                        <SourcesField value={editDraft.sources} onChange={(value) => setEditDraft({ ...editDraft, sources: value })} />
+                      </div>
+                      <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />
+                    </div>
+                    <div className="repo-row-actions">
+                      <button className="secondary" type="button" onClick={() => setEditingId('')} disabled={busy}>Cancel</button>
+                      <button className="primary" type="button" onClick={() => saveEdit(repo)} disabled={busy}>Save</button>
+                      <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])} disabled={busy}><Trash2 size={16} /> Remove</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="repo-row-main">
+                      <h2>{repo.name}</h2>
+                      {repo.registrationMode === 'remote_clone' && repo.remoteUrl && <span className="repo-remote-url" title={repo.remoteUrl}>{repo.remoteUrl}</span>}
+                      <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} disabled={operationBusy('workspace-form')} title={repo.path}>{repo.path}</button>
+                      <div className="repo-directory-list">
+                        {repo.sources.map((directory) => (
+                          <div className="repo-directory-chip" key={directory}>
+                            <span className="repo-directory-name">{directory}</span>
+                            <button type="button" onClick={() => void openSourceSettings(repo, directory)} disabled={operationBusy('workspace-form')} aria-label={`Configure ${directory}`} title={`Configure ${directory}`}>
+                              <SlidersHorizontal size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="repo-row-actions">
+                      <button className="secondary icon-action" onClick={() => revealPath(repo.path)} disabled={operationBusy('workspace-form')} title="Reveal"><ExternalLink size={16} /></button>
+                      <button className="secondary icon-action" onClick={() => startEdit(repo)} disabled={operationBusy('workspace-form')} title="Edit"><Pencil size={16} /></button>
+                      <button className="secondary" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all')}><RotateCw size={16} /> Scan</button>
+                    </div>
+                  </>
+                )}
+                <WorkspaceHealthPanel workspaceId={repo.id} />
+              </article>
+            ))}
+            {workspaces.length === 0 && <div className="empty-inline repo-empty"><CheckCircle2 size={18} /> No workspaces registered.</div>}
+          </div>
+        </div>
+      </div>
+
+      {registrationOpen && <section className="modal-backdrop" role="presentation">
+        <div className="modal-panel workspace-registration-modal" role="dialog" aria-modal="true" aria-labelledby="add-workspace-title">
+          <header>
+            <div><h2 id="add-workspace-title">Add workspace</h2><span>Register a local folder or clone a remote Git repository.</span></div>
+            <button className="icon-button" type="button" onClick={() => setRegistrationOpen(false)} aria-label="Close add workspace"><X size={16} /></button>
+          </header>
+          <div className="workspaces-left-column">
           {systemConfig && (
             <section className="repo-create-panel data-dir-panel">
               <header>
@@ -547,105 +664,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
           )}
           </form>
         </div>
-
-        <div className="repo-list-panel">
-          <header>
-            <div>
-              <h2>Registered</h2>
-              <span>{workspaces.length} workspaces</span>
-              <label className="repo-select-all">
-                <input
-                  ref={selectAllRef}
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAllWorkspaceSelection}
-                  disabled={busy || workspaces.length === 0}
-                />
-                Select all ({selectedWorkspaces.length} selected)
-              </label>
-            </div>
-            <div className="repo-list-header-actions">
-              <button className="secondary" type="button" onClick={() => void scanAll()} disabled={busy || workspaces.length === 0}>
-                <RotateCw size={16} /> Scan all
-              </button>
-              <button
-                className="secondary danger"
-                type="button"
-                onClick={() => setWorkspacesToRemove(selectedWorkspaces)}
-                disabled={busy || selectedWorkspaces.length === 0}
-              >
-                <Trash2 size={16} /> Remove selected
-              </button>
-            </div>
-          </header>
-          {notice && <WorkspaceNoticePanel notice={notice} onDismiss={() => setNotice(null)} />}
-          <div className="repo-list">
-            {workspaces.map((repo) => (
-              <article className="repo-row" key={repo.id}>
-                <label className="repo-row-select" aria-label={`Select ${repo.name}`}>
-                  <input
-                    type="checkbox"
-                    checked={selectedWorkspaceIds.includes(repo.id)}
-                    onChange={() => toggleWorkspaceSelection(repo.id)}
-                    disabled={busy}
-                  />
-                </label>
-                <div className="repo-row-icon">
-                  <HardDrive size={18} />
-                  <span className="repo-baseline-badge" title={`Baseline branch: ${repo.baselineBranch}`}>{repo.baselineBranch}</span>
-                </div>
-                {editingId === repo.id ? (
-                  <>
-                    <div className="repo-row-main repo-edit-form">
-                      <label className="repo-field">Workspace Name<input value={editDraft.name} onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })} /></label>
-                      <label className="repo-field">Local Path<input value={editDraft.path} onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })} /></label>
-                      <div className="repo-field-grid">
-                        <BranchField value={editDraft.baselineBranch} onChange={(value) => setEditDraft({ ...editDraft, baselineBranch: value })} />
-                        <SourcesField value={editDraft.sources} onChange={(value) => setEditDraft({ ...editDraft, sources: value })} />
-                      </div>
-                      <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />
-                    </div>
-                    <div className="repo-row-actions">
-                      <button className="secondary" type="button" onClick={() => setEditingId('')} disabled={busy}>Cancel</button>
-                      <button className="primary" type="button" onClick={() => saveEdit(repo)} disabled={busy}>Save</button>
-                      <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])} disabled={busy}><Trash2 size={16} /> Remove</button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="repo-row-main">
-                      <h2>{repo.name}</h2>
-                      {repo.registrationMode === 'remote_clone' && repo.remoteUrl && <span className="repo-remote-url" title={repo.remoteUrl}>{repo.remoteUrl}</span>}
-                      <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} disabled={busy} title={repo.path}>{repo.path}</button>
-                      <div className="repo-directory-list">
-                        {repo.sources.map((directory) => (
-                          <div className="repo-directory-chip" key={directory}>
-                            <span className="repo-directory-name">{directory}</span>
-                            <button type="button" onClick={() => void openSourceSettings(repo, directory)} disabled={busy} aria-label={`Configure ${directory}`} title={`Configure ${directory}`}>
-                              <SlidersHorizontal size={12} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="repo-row-actions">
-                      <button className="secondary icon-action" onClick={() => revealPath(repo.path)} disabled={busy} title="Reveal">
-                        <ExternalLink size={16} />
-                      </button>
-                      <button className="secondary icon-action" onClick={() => startEdit(repo)} disabled={busy} title="Edit">
-                        <Pencil size={16} />
-                      </button>
-                      <button className="secondary" onClick={() => scan(repo)} disabled={busy}><RotateCw size={16} /> Scan</button>
-                    </div>
-                  </>
-                )}
-                <WorkspaceHealthPanel workspaceId={repo.id} />
-              </article>
-            ))}
-            {workspaces.length === 0 && <div className="empty-inline repo-empty"><CheckCircle2 size={18} /> No workspaces registered.</div>}
-          </div>
         </div>
-      </div>
+      </section>}
       {workspacesToRemove && (
         <ConfirmDialog
           title={workspacesToRemove.length === 1 ? 'Remove workspace' : 'Remove selected workspaces'}
