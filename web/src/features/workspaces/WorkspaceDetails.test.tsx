@@ -30,6 +30,7 @@ describe('workspace detail settings', () => {
 
     expect(screen.queryByRole('tab', { name: 'Health' })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Workspace health' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove' }).closest('header')).toHaveClass('workspace-detail-heading');
     expect(screen.queryByText('Connect Jira')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Sources' }));
     expect(screen.getAllByRole('button', { name: 'Configure structure' })).toHaveLength(2);

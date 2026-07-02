@@ -2650,6 +2650,10 @@ body.is-resizing-drawer {
   font-size: 12px;
 }
 
+.workspace-detail-remove {
+  margin-left: auto;
+}
+
 .workspace-detail-section,
 .repo-edit-form {
   display: grid;
@@ -2690,7 +2694,6 @@ body.is-resizing-drawer {
   gap: 8px;
 }
 
-.workspace-danger-zone,
 .workspace-source-row,
 .workspace-integration-card {
   display: flex;
@@ -2702,12 +2705,6 @@ body.is-resizing-drawer {
   border-radius: 8px;
 }
 
-.workspace-danger-zone {
-  margin-top: 12px;
-  border-color: color-mix(in srgb, #dc2626 28%, var(--line));
-}
-
-.workspace-danger-zone > div,
 .workspace-source-row > div,
 .workspace-integration-card > div {
   min-width: 0;
@@ -2715,7 +2712,6 @@ body.is-resizing-drawer {
   gap: 3px;
 }
 
-.workspace-danger-zone span,
 .workspace-source-row span,
 .workspace-integration-card span {
   color: var(--muted);

@@ -66,7 +66,7 @@ Application Settings
 - Put `Add workspace` in the page header as the primary action and `Scan all` as secondary.
 - Use a labeled overflow menu for reveal, bulk-selection entry, and other secondary actions.
 - Do not render forms, health checks, or Jira fields inside list rows.
-- Put workspace removal at the bottom of Overview and retain the existing confirmation semantics.
+- Put workspace removal at the right edge of the persistent workspace detail header and retain the existing confirmation semantics.
 - Show notices near the action that produced them; do not use one page-wide status for unrelated operations.
 - Track busy state per operation so scanning one workspace does not disable unrelated navigation.
 

@@ -117,7 +117,7 @@ Preserve the completed read-only Jira integration and redesign workspace managem
 **Deliverables:**
 
 - [x] Add Overview, Sources, and Integrations tabs for the selected workspace.
-- [x] Move editable identity, path, baseline branch, registration metadata, and destructive removal into Overview.
+- [x] Move editable identity, path, baseline branch, and registration metadata into Overview, with destructive removal in the detail header.
 - [x] Replace source chips with source rows and retain the existing source-structure dialog through labeled Configure actions.
 - [x] Move Jira fields and connection testing into Integrations without changing existing API or secret-handling behavior.
 - [x] Keep detailed health checks and scanning in Overview while retaining a compact scan summary in the list.

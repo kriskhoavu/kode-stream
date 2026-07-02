@@ -524,6 +524,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                 <header className="workspace-detail-heading">
                   <div className="repo-row-icon"><HardDrive size={18} /></div>
                   <div><h2>{repo.name}</h2><span>{activeDetailTab === 'overview' ? 'Workspace details and health' : activeDetailTab === 'sources' ? 'Indexed source directories' : 'Connected services'}</span></div>
+                  <button className="secondary danger workspace-detail-remove" type="button" onClick={() => setWorkspacesToRemove([repo])}><Trash2 size={16} /> Remove</button>
                 </header>
 
                 {activeDetailTab === 'overview' && <section className="workspace-detail-section">
@@ -548,10 +549,6 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                     <div className="repo-row-actions workspace-detail-actions">
                       <button className="secondary" type="button" onClick={() => revealPath(repo.path)}><ExternalLink size={16} /> Reveal folder</button>
                       <button className="primary" type="button" onClick={() => startEdit(repo)}><Pencil size={16} /> Edit overview</button>
-                    </div>
-                    <div className="workspace-danger-zone">
-                      <div><strong>Remove workspace</strong><span>Remove its cached items from Plan Manager.</span></div>
-                      <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])}><Trash2 size={16} /> Remove</button>
                     </div>
                   </>}
                   <div className="workspace-overview-health">
