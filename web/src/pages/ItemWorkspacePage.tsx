@@ -2,7 +2,6 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MutableRefObject } from 'react';
 import {
   ArrowLeft,
-  Bot,
   ChevronDown,
   Code2,
   File as FileIcon,
@@ -35,7 +34,7 @@ import type { TreeFileState } from '../features/file-tree/FileStateIcon';
 import { ContentSearchInput, ContentSearchResults } from '../features/content-search/ContentSearch';
 import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
-import { AISessionLaunchDialog } from '../features/ai-session/AISessionLaunchDialog';
+import { AISessionLaunchControl } from '../features/ai-session/AISessionLaunchControl';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'git';
@@ -69,7 +68,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(300);
   const [rightWidth, setRightWidth] = useState(300);
-  const [aiLaunchOpen, setAILaunchOpen] = useState(false);
   const [aiLaunchMessage, setAILaunchMessage] = useState('');
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
@@ -414,7 +412,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           <h1>{plan?.title ?? 'Loading item'}</h1>
           <span>{plan?.scope} / {plan?.branch} / {plan?.identifier}</span>
         </div>
-        <div className="workspace-header-actions"><button className="primary" type="button" disabled={!plan} onClick={() => setAILaunchOpen(true)}><Bot size={16} /> Open AI session</button><button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button></div>
+        <div className="workspace-header-actions"><AISessionLaunchControl itemId={itemId} disabled={!plan} onLaunched={setAILaunchMessage} onError={(caught) => showOperationError(caught, 'AI session launch failed')} /><button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button></div>
       </header>
       {aiLaunchMessage && <div className="operation-notice" role="status">{aiLaunchMessage}</div>}
       <div className="workspace-grid" style={gridStyle} ref={workspaceGridRef}>
@@ -607,7 +605,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           )}
         </aside>
       </div>
-      {aiLaunchOpen && <AISessionLaunchDialog itemId={itemId} onClose={() => setAILaunchOpen(false)} onLaunched={setAILaunchMessage} />}
       {revertDialogOpen && file && (
         <ConfirmDialog
           title="Revert file"

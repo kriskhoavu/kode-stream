@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, X } from 'lucide-react';
 import { api } from '../../lib/api';
-import type { AICapability, AISessionEligibility, AISettings, AISessionLaunchInput } from '../../lib/types';
+import type { AICapability, AISessionEligibility, AISettings, AISessionLaunchInput, AISessionLaunchResult } from '../../lib/types';
 
-export function AISessionLaunchDialog({ itemId, onClose, onLaunched }: { itemId: string; onClose: () => void; onLaunched: (message: string) => void }) {
+export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched }: { itemId: string; preference?: AISessionLaunchInput | null; onClose: () => void; onLaunched: (result: AISessionLaunchResult) => void }) {
   const [settings, setSettings] = useState<AISettings | null>(null);
   const [capabilities, setCapabilities] = useState<AICapability[]>([]);
   const [eligibility, setEligibility] = useState<AISessionEligibility | null>(null);
@@ -23,11 +23,12 @@ export function AISessionLaunchDialog({ itemId, onClose, onLaunched }: { itemId:
       setSettings(nextSettings);
       setCapabilities(nextCapabilities);
       setEligibility(nextEligibility);
-      setProvider(nextSettings.defaultProvider);
-      setTerminal(nextSettings.defaultTerminal);
+      setProvider(preference?.provider ?? nextSettings.defaultProvider);
+      setTerminal(preference?.terminal ?? nextSettings.defaultTerminal);
+      setContextMode(preference?.contextMode ?? 'card_context');
     }).catch((caught) => active && setError(caught instanceof Error ? caught.message : 'AI session options are unavailable.')).finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [itemId]);
+  }, [itemId, preference]);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -50,7 +51,7 @@ export function AISessionLaunchDialog({ itemId, onClose, onLaunched }: { itemId:
     setError('');
     try {
       const result = await api.launchAISession(itemId, { provider, terminal, contextMode });
-      onLaunched(`${label(result.provider)} opened in ${label(result.terminal)} with ${result.contextMode === 'card_context' ? 'card context' : 'workspace context'}.`);
+      onLaunched(result);
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'AI session launch failed.');

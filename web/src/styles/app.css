@@ -531,6 +531,24 @@ button:disabled {
   gap: 8px;
 }
 
+.ai-launch-split {
+  display: inline-flex;
+}
+
+.ai-launch-split .primary {
+  border-radius: 0;
+}
+
+.ai-launch-main {
+  border-radius: 8px 0 0 8px !important;
+}
+
+.ai-launch-settings {
+  border-left: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 0 8px 8px 0 !important;
+  padding: 0 10px;
+}
+
 .operation-notice {
   border: 1px solid color-mix(in srgb, #22c55e 35%, var(--line));
   border-radius: 7px;

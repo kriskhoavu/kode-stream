@@ -16,6 +16,7 @@ Deliver provider detection, safe context selection, macOS external-terminal laun
 | E1    | Workspace-Only Sessions            | Done   |
 | E2    | Context-Only Session Model         | Done   |
 | E3    | Direct Card Path Handoff           | Done   |
+| E4    | Remembered Split Launch            | Done   |
 
 ## Phase B1: Capability And Settings Foundation
 
@@ -123,3 +124,17 @@ Deliver provider detection, safe context selection, macOS external-terminal laun
 **Verification:** `go test ./... && npm run typecheck && npm test -- --run`
 
 **Commit:** `PM-018: Pass card paths directly to AI sessions`
+
+## Phase E4: Remembered Split Launch
+
+**Deliverables:**
+
+- [x] Replace the single launch action with a main launch segment and a settings segment.
+- [x] Store the last successful provider, terminal, and context mode in browser local storage.
+- [x] Open configuration on the first launch and reuse the saved selection on later main-button clicks.
+- [x] Reopen configuration when a remembered launch fails.
+- [x] Test first-use, remembered-launch, settings, and failure behavior.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session && npm run build`
+
+**Commit:** `PM-018: Remember AI session launch choices`

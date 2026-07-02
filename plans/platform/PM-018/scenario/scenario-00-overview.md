@@ -9,6 +9,8 @@
 | 3   | Missing provider or terminal | Launch is blocked with an actionable capability error           |
 | 4   | Invalid custom template      | Settings reject unknown placeholders before process execution   |
 | 5   | Snapshot-only item           | Card context is disabled while workspace-only remains available |
+| 6   | Repeat preferred launch      | Main action reuses the last successful browser-local selection  |
+| 7   | Change preferred launch      | Settings segment opens configuration without launching          |
 
 ## Flow 1: Launch an External Session
 
@@ -41,3 +43,6 @@ Launch request
 - Workspace-only context is available for any indexed item and passes no initial prompt.
 - Neither context mode creates a context file or directory.
 - Launch commands cannot introduce unapproved shell fragments through settings or item values.
+- The first main-button click opens configuration when no browser preference exists.
+- A successful configured launch becomes the next main-button choice on that browser.
+- A failed remembered launch reports the error and reopens configuration.
