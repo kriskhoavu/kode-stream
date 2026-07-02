@@ -543,6 +543,19 @@ button:disabled {
   border-radius: 8px 0 0 8px !important;
 }
 
+.ai-launch-main-saved {
+  box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.65), 0 10px 22px rgba(79, 70, 229, 0.22);
+}
+
+.ai-launch-saved-indicator {
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18);
+}
+
 .ai-launch-settings {
   border-left: 1px solid rgba(255, 255, 255, 0.28) !important;
   border-radius: 0 8px 8px 0 !important;

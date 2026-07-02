@@ -133,6 +133,7 @@ Deliver provider detection, safe context selection, macOS external-terminal laun
 - [x] Store the last successful provider, terminal, and context mode in browser local storage.
 - [x] Open configuration on the first launch and reuse the saved selection on later main-button clicks.
 - [x] Reopen configuration when a remembered launch fails.
+- [x] Indicate a saved choice with color and expose its details through the main action label and tooltip.
 - [x] Test first-use, remembered-launch, settings, and failure behavior.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session && npm run build`

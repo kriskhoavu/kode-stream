@@ -23,6 +23,7 @@ Add frontend equivalents of `AICapability`, `AISettings`, `LaunchTemplate`, `AIS
 - Settings lists provider and terminal presets with detected state, executable override, argument template, enable toggle, and default selection.
 - Item workspace adds a split `Open AI session` action.
 - The main segment opens configuration when no preference exists, then launches directly with the last successful selection.
+- A colored indicator and tooltip identify the remembered provider, terminal, and context mode.
 - The settings segment always opens configuration so the selection can be changed.
 - Dialog requires provider, terminal, and context mode.
 - Workspace-only explains that no card context is injected and workspace paths can be referenced manually.
