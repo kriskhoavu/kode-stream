@@ -2606,7 +2606,7 @@ body.is-resizing-drawer {
   margin: 0;
 }
 
-.workspace-registration-modal {
+.modal-panel.workspace-registration-modal {
   width: min(820px, calc(100vw - 40px));
   max-height: min(900px, calc(100vh - 32px));
   overflow: auto;
@@ -5422,7 +5422,7 @@ body.is-resizing-panel {
 }
 
 @media (max-width: 640px) {
-  .workspace-registration-modal {
+  .modal-panel.workspace-registration-modal {
     width: calc(100vw - 20px);
     max-height: calc(100vh - 20px);
     padding: 14px;
