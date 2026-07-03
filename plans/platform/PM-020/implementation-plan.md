@@ -10,14 +10,15 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 
 ## Phases Summary
 
-| Phase | Name                    | Status   |
-|-------|-------------------------|----------|
-| B1    | PTY Session Lifecycle   | Complete |
-| F1    | Embedded Terminal       | Complete |
-| V1    | Integrated Verification | Complete |
-| F2    | Multi-Session Dock      | Complete |
-| F3    | Floating Minimized Mode | Complete |
-| F4    | Collapsed Session Chip  | Complete |
+| Phase | Name                     | Status   |
+|-------|--------------------------|----------|
+| B1    | PTY Session Lifecycle    | Complete |
+| F1    | Embedded Terminal        | Complete |
+| V1    | Integrated Verification  | Complete |
+| F2    | Multi-Session Dock       | Complete |
+| F3    | Floating Minimized Mode  | Complete |
+| F4    | Collapsed Session Chip   | Complete |
+| F5    | Minimized Visibility Fix | Complete |
 
 ## Phase B1: PTY Session Lifecycle
 
@@ -97,3 +98,14 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session`
 
 **Commit:** `PM-020: Collapse minimized terminal to corner`
+
+## Phase F5: Minimized Visibility Fix
+
+**Deliverables:**
+
+- [x] Prevent terminal backdrop layout rules from overriding the minimized `hidden` state.
+- [x] Keep only the corner restore chip visible while minimized.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session && npm run build`
+
+**Commit:** `PM-020: Hide terminal dialog when minimized`

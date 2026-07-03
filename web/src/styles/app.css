@@ -827,6 +827,8 @@ button:disabled {
 	isolation: isolate;
 }
 
+.embedded-terminal-backdrop[hidden] { display: none; }
+
 .embedded-terminal-shell {
 	display: grid;
 	grid-template-rows: auto minmax(0, 1fr);
