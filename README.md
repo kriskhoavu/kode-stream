@@ -71,7 +71,7 @@ External AI session launch currently supports macOS Terminal, iTerm2, and WezTer
 
 Embedded AI sessions are also available on macOS and supported Unix hosts. They run the selected provider in an app-owned terminal with explicit cancel, reconnect, and exit state. External launch remains the fallback on unsupported platforms or when users prefer a native terminal.
 
-The terminal dock supports multiple concurrent sessions across workspaces. Minimize it into a live bottom-right window while reading and editing plans, switch sessions from workspace-labeled tabs, or maximize the active terminal for full-screen work.
+The terminal dock supports multiple concurrent sessions across workspaces. Minimize it into a compact bottom-right restore chip while reading and editing plans, switch sessions from workspace-labeled tabs after restoration, or maximize the active terminal for full-screen work.
 
 ## Quick Start
 

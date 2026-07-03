@@ -71,14 +71,4 @@ describe('EmbeddedTerminal', () => {
 		expect(screen.getByRole('button', { name: 'Restore embedded terminal size' })).toBeInTheDocument();
 	});
 
-	it('becomes a non-modal live terminal in minimized mode', async () => {
-		vi.stubGlobal('WebSocket', TestSocket);
-		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-		render(<EmbeddedTerminal initial={initial} {...terminalProps} mode="minimized" onClose={vi.fn()} />);
-		await waitFor(() => expect(fit).toHaveBeenCalled());
-		const dialog = screen.getByRole('dialog');
-		expect(dialog).not.toHaveAttribute('aria-modal');
-		expect(screen.getByRole('button', { name: 'Restore embedded terminal' })).toBeInTheDocument();
-		expect(screen.getByLabelText('AI terminal output')).toBeVisible();
-	});
 });

@@ -17,6 +17,7 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 | V1    | Integrated Verification | Complete |
 | F2    | Multi-Session Dock      | Complete |
 | F3    | Floating Minimized Mode | Complete |
+| F4    | Collapsed Session Chip  | Complete |
 
 ## Phase B1: PTY Session Lifecycle
 
@@ -82,3 +83,17 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session`
 
 **Commit:** `PM-020: Add floating minimized terminal`
+
+## Phase F4: Collapsed Session Chip
+
+**Deliverables:**
+
+- [x] Fully hide terminal content and controls while minimized.
+- [x] Keep all terminal components mounted and session transports connected.
+- [x] Show one compact bottom-right restore chip with active-session context and session count.
+- [x] Refit the active terminal after restoration.
+- [x] Test collapsed presentation, retained sessions, and restore behavior.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session`
+
+**Commit:** `PM-020: Collapse minimized terminal to corner`

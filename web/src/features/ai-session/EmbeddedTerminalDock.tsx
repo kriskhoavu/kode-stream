@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bot } from 'lucide-react';
+import { Bot, Maximize2 } from 'lucide-react';
 import type { EmbeddedAISessionResult, WorkspaceConfig } from '../../lib/types';
 import { EmbeddedTerminal } from './EmbeddedTerminal';
 import { embeddedSessionStartedEvent } from './terminalSessions';
@@ -35,10 +35,11 @@ export function EmbeddedTerminalDock({ workspaces }: { workspaces: WorkspaceConf
 	};
 
 	return <>
-		<div className={`embedded-terminal-backdrop terminal-mode-${mode}`}>
+		{mode === 'minimized' && <button className="embedded-terminal-minimized" type="button" aria-label={`Restore embedded terminal, ${sessions.length} open session${sessions.length === 1 ? '' : 's'}`} onClick={() => setMode('normal')}><span className="embedded-terminal-minimized-icon"><Bot size={17} /><i aria-hidden="true" /></span><span><strong>{sessionLabel(active, workspaceNames)}</strong><small>{sessions.length} open session{sessions.length === 1 ? '' : 's'} · click to restore</small></span><Maximize2 size={17} /></button>}
+		<div className={`embedded-terminal-backdrop terminal-mode-${mode}`} hidden={mode === 'minimized'}>
 			<section className="embedded-terminal-shell" aria-label="Embedded terminal dock">
 				<nav className="embedded-terminal-tabs" aria-label="Open embedded sessions">{sessions.map((result) => <button key={result.session.id} type="button" className={result.session.id === active.session.id ? 'active' : ''} onClick={() => select(result.session.id)}><Bot size={14} /> {sessionLabel(result, workspaceNames)}</button>)}</nav>
-				{sessions.map((result) => <EmbeddedTerminal key={result.session.id} initial={result} visible={result.session.id === active.session.id} mode={mode} title={sessionLabel(result, workspaceNames)} onToggleMinimize={() => setMode((current) => current === 'minimized' ? 'normal' : 'minimized')} onToggleMaximize={() => setMode((current) => current === 'maximized' ? 'normal' : 'maximized')} onClose={() => close(result.session.id)} />)}
+				{sessions.map((result) => <EmbeddedTerminal key={result.session.id} initial={result} visible={mode !== 'minimized' && result.session.id === active.session.id} mode={mode === 'maximized' ? 'maximized' : 'normal'} title={sessionLabel(result, workspaceNames)} onToggleMinimize={() => setMode('minimized')} onToggleMaximize={() => setMode((current) => current === 'maximized' ? 'normal' : 'maximized')} onClose={() => close(result.session.id)} />)}
 			</section>
 		</div>
 	</>;

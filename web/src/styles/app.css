@@ -842,27 +842,34 @@ button:disabled {
 .terminal-mode-maximized { padding: 0; }
 .terminal-mode-maximized .embedded-terminal-shell { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
 
-.terminal-mode-minimized {
-	place-items: end;
-	pointer-events: none;
-	padding: 0 18px 18px 0;
-	background: transparent;
+.embedded-terminal-minimized {
+	position: fixed;
+	right: 18px;
+	bottom: 18px;
+	z-index: 100;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 9px;
+	width: min(310px, calc(100vw - 36px));
+	min-height: 48px;
+	border: 1px solid color-mix(in srgb, var(--blue) 32%, var(--line));
+	border-radius: 10px;
+	background: var(--panel);
+	color: var(--text);
+	box-shadow: 0 14px 38px rgba(15, 23, 42, 0.3);
+	padding: 7px 10px;
+	text-align: left;
 }
 
-.terminal-mode-minimized .embedded-terminal-shell {
-	pointer-events: auto;
-	width: min(520px, calc(100vw - 36px));
-	height: min(380px, calc(100dvh - 36px));
-	border-color: color-mix(in srgb, var(--blue) 32%, var(--line));
-	box-shadow: 0 18px 55px rgba(15, 23, 42, 0.36);
-}
-
-.terminal-mode-minimized .embedded-terminal-panel > header { padding: 8px 10px; }
-.terminal-mode-minimized .embedded-terminal-panel > header h2 { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.terminal-mode-minimized .embedded-terminal-panel > header p { font-size: 11px; }
-.terminal-mode-minimized .embedded-terminal-panel > footer { display: none; }
-.terminal-mode-minimized .embedded-terminal-tabs { padding: 4px; }
-.terminal-mode-minimized .embedded-terminal-tabs button { min-height: 28px; max-width: 220px; font-size: 11px; }
+.embedded-terminal-minimized:hover { border-color: var(--blue); transform: translateY(-1px); }
+.embedded-terminal-minimized > span:not(.embedded-terminal-minimized-icon) { min-width: 0; display: grid; gap: 2px; }
+.embedded-terminal-minimized strong,
+.embedded-terminal-minimized small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.embedded-terminal-minimized strong { font-size: 12px; }
+.embedded-terminal-minimized small { color: var(--muted); font-size: 10px; }
+.embedded-terminal-minimized-icon { position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 7px; background: color-mix(in srgb, var(--blue) 12%, var(--panel-soft)); color: var(--blue); }
+.embedded-terminal-minimized-icon i { position: absolute; right: -2px; bottom: -2px; width: 8px; height: 8px; border: 2px solid var(--panel); border-radius: 50%; background: var(--green); }
 
 .embedded-terminal-panel {
 	position: absolute;

@@ -19,13 +19,15 @@ describe('EmbeddedTerminalDock', () => {
 		expect(screen.getByRole('region', { name: 'Discovery · codex · PM-020' })).toBeVisible();
 	});
 
-	it('minimizes to a live floating terminal and restores it', () => {
+	it('fully collapses to a corner chip and restores the connected terminal', () => {
 		render(<EmbeddedTerminalDock workspaces={[]} />);
 		act(() => { openEmbeddedSession(session('one', 'ws-1', 'item-1')); });
 		fireEvent.click(screen.getByRole('button', { name: 'Minimize test terminal' }));
-		expect(screen.getByRole('region', { name: 'Embedded terminal dock' }).parentElement).toHaveClass('terminal-mode-minimized');
-		expect(screen.getByText('Live terminal output')).toBeVisible();
-		fireEvent.click(screen.getByRole('button', { name: 'Restore test terminal' }));
+		const restore = screen.getByRole('button', { name: 'Restore embedded terminal, 1 open session' });
+		expect(restore).toBeVisible();
+		expect(screen.getByText('Live terminal output')).not.toBeVisible();
+		fireEvent.click(restore);
 		expect(screen.getByRole('region', { name: 'Embedded terminal dock' }).parentElement).toHaveClass('terminal-mode-normal');
+		expect(screen.getByText('Live terminal output')).toBeVisible();
 	});
 });
