@@ -67,7 +67,7 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	if mode == "card_context" {
 		args = expandAll(provider.Args, values)
 	}
-	session, grant, err := s.embedded.Start(ptysession.StartRequest{ItemID: itemID, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+	session, grant, err := s.embedded.Start(ptysession.StartRequest{ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}

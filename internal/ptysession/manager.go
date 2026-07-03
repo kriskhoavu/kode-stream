@@ -35,14 +35,16 @@ type Config struct {
 }
 
 type Session struct {
-	ID          string    `json:"id"`
-	ItemID      string    `json:"itemId"`
-	WorkspaceID string    `json:"workspaceId"`
-	Provider    string    `json:"provider"`
-	Intent      string    `json:"intent"`
-	State       string    `json:"state"`
-	StartedAt   time.Time `json:"startedAt"`
-	ExitCode    *int      `json:"exitCode,omitempty"`
+	ID             string    `json:"id"`
+	ItemID         string    `json:"itemId"`
+	ItemIdentifier string    `json:"itemIdentifier,omitempty"`
+	ItemTitle      string    `json:"itemTitle,omitempty"`
+	WorkspaceID    string    `json:"workspaceId"`
+	Provider       string    `json:"provider"`
+	Intent         string    `json:"intent"`
+	State          string    `json:"state"`
+	StartedAt      time.Time `json:"startedAt"`
+	ExitCode       *int      `json:"exitCode,omitempty"`
 }
 
 type Grant struct {
@@ -52,9 +54,9 @@ type Grant struct {
 }
 
 type StartRequest struct {
-	ItemID, WorkspaceID, Provider, Intent, Executable, Dir string
-	Args                                                   []string
-	Columns, Rows                                          uint16
+	ItemID, ItemIdentifier, ItemTitle, WorkspaceID, Provider, Intent, Executable, Dir string
+	Args                                                                              []string
+	Columns, Rows                                                                     uint16
 }
 
 type managed struct {
@@ -120,7 +122,7 @@ func (m *Manager) Start(request StartRequest) (Session, Grant, error) {
 		return Session{}, Grant{}, err
 	}
 	now := time.Now().UTC()
-	s := &managed{info: Session{ID: id, ItemID: request.ItemID, WorkspaceID: request.WorkspaceID, Provider: request.Provider, Intent: request.Intent, State: StateStarting, StartedAt: now}, grantHash: hash(token), grantExpires: now.Add(m.config.GrantTTL), subs: map[chan []byte]struct{}{}}
+	s := &managed{info: Session{ID: id, ItemID: request.ItemID, ItemIdentifier: request.ItemIdentifier, ItemTitle: request.ItemTitle, WorkspaceID: request.WorkspaceID, Provider: request.Provider, Intent: request.Intent, State: StateStarting, StartedAt: now}, grantHash: hash(token), grantExpires: now.Add(m.config.GrantTTL), subs: map[chan []byte]struct{}{}}
 	m.sessions[id] = s
 	m.mu.Unlock()
 

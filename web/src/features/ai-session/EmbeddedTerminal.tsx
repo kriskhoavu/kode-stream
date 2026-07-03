@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Maximize2, Minimize2, Shrink, Square, X } from 'lucide-react';
+import { Copy, Minus, Square, SquareTerminal, X } from 'lucide-react';
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -8,13 +8,13 @@ import type { EmbeddedAISessionResult, EmbeddedAISessionState } from '../../lib/
 
 type ServerFrame = { type: 'output' | 'state' | 'warning' | 'exit'; data?: string; encoding?: string; state?: EmbeddedAISessionState; exitCode?: number; message?: string };
 
-export function EmbeddedTerminal({ initial, visible, mode, title, onToggleMinimize, onToggleMaximize, onClose }: { initial: EmbeddedAISessionResult; visible: boolean; mode: 'normal' | 'maximized'; title: string; onToggleMinimize: () => void; onToggleMaximize: () => void; onClose: () => void }) {
+export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onToggleMinimize, onToggleMaximize, onClose }: { initial: EmbeddedAISessionResult; visible: boolean; mode: 'normal' | 'maximized'; title: string; subtitle: string; onToggleMinimize: () => void; onToggleMaximize: () => void; onClose: () => void }) {
 	const [state, setState] = useState<EmbeddedAISessionState>(initial.session.state);
 	const [connection, setConnection] = useState<'connecting' | 'connected' | 'reconnecting' | 'closed'>('connecting');
 	const [exitCode, setExitCode] = useState<number | undefined>(initial.session.exitCode);
 	const [message, setMessage] = useState('');
 	const hostRef = useRef<HTMLDivElement | null>(null);
-	const cancelRef = useRef<HTMLButtonElement | null>(null);
+	const controlsRef = useRef<HTMLButtonElement | null>(null);
 	const terminalRef = useRef<Terminal | null>(null);
 	const fitRef = useRef<FitAddon | null>(null);
 	const socketRef = useRef<WebSocket | null>(null);
@@ -57,7 +57,7 @@ export function EmbeddedTerminal({ initial, visible, mode, title, onToggleMinimi
 	}, [initial]);
 
 	useEffect(() => {
-		const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && event.ctrlKey && event.shiftKey) { event.preventDefault(); cancelRef.current?.focus(); } };
+		const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && event.ctrlKey && event.shiftKey) { event.preventDefault(); controlsRef.current?.focus(); } };
 		window.addEventListener('keydown', escape); return () => window.removeEventListener('keydown', escape);
 	}, []);
 
@@ -67,14 +67,12 @@ export function EmbeddedTerminal({ initial, visible, mode, title, onToggleMinimi
 		return () => cancelAnimationFrame(frame);
 	}, [mode, visible]);
 
-	const cancel = async () => { try { const result = await api.cancelEmbeddedAISession(initial.session.id); setState(result.state); setExitCode(result.exitCode); } catch (error) { setMessage(error instanceof Error ? error.message : 'Cancellation failed.'); } };
 	const close = () => { if (active && !window.confirm('Cancel the running AI session and close the terminal?')) return; if (active) void api.cancelEmbeddedAISession(initial.session.id); onClose(); };
 
 	return <section className={`embedded-terminal-panel${visible ? ' active' : ''}`} aria-hidden={!visible} role={visible ? 'dialog' : undefined} aria-modal={visible ? 'true' : undefined} aria-labelledby={visible ? `embedded-terminal-title-${initial.session.id}` : undefined}>
-		<header><div><h2 id={`embedded-terminal-title-${initial.session.id}`}>{title}</h2><p role="status" aria-live="polite">{stateLabel(state, connection, exitCode)}</p></div><div className="embedded-terminal-window-actions"><button className="icon-button" type="button" aria-label="Minimize embedded terminal" onClick={onToggleMinimize}><Minimize2 size={18} /></button><button className="icon-button" type="button" aria-label={mode === 'maximized' ? 'Restore embedded terminal size' : 'Maximize embedded terminal'} onClick={onToggleMaximize}>{mode === 'maximized' ? <Shrink size={18} /> : <Maximize2 size={18} />}</button><button className="icon-button" type="button" aria-label="Close embedded terminal" onClick={close}><X size={18} /></button></div></header>
+		<header><div className="embedded-terminal-heading"><span className="embedded-terminal-heading-icon"><SquareTerminal size={19} /></span><div><h2 id={`embedded-terminal-title-${initial.session.id}`}>{title}</h2><p>{subtitle} · <span role="status" aria-live="polite">{stateLabel(state, connection, exitCode)}</span></p></div></div><div className="embedded-terminal-window-actions"><button ref={controlsRef} className="icon-button" type="button" title="Minimize" aria-label="Minimize embedded terminal" onClick={onToggleMinimize}><Minus size={18} strokeWidth={1.8} /></button><button className="icon-button" type="button" title={mode === 'maximized' ? 'Restore' : 'Maximize'} aria-label={mode === 'maximized' ? 'Restore embedded terminal size' : 'Maximize embedded terminal'} onClick={onToggleMaximize}>{mode === 'maximized' ? <Copy size={16} strokeWidth={1.8} /> : <Square size={15} strokeWidth={1.8} />}</button><button className="icon-button embedded-terminal-close" type="button" title="Close" aria-label="Close embedded terminal" onClick={close}><X size={18} strokeWidth={1.8} /></button></div></header>
 		<div ref={hostRef} className="embedded-terminal-canvas" aria-label="AI terminal output" />
 		{message && <p className="error" role="alert">{message}</p>}
-		<footer><span>Press Ctrl+Shift+Escape to leave terminal focus.</span><div><button type="button" className="ghost" onClick={() => terminalRef.current?.focus()}><Maximize2 size={15} /> Focus terminal</button><button ref={cancelRef} type="button" className="danger" disabled={!active} onClick={() => void cancel()}><Square size={14} /> Cancel session</button></div></footer>
 	</section>;
 }
 

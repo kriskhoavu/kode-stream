@@ -26,8 +26,8 @@ class TestSocket {
 	constructor(public url: string) { TestSocket.instances.push(this); }
 }
 
-const initial = { session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context' as const, state: 'running' as const, startedAt: '2026-07-03T00:00:00Z' }, grant: { sessionId: 'session-1', token: 'secret', expiresAt: '2026-07-03T00:01:00Z' } };
-const terminalProps = { visible: true, mode: 'normal' as const, title: 'Workspace · codex · item-1', onToggleMinimize: vi.fn(), onToggleMaximize: vi.fn() };
+const initial = { session: { id: 'session-1', itemId: 'item-1', itemIdentifier: 'PM-020', itemTitle: 'Embedded terminal', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context' as const, state: 'running' as const, startedAt: '2026-07-03T00:00:00Z' }, grant: { sessionId: 'session-1', token: 'secret', expiresAt: '2026-07-03T00:01:00Z' } };
+const terminalProps = { visible: true, mode: 'normal' as const, title: 'Codex terminal', subtitle: 'Discovery · PM-020', onToggleMinimize: vi.fn(), onToggleMaximize: vi.fn() };
 
 describe('EmbeddedTerminal', () => {
 	afterEach(() => { TestSocket.instances = []; vi.clearAllMocks(); });
@@ -42,16 +42,21 @@ describe('EmbeddedTerminal', () => {
 		expect(write).toHaveBeenCalled();
 		act(() => { socket.onmessage?.({ data: JSON.stringify({ type: 'state', state: 'exited', exitCode: 0 }) }); });
 		expect(await screen.findByRole('status')).toHaveTextContent('exited with code 0');
-		expect(screen.getByRole('button', { name: 'Cancel session' })).toBeDisabled();
+		expect(screen.getByRole('heading', { name: 'Codex terminal' })).toBeInTheDocument();
+		expect(screen.getByText(/Discovery · PM-020/)).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Cancel session' })).not.toBeInTheDocument();
 	});
 
-	it('cancels explicitly and closes the socket during cleanup', async () => {
+	it('confirms close, cancels the running session, and closes the socket during cleanup', async () => {
 		vi.stubGlobal('WebSocket', TestSocket);
 		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+		vi.spyOn(window, 'confirm').mockReturnValue(true);
 		vi.mocked(api.cancelEmbeddedAISession).mockResolvedValue({ ...initial.session, state: 'cancelled' });
-		const view = render(<EmbeddedTerminal initial={initial} {...terminalProps} onClose={vi.fn()} />);
+		const onClose = vi.fn();
+		const view = render(<EmbeddedTerminal initial={initial} {...terminalProps} onClose={onClose} />);
 		await waitFor(() => expect(TestSocket.instances).toHaveLength(1));
-		fireEvent.click(screen.getByRole('button', { name: 'Cancel session' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Close embedded terminal' }));
+		expect(window.confirm).toHaveBeenCalled(); expect(onClose).toHaveBeenCalled();
 		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
 		view.unmount(); expect(TestSocket.instances[0].close).toHaveBeenCalled();
 	});

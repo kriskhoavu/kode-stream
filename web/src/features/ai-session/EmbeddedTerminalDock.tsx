@@ -35,16 +35,30 @@ export function EmbeddedTerminalDock({ workspaces }: { workspaces: WorkspaceConf
 	};
 
 	return <>
-		{mode === 'minimized' && <button className="embedded-terminal-minimized" type="button" aria-label={`Restore embedded terminal, ${sessions.length} open session${sessions.length === 1 ? '' : 's'}`} onClick={() => setMode('normal')}><span className="embedded-terminal-minimized-icon"><Bot size={17} /><i aria-hidden="true" /></span><span><strong>{sessionLabel(active, workspaceNames)}</strong><small>{sessions.length} open session{sessions.length === 1 ? '' : 's'} · click to restore</small></span><Maximize2 size={17} /></button>}
+		{mode === 'minimized' && <button className="embedded-terminal-minimized" type="button" aria-label={`Restore embedded terminal, ${sessions.length} open session${sessions.length === 1 ? '' : 's'}`} onClick={() => setMode('normal')}><span className="embedded-terminal-minimized-icon"><Bot size={17} /><i aria-hidden="true" /></span><span><strong>{sessionLabel(active)}</strong><small>{workspaceContext(active, workspaceNames)} · {sessions.length} open</small></span><Maximize2 size={17} /></button>}
 		<div className={`embedded-terminal-backdrop terminal-mode-${mode}`} hidden={mode === 'minimized'}>
 			<section className="embedded-terminal-shell" aria-label="Embedded terminal dock">
-				<nav className="embedded-terminal-tabs" aria-label="Open embedded sessions">{sessions.map((result) => <button key={result.session.id} type="button" className={result.session.id === active.session.id ? 'active' : ''} onClick={() => select(result.session.id)}><Bot size={14} /> {sessionLabel(result, workspaceNames)}</button>)}</nav>
-				{sessions.map((result) => <EmbeddedTerminal key={result.session.id} initial={result} visible={mode !== 'minimized' && result.session.id === active.session.id} mode={mode === 'maximized' ? 'maximized' : 'normal'} title={sessionLabel(result, workspaceNames)} onToggleMinimize={() => setMode('minimized')} onToggleMaximize={() => setMode((current) => current === 'maximized' ? 'normal' : 'maximized')} onClose={() => close(result.session.id)} />)}
+				<nav className="embedded-terminal-tabs" aria-label="Open embedded sessions">{sessions.map((result) => <button key={result.session.id} type="button" className={result.session.id === active.session.id ? 'active' : ''} onClick={() => select(result.session.id)}><Bot size={14} /> {sessionLabel(result)}<small>{workspaceName(result, workspaceNames)}</small></button>)}</nav>
+				{sessions.map((result) => <EmbeddedTerminal key={result.session.id} initial={result} visible={mode !== 'minimized' && result.session.id === active.session.id} mode={mode === 'maximized' ? 'maximized' : 'normal'} title={`${providerLabel(result.session.provider)} terminal`} subtitle={workspaceContext(result, workspaceNames)} onToggleMinimize={() => setMode('minimized')} onToggleMaximize={() => setMode((current) => current === 'maximized' ? 'normal' : 'maximized')} onClose={() => close(result.session.id)} />)}
 			</section>
 		</div>
 	</>;
 }
 
-function sessionLabel(result: EmbeddedAISessionResult, workspaceNames: Map<string, string>) {
-	return `${workspaceNames.get(result.session.workspaceId) ?? result.session.workspaceId} · ${result.session.provider} · ${result.session.itemId}`;
+function sessionLabel(result: EmbeddedAISessionResult) {
+	return `${providerLabel(result.session.provider)} · ${result.session.itemIdentifier ?? result.session.itemId}`;
+}
+
+function workspaceContext(result: EmbeddedAISessionResult, workspaceNames: Map<string, string>) {
+	const workspace = workspaceName(result, workspaceNames);
+	const item = result.session.itemIdentifier ?? result.session.itemTitle;
+	return item ? `${workspace} · ${item}` : workspace;
+}
+
+function workspaceName(result: EmbeddedAISessionResult, workspaceNames: Map<string, string>) {
+	return workspaceNames.get(result.session.workspaceId) ?? result.session.workspaceId;
+}
+
+function providerLabel(provider: string) {
+	return ({ codex: 'Codex', claude: 'Claude', copilot: 'Copilot', opencode: 'OpenCode' } as Record<string, string>)[provider] ?? provider;
 }

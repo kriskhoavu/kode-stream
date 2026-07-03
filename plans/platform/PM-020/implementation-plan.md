@@ -19,6 +19,7 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 | F3    | Floating Minimized Mode  | Complete |
 | F4    | Collapsed Session Chip   | Complete |
 | F5    | Minimized Visibility Fix | Complete |
+| F6    | Terminal Window Chrome   | Complete |
 
 ## Phase B1: PTY Session Lifecycle
 
@@ -109,3 +110,17 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session && npm run build`
 
 **Commit:** `PM-020: Hide terminal dialog when minimized`
+
+## Phase F6: Terminal Window Chrome
+
+**Deliverables:**
+
+- [x] Add card identifier and title to embedded session metadata.
+- [x] Replace opaque IDs with a provider title and workspace/card subtitle.
+- [x] Use conventional minimize, maximize/restore, and close controls.
+- [x] Remove the redundant cancel/focus footer while preserving close confirmation and focus escape.
+- [x] Test metadata, title presentation, window controls, and close cancellation.
+
+**Verification:** `go test ./internal/ptysession ./internal/application/aisession && npm run typecheck && npm test -- --run web/src/features/ai-session`
+
+**Commit:** `PM-020: Redesign embedded terminal chrome`

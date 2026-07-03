@@ -10,12 +10,15 @@ import (
 func TestSessionStreamsInputOutputAndReconnectBuffer(t *testing.T) {
 	manager := New(Config{GracePeriod: time.Second})
 	t.Cleanup(func() { _ = manager.Close() })
-	session, grant, err := manager.Start(StartRequest{Executable: "/bin/sh", Args: []string{"-c", "read line; printf 'reply:%s' \"$line\""}, Dir: t.TempDir()})
+	session, grant, err := manager.Start(StartRequest{ItemIdentifier: "PM-020", ItemTitle: "Embedded terminal", Executable: "/bin/sh", Args: []string{"-c", "read line; printf 'reply:%s' \"$line\""}, Dir: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if session.State != StateRunning || grant.Token == "" {
 		t.Fatalf("session=%#v grant=%#v", session, grant)
+	}
+	if session.ItemIdentifier != "PM-020" || session.ItemTitle != "Embedded terminal" {
+		t.Fatalf("session metadata=%#v", session)
 	}
 	if err := manager.Authenticate(session.ID, grant.Token); err != nil {
 		t.Fatal(err)

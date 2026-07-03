@@ -168,6 +168,8 @@ export type EmbeddedAISessionState = 'starting' | 'running' | 'exited' | 'cancel
 export interface EmbeddedAISession {
 	id: string;
 	itemId: string;
+	itemIdentifier?: string;
+	itemTitle?: string;
 	workspaceId: string;
 	provider: string;
 	intent: AISessionLaunchInput['contextMode'];

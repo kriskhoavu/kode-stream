@@ -24,6 +24,7 @@ The terminal component uses a maintained terminal emulator library with fit and 
 - Restore focus predictably and expose lifecycle status outside the terminal canvas.
 - Keep multiple workspace sessions connected and identify each by workspace, item, and provider.
 - Support a compact bottom-right minimized session chip plus normal and maximized modes; keep transports mounted and refit the terminal after restoration.
+- Use provider-focused window titles, workspace/card subtitles, conventional window controls, and close confirmation instead of a separate cancel action.
 
 ## Accessibility
 
