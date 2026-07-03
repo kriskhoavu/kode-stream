@@ -2,9 +2,11 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"net/http"
 	"net/url"
 	"os"
@@ -132,6 +134,10 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/items/{id}", a.itemDetail)
 	mux.HandleFunc("GET /api/items/{id}/ai-session-eligibility", a.aiSessionEligibility)
 	mux.HandleFunc("POST /api/items/{id}/ai-sessions", a.launchAISession)
+	mux.HandleFunc("POST /api/items/{id}/ai-sessions/embedded", a.startEmbeddedAISession)
+	mux.HandleFunc("GET /api/ai/sessions/{sessionId}", a.embeddedAISession)
+	mux.HandleFunc("DELETE /api/ai/sessions/{sessionId}", a.cancelEmbeddedAISession)
+	mux.HandleFunc("GET /api/ai/sessions/{sessionId}/channel", a.embeddedAISessionChannel)
 	mux.HandleFunc("GET /api/items/{id}/jira", a.jiraIssue)
 	mux.HandleFunc("POST /api/items/{id}/jira/refresh", a.refreshJiraIssue)
 	mux.HandleFunc("GET /api/items/{id}/jira/attachments/{attachmentId}", a.jiraAttachment)
@@ -158,6 +164,162 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/system/config-paths", a.systemConfigPaths)
 	mux.HandleFunc("PUT /api/system/config-paths", a.updateSystemConfigPaths)
 	return mux
+}
+
+func (a *API) startEmbeddedAISession(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
+		return
+	}
+	var input appaisession.EmbeddedInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.aiSessions.StartEmbedded(r.PathValue("id"), input)
+	if err == nil {
+		writeJSON(w, http.StatusCreated, result)
+		return
+	}
+	var launchErr *appaisession.LaunchError
+	if !errors.As(err, &launchErr) {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	status := http.StatusBadRequest
+	if launchErr.Code == "item_not_found" || launchErr.Code == "workspace_not_found" {
+		status = http.StatusNotFound
+	}
+	if launchErr.Code == "launch_failed" {
+		status = http.StatusInternalServerError
+	}
+	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+}
+
+func (a *API) embeddedAISession(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil || a.aiSessions.EmbeddedManager() == nil {
+		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
+		return
+	}
+	session, err := a.aiSessions.EmbeddedManager().Get(r.PathValue("sessionId"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, session)
+}
+
+func (a *API) cancelEmbeddedAISession(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil || a.aiSessions.EmbeddedManager() == nil {
+		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
+		return
+	}
+	session, err := a.aiSessions.EmbeddedManager().Cancel(r.PathValue("sessionId"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, session)
+}
+
+type channelInput struct {
+	Type    string `json:"type"`
+	Data    string `json:"data,omitempty"`
+	Columns uint16 `json:"columns,omitempty"`
+	Rows    uint16 `json:"rows,omitempty"`
+}
+type channelOutput struct {
+	Type     string `json:"type"`
+	Data     string `json:"data,omitempty"`
+	Encoding string `json:"encoding,omitempty"`
+	State    string `json:"state,omitempty"`
+	ExitCode *int   `json:"exitCode,omitempty"`
+	Message  string `json:"message,omitempty"`
+}
+
+func (a *API) embeddedAISessionChannel(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil || a.aiSessions.EmbeddedManager() == nil {
+		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
+		return
+	}
+	manager := a.aiSessions.EmbeddedManager()
+	id := r.PathValue("sessionId")
+	if err := manager.Authenticate(id, r.URL.Query().Get("token")); err != nil {
+		writeError(w, http.StatusUnauthorized, "invalid session grant")
+		return
+	}
+	upgrader := websocket.Upgrader{CheckOrigin: func(request *http.Request) bool {
+		return request.Header.Get("Origin") == "http://"+request.Host || request.Header.Get("Origin") == "https://"+request.Host
+	}}
+	connection, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer connection.Close()
+	output, buffered, unsubscribe, err := manager.Subscribe(id)
+	if err != nil {
+		return
+	}
+	defer unsubscribe()
+	if len(buffered) > 0 {
+		_ = connection.WriteJSON(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(buffered), Encoding: "base64"})
+	}
+	state, _ := manager.Get(id)
+	_ = connection.WriteJSON(channelOutput{Type: "state", State: state.State, ExitCode: state.ExitCode})
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		for {
+			var message channelInput
+			if err := connection.ReadJSON(&message); err != nil {
+				return
+			}
+			switch message.Type {
+			case "input":
+				decoded, err := base64.StdEncoding.DecodeString(message.Data)
+				if err == nil {
+					_ = manager.Write(id, decoded)
+				}
+			case "resize":
+				_ = manager.Resize(id, message.Columns, message.Rows)
+			case "cancel":
+				_, _ = manager.Cancel(id)
+			case "heartbeat":
+			}
+		}
+	}()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+	lastState := state.State
+	for {
+		select {
+		case data, ok := <-output:
+			if !ok {
+				return
+			}
+			if err := connection.WriteJSON(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(data), Encoding: "base64"}); err != nil {
+				return
+			}
+		case <-ticker.C:
+			current, err := manager.Get(id)
+			if err != nil {
+				return
+			}
+			if current.State != lastState {
+				if err := connection.WriteJSON(channelOutput{Type: "state", State: current.State, ExitCode: current.ExitCode}); err != nil {
+					return
+				}
+				lastState = current.State
+				if current.State != "running" && current.State != "starting" {
+					return
+				}
+			}
+		case <-done:
+			return
+		}
+	}
 }
 
 func (a *API) aiSessionEligibility(w http.ResponseWriter, r *http.Request) {

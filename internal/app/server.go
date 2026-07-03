@@ -24,6 +24,7 @@ import (
 	"plan-manager/internal/itemwriter"
 	jiraclient "plan-manager/internal/jira"
 	"plan-manager/internal/navigation"
+	"plan-manager/internal/ptysession"
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
 	"plan-manager/internal/systemdialog"
@@ -33,8 +34,9 @@ import (
 var frontendFS embed.FS
 
 type Server struct {
-	port int
-	app  http.Handler
+	port     int
+	app      http.Handler
+	sessions *ptysession.Manager
 }
 
 func NewServer(port int) (*Server, error) {
@@ -55,14 +57,22 @@ func NewServer(port int) (*Server, error) {
 	healthService := health.New(reg, idx, git)
 	searchService := appsearch.New(idx)
 	navigationStore := navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile)
-	aiSessionService := aisession.New(aisettings.New(paths.AISettingsFile)).ConfigureLaunch(reg, idx, auditStore, os.TempDir())
+	sessionManager := ptysession.New(ptysession.Config{})
+	aiSessionService := aisession.New(aisettings.New(paths.AISettingsFile)).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager)
 	jiraService := appjira.New(reg, idx, jiraclient.New())
 	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore).WithAISessions(aiSessionService).WithJira(jiraService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())
 	mux.Handle("/", spaHandler())
-	return &Server{port: port, app: api.Log(mux)}, nil
+	return &Server{port: port, app: api.Log(mux), sessions: sessionManager}, nil
+}
+
+func (s *Server) Close() error {
+	if s.sessions != nil {
+		return s.sessions.Close()
+	}
+	return nil
 }
 
 func (s *Server) Serve() error {

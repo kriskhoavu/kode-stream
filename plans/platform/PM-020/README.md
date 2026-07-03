@@ -1,0 +1,55 @@
+# PM-020: Embedded AI Terminal
+
+PM-020 builds on PM-018 by adding a managed embedded PTY as an alternative AI-session surface. It owns terminal process lifecycle, loopback transport, reconnect behavior, and the browser terminal experience while preserving external launch as a fallback.
+
+## Related Plans
+
+| Item                          | Relationship           | Key Context                                                     |
+|-------------------------------|------------------------|-----------------------------------------------------------------|
+| [PM-018](../PM-018/README.md) | Required AI foundation | Reuse providers, settings, intents, eligibility, and manifests  |
+| [PM-016](../PM-016/README.md) | Local operation safety | Reuse audit and explicit-confirmation patterns                  |
+| [PM-017](../PM-017/README.md) | Platform rollout       | Keep external terminal launch available as a compatibility path |
+| [PM-021](../PM-021/README.md) | Separated Jira scope   | Owns Jira field, transition, and attachment mutations           |
+
+## Scope
+
+### Goal
+
+Let users interact with a supported AI CLI inside Plan Manager through a bounded, workspace-contained terminal session.
+
+### Non-Goals
+
+- No unattended AI agents or background implementation queue.
+- No remote PTY access outside the loopback Plan Manager origin.
+- No Jira writes; PM-021 owns Jira editing.
+- No replacement of the existing external terminal launch path.
+
+## Glossary
+
+| Term             | Meaning                                                                   |
+|------------------|---------------------------------------------------------------------------|
+| Embedded Session | AI provider process attached to a Plan Manager-owned pseudo-terminal      |
+| Session Channel  | Loopback WebSocket carrying terminal input, output, resize, and lifecycle |
+| Session Lease    | Bounded ownership period renewed while the browser remains connected      |
+
+## Data Flow
+
+```text
+PM-018 launch request -> embedded mode -> validated PTY process
+  <-> loopback WebSocket <-> terminal UI -> exit or cleanup
+```
+
+## Design Decisions
+
+| Decision                            | Alternatives Considered         | Rationale                                                   |
+|-------------------------------------|---------------------------------|-------------------------------------------------------------|
+| Reuse PM-018 launch contracts       | Separate embedded configuration | Keeps provider behavior consistent across terminal surfaces |
+| Keep external launch available      | Replace with embedded terminal  | Preserves a stable fallback and native terminal preference  |
+| Opaque sessions with bounded leases | Browser-owned PID               | Prevents process identifier exposure and orphaned processes |
+
+## Documents
+
+- [Scenario Overview](scenario/scenario-00-overview.md)
+- [Backend Design](design/design-01-backend.md)
+- [Frontend Design](design/design-02-frontend.md)
+- [Implementation Plan](implementation-plan.md)
