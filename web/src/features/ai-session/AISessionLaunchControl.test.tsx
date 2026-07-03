@@ -4,9 +4,9 @@ import type { AISessionLaunchResult } from '../../lib/types';
 import { api } from '../../lib/api';
 import { AISessionLaunchControl } from './AISessionLaunchControl';
 
-vi.mock('../../lib/api', () => ({ api: { launchAISession: vi.fn() } }));
+vi.mock('../../lib/api', () => ({ api: { launchAISession: vi.fn(), startEmbeddedAISession: vi.fn(), cancelEmbeddedAISession: vi.fn() } }));
 vi.mock('./AISessionLaunchDialog', () => ({
-  AISessionLaunchDialog: ({ onLaunched }: { onLaunched: (result: AISessionLaunchResult) => void }) => <button onClick={() => onLaunched({ accepted: true, provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only', startedAt: '2026-07-02T00:00:00Z' })}>Save test choice</button>
+	AISessionLaunchDialog: ({ onLaunched }: { onLaunched: (result: AISessionLaunchResult, input: AISessionLaunchResult) => void }) => <button onClick={() => onLaunched({ accepted: true, provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only', startedAt: '2026-07-02T00:00:00Z' }, { accepted: true, provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only', surface: 'external', startedAt: '2026-07-02T00:00:00Z' })}>Save test choice</button>
 }));
 
 describe('AISessionLaunchControl', () => {
@@ -21,7 +21,7 @@ describe('AISessionLaunchControl', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open AI session' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save test choice' }));
-    expect(JSON.parse(localStorage.getItem('aiSession.lastLaunch') ?? 'null')).toEqual({ provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only' });
+		expect(JSON.parse(localStorage.getItem('aiSession.lastLaunch') ?? 'null')).toEqual({ provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only', surface: 'external' });
     expect(screen.getByRole('button', { name: /using saved choice: Codex · iTerm2 · workspace only/i })).toHaveAttribute('title', 'Saved choice: Codex · iTerm2 · workspace only');
     fireEvent.click(screen.getByRole('button', { name: /using saved choice/i }));
 

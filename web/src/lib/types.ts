@@ -155,11 +155,32 @@ export interface AISessionLaunchInput {
   provider: string;
   terminal: string;
   contextMode: 'workspace_only' | 'card_context';
+	surface?: 'external' | 'embedded';
 }
 
 export interface AISessionLaunchResult extends AISessionLaunchInput {
   accepted: boolean;
   startedAt: string;
+}
+
+export type EmbeddedAISessionState = 'starting' | 'running' | 'exited' | 'cancelled' | 'failed';
+
+export interface EmbeddedAISession {
+	id: string;
+	itemId: string;
+	itemIdentifier?: string;
+	itemTitle?: string;
+	workspaceId: string;
+	provider: string;
+	intent: AISessionLaunchInput['contextMode'];
+	state: EmbeddedAISessionState;
+	startedAt: string;
+	exitCode?: number;
+}
+
+export interface EmbeddedAISessionResult {
+	session: EmbeddedAISession;
+	grant: { sessionId: string; token: string; expiresAt: string };
 }
 
 export interface SourceStructureSettings {

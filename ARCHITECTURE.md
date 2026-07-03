@@ -227,19 +227,21 @@ User edits Markdown or metadata
   -> frontend refreshes current data and other tabs show stale-content notice
 ```
 
-### External AI Session Launch
+### AI Session Launch
 
 ```text
 User opens an item and selects Open AI session
   -> frontend loads detected providers, terminals, and item eligibility
-  -> user selects workspace-only or selected-card context
+  -> user selects workspace-only or selected-card context and an external or embedded surface
   -> backend validates the indexed item and registered workspace
   -> selected-card passes the workspace-relative card path; workspace-only passes no prompt
-  -> terminal adapter starts the selected AI CLI at the workspace root
+  -> external mode starts the selected terminal, or embedded mode starts a managed PTY
   -> audit records identifiers and outcome without prompt content
 ```
 
 Workspace-only starts at the workspace root without card context so the user can reference files and directories manually. Selected-card context works for any editable working-tree item and passes its workspace-relative path directly to the AI with a neutral instruction to read relevant documents and wait for the user's request. No persistent context resource is created. External tools retain their own authentication, approval, and sandbox behavior.
+
+Embedded mode keeps the provider process in a bounded PTY session owned by `internal/ptysession`. The browser connects through a loopback WebSocket using an in-memory, session-scoped grant. Output buffering and a short lease allow reconnect; cancellation, lease expiry, startup failure, or server shutdown terminates the PTY process group. Grants and terminal content are excluded from request logs and audit payloads.
 
 ### Read-Only Jira Integration
 
@@ -521,6 +523,10 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
 | `DELETE` | `/api/saved-filters/{id}`                               | Delete a saved filter                            |
 | `GET`    | `/api/recent-items`                                     | List recently opened items                       |
 | `POST`   | `/api/recent-items`                                     | Record an opened item                            |
+| `POST`   | `/api/items/{id}/ai-sessions/embedded`                  | Start a managed embedded AI session              |
+| `GET`    | `/api/ai/sessions/{sessionId}`                          | Read embedded session state                      |
+| `DELETE` | `/api/ai/sessions/{sessionId}`                          | Cancel an embedded session                       |
+| `GET`    | `/api/ai/sessions/{sessionId}/channel`                  | Upgrade to the typed terminal WebSocket channel  |
 | `GET`    | `/api/workspaces`                                       | List registered workspaces                       |
 | `POST`   | `/api/workspaces`                                       | Create workspace registration                    |
 | `PUT`    | `/api/workspaces/{id}`                                  | Update workspace registration                    |

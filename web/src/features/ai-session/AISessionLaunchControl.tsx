@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Bot, Settings2 } from 'lucide-react';
 import { api } from '../../lib/api';
-import type { AISessionLaunchInput, AISessionLaunchResult } from '../../lib/types';
+import type { AISessionLaunchInput, AISessionLaunchResult, EmbeddedAISessionResult } from '../../lib/types';
 import { AISessionLaunchDialog } from './AISessionLaunchDialog';
 import { readAISessionPreference, saveAISessionPreference } from './preferences';
+import { openEmbeddedSession } from './terminalSessions';
 
 export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void }) {
   const [preference, setPreference] = useState<AISessionLaunchInput | null>(readAISessionPreference);
@@ -18,8 +19,13 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }
     }
     setLaunching(true);
     try {
-      const result = await api.launchAISession(itemId, preference);
-      onLaunched(launchMessage(result));
+		if (preference.surface === 'embedded') {
+			const result = await api.startEmbeddedAISession(itemId, { provider: preference.provider, contextMode: preference.contextMode, columns: 80, rows: 24 });
+			openEmbeddedSession(result); onLaunched(`${label(preference.provider)} opened in the embedded terminal.`);
+		} else {
+			const result = await api.launchAISession(itemId, { provider: preference.provider, terminal: preference.terminal, contextMode: preference.contextMode });
+			onLaunched(launchMessage(result));
+		}
     } catch (caught) {
       onError(caught);
       setDialogOpen(true);
@@ -28,11 +34,12 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }
     }
   };
 
-  const rememberLaunch = (result: AISessionLaunchResult) => {
-    const next = { provider: result.provider, terminal: result.terminal, contextMode: result.contextMode };
+  const rememberLaunch = (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => {
+		const next = { provider: input.provider, terminal: input.terminal, contextMode: input.contextMode, surface: input.surface ?? 'external' };
     saveAISessionPreference(next);
     setPreference(next);
-    onLaunched(launchMessage(result));
+		if ('session' in result) { openEmbeddedSession(result); onLaunched(`${label(input.provider)} opened in the embedded terminal.`); }
+		else onLaunched(launchMessage(result));
   };
 
   return <>
@@ -50,7 +57,8 @@ function launchMessage(result: AISessionLaunchResult) {
 
 function preferenceLabel(preference: AISessionLaunchInput) {
   const context = preference.contextMode === 'card_context' ? 'selected card' : 'workspace only';
-  return `${label(preference.provider)} · ${label(preference.terminal)} · ${context}`;
+	const surface = preference.surface === 'embedded' ? 'Embedded' : label(preference.terminal);
+	return `${label(preference.provider)} · ${surface} · ${context}`;
 }
 
 function label(id: string) {

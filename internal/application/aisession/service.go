@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"plan-manager/internal/aisettings"
+	"plan-manager/internal/ptysession"
 )
 
 type Capability struct {
@@ -27,7 +28,15 @@ type Service struct {
 	stat     func(string) (os.FileInfo, error)
 	goos     string
 	launch   *launchDependencies
+	embedded *ptysession.Manager
 }
+
+func (s *Service) ConfigureEmbedded(manager *ptysession.Manager) *Service {
+	s.embedded = manager
+	return s
+}
+
+func (s *Service) EmbeddedManager() *ptysession.Manager { return s.embedded }
 
 func New(store *aisettings.Store) *Service {
 	return &Service{store: store, lookPath: exec.LookPath, stat: os.Stat, goos: runtime.GOOS}

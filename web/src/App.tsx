@@ -13,6 +13,7 @@ import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';
 import { labels } from './lib/vocabulary';
 import { useAppSettings } from './features/settings/appSettings';
+import { EmbeddedTerminalDock } from './features/ai-session/EmbeddedTerminalDock';
 
 const WorkspaceExplorerPage = lazy(() => import('./pages/WorkspaceExplorerPage').then((module) => ({ default: module.WorkspaceExplorerPage })));
 
@@ -248,6 +249,7 @@ export function App() {
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}><Settings size={18} />Settings</button>
       </nav>
+		<EmbeddedTerminalDock workspaces={workspaces} />
     </div>
   );
 }

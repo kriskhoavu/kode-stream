@@ -69,6 +69,10 @@ Platform-specific tools used for native folder selection and path reveal:
 
 External AI session launch currently supports macOS Terminal, iTerm2, and WezTerm. Install and authenticate at least one supported AI CLI separately. Plan Manager does not bypass the CLI's permission prompts or sandbox.
 
+Embedded AI sessions are also available on macOS and supported Unix hosts. They run the selected provider in an app-owned terminal with explicit cancel, reconnect, and exit state. External launch remains the fallback on unsupported platforms or when users prefer a native terminal.
+
+The terminal dock supports multiple concurrent sessions across workspaces. Minimize it into a compact bottom-right restore chip while reading and editing plans, switch sessions from workspace-labeled tabs after restoration, or maximize the active terminal for full-screen work.
+
 ## Quick Start
 
 ```bash
@@ -186,6 +190,8 @@ dataDir: /Users/me/.plan-manager-data
 Changing `dataDir` requires a restart.
 
 AI settings contain executable paths and argument templates only. Workspace-only sessions open at the workspace root without generated context, allowing manual file and directory references. Selected-card sessions pass the card's workspace-relative path directly to the AI, which can read relevant documents from that directory before waiting for the user's request. No context file or directory is created.
+
+Embedded terminal grants remain in browser memory and expire quickly. Closing or navigating away from a running session requires confirmation; cancellation, disconnect timeout, and Plan Manager shutdown clean up the provider process.
 
 Jira token lookup checks the running process environment first and then falls back to `~/.creds.zsh` and `~/.creds.sh` if the environment variable is missing. The file must contain an exported variable such as `export CC_JIRA_API_TOKEN="..."`.
 
