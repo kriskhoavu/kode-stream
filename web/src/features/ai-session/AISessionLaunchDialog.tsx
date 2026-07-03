@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, X } from 'lucide-react';
 import { api } from '../../lib/api';
-import type { AICapability, AISessionEligibility, AISettings, AISessionLaunchInput, AISessionLaunchResult } from '../../lib/types';
+import type { AICapability, AISessionEligibility, AISettings, AISessionLaunchInput, AISessionLaunchResult, EmbeddedAISessionResult } from '../../lib/types';
 
-export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched }: { itemId: string; preference?: AISessionLaunchInput | null; onClose: () => void; onLaunched: (result: AISessionLaunchResult) => void }) {
+export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched }: { itemId: string; preference?: AISessionLaunchInput | null; onClose: () => void; onLaunched: (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => void }) {
   const [settings, setSettings] = useState<AISettings | null>(null);
   const [capabilities, setCapabilities] = useState<AICapability[]>([]);
   const [eligibility, setEligibility] = useState<AISessionEligibility | null>(null);
   const [provider, setProvider] = useState('');
   const [terminal, setTerminal] = useState('');
   const [contextMode, setContextMode] = useState<AISessionLaunchInput['contextMode']>('card_context');
+	const [surface, setSurface] = useState<'external' | 'embedded'>('external');
   const [loading, setLoading] = useState(true);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState('');
@@ -26,6 +27,7 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
       setProvider(preference?.provider ?? nextSettings.defaultProvider);
       setTerminal(preference?.terminal ?? nextSettings.defaultTerminal);
       setContextMode(preference?.contextMode ?? 'card_context');
+			setSurface(preference?.surface ?? 'external');
     }).catch((caught) => active && setError(caught instanceof Error ? caught.message : 'AI session options are unavailable.')).finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [itemId, preference]);
@@ -50,8 +52,11 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
     setLaunching(true);
     setError('');
     try {
-      const result = await api.launchAISession(itemId, { provider, terminal, contextMode });
-      onLaunched(result);
+		const input = { provider, terminal, contextMode, surface };
+		const result = surface === 'embedded'
+			? await api.startEmbeddedAISession(itemId, { provider, contextMode, columns: 80, rows: 24 })
+			: await api.launchAISession(itemId, { provider, terminal, contextMode });
+		onLaunched(result, input);
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'AI session launch failed.');
@@ -62,7 +67,7 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 
   const providers = toolOptions(settings?.providers, capabilities, 'provider');
   const terminals = toolOptions(settings?.terminals, capabilities, 'terminal');
-  const canLaunch = !loading && !launching && (contextMode === 'workspace_only' || eligibility?.cardContextAvailable) && providers.some((item) => item.id === provider) && terminals.some((item) => item.id === terminal);
+	const canLaunch = !loading && !launching && (contextMode === 'workspace_only' || eligibility?.cardContextAvailable) && providers.some((item) => item.id === provider) && (surface === 'embedded' || terminals.some((item) => item.id === terminal));
 
   return (
     <div className="modal-backdrop ai-launch-backdrop" role="presentation">
@@ -72,12 +77,13 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
         {error && <p className="error" role="alert">{error}</p>}
         {settings && eligibility && <div className="ai-launch-fields">
           <label>AI provider<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providers.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>
-          <label>Terminal<select value={terminal} onChange={(event) => setTerminal(event.target.value)}>{terminals.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>
+			<fieldset><legend>Session surface</legend><label><input type="radio" name="ai-surface" checked={surface === 'external'} onChange={() => setSurface('external')} /> External terminal</label><label><input type="radio" name="ai-surface" checked={surface === 'embedded'} onChange={() => setSurface('embedded')} /> Embedded terminal</label></fieldset>
+			{surface === 'external' && <label>Terminal<select value={terminal} onChange={(event) => setTerminal(event.target.value)}>{terminals.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>}
           <fieldset><legend>Session context</legend><label><input type="radio" name="ai-context" checked={contextMode === 'workspace_only'} onChange={() => setContextMode('workspace_only')} /> Workspace only — start with a free prompt</label><label><input type="radio" name="ai-context" checked={contextMode === 'card_context'} disabled={!eligibility.cardContextAvailable} aria-describedby="card-context-readiness" onChange={() => setContextMode('card_context')} /> Selected card — provide its path and related documents</label></fieldset>
           {contextMode === 'workspace_only' && <p className="eligibility-ready">No card context will be injected. The AI opens at the workspace root so you can manually reference any relevant file or directory.</p>}
           {contextMode === 'card_context' && <p id="card-context-readiness" className={eligibility.cardContextAvailable ? 'eligibility-ready' : 'eligibility-blocked'}>{eligibility.cardContextAvailable ? 'The selected card path will be provided as context. The AI will read relevant documents from that path and wait for your request.' : `Card context unavailable: ${eligibility.missing.join(', ') || 'the card is not available in the working tree'}.`}</p>}
           {!eligibility.editable && contextMode !== 'workspace_only' && <p className="error">Card context requires an editable working-tree item.</p>}
-          {(providers.length === 0 || terminals.length === 0) && <p className="error">Enable and detect at least one AI provider and terminal in Settings.</p>}
+			{(providers.length === 0 || (surface === 'external' && terminals.length === 0)) && <p className="error">Enable and detect the tools required for this session in Settings.</p>}
         </div>}
         <footer className="modal-actions"><button className="ghost" type="button" disabled={launching} onClick={onClose}>Cancel</button><button className="primary" type="button" disabled={!canLaunch} onClick={() => void launch()}>{launching ? 'Opening...' : 'Open session'}</button></footer>
       </section>

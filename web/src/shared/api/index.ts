@@ -4,6 +4,8 @@ import type {
   AISessionEligibility,
   AISessionLaunchInput,
   AISessionLaunchResult,
+	EmbeddedAISession,
+	EmbeddedAISessionResult,
   AppState,
   AuditEvent,
   BranchLoadResult,
@@ -88,6 +90,9 @@ export const api = {
   saveAISettings: (settings: AISettings) => request<AISettings>('/api/ai/settings', { method: 'PUT', body: JSON.stringify(settings) }),
   aiSessionEligibility: (itemId: string) => request<AISessionEligibility>(`/api/items/${encodeURIComponent(itemId)}/ai-session-eligibility`),
   launchAISession: (itemId: string, input: AISessionLaunchInput) => request<AISessionLaunchResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions`, { method: 'POST', body: JSON.stringify(input) }),
+	startEmbeddedAISession: (itemId: string, input: Pick<AISessionLaunchInput, 'provider' | 'contextMode'> & { columns?: number; rows?: number }) => request<EmbeddedAISessionResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }),
+	embeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
+	cancelEmbeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
   state: () => request<AppState>('/api/state'),
   search: async (params: { q: string; workspaceId?: string; types?: string[]; limit?: number }) => {
     const query = new URLSearchParams({ q: params.q });

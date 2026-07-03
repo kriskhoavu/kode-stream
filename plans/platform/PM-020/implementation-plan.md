@@ -13,7 +13,7 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 | Phase | Name                    | Status   |
 |-------|-------------------------|----------|
 | B1    | PTY Session Lifecycle   | Complete |
-| F1    | Embedded Terminal       | Draft    |
+| F1    | Embedded Terminal       | Complete |
 | V1    | Integrated Verification | Draft    |
 
 ## Phase B1: PTY Session Lifecycle
@@ -33,10 +33,10 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 
 **Deliverables:**
 
-- [ ] Add launch-surface selection to PM-018 workflow.
-- [ ] Add terminal emulator, typed channel client, resize, reconnect, and lifecycle controls.
-- [ ] Add navigation guard, accessible focus escape, cancellation, and exit presentation.
-- [ ] Test connection states, frame handling, reconnect deadline, and cleanup actions.
+- [x] Add launch-surface selection to PM-018 workflow.
+- [x] Add terminal emulator, typed channel client, resize, reconnect, and lifecycle controls.
+- [x] Add navigation guard, accessible focus escape, cancellation, and exit presentation.
+- [x] Test connection states, frame handling, reconnect deadline, and cleanup actions.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session`
 
