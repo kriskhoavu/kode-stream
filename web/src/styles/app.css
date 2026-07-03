@@ -842,6 +842,28 @@ button:disabled {
 .terminal-mode-maximized { padding: 0; }
 .terminal-mode-maximized .embedded-terminal-shell { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
 
+.terminal-mode-minimized {
+	place-items: end;
+	pointer-events: none;
+	padding: 0 18px 18px 0;
+	background: transparent;
+}
+
+.terminal-mode-minimized .embedded-terminal-shell {
+	pointer-events: auto;
+	width: min(520px, calc(100vw - 36px));
+	height: min(380px, calc(100dvh - 36px));
+	border-color: color-mix(in srgb, var(--blue) 32%, var(--line));
+	box-shadow: 0 18px 55px rgba(15, 23, 42, 0.36);
+}
+
+.terminal-mode-minimized .embedded-terminal-panel > header { padding: 8px 10px; }
+.terminal-mode-minimized .embedded-terminal-panel > header h2 { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.terminal-mode-minimized .embedded-terminal-panel > header p { font-size: 11px; }
+.terminal-mode-minimized .embedded-terminal-panel > footer { display: none; }
+.terminal-mode-minimized .embedded-terminal-tabs { padding: 4px; }
+.terminal-mode-minimized .embedded-terminal-tabs button { min-height: 28px; max-width: 220px; font-size: 11px; }
+
 .embedded-terminal-panel {
 	position: absolute;
 	visibility: hidden;
@@ -908,25 +930,6 @@ button:disabled {
 }
 
 .embedded-terminal-tabs button.active { border-color: var(--line); background: var(--panel); color: var(--text); }
-
-.embedded-terminal-tray {
-	position: fixed;
-	right: 18px;
-	bottom: 18px;
-	left: max(176px, 18px);
-	z-index: 100;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	border: 1px solid var(--line);
-	border-radius: 10px;
-	background: var(--panel);
-	box-shadow: var(--shadow-lg);
-	padding-right: 8px;
-}
-
-.embedded-terminal-tray .embedded-terminal-tabs { flex: 1; border: 0; background: transparent; }
 
 .ai-launch-dialog header h2 {
   display: flex;

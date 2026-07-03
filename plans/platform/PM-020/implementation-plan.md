@@ -16,6 +16,7 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 | F1    | Embedded Terminal       | Complete |
 | V1    | Integrated Verification | Complete |
 | F2    | Multi-Session Dock      | Complete |
+| F3    | Floating Minimized Mode | Complete |
 
 ## Phase B1: PTY Session Lifecycle
 
@@ -68,3 +69,16 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session web/src/App.test.tsx`
 
 **Commit:** `PM-020: Add multi-session terminal dock`
+
+## Phase F3: Floating Minimized Mode
+
+**Deliverables:**
+
+- [x] Keep the active terminal visible in a compact bottom-right window when minimized.
+- [x] Allow interaction with the application outside the floating terminal.
+- [x] Preserve session switching, input, output, resize, restore, and close controls.
+- [x] Test non-modal minimized presentation and restoration.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session`
+
+**Commit:** `PM-020: Add floating minimized terminal`

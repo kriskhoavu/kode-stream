@@ -23,7 +23,7 @@ The terminal component uses a maintained terminal emulator library with fit and 
 - Preserve bounded scrollback supplied by the terminal component and backend reconnect buffer.
 - Restore focus predictably and expose lifecycle status outside the terminal canvas.
 - Keep multiple workspace sessions connected and identify each by workspace, item, and provider.
-- Support minimized, normal, and maximized dock modes; refit terminal dimensions after every mode change.
+- Support a live, non-modal bottom-right minimized window plus normal and maximized modes; refit terminal dimensions after every mode change.
 
 ## Accessibility
 

@@ -27,7 +27,7 @@ class TestSocket {
 }
 
 const initial = { session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context' as const, state: 'running' as const, startedAt: '2026-07-03T00:00:00Z' }, grant: { sessionId: 'session-1', token: 'secret', expiresAt: '2026-07-03T00:01:00Z' } };
-const terminalProps = { visible: true, mode: 'normal' as const, title: 'Workspace · codex · item-1', onMinimize: vi.fn(), onToggleMaximize: vi.fn() };
+const terminalProps = { visible: true, mode: 'normal' as const, title: 'Workspace · codex · item-1', onToggleMinimize: vi.fn(), onToggleMaximize: vi.fn() };
 
 describe('EmbeddedTerminal', () => {
 	afterEach(() => { TestSocket.instances = []; vi.clearAllMocks(); });
@@ -59,15 +59,26 @@ describe('EmbeddedTerminal', () => {
 	it('offers minimize and maximize controls and refits on mode changes', async () => {
 		vi.stubGlobal('WebSocket', TestSocket);
 		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-		const onMinimize = vi.fn(); const onToggleMaximize = vi.fn();
-		const view = render(<EmbeddedTerminal initial={initial} {...terminalProps} onMinimize={onMinimize} onToggleMaximize={onToggleMaximize} onClose={vi.fn()} />);
+		const onToggleMinimize = vi.fn(); const onToggleMaximize = vi.fn();
+		const view = render(<EmbeddedTerminal initial={initial} {...terminalProps} onToggleMinimize={onToggleMinimize} onToggleMaximize={onToggleMaximize} onClose={vi.fn()} />);
 		await waitFor(() => expect(fit).toHaveBeenCalled());
 		fireEvent.click(screen.getByRole('button', { name: 'Minimize embedded terminal' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Maximize embedded terminal' }));
-		expect(onMinimize).toHaveBeenCalled(); expect(onToggleMaximize).toHaveBeenCalled();
+		expect(onToggleMinimize).toHaveBeenCalled(); expect(onToggleMaximize).toHaveBeenCalled();
 		const calls = fit.mock.calls.length;
 		view.rerender(<EmbeddedTerminal initial={initial} {...terminalProps} mode="maximized" onClose={vi.fn()} />);
 		await waitFor(() => expect(fit.mock.calls.length).toBeGreaterThan(calls));
 		expect(screen.getByRole('button', { name: 'Restore embedded terminal size' })).toBeInTheDocument();
+	});
+
+	it('becomes a non-modal live terminal in minimized mode', async () => {
+		vi.stubGlobal('WebSocket', TestSocket);
+		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+		render(<EmbeddedTerminal initial={initial} {...terminalProps} mode="minimized" onClose={vi.fn()} />);
+		await waitFor(() => expect(fit).toHaveBeenCalled());
+		const dialog = screen.getByRole('dialog');
+		expect(dialog).not.toHaveAttribute('aria-modal');
+		expect(screen.getByRole('button', { name: 'Restore embedded terminal' })).toBeInTheDocument();
+		expect(screen.getByLabelText('AI terminal output')).toBeVisible();
 	});
 });
