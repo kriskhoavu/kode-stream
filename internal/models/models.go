@@ -113,6 +113,15 @@ type WorkspaceConfig struct {
 	Sources            []string                  `json:"sources" yaml:"sources"`
 	CreatedAt          time.Time                 `json:"createdAt" yaml:"createdAt"`
 	LastScannedAt      time.Time                 `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
+	Jira               *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
+}
+
+type JiraConnection struct {
+	DeploymentType string `json:"deploymentType" yaml:"deploymentType"`
+	BaseURL        string `json:"baseUrl" yaml:"baseUrl"`
+	ProjectKey     string `json:"projectKey" yaml:"projectKey"`
+	AccountEmail   string `json:"accountEmail,omitempty" yaml:"accountEmail,omitempty"`
+	TokenEnvVar    string `json:"tokenEnvVar" yaml:"tokenEnvVar"`
 }
 
 type WorkspaceRegistrationMode string
@@ -142,6 +151,7 @@ type WorkspaceInput struct {
 	RegistrationMode WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
 	RemoteURL        string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
 	CloneRoot        string                    `json:"cloneRoot,omitempty" yaml:"cloneRoot,omitempty"`
+	Jira             *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
 }
 
 type SourceStructureSettings struct {
@@ -254,6 +264,7 @@ const (
 	FileKindYAML        FileKind = "yaml"
 	FileKindCode        FileKind = "code"
 	FileKindText        FileKind = "text"
+	FileKindImage       FileKind = "image"
 	FileKindUnsupported FileKind = "unsupported"
 )
 

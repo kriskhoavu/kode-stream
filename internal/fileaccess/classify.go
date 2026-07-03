@@ -18,10 +18,12 @@ const (
 	FileKindYAML        = models.FileKindYAML
 	FileKindCode        = models.FileKindCode
 	FileKindText        = models.FileKindText
+	FileKindImage       = models.FileKindImage
 	FileKindUnsupported = models.FileKindUnsupported
 
 	RichPreviewThresholdBytes int64 = 1 << 20
 	MaxTextResponseBytes      int64 = 2 << 20
+	MaxImageResponseBytes     int64 = 8 << 20
 	binarySampleBytes               = 8 << 10
 )
 
@@ -38,6 +40,7 @@ var extensionClassifications = map[string]Classification{
 	".cs":         {FileKindCode, "csharp"},
 	".css":        {FileKindCode, "css"},
 	".go":         {FileKindCode, "go"},
+	".gif":        {FileKindImage, "image/gif"},
 	".h":          {FileKindCode, "c"},
 	".hpp":        {FileKindCode, "cpp"},
 	".htm":        {FileKindHTML, "html"},
@@ -45,6 +48,8 @@ var extensionClassifications = map[string]Classification{
 	".java":       {FileKindCode, "java"},
 	".js":         {FileKindCode, "javascript"},
 	".json":       {FileKindJSON, "json"},
+	".jpeg":       {FileKindImage, "image/jpeg"},
+	".jpg":        {FileKindImage, "image/jpeg"},
 	".jsx":        {FileKindCode, "jsx"},
 	".kt":         {FileKindCode, "kotlin"},
 	".kts":        {FileKindCode, "kotlin"},
@@ -52,6 +57,7 @@ var extensionClassifications = map[string]Classification{
 	".md":         {FileKindMarkdown, "markdown"},
 	".markdown":   {FileKindMarkdown, "markdown"},
 	".properties": {FileKindText, "properties"},
+	".png":        {FileKindImage, "image/png"},
 	".py":         {FileKindCode, "python"},
 	".rb":         {FileKindCode, "ruby"},
 	".rs":         {FileKindCode, "rust"},
@@ -61,6 +67,7 @@ var extensionClassifications = map[string]Classification{
 	".ts":         {FileKindCode, "typescript"},
 	".tsx":        {FileKindCode, "tsx"},
 	".txt":        {FileKindText, "text"},
+	".webp":       {FileKindImage, "image/webp"},
 	".xml":        {FileKindCode, "xml"},
 	".yaml":       {FileKindYAML, "yaml"},
 	".yml":        {FileKindYAML, "yaml"},
@@ -98,7 +105,7 @@ func IsBinary(data []byte) bool {
 }
 
 func IsEditableKind(kind FileKind) bool {
-	return kind != FileKindUnsupported
+	return kind != FileKindUnsupported && kind != FileKindImage
 }
 
 func ValidateEditableContent(current, next []byte) error {

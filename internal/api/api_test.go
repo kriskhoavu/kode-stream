@@ -290,6 +290,23 @@ func TestRoutesMissingItemReturnsNotFoundJSON(t *testing.T) {
 	}
 }
 
+func TestJiraConnectionRouteRequiresServiceAndValidBody(t *testing.T) {
+	unavailable := httptest.NewRecorder()
+	New(nil, nil, nil, nil, nil, nil, nil).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodPost, "/api/workspaces/w1/jira/test", strings.NewReader(`{}`)))
+	if unavailable.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unavailable status = %d", unavailable.Code)
+	}
+}
+
+func TestJiraAttachmentResponseHelpersAreSafe(t *testing.T) {
+	if !safeInlineMediaType("image/png") || safeInlineMediaType("text/html") || safeInlineMediaType("application/pdf") {
+		t.Fatal("unexpected inline media policy")
+	}
+	if got := sanitizeDownloadName(`../bad\"name.html`); strings.ContainsAny(got, "/\\\"") || got == "" {
+		t.Fatalf("sanitized name=%q", got)
+	}
+}
+
 func TestCreateWorkspaceSupportsRemoteClonePayload(t *testing.T) {
 	remote := t.TempDir()
 	if output, err := exec.Command("git", "init", "-b", "main", remote).CombinedOutput(); err != nil {

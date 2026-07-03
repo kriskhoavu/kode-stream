@@ -612,7 +612,22 @@ Context mode must be `workspace_only` or `card_context`. Workspace-only opens at
 
 Provider authentication, approvals, and sandbox behavior remain owned by the provider CLI. Audit events must not record prompts, command arguments, or manifest contents.
 
-## 14. Baseline Safety Rules
+## 14. Read-Only Jira Integration
+
+Each workspace may define one optional Jira Cloud or Jira Server/Data Center connection. Persisted configuration contains deployment type, base URL, project key, optional Cloud account email, and token environment-variable name. Token values must never be persisted or returned.
+
+Required APIs:
+
+- `POST /api/workspaces/{id}/jira/test`
+- `GET /api/items/{id}/jira`
+- `POST /api/items/{id}/jira/refresh`
+- `GET /api/items/{id}/jira/attachments/{attachmentId}`
+
+Item identifiers must match the configured project key exactly before Jira access. Successful and not-found reads may be cached in memory for five minutes; refresh bypasses the cache. Expected Jira states must distinguish not configured, invalid identifier, project mismatch, not found, authentication failure, forbidden access, and unavailable service.
+
+Descriptions must render as safe normalized text. Attachments require explicit user action and backend checks for issue ownership, origin, response size, filename, content type, timeout, and safe response headers.
+
+## 15. Baseline Safety Rules
 
 - Server must not expose remote network binding by default.
 - Registry/index/audit data must be outside managed workspace paths.

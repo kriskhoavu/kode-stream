@@ -15,6 +15,8 @@ func TestClassifyPath(t *testing.T) {
 		{"page.HTML", FileKindHTML, "html"},
 		{"data.json", FileKindJSON, "json"},
 		{"plan.yml", FileKindYAML, "yaml"},
+		{"screen.PNG", FileKindImage, "image/png"},
+		{"photo.jpeg", FileKindImage, "image/jpeg"},
 		{"src/main.go", FileKindCode, "go"},
 		{"src/App.tsx", FileKindCode, "tsx"},
 		{"Dockerfile", FileKindCode, "dockerfile"},
@@ -66,5 +68,8 @@ func TestPreviewThresholdsRemainOrdered(t *testing.T) {
 	}
 	if MaxTextResponseBytes <= RichPreviewThresholdBytes {
 		t.Fatal("maximum text response must exceed rich preview threshold")
+	}
+	if MaxImageResponseBytes <= MaxTextResponseBytes {
+		t.Fatal("maximum image response must exceed maximum text response")
 	}
 }

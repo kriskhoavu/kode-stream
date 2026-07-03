@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	appgit "plan-manager/internal/application/git"
 	apphealth "plan-manager/internal/application/health"
 	appitem "plan-manager/internal/application/item"
+	appjira "plan-manager/internal/application/jira"
 	appsearch "plan-manager/internal/application/search"
 	appworkspace "plan-manager/internal/application/workspace"
 	appworkspacefiles "plan-manager/internal/application/workspacefiles"
@@ -48,6 +50,12 @@ type API struct {
 	workspaceFiles *appworkspacefiles.Service
 	contentSearch  *appcontentsearch.Service
 	aiSessions     *appaisession.Service
+	jira           *appjira.Service
+}
+
+func (a *API) WithJira(service *appjira.Service) *API {
+	a.jira = service
+	return a
 }
 
 func (a *API) WithAISessions(service *appaisession.Service) *API {
@@ -103,6 +111,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("PUT /api/workspaces/{id}", a.updateWorkspace)
 	mux.HandleFunc("DELETE /api/workspaces/{id}", a.deleteWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
+	mux.HandleFunc("POST /api/workspaces/{id}/jira/test", a.testJiraConnection)
 	mux.HandleFunc("POST /api/workspaces/{id}/kanban/branch", a.loadKanbanBranch)
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
@@ -123,6 +132,9 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/items/{id}", a.itemDetail)
 	mux.HandleFunc("GET /api/items/{id}/ai-session-eligibility", a.aiSessionEligibility)
 	mux.HandleFunc("POST /api/items/{id}/ai-sessions", a.launchAISession)
+	mux.HandleFunc("GET /api/items/{id}/jira", a.jiraIssue)
+	mux.HandleFunc("POST /api/items/{id}/jira/refresh", a.refreshJiraIssue)
+	mux.HandleFunc("GET /api/items/{id}/jira/attachments/{attachmentId}", a.jiraAttachment)
 	mux.HandleFunc("GET /api/items/{id}/files", a.itemFiles)
 	mux.HandleFunc("GET /api/items/{id}/content-search", a.itemContentSearch)
 	mux.HandleFunc("GET /api/items/{id}/files/{fileID}", a.itemFileContent)
@@ -229,6 +241,88 @@ func (a *API) saveAISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	saved, err := a.aiSessions.Save(settings)
 	respond(w, saved, err)
+}
+
+func (a *API) jiraAttachment(w http.ResponseWriter, r *http.Request) {
+	if a.jira == nil {
+		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
+		return
+	}
+	content, err := a.jira.Attachment(r.Context(), r.PathValue("id"), r.PathValue("attachmentId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	filename := sanitizeDownloadName(content.Filename)
+	disposition := "attachment"
+	if safeInlineMediaType(content.MediaType) {
+		disposition = "inline"
+	}
+	w.Header().Set("Content-Type", content.MediaType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`%s; filename=%q`, disposition, filename))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Length", strconv.Itoa(len(content.Data)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content.Data)
+}
+
+func safeInlineMediaType(value string) bool {
+	switch strings.ToLower(value) {
+	case "image/png", "image/jpeg", "image/gif", "image/webp":
+		return true
+	default:
+		return false
+	}
+}
+func sanitizeDownloadName(value string) string {
+	value = filepath.Base(strings.ReplaceAll(value, "\\", "/"))
+	value = strings.Map(func(r rune) rune {
+		if r < ' ' || r == 127 || r == '"' {
+			return -1
+		}
+		return r
+	}, value)
+	if strings.TrimSpace(value) == "" || value == "." {
+		return "attachment"
+	}
+	return value
+}
+
+func (a *API) jiraIssue(w http.ResponseWriter, r *http.Request) { a.respondJiraIssue(w, r, false) }
+func (a *API) refreshJiraIssue(w http.ResponseWriter, r *http.Request) {
+	a.respondJiraIssue(w, r, true)
+}
+func (a *API) respondJiraIssue(w http.ResponseWriter, r *http.Request, refresh bool) {
+	if a.jira == nil {
+		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
+		return
+	}
+	result, err := a.jira.Issue(r.Context(), r.PathValue("id"), refresh)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (a *API) testJiraConnection(w http.ResponseWriter, r *http.Request) {
+	if a.jira == nil {
+		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
+		return
+	}
+	var connection models.JiraConnection
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&connection); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.jira.TestConnection(r.Context(), r.PathValue("id"), &connection)
+	respond(w, result, err)
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
@@ -1084,6 +1178,14 @@ func writeError(w http.ResponseWriter, status int, message string) {
 func recoveryHint(message string) string {
 	lower := strings.ToLower(message)
 	switch {
+	case strings.Contains(lower, "jira token environment variable"):
+		return "Set the configured environment variable or add it to ~/.creds.zsh or ~/.creds.sh, then restart Plan Manager."
+	case strings.Contains(lower, "jira authentication"):
+		return "Check the Jira account and token configured for this workspace."
+	case strings.Contains(lower, "jira project"):
+		return "Check the Jira project key and account permissions."
+	case strings.Contains(lower, "jira is unavailable"):
+		return "Check the Jira base URL, network access, and server availability."
 	case strings.Contains(lower, "changed since it was loaded"):
 		return "Reload the file to review the latest content, then apply your changes again."
 	case strings.Contains(lower, "local changes"):

@@ -58,6 +58,12 @@ describe('buildWorkspaceInput', () => {
       sources: ['plans']
     });
   });
+
+  it('normalizes optional Jira metadata without a token value', () => {
+    expect(buildWorkspaceInput({ name: 'Jira', registrationMode: 'local_path', path: '/repo', remoteUrl: '', cloneRoot: '', baselineBranch: 'main', sources: 'plans', jira: { deploymentType: 'cloud', baseUrl: 'https://company.atlassian.net/', projectKey: 'di', accountEmail: ' user@example.com ', tokenEnvVar: ' JIRA_TOKEN ' } })).toEqual(expect.objectContaining({
+      jira: { deploymentType: 'cloud', baseUrl: 'https://company.atlassian.net', projectKey: 'DI', accountEmail: 'user@example.com', tokenEnvVar: 'JIRA_TOKEN' }
+    }));
+  });
 });
 
 describe('inferWorkspaceNameFromRemoteURL', () => {

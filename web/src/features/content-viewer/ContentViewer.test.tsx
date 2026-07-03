@@ -44,6 +44,35 @@ describe('ContentViewer', () => {
     await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Large'));
   });
 
+  it('renders supported image data without a source mode', () => {
+    const dataURL = 'data:image/png;base64,iVBORw0KGgo=';
+    render(<ContentViewer file={file({ id: 'diagram_png', path: 'diagram.png', kind: 'image', language: 'image/png', editable: false })} content={dataURL} />);
+
+    expect(screen.getByRole('img', { name: 'diagram.png' })).toHaveAttribute('src', dataURL);
+    expect(screen.queryByRole('tab', { name: 'Source' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(screen.getByRole('button', { name: 'Reset zoom to 100%' })).toHaveTextContent('125%');
+    expect(screen.getByRole('img', { name: 'diagram.png' })).toHaveStyle({ width: '125%' });
+    const canvas = document.querySelector('.image-preview-canvas') as HTMLDivElement;
+    canvas.scrollLeft = 50;
+    canvas.scrollTop = 40;
+    fireEvent(canvas, pointerEvent('pointerdown', { pointerId: 1, button: 0, clientX: 100, clientY: 100 }));
+    fireEvent(canvas, pointerEvent('pointermove', { pointerId: 1, clientX: 75, clientY: 70 }));
+    expect(canvas.scrollLeft).toBe(75);
+    expect(canvas.scrollTop).toBe(70);
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Fit image' }));
+    expect(screen.getByRole('button', { name: 'Fit image' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('renders HTML in a sandboxed preview with a source fallback', async () => {
+    render(<ContentViewer file={file({ id: 'page_html', path: 'page.html', kind: 'html', language: 'html', editable: true })} content='<h1>Preview</h1><script>alert(1)</script>' />);
+
+    expect(await screen.findByTitle('HTML preview')).toHaveAttribute('sandbox', '');
+    fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
+    await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('<h1>Preview</h1>'));
+  });
+
   it('sanitizes Markdown output and marks external links', async () => {
     const html = await renderMarkdown('<script>alert("x")</script>\n\n[Site](https://example.test)');
     const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
@@ -62,3 +91,9 @@ describe('ContentViewer', () => {
     expect(document.querySelector('.source-line-content')?.textContent).toContain('const x = "');
   });
 });
+
+function pointerEvent(type: string, values: Record<string, number>) {
+  const event = new Event(type, { bubbles: true });
+  for (const [key, value] of Object.entries(values)) Object.defineProperty(event, key, { value });
+  return event;
+}

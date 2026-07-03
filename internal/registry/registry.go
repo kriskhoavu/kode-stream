@@ -3,6 +3,7 @@ package registry
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -219,6 +220,10 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 		}
 		cleanDirs = append(cleanDirs, filepath.ToSlash(clean))
 	}
+	jira, err := ValidateJiraConnection(input.Jira)
+	if err != nil {
+		return models.WorkspaceConfig{}, err
+	}
 
 	return models.WorkspaceConfig{
 		ID:               slug(name) + "-" + shortHash(root),
@@ -230,7 +235,47 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 		ClonePathManaged: mode == models.WorkspaceRegistrationModeRemoteClone,
 		Sources:          cleanDirs,
 		CreatedAt:        time.Now().UTC(),
+		Jira:             jira,
 	}, nil
+}
+
+var envNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+var projectKeyPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+
+func ValidateJiraConnection(input *models.JiraConnection) (*models.JiraConnection, error) {
+	if input == nil {
+		return nil, nil
+	}
+	connection := *input
+	connection.DeploymentType = strings.ToLower(strings.TrimSpace(connection.DeploymentType))
+	connection.BaseURL = strings.TrimRight(strings.TrimSpace(connection.BaseURL), "/")
+	connection.ProjectKey = strings.ToUpper(strings.TrimSpace(connection.ProjectKey))
+	connection.AccountEmail = strings.TrimSpace(connection.AccountEmail)
+	connection.TokenEnvVar = strings.TrimSpace(connection.TokenEnvVar)
+	if connection.DeploymentType != "cloud" && connection.DeploymentType != "server" {
+		return nil, errors.New("Jira deployment type must be cloud or server")
+	}
+	parsed, err := url.Parse(connection.BaseURL)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return nil, errors.New("Jira base URL is invalid")
+	}
+	loopback := parsed.Hostname() == "localhost" || parsed.Hostname() == "127.0.0.1" || parsed.Hostname() == "::1"
+	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && loopback) {
+		return nil, errors.New("Jira base URL must use HTTPS")
+	}
+	if !projectKeyPattern.MatchString(connection.ProjectKey) {
+		return nil, errors.New("Jira project key is invalid")
+	}
+	if !envNamePattern.MatchString(connection.TokenEnvVar) {
+		return nil, errors.New("Jira token environment variable is invalid")
+	}
+	if connection.DeploymentType == "cloud" && connection.AccountEmail == "" {
+		return nil, errors.New("Jira Cloud account email is required")
+	}
+	if connection.DeploymentType == "server" {
+		connection.AccountEmail = ""
+	}
+	return &connection, nil
 }
 
 func normalizeWorkspace(workspace models.WorkspaceConfig) models.WorkspaceConfig {

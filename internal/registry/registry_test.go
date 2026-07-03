@@ -27,6 +27,36 @@ func TestCreateDefaultsRegistrationModeToLocalPath(t *testing.T) {
 	}
 }
 
+func TestValidateJiraConnectionNormalizesCloudAndServer(t *testing.T) {
+	cloud, err := ValidateJiraConnection(&models.JiraConnection{DeploymentType: " CLOUD ", BaseURL: "https://jira.example.com/", ProjectKey: "di", AccountEmail: " user@example.com ", TokenEnvVar: "JIRA_TOKEN"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cloud.DeploymentType != "cloud" || cloud.BaseURL != "https://jira.example.com" || cloud.ProjectKey != "DI" || cloud.AccountEmail != "user@example.com" {
+		t.Fatalf("cloud = %#v", cloud)
+	}
+	server, err := ValidateJiraConnection(&models.JiraConnection{DeploymentType: "server", BaseURL: "http://127.0.0.1:8080", ProjectKey: "OPS", AccountEmail: "ignored", TokenEnvVar: "JIRA_PAT"})
+	if err != nil || server.AccountEmail != "" {
+		t.Fatalf("server=%#v err=%v", server, err)
+	}
+}
+
+func TestValidateJiraConnectionRejectsUnsafeOrIncompleteValues(t *testing.T) {
+	tests := []*models.JiraConnection{
+		{DeploymentType: "other", BaseURL: "https://jira.example.com", ProjectKey: "DI", TokenEnvVar: "JIRA_TOKEN"},
+		{DeploymentType: "cloud", BaseURL: "http://jira.example.com", ProjectKey: "DI", AccountEmail: "a@b.com", TokenEnvVar: "JIRA_TOKEN"},
+		{DeploymentType: "cloud", BaseURL: "https://user@jira.example.com", ProjectKey: "DI", AccountEmail: "a@b.com", TokenEnvVar: "JIRA_TOKEN"},
+		{DeploymentType: "cloud", BaseURL: "https://jira.example.com", ProjectKey: "bad-key", AccountEmail: "a@b.com", TokenEnvVar: "JIRA_TOKEN"},
+		{DeploymentType: "cloud", BaseURL: "https://jira.example.com", ProjectKey: "DI", TokenEnvVar: "JIRA_TOKEN"},
+		{DeploymentType: "server", BaseURL: "https://jira.example.com", ProjectKey: "DI", TokenEnvVar: "not valid"},
+	}
+	for _, connection := range tests {
+		if _, err := ValidateJiraConnection(connection); err == nil {
+			t.Fatalf("expected rejection: %#v", connection)
+		}
+	}
+}
+
 func TestCreateRemoteCloneRequiresRemoteURL(t *testing.T) {
 	root := newRegistryGitRepo(t)
 	registry := New(filepath.Join(t.TempDir(), "workspaces.yaml"), gitadapter.New())

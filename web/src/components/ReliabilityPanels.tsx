@@ -2,10 +2,26 @@ import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Circl
 import { useState } from 'react';
 import { useAuditEvents, useWorkspaceHealth } from '../features/reliability/hooks';
 
-export function WorkspaceHealthPanel({ workspaceId }: { workspaceId: string }) {
+export function WorkspaceHealthPanel({ workspaceId, embedded = false }: { workspaceId: string; embedded?: boolean }) {
   const { health, loading, error, refresh } = useWorkspaceHealth(workspaceId);
   const [collapsed, setCollapsed] = useState(true);
   const healthStatus = loading ? undefined : error ? 'failed' : health?.summary;
+
+  if (embedded) {
+    return <div className="workspace-health-embedded" aria-label="Workspace health">
+      <div className="workspace-health-embedded-summary">
+        <span className={`health-summary-icon ${healthStatus ?? 'idle'}`}><HealthIcon status={healthStatus} /></span>
+        <span>{loading ? 'Checking workspace...' : error ? error : health?.summary === 'ok' ? 'All workspace checks passed.' : health ? 'Workspace checks need attention.' : 'Workspace health is unavailable.'}</span>
+        <button className="secondary" type="button" onClick={() => void refresh()}><RefreshCw size={14} /> Refresh health</button>
+      </div>
+      {!loading && !error && health && <div className="health-checks">
+        {health.checks.map((check) => <div className={`health-check ${check.status}`} key={check.name} title={check.recoveryHint || check.message}>
+          <HealthIcon status={check.status} />
+          <span>{check.message}</span>
+        </div>)}
+      </div>}
+    </div>;
+  }
 
   return (
     <section className="health-panel" aria-label="Workspace health">

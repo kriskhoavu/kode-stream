@@ -2,6 +2,7 @@ package fileaccess
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -240,10 +241,14 @@ func fileIDForPath(path string) string {
 
 func fileContent(relPath string, data []byte) models.FileContent {
 	classification := ClassifyPath(relPath)
+	content := string(data)
+	if classification.Kind == FileKindImage {
+		content = "data:" + classification.Language + ";base64," + base64.StdEncoding.EncodeToString(data)
+	}
 	return models.FileContent{
 		ID:        fileIDForPath(relPath),
 		Path:      relPath,
-		Content:   string(data),
+		Content:   content,
 		Language:  classification.Language,
 		Hash:      contentHash(data),
 		Kind:      classification.Kind,
@@ -263,15 +268,23 @@ func readFileContent(relPath, fullPath string) (models.FileContent, error) {
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	data, err := io.ReadAll(io.LimitReader(file, MaxTextResponseBytes+1))
+	classification := ClassifyPath(relPath)
+	limit := MaxTextResponseBytes
+	if classification.Kind == FileKindImage {
+		limit = MaxImageResponseBytes
+	}
+	data, err := io.ReadAll(io.LimitReader(file, limit+1))
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	if isBinary(data) {
+	if classification.Kind == FileKindImage && (info.Size() > MaxImageResponseBytes || int64(len(data)) > MaxImageResponseBytes) {
+		return models.FileContent{}, ErrUnsupportedContent
+	}
+	if classification.Kind != FileKindImage && isBinary(data) {
 		return models.FileContent{}, ErrUnsupportedContent
 	}
 
-	truncated := info.Size() > MaxTextResponseBytes || int64(len(data)) > MaxTextResponseBytes
+	truncated := classification.Kind != FileKindImage && (info.Size() > MaxTextResponseBytes || int64(len(data)) > MaxTextResponseBytes)
 	if truncated {
 		data = data[:MaxTextResponseBytes]
 		for len(data) > 0 && !utf8.Valid(data) {
@@ -301,6 +314,10 @@ func readFileContent(relPath, fullPath string) (models.FileContent, error) {
 
 func ReadFileContent(relPath, fullPath string) (models.FileContent, error) {
 	return readFileContent(relPath, fullPath)
+}
+
+func FileContentFromBytes(relPath string, data []byte) models.FileContent {
+	return fileContent(relPath, data)
 }
 
 func contentHash(data []byte) string {

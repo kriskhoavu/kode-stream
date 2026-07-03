@@ -8,6 +8,7 @@ const adapterModes: Record<FileKind, { defaultMode: ViewerMode; modes: ViewerMod
   yaml: { defaultMode: 'structured', modes: ['structured', 'source'] },
   code: { defaultMode: 'source', modes: ['source'] },
   text: { defaultMode: 'source', modes: ['source'] },
+  image: { defaultMode: 'rendered', modes: ['rendered'] },
   unsupported: { defaultMode: 'source', modes: [] }
 };
 
