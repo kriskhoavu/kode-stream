@@ -1,6 +1,6 @@
 # PM-020: Embedded AI Terminal
 
-PM-020 builds on PM-018 by adding a managed embedded PTY as an alternative AI-session surface. It owns terminal process lifecycle, loopback transport, reconnect behavior, and the browser terminal experience while preserving external launch as a fallback.
+PM-020 builds on PM-018 by adding managed embedded PTYs as an alternative AI-session surface. It owns terminal process lifecycle, loopback transport, reconnect behavior, and an app-level multi-session terminal dock while preserving external launch as a fallback.
 
 ## Related Plans
 
@@ -26,17 +26,20 @@ Let users interact with a supported AI CLI inside Plan Manager through a bounded
 
 ## Glossary
 
-| Term             | Meaning                                                                   |
-|------------------|---------------------------------------------------------------------------|
-| Embedded Session | AI provider process attached to a Plan Manager-owned pseudo-terminal      |
-| Session Channel  | Loopback WebSocket carrying terminal input, output, resize, and lifecycle |
-| Session Lease    | Bounded ownership period renewed while the browser remains connected      |
+| Term             | Meaning                                                                     |
+|------------------|-----------------------------------------------------------------------------|
+| Embedded Session | AI provider process attached to a Plan Manager-owned pseudo-terminal        |
+| Session Channel  | Loopback WebSocket carrying terminal input, output, resize, and lifecycle   |
+| Session Lease    | Bounded ownership period renewed while the browser remains connected        |
+| Terminal Dock    | App-level owner for switching, minimizing, maximizing, and closing sessions |
 
 ## Data Flow
 
 ```text
 PM-018 launch request -> embedded mode -> validated PTY process
-  <-> loopback WebSocket <-> terminal UI -> exit or cleanup
+  <-> loopback WebSocket <-> app-level terminal dock
+  -> normal, maximized, or collapsed restore-chip presentation
+  -> exit, confirmed close, lease expiry, or shutdown cleanup
 ```
 
 ## Design Decisions
@@ -46,6 +49,8 @@ PM-018 launch request -> embedded mode -> validated PTY process
 | Reuse PM-018 launch contracts       | Separate embedded configuration | Keeps provider behavior consistent across terminal surfaces |
 | Keep external launch available      | Replace with embedded terminal  | Preserves a stable fallback and native terminal preference  |
 | Opaque sessions with bounded leases | Browser-owned PID               | Prevents process identifier exposure and orphaned processes |
+| App-level multi-session dock        | Item-owned terminal modal       | Keeps sessions connected across workspace navigation        |
+| Collapsed restore chip              | Small live terminal window      | Fully frees the plan UI while retaining session transports  |
 
 ## Documents
 

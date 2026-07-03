@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add a bounded embedded AI terminal using PM-018 contracts while retaining external launch as a fallback.
+Add bounded embedded AI terminals using PM-018 contracts while retaining external launch as a fallback. The delivered UI is an app-level multi-session dock with normal and maximized windows plus a fully collapsed bottom-right restore chip.
 
 ## Prerequisites
 
@@ -10,16 +10,16 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 
 ## Phases Summary
 
-| Phase | Name                     | Status   |
-|-------|--------------------------|----------|
-| B1    | PTY Session Lifecycle    | Complete |
-| F1    | Embedded Terminal        | Complete |
-| V1    | Integrated Verification  | Complete |
-| F2    | Multi-Session Dock       | Complete |
-| F3    | Floating Minimized Mode  | Complete |
-| F4    | Collapsed Session Chip   | Complete |
-| F5    | Minimized Visibility Fix | Complete |
-| F6    | Terminal Window Chrome   | Complete |
+| Phase | Name                     | Status           |
+|-------|--------------------------|------------------|
+| B1    | PTY Session Lifecycle    | Complete         |
+| F1    | Embedded Terminal        | Complete         |
+| V1    | Integrated Verification  | Complete         |
+| F2    | Multi-Session Dock       | Complete         |
+| F3    | Floating Minimized Mode  | Superseded by F4 |
+| F4    | Collapsed Session Chip   | Complete         |
+| F5    | Minimized Visibility Fix | Complete         |
+| F6    | Terminal Window Chrome   | Complete         |
 
 ## Phase B1: PTY Session Lifecycle
 
@@ -40,7 +40,7 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 
 - [x] Add launch-surface selection to PM-018 workflow.
 - [x] Add terminal emulator, typed channel client, resize, reconnect, and lifecycle controls.
-- [x] Add navigation guard, accessible focus escape, cancellation, and exit presentation.
+- [x] Add browser-unload guard, accessible focus escape, confirmed close, and exit presentation.
 - [x] Test connection states, frame handling, reconnect deadline, and cleanup actions.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session`
@@ -74,6 +74,8 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 **Commit:** `PM-020: Add multi-session terminal dock`
 
 ## Phase F3: Floating Minimized Mode
+
+This intermediate presentation was implemented and then replaced by F4 after usability review.
 
 **Deliverables:**
 

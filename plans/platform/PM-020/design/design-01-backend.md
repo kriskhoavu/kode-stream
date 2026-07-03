@@ -8,12 +8,12 @@ Add a PTY session manager and loopback WebSocket transport around PM-018 launch 
 
 | Type                  | Key Fields                                                                |
 |-----------------------|---------------------------------------------------------------------------|
-| `EmbeddedSession`     | `id`, `itemId`, `workspaceId`, `provider`, `intent`, `state`, `startedAt` |
+| `EmbeddedSession`     | `id`, item identity/title, workspace, provider, intent, state, timestamps |
 | `SessionChannelGrant` | `sessionId`, `token`, `expiresAt`                                         |
 | `TerminalSize`        | `columns`, `rows`                                                         |
 | `SessionEvent`        | `type`, `data`, `exitCode`, `message`                                     |
 
-Session states are `starting`, `running`, `exited`, `cancelled`, and `failed`. Session IDs and channel tokens are cryptographically random. Tokens are compared in constant time and scoped to one session.
+Session states are `starting`, `running`, `exited`, `cancelled`, and `failed`. Session IDs and channel tokens are cryptographically random. Tokens are compared in constant time, scoped to one session, and reusable only during their short validity window so reconnect can resume buffered output.
 
 ## API Contract
 

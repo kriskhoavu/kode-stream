@@ -9,6 +9,9 @@
 | 3   | Reconnect to a session       | Buffered output resumes within the reconnect grace time |
 | 4   | Disconnect or cancel session | Lease and cleanup rules prevent orphaned processes      |
 | 5   | Fall back to external launch | Existing PM-018 external launch remains available       |
+| 6   | Work across sessions         | Sessions remain connected across items and workspaces   |
+| 7   | Minimize and restore         | Terminal collapses to a corner chip and restores intact |
+| 8   | Close a running session      | Confirmation cancels the process before removing the UI |
 
 ## Flow 1: Embedded AI Session
 
@@ -16,7 +19,7 @@
 User chooses Embedded terminal
   -> backend reuses PM-018 validation and context generation
   -> PTY starts provider in registered workspace root
-  -> API returns opaque session ID and one-time channel token
+  -> API returns session metadata and a short-lived, session-scoped channel grant
   -> browser opens loopback WebSocket
   -> input, output, resize, and lifecycle events flow over channel
   -> exit, cancellation, lease expiry, or server shutdown cleans process
@@ -27,5 +30,8 @@ User chooses Embedded terminal
 - Embedded sessions cannot start outside registered workspace roots.
 - Session channel tokens are short-lived, single-session, and never logged.
 - Disconnect grace permits a brief reconnect, then terminates the process.
-- Navigation never silently leaves an app-owned provider process running.
+- App navigation preserves managed sessions in the app-level dock.
+- Minimize fully hides terminal content and leaves one compact restore chip.
+- Multiple workspace sessions remain independently selectable and connected.
+- Close confirms before cancelling a running provider process.
 - External launch remains usable when embedded mode is unavailable.
