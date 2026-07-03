@@ -20,7 +20,7 @@ Display a matching Jira ticket, safely access its attachments, and provide a sca
 
 ### Non-Goals
 
-- No Jira field, status, comment, or attachment mutations; PM-020 owns writes.
+- No Jira field, status, comment, or attachment mutations; PM-021 owns writes.
 - No Jira-driven Kanban synchronization.
 - No automatic attachment loading or untrusted Jira HTML rendering.
 - No token persistence by Plan Manager.

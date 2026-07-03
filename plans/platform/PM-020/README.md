@@ -4,12 +4,12 @@ PM-020 builds on PM-018 by adding managed embedded PTYs as an alternative AI-ses
 
 ## Related Plans
 
-| Item                          | Relationship           | Key Context                                                     |
-|-------------------------------|------------------------|-----------------------------------------------------------------|
-| [PM-018](../PM-018/README.md) | Required AI foundation | Reuse providers, settings, intents, eligibility, and manifests  |
-| [PM-016](../PM-016/README.md) | Local operation safety | Reuse audit and explicit-confirmation patterns                  |
-| [PM-017](../PM-017/README.md) | Platform rollout       | Keep external terminal launch available as a compatibility path |
-| [PM-021](../PM-021/README.md) | Separated Jira scope   | Owns Jira field, transition, and attachment mutations           |
+| Item                                  | Relationship           | Key Context                                                     |
+|---------------------------------------|------------------------|-----------------------------------------------------------------|
+| [PM-018](../PM-018/README.md)         | Required AI foundation | Reuse providers, settings, intents, eligibility, and manifests  |
+| [PM-016](../PM-016/README.md)         | Local operation safety | Reuse audit and explicit-confirmation patterns                  |
+| [PM-017](../PM-017/README.md)         | Platform rollout       | Keep external terminal launch available as a compatibility path |
+| [PM-021](../pending-PM-021/README.md) | Pending Jira scope     | Owns deferred Jira field, transition, and attachment mutations  |
 
 ## Scope
 
