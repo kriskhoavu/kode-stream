@@ -6,12 +6,12 @@ Extend the PM-018 launch dialog with external and embedded surfaces. Add an embe
 
 ## State Management
 
-| State              | Owner                 | Behavior                                                  |
-|--------------------|-----------------------|-----------------------------------------------------------|
-| Launch selection   | PM-018 launch dialog  | Adds `external` or `embedded` surface                     |
-| Session metadata   | Embedded-session hook | Tracks ID, lifecycle, reconnect deadline, and exit result |
-| Terminal transport | Terminal component    | Sends input/resize and renders output frames              |
-| Navigation guard   | Item workspace        | Warns before leaving a running session                    |
+| State              | Owner                   | Behavior                                             |
+|--------------------|-------------------------|------------------------------------------------------|
+| Launch selection   | PM-018 launch dialog    | Adds `external` or `embedded` surface                |
+| Session metadata   | App-level terminal dock | Tracks sessions across item and workspace navigation |
+| Terminal transport | Terminal component      | Sends input/resize and renders output frames         |
+| Navigation guard   | Item workspace          | Warns before leaving a running session               |
 
 The terminal component uses a maintained terminal emulator library with fit and resize support. Raw provider output is rendered as terminal data, never HTML. The WebSocket URL derives from the current loopback origin and the grant remains in memory only.
 
@@ -22,6 +22,8 @@ The terminal component uses a maintained terminal emulator library with fit and 
 - Provide explicit cancel and close actions; closing an active view does not silently leave a process running.
 - Preserve bounded scrollback supplied by the terminal component and backend reconnect buffer.
 - Restore focus predictably and expose lifecycle status outside the terminal canvas.
+- Keep multiple workspace sessions connected and identify each by workspace, item, and provider.
+- Support minimized, normal, and maximized dock modes; refit terminal dimensions after every mode change.
 
 ## Accessibility
 
@@ -35,3 +37,4 @@ The terminal component uses a maintained terminal emulator library with fit and 
 |--------------------------------|----------------------------------------------------------|
 | Separate terminal lifecycle UI | Terminal output alone cannot communicate app-owned state |
 | Keep grants in memory          | Prevents session credentials entering persistent storage |
+| App-level multi-session dock   | Prevents navigation from destroying unrelated sessions   |

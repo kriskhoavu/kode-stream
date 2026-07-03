@@ -4,13 +4,12 @@ import { api } from '../../lib/api';
 import type { AISessionLaunchInput, AISessionLaunchResult, EmbeddedAISessionResult } from '../../lib/types';
 import { AISessionLaunchDialog } from './AISessionLaunchDialog';
 import { readAISessionPreference, saveAISessionPreference } from './preferences';
-import { EmbeddedTerminal } from './EmbeddedTerminal';
+import { openEmbeddedSession } from './terminalSessions';
 
 export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void }) {
   const [preference, setPreference] = useState<AISessionLaunchInput | null>(readAISessionPreference);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
-	const [embedded, setEmbedded] = useState<EmbeddedAISessionResult | null>(null);
   const savedChoice = preference ? preferenceLabel(preference) : '';
 
   const quickLaunch = async () => {
@@ -22,7 +21,7 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }
     try {
 		if (preference.surface === 'embedded') {
 			const result = await api.startEmbeddedAISession(itemId, { provider: preference.provider, contextMode: preference.contextMode, columns: 80, rows: 24 });
-			setEmbedded(result); onLaunched(`${label(preference.provider)} opened in the embedded terminal.`);
+			openEmbeddedSession(result); onLaunched(`${label(preference.provider)} opened in the embedded terminal.`);
 		} else {
 			const result = await api.launchAISession(itemId, { provider: preference.provider, terminal: preference.terminal, contextMode: preference.contextMode });
 			onLaunched(launchMessage(result));
@@ -39,7 +38,7 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }
 		const next = { provider: input.provider, terminal: input.terminal, contextMode: input.contextMode, surface: input.surface ?? 'external' };
     saveAISessionPreference(next);
     setPreference(next);
-		if ('session' in result) { setEmbedded(result); onLaunched(`${label(input.provider)} opened in the embedded terminal.`); }
+		if ('session' in result) { openEmbeddedSession(result); onLaunched(`${label(input.provider)} opened in the embedded terminal.`); }
 		else onLaunched(launchMessage(result));
   };
 
@@ -49,7 +48,6 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }
       <button className="primary ai-launch-settings" type="button" disabled={disabled || launching} aria-label="Configure AI session" title="Configure AI session" onClick={() => setDialogOpen(true)}><Settings2 size={16} /></button>
     </div>
     {dialogOpen && <AISessionLaunchDialog itemId={itemId} preference={preference} onClose={() => setDialogOpen(false)} onLaunched={rememberLaunch} />}
-		{embedded && <EmbeddedTerminal initial={embedded} onClose={() => setEmbedded(null)} />}
   </>;
 }
 

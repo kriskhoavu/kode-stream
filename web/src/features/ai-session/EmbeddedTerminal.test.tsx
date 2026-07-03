@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { EmbeddedTerminal } from './EmbeddedTerminal';
 
 const write = vi.fn();
+const fit = vi.fn();
 vi.mock('@xterm/xterm', () => ({ Terminal: class {
 	cols = 80; rows = 24;
 	loadAddon() {} open() {} focus() {} dispose() {}
@@ -11,7 +12,7 @@ vi.mock('@xterm/xterm', () => ({ Terminal: class {
 	onData() { return { dispose() {} }; }
 	onResize() { return { dispose() {} }; }
 } }));
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }));
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit = fit; } }));
 vi.mock('../../lib/api', () => ({ api: { cancelEmbeddedAISession: vi.fn() } }));
 
 class TestSocket {
@@ -26,6 +27,7 @@ class TestSocket {
 }
 
 const initial = { session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context' as const, state: 'running' as const, startedAt: '2026-07-03T00:00:00Z' }, grant: { sessionId: 'session-1', token: 'secret', expiresAt: '2026-07-03T00:01:00Z' } };
+const terminalProps = { visible: true, mode: 'normal' as const, title: 'Workspace · codex · item-1', onMinimize: vi.fn(), onToggleMaximize: vi.fn() };
 
 describe('EmbeddedTerminal', () => {
 	afterEach(() => { TestSocket.instances = []; vi.clearAllMocks(); });
@@ -33,7 +35,7 @@ describe('EmbeddedTerminal', () => {
 	it('connects, handles output and presents exit state', async () => {
 		vi.stubGlobal('WebSocket', TestSocket);
 		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-		render(<EmbeddedTerminal initial={initial} onClose={vi.fn()} />);
+		render(<EmbeddedTerminal initial={initial} {...terminalProps} onClose={vi.fn()} />);
 		await waitFor(() => expect(TestSocket.instances).toHaveLength(1));
 		const socket = TestSocket.instances[0];
 		act(() => { socket.onopen?.(); socket.onmessage?.({ data: JSON.stringify({ type: 'output', data: btoa('hello'), encoding: 'base64' }) }); });
@@ -47,10 +49,25 @@ describe('EmbeddedTerminal', () => {
 		vi.stubGlobal('WebSocket', TestSocket);
 		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 		vi.mocked(api.cancelEmbeddedAISession).mockResolvedValue({ ...initial.session, state: 'cancelled' });
-		const view = render(<EmbeddedTerminal initial={initial} onClose={vi.fn()} />);
+		const view = render(<EmbeddedTerminal initial={initial} {...terminalProps} onClose={vi.fn()} />);
 		await waitFor(() => expect(TestSocket.instances).toHaveLength(1));
 		fireEvent.click(screen.getByRole('button', { name: 'Cancel session' }));
 		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
 		view.unmount(); expect(TestSocket.instances[0].close).toHaveBeenCalled();
+	});
+
+	it('offers minimize and maximize controls and refits on mode changes', async () => {
+		vi.stubGlobal('WebSocket', TestSocket);
+		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+		const onMinimize = vi.fn(); const onToggleMaximize = vi.fn();
+		const view = render(<EmbeddedTerminal initial={initial} {...terminalProps} onMinimize={onMinimize} onToggleMaximize={onToggleMaximize} onClose={vi.fn()} />);
+		await waitFor(() => expect(fit).toHaveBeenCalled());
+		fireEvent.click(screen.getByRole('button', { name: 'Minimize embedded terminal' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Maximize embedded terminal' }));
+		expect(onMinimize).toHaveBeenCalled(); expect(onToggleMaximize).toHaveBeenCalled();
+		const calls = fit.mock.calls.length;
+		view.rerender(<EmbeddedTerminal initial={initial} {...terminalProps} mode="maximized" onClose={vi.fn()} />);
+		await waitFor(() => expect(fit.mock.calls.length).toBeGreaterThan(calls));
+		expect(screen.getByRole('button', { name: 'Restore embedded terminal size' })).toBeInTheDocument();
 	});
 });

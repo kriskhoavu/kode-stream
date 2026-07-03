@@ -1,0 +1,53 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Bot, Maximize2 } from 'lucide-react';
+import type { EmbeddedAISessionResult, WorkspaceConfig } from '../../lib/types';
+import { EmbeddedTerminal } from './EmbeddedTerminal';
+import { embeddedSessionStartedEvent } from './terminalSessions';
+
+type DockMode = 'normal' | 'maximized' | 'minimized';
+
+export function EmbeddedTerminalDock({ workspaces }: { workspaces: WorkspaceConfig[] }) {
+	const [sessions, setSessions] = useState<EmbeddedAISessionResult[]>([]);
+	const [activeId, setActiveId] = useState('');
+	const [mode, setMode] = useState<DockMode>('normal');
+	const workspaceNames = useMemo(() => new Map(workspaces.map((workspace) => [workspace.id, workspace.name])), [workspaces]);
+
+	useEffect(() => {
+		const add = (event: Event) => {
+			const result = (event as CustomEvent<EmbeddedAISessionResult>).detail;
+			setSessions((current) => current.some(({ session }) => session.id === result.session.id) ? current : [...current, result]);
+			setActiveId(result.session.id);
+			setMode('normal');
+		};
+		window.addEventListener(embeddedSessionStartedEvent, add);
+		return () => window.removeEventListener(embeddedSessionStartedEvent, add);
+	}, []);
+
+	if (sessions.length === 0) return null;
+	const active = sessions.find(({ session }) => session.id === activeId) ?? sessions[0];
+	const select = (id: string) => { setActiveId(id); if (mode === 'minimized') setMode('normal'); };
+	const close = (id: string) => {
+		setSessions((current) => current.filter(({ session }) => session.id !== id));
+		if (id === active.session.id) {
+			const remaining = sessions.filter(({ session }) => session.id !== id);
+			setActiveId(remaining[0]?.session.id ?? '');
+		}
+	};
+
+	return <>
+		{mode === 'minimized' && <aside className="embedded-terminal-tray" aria-label="Embedded terminal sessions">
+			<div className="embedded-terminal-tabs">{sessions.map((result) => <button key={result.session.id} type="button" className={result.session.id === active.session.id ? 'active' : ''} onClick={() => select(result.session.id)}><Bot size={14} /> {sessionLabel(result, workspaceNames)}</button>)}</div>
+			<button className="icon-button" type="button" aria-label="Restore embedded terminal" onClick={() => setMode('normal')}><Maximize2 size={17} /></button>
+		</aside>}
+		<div className={`embedded-terminal-backdrop terminal-mode-${mode}`} hidden={mode === 'minimized'}>
+			<section className="embedded-terminal-shell" aria-label="Embedded terminal dock">
+				<nav className="embedded-terminal-tabs" aria-label="Open embedded sessions">{sessions.map((result) => <button key={result.session.id} type="button" className={result.session.id === active.session.id ? 'active' : ''} onClick={() => select(result.session.id)}><Bot size={14} /> {sessionLabel(result, workspaceNames)}</button>)}</nav>
+				{sessions.map((result) => <EmbeddedTerminal key={result.session.id} initial={result} visible={result.session.id === active.session.id} mode={mode === 'maximized' ? 'maximized' : 'normal'} title={sessionLabel(result, workspaceNames)} onMinimize={() => setMode('minimized')} onToggleMaximize={() => setMode((current) => current === 'maximized' ? 'normal' : 'maximized')} onClose={() => close(result.session.id)} />)}
+			</section>
+		</div>
+	</>;
+}
+
+function sessionLabel(result: EmbeddedAISessionResult, workspaceNames: Map<string, string>) {
+	return `${workspaceNames.get(result.session.workspaceId) ?? result.session.workspaceId} · ${result.session.provider} · ${result.session.itemId}`;
+}
