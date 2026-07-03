@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/creack/pty"
@@ -246,7 +245,7 @@ func (m *Manager) stop(id, state string) (Session, error) {
 	if s.info.State == StateRunning || s.info.State == StateStarting {
 		s.info.State = state
 		if s.command != nil && s.command.Process != nil {
-			_ = syscall.Kill(-s.command.Process.Pid, syscall.SIGKILL)
+			_ = stopProcess(s.command.Process)
 		}
 		if s.file != nil {
 			_ = s.file.Close()

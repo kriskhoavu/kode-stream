@@ -9,6 +9,14 @@
 - Local binary build: `go build ./cmd/plan-manager`
 - Run app: `./plan-manager serve -port 4317`
 
+## Embedded AI Terminal Checklist
+
+- Start workspace-only and selected-card sessions with a disposable provider command.
+- Verify input, output, resize, cancellation, reconnect, exit status, and external-launch fallback.
+- Confirm disconnect grace and `Ctrl+C` server shutdown terminate provider process groups.
+- Inspect console and `audit-log.jsonl`; neither the channel grant nor terminal content may appear.
+- Run the lifecycle suite on macOS or another supported Unix development host.
+
 ## Playwright Acceptance Checklist
 
 - Register this repository with `plans` as the Plan Directory.

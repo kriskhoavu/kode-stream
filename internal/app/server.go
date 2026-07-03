@@ -2,13 +2,16 @@ package app
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"plan-manager/internal/aisettings"
 	"plan-manager/internal/api"
@@ -82,7 +85,15 @@ func (s *Server) Serve() error {
 	}
 	url := "http://" + listener.Addr().String()
 	fmt.Printf("Plan Manager running at %s\n", url)
-	return http.Serve(listener, s.app)
+	stopping := make(chan os.Signal, 1)
+	signal.Notify(stopping, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(stopping)
+	go func() { <-stopping; _ = s.Close(); _ = listener.Close() }()
+	err = http.Serve(listener, s.app)
+	if errors.Is(err, net.ErrClosed) {
+		return nil
+	}
+	return err
 }
 
 func envPort() int {

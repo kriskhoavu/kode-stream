@@ -589,7 +589,7 @@ At startup:
 - copy `repositories.yaml` to `workspaces.yaml` if target is missing
 - copy `plan-index.yaml` to `item-index.yaml` if target is missing
 
-## 13. External AI Sessions
+## 13. AI Sessions
 
 ### 13.1 Settings and Detection
 
@@ -611,6 +611,12 @@ Item AI APIs:
 Context mode must be `workspace_only` or `card_context`. Workspace-only opens at the registered workspace root without provider prompt arguments and may be used from snapshot items. Card context requires an editable working-tree item but does not require `plan.yaml`; it passes the workspace-relative card path directly to the AI with a neutral instruction to read relevant documents and wait for the user's request. Neither mode creates a persistent context resource.
 
 Provider authentication, approvals, and sandbox behavior remain owned by the provider CLI. Audit events must not record prompts, command arguments, or manifest contents.
+
+### 13.3 Embedded Sessions
+
+The launch dialog keeps external mode as the default and may start a provider in a managed embedded PTY. Embedded sessions expose create, status, cancel, and loopback WebSocket channel APIs. Session IDs and grants are cryptographically random; grants are short-lived, scoped to one session, retained only in browser memory, and compared in constant time.
+
+The session manager limits concurrent sessions, terminal dimensions, reconnect output, and disconnect grace. It terminates the process group after cancellation, lease expiry, startup failure, or server shutdown. Request logs and audit payloads must not include grant query values, provider input, or terminal output. Embedded PTYs are supported on macOS, Linux, FreeBSD, DragonFly, and OpenBSD; external launch remains available elsewhere.
 
 ## 14. Read-Only Jira Integration
 

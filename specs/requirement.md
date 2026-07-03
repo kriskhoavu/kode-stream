@@ -188,6 +188,8 @@ Files:
 - Reuse Git credentials
 - No credential storage
 - Read-only mode available
+- Embedded terminal channels remain loopback-only; grants and terminal content are never persisted or logged.
+- Embedded provider processes have bounded concurrency, output, dimensions, reconnect leases, cancellation, and shutdown cleanup.
 
 ## Distribution Strategy
 

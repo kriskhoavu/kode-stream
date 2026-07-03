@@ -14,7 +14,7 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 |-------|-------------------------|----------|
 | B1    | PTY Session Lifecycle   | Complete |
 | F1    | Embedded Terminal       | Complete |
-| V1    | Integrated Verification | Draft    |
+| V1    | Integrated Verification | Complete |
 
 ## Phase B1: PTY Session Lifecycle
 
@@ -46,9 +46,9 @@ Add a bounded embedded AI terminal using PM-018 contracts while retaining extern
 
 **Deliverables:**
 
-- [ ] Test PTY lifecycle on supported development platforms and external-launch fallback.
-- [ ] Confirm session grants and terminal content never enter logs or audit payloads.
-- [ ] Update architecture, requirements baseline, security guidance, and user documentation.
+- [x] Test PTY lifecycle on supported development platforms and external-launch fallback.
+- [x] Confirm session grants and terminal content never enter logs or audit payloads.
+- [x] Update architecture, requirements baseline, security guidance, and user documentation.
 
 **Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/plan-manager`
 
