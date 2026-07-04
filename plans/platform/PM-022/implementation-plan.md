@@ -12,7 +12,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | B2    | Detection and persisted index          | Complete |
 | B3    | Query APIs and page access             | Complete |
 | B4    | Rescan, Sync, Enrich, and audit        | Complete |
-| F1    | Routes, types, and API client          | Pending  |
+| F1    | Routes, types, and API client          | Complete |
 | F2    | Knowledge controller and Browse view   | Pending  |
 | F3    | Reader and Explorer integration        | Pending  |
 | F4    | Graph, settings, and responsive polish | Pending  |
@@ -85,10 +85,10 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 
 **Deliverables:**
 
-- [ ] Add Knowledge DTOs and API client methods.
-- [ ] Add the `/knowledge` route with encoded workspace, root, slug, and view state.
-- [ ] Extend route parsing, path generation, saved-route validation assumptions, and tests.
-- [ ] Add desktop and mobile Knowledge navigation with lazy page loading.
+- [x] Add Knowledge DTOs and API client methods.
+- [x] Add the `/knowledge` route with encoded workspace, root, slug, and view state.
+- [x] Extend route parsing, path generation, saved-route validation assumptions, and tests.
+- [x] Add desktop and mobile Knowledge navigation with lazy page loading.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/app/router.test.ts web/src/App.test.tsx`
 

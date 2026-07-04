@@ -22,6 +22,11 @@ import type {
   JiraConnection,
   JiraConnectionTest,
   JiraIssueState,
+  KnowledgeActionResult,
+  KnowledgeGraph,
+  KnowledgePageDetail,
+  KnowledgePagesResponse,
+  KnowledgeWiki,
   HealthCheck,
   NewItemInput,
   PathSelection,
@@ -85,6 +90,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+	knowledgeWikis: async (workspaceId: string) => (await request<KnowledgeWiki[] | null>(`/api/knowledge/wikis?workspaceId=${encodeURIComponent(workspaceId)}`)) ?? [],
+	knowledgePages: (workspaceId: string, root: string) => request<KnowledgePagesResponse>(knowledgeURL(workspaceId, root, 'pages')),
+	knowledgePage: (workspaceId: string, root: string, slug: string) => request<KnowledgePageDetail>(`${knowledgeURL(workspaceId, root, 'pages')}/${encodeURIComponent(slug)}`),
+	knowledgeGraph: (workspaceId: string, root: string) => request<KnowledgeGraph>(knowledgeURL(workspaceId, root, 'graph')),
+	rescanKnowledge: (workspaceId: string, root: string) => request<KnowledgeActionResult>(knowledgeURL(workspaceId, root, 'rescan'), { method: 'POST' }),
+	syncKnowledge: (workspaceId: string, confirm = false) => request<KnowledgeActionResult>(`/api/knowledge/workspaces/${encodeURIComponent(workspaceId)}/sync`, { method: 'POST', body: JSON.stringify({ confirm }) }),
+	enrichKnowledge: (workspaceId: string, confirm: boolean) => request<KnowledgeActionResult>(`/api/knowledge/workspaces/${encodeURIComponent(workspaceId)}/enrich`, { method: 'POST', body: JSON.stringify({ confirm }) }),
   aiCapabilities: () => request<AICapability[]>('/api/ai/capabilities'),
   aiSettings: () => request<AISettings>('/api/ai/settings'),
   saveAISettings: (settings: AISettings) => request<AISettings>('/api/ai/settings', { method: 'PUT', body: JSON.stringify(settings) }),
@@ -275,6 +287,10 @@ export const api = {
   switchBranch: (workspaceId: string, input: BranchSwitchInput) =>
     request<GitOperationResult>(`/api/workspaces/${workspaceId}/git/switch`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult)
 };
+
+function knowledgeURL(workspaceId: string, root: string, resource: 'pages' | 'graph' | 'rescan'): string {
+	return `/api/knowledge/wikis/${encodeURIComponent(workspaceId)}/${encodeURIComponent(root)}/${resource}`;
+}
 
 function contentSearchQuery(params: { q: string; caseSensitive?: boolean }): URLSearchParams {
 	const query = new URLSearchParams({ q: params.q });
