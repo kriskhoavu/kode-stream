@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"plan-manager/internal/models"
 )
@@ -11,7 +12,6 @@ import (
 var (
 	branchNamePattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 	serviceNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
-	ticketNamePattern  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[A-Za-z0-9][A-Za-z0-9._-]*$`)
 )
 
 func ValidateStatus(status models.ItemStatus) error {
@@ -75,17 +75,19 @@ func ValidateScopeName(service string) error {
 	}
 }
 
-func ValidateIdentifierName(ticket string) error {
-	ticket = strings.TrimSpace(ticket)
+func ValidateIdentifierName(item string) error {
+	item = strings.TrimSpace(item)
 	switch {
-	case ticket == "":
-		return fmt.Errorf("ticket name is required")
-	case ticket == "." || ticket == "..":
-		return fmt.Errorf("ticket name is invalid")
-	case strings.Contains(ticket, "/"), strings.Contains(ticket, `\`):
-		return fmt.Errorf("ticket name must be one path segment")
-	case !ticketNamePattern.MatchString(ticket):
-		return fmt.Errorf("ticket name must look like PM-002 or DI-170")
+	case item == "":
+		return fmt.Errorf("item name is required")
+	case item == "." || item == "..":
+		return fmt.Errorf("item name is invalid")
+	case strings.Contains(item, "/"), strings.Contains(item, `\`):
+		return fmt.Errorf("item name must be one path segment")
+	case strings.ContainsAny(item, `<>:"|?*`):
+		return fmt.Errorf("item name contains invalid characters")
+	case strings.IndexFunc(item, unicode.IsControl) >= 0:
+		return fmt.Errorf("item name contains invalid characters")
 	default:
 		return nil
 	}

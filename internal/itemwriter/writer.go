@@ -149,6 +149,9 @@ func (w *Writer) MaterializeSnapshotItem(workspace models.WorkspaceConfig, item 
 }
 
 func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewItemInput) (models.WriteResult, error) {
+	input.Source = strings.TrimSpace(input.Source)
+	input.Scope = strings.TrimSpace(input.Scope)
+	input.Identifier = strings.TrimSpace(input.Identifier)
 	source, err := validateSource(workspace, input.Source)
 	if err != nil {
 		return models.WriteResult{}, err
@@ -166,10 +169,6 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 	if err := writeguard.ValidateStatus(status); err != nil {
 		return models.WriteResult{}, err
 	}
-	title := strings.TrimSpace(input.Title)
-	if title == "" {
-		title = input.Identifier
-	}
 	itemRoot := filepath.ToSlash(filepath.Join(source, input.Scope, input.Identifier))
 	fullRoot, err := safeJoin(workspace.Path, itemRoot)
 	if err != nil {
@@ -180,35 +179,10 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 	} else if !os.IsNotExist(err) {
 		return models.WriteResult{}, err
 	}
-	if err := os.MkdirAll(filepath.Join(fullRoot, "scenario"), 0o755); err != nil {
+	if err := os.MkdirAll(fullRoot, 0o755); err != nil {
 		return models.WriteResult{}, err
 	}
-	if err := os.MkdirAll(filepath.Join(fullRoot, "design"), 0o755); err != nil {
-		return models.WriteResult{}, err
-	}
-	files := map[string]string{
-		"README.md":                        "# " + input.Identifier + ": " + title + "\n\n## Overview\n\n",
-		"scenario/scenario-00-overview.md": "# Scenario Overview\n\n",
-		"design/design-01-backend.md":      "# Backend Design\n\n",
-		"design/design-02-frontend.md":     "# Frontend Design\n\n",
-		"implementation-plan.md":           "# Implementation Plan\n\n",
-	}
-	for rel, content := range files {
-		if err := os.WriteFile(filepath.Join(fullRoot, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
-			return models.WriteResult{}, err
-		}
-	}
-	meta := planYAML{
-		Plan: planFields{
-			Identifier: input.Identifier,
-			Title:      title,
-			Scope:      input.Scope,
-			Status:     string(status),
-			Owner:      strings.TrimSpace(input.Owner),
-			Tags:       cleanTags(input.Tags),
-		},
-	}
-	if err := writePlanMetadataAt(fullRoot, meta); err != nil {
+	if err := os.WriteFile(filepath.Join(fullRoot, "README.md"), nil, 0o644); err != nil {
 		return models.WriteResult{}, err
 	}
 	return w.refresh(workspace, itemRoot)

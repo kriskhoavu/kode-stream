@@ -122,7 +122,7 @@ func TestCreateItemRejectsDuplicate(t *testing.T) {
 	}
 }
 
-func TestCreateItemWritesStarterFiles(t *testing.T) {
+func TestCreateItemWritesOnlyEmptyReadme(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "items"), 0o755); err != nil {
 		t.Fatal(err)
@@ -133,26 +133,27 @@ func TestCreateItemWritesStarterFiles(t *testing.T) {
 	if _, err := writer.CreateItem(workspace, models.NewItemInput{
 		Source:     "items",
 		Scope:      "platform",
-		Identifier: "PM-003",
-		Title:      "Next Item",
+		Identifier: "free form item",
 		Status:     models.StatusDraft,
 		Tags:       []string{"platform"},
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	for _, rel := range []string{"README.md", "scenario/scenario-00-overview.md", "design/design-01-backend.md", "design/design-02-frontend.md", "implementation-plan.md", "plan.yaml"} {
-		if _, err := os.Stat(filepath.Join(root, "items", "platform", "PM-003", filepath.FromSlash(rel))); err != nil {
-			t.Fatalf("expected %s: %v", rel, err)
-		}
-	}
-	data, err := os.ReadFile(filepath.Join(root, "items", "platform", "PM-003", "plan.yaml"))
+	itemRoot := filepath.Join(root, "items", "platform", "free form item")
+	entries, err := os.ReadDir(itemRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := string(data)
-	if strings.Contains(text, "identifier:") || strings.Contains(text, "scope:") || strings.Contains(text, "title:") || strings.Contains(text, "documents:") {
-		t.Fatalf("starter plan.yaml should contain only non-inferable metadata:\n%s", text)
+	if len(entries) != 1 || entries[0].Name() != "README.md" {
+		t.Fatalf("expected only README.md, got %#v", entries)
+	}
+	data, err := os.ReadFile(filepath.Join(itemRoot, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) != 0 {
+		t.Fatalf("expected an empty README.md, got %q", data)
 	}
 }
 

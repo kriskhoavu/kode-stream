@@ -61,14 +61,14 @@ func TestValidateScopeName(t *testing.T) {
 }
 
 func TestValidateIdentifierName(t *testing.T) {
-	valid := []string{"PM-002", "DI-170", "ABC-202602"}
+	valid := []string{"PM-002", "DI-170", "ABC-202602", "release notes", "my_item", "123", "Ideas (July)", "nghiên cứu"}
 	for _, ticket := range valid {
 		if err := ValidateIdentifierName(ticket); err != nil {
 			t.Fatalf("expected %q to be valid: %v", ticket, err)
 		}
 	}
 
-	invalid := []string{"", "PM", "002", "PM/002", "../PM-002", "PM 002"}
+	invalid := []string{"", ".", "..", "PM/002", "../PM-002", "item?"}
 	for _, ticket := range invalid {
 		if err := ValidateIdentifierName(ticket); err == nil {
 			t.Fatalf("expected %q to be rejected", ticket)

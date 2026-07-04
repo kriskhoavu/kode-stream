@@ -70,7 +70,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
   const [drawerPlanId, setDrawerPlanId] = useState('');
   const [newPlanOpen, setNewPlanOpen] = useState(false);
-  const [newPlanDraft, setNewPlanDraft] = useState({ source: '', scope: '', identifier: '', title: '', status: 'draft' as ItemStatus });
+  const [newPlanDraft, setNewPlanDraft] = useState({ source: '', scope: '', identifier: '', status: 'draft' as ItemStatus });
   const [newPlanError, setNewPlanError] = useState('');
   const [creatingPlan, setCreatingPlan] = useState(false);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
@@ -370,12 +370,11 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
         source,
         scope: source,
         identifier: newPlanDraft.identifier.trim(),
-        title: newPlanDraft.title.trim(),
         status: newPlanDraft.status
       });
       notifyReliabilityChanged();
       setNewPlanOpen(false);
-      setNewPlanDraft({ source: '', scope: '', identifier: '', title: '', status: 'draft' });
+      setNewPlanDraft({ source: '', scope: '', identifier: '', status: 'draft' });
       await onWorkspacesChanged();
       await reloadPlans();
       onOpenPlan(result.item.id);
@@ -779,8 +778,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
               <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
                 {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
               </select></label>
-              <label>{labels.identifier}<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="PM-003" /></label>
-              <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Item title" /></label>
+              <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Any item name" /></label>
               <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
             </div>
             {newPlanError && <p className="error">{newPlanError}</p>}

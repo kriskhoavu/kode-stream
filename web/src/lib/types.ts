@@ -471,7 +471,7 @@ export interface NewItemInput {
   source: string;
   scope: string;
   identifier: string;
-  title: string;
+  title?: string;
   status?: ItemStatus;
   owner?: string;
   tags?: string[];
