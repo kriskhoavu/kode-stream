@@ -13,7 +13,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | B3    | Query APIs and page access             | Complete |
 | B4    | Rescan, Sync, Enrich, and audit        | Complete |
 | F1    | Routes, types, and API client          | Complete |
-| F2    | Knowledge controller and Browse view   | Pending  |
+| F2    | Knowledge controller and Browse view   | Complete |
 | F3    | Reader and Explorer integration        | Pending  |
 | F4    | Graph, settings, and responsive polish | Pending  |
 | V1    | Full verification and documentation    | Pending  |
@@ -98,11 +98,11 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 
 **Deliverables:**
 
-- [ ] Add `useKnowledgeController` with stale-request protection and action invalidation.
-- [ ] Add workspace and Wiki selection with deterministic fallback behavior.
-- [ ] Render domain hierarchy, page summaries, metadata filters, and warnings.
-- [ ] Add keyboard navigation, route synchronization, loading, and empty states.
-- [ ] Add focused controller and Browse interaction tests.
+- [x] Add `useKnowledgeController` with stale-request protection and action invalidation.
+- [x] Add workspace and Wiki selection with deterministic fallback behavior.
+- [x] Render domain hierarchy, page summaries, metadata filters, and warnings.
+- [x] Add keyboard navigation, route synchronization, loading, and empty states.
+- [x] Add focused controller and Browse interaction tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
 

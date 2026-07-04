@@ -1,0 +1,23 @@
+.knowledge-page { display: grid; grid-template-rows: auto 1fr; height: 100%; min-height: 0; }
+.knowledge-toolbar { align-items: center; border-bottom: 1px solid var(--border-color); display: flex; flex-wrap: wrap; gap: .75rem; padding: .75rem 1rem; }
+.knowledge-toolbar h1 { font-size: 1.15rem; margin: 0 auto 0 0; }
+.knowledge-toolbar select { max-width: 15rem; }
+.knowledge-views { display: flex; gap: .25rem; }
+.knowledge-views button.active { background: var(--accent-soft); color: var(--accent); }
+.knowledge-browser { display: grid; grid-template-columns: minmax(17rem, 25rem) 1fr; min-height: 0; }
+.knowledge-browser-list { border-right: 1px solid var(--border-color); overflow: auto; padding: 1rem; }
+.knowledge-search { align-items: center; display: flex; gap: .5rem; margin-bottom: 1rem; }
+.knowledge-search input { min-width: 0; width: 100%; }
+.knowledge-domain h3 { color: var(--text-muted); font-size: .75rem; letter-spacing: .06em; margin: 1rem 0 .35rem; text-transform: uppercase; }
+.knowledge-page-row { align-items: center; background: transparent; border: 0; border-radius: .45rem; display: flex; gap: .55rem; padding: .55rem; text-align: left; width: 100%; }
+.knowledge-page-row.active { background: var(--accent-soft); }
+.knowledge-page-row span { display: grid; min-width: 0; }
+.knowledge-page-row strong, .knowledge-page-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.knowledge-page-row small { color: var(--text-muted); font-size: .72rem; }
+.knowledge-summary { overflow: auto; padding: clamp(1rem, 3vw, 2.5rem); }
+.knowledge-tags { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0; }
+.knowledge-tags span { background: var(--surface-muted); border-radius: 999px; font-size: .75rem; padding: .25rem .55rem; }
+.knowledge-warnings { background: var(--warning-soft, #fff7df); border-radius: .5rem; margin-top: 1.25rem; padding: .75rem; }
+.knowledge-warnings strong { align-items: center; display: flex; gap: .35rem; }
+.knowledge-status { padding: 1rem; }
+@media (max-width: 760px) { .knowledge-browser { grid-template-columns: 1fr; } .knowledge-browser-list { border: 0; } .knowledge-summary { border-top: 1px solid var(--border-color); } }
