@@ -608,7 +608,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                   </> : <><div className="workspace-integration-card">
                     <div><strong>Jira</strong><span>{repo.jira ? `${repo.jira.projectKey} · ${repo.jira.deploymentType === 'cloud' ? 'Cloud' : 'Server / Data Center'}` : 'Not configured'}</span></div>
                     <button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
-                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>Configure</button></div></>}
+                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>Configure Knowledge</button></div></>}
                 </section>}
 
               </article>
@@ -1071,7 +1071,9 @@ function KnowledgeRoots({ workspaceId, enabled }: { workspaceId: string; enabled
 	useEffect(() => {
 		let active = true;
 		if (!enabled) { setRoots([]); return; }
-		void api.knowledgeWikis(workspaceId).then((wikis) => { if (active) setRoots(wikis.map((wiki) => wiki.root)); }).catch(() => { if (active) setRoots([]); });
+		const loadWikis = api.knowledgeWikis;
+		if (typeof loadWikis !== 'function') { setRoots([]); return; }
+		void loadWikis(workspaceId).then((wikis) => { if (active) setRoots(wikis.map((wiki) => wiki.root)); }).catch(() => { if (active) setRoots([]); });
 		return () => { active = false; };
 	}, [enabled, workspaceId]);
 	return <small>{enabled ? roots.length ? `Detected: ${roots.join(', ')}` : 'No compatible Wiki roots detected yet.' : 'Detection is disabled.'}</small>;

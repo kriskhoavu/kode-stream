@@ -159,6 +159,18 @@ The first valid page for a slug is indexed deterministically by normalized relat
 - Enrich is disabled until configured, requires confirmation, is shell-free and bounded, creates an audit event, and rescans after success.
 - Existing Kanban, Explorer, item index, Git, search, and release behavior remain unchanged.
 
+## Implementation Status
+
+Implemented on `feature/PM-022-structured-knowledge-wiki` in nine phase commits.
+
+- The real Discovery `docs` source indexed 50 pages, 50 graph nodes, 131 directed edges, and 5 non-blocking content warnings on 2026-07-04.
+- Live API verification covered Wiki listing, `offer-overview` detail, graph response, Rescan, and configured shell-free Enrich using `/bin/echo` against temporary Plan Manager data.
+- Sync confirmation/failure preservation, process start failure, non-zero exit, timeout, output truncation, and audit behavior are covered by disposable fixtures.
+- Backend verification: 256 tests passed across 34 Go packages.
+- Frontend verification: 170 tests passed across 43 test files; TypeScript and the production build passed.
+- The lazy Knowledge graph bundle is 185.64 kB (60.26 kB gzip); initial Knowledge Browse is 14.94 kB (5.18 kB gzip).
+- The in-app browser was unavailable during final verification, so desktop/mobile visual inspection could not be performed. Responsive CSS, navigation, keyboard behavior, reader, graph, warnings, actions, settings, and Explorer routing are covered by focused interaction tests and the production build.
+
 ## Documents
 
 - [Scenario Overview](scenario/scenario-00-overview.md)

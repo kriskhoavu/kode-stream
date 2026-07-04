@@ -16,7 +16,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | F2    | Knowledge controller and Browse view   | Complete |
 | F3    | Reader and Explorer integration        | Complete |
 | F4    | Graph, settings, and responsive polish | Complete |
-| V1    | Full verification and documentation    | Pending  |
+| V1    | Full verification and documentation    | Complete |
 
 ## Backend Phases
 
@@ -143,11 +143,11 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 
 **Deliverables:**
 
-- [ ] Verify Discovery `docs` detection and representative page/link metadata manually.
-- [ ] Verify Rescan, Sync confirmation, and configured Enrich against a disposable Git fixture.
-- [ ] Verify desktop and mobile Browse, Read, Graph, warnings, and Explorer navigation.
-- [ ] Run Markdown formatting and update PM-022 documents for implementation changes.
-- [ ] Record final test counts and graph chunk size in the README implementation status.
+- [x] Verify Discovery `docs` detection and representative page/link metadata manually.
+- [x] Verify Rescan, Sync confirmation, and configured Enrich against a disposable Git fixture.
+- [x] Verify desktop and mobile Browse, Read, Graph, warnings, and Explorer navigation through focused interaction tests and the responsive production build; the in-app browser was unavailable for visual inspection.
+- [x] Run Markdown formatting and update PM-022 documents for implementation changes.
+- [x] Record final test counts and graph chunk size in the README implementation status.
 
 **Verification:**
 
