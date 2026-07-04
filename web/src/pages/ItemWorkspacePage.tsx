@@ -5,8 +5,10 @@ import {
   ChevronDown,
   Code2,
   File as FileIcon,
+  FilePlus2,
   FileText,
   FolderOpen,
+  FolderPlus,
   GitBranch,
   GitCompare,
   GripVertical,
@@ -17,6 +19,7 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Pencil,
   RefreshCw,
 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -71,6 +74,14 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const [leftWidth, setLeftWidth] = useState(300);
   const [rightWidth, setRightWidth] = useState(300);
   const [aiLaunchMessage, setAILaunchMessage] = useState('');
+  const [createPathKind, setCreatePathKind] = useState<'file' | 'directory' | null>(null);
+  const [createPathName, setCreatePathName] = useState('');
+  const [creatingPath, setCreatingPath] = useState(false);
+  const [selectedDirectoryPath, setSelectedDirectoryPath] = useState('');
+  const [selectedTreeNode, setSelectedTreeNode] = useState<{ path: string; type: 'file' | 'directory' } | null>(null);
+  const [renameName, setRenameName] = useState('');
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renamingPath, setRenamingPath] = useState(false);
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
 	const [contentSearchIndex, setContentSearchIndex] = useState(0);
@@ -87,6 +98,76 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     if (!result.message) return;
     setError(result.message);
     setRecoveryHint(result.recoveryHint ?? '');
+  };
+
+  const createItemPath = async () => {
+    if (!plan?.itemPath || !createPathKind || !createPathName.trim()) return;
+    const parts = createPathName.trim().split('/');
+    if (parts.some((part) => !part || part === '.' || part === '..')) {
+      setError('Use a relative path without empty, ".", or ".." segments.');
+      return;
+    }
+    setCreatingPath(true);
+    setError('');
+    try {
+      const directoryParts = createPathKind === 'file' ? parts.slice(0, -1) : parts;
+      const existingDirectories = fileDirectoryPaths(files);
+      let relativeParent = selectedDirectoryPath;
+      for (const directory of directoryParts) {
+        const relativePath = relativeParent ? `${relativeParent}/${directory}` : directory;
+        if (!existingDirectories.has(relativePath)) {
+          const parentPath = relativeParent ? `${plan.itemPath}/${relativeParent}` : plan.itemPath;
+          await api.createWorkspaceDirectory(plan.workspaceId, { parentPath, name: directory });
+          existingDirectories.add(relativePath);
+        }
+        relativeParent = relativePath;
+      }
+      if (createPathKind === 'file') {
+        const parentPath = relativeParent ? `${plan.itemPath}/${relativeParent}` : plan.itemPath;
+        await api.createWorkspaceFile(plan.workspaceId, { parentPath, name: parts.at(-1)!, content: '' });
+      }
+      setFiles(await api.files(itemId));
+      setCreatePathKind(null);
+      setCreatePathName('');
+      await onContentChanged?.();
+      notifyReliabilityChanged();
+    } catch (caught) {
+      showOperationError(caught, `Could not create ${createPathKind}`);
+    } finally {
+      setCreatingPath(false);
+    }
+  };
+
+  const renameItemPath = async () => {
+    if (!plan?.itemPath || !selectedTreeNode || !renameName.trim()) return;
+    const name = renameName.trim();
+    if (name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
+      setError('Rename must be a single file or directory name.');
+      return;
+    }
+    const separator = selectedTreeNode.path.lastIndexOf('/');
+    const parent = separator >= 0 ? selectedTreeNode.path.slice(0, separator) : '';
+    const destination = parent ? `${parent}/${name}` : name;
+    setRenamingPath(true);
+    setError('');
+    try {
+      await api.renameWorkspacePath(plan.workspaceId, {
+        path: `${plan.itemPath}/${selectedTreeNode.path}`,
+        destinationPath: `${plan.itemPath}/${destination}`
+      });
+      setFiles(await api.files(itemId));
+      if (selectedTreeNode.type === 'file') editor.open(null);
+      if (selectedDirectoryPath === selectedTreeNode.path) setSelectedDirectoryPath(destination);
+      setSelectedTreeNode({ path: destination, type: selectedTreeNode.type });
+      setRenameName('');
+      setRenameOpen(false);
+      await onContentChanged?.();
+      notifyReliabilityChanged();
+    } catch (caught) {
+      showOperationError(caught, 'Could not rename path');
+    } finally {
+      setRenamingPath(false);
+    }
   };
 
   const editor = useFileEditorSession({
@@ -420,10 +501,15 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
       <div className="workspace-grid" style={gridStyle} ref={workspaceGridRef}>
         <aside className={leftCollapsed ? 'file-tree side-panel collapsed' : 'file-tree side-panel'}>
           <div className="panel-header">
-            <h2><FolderOpen size={16} /> Files</h2>
-            <button className="icon-button" type="button" title={leftCollapsed ? 'Expand files' : 'Collapse files'} onClick={() => setLeftCollapsed((value) => !value)}>
-              {leftCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            </button>
+            <button className={selectedDirectoryPath ? 'ghost' : 'ghost active'} type="button" title="Select item root" onClick={() => { setSelectedDirectoryPath(''); setSelectedTreeNode(null); }}><FolderOpen size={16} /> Files</button>
+            <div className="workspace-header-actions">
+              {!leftCollapsed && <button className="icon-button" type="button" aria-label="New file" title="New file" onClick={() => setCreatePathKind('file')}><FilePlus2 size={16} /></button>}
+              {!leftCollapsed && <button className="icon-button" type="button" aria-label="New folder" title="New folder" onClick={() => setCreatePathKind('directory')}><FolderPlus size={16} /></button>}
+              {!leftCollapsed && <button className="icon-button" type="button" aria-label="Rename selected path" title="Rename" disabled={!selectedTreeNode} onClick={() => { setRenameName(selectedTreeNode?.path.split('/').at(-1) ?? ''); setRenameOpen(true); }}><Pencil size={16} /></button>}
+              <button className="icon-button" type="button" title={leftCollapsed ? 'Expand files' : 'Collapse files'} onClick={() => setLeftCollapsed((value) => !value)}>
+                {leftCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+              </button>
+            </div>
           </div>
           {!leftCollapsed && (
 			<>
@@ -433,7 +519,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
 		  )}
 		  {!leftCollapsed && (
 			<div className="file-tree-list" ref={fileTreeRef} tabIndex={-1}>
-			  {files.map((node) => <TreeNode node={node} key={node.id} onOpen={openTreeFile} activeId={file?.id} depth={0} fileStateByPath={fileStateByPath} />)}
+              {files.map((node) => <TreeNode node={node} key={node.id} onOpen={openTreeFile} activeId={file?.id} depth={0} fileStateByPath={fileStateByPath} selectedDirectoryPath={selectedDirectoryPath} onSelectDirectory={(path) => { setSelectedDirectoryPath(path); setSelectedTreeNode({ path, type: 'directory' }); }} onSelectFile={(path) => setSelectedTreeNode({ path, type: 'file' })} />)}
             </div>
           )}
           {!leftCollapsed && (
@@ -611,6 +697,36 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           )}
         </aside>
       </div>
+      {createPathKind && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-label={`Create new ${createPathKind}`}>
+            <header><h2>New {createPathKind === 'file' ? 'file' : 'folder'}</h2></header>
+            <div className="metadata-form">
+              <p>Parent: {selectedDirectoryPath || 'item root'}</p>
+              <label>Relative path<input autoFocus value={createPathName} onChange={(event) => setCreatePathName(event.target.value)} placeholder={createPathKind === 'file' ? 'schema.json' : 'api'} /></label>
+            </div>
+            <footer className="modal-actions">
+              <button className="ghost" type="button" disabled={creatingPath} onClick={() => { setCreatePathKind(null); setCreatePathName(''); }}>Cancel</button>
+              <button className="primary" type="button" disabled={creatingPath || !createPathName.trim()} onClick={() => void createItemPath()}>{creatingPath ? 'Creating...' : 'Create'}</button>
+            </footer>
+          </section>
+        </div>
+      )}
+      {renameOpen && selectedTreeNode && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Rename path">
+            <header><h2>Rename {selectedTreeNode.type}</h2></header>
+            <div className="metadata-form">
+              <p>Current: {selectedTreeNode.path}</p>
+              <label>Name<input autoFocus value={renameName} onChange={(event) => setRenameName(event.target.value)} /></label>
+            </div>
+            <footer className="modal-actions">
+              <button className="ghost" type="button" disabled={renamingPath} onClick={() => { setRenameOpen(false); setRenameName(''); }}>Cancel</button>
+              <button className="primary" type="button" disabled={renamingPath || !renameName.trim()} onClick={() => void renameItemPath()}>{renamingPath ? 'Renaming...' : 'Rename'}</button>
+            </footer>
+          </section>
+        </div>
+      )}
       {revertDialogOpen && file && (
         <ConfirmDialog
           title="Revert file"
@@ -717,26 +833,27 @@ function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, rever
   );
 }
 
-const TreeNode = memo(function TreeNode({ node, onOpen, activeId, depth, fileStateByPath }: { node: FileNode; onOpen: (id: string) => void; activeId?: string; depth: number; fileStateByPath: Map<string, TreeFileState> }) {
+const TreeNode = memo(function TreeNode({ node, onOpen, activeId, depth, fileStateByPath, selectedDirectoryPath, onSelectDirectory, onSelectFile }: { node: FileNode; onOpen: (id: string) => void; activeId?: string; depth: number; fileStateByPath: Map<string, TreeFileState>; selectedDirectoryPath: string; onSelectDirectory: (path: string) => void; onSelectFile: (path: string) => void }) {
   const indent = { '--tree-indent': `${depth * 14}px` } as CSSProperties & Record<'--tree-indent', string>;
+  const [expanded, setExpanded] = useState(true);
 
   if (node.type === 'directory') {
     return (
-      <details open className="tree-dir">
-        <summary className="tree-row tree-row-dir" style={indent} title={node.path}>
+      <details open={expanded} className="tree-dir">
+        <summary className={selectedDirectoryPath === node.path ? 'tree-row tree-row-dir active' : 'tree-row tree-row-dir'} style={indent} title={node.path} onClick={(event) => { event.preventDefault(); onSelectDirectory(node.path); }} onDoubleClick={(event) => { event.preventDefault(); setExpanded((value) => !value); }}>
           <ChevronDown className="tree-chevron" size={14} />
           <FolderOpen className="tree-icon" size={16} />
           <span className="tree-label">{node.name}</span>
         </summary>
         <div className="tree-children">
-          {node.children?.map((child) => <TreeNode node={child} key={child.id} onOpen={onOpen} activeId={activeId} depth={depth + 1} fileStateByPath={fileStateByPath} />)}
+          {node.children?.map((child) => <TreeNode node={child} key={child.id} onOpen={onOpen} activeId={activeId} depth={depth + 1} fileStateByPath={fileStateByPath} selectedDirectoryPath={selectedDirectoryPath} onSelectDirectory={onSelectDirectory} onSelectFile={onSelectFile} />)}
         </div>
       </details>
     );
   }
   const state = fileStateByPath.get(normalizePath(node.path));
   return (
-    <button className={activeId === node.id ? 'tree-row tree-file active' : 'tree-row tree-file'} style={indent} title={node.path} onClick={() => onOpen(node.id)}>
+    <button className={activeId === node.id ? 'tree-row tree-file active' : 'tree-row tree-file'} style={indent} title={node.path} onClick={() => { onSelectFile(node.path); onOpen(node.id); }}>
       <span className="tree-spacer" />
       <FileIcon className="tree-icon" size={16} />
       <span className="tree-label">{node.name}</span>
@@ -756,6 +873,17 @@ function firstFile(nodes: FileNode[]): FileNode | null {
 
 function preferredFile(nodes: FileNode[]): FileNode | null {
 	return findReadme(nodes, true) ?? findReadme(nodes, false) ?? firstFile(nodes);
+}
+
+function fileDirectoryPaths(nodes: FileNode[]): Set<string> {
+  const paths = new Set<string>();
+  const visit = (entries: FileNode[]) => entries.forEach((node) => {
+    if (node.type !== 'directory') return;
+    paths.add(node.path);
+    visit(node.children ?? []);
+  });
+  visit(nodes);
+  return paths;
 }
 
 function findReadme(nodes: FileNode[], rootOnly: boolean): FileNode | null {

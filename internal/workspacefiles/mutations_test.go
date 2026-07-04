@@ -9,7 +9,7 @@ import (
 	"plan-manager/internal/models"
 )
 
-func TestCreateMarkdownAndDirectory(t *testing.T) {
+func TestCreateFileAndDirectory(t *testing.T) {
 	root := t.TempDir()
 	mustMkdir(t, filepath.Join(root, "docs"))
 	workspace := models.WorkspaceConfig{ID: "ws", Path: root}
@@ -19,15 +19,15 @@ func TestCreateMarkdownAndDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file, err := a.CreateMarkdown(workspace, models.WorkspaceFileCreateInput{ParentPath: "docs/guides", Name: "start.md", Content: "# Start\n"})
+	file, err := a.CreateFile(workspace, models.WorkspaceFileCreateInput{ParentPath: "docs/guides", Name: "start.txt", Content: "Start\n"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if directory.Path != "docs/guides" || file.Path != "docs/guides/start.md" {
+	if directory.Path != "docs/guides" || file.Path != "docs/guides/start.txt" {
 		t.Fatalf("unexpected results: %#v %#v", directory, file)
 	}
-	data, err := os.ReadFile(filepath.Join(root, "docs", "guides", "start.md"))
-	if err != nil || string(data) != "# Start\n" {
+	data, err := os.ReadFile(filepath.Join(root, "docs", "guides", "start.txt"))
+	if err != nil || string(data) != "Start\n" {
 		t.Fatalf("created file = %q, %v", data, err)
 	}
 }
@@ -46,12 +46,11 @@ func TestCreateRejectsInvalidProtectedUnsupportedAndOccupiedNames(t *testing.T) 
 	}{
 		{"traversal name", models.WorkspaceFileCreateInput{ParentPath: "docs", Name: "../escape.md"}, ErrInvalidName},
 		{"git name", models.WorkspaceFileCreateInput{ParentPath: "docs", Name: ".git"}, ErrInvalidName},
-		{"non markdown", models.WorkspaceFileCreateInput{ParentPath: "docs", Name: "notes.txt"}, ErrMarkdownOnly},
 		{"occupied", models.WorkspaceFileCreateInput{ParentPath: "docs", Name: "exists.md"}, ErrDestinationExists},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if _, err := a.CreateMarkdown(workspace, test.input); !errors.Is(err, test.want) {
+			if _, err := a.CreateFile(workspace, test.input); !errors.Is(err, test.want) {
 				t.Fatalf("error = %v, want %v", err, test.want)
 			}
 		})

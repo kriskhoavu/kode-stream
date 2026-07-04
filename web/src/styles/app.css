@@ -4113,6 +4113,11 @@ body.is-resizing-panel {
   font-weight: 650;
 }
 
+.tree-row-dir.active {
+  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
+  color: var(--blue);
+}
+
 .tree-dir[open] > .tree-row-dir .tree-chevron {
   transform: rotate(0deg);
 }

@@ -329,7 +329,7 @@ function ExplorerTreeRow({ row, gitState, branchState, active, selected, expande
   const workspace = row.node.type === 'workspace' ? row.node.workspace : undefined;
   return <div className={`explorer-tree-row${selected ? ' selected' : ''}${active ? ' active' : ''}`} role="treeitem" aria-level={row.level + 1} aria-expanded={expandable ? expanded : undefined} aria-selected={selected} style={{ '--explorer-depth': row.level } as CSSProperties} onMouseEnter={onFocus}>
     <button className="explorer-row-toggle" type="button" tabIndex={-1} onClick={onToggle} disabled={!expandable} aria-label={expandable ? `${expanded ? 'Collapse' : 'Expand'} ${row.node.name}` : undefined}>{expandable ? (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
-    <button className="explorer-row-main" type="button" tabIndex={active ? 0 : -1} onFocus={onFocus} onClick={expandable ? onToggle : onSelect}>
+    <button className="explorer-row-main" type="button" tabIndex={active ? 0 : -1} onFocus={onFocus} onClick={onSelect} onDoubleClick={expandable ? onToggle : undefined}>
       {row.node.type === 'workspace' ? <FolderGit2 className="explorer-node-icon" size={16} /> : row.node.type === 'directory' ? <Folder className="explorer-node-icon" size={16} /> : <File className="explorer-node-icon" size={16} />}
       <span className={`explorer-row-label ${row.node.type}`}>{row.node.name}</span>
       {row.node.type === 'file' && gitState && <FileStateIcon state={gitState.conflict ? 'conflicted' : gitState.status} />}
@@ -355,7 +355,7 @@ function ExplorerUnifiedSearchResults({ query, results, loading, error, activeIn
 
 function ExplorerPathDialog({ dialog, busy, error, onCancel, onSubmit }: { dialog: PathDialog; busy: boolean; error: string; onCancel: () => void; onSubmit: (name: string) => Promise<boolean> }) {
   const [name, setName] = useState(dialog.initialName ?? '');
-  const title = dialog.kind === 'file' ? 'Create Markdown file' : dialog.kind === 'directory' ? 'Create directory' : 'Rename path';
+  const title = dialog.kind === 'file' ? 'Create file' : dialog.kind === 'directory' ? 'Create directory' : 'Rename path';
   return <div className="dialog-backdrop" role="presentation"><section className="explorer-path-dialog" role="dialog" aria-modal="true" aria-labelledby="explorer-path-dialog-title">
     <header><h2 id="explorer-path-dialog-title">{title}</h2><button className="icon-button" onClick={onCancel} aria-label="Close"><X size={16} /></button></header>
     <p>Parent: {dialog.parentPath || 'workspace root'}</p>

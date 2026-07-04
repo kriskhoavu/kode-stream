@@ -22,7 +22,6 @@ var (
 	ErrOutsideRoot   = errors.New("workspace path escapes root")
 	ErrHashRequired  = errors.New("expected hash is required")
 	ErrStaleContent  = errors.New("file content changed since it was loaded")
-	ErrMarkdownOnly  = errors.New("only Markdown files can be created")
 )
 
 type IgnoreChecker interface {

@@ -139,11 +139,11 @@ func TestSearchAndPathStates(t *testing.T) {
 
 func TestCreateAndRenameAuditAndRefreshConfiguredSources(t *testing.T) {
 	service, workspace, audit, refresher := newTestService(t)
-	created, err := service.CreateMarkdown(workspace.ID, models.WorkspaceFileCreateInput{ParentPath: "plans", Name: "new.md", Content: "new"})
+	created, err := service.CreateFile(workspace.ID, models.WorkspaceFileCreateInput{ParentPath: "plans", Name: "new.txt", Content: "new"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	renamed, err := service.Rename(workspace.ID, models.WorkspacePathRenameInput{Path: "plans/new.md", DestinationPath: "plans/renamed.md"})
+	renamed, err := service.Rename(workspace.ID, models.WorkspacePathRenameInput{Path: "plans/new.txt", DestinationPath: "plans/renamed.txt"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -839,7 +839,7 @@ func (a *API) createWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	result, err := a.workspaceFiles.CreateMarkdown(r.PathValue("id"), input)
+	result, err := a.workspaceFiles.CreateFile(r.PathValue("id"), input)
 	respondWorkspaceFileResult(w, result, err)
 }
 

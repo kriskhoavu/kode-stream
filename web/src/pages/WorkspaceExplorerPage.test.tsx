@@ -49,17 +49,17 @@ describe('WorkspaceExplorerPage', () => {
     render(<WorkspaceExplorerPage workspaces={[configuredWorkspace]} location={{ mode: 'sources' }} onLocationChange={vi.fn()} onOpenKanban={vi.fn()} />);
 
     const workspaceButton = screen.getByRole('button', { name: 'Workspace' });
-    fireEvent.click(workspaceButton);
+    fireEvent.doubleClick(workspaceButton);
     const docsButton = await screen.findByRole('button', { name: 'docs' });
     expect(workspaceButton.closest('[role="treeitem"]')).toHaveAttribute('aria-expanded', 'true');
 
-    fireEvent.click(docsButton);
+    fireEvent.doubleClick(docsButton);
     await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
     expect(await screen.findByText('guide.md')).toBeInTheDocument();
 
-    fireEvent.click(docsButton);
+    fireEvent.doubleClick(docsButton);
     expect(screen.queryByText('guide.md')).not.toBeInTheDocument();
-    fireEvent.click(workspaceButton);
+    fireEvent.doubleClick(workspaceButton);
     expect(screen.queryByRole('button', { name: 'docs' })).not.toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe('WorkspaceExplorerPage', () => {
     render(<WorkspaceExplorerPage workspaces={[configuredWorkspace]} location={{ workspaceId: 'ws', path: 'docs/guide.md', mode: 'sources' }} onLocationChange={vi.fn()} onOpenKanban={vi.fn()} />);
 
     const docsButton = await screen.findByRole('button', { name: 'docs' });
-    fireEvent.click(docsButton);
+    fireEvent.doubleClick(docsButton);
     expect(docsButton.closest('[role="treeitem"]')).toHaveAttribute('aria-expanded', 'false');
 
     await act(async () => resolveDocs?.({
@@ -117,12 +117,12 @@ describe('WorkspaceExplorerPage', () => {
     expect(folderButton.closest('.explorer-tree-row')?.querySelector('.tree-state-icon')).toBeNull();
     expect(folderButton).not.toHaveTextContent('DI-170');
     expect(folderButton.closest('.explorer-tree-row')?.querySelector('.item-status-dot')).toBeNull();
-    fireEvent.click(folderButton);
+    fireEvent.doubleClick(folderButton);
     await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
     expect(await screen.findByText('guide.md')).toBeInTheDocument();
     expect(screen.getByText('guide.md')).toHaveClass('explorer-row-label', 'file');
     expect(screen.getByLabelText('Modified file not committed')).toHaveClass('tree-state-icon', 'modified');
-    fireEvent.click(folderButton);
+    fireEvent.doubleClick(folderButton);
     expect(folderButton.closest('[role="treeitem"]')).toHaveAttribute('aria-expanded', 'false');
   });
 

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/models"
 )
 
@@ -18,13 +17,10 @@ var (
 	ErrSymlinkMutation   = errors.New("workspace symlinks cannot be changed")
 )
 
-func (a *Access) CreateMarkdown(workspace models.WorkspaceConfig, input models.WorkspaceFileCreateInput) (models.WorkspacePathMutationResult, error) {
+func (a *Access) CreateFile(workspace models.WorkspaceConfig, input models.WorkspaceFileCreateInput) (models.WorkspacePathMutationResult, error) {
 	name, err := validateEntryName(input.Name)
 	if err != nil {
 		return models.WorkspacePathMutationResult{}, err
-	}
-	if fileaccess.ClassifyPath(name).Kind != models.FileKindMarkdown {
-		return models.WorkspacePathMutationResult{}, ErrMarkdownOnly
 	}
 	parentPath, parent, err := resolve(workspace.Path, input.ParentPath, true)
 	if err != nil {

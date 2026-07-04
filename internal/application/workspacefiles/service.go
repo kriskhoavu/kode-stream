@@ -23,7 +23,7 @@ type Access interface {
 	WriteMarkdown(workspace models.WorkspaceConfig, input models.WorkspaceFileSaveInput) (models.FileContent, error)
 	ResolveFile(workspace models.WorkspaceConfig, path string) (string, string, error)
 	Search(workspace models.WorkspaceConfig, query string, includeIgnored bool) (models.WorkspacePathSearchResponse, error)
-	CreateMarkdown(workspace models.WorkspaceConfig, input models.WorkspaceFileCreateInput) (models.WorkspacePathMutationResult, error)
+	CreateFile(workspace models.WorkspaceConfig, input models.WorkspaceFileCreateInput) (models.WorkspacePathMutationResult, error)
 	CreateDirectory(workspace models.WorkspaceConfig, input models.WorkspaceDirectoryCreateInput) (models.WorkspacePathMutationResult, error)
 	Rename(workspace models.WorkspaceConfig, input models.WorkspacePathRenameInput) (models.WorkspacePathMutationResult, error)
 }
@@ -113,9 +113,9 @@ func (s *Service) PathStates(workspaceID string) ([]models.WorkspacePathGitState
 	return s.git.PathStates(workspace.ID, workspace.Path)
 }
 
-func (s *Service) CreateMarkdown(workspaceID string, input models.WorkspaceFileCreateInput) (models.WorkspacePathMutationResult, error) {
+func (s *Service) CreateFile(workspaceID string, input models.WorkspaceFileCreateInput) (models.WorkspacePathMutationResult, error) {
 	return s.mutate(workspaceID, "workspace_file_create", []string{joinInputPath(input.ParentPath, input.Name)}, func(workspace models.WorkspaceConfig) (models.WorkspacePathMutationResult, error) {
-		return s.files.CreateMarkdown(workspace, input)
+		return s.files.CreateFile(workspace, input)
 	})
 }
 
@@ -281,7 +281,7 @@ func isBlockedMutation(err error) bool {
 	return errors.Is(err, workspaceaccess.ErrInvalidName) || errors.Is(err, workspaceaccess.ErrDestinationExists) ||
 		errors.Is(err, workspaceaccess.ErrRootMutation) || errors.Is(err, workspaceaccess.ErrSymlinkMutation) ||
 		errors.Is(err, workspaceaccess.ErrInvalidPath) || errors.Is(err, workspaceaccess.ErrProtectedPath) ||
-		errors.Is(err, workspaceaccess.ErrOutsideRoot) || errors.Is(err, workspaceaccess.ErrMarkdownOnly)
+		errors.Is(err, workspaceaccess.ErrOutsideRoot)
 }
 
 func joinInputPath(parent, name string) string {
