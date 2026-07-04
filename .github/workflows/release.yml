@@ -10,6 +10,33 @@ permissions:
   contents: write
 
 jobs:
+  signing-config:
+    runs-on: ubuntu-latest
+    outputs:
+      macos_enabled: ${{ steps.detect.outputs.macos_enabled }}
+      windows_enabled: ${{ steps.detect.outputs.windows_enabled }}
+    steps:
+      - name: Detect signing configuration
+        id: detect
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_P12_PASSWORD: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if [[ -n "$MACOS_CERT_P12_BASE64" && -n "$MACOS_CERT_P12_PASSWORD" && -n "$MACOS_CODESIGN_IDENTITY" ]]; then
+            echo "macos_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "macos_enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ -n "$WINDOWS_CERT_PFX_BASE64" && -n "$WINDOWS_CERT_PASSWORD" ]]; then
+            echo "windows_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "windows_enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -142,9 +169,9 @@ jobs:
           path: out/SHA256SUMS
 
   sign-macos:
-    needs: build
+    needs: [ build, signing-config ]
     runs-on: macos-latest
-    if: startsWith(github.ref, 'refs/tags/v') && secrets.MACOS_CERT_P12_BASE64 != '' && secrets.MACOS_CERT_P12_PASSWORD != '' && secrets.MACOS_CODESIGN_IDENTITY != ''
+    if: startsWith(github.ref, 'refs/tags/v') && needs.signing-config.outputs.macos_enabled == 'true'
     steps:
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
@@ -185,9 +212,9 @@ jobs:
           path: signed/plan-manager_*_darwin_*-signed.tar.gz
 
   sign-windows:
-    needs: build
+    needs: [ build, signing-config ]
     runs-on: windows-latest
-    if: startsWith(github.ref, 'refs/tags/v') && secrets.WINDOWS_CERT_PFX_BASE64 != '' && secrets.WINDOWS_CERT_PASSWORD != ''
+    if: startsWith(github.ref, 'refs/tags/v') && needs.signing-config.outputs.windows_enabled == 'true'
     steps:
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
