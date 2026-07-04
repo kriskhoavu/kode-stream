@@ -42,6 +42,27 @@ func TestKnowledgeErrorMapping(t *testing.T) {
 	}
 }
 
+func TestKnowledgeActionStatusMapping(t *testing.T) {
+	api := &API{}
+	tests := []struct {
+		result knowledgeindex.KnowledgeActionResult
+		err    error
+		status int
+	}{
+		{knowledgeindex.KnowledgeActionResult{}, appknowledge.ErrConfirmationRequired, http.StatusConflict},
+		{knowledgeindex.KnowledgeActionResult{}, appknowledge.ErrEnrichNotConfigured, http.StatusConflict},
+		{knowledgeindex.KnowledgeActionResult{OK: false, Operation: "sync", Message: "pull failed"}, nil, http.StatusUnprocessableEntity},
+		{knowledgeindex.KnowledgeActionResult{OK: true, Operation: "rescan"}, nil, http.StatusOK},
+	}
+	for _, test := range tests {
+		response := httptest.NewRecorder()
+		api.respondKnowledgeAction(response, test.result, test.err)
+		if response.Code != test.status {
+			t.Fatalf("result=%#v err=%v status=%d", test.result, test.err, response.Code)
+		}
+	}
+}
+
 func TestKnowledgeRouteCanBeSaved(t *testing.T) {
 	if !validAppRoute("/knowledge") || !validAppRoute("/knowledge?workspace=ws&root=docs") {
 		t.Fatal("knowledge route should be valid")

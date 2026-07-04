@@ -11,7 +11,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | B1    | Knowledge domain and parser            | Complete |
 | B2    | Detection and persisted index          | Complete |
 | B3    | Query APIs and page access             | Complete |
-| B4    | Rescan, Sync, Enrich, and audit        | Pending  |
+| B4    | Rescan, Sync, Enrich, and audit        | Complete |
 | F1    | Routes, types, and API client          | Pending  |
 | F2    | Knowledge controller and Browse view   | Pending  |
 | F3    | Reader and Explorer integration        | Pending  |
@@ -68,12 +68,12 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 
 **Deliverables:**
 
-- [ ] Add one-Wiki Rescan with atomic index replacement.
-- [ ] Compose existing guarded Git pull with post-success workspace Wiki detection and rescan.
-- [ ] Execute configured enrichment executable and literal arguments without a shell.
-- [ ] Add timeout, process cleanup, bounded output, confirmation, and failure preservation.
-- [ ] Record sanitized `knowledge_enrich`, `knowledge_sync`, and `knowledge_rescan` audit events.
-- [ ] Add tests for Git confirmation/failure and all process execution outcomes.
+- [x] Add one-Wiki Rescan with atomic index replacement.
+- [x] Compose existing guarded Git pull with post-success workspace Wiki detection and rescan.
+- [x] Execute configured enrichment executable and literal arguments without a shell.
+- [x] Add timeout, process cleanup, bounded output, confirmation, and failure preservation.
+- [x] Record sanitized `knowledge_enrich`, `knowledge_sync`, and `knowledge_rescan` audit events.
+- [x] Add tests for Git confirmation/failure and all process execution outcomes.
 
 **Verification:** `go test ./internal/application/knowledge/... ./internal/api/... ./internal/audit/...`
 

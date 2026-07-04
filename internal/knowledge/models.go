@@ -96,7 +96,9 @@ type KnowledgeGraphEdge struct {
 }
 
 type KnowledgeActionResult struct {
+	OK           bool               `json:"ok" yaml:"ok"`
 	Operation    string             `json:"operation" yaml:"operation"`
+	Message      string             `json:"message,omitempty" yaml:"message,omitempty"`
 	Wikis        []KnowledgeWiki    `json:"wikis" yaml:"wikis"`
 	Warnings     []KnowledgeWarning `json:"warnings" yaml:"warnings"`
 	Log          string             `json:"log,omitempty" yaml:"log,omitempty"`

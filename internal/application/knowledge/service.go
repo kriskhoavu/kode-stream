@@ -1,11 +1,16 @@
 package knowledge
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"plan-manager/internal/fileaccess"
 	knowledgeindex "plan-manager/internal/knowledge"
@@ -14,24 +19,215 @@ import (
 )
 
 var (
-	ErrWorkspaceNotFound = errors.New("knowledge workspace not found")
-	ErrWikiNotFound      = errors.New("knowledge wiki not found")
-	ErrPageNotFound      = errors.New("knowledge page not found")
-	ErrUnsafePath        = errors.New("unsafe knowledge path")
+	ErrWorkspaceNotFound    = errors.New("knowledge workspace not found")
+	ErrWikiNotFound         = errors.New("knowledge wiki not found")
+	ErrPageNotFound         = errors.New("knowledge page not found")
+	ErrUnsafePath           = errors.New("unsafe knowledge path")
+	ErrConfirmationRequired = errors.New("confirmation required")
+	ErrEnrichNotConfigured  = errors.New("knowledge enrichment is not configured")
 )
 
 const (
-	maxGraphNodes = 2_000
-	maxGraphEdges = 10_000
+	maxGraphNodes        = 2_000
+	maxGraphEdges        = 10_000
+	maxActionLogBytes    = 64 << 10
+	defaultEnrichTimeout = 5 * time.Minute
 )
 
+type workspaceDetector interface {
+	DetectWorkspace(context.Context, models.WorkspaceConfig) ([]knowledgeindex.KnowledgeWiki, error)
+}
+type gitPuller interface {
+	Pull(string, models.GitOperationInput) models.GitOperationResult
+}
+type auditAppender interface {
+	Append(models.AuditEvent) (models.AuditEvent, error)
+}
+
 type Service struct {
-	registry *registry.Registry
-	store    *knowledgeindex.Store
+	registry      *registry.Registry
+	store         *knowledgeindex.Store
+	detector      workspaceDetector
+	git           gitPuller
+	audit         auditAppender
+	enrichTimeout time.Duration
 }
 
 func New(registry *registry.Registry, store *knowledgeindex.Store) *Service {
-	return &Service{registry: registry, store: store}
+	return &Service{registry: registry, store: store, enrichTimeout: defaultEnrichTimeout}
+}
+
+func (s *Service) ConfigureActions(detector workspaceDetector, git gitPuller, audit auditAppender) *Service {
+	s.detector, s.git, s.audit = detector, git, audit
+	return s
+}
+
+func (s *Service) Rescan(ctx context.Context, workspaceID, root string) (knowledgeindex.KnowledgeActionResult, error) {
+	started := time.Now()
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return knowledgeindex.KnowledgeActionResult{}, err
+	}
+	if s.detector == nil {
+		return knowledgeindex.KnowledgeActionResult{}, errors.New("knowledge detector is unavailable")
+	}
+	wikis, err := s.detector.DetectWorkspace(ctx, workspace)
+	if err != nil {
+		s.recordAudit(workspaceID, "knowledge_rescan", root, started, err)
+		return knowledgeindex.KnowledgeActionResult{}, err
+	}
+	for _, wiki := range wikis {
+		if wiki.Root != root {
+			continue
+		}
+		if err := s.store.ReplaceWiki(workspaceID, root, wiki); err != nil {
+			s.recordAudit(workspaceID, "knowledge_rescan", root, started, err)
+			return knowledgeindex.KnowledgeActionResult{}, err
+		}
+		result := actionResult("rescan", []knowledgeindex.KnowledgeWiki{wiki}, "", false)
+		s.recordAudit(workspaceID, "knowledge_rescan", root, started, nil)
+		return result, nil
+	}
+	s.recordAudit(workspaceID, "knowledge_rescan", root, started, ErrWikiNotFound)
+	return knowledgeindex.KnowledgeActionResult{}, ErrWikiNotFound
+}
+
+func (s *Service) Sync(ctx context.Context, workspaceID string, input models.GitOperationInput) (knowledgeindex.KnowledgeActionResult, error) {
+	started := time.Now()
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return knowledgeindex.KnowledgeActionResult{}, err
+	}
+	if s.git == nil || s.detector == nil {
+		return knowledgeindex.KnowledgeActionResult{}, errors.New("knowledge sync is unavailable")
+	}
+	gitResult := s.git.Pull(workspaceID, input)
+	if !gitResult.OK {
+		err := errors.New(gitResult.Message)
+		s.recordAudit(workspaceID, "knowledge_sync", "", started, err)
+		return knowledgeindex.KnowledgeActionResult{OK: false, Operation: "sync", Message: gitResult.Message, Wikis: []knowledgeindex.KnowledgeWiki{}, Warnings: []knowledgeindex.KnowledgeWarning{}, CompletedAt: time.Now().UTC()}, nil
+	}
+	wikis, err := s.detector.DetectWorkspace(ctx, workspace)
+	if err == nil {
+		err = s.store.ReplaceWorkspace(workspaceID, wikis)
+	}
+	if err != nil {
+		s.recordAudit(workspaceID, "knowledge_sync", "", started, err)
+		return knowledgeindex.KnowledgeActionResult{}, err
+	}
+	result := actionResult("sync", wikis, "", false)
+	s.recordAudit(workspaceID, "knowledge_sync", "", started, nil)
+	return result, nil
+}
+
+func (s *Service) Enrich(ctx context.Context, workspaceID string, confirm bool) (knowledgeindex.KnowledgeActionResult, error) {
+	started := time.Now()
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return knowledgeindex.KnowledgeActionResult{}, err
+	}
+	if !confirm {
+		return knowledgeindex.KnowledgeActionResult{}, ErrConfirmationRequired
+	}
+	if workspace.Knowledge == nil || strings.TrimSpace(workspace.Knowledge.EnrichExecutable) == "" {
+		return knowledgeindex.KnowledgeActionResult{}, ErrEnrichNotConfigured
+	}
+	if s.detector == nil {
+		return knowledgeindex.KnowledgeActionResult{}, errors.New("knowledge detector is unavailable")
+	}
+	timeout := s.enrichTimeout
+	if timeout <= 0 {
+		timeout = defaultEnrichTimeout
+	}
+	runContext, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	command := exec.Command(workspace.Knowledge.EnrichExecutable, workspace.Knowledge.EnrichArgs...)
+	command.Dir = workspace.Path
+	configureProcess(command)
+	buffer := &limitedBuffer{limit: maxActionLogBytes}
+	command.Stdout, command.Stderr = buffer, buffer
+	if err = command.Start(); err == nil {
+		done := make(chan error, 1)
+		go func() { done <- command.Wait() }()
+		select {
+		case err = <-done:
+		case <-runContext.Done():
+			killProcess(command)
+			<-done
+			err = fmt.Errorf("enrichment timed out: %w", runContext.Err())
+		}
+	}
+	if err != nil {
+		s.recordAudit(workspaceID, "knowledge_enrich", "", started, err)
+		return knowledgeindex.KnowledgeActionResult{OK: false, Operation: "enrich", Message: sanitizeError(err), Wikis: []knowledgeindex.KnowledgeWiki{}, Warnings: []knowledgeindex.KnowledgeWarning{}, Log: buffer.String(), LogTruncated: buffer.truncated, CompletedAt: time.Now().UTC()}, nil
+	}
+	wikis, err := s.detector.DetectWorkspace(ctx, workspace)
+	if err == nil {
+		err = s.store.ReplaceWorkspace(workspaceID, wikis)
+	}
+	if err != nil {
+		s.recordAudit(workspaceID, "knowledge_enrich", "", started, err)
+		return knowledgeindex.KnowledgeActionResult{}, err
+	}
+	result := actionResult("enrich", wikis, buffer.String(), buffer.truncated)
+	s.recordAudit(workspaceID, "knowledge_enrich", "", started, nil)
+	return result, nil
+}
+
+type limitedBuffer struct {
+	buffer    bytes.Buffer
+	limit     int
+	truncated bool
+}
+
+func (w *limitedBuffer) Write(data []byte) (int, error) {
+	original := len(data)
+	remaining := w.limit - w.buffer.Len()
+	if remaining > 0 {
+		if len(data) > remaining {
+			data = data[:remaining]
+		}
+		_, _ = w.buffer.Write(data)
+	}
+	if original > remaining {
+		w.truncated = true
+	}
+	return original, nil
+}
+func (w *limitedBuffer) String() string { return w.buffer.String() }
+
+func actionResult(operation string, wikis []knowledgeindex.KnowledgeWiki, log string, truncated bool) knowledgeindex.KnowledgeActionResult {
+	warnings := make([]knowledgeindex.KnowledgeWarning, 0)
+	for _, wiki := range wikis {
+		warnings = append(warnings, wiki.Warnings...)
+	}
+	if wikis == nil {
+		wikis = []knowledgeindex.KnowledgeWiki{}
+	}
+	return knowledgeindex.KnowledgeActionResult{OK: true, Operation: operation, Wikis: wikis, Warnings: warnings, Log: log, LogTruncated: truncated, CompletedAt: time.Now().UTC()}
+}
+
+func (s *Service) recordAudit(workspaceID, operation, path string, started time.Time, err error) {
+	if s.audit == nil {
+		return
+	}
+	status, message := models.AuditStatusSuccess, "Knowledge action completed."
+	if err != nil {
+		status, message = models.AuditStatusFailed, "Knowledge action failed."
+	}
+	paths := []string{}
+	if path != "" {
+		paths = []string{path}
+	}
+	_, _ = s.audit.Append(models.AuditEvent{WorkspaceID: workspaceID, Operation: operation, Status: status, Message: message, Paths: paths, DurationMS: time.Since(started).Milliseconds()})
+}
+
+func sanitizeError(err error) string {
+	message := strings.TrimSpace(err.Error())
+	if len(message) > 500 {
+		message = message[:500]
+	}
+	return message
 }
 
 func (s *Service) Wikis(workspaceID string) ([]knowledgeindex.KnowledgeWiki, error) {

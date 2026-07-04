@@ -33,6 +33,7 @@ import (
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
 	"plan-manager/internal/itemwriter"
+	knowledgeindex "plan-manager/internal/knowledge"
 	"plan-manager/internal/models"
 	"plan-manager/internal/navigation"
 	"plan-manager/internal/registry"
@@ -119,6 +120,9 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/knowledge/wikis/{workspaceID}/{root}/pages", a.knowledgePages)
 	mux.HandleFunc("GET /api/knowledge/wikis/{workspaceID}/{root}/pages/{slug}", a.knowledgePage)
 	mux.HandleFunc("GET /api/knowledge/wikis/{workspaceID}/{root}/graph", a.knowledgeGraph)
+	mux.HandleFunc("POST /api/knowledge/wikis/{workspaceID}/{root}/rescan", a.knowledgeRescan)
+	mux.HandleFunc("POST /api/knowledge/workspaces/{workspaceID}/sync", a.knowledgeSync)
+	mux.HandleFunc("POST /api/knowledge/workspaces/{workspaceID}/enrich", a.knowledgeEnrich)
 	mux.HandleFunc("POST /api/workspaces", a.createWorkspace)
 	mux.HandleFunc("POST /api/workspaces/stream-create", a.createWorkspaceStream)
 	mux.HandleFunc("PUT /api/workspaces/{id}", a.updateWorkspace)
@@ -686,6 +690,60 @@ func (a *API) knowledgeGraph(w http.ResponseWriter, r *http.Request) {
 	}
 	graph, err := a.knowledge.Graph(r.PathValue("workspaceID"), r.PathValue("root"))
 	a.respondKnowledge(w, graph, err)
+}
+
+func (a *API) knowledgeRescan(w http.ResponseWriter, r *http.Request) {
+	if a.knowledge == nil {
+		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
+		return
+	}
+	result, err := a.knowledge.Rescan(r.Context(), r.PathValue("workspaceID"), r.PathValue("root"))
+	a.respondKnowledgeAction(w, result, err)
+}
+
+func (a *API) knowledgeSync(w http.ResponseWriter, r *http.Request) {
+	if a.knowledge == nil {
+		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
+		return
+	}
+	var input models.GitOperationInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.knowledge.Sync(r.Context(), r.PathValue("workspaceID"), input)
+	a.respondKnowledgeAction(w, result, err)
+}
+
+func (a *API) knowledgeEnrich(w http.ResponseWriter, r *http.Request) {
+	if a.knowledge == nil {
+		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
+		return
+	}
+	var input models.GitOperationInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.knowledge.Enrich(r.Context(), r.PathValue("workspaceID"), input.Confirm)
+	a.respondKnowledgeAction(w, result, err)
+}
+
+func (a *API) respondKnowledgeAction(w http.ResponseWriter, result knowledgeindex.KnowledgeActionResult, err error) {
+	switch {
+	case errors.Is(err, appknowledge.ErrConfirmationRequired), errors.Is(err, appknowledge.ErrEnrichNotConfigured):
+		writeError(w, http.StatusConflict, err.Error())
+	case err != nil:
+		a.respondKnowledge(w, result, err)
+	case !result.OK:
+		writeJSON(w, http.StatusUnprocessableEntity, result)
+	default:
+		writeJSON(w, http.StatusOK, result)
+	}
 }
 
 func (a *API) respondKnowledge(w http.ResponseWriter, data any, err error) {

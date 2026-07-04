@@ -1,14 +1,47 @@
 package knowledge
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"gopkg.in/yaml.v3"
 	"plan-manager/internal/gitadapter"
 	knowledgeindex "plan-manager/internal/knowledge"
+	"plan-manager/internal/models"
 	"plan-manager/internal/registry"
 )
+
+type stubDetector struct {
+	wikis []knowledgeindex.KnowledgeWiki
+	err   error
+	calls int
+}
+
+func (d *stubDetector) DetectWorkspace(_ context.Context, _ models.WorkspaceConfig) ([]knowledgeindex.KnowledgeWiki, error) {
+	d.calls++
+	return d.wikis, d.err
+}
+
+type stubPuller struct {
+	result models.GitOperationResult
+	input  models.GitOperationInput
+}
+
+func (p *stubPuller) Pull(_ string, input models.GitOperationInput) models.GitOperationResult {
+	p.input = input
+	return p.result
+}
+
+type stubAudit struct{ events []models.AuditEvent }
+
+func (a *stubAudit) Append(event models.AuditEvent) (models.AuditEvent, error) {
+	a.events = append(a.events, event)
+	return event, nil
+}
 
 func TestQueriesReturnIndexedPagesAndGuardedMarkdown(t *testing.T) {
 	service, workspaceID := newKnowledgeService(t)
@@ -50,6 +83,105 @@ func TestQueriesReturnStableMissingAndUnsafeErrors(t *testing.T) {
 	}
 }
 
+func TestRescanAndSyncReplaceOnlyAfterSuccessfulDetection(t *testing.T) {
+	service, store := newActionService(t, "", nil)
+	detector := &stubDetector{wikis: []knowledgeindex.KnowledgeWiki{{Root: "docs", Pages: []knowledgeindex.KnowledgePage{}, Warnings: []knowledgeindex.KnowledgeWarning{}}}}
+	puller, audits := &stubPuller{result: models.GitOperationResult{OK: true}}, &stubAudit{}
+	service.ConfigureActions(detector, puller, audits)
+	result, err := service.Rescan(context.Background(), "ws", "docs")
+	if err != nil || !result.OK {
+		t.Fatalf("rescan=%#v err=%v", result, err)
+	}
+	if len(audits.events) != 1 || audits.events[0].Operation != "knowledge_rescan" {
+		t.Fatalf("audits=%#v", audits.events)
+	}
+	result, err = service.Sync(context.Background(), "ws", models.GitOperationInput{Confirm: true})
+	if err != nil || !result.OK || !puller.input.Confirm {
+		t.Fatalf("sync=%#v err=%v input=%#v", result, err, puller.input)
+	}
+
+	detector.err = errors.New("scan failed")
+	puller.result = models.GitOperationResult{OK: false, Message: "confirm to pull"}
+	result, err = service.Sync(context.Background(), "ws", models.GitOperationInput{})
+	if err != nil || result.OK || result.Message != "confirm to pull" {
+		t.Fatalf("failed sync=%#v err=%v", result, err)
+	}
+	wikis, err := store.List("ws")
+	if err != nil || len(wikis) != 1 || wikis[0].Root != "docs" {
+		t.Fatalf("preserved wikis=%#v err=%v", wikis, err)
+	}
+}
+
+func TestEnrichRequiresConfirmationAndConfiguration(t *testing.T) {
+	service, _ := newActionService(t, "", nil)
+	if _, err := service.Enrich(context.Background(), "ws", false); err != ErrConfirmationRequired {
+		t.Fatalf("confirmation err=%v", err)
+	}
+	if _, err := service.Enrich(context.Background(), "ws", true); err != ErrEnrichNotConfigured {
+		t.Fatalf("configuration err=%v", err)
+	}
+}
+
+func TestEnrichPassesLiteralArgumentsRescansAndBoundsOutput(t *testing.T) {
+	workspace := t.TempDir()
+	script := filepath.Join(workspace, "enrich.sh")
+	content := "#!/bin/sh\nprintf '%s' \"$1\" > args.txt\nhead -c 70000 /dev/zero | tr '\\0' x\n"
+	if err := os.WriteFile(script, []byte(content), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	service, _ := newActionServiceAt(t, workspace, script, []string{"literal $HOME ; value"})
+	detector, audits := &stubDetector{wikis: []knowledgeindex.KnowledgeWiki{{Root: "docs", Pages: []knowledgeindex.KnowledgePage{}, Warnings: []knowledgeindex.KnowledgeWarning{}}}}, &stubAudit{}
+	service.ConfigureActions(detector, nil, audits)
+	result, err := service.Enrich(context.Background(), "ws", true)
+	if err != nil || !result.OK || !result.LogTruncated || len(result.Log) != maxActionLogBytes {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	argument, err := os.ReadFile(filepath.Join(workspace, "args.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(argument) != "literal $HOME ; value" {
+		t.Fatalf("argument=%q", argument)
+	}
+	if detector.calls != 1 || len(audits.events) != 1 || audits.events[0].Status != models.AuditStatusSuccess {
+		t.Fatalf("detector=%d audits=%#v", detector.calls, audits.events)
+	}
+}
+
+func TestEnrichReportsStartExitAndTimeoutFailuresWithoutRescan(t *testing.T) {
+	tests := []struct {
+		name, script string
+		timeout      time.Duration
+	}{
+		{"start", "", time.Second},
+		{"exit", "#!/bin/sh\necho failed\nexit 7\n", time.Second},
+		{"timeout", "#!/bin/sh\nsleep 5\n", 20 * time.Millisecond},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			workspace := t.TempDir()
+			executable := filepath.Join(workspace, "missing")
+			if test.script != "" {
+				executable = filepath.Join(workspace, "tool.sh")
+				if err := os.WriteFile(executable, []byte(test.script), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			service, _ := newActionServiceAt(t, workspace, executable, nil)
+			service.enrichTimeout = test.timeout
+			detector, audits := &stubDetector{}, &stubAudit{}
+			service.ConfigureActions(detector, nil, audits)
+			result, err := service.Enrich(context.Background(), "ws", true)
+			if err != nil || result.OK || result.Message == "" || detector.calls != 0 {
+				t.Fatalf("result=%#v err=%v calls=%d", result, err, detector.calls)
+			}
+			if len(audits.events) != 1 || audits.events[0].Status != models.AuditStatusFailed {
+				t.Fatalf("audits=%#v", audits.events)
+			}
+		})
+	}
+}
+
 func newKnowledgeService(t *testing.T) (*Service, string) {
 	t.Helper()
 	directory, workspaceRoot := t.TempDir(), t.TempDir()
@@ -79,4 +211,29 @@ func newKnowledgeService(t *testing.T) (*Service, string) {
 		t.Fatal(err)
 	}
 	return New(reg, store), "ws"
+}
+
+func newActionService(t *testing.T, executable string, args []string) (*Service, *knowledgeindex.Store) {
+	t.Helper()
+	return newActionServiceAt(t, t.TempDir(), executable, args)
+}
+
+func newActionServiceAt(t *testing.T, workspaceRoot, executable string, args []string) (*Service, *knowledgeindex.Store) {
+	t.Helper()
+	directory := t.TempDir()
+	settings := &models.KnowledgeSettings{EnrichExecutable: executable, EnrichArgs: args}
+	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: workspaceRoot, Sources: []string{"docs"}, Knowledge: settings}
+	data, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(directory, "workspaces.yaml")
+	if err := os.WriteFile(registryPath, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := knowledgeindex.NewStore(filepath.Join(directory, "knowledge-index.yaml"))
+	if err := store.ReplaceWorkspace("ws", []knowledgeindex.KnowledgeWiki{{Root: "old", Pages: []knowledgeindex.KnowledgePage{}, Warnings: []knowledgeindex.KnowledgeWarning{}}}); err != nil {
+		t.Fatal(err)
+	}
+	return New(registry.New(registryPath, gitadapter.New()), store), store
 }
