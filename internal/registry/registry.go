@@ -102,6 +102,9 @@ func (r *Registry) Update(id string, input models.WorkspaceInput) (models.Worksp
 	if strings.TrimSpace(input.RemoteURL) == "" {
 		input.RemoteURL = existing.RemoteURL
 	}
+	if input.Knowledge == nil {
+		input.Knowledge = existing.Knowledge
+	}
 	workspace, err := r.validate(input)
 	if err != nil {
 		return models.WorkspaceConfig{}, err
@@ -236,6 +239,7 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 		Sources:          cleanDirs,
 		CreatedAt:        time.Now().UTC(),
 		Jira:             jira,
+		Knowledge:        normalizeKnowledgeSettings(input.Knowledge),
 	}, nil
 }
 
@@ -287,7 +291,22 @@ func normalizeWorkspace(workspace models.WorkspaceConfig) models.WorkspaceConfig
 		workspace.RemoteURL = ""
 		workspace.ClonePathManaged = false
 	}
+	workspace.Knowledge = normalizeKnowledgeSettings(workspace.Knowledge)
 	return workspace
+}
+
+func normalizeKnowledgeSettings(settings *models.KnowledgeSettings) *models.KnowledgeSettings {
+	if settings == nil {
+		return nil
+	}
+	normalized := *settings
+	normalized.EnrichExecutable = strings.TrimSpace(normalized.EnrichExecutable)
+	if normalized.EnrichArgs == nil {
+		normalized.EnrichArgs = []string{}
+	} else {
+		normalized.EnrichArgs = append([]string(nil), normalized.EnrichArgs...)
+	}
+	return &normalized
 }
 
 func normalizeRegistrationMode(mode models.WorkspaceRegistrationMode) models.WorkspaceRegistrationMode {

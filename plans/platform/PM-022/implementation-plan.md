@@ -9,7 +9,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | Phase | Name                                   | Status   |
 |-------|----------------------------------------|----------|
 | B1    | Knowledge domain and parser            | Complete |
-| B2    | Detection and persisted index          | Pending  |
+| B2    | Detection and persisted index          | Complete |
 | B3    | Query APIs and page access             | Pending  |
 | B4    | Rescan, Sync, Enrich, and audit        | Pending  |
 | F1    | Routes, types, and API client          | Pending  |
@@ -38,12 +38,12 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 
 **Deliverables:**
 
-- [ ] Resolve `knowledge-index.yaml` through application config.
-- [ ] Detect Wiki roots only from registered sources with `index.md` and valid pages.
-- [ ] Enforce workspace, source, symlink, ignore, file, byte, page, link, and time budgets.
-- [ ] Persist metadata and relationships with atomic replacement by workspace and root.
-- [ ] Preserve previous index entries after failed scans and remove stale roots only after successful workspace detection.
-- [ ] Add registry fields for optional Knowledge settings while preserving existing YAML.
+- [x] Resolve `knowledge-index.yaml` through application config.
+- [x] Detect Wiki roots only from registered sources with `index.md` and valid pages.
+- [x] Enforce workspace, source, symlink, ignore, file, byte, page, link, and time budgets.
+- [x] Persist metadata and relationships with atomic replacement by workspace and root.
+- [x] Preserve previous index entries after failed scans and remove stale roots only after successful workspace detection.
+- [x] Add registry fields for optional Knowledge settings while preserving existing YAML.
 
 **Verification:** `go test ./internal/knowledge/... ./internal/config/... ./internal/registry/...`
 

@@ -9,16 +9,17 @@ import (
 )
 
 type Paths struct {
-	Dir              string
-	DefaultDir       string
-	RegistryFile     string
-	PlanIndexFile    string
-	AuditLogFile     string
-	SavedFiltersFile string
-	RecentItemsFile  string
-	AISettingsFile   string
-	CloneRootDir     string
-	FrontendAssets   string
+	Dir                string
+	DefaultDir         string
+	RegistryFile       string
+	PlanIndexFile      string
+	KnowledgeIndexFile string
+	AuditLogFile       string
+	SavedFiltersFile   string
+	RecentItemsFile    string
+	AISettingsFile     string
+	CloneRootDir       string
+	FrontendAssets     string
 }
 
 func ResolvePaths() (Paths, error) {
@@ -38,15 +39,16 @@ func ResolvePaths() (Paths, error) {
 		return Paths{}, err
 	}
 	paths := Paths{
-		Dir:              dir,
-		DefaultDir:       defaultDir,
-		RegistryFile:     filepath.Join(dir, "workspaces.yaml"),
-		PlanIndexFile:    filepath.Join(dir, "item-index.yaml"),
-		AuditLogFile:     filepath.Join(dir, "audit-log.jsonl"),
-		SavedFiltersFile: filepath.Join(dir, "saved-filters.yaml"),
-		RecentItemsFile:  filepath.Join(dir, "recent-items.yaml"),
-		AISettingsFile:   filepath.Join(dir, "ai-settings.yaml"),
-		CloneRootDir:     cloneRootDir,
+		Dir:                dir,
+		DefaultDir:         defaultDir,
+		RegistryFile:       filepath.Join(dir, "workspaces.yaml"),
+		PlanIndexFile:      filepath.Join(dir, "item-index.yaml"),
+		KnowledgeIndexFile: filepath.Join(dir, "knowledge-index.yaml"),
+		AuditLogFile:       filepath.Join(dir, "audit-log.jsonl"),
+		SavedFiltersFile:   filepath.Join(dir, "saved-filters.yaml"),
+		RecentItemsFile:    filepath.Join(dir, "recent-items.yaml"),
+		AISettingsFile:     filepath.Join(dir, "ai-settings.yaml"),
+		CloneRootDir:       cloneRootDir,
 	}
 	copyLegacyFile(filepath.Join(dir, "repositories.yaml"), paths.RegistryFile)
 	copyLegacyFile(filepath.Join(dir, "plan-index.yaml"), paths.PlanIndexFile)

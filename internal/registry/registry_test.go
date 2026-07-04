@@ -27,6 +27,26 @@ func TestCreateDefaultsRegistrationModeToLocalPath(t *testing.T) {
 	}
 }
 
+func TestKnowledgeSettingsRoundTripAndSurviveUnrelatedUpdate(t *testing.T) {
+	root := newRegistryGitRepo(t)
+	registry := New(filepath.Join(t.TempDir(), "workspaces.yaml"), gitadapter.New())
+	disabled := false
+	created, err := registry.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}, Knowledge: &models.KnowledgeSettings{Enabled: &disabled, EnrichExecutable: " tool ", EnrichArgs: []string{"--sync"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Knowledge == nil || created.Knowledge.EnrichExecutable != "tool" || *created.Knowledge.Enabled {
+		t.Fatalf("knowledge = %#v", created.Knowledge)
+	}
+	updated, err := registry.Update(created.ID, models.WorkspaceInput{Name: "Renamed", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Knowledge == nil || updated.Knowledge.EnrichExecutable != "tool" {
+		t.Fatalf("knowledge lost = %#v", updated.Knowledge)
+	}
+}
+
 func TestValidateJiraConnectionNormalizesCloudAndServer(t *testing.T) {
 	cloud, err := ValidateJiraConnection(&models.JiraConnection{DeploymentType: " CLOUD ", BaseURL: "https://jira.example.com/", ProjectKey: "di", AccountEmail: " user@example.com ", TokenEnvVar: "JIRA_TOKEN"})
 	if err != nil {
