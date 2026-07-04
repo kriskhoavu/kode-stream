@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KnowledgeLocation } from '../../app/router';
 import { api } from '../../lib/api';
-import type { KnowledgeActionResult, KnowledgePage, KnowledgePageDetail, KnowledgeWarning, KnowledgeWiki, WorkspaceConfig } from '../../lib/types';
+import type { KnowledgeActionResult, KnowledgeGraph, KnowledgePage, KnowledgePageDetail, KnowledgeWarning, KnowledgeWiki, WorkspaceConfig } from '../../lib/types';
 
 export function useKnowledgeController(workspaces: WorkspaceConfig[], location: KnowledgeLocation | undefined, onLocationChange: (location: KnowledgeLocation) => void) {
 	const [wikis, setWikis] = useState<KnowledgeWiki[]>([]);
@@ -14,8 +14,11 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 	const [actionBusy, setActionBusy] = useState(false);
 	const [detail, setDetail] = useState<KnowledgePageDetail | null>(null);
 	const [detailLoading, setDetailLoading] = useState(false);
+	const [graph, setGraph] = useState<KnowledgeGraph | null>(null);
+	const [graphLoading, setGraphLoading] = useState(false);
 	const requestVersion = useRef(0);
 	const detailVersion = useRef(0);
+	const graphVersion = useRef(0);
 	const locationRef = useRef(location);
 	const onLocationChangeRef = useRef(onLocationChange);
 	locationRef.current = location;
@@ -55,7 +58,7 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 	useEffect(() => { void load(); return () => { requestVersion.current++; }; }, [load]);
 
 	useEffect(() => {
-		const version = ++detailVersion.current;
+		const version = ++graphVersion.current;
 		if (!workspace || !wiki || !location?.slug || location.view !== 'read') { setDetail(null); setDetailLoading(false); return; }
 		setDetailLoading(true);
 		void api.knowledgePage(workspace.id, wiki.root, location.slug).then((loaded) => {
@@ -68,6 +71,14 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 		return () => { detailVersion.current++; };
 	}, [workspace, wiki, location?.slug, location?.view]);
 
+	useEffect(() => {
+		const version = ++detailVersion.current;
+		if (!workspace || !wiki || location?.view !== 'graph') { setGraph(null); setGraphLoading(false); return; }
+		setGraphLoading(true);
+		void api.knowledgeGraph(workspace.id, wiki.root).then((loaded) => { if (version === graphVersion.current) setGraph(loaded); }).catch(() => { if (version === graphVersion.current) setError('Knowledge graph could not be loaded.'); }).finally(() => { if (version === graphVersion.current) setGraphLoading(false); });
+		return () => { graphVersion.current++; };
+	}, [workspace, wiki, location?.view]);
+
 	const runAction = useCallback(async (operation: 'rescan' | 'sync' | 'enrich', confirm = false) => {
 		if (!workspace || (operation === 'rescan' && !wiki)) return null;
 		setActionBusy(true); setError('');
@@ -75,11 +86,17 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 			const result = operation === 'rescan' ? await api.rescanKnowledge(workspace.id, wiki!.root)
 				: operation === 'sync' ? await api.syncKnowledge(workspace.id, confirm) : await api.enrichKnowledge(workspace.id, confirm);
 			setActionResult(result); await load(); return result;
-		} catch (actionError) { setError(actionError instanceof Error ? actionError.message : 'Knowledge action failed.'); return null; }
+		} catch (actionError) {
+			const message = actionError instanceof Error ? actionError.message : 'Knowledge action failed.';
+			setError(message);
+			const operationLog = actionError && typeof actionError === 'object' && 'operationLog' in actionError && typeof actionError.operationLog === 'string' ? actionError.operationLog : undefined;
+			setActionResult({ ok: false, operation, message, wikis: [], warnings: [], log: operationLog, logTruncated: false, completedAt: new Date().toISOString() });
+			return null;
+		}
 		finally { setActionBusy(false); }
 	}, [load, wiki, workspace]);
 
-	return useMemo(() => ({ workspace, wiki, page, detail, detailLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, reload: load, runAction }), [workspace, wiki, page, detail, detailLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, load, runAction]);
+	return useMemo(() => ({ workspace, wiki, page, detail, detailLoading, graph, graphLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, reload: load, runAction }), [workspace, wiki, page, detail, detailLoading, graph, graphLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, load, runAction]);
 }
 
 function sameLocation(left: KnowledgeLocation | undefined, right: KnowledgeLocation): boolean {

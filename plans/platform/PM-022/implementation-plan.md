@@ -15,7 +15,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | F1    | Routes, types, and API client          | Complete |
 | F2    | Knowledge controller and Browse view   | Complete |
 | F3    | Reader and Explorer integration        | Complete |
-| F4    | Graph, settings, and responsive polish | Pending  |
+| F4    | Graph, settings, and responsive polish | Complete |
 | V1    | Full verification and documentation    | Pending  |
 
 ## Backend Phases
@@ -126,12 +126,12 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 
 **Deliverables:**
 
-- [ ] Add and lazy-load an interactive graph dependency behind a feature adapter.
-- [ ] Render domain-aware nodes, directed edges, selection, neighbor highlighting, filters, fit, pan, and zoom.
-- [ ] Add accessible relationship list and graph truncation feedback.
-- [ ] Add workspace Knowledge settings for enablement and enrichment executable/arguments.
-- [ ] Add Rescan, guarded Sync, and confirmed Enrich actions with status and bounded logs.
-- [ ] Complete mobile layout, focus behavior, live announcements, and feature styling.
+- [x] Add and lazy-load an interactive graph dependency behind a feature adapter.
+- [x] Render domain-aware nodes, directed edges, selection, neighbor highlighting, filters, fit, pan, and zoom.
+- [x] Add accessible relationship list and graph truncation feedback.
+- [x] Add workspace Knowledge settings for enablement and enrichment executable/arguments.
+- [x] Add Rescan, guarded Sync, and confirmed Enrich actions with status and bounded logs.
+- [x] Complete mobile layout, focus behavior, live announcements, and feature styling.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/WorkspacesPage.test.ts && npm run build`
 

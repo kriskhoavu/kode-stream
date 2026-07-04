@@ -1,0 +1,9 @@
+import { RotateCw, Sparkles, GitPullRequest } from 'lucide-react';
+import { api } from '../../lib/api';
+import type { KnowledgeActionResult, KnowledgeSettings } from '../../lib/types';
+
+export function KnowledgeActions({ workspaceId, settings, root, busy, result, onRun }: { workspaceId: string; settings?: KnowledgeSettings; root?: string; busy: boolean; result: KnowledgeActionResult | null; onRun: (operation: 'rescan' | 'sync' | 'enrich', confirm?: boolean) => Promise<unknown> }) {
+	const sync = async () => { const status = await api.gitStatus(workspaceId); const confirm = (status.dirty || status.conflicted) ? window.confirm('The working tree has local changes. Pull and rescan Knowledge?') : false; if ((status.dirty || status.conflicted) && !confirm) return; await onRun('sync', confirm); };
+	const enrich = async () => { if (!settings?.enrichExecutable) return; const command = [settings.enrichExecutable, ...(settings.enrichArgs ?? [])].join(' '); if (window.confirm(`Run the configured enrichment command from the workspace root?\n\n${command}`)) await onRun('enrich', true); };
+	return <div className="knowledge-actions"><button disabled={busy || !root} onClick={() => void onRun('rescan')}><RotateCw size={14} /> Rescan</button><button disabled={busy} onClick={() => void sync()}><GitPullRequest size={14} /> Sync</button><button disabled={busy || !settings?.enrichExecutable} title={settings?.enrichExecutable ? 'Run configured enrichment' : 'Configure enrichment in Workspace settings'} onClick={() => void enrich()}><Sparkles size={14} /> Enrich</button>{result && <span role="status">{result.ok ? `${result.operation} completed` : result.message || `${result.operation} failed`}</span>}{result?.log && <details><summary>Action log{result.logTruncated ? ' (truncated)' : ''}</summary><pre>{result.log}</pre></details>}</div>;
+}

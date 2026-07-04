@@ -20,6 +20,20 @@
 .knowledge-warnings { background: var(--warning-soft, #fff7df); border-radius: .5rem; margin-top: 1.25rem; padding: .75rem; }
 .knowledge-warnings strong { align-items: center; display: flex; gap: .35rem; }
 .knowledge-status { padding: 1rem; }
+.knowledge-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .35rem; }
+.knowledge-actions button { align-items: center; display: flex; gap: .3rem; }
+.knowledge-actions details { flex-basis: 100%; }
+.knowledge-actions pre { max-height: 12rem; max-width: 50rem; overflow: auto; white-space: pre-wrap; }
+.knowledge-graph-view { display: grid; grid-template-rows: auto auto minmax(22rem, 1fr) auto; min-height: 0; overflow: auto; }
+.knowledge-graph-filters { display: flex; flex-wrap: wrap; gap: .5rem; padding: .75rem 1rem; }
+.knowledge-graph-canvas { min-height: 26rem; }
+.knowledge-graph-notice, .knowledge-relationship-list { margin: .5rem 1rem; }
+.knowledge-relationship-list button { background: transparent; border: 0; color: var(--accent); cursor: pointer; padding: 0; }
+.react-flow__node { background: var(--surface); border: 1px solid var(--border-color); border-radius: .5rem; padding: .6rem; }
+.react-flow__node.selected { border: 2px solid var(--accent); }
+.react-flow__node.neighbor { border-color: var(--accent); }
+.react-flow__edge.neighbor path { stroke: var(--accent); stroke-width: 2; }
+.knowledge-settings-fields { display: grid; gap: .75rem; margin-top: 1rem; }
 .knowledge-reader { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 23rem); min-height: 0; }
 .knowledge-reader-content { min-width: 0; overflow: auto; }
 .knowledge-reader-content .content-viewer { height: 100%; }
@@ -31,3 +45,4 @@
 .knowledge-unresolved { color: var(--text-muted); }
 @media (max-width: 760px) { .knowledge-browser { grid-template-columns: 1fr; } .knowledge-browser-list { border: 0; } .knowledge-summary { border-top: 1px solid var(--border-color); } }
 @media (max-width: 760px) { .knowledge-reader { grid-template-columns: 1fr; } .knowledge-reader-meta { border-left: 0; border-top: 1px solid var(--border-color); } }
+@media (max-width: 760px) { .knowledge-toolbar { align-items: stretch; } .knowledge-toolbar h1 { flex-basis: 100%; } .knowledge-toolbar select { max-width: none; width: 100%; } .knowledge-actions { flex-basis: 100%; } .knowledge-graph-filters > * { width: 100%; } }
