@@ -10,7 +10,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 |-------|----------------------------------------|----------|
 | B1    | Knowledge domain and parser            | Complete |
 | B2    | Detection and persisted index          | Complete |
-| B3    | Query APIs and page access             | Pending  |
+| B3    | Query APIs and page access             | Complete |
 | B4    | Rescan, Sync, Enrich, and audit        | Pending  |
 | F1    | Routes, types, and API client          | Pending  |
 | F2    | Knowledge controller and Browse view   | Pending  |
@@ -53,12 +53,12 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 
 **Deliverables:**
 
-- [ ] Add the Knowledge application service and wire it in the server composition root.
-- [ ] Add Wiki list, page list, page detail, and graph endpoints.
-- [ ] Read selected Markdown through guarded workspace access and return viewer-compatible classification.
-- [ ] Return empty arrays, stable warning codes, deterministic ordering, and bounded graph responses.
-- [ ] Extend saved-route validation for `/knowledge`.
-- [ ] Add service and HTTP contract tests for valid, missing, malformed, and unsafe requests.
+- [x] Add the Knowledge application service and wire it in the server composition root.
+- [x] Add Wiki list, page list, page detail, and graph endpoints.
+- [x] Read selected Markdown through guarded workspace access and return viewer-compatible classification.
+- [x] Return empty arrays, stable warning codes, deterministic ordering, and bounded graph responses.
+- [x] Extend saved-route validation for `/knowledge`.
+- [x] Add service and HTTP contract tests for valid, missing, malformed, and unsafe requests.
 
 **Verification:** `go test ./internal/application/knowledge/... ./internal/api/...`
 

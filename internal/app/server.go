@@ -18,6 +18,7 @@ import (
 	"plan-manager/internal/application/aisession"
 	"plan-manager/internal/application/health"
 	appjira "plan-manager/internal/application/jira"
+	appknowledge "plan-manager/internal/application/knowledge"
 	appsearch "plan-manager/internal/application/search"
 	"plan-manager/internal/audit"
 	"plan-manager/internal/config"
@@ -26,6 +27,7 @@ import (
 	"plan-manager/internal/itemindex"
 	"plan-manager/internal/itemwriter"
 	jiraclient "plan-manager/internal/jira"
+	"plan-manager/internal/knowledge"
 	"plan-manager/internal/navigation"
 	"plan-manager/internal/ptysession"
 	"plan-manager/internal/registry"
@@ -63,7 +65,8 @@ func NewServer(port int) (*Server, error) {
 	sessionManager := ptysession.New(ptysession.Config{})
 	aiSessionService := aisession.New(aisettings.New(paths.AISettingsFile)).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager)
 	jiraService := appjira.New(reg, idx, jiraclient.New())
-	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore).WithAISessions(aiSessionService).WithJira(jiraService)
+	knowledgeService := appknowledge.New(reg, knowledge.NewStore(paths.KnowledgeIndexFile))
+	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())

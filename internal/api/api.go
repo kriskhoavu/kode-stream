@@ -23,6 +23,7 @@ import (
 	apphealth "plan-manager/internal/application/health"
 	appitem "plan-manager/internal/application/item"
 	appjira "plan-manager/internal/application/jira"
+	appknowledge "plan-manager/internal/application/knowledge"
 	appsearch "plan-manager/internal/application/search"
 	appworkspace "plan-manager/internal/application/workspace"
 	appworkspacefiles "plan-manager/internal/application/workspacefiles"
@@ -53,6 +54,7 @@ type API struct {
 	contentSearch  *appcontentsearch.Service
 	aiSessions     *appaisession.Service
 	jira           *appjira.Service
+	knowledge      *appknowledge.Service
 }
 
 func (a *API) WithJira(service *appjira.Service) *API {
@@ -62,6 +64,11 @@ func (a *API) WithJira(service *appjira.Service) *API {
 
 func (a *API) WithAISessions(service *appaisession.Service) *API {
 	a.aiSessions = service
+	return a
+}
+
+func (a *API) WithKnowledge(service *appknowledge.Service) *API {
+	a.knowledge = service
 	return a
 }
 
@@ -108,6 +115,10 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/ai/settings", a.aiSettings)
 	mux.HandleFunc("PUT /api/ai/settings", a.saveAISettings)
 	mux.HandleFunc("GET /api/workspaces", a.listWorkspaces)
+	mux.HandleFunc("GET /api/knowledge/wikis", a.knowledgeWikis)
+	mux.HandleFunc("GET /api/knowledge/wikis/{workspaceID}/{root}/pages", a.knowledgePages)
+	mux.HandleFunc("GET /api/knowledge/wikis/{workspaceID}/{root}/pages/{slug}", a.knowledgePage)
+	mux.HandleFunc("GET /api/knowledge/wikis/{workspaceID}/{root}/graph", a.knowledgeGraph)
 	mux.HandleFunc("POST /api/workspaces", a.createWorkspace)
 	mux.HandleFunc("POST /api/workspaces/stream-create", a.createWorkspaceStream)
 	mux.HandleFunc("PUT /api/workspaces/{id}", a.updateWorkspace)
@@ -638,7 +649,56 @@ func (a *API) recordRecentItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func validAppRoute(route string) bool {
-	return route == "/kanban" || route == "/items" || route == "/branches" || route == "/workspaces" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/kanban?")
+	return route == "/kanban" || route == "/items" || route == "/branches" || route == "/workspaces" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/kanban?") || strings.HasPrefix(route, "/knowledge?")
+}
+
+func (a *API) knowledgeWikis(w http.ResponseWriter, r *http.Request) {
+	if a.knowledge == nil {
+		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
+		return
+	}
+	wikis, err := a.knowledge.Wikis(r.URL.Query().Get("workspaceId"))
+	a.respondKnowledge(w, wikis, err)
+}
+
+func (a *API) knowledgePages(w http.ResponseWriter, r *http.Request) {
+	if a.knowledge == nil {
+		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
+		return
+	}
+	pages, warnings, err := a.knowledge.Pages(r.PathValue("workspaceID"), r.PathValue("root"))
+	a.respondKnowledge(w, map[string]any{"pages": pages, "warnings": warnings}, err)
+}
+
+func (a *API) knowledgePage(w http.ResponseWriter, r *http.Request) {
+	if a.knowledge == nil {
+		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
+		return
+	}
+	page, err := a.knowledge.Page(r.PathValue("workspaceID"), r.PathValue("root"), r.PathValue("slug"))
+	a.respondKnowledge(w, page, err)
+}
+
+func (a *API) knowledgeGraph(w http.ResponseWriter, r *http.Request) {
+	if a.knowledge == nil {
+		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
+		return
+	}
+	graph, err := a.knowledge.Graph(r.PathValue("workspaceID"), r.PathValue("root"))
+	a.respondKnowledge(w, graph, err)
+}
+
+func (a *API) respondKnowledge(w http.ResponseWriter, data any, err error) {
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, data)
+	case errors.Is(err, appknowledge.ErrWorkspaceNotFound), errors.Is(err, appknowledge.ErrWikiNotFound), errors.Is(err, appknowledge.ErrPageNotFound), errors.Is(err, os.ErrNotExist):
+		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, appknowledge.ErrUnsafePath), errors.Is(err, fileaccess.ErrUnsupportedContent):
+		writeError(w, http.StatusBadRequest, err.Error())
+	default:
+		writeError(w, http.StatusInternalServerError, "knowledge request failed")
+	}
 }
 
 func (a *API) workspaceHealth(w http.ResponseWriter, r *http.Request) {

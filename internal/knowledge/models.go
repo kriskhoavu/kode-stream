@@ -1,6 +1,10 @@
 package knowledge
 
-import "time"
+import (
+	"time"
+
+	"plan-manager/internal/models"
+)
 
 type LinkResolution string
 
@@ -41,6 +45,12 @@ type KnowledgePage struct {
 	SourceCount int             `json:"sourceCount,omitempty" yaml:"sourceCount,omitempty"`
 	Links       []KnowledgeLink `json:"links" yaml:"links"`
 	Backlinks   []string        `json:"backlinks" yaml:"backlinks"`
+}
+
+type KnowledgePageDetail struct {
+	KnowledgePage
+	Content  models.FileContent `json:"content" yaml:"content"`
+	Warnings []KnowledgeWarning `json:"warnings" yaml:"warnings"`
 }
 
 type KnowledgeLink struct {
