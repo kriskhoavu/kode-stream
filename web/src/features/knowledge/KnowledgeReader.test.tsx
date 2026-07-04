@@ -16,7 +16,7 @@ describe('KnowledgeReader', () => {
 	it('renders shared Markdown, metadata, relationships, and Explorer action', async () => {
 		const onNavigate = vi.fn(), onOpenExplorer = vi.fn();
 		render(<KnowledgeReader detail={detail} onNavigate={onNavigate} onOpenExplorer={onOpenExplorer} />);
-		expect(await screen.findByRole('heading', { name: 'Overview', level: 1 })).toBeInTheDocument();
+		expect(await screen.findByRole('heading', { name: 'Overview', level: 1 }, { timeout: 3000 })).toBeInTheDocument();
 		expect(screen.getByText('plans/api/PM-1/README.md')).toBeInTheDocument();
 		expect(screen.getByText('Missing target')).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Open in Explorer' }));

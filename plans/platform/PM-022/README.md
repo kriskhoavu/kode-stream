@@ -170,6 +170,7 @@ Implemented on `feature/PM-022-structured-knowledge-wiki` in nine phase commits.
 - Frontend verification: 170 tests passed across 43 test files; TypeScript and the production build passed.
 - The lazy Knowledge graph bundle is 185.64 kB (60.26 kB gzip); initial Knowledge Browse is 14.94 kB (5.18 kB gzip).
 - The in-app browser was unavailable during final verification, so desktop/mobile visual inspection could not be performed. Responsive CSS, navigation, keyboard behavior, reader, graph, warnings, actions, settings, and Explorer routing are covered by focused interaction tests and the production build.
+- A post-implementation UI repair replaced invalid theme tokens, styled all Knowledge controls through existing application patterns, removed empty status spacing, and collapsed large warning collections. The frontend suite now contains 171 tests across 44 files, including a regression for the reported broken layout.
 
 ## Documents
 

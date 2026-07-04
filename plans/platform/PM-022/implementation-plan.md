@@ -17,6 +17,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | F3    | Reader and Explorer integration        | Complete |
 | F4    | Graph, settings, and responsive polish | Complete |
 | V1    | Full verification and documentation    | Complete |
+| UI1   | Knowledge layout repair                | Complete |
 
 ## Backend Phases
 
@@ -160,6 +161,20 @@ git diff --check
 ```
 
 **Commit:** `PM-022: Finalize Structured Knowledge Wiki`
+
+### Phase UI1: Knowledge Layout Repair
+
+**Deliverables:**
+
+- [x] Replace invalid Knowledge-only color tokens with the application theme tokens.
+- [x] Apply established application button, panel, form, and active-state styling.
+- [x] Remove the permanent empty live-status row and restore compact toolbar spacing.
+- [x] Collapse large Wiki warning collections and bound their expanded height.
+- [x] Add a focused regression test for controls, status spacing, and warning overflow.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/pages/KnowledgePage.test.tsx web/src/features/knowledge && npm test -- --run && npm run build`
+
+**Commit:** `PM-022: Repair Knowledge page layout`
 
 ## Rollback And Compatibility
 
