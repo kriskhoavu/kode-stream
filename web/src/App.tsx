@@ -25,8 +25,6 @@ export function App() {
     workspaces,
     activeRepo,
     contentRefreshKey,
-    showStaleNotice,
-    setShowStaleNotice,
     navigate,
     selectWorkspace: selectWorkspaceState,
     refreshAppData,
@@ -218,30 +216,15 @@ export function App() {
             visibleStatuses={appSettings.visibleKanbanStatuses}
             focusedItemId={route.focusedItemId}
             onOpenPlan={(itemId) => navigate({ name: 'workspace', itemId })}
-            onWorkspacesChanged={() => refreshAppData(true)}
+            onWorkspacesChanged={() => refreshAppData()}
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
           />
         )}
-        {route.name === 'workspace' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly(true)} />}
-        {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData(true)} />}
+        {route.name === 'workspace' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly()} />}
+        {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData()} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
         {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkspaceExplorerPage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenKanban={openWorkspaceKanban} /></Suspense>}
       </main>
-
-      {showStaleNotice && (
-        <div className="stale-notice" role="status" aria-live="polite">
-          <strong>Content may have changed</strong>
-          <span>Refresh the current view to load the latest items and workspaces.</span>
-          <div>
-            <button className="primary" type="button" onClick={() => void refreshAppData()}>
-              Refresh
-            </button>
-            <button className="ghost" type="button" onClick={() => setShowStaleNotice(false)}>
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
 
       <nav className="bottom-nav">
         <button className={route.name === 'kanban' ? 'active' : ''} onClick={() => navigate({ name: 'kanban' })}><KanbanSquare size={18} />Kanban</button>
