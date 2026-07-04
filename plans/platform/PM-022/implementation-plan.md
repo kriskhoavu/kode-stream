@@ -14,7 +14,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | B4    | Rescan, Sync, Enrich, and audit        | Complete |
 | F1    | Routes, types, and API client          | Complete |
 | F2    | Knowledge controller and Browse view   | Complete |
-| F3    | Reader and Explorer integration        | Pending  |
+| F3    | Reader and Explorer integration        | Complete |
 | F4    | Graph, settings, and responsive polish | Pending  |
 | V1    | Full verification and documentation    | Pending  |
 
@@ -112,11 +112,11 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 
 **Deliverables:**
 
-- [ ] Render selected Markdown through the shared Content Viewer.
-- [ ] Intercept resolved Wiki links and preserve safe external-link behavior.
-- [ ] Show metadata, source references, outgoing links, backlinks, and warnings.
-- [ ] Add “Open in Explorer” with workspace-relative deep-link behavior.
-- [ ] Test reader navigation, removed pages, unresolved links, and Explorer routing.
+- [x] Render selected Markdown through the shared Content Viewer.
+- [x] Intercept resolved Wiki links and preserve safe external-link behavior.
+- [x] Show metadata, source references, outgoing links, backlinks, and warnings.
+- [x] Add “Open in Explorer” with workspace-relative deep-link behavior.
+- [x] Test reader navigation, removed pages, unresolved links, and Explorer routing.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/WorkspaceExplorerPage.test.tsx`
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KnowledgeLocation } from '../../app/router';
 import { api } from '../../lib/api';
-import type { KnowledgeActionResult, KnowledgePage, KnowledgeWarning, KnowledgeWiki, WorkspaceConfig } from '../../lib/types';
+import type { KnowledgeActionResult, KnowledgePage, KnowledgePageDetail, KnowledgeWarning, KnowledgeWiki, WorkspaceConfig } from '../../lib/types';
 
 export function useKnowledgeController(workspaces: WorkspaceConfig[], location: KnowledgeLocation | undefined, onLocationChange: (location: KnowledgeLocation) => void) {
 	const [wikis, setWikis] = useState<KnowledgeWiki[]>([]);
@@ -12,7 +12,10 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 	const [notice, setNotice] = useState('');
 	const [actionResult, setActionResult] = useState<KnowledgeActionResult | null>(null);
 	const [actionBusy, setActionBusy] = useState(false);
+	const [detail, setDetail] = useState<KnowledgePageDetail | null>(null);
+	const [detailLoading, setDetailLoading] = useState(false);
 	const requestVersion = useRef(0);
+	const detailVersion = useRef(0);
 	const locationRef = useRef(location);
 	const onLocationChangeRef = useRef(onLocationChange);
 	locationRef.current = location;
@@ -51,6 +54,20 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 
 	useEffect(() => { void load(); return () => { requestVersion.current++; }; }, [load]);
 
+	useEffect(() => {
+		const version = ++detailVersion.current;
+		if (!workspace || !wiki || !location?.slug || location.view !== 'read') { setDetail(null); setDetailLoading(false); return; }
+		setDetailLoading(true);
+		void api.knowledgePage(workspace.id, wiki.root, location.slug).then((loaded) => {
+			if (version === detailVersion.current) setDetail(loaded);
+		}).catch(() => {
+			if (version !== detailVersion.current) return;
+			setDetail(null); setNotice('The selected page could not be loaded. It may have been removed.');
+			onLocationChangeRef.current({ workspaceId: workspace.id, root: wiki.root, view: 'browse' });
+		}).finally(() => { if (version === detailVersion.current) setDetailLoading(false); });
+		return () => { detailVersion.current++; };
+	}, [workspace, wiki, location?.slug, location?.view]);
+
 	const runAction = useCallback(async (operation: 'rescan' | 'sync' | 'enrich', confirm = false) => {
 		if (!workspace || (operation === 'rescan' && !wiki)) return null;
 		setActionBusy(true); setError('');
@@ -62,7 +79,7 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 		finally { setActionBusy(false); }
 	}, [load, wiki, workspace]);
 
-	return useMemo(() => ({ workspace, wiki, page, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, reload: load, runAction }), [workspace, wiki, page, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, load, runAction]);
+	return useMemo(() => ({ workspace, wiki, page, detail, detailLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, reload: load, runAction }), [workspace, wiki, page, detail, detailLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, load, runAction]);
 }
 
 function sameLocation(left: KnowledgeLocation | undefined, right: KnowledgeLocation): boolean {
