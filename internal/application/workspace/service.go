@@ -214,7 +214,10 @@ func (s *Service) LoadBranch(id string, input models.BranchLoadInput) (models.Br
 		reader = scanner.NewFilesystemSourceReader(workspace.Path)
 	}
 	sourceHash := sourceConfigurationHash(workspace)
-	if !input.Force {
+	// A commit hash only identifies a Git snapshot. It says nothing about
+	// uncommitted additions, edits, or deletions in the checked-out working tree.
+	// Cache immutable branch snapshots, but always rescan the working tree.
+	if !input.Force && sourceMode != "working_tree" {
 		if metadata, ok, err := s.index.BranchScan(workspace.ID, selectedBranch); err != nil {
 			return models.BranchLoadResult{}, err
 		} else if ok && metadata.Commit == commit && metadata.SourceConfigurationHash == sourceHash {

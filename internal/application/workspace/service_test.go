@@ -108,6 +108,41 @@ func TestLoadBranchScansSnapshotWithoutCheckout(t *testing.T) {
 	}
 }
 
+func TestLoadBranchRescansWorkingTreeWhenItemDirectoryIsDeleted(t *testing.T) {
+	root := newWorkspaceGitRepo(t)
+	itemPath := "plans/platform/PM-001"
+	writeWorkspaceGitFile(t, root, itemPath+"/README.md", "# PM-001\n")
+	workspaceGitCommit(t, root, "add plan")
+
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), nil, git)
+
+	first, err := service.LoadBranch(workspace.ID, models.BranchLoadInput{Branch: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ItemCount != 1 {
+		t.Fatalf("initial item count = %d, want 1", first.ItemCount)
+	}
+	if err := os.RemoveAll(filepath.Join(root, filepath.FromSlash(itemPath))); err != nil {
+		t.Fatal(err)
+	}
+
+	refreshed, err := service.LoadBranch(workspace.ID, models.BranchLoadInput{Branch: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.ItemCount != 0 || len(refreshed.Items) != 0 {
+		t.Fatalf("items after directory deletion = %#v, want none", refreshed.Items)
+	}
+}
+
 func TestSourceStructureIncludesProposalsAndPreview(t *testing.T) {
 	root := newWorkspaceGitRepo(t)
 	writeWorkspaceGitFile(t, root, "docs/api/feature/DI-101/README.md", "# DI-101: API Search\n")
