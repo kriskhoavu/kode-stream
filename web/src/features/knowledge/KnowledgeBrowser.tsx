@@ -23,7 +23,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		const childPages = node.landingPage ? node.pages.filter((page) => page !== node.landingPage) : node.pages;
 		return <section className="knowledge-domain" key={node.path}>
 			<h3>{node.landingPage ? <button type="button" className={node.landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={() => onSelect(node.landingPage!.slug)} onKeyDown={(event) => moveFocus(event, node.landingPage!.slug)} aria-label={`Open ${node.path} index`}><BookMarked size={13} /><span>{node.name}</span></button> : node.name}</h3>
-			{childPages.map((page) => { const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length; return <button className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}><span><strong>{page.title}</strong><small><span className={`knowledge-type-badge ${pageTypeClass(page.pageType)}`}>{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">{pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span></button>; })}
+			{childPages.map((page) => { const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length; return <button className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}><span><strong className="knowledge-page-title">{page.title}</strong><small><span className="knowledge-page-type">{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span></button>; })}
 			{node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map(renderDomain)}</div>}
 		</section>;
 	};
@@ -76,8 +76,4 @@ function buildDomainTree(visiblePages: KnowledgePage[], allPages: KnowledgePage[
 
 function displayPageType(pageType?: string): string {
 	return (pageType || 'PAGE').replaceAll('_', '-');
-}
-
-function pageTypeClass(pageType?: string): string {
-	return `type-${(pageType || 'page').toLowerCase().replaceAll('_', '-')}`;
 }

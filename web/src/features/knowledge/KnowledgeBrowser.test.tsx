@@ -43,7 +43,7 @@ describe('KnowledgeBrowser', () => {
 		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-chevron-right')).not.toBeInTheDocument();
 	});
 
-	it('renders slash-separated domains as a nested hierarchy with page type badges', () => {
+	it('renders slash-separated domains as a nested hierarchy with simple page type text', () => {
 		const nestedPages: KnowledgePage[] = [
 			{ ...pages[0], slug: 'master-data-index', path: 'master-data/index.md', domain: 'master-data' },
 			{ ...pages[1], slug: 'article-reference', path: 'master-data/article/reference.md', domain: 'master-data/article', pageType: 'REFERENCE' },
@@ -54,8 +54,16 @@ describe('KnowledgeBrowser', () => {
 		const parent = screen.getByRole('heading', { name: 'master-data' }).closest('.knowledge-domain');
 		expect(parent).toContainElement(screen.getByRole('heading', { name: 'article' }));
 		expect(parent).toContainElement(screen.getByRole('heading', { name: 'customer' }));
-		expect(screen.getByText('REFERENCE')).toHaveClass('knowledge-type-badge', 'type-reference');
-		expect(screen.getByText('HOW-TO')).toHaveClass('knowledge-type-badge', 'type-how-to');
+		expect(screen.getByText('REFERENCE')).toHaveClass('knowledge-page-type');
+		expect(screen.getByText('REFERENCE')).not.toHaveClass('knowledge-type-badge');
+		expect(screen.getByText('HOW-TO')).toHaveClass('knowledge-page-type');
+	});
+
+	it('keeps the selected page title readable without inheriting the accent color', () => {
+		render(<KnowledgeBrowser pages={pages} selectedSlug="offer-overview" warnings={[]} onSelect={vi.fn()} />);
+		const selected = screen.getByRole('button', { name: /Offer Overview/ });
+		expect(selected).toHaveClass('active');
+		expect(screen.getByText('Offer Overview')).toHaveClass('knowledge-page-title');
 	});
 
 	it('explains an empty valid Wiki', () => {

@@ -21,6 +21,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | UI2   | Integrated Wiki reading experience     | Complete |
 | UI3   | Interactive domain landing pages       | Complete |
 | UI4   | Hierarchical Wiki navigation           | Complete |
+| UI5   | Dark-mode navigation simplification    | Complete |
 
 ## Backend Phases
 
@@ -222,6 +223,20 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
 
 **Commit:** `PM-022: Improve Knowledge navigation hierarchy`
+
+### Phase UI5: Dark-Mode Navigation Simplification
+
+**Deliverables:**
+
+- [x] Replace colored page-type badges with compact muted text labels.
+- [x] Keep selected page titles on the high-contrast application text color.
+- [x] Use a subtle tinted background, border, and left accent for selection.
+- [x] Keep landing-page labels readable while applying accent color only to their icon.
+- [x] Add focused regression coverage for simple labels and selected-page styling hooks.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Simplify Knowledge navigation styling`
 
 ## Rollback And Compatibility
 

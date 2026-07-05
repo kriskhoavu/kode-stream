@@ -231,8 +231,15 @@
   cursor: pointer;
 }
 
-.knowledge-domain-link:hover,
+.knowledge-domain-link:hover {
+  color: var(--blue);
+}
+
 .knowledge-domain-link.active {
+  color: var(--text);
+}
+
+.knowledge-domain-link.active svg {
   color: var(--blue);
 }
 
@@ -254,9 +261,14 @@
 }
 
 .knowledge-page-row.active {
-  border-color: color-mix(in srgb, var(--blue) 28%, var(--line));
-  background: color-mix(in srgb, var(--blue) 9%, var(--panel));
-  color: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 34%, var(--line));
+  background: color-mix(in srgb, var(--blue) 7%, var(--panel));
+  color: var(--text);
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.knowledge-page-row.active .knowledge-page-title {
+  color: var(--text);
 }
 
 .knowledge-page-row > span {
@@ -284,36 +296,10 @@
   font-size: 10px;
 }
 
-.knowledge-type-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 17px;
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel-soft);
+.knowledge-page-type {
   color: var(--muted);
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 0.035em;
-}
-
-.knowledge-type-badge.type-concept {
-  border-color: color-mix(in srgb, var(--blue) 30%, var(--line));
-  background: color-mix(in srgb, var(--blue) 9%, var(--panel));
-  color: var(--blue);
-}
-
-.knowledge-type-badge.type-reference {
-  border-color: color-mix(in srgb, var(--green) 30%, var(--line));
-  background: color-mix(in srgb, var(--green) 9%, var(--panel));
-  color: var(--green);
-}
-
-.knowledge-type-badge.type-how-to {
-  border-color: color-mix(in srgb, #d97706 30%, var(--line));
-  background: color-mix(in srgb, #d97706 9%, var(--panel));
-  color: #b76a05;
+  font-weight: 650;
+  letter-spacing: 0.025em;
 }
 
 .knowledge-page-warning {
