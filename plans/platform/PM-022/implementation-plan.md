@@ -20,6 +20,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | UI1   | Knowledge layout repair                | Complete |
 | UI2   | Integrated Wiki reading experience     | Complete |
 | UI3   | Interactive domain landing pages       | Complete |
+| UI4   | Hierarchical Wiki navigation           | Complete |
 
 ## Backend Phases
 
@@ -206,6 +207,21 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
 
 **Commit:** `PM-022: Add interactive Knowledge domain parents`
+
+### Phase UI4: Hierarchical Wiki Navigation
+
+**Deliverables:**
+
+- [x] Replace the landing-page chevron with a bookmark icon that does not imply collapsing.
+- [x] Render page types as distinct Concept, Reference, How-to, and fallback badges.
+- [x] Convert slash-separated domain labels into an indented tree with hierarchy guide lines.
+- [x] Show only the local domain segment at nested levels while preserving full-path navigation labels.
+- [x] Keep the hierarchy expanded and preserve arrow-key navigation across landing and page controls.
+- [x] Add focused regression coverage for nested domains, landing icons, and page-type badges.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Improve Knowledge navigation hierarchy`
 
 ## Rollback And Compatibility
 

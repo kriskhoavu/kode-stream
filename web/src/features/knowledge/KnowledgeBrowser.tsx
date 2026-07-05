@@ -1,20 +1,31 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, ChevronRight, Search } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { BookMarked, BookOpen, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
 
 export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode }) {
 	const [query, setQuery] = useState('');
-	const buttons = useRef<Array<HTMLButtonElement | null>>([]);
 	const filtered = useMemo(() => {
 		const needle = query.trim().toLowerCase();
 		return needle ? pages.filter((page) => [page.title, page.slug, page.summary ?? '', ...page.roles, ...page.topics].some((value) => value.toLowerCase().includes(needle))) : pages;
 	}, [pages, query]);
-	const domains = useMemo(() => groupByDomain(filtered), [filtered]);
-	let buttonIndex = 0;
-	const moveFocus = (event: React.KeyboardEvent, index: number, slug: string) => {
-		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1))); buttons.current[next]?.focus(); }
+	const domains = useMemo(() => buildDomainTree(filtered, pages), [filtered, pages]);
+	const moveFocus = (event: React.KeyboardEvent<HTMLButtonElement>, slug: string) => {
+		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+			event.preventDefault();
+			const controls = Array.from(event.currentTarget.closest('nav')?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+			const current = controls.indexOf(event.currentTarget);
+			controls[Math.max(0, Math.min(controls.length - 1, current + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus();
+		}
 		if (event.key === 'Enter') { event.preventDefault(); onSelect(slug); }
+	};
+	const renderDomain = (node: DomainNode): ReactNode => {
+		const childPages = node.landingPage ? node.pages.filter((page) => page !== node.landingPage) : node.pages;
+		return <section className="knowledge-domain" key={node.path}>
+			<h3>{node.landingPage ? <button type="button" className={node.landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={() => onSelect(node.landingPage!.slug)} onKeyDown={(event) => moveFocus(event, node.landingPage!.slug)} aria-label={`Open ${node.path} index`}><BookMarked size={13} /><span>{node.name}</span></button> : node.name}</h3>
+			{childPages.map((page) => { const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length; return <button className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}><span><strong>{page.title}</strong><small><span className={`knowledge-type-badge ${pageTypeClass(page.pageType)}`}>{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">{pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span></button>; })}
+			{node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map(renderDomain)}</div>}
+		</section>;
 	};
 
 	return <div className="knowledge-browser">
@@ -22,27 +33,51 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			<label className="knowledge-search"><Search size={15} /><span className="knowledge-visually-hidden">Filter Knowledge pages</span><input aria-label="Filter Knowledge pages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter pages" /></label>
 			{pages.length === 0 && <div className="knowledge-empty"><h2>No valid pages indexed</h2><p>Add Markdown pages with <code>slug</code> and <code>title</code> front matter, then rescan.</p></div>}
 			{pages.length > 0 && filtered.length === 0 && <p className="knowledge-empty">No pages match this filter.</p>}
-			<nav aria-label="Knowledge pages">{Array.from(domains.entries()).map(([domain, domainPages]) => {
-				const landingPage = findLandingPage(domainPages);
-				const childPages = landingPage ? domainPages.filter((page) => page !== landingPage) : domainPages;
-				const landingIndex = landingPage ? buttonIndex++ : -1;
-				return <section className="knowledge-domain" key={domain}><h3>{landingPage ? <button ref={(node) => { buttons.current[landingIndex] = node; }} type="button" className={landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={() => onSelect(landingPage.slug)} onKeyDown={(event) => moveFocus(event, landingIndex, landingPage.slug)} aria-label={`Open ${domain} index`}><span>{domain}</span><ChevronRight size={13} /></button> : domain}</h3>{childPages.map((page) => { const index = buttonIndex++; const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length; return <button ref={(node) => { buttons.current[index] = node; }} className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, index, page.slug)}><BookOpen size={15} /><span><strong>{page.title}</strong><small>{page.pageType || 'PAGE'}{pageWarnings ? ` · ${pageWarnings} warning${pageWarnings === 1 ? '' : 's'}` : ''}</small></span></button>; })}</section>;
-			})}</nav>
+			<nav aria-label="Knowledge pages">{domains.map(renderDomain)}</nav>
 			<KnowledgeWarnings warnings={warnings} compact indexDiagnostics />
 		</div>
 		<section className="knowledge-content-pane" aria-label="Knowledge page content">{children ?? <div className="knowledge-welcome"><BookOpen size={28} /><h2>Select a page</h2><p>Choose an entry from the index to read its full content.</p></div>}</section>
 	</div>;
 }
 
+interface DomainNode {
+	name: string;
+	path: string;
+	pages: KnowledgePage[];
+	landingPage?: KnowledgePage;
+	children: DomainNode[];
+}
+
 function findLandingPage(pages: KnowledgePage[]): KnowledgePage | undefined {
 	return pages.find((page) => /(?:^|\/)index\.md$/i.test(page.path)) ?? pages.find((page) => /(?:^|\/)readme\.md$/i.test(page.path));
 }
 
-function groupByDomain(pages: KnowledgePage[]): Map<string, KnowledgePage[]> {
-	const groups = new Map<string, KnowledgePage[]>();
-	for (const page of pages) {
-		const domain = page.domain || 'root';
-		groups.set(domain, [...(groups.get(domain) ?? []), page]);
+function buildDomainTree(visiblePages: KnowledgePage[], allPages: KnowledgePage[]): DomainNode[] {
+	const roots: DomainNode[] = [];
+	const nodes = new Map<string, DomainNode>();
+	for (const page of visiblePages) {
+		const parts = (page.domain || 'root').split('/').filter(Boolean);
+		let siblings = roots;
+		for (let index = 0; index < parts.length; index++) {
+			const path = parts.slice(0, index + 1).join('/');
+			let node = nodes.get(path);
+			if (!node) {
+				node = { name: parts[index], path, pages: [], children: [] };
+				nodes.set(path, node);
+				siblings.push(node);
+			}
+			siblings = node.children;
+		}
+		nodes.get(parts.join('/'))!.pages.push(page);
 	}
-	return groups;
+	for (const node of nodes.values()) node.landingPage = findLandingPage(allPages.filter((page) => (page.domain || 'root') === node.path));
+	return roots;
+}
+
+function displayPageType(pageType?: string): string {
+	return (pageType || 'PAGE').replaceAll('_', '-');
+}
+
+function pageTypeClass(pageType?: string): string {
+	return `type-${(pageType || 'page').toLowerCase().replaceAll('_', '-')}`;
 }

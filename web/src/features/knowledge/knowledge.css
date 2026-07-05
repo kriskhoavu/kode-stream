@@ -205,10 +205,21 @@
   text-transform: uppercase;
 }
 
+.knowledge-domain-children {
+  margin-left: 9px;
+  padding-left: 12px;
+  border-left: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.knowledge-domain-children .knowledge-domain h3 {
+  margin-top: 10px;
+}
+
 .knowledge-domain-link {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 6px;
   width: 100%;
   padding: 3px 0;
   border: 0;
@@ -225,18 +236,9 @@
   color: var(--blue);
 }
 
-.knowledge-domain-link svg {
-  transition: transform 120ms ease;
-}
-
-.knowledge-domain-link:hover svg {
-  transform: translateX(2px);
-}
-
 .knowledge-page-row {
   display: flex;
   align-items: center;
-  gap: 9px;
   width: 100%;
   padding: 9px 10px;
   border: 1px solid transparent;
@@ -274,9 +276,48 @@
 }
 
 .knowledge-page-row small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 2px;
   color: var(--muted);
   font-size: 10px;
+}
+
+.knowledge-type-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 17px;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+}
+
+.knowledge-type-badge.type-concept {
+  border-color: color-mix(in srgb, var(--blue) 30%, var(--line));
+  background: color-mix(in srgb, var(--blue) 9%, var(--panel));
+  color: var(--blue);
+}
+
+.knowledge-type-badge.type-reference {
+  border-color: color-mix(in srgb, var(--green) 30%, var(--line));
+  background: color-mix(in srgb, var(--green) 9%, var(--panel));
+  color: var(--green);
+}
+
+.knowledge-type-badge.type-how-to {
+  border-color: color-mix(in srgb, #d97706 30%, var(--line));
+  background: color-mix(in srgb, #d97706 9%, var(--panel));
+  color: #b76a05;
+}
+
+.knowledge-page-warning {
+  color: #b76a05;
 }
 
 .knowledge-content-pane {

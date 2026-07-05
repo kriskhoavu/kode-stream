@@ -39,6 +39,23 @@ describe('KnowledgeBrowser', () => {
 		expect(onSelect).toHaveBeenCalledWith('a12-index');
 		expect(screen.queryByRole('button', { name: /A12 Documentation/ })).not.toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-book-marked')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-chevron-right')).not.toBeInTheDocument();
+	});
+
+	it('renders slash-separated domains as a nested hierarchy with page type badges', () => {
+		const nestedPages: KnowledgePage[] = [
+			{ ...pages[0], slug: 'master-data-index', path: 'master-data/index.md', domain: 'master-data' },
+			{ ...pages[1], slug: 'article-reference', path: 'master-data/article/reference.md', domain: 'master-data/article', pageType: 'REFERENCE' },
+			{ ...pages[1], slug: 'customer-how-to', path: 'master-data/customer/import.md', domain: 'master-data/customer', pageType: 'HOW_TO' }
+		];
+		render(<KnowledgeBrowser pages={nestedPages} warnings={[]} onSelect={vi.fn()} />);
+
+		const parent = screen.getByRole('heading', { name: 'master-data' }).closest('.knowledge-domain');
+		expect(parent).toContainElement(screen.getByRole('heading', { name: 'article' }));
+		expect(parent).toContainElement(screen.getByRole('heading', { name: 'customer' }));
+		expect(screen.getByText('REFERENCE')).toHaveClass('knowledge-type-badge', 'type-reference');
+		expect(screen.getByText('HOW-TO')).toHaveClass('knowledge-type-badge', 'type-how-to');
 	});
 
 	it('explains an empty valid Wiki', () => {
