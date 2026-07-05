@@ -5,7 +5,7 @@ import { KnowledgeWarnings } from './KnowledgeWarnings';
 
 export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode }) {
 	const [query, setQuery] = useState('');
-	const [collapsedDomains, setCollapsedDomains] = useState<Set<string>>(() => new Set());
+	const [expandedDomains, setExpandedDomains] = useState<Set<string>>(() => new Set(['root']));
 	const filtered = useMemo(() => {
 		const needle = query.trim().toLowerCase();
 		return needle ? pages.filter((page) => [page.title, page.slug, page.summary ?? '', ...page.roles, ...page.topics].some((value) => value.toLowerCase().includes(needle))) : pages;
@@ -23,10 +23,11 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 	const renderDomain = (node: DomainNode): ReactNode => {
 		const childPages = node.landingPage ? node.pages.filter((page) => page !== node.landingPage) : node.pages;
 		const collapsible = childPages.length > 0 || node.children.length > 0;
-		const expanded = query.trim() !== '' || !collapsedDomains.has(node.path);
-		const toggleDomain = () => setCollapsedDomains((current) => {
+		const expanded = query.trim() !== '' || expandedDomains.has(node.path.toLowerCase());
+		const toggleDomain = () => setExpandedDomains((current) => {
 			const next = new Set(current);
-			if (next.has(node.path)) next.delete(node.path); else next.add(node.path);
+			const key = node.path.toLowerCase();
+			if (next.has(key)) next.delete(key); else next.add(key);
 			return next;
 		});
 		return <section className="knowledge-domain" key={node.path}>

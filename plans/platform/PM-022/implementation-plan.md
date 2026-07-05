@@ -24,6 +24,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | UI5   | Dark-mode navigation simplification    | Complete |
 | UI6   | Collapsible Wiki domains               | Complete |
 | UI7   | Root domain ordering                   | Complete |
+| UI8   | Root-only default expansion            | Complete |
 
 ## Backend Phases
 
@@ -267,6 +268,20 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
 
 **Commit:** `PM-022: Keep root Knowledge domain first`
+
+### Phase UI8: Root-Only Default Expansion
+
+**Deliverables:**
+
+- [x] Expand the top-level `root` domain by default.
+- [x] Collapse every other top-level and nested domain by default.
+- [x] Preserve manual expansion state during the mounted session.
+- [x] Continue temporarily revealing matching domains while filtering.
+- [x] Add focused regression coverage for initial root and non-root states.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Default Knowledge domains to collapsed`
 
 ## Rollback And Compatibility
 

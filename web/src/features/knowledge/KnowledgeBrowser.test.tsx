@@ -20,7 +20,8 @@ describe('KnowledgeBrowser', () => {
 
 	it('supports keyboard movement and activation', () => {
 		const onSelect = vi.fn();
-		render(<KnowledgeBrowser pages={pages} warnings={[]} onSelect={onSelect} />);
+		const rootPages = pages.map((page) => ({ ...page, domain: '' }));
+		render(<KnowledgeBrowser pages={rootPages} warnings={[]} onSelect={onSelect} />);
 		const first = screen.getByRole('button', { name: /Offer Overview/ });
 		const second = screen.getByRole('button', { name: /Article Import/ });
 		first.focus(); fireEvent.keyDown(first, { key: 'ArrowDown' }); expect(second).toHaveFocus();
@@ -48,6 +49,7 @@ describe('KnowledgeBrowser', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Open A12 index' }));
 		expect(onSelect).toHaveBeenCalledWith('a12-index');
 		expect(screen.queryByRole('button', { name: /A12 Documentation/ })).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Expand A12' }));
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-book-marked')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-chevron-right')).not.toBeInTheDocument();
@@ -61,6 +63,7 @@ describe('KnowledgeBrowser', () => {
 		];
 		render(<KnowledgeBrowser pages={nestedPages} warnings={[]} onSelect={vi.fn()} />);
 
+		fireEvent.change(screen.getByRole('textbox', { name: 'Filter Knowledge pages' }), { target: { value: 'developer' } });
 		const parent = screen.getByRole('heading', { name: 'master-data' }).closest('.knowledge-domain');
 		expect(parent).toContainElement(screen.getByRole('heading', { name: 'article' }));
 		expect(parent).toContainElement(screen.getByRole('heading', { name: 'customer' }));
@@ -70,7 +73,8 @@ describe('KnowledgeBrowser', () => {
 	});
 
 	it('keeps the selected page title readable without inheriting the accent color', () => {
-		render(<KnowledgeBrowser pages={pages} selectedSlug="offer-overview" warnings={[]} onSelect={vi.fn()} />);
+		const rootPages = pages.map((page) => ({ ...page, domain: '' }));
+		render(<KnowledgeBrowser pages={rootPages} selectedSlug="offer-overview" warnings={[]} onSelect={vi.fn()} />);
 		const selected = screen.getByRole('button', { name: /Offer Overview/ });
 		expect(selected).toHaveClass('active');
 		expect(screen.getByText('Offer Overview')).toHaveClass('knowledge-page-title');
@@ -84,10 +88,12 @@ describe('KnowledgeBrowser', () => {
 		];
 		render(<KnowledgeBrowser pages={domainPages} warnings={[]} onSelect={onSelect} />);
 
-		const collapse = screen.getByRole('button', { name: 'Collapse A12' });
-		expect(collapse).toHaveAttribute('aria-expanded', 'true');
-		fireEvent.click(collapse);
+		const expand = screen.getByRole('button', { name: 'Expand A12' });
+		expect(expand).toHaveAttribute('aria-expanded', 'false');
 		expect(screen.queryByRole('button', { name: /A12 Architecture Analysis/ })).not.toBeInTheDocument();
+		fireEvent.click(expand);
+		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Collapse A12' }));
 		expect(onSelect).not.toHaveBeenCalled();
 		fireEvent.change(screen.getByRole('textbox', { name: 'Filter Knowledge pages' }), { target: { value: 'architecture' } });
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
@@ -95,6 +101,19 @@ describe('KnowledgeBrowser', () => {
 
 		fireEvent.click(screen.getByRole('button', { name: 'Expand A12' }));
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
+	});
+
+	it('opens only the root domain by default', () => {
+		const domainPages: KnowledgePage[] = [
+			{ ...pages[0], slug: 'root-page', title: 'Root Page', path: 'root.md', domain: '' },
+			{ ...pages[1], slug: 'article-page', title: 'Article Page', path: 'article/page.md', domain: 'article' }
+		];
+		render(<KnowledgeBrowser pages={domainPages} warnings={[]} onSelect={vi.fn()} />);
+
+		expect(screen.getByRole('button', { name: /Root Page/ })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Article Page/ })).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Collapse root' })).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByRole('button', { name: 'Expand article' })).toHaveAttribute('aria-expanded', 'false');
 	});
 
 	it('explains an empty valid Wiki', () => {

@@ -17,7 +17,7 @@ vi.mock('../lib/api', () => ({
 }));
 
 const workspace = { id: 'discovery', name: 'Discovery', path: '/repo', baselineBranch: 'main', sources: ['docs'], createdAt: '' };
-const page = { slug: 'overview', title: 'Offer Overview', path: 'offer/overview.md', domain: 'offer', pageType: 'CONCEPT', roles: ['BA'], topics: ['workflow'], summary: 'Offer lifecycle.', sourceRefs: [], links: [], backlinks: [] };
+const page = { slug: 'overview', title: 'Offer Overview', path: 'overview.md', domain: 'root', pageType: 'CONCEPT', roles: ['BA'], topics: ['workflow'], summary: 'Offer lifecycle.', sourceRefs: [], links: [], backlinks: [] };
 
 describe('KnowledgePage layout', () => {
 	beforeEach(() => {
