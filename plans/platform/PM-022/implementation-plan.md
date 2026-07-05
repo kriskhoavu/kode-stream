@@ -18,6 +18,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | F4    | Graph, settings, and responsive polish | Complete |
 | V1    | Full verification and documentation    | Complete |
 | UI1   | Knowledge layout repair                | Complete |
+| UI2   | Integrated Wiki reading experience     | Complete |
 
 ## Backend Phases
 
@@ -175,6 +176,21 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/KnowledgePage.test.tsx web/src/features/knowledge && npm test -- --run && npm run build`
 
 **Commit:** `PM-022: Repair Knowledge page layout`
+
+### Phase UI2: Integrated Wiki Reading Experience
+
+**Deliverables:**
+
+- [x] Keep the Wiki index visible while reading page content.
+- [x] Open full page content with one click instead of an intermediate summary and “Read page” action.
+- [x] Replace Browse and Read modes with a single Pages workspace while retaining Graph as a separate view.
+- [x] Move repository-wide scan warnings into collapsed, clearly scoped Index diagnostics.
+- [x] Correct swapped detail and graph request guards that left page reads stuck on “Loading page…”.
+- [x] Add regression coverage for single-click navigation, persistent index visibility, and completed page loading.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/pages/KnowledgePage.test.tsx web/src/features/knowledge && npm run build`
+
+**Commit:** `PM-022: Integrate Knowledge index and reader`
 
 ## Rollback And Compatibility
 

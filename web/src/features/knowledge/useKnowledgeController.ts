@@ -58,7 +58,7 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 	useEffect(() => { void load(); return () => { requestVersion.current++; }; }, [load]);
 
 	useEffect(() => {
-		const version = ++graphVersion.current;
+		const version = ++detailVersion.current;
 		if (!workspace || !wiki || !location?.slug || location.view !== 'read') { setDetail(null); setDetailLoading(false); return; }
 		setDetailLoading(true);
 		void api.knowledgePage(workspace.id, wiki.root, location.slug).then((loaded) => {
@@ -72,7 +72,7 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 	}, [workspace, wiki, location?.slug, location?.view]);
 
 	useEffect(() => {
-		const version = ++detailVersion.current;
+		const version = ++graphVersion.current;
 		if (!workspace || !wiki || location?.view !== 'graph') { setGraph(null); setGraphLoading(false); return; }
 		setGraphLoading(true);
 		void api.knowledgeGraph(workspace.id, wiki.root).then((loaded) => { if (version === graphVersion.current) setGraph(loaded); }).catch(() => { if (version === graphVersion.current) setError('Knowledge graph could not be loaded.'); }).finally(() => { if (version === graphVersion.current) setGraphLoading(false); });
