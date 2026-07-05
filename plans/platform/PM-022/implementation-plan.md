@@ -25,6 +25,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | UI6   | Collapsible Wiki domains               | Complete |
 | UI7   | Root domain ordering                   | Complete |
 | UI8   | Root-only default expansion            | Complete |
+| UI9   | Landing-domain child alignment         | Complete |
 
 ## Backend Phases
 
@@ -282,6 +283,20 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
 
 **Commit:** `PM-022: Default Knowledge domains to collapsed`
+
+### Phase UI9: Landing-Domain Child Alignment
+
+**Deliverables:**
+
+- [x] Identify domain groups that expose a landing-page icon.
+- [x] Indent their direct page entries beyond the parent title position.
+- [x] Preserve full-width hit targets within the available sidebar width.
+- [x] Leave root and non-landing domain spacing unchanged.
+- [x] Add focused regression coverage for the landing-domain styling hook.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Align Knowledge landing-page children`
 
 ## Rollback And Compatibility
 

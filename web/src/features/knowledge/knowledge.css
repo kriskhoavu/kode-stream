@@ -290,6 +290,11 @@
   text-align: left;
 }
 
+.knowledge-domain.has-landing > .knowledge-page-row {
+  width: calc(100% - 22px);
+  margin-left: 22px;
+}
+
 .knowledge-page-row:hover {
   background: var(--panel);
   border-color: var(--line);
