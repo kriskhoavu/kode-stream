@@ -23,6 +23,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | UI4   | Hierarchical Wiki navigation           | Complete |
 | UI5   | Dark-mode navigation simplification    | Complete |
 | UI6   | Collapsible Wiki domains               | Complete |
+| UI7   | Root domain ordering                   | Complete |
 
 ## Backend Phases
 
@@ -253,6 +254,19 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
 
 **Commit:** `PM-022: Add collapsible Knowledge domains`
+
+### Phase UI7: Root Domain Ordering
+
+**Deliverables:**
+
+- [x] Promote the top-level `root` domain ahead of all other domains.
+- [x] Apply the ordering independently of API page order.
+- [x] Preserve the existing relative order of all non-root domains.
+- [x] Add focused regression coverage for unordered page input.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Keep root Knowledge domain first`
 
 ## Rollback And Compatibility
 

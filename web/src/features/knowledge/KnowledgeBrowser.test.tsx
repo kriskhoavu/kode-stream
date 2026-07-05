@@ -27,6 +27,16 @@ describe('KnowledgeBrowser', () => {
 		fireEvent.keyDown(second, { key: 'Enter' }); expect(onSelect).toHaveBeenCalledWith('article-import');
 	});
 
+	it('always places the root domain before other top-level domains', () => {
+		const unorderedPages: KnowledgePage[] = [
+			...pages,
+			{ ...pages[0], slug: 'root-page', title: 'Root Page', path: 'root-page.md', domain: '' }
+		];
+		render(<KnowledgeBrowser pages={unorderedPages} warnings={[]} onSelect={vi.fn()} />);
+
+		expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('root');
+	});
+
 	it('promotes a domain index page into an interactive parent', () => {
 		const onSelect = vi.fn();
 		const domainPages: KnowledgePage[] = [

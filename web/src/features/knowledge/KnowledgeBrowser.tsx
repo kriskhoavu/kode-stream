@@ -79,6 +79,8 @@ function buildDomainTree(visiblePages: KnowledgePage[], allPages: KnowledgePage[
 		nodes.get(parts.join('/'))!.pages.push(page);
 	}
 	for (const node of nodes.values()) node.landingPage = findLandingPage(allPages.filter((page) => (page.domain || 'root') === node.path));
+	const rootIndex = roots.findIndex((node) => node.path.toLowerCase() === 'root');
+	if (rootIndex > 0) roots.unshift(...roots.splice(rootIndex, 1));
 	return roots;
 }
 
