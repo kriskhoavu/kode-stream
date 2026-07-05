@@ -205,6 +205,34 @@
   text-transform: uppercase;
 }
 
+.knowledge-domain-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.knowledge-domain-link:hover,
+.knowledge-domain-link.active {
+  color: var(--blue);
+}
+
+.knowledge-domain-link svg {
+  transition: transform 120ms ease;
+}
+
+.knowledge-domain-link:hover svg {
+  transform: translateX(2px);
+}
+
 .knowledge-page-row {
   display: flex;
   align-items: center;

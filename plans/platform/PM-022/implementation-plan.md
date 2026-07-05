@@ -19,6 +19,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | V1    | Full verification and documentation    | Complete |
 | UI1   | Knowledge layout repair                | Complete |
 | UI2   | Integrated Wiki reading experience     | Complete |
+| UI3   | Interactive domain landing pages       | Complete |
 
 ## Backend Phases
 
@@ -191,6 +192,20 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/KnowledgePage.test.tsx web/src/features/knowledge && npm run build`
 
 **Commit:** `PM-022: Integrate Knowledge index and reader`
+
+### Phase UI3: Interactive Domain Landing Pages
+
+**Deliverables:**
+
+- [x] Recognize `index.md` and `README.md` as domain landing pages.
+- [x] Promote each domain heading into an accessible landing-page control.
+- [x] Remove the landing page from the child list to avoid duplicate hierarchy entries.
+- [x] Preserve keyboard navigation across parent and child page controls.
+- [x] Add focused regression coverage for parent navigation and child rendering.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Add interactive Knowledge domain parents`
 
 ## Rollback And Compatibility
 

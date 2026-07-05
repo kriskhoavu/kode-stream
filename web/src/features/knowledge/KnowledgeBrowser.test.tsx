@@ -27,6 +27,20 @@ describe('KnowledgeBrowser', () => {
 		fireEvent.keyDown(second, { key: 'Enter' }); expect(onSelect).toHaveBeenCalledWith('article-import');
 	});
 
+	it('promotes a domain index page into an interactive parent', () => {
+		const onSelect = vi.fn();
+		const domainPages: KnowledgePage[] = [
+			{ ...pages[0], slug: 'a12-index', title: 'A12 Documentation', path: 'a12/README.md', domain: 'A12' },
+			{ ...pages[1], slug: 'a12-analysis', title: 'A12 Architecture Analysis', path: 'a12/architecture.md', domain: 'A12' }
+		];
+		render(<KnowledgeBrowser pages={domainPages} warnings={[]} onSelect={onSelect} />);
+
+		fireEvent.click(screen.getByRole('button', { name: 'Open A12 index' }));
+		expect(onSelect).toHaveBeenCalledWith('a12-index');
+		expect(screen.queryByRole('button', { name: /A12 Documentation/ })).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
+	});
+
 	it('explains an empty valid Wiki', () => {
 		render(<KnowledgeBrowser pages={[]} warnings={[]} onSelect={vi.fn()} />);
 		expect(screen.getByRole('heading', { name: 'No valid pages indexed' })).toBeInTheDocument();
