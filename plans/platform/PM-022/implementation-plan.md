@@ -22,6 +22,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | UI3   | Interactive domain landing pages       | Complete |
 | UI4   | Hierarchical Wiki navigation           | Complete |
 | UI5   | Dark-mode navigation simplification    | Complete |
+| UI6   | Collapsible Wiki domains               | Complete |
 
 ## Backend Phases
 
@@ -237,6 +238,21 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
 
 **Commit:** `PM-022: Simplify Knowledge navigation styling`
+
+### Phase UI6: Collapsible Wiki Domains
+
+**Deliverables:**
+
+- [x] Add independent expand and collapse controls to every domain with children.
+- [x] Keep landing-page navigation separate from hierarchy toggling.
+- [x] Start domains expanded and retain collapse state during the mounted session.
+- [x] Temporarily reveal matching domains while filtering without discarding saved state.
+- [x] Preserve page-entry arrow navigation without including toggle controls.
+- [x] Add focused regression coverage for collapse, expand, filtering, and landing-page isolation.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Add collapsible Knowledge domains`
 
 ## Rollback And Compatibility
 

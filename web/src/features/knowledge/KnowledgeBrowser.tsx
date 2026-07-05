@@ -1,10 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { BookMarked, BookOpen, Search } from 'lucide-react';
+import { BookMarked, BookOpen, ChevronRight, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
 
 export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode }) {
 	const [query, setQuery] = useState('');
+	const [collapsedDomains, setCollapsedDomains] = useState<Set<string>>(() => new Set());
 	const filtered = useMemo(() => {
 		const needle = query.trim().toLowerCase();
 		return needle ? pages.filter((page) => [page.title, page.slug, page.summary ?? '', ...page.roles, ...page.topics].some((value) => value.toLowerCase().includes(needle))) : pages;
@@ -13,7 +14,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 	const moveFocus = (event: React.KeyboardEvent<HTMLButtonElement>, slug: string) => {
 		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
 			event.preventDefault();
-			const controls = Array.from(event.currentTarget.closest('nav')?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+			const controls = Array.from(event.currentTarget.closest('nav')?.querySelectorAll<HTMLButtonElement>('[data-knowledge-entry]') ?? []);
 			const current = controls.indexOf(event.currentTarget);
 			controls[Math.max(0, Math.min(controls.length - 1, current + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus();
 		}
@@ -21,10 +22,17 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 	};
 	const renderDomain = (node: DomainNode): ReactNode => {
 		const childPages = node.landingPage ? node.pages.filter((page) => page !== node.landingPage) : node.pages;
+		const collapsible = childPages.length > 0 || node.children.length > 0;
+		const expanded = query.trim() !== '' || !collapsedDomains.has(node.path);
+		const toggleDomain = () => setCollapsedDomains((current) => {
+			const next = new Set(current);
+			if (next.has(node.path)) next.delete(node.path); else next.add(node.path);
+			return next;
+		});
 		return <section className="knowledge-domain" key={node.path}>
-			<h3>{node.landingPage ? <button type="button" className={node.landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={() => onSelect(node.landingPage!.slug)} onKeyDown={(event) => moveFocus(event, node.landingPage!.slug)} aria-label={`Open ${node.path} index`}><BookMarked size={13} /><span>{node.name}</span></button> : node.name}</h3>
-			{childPages.map((page) => { const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length; return <button className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}><span><strong className="knowledge-page-title">{page.title}</strong><small><span className="knowledge-page-type">{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span></button>; })}
-			{node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map(renderDomain)}</div>}
+			<div className="knowledge-domain-header"><h3>{node.landingPage ? <button data-knowledge-entry type="button" className={node.landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={() => onSelect(node.landingPage!.slug)} onKeyDown={(event) => moveFocus(event, node.landingPage!.slug)} aria-label={`Open ${node.path} index`}><BookMarked size={13} /><span>{node.name}</span></button> : node.name}</h3>{collapsible && <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>}</div>
+			{expanded && childPages.map((page) => { const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length; return <button data-knowledge-entry className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}><span><strong className="knowledge-page-title">{page.title}</strong><small><span className="knowledge-page-type">{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span></button>; })}
+			{expanded && node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map(renderDomain)}</div>}
 		</section>;
 	};
 

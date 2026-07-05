@@ -66,6 +66,27 @@ describe('KnowledgeBrowser', () => {
 		expect(screen.getByText('Offer Overview')).toHaveClass('knowledge-page-title');
 	});
 
+	it('collapses and expands domains independently from opening their landing page', () => {
+		const onSelect = vi.fn();
+		const domainPages: KnowledgePage[] = [
+			{ ...pages[0], slug: 'a12-index', path: 'a12/README.md', domain: 'A12' },
+			{ ...pages[1], slug: 'a12-analysis', title: 'A12 Architecture Analysis', path: 'a12/architecture.md', domain: 'A12' }
+		];
+		render(<KnowledgeBrowser pages={domainPages} warnings={[]} onSelect={onSelect} />);
+
+		const collapse = screen.getByRole('button', { name: 'Collapse A12' });
+		expect(collapse).toHaveAttribute('aria-expanded', 'true');
+		fireEvent.click(collapse);
+		expect(screen.queryByRole('button', { name: /A12 Architecture Analysis/ })).not.toBeInTheDocument();
+		expect(onSelect).not.toHaveBeenCalled();
+		fireEvent.change(screen.getByRole('textbox', { name: 'Filter Knowledge pages' }), { target: { value: 'architecture' } });
+		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
+		fireEvent.change(screen.getByRole('textbox', { name: 'Filter Knowledge pages' }), { target: { value: '' } });
+
+		fireEvent.click(screen.getByRole('button', { name: 'Expand A12' }));
+		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
+	});
+
 	it('explains an empty valid Wiki', () => {
 		render(<KnowledgeBrowser pages={[]} warnings={[]} onSelect={vi.fn()} />);
 		expect(screen.getByRole('heading', { name: 'No valid pages indexed' })).toBeInTheDocument();

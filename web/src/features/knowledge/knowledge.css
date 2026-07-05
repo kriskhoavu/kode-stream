@@ -197,8 +197,17 @@
   border: 0;
 }
 
+.knowledge-domain-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 16px 3px 5px 7px;
+}
+
 .knowledge-domain h3 {
-  margin: 16px 7px 5px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   color: var(--muted);
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -211,8 +220,34 @@
   border-left: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
 }
 
-.knowledge-domain-children .knowledge-domain h3 {
+.knowledge-domain-children .knowledge-domain-header {
   margin-top: 10px;
+}
+
+.knowledge-domain-toggle {
+  display: inline-grid;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.knowledge-domain-toggle:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.knowledge-domain-toggle svg {
+  transition: transform 140ms ease;
+}
+
+.knowledge-domain-toggle.expanded svg {
+  transform: rotate(90deg);
 }
 
 .knowledge-domain-link {
