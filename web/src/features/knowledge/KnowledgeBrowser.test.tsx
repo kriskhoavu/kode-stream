@@ -52,7 +52,9 @@ describe('KnowledgeBrowser', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Expand A12' }));
 		const childPage = screen.getByRole('button', { name: /A12 Architecture Analysis/ });
 		expect(childPage).toBeInTheDocument();
-		expect(childPage.closest('.knowledge-domain')).toHaveClass('has-landing');
+		const landingControl = screen.getByRole('button', { name: 'Open A12 index' });
+		expect(landingControl.firstElementChild).toHaveTextContent('A12');
+		expect(landingControl.lastElementChild).toHaveClass('lucide-book-marked');
 		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-book-marked')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-chevron-right')).not.toBeInTheDocument();
 	});

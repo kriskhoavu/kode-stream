@@ -26,6 +26,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | UI7   | Root domain ordering                   | Complete |
 | UI8   | Root-only default expansion            | Complete |
 | UI9   | Landing-domain child alignment         | Complete |
+| UI10  | Uniform domain alignment               | Complete |
 
 ## Backend Phases
 
@@ -297,6 +298,20 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
 
 **Commit:** `PM-022: Align Knowledge landing-page children`
+
+### Phase UI10: Uniform Domain Alignment
+
+**Deliverables:**
+
+- [x] Align landing-domain titles with plain domain titles such as `root`.
+- [x] Move the landing-page bookmark after the domain label so it does not shift content.
+- [x] Remove the special landing-domain child offset.
+- [x] Use the same direct-page spacing for root and landing domains.
+- [x] Add focused regression coverage for label-first bookmark placement.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Normalize Knowledge domain alignment`
 
 ## Rollback And Compatibility
 
