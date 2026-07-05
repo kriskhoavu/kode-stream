@@ -28,6 +28,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | UI9   | Landing-domain child alignment         | Complete |
 | UI10  | Uniform domain alignment               | Complete |
 | UI11  | Consistent domain icons                | Complete |
+| UI12  | Reader-to-tree synchronization         | Complete |
 
 ## Backend Phases
 
@@ -327,6 +328,21 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
 
 **Commit:** `PM-022: Standardize Knowledge domain icons`
+
+### Phase UI12: Reader-To-Tree Synchronization
+
+**Deliverables:**
+
+- [x] Detect page selection changes initiated by reader references and backlinks.
+- [x] Expand every ancestor domain for the selected page.
+- [x] Clear filters that would hide the selected page.
+- [x] Scroll the selected entry into the visible sidebar area and move keyboard focus to it.
+- [x] Keep landing-page and direct-page entries addressable by slug.
+- [x] Add focused regression coverage for nested external selection and focus.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Synchronize Knowledge reader selection`
 
 ## Rollback And Compatibility
 

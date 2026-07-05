@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { KnowledgePage } from '../../lib/types';
 import { KnowledgeBrowser } from './KnowledgeBrowser';
@@ -120,6 +120,22 @@ describe('KnowledgeBrowser', () => {
 		expect(screen.getByRole('button', { name: 'Expand article' })).toHaveAttribute('aria-expanded', 'false');
 		expect(screen.getByRole('heading', { name: 'root' }).querySelector('.lucide-book-marked')).toBeInTheDocument();
 		expect(screen.getByRole('heading', { name: 'article' }).querySelector('.lucide-book-marked')).toBeInTheDocument();
+	});
+
+	it('expands and focuses a referenced page selected outside the tree', async () => {
+		const nestedPages: KnowledgePage[] = [
+			{ ...pages[0], slug: 'root-page', path: 'root.md', domain: '' },
+			{ ...pages[1], slug: 'article-reference', title: 'Article Reference', path: 'master-data/article/reference.md', domain: 'master-data/article' }
+		];
+		const view = render(<KnowledgeBrowser pages={nestedPages} warnings={[]} onSelect={vi.fn()} />);
+		fireEvent.change(screen.getByRole('textbox', { name: 'Filter Knowledge pages' }), { target: { value: 'root' } });
+
+		view.rerender(<KnowledgeBrowser pages={nestedPages} selectedSlug="article-reference" warnings={[]} onSelect={vi.fn()} />);
+
+		await waitFor(() => expect(screen.getByRole('button', { name: /Article Reference/ })).toHaveFocus());
+		expect(screen.getByRole('button', { name: 'Collapse master-data' })).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByRole('button', { name: 'Collapse master-data/article' })).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByRole('textbox', { name: 'Filter Knowledge pages' })).toHaveValue('');
 	});
 
 	it('explains an empty valid Wiki', () => {
