@@ -250,11 +250,15 @@
   transform: rotate(90deg);
 }
 
-.knowledge-domain-link {
+.knowledge-domain-link,
+.knowledge-domain-label {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
+}
+
+.knowledge-domain-link {
   width: 100%;
   padding: 3px 0;
   border: 0;
@@ -288,6 +292,11 @@
   background: transparent;
   color: var(--text);
   text-align: left;
+}
+
+.knowledge-domain > .knowledge-page-row {
+  width: calc(100% - 22px);
+  margin-left: 22px;
 }
 
 .knowledge-page-row:hover {

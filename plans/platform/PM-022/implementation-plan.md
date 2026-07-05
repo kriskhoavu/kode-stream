@@ -27,6 +27,7 @@ Implement Knowledge as a separate indexed read model over compatible Markdown Wi
 | UI8   | Root-only default expansion            | Complete |
 | UI9   | Landing-domain child alignment         | Complete |
 | UI10  | Uniform domain alignment               | Complete |
+| UI11  | Consistent domain icons                | Complete |
 
 ## Backend Phases
 
@@ -312,6 +313,20 @@ git diff --check
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
 
 **Commit:** `PM-022: Normalize Knowledge domain alignment`
+
+### Phase UI11: Consistent Domain Icons
+
+**Deliverables:**
+
+- [x] Render the Wiki icon to the left of every domain label, including `root`.
+- [x] Keep landing-enabled domain labels clickable without changing plain-domain semantics.
+- [x] Apply one consistent direct-child indentation to every domain.
+- [x] Preserve nested hierarchy offsets and full-width sidebar containment.
+- [x] Add focused regression coverage for root, plain, and landing-domain icons.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge web/src/pages/KnowledgePage.test.tsx && npm run build`
+
+**Commit:** `PM-022: Standardize Knowledge domain icons`
 
 ## Rollback And Compatibility
 
