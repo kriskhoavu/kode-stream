@@ -251,20 +251,19 @@ plan-manager/
 ├── cmd/
 │   └── plan-manager/                # CLI entrypoint
 ├── internal/
-│   ├── app/                         # Application bootstrap
-│   │   ├── frontend/                # Embedded production frontend assets
-│   │   └── ...
-│   ├── api/                         # HTTP API layer
-│   ├── application/                 # Application services (use cases)
-│   │   ├── health/
-│   │   └── search/
-│   ├── config/                      # Configuration
-│   ├── registry/                    # Workspace registry
-│   ├── scanner/                     # Workspace scanning
-│   ├── itemindex/                   # Item indexing & cache
-│   ├── itemwriter/                  # Item persistence
-│   ├── gitadapter/                  # Git integration
-│   └── fileaccess/                  # Filesystem abstraction
+│   ├── server/                      # Composition root, API transport, embedded frontend
+│   ├── common/                      # Shared errors, HTTP helpers, compatibility contracts
+│   ├── filesystem/                  # Bounded content, path, and write capabilities
+│   ├── workspace/                   # Registry, scanning, files, safety, and health
+│   ├── item/                        # Item workflows, index, and persistence
+│   ├── search/                      # Item, content, and path search
+│   ├── knowledge/                   # Structured Wiki indexing and actions
+│   ├── git/                         # Guarded Git workflows and repository
+│   ├── jira/                        # Jira integration
+│   ├── ai/                          # AI settings, launch, and embedded terminal
+│   ├── system/                      # Configuration, dialogs, health, and doctor
+│   ├── audit/                       # Operation audit events
+│   └── navigation/                  # Saved filters and recent items
 ├── web/                             # React frontend
 │   └── src/
 │       └── features/

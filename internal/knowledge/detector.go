@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"plan-manager/internal/models"
-	"plan-manager/internal/workspacefiles"
+	"plan-manager/internal/common/models"
+	"plan-manager/internal/workspace/files"
 )
 
 const (

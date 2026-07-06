@@ -17,7 +17,7 @@ export default defineConfig({
   root: 'web',
   plugins: [react(), katexWoff2Only()],
   build: {
-    outDir: '../internal/app/frontend',
+    outDir: '../internal/server/frontend',
     emptyOutDir: true,
     chunkSizeWarningLimit: 650
   },

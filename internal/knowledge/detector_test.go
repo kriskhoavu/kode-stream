@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"plan-manager/internal/models"
+	"plan-manager/internal/common/models"
 )
 
 type detectorIgnoreChecker struct{}

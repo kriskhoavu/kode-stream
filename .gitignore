@@ -46,7 +46,7 @@ vitest.config.d.ts
 ### Local builds ###
 /plan-manager
 /.run/
-/internal/app/frontend/assets/
+/internal/server/frontend/assets/
 /release/
 
 ### Docker ###
