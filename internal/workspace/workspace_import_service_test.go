@@ -23,7 +23,8 @@ func TestPreviewImportValidatesCandidatesAndDetectsDuplicates(t *testing.T) {
 	if _, err := reg.Create(models.WorkspaceInput{Name: "Registered", Path: second, BaselineBranch: "main", Sources: []string{"plans"}}); err != nil {
 		t.Fatal(err)
 	}
-	service := New(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, nil)
+	indexPath := filepath.Join(dataDir, "items.yaml")
+	service := New(reg, itemindex.New(indexPath), nil, nil)
 	source := filepath.Join(t.TempDir(), "workspaces.yaml")
 	contents := fmt.Sprintf(`
 - id: ignored-source-id
@@ -74,6 +75,9 @@ func TestPreviewImportValidatesCandidatesAndDetectsDuplicates(t *testing.T) {
 	listed, err := reg.List()
 	if err != nil || len(listed) != 1 {
 		t.Fatalf("preview mutated registry: records=%+v err=%v", listed, err)
+	}
+	if _, err := os.Stat(indexPath); !os.IsNotExist(err) {
+		t.Fatalf("preview wrote derived index: %v", err)
 	}
 }
 
@@ -163,6 +167,10 @@ func TestImportRegistersBatchAndContinuesAfterScanFailure(t *testing.T) {
 	}
 	source := filepath.Join(t.TempDir(), "workspaces.yaml")
 	writeImportSource(t, source, first, second)
+	sourceBefore, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
 	preview, err := service.PreviewImport(source)
 	if err != nil {
 		t.Fatal(err)
@@ -188,6 +196,14 @@ func TestImportRegistersBatchAndContinuesAfterScanFailure(t *testing.T) {
 		if len(event.Paths) != 0 || event.Error != "" {
 			t.Fatalf("audit leaked import detail: %+v", event)
 		}
+	}
+	sourceAfter, err := os.ReadFile(source)
+	if err != nil || string(sourceAfter) != string(sourceBefore) {
+		t.Fatalf("import changed source file: err=%v", err)
+	}
+	entries, err := os.ReadDir(dataDir)
+	if err != nil || len(entries) != 1 || entries[0].Name() != "workspaces.yaml" {
+		t.Fatalf("unexpected import writes: entries=%v err=%v", entries, err)
 	}
 }
 

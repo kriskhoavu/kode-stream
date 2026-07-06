@@ -12,7 +12,7 @@ Implement a review-first import from a current-schema `workspaces.yaml` into Pla
 | B2    | Atomic registration and scan orchestration | Complete |
 | F1    | Client contracts and dialog state          | Complete |
 | F2    | Review and result experience               | Complete |
-| V1    | Cross-track verification and documentation | Pending  |
+| V1    | Cross-track verification and documentation | Complete |
 
 ## Backend Phases
 
@@ -95,12 +95,12 @@ Implement a review-first import from a current-schema `workspaces.yaml` into Pla
 
 **Deliverables:**
 
-- [ ] Verify macOS, Linux, Windows, environment override, and bootstrap destination resolution in automated tests.
-- [ ] Verify preview performs no writes and import writes only the effective registry and derived indexes.
-- [ ] Verify imported workspace deletion never removes its directory.
-- [ ] Verify strict rejection of removed legacy schema fields.
-- [ ] Update README, architecture, API, and implementation baseline documentation.
-- [ ] Run Markdown formatting and review every planning/documentation diff.
+- [x] Verify macOS, Linux, Windows, environment override, and bootstrap destination resolution in automated tests.
+- [x] Verify preview performs no writes and import writes only the effective registry and derived indexes.
+- [x] Verify imported workspace deletion never removes its directory.
+- [x] Verify strict rejection of removed legacy schema fields.
+- [x] Update README, architecture, API, and implementation baseline documentation.
+- [x] Run Markdown formatting and review every planning/documentation diff.
 
 **Verification:** `rtk go test ./... && rtk npm test -- --run && rtk npm run build && rtk git diff --check`
 

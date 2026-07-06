@@ -1,6 +1,6 @@
 # Plan Manager Architecture
 
-This document describes the current architecture through PM-023.
+This document describes the current architecture through PM-024.
 
 Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
@@ -64,23 +64,23 @@ User browser
 
 ## Backend Components
 
-| Component             | Package               | Responsibility                                                                |
-|-----------------------|-----------------------|-------------------------------------------------------------------------------|
-| CLI entrypoint        | `cmd/plan-manager`    | Parses `serve` and `doctor` commands                                          |
-| Server                | `internal/server`     | Resolves paths, wires dependencies, and serves the API and embedded frontend  |
-| HTTP transport        | `internal/server/api` | Preserves routes and wire contracts while controllers move into domains       |
-| Shared contracts      | `internal/common`     | Owns shared errors, HTTP helpers, and compatibility DTOs                      |
-| Workspace domain      | `internal/workspace`  | Owns registration, scanning, files, source settings, safety, and health       |
-| Item domain           | `internal/item`       | Owns item workflows, cached index data, file writing, and refresh behavior    |
-| Search domain         | `internal/search`     | Owns item, content, and workspace-path search workflows                       |
-| Knowledge domain      | `internal/knowledge`  | Detects, indexes, reads, and enriches structured Markdown Wikis               |
-| Git domain            | `internal/git`        | Owns guarded Git workflows and the concrete Git repository                    |
-| Jira domain           | `internal/jira`       | Owns Jira workflows, caching, HTTP access, and attachment guards              |
-| AI domain             | `internal/ai`         | Owns settings, capability detection, launch, and embedded terminal sessions   |
-| System domain         | `internal/system`     | Owns configuration paths, native dialogs, application health, and diagnostics |
-| Audit domain          | `internal/audit`      | Appends and queries local operation events                                    |
-| Navigation domain     | `internal/navigation` | Stores saved filters and recent items                                         |
-| Filesystem capability | `internal/filesystem` | Provides bounded content access, path validation, and guarded writes          |
+| Component             | Package               | Responsibility                                                                  |
+|-----------------------|-----------------------|---------------------------------------------------------------------------------|
+| CLI entrypoint        | `cmd/plan-manager`    | Parses `serve` and `doctor` commands                                            |
+| Server                | `internal/server`     | Resolves paths, wires dependencies, and serves the API and embedded frontend    |
+| HTTP transport        | `internal/server/api` | Preserves routes and wire contracts while controllers move into domains         |
+| Shared contracts      | `internal/common`     | Owns shared errors, HTTP helpers, and compatibility DTOs                        |
+| Workspace domain      | `internal/workspace`  | Owns registration, import, scanning, files, source settings, safety, and health |
+| Item domain           | `internal/item`       | Owns item workflows, cached index data, file writing, and refresh behavior      |
+| Search domain         | `internal/search`     | Owns item, content, and workspace-path search workflows                         |
+| Knowledge domain      | `internal/knowledge`  | Detects, indexes, reads, and enriches structured Markdown Wikis                 |
+| Git domain            | `internal/git`        | Owns guarded Git workflows and the concrete Git repository                      |
+| Jira domain           | `internal/jira`       | Owns Jira workflows, caching, HTTP access, and attachment guards                |
+| AI domain             | `internal/ai`         | Owns settings, capability detection, launch, and embedded terminal sessions     |
+| System domain         | `internal/system`     | Owns configuration paths, native dialogs, application health, and diagnostics   |
+| Audit domain          | `internal/audit`      | Appends and queries local operation events                                      |
+| Navigation domain     | `internal/navigation` | Stores saved filters and recent items                                           |
+| Filesystem capability | `internal/filesystem` | Provides bounded content access, path validation, and guarded writes            |
 
 ## Frontend Components
 
@@ -102,7 +102,7 @@ User browser
 | Workspace explorer        | `web/src/features/workspace-explorer`     | Lazy tree, path search, Git markers, mutations, and keyboard state    |
 | Search dialog             | `web/src/components/SearchDialog.tsx`     | Global search, grouped results, and recent items                      |
 | Kanban page               | `web/src/pages/KanbanPage.tsx`            | Board, cards, and preview drawer composition                          |
-| Workspace page            | `web/src/pages/WorkspacesPage.tsx`        | Workspace create, edit, delete, scan, reveal                          |
+| Workspace page            | `web/src/pages/WorkspacesPage.tsx`        | Workspace create, import, edit, delete, scan, reveal                  |
 | Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`     | File tree, preview, Markdown editor, diff, metadata, Git controls     |
 | Explorer page             | `web/src/pages/WorkspaceExplorerPage.tsx` | Global filesystem tree, file editor, and context inspector            |
 | Error boundary            | `web/src/components/ErrorBoundary.tsx`    | Catches frontend render failures                                      |
@@ -159,6 +159,22 @@ User clicks Scan
   -> registry updates lastScannedAt
   -> frontend reloads items
 ```
+
+### Existing Workspace Import
+
+```text
+User selects a current-schema workspaces.yaml
+  -> POST /api/workspaces/import-preview reads a bounded strict YAML document
+  -> workspace validation checks Git roots, branches, sources, Jira, Knowledge, and duplicates
+  -> frontend reviews all candidates and selects valid entries
+  -> POST /api/workspaces/import rereads the source and matches candidate digests
+  -> registry rechecks duplicates under lock and atomically replaces workspaces.yaml once
+  -> each new registration is scanned independently
+  -> frontend reports indexed, scan-failed, skipped, and failed outcomes
+```
+
+Preview does not write registry or index state. Source IDs, timestamps, scan state, and clone ownership are ignored.
+Imported registrations use `existing_workspace`, destination-generated identity, and non-managed deletion semantics.
 
 ### Item Detail
 
@@ -318,15 +334,17 @@ Plan Manager does not use a database server. It uses YAML files in the OS user c
 
 Stores registered workspace configuration. The filename and API fields use workspace naming.
 
-| Field            | Type       | Purpose                                       |
-|------------------|------------|-----------------------------------------------|
-| `id`             | `string`   | Stable app ID derived from name and root path |
-| `name`           | `string`   | Display name                                  |
-| `path`           | `string`   | Absolute Git workspace root                   |
-| `baselineBranch` | `string`   | Baseline branch validated at registration     |
-| `sources`        | `string[]` | Configured sources such as `plans` or `docs`  |
-| `createdAt`      | `string`   | Creation timestamp                            |
-| `lastScannedAt`  | `string`   | Last successful scan timestamp                |
+| Field              | Type       | Purpose                                                         |
+|--------------------|------------|-----------------------------------------------------------------|
+| `id`               | `string`   | Stable app ID derived from name and root path                   |
+| `name`             | `string`   | Display name                                                    |
+| `path`             | `string`   | Absolute Git workspace root                                     |
+| `baselineBranch`   | `string`   | Baseline branch validated at registration                       |
+| `sources`          | `string[]` | Configured sources such as `plans` or `docs`                    |
+| `createdAt`        | `string`   | Creation timestamp                                              |
+| `lastScannedAt`    | `string`   | Last successful scan timestamp                                  |
+| `registrationMode` | `string`   | `local_path`, `remote_clone`, or `existing_workspace` ownership |
+| `clonePathManaged` | `boolean`  | Whether deletion may remove an app-created clone directory      |
 
 Example:
 
