@@ -87,6 +87,124 @@ func (s *Service) PreviewImport(sourcePath string) (models.WorkspaceImportPrevie
 	return preview, nil
 }
 
+func (s *Service) Import(request models.WorkspaceImportRequest) ([]models.WorkspaceImportResult, error) {
+	preview, err := s.PreviewImport(request.SourcePath)
+	if err != nil {
+		return nil, err
+	}
+	selected := make([]string, 0, len(request.CandidateKeys))
+	selectedSet := map[string]struct{}{}
+	for _, key := range request.CandidateKeys {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if _, exists := selectedSet[key]; exists {
+			continue
+		}
+		selectedSet[key] = struct{}{}
+		selected = append(selected, key)
+	}
+	results := make([]models.WorkspaceImportResult, len(selected))
+	resultIndex := make(map[string]int, len(selected))
+	for i, key := range selected {
+		resultIndex[key] = i
+		results[i] = models.WorkspaceImportResult{CandidateKey: key, Status: "skipped", Message: "candidate no longer exists in the import source"}
+	}
+
+	inputs := make([]models.WorkspaceInput, 0, len(selected))
+	inputKeys := make([]string, 0, len(selected))
+	for _, candidate := range preview.Candidates {
+		index, wanted := resultIndex[candidate.CandidateKey]
+		if !wanted {
+			continue
+		}
+		if candidate.Status != "valid" {
+			results[index].Message = importSkipMessage(candidate.Status)
+			continue
+		}
+		input := candidate.Workspace
+		input.RegistrationMode = models.WorkspaceRegistrationModeExisting
+		inputs = append(inputs, input)
+		inputKeys = append(inputKeys, candidate.CandidateKey)
+	}
+	if len(inputs) == 0 {
+		return results, nil
+	}
+
+	created, persistErr := s.registry.BatchCreate(inputs)
+	if persistErr != nil {
+		for _, key := range inputKeys {
+			index := resultIndex[key]
+			results[index].Status = "failed"
+			results[index].Message = "workspace registry could not be updated"
+		}
+		s.recordImportAudit("", models.AuditStatusFailed, "Workspace import registry update failed.")
+		return results, nil
+	}
+	for i, outcome := range created {
+		key := inputKeys[i]
+		index := resultIndex[key]
+		if outcome.Err != nil {
+			results[index].Status = "skipped"
+			results[index].Message = "workspace became invalid or was already registered"
+			continue
+		}
+		workspace := outcome.Workspace
+		results[index].Workspace = &workspace
+		s.recordImportAudit(workspace.ID, models.AuditStatusSuccess, "Workspace imported.")
+		if s.importScan == nil && (s.scanner == nil || s.index == nil) {
+			results[index].Status = "scan_failed"
+			results[index].Message = "workspace was registered but indexing is unavailable"
+			s.recordScanAudit(workspace.ID, models.AuditStatusFailed, "Imported workspace indexing failed.")
+			continue
+		}
+		var scan models.ScanResult
+		var scanErr error
+		if s.importScan != nil {
+			scan, scanErr = s.importScan(workspace.ID)
+		} else {
+			scan, scanErr = s.Scan(workspace.ID)
+		}
+		if scanErr != nil {
+			results[index].Status = "scan_failed"
+			results[index].Message = "workspace was registered but indexing failed"
+			s.recordScanAudit(workspace.ID, models.AuditStatusFailed, "Imported workspace indexing failed.")
+			continue
+		}
+		results[index].Status = "indexed"
+		results[index].Scan = &scan
+		results[index].Message = "workspace imported and indexed"
+		s.recordScanAudit(workspace.ID, models.AuditStatusSuccess, "Imported workspace indexed.")
+	}
+	return results, nil
+}
+
+func importSkipMessage(status string) string {
+	switch status {
+	case "duplicate":
+		return "workspace path is duplicated in the import source"
+	case "already_registered":
+		return "workspace is already registered"
+	default:
+		return "workspace is no longer valid"
+	}
+}
+
+func (s *Service) recordImportAudit(workspaceID string, status models.AuditStatus, message string) {
+	if s.audit == nil {
+		return
+	}
+	_, _ = s.audit.Append(models.AuditEvent{WorkspaceID: workspaceID, Operation: "workspace_import", Status: status, Message: message, Paths: []string{}})
+}
+
+func (s *Service) recordScanAudit(workspaceID string, status models.AuditStatus, message string) {
+	if s.audit == nil {
+		return
+	}
+	_, _ = s.audit.Append(models.AuditEvent{WorkspaceID: workspaceID, Operation: "workspace_import_scan", Status: status, Message: message, Paths: []string{}})
+}
+
 func readWorkspaceImport(sourcePath string) (string, []byte, []models.WorkspaceConfig, error) {
 	rawPath := strings.TrimSpace(sourcePath)
 	if rawPath == "" || !filepath.IsAbs(rawPath) {

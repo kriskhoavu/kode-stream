@@ -9,7 +9,7 @@ Implement a review-first import from a current-schema `workspaces.yaml` into Pla
 | Phase | Name                                       | Status   |
 |-------|--------------------------------------------|----------|
 | B1    | Import contracts and strict preview        | Complete |
-| B2    | Atomic registration and scan orchestration | Pending  |
+| B2    | Atomic registration and scan orchestration | Complete |
 | F1    | Client contracts and dialog state          | Pending  |
 | F2    | Review and result experience               | Pending  |
 | V1    | Cross-track verification and documentation | Pending  |
@@ -39,14 +39,14 @@ Implement a review-first import from a current-schema `workspaces.yaml` into Pla
 
 **Deliverables:**
 
-- [ ] Add registry batch-create with locked duplicate recheck.
-- [ ] Replace registry files atomically with mode `0600`.
-- [ ] Reread source and match selected candidate keys during import.
-- [ ] Persist destination-generated identity and `existing_workspace` ownership.
-- [ ] Scan every imported workspace and continue after individual failures.
-- [ ] Return indexed, scan-failed, skipped, and failed outcomes per candidate.
-- [ ] Record import and scan audit outcomes without leaking local secrets.
-- [ ] Cover write failure, changed source, concurrent duplicate, and mixed scan results.
+- [x] Add registry batch-create with locked duplicate recheck.
+- [x] Replace registry files atomically with mode `0600`.
+- [x] Reread source and match selected candidate keys during import.
+- [x] Persist destination-generated identity and `existing_workspace` ownership.
+- [x] Scan every imported workspace and continue after individual failures.
+- [x] Return indexed, scan-failed, skipped, and failed outcomes per candidate.
+- [x] Record import and scan audit outcomes without leaking local secrets.
+- [x] Cover write failure, changed source, concurrent duplicate, and mixed scan results.
 
 **Verification:** `rtk go test ./internal/workspace/... ./internal/item/... ./internal/server/api`
 

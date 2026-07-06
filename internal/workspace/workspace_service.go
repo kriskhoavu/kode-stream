@@ -45,6 +45,17 @@ type WorkspaceService struct {
 	scanner  *scanner.Scanner
 	writer   *itemwriter.Writer
 	git      *gitadapter.GitAdapter
+	audit    interface {
+		Append(models.AuditEvent) (models.AuditEvent, error)
+	}
+	importScan func(string) (models.ScanResult, error)
+}
+
+func (s *WorkspaceService) ConfigureAudit(store interface {
+	Append(models.AuditEvent) (models.AuditEvent, error)
+}) *WorkspaceService {
+	s.audit = store
+	return s
 }
 
 type Service = WorkspaceService

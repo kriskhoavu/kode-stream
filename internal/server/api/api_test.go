@@ -398,6 +398,18 @@ func TestWorkspaceImportPreviewEndpointReturnsCandidatesWithoutWriting(t *testin
 	if _, err := os.Stat(registryPath); !os.IsNotExist(err) {
 		t.Fatalf("preview wrote registry: %v", err)
 	}
+	importResponse := httptest.NewRecorder()
+	importBody, err := json.Marshal(models.WorkspaceImportRequest{SourcePath: source, CandidateKeys: []string{preview.Candidates[0].CandidateKey}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.ServeHTTP(importResponse, httptest.NewRequest(http.MethodPost, "/api/workspaces/import", strings.NewReader(string(importBody))))
+	if importResponse.Code != http.StatusOK || !strings.Contains(importResponse.Body.String(), `"status":"scan_failed"`) {
+		t.Fatalf("import status = %d body = %s", importResponse.Code, importResponse.Body.String())
+	}
+	if _, err := os.Stat(registryPath); err != nil {
+		t.Fatalf("import did not write registry: %v", err)
+	}
 
 	invalid := httptest.NewRecorder()
 	handler.ServeHTTP(invalid, httptest.NewRequest(http.MethodPost, "/api/workspaces/import-preview", strings.NewReader(`{"sourcePath":"relative.yaml"}`)))

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"plan-manager/internal/common/models"
 	gitadapter "plan-manager/internal/git"
@@ -142,6 +143,122 @@ func TestExistingWorkspaceDeletionNeverRemovesDirectory(t *testing.T) {
 	}
 	if _, err := os.Stat(root); err != nil {
 		t.Fatalf("imported workspace directory was removed: %v", err)
+	}
+}
+
+func TestImportRegistersBatchAndContinuesAfterScanFailure(t *testing.T) {
+	first := importGitRepo(t)
+	second := importGitRepo(t)
+	dataDir := t.TempDir()
+	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
+	audits := &importAuditRecorder{}
+	service := New(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, nil).ConfigureAudit(audits)
+	scanCalls := 0
+	service.importScan = func(workspaceID string) (models.ScanResult, error) {
+		scanCalls++
+		if scanCalls == 2 {
+			return models.ScanResult{}, fmt.Errorf("private scanner detail")
+		}
+		return models.ScanResult{WorkspaceID: workspaceID, ScannedAt: time.Now().UTC(), ItemCount: 2, Warnings: []models.ScanWarning{}}, nil
+	}
+	source := filepath.Join(t.TempDir(), "workspaces.yaml")
+	writeImportSource(t, source, first, second)
+	preview, err := service.PreviewImport(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := service.Import(models.WorkspaceImportRequest{SourcePath: source, CandidateKeys: []string{preview.Candidates[0].CandidateKey, preview.Candidates[1].CandidateKey}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 || results[0].Status != "indexed" || results[1].Status != "scan_failed" {
+		t.Fatalf("results = %+v", results)
+	}
+	if results[0].Workspace == nil || results[1].Workspace == nil || results[0].Scan == nil || strings.Contains(results[1].Message, "private") {
+		t.Fatalf("unsafe or incomplete results = %+v", results)
+	}
+	listed, err := reg.List()
+	if err != nil || len(listed) != 2 || scanCalls != 2 {
+		t.Fatalf("listed=%+v scans=%d err=%v", listed, scanCalls, err)
+	}
+	if len(audits.events) != 4 || audits.events[0].Operation != "workspace_import" || audits.events[3].Status != models.AuditStatusFailed {
+		t.Fatalf("audits = %+v", audits.events)
+	}
+	for _, event := range audits.events {
+		if len(event.Paths) != 0 || event.Error != "" {
+			t.Fatalf("audit leaked import detail: %+v", event)
+		}
+	}
+}
+
+func TestImportRereadsSourceAndSkipsChangedCandidateKey(t *testing.T) {
+	root := importGitRepo(t)
+	dataDir := t.TempDir()
+	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
+	service := New(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, nil)
+	source := filepath.Join(t.TempDir(), "workspaces.yaml")
+	writeImportSource(t, source, root)
+	preview, err := service.PreviewImport(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := fmt.Sprintf("- name: Changed\n  path: %q\n  baselineBranch: main\n  sources: [plans]\n", root)
+	if err := os.WriteFile(source, []byte(changed), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	results, err := service.Import(models.WorkspaceImportRequest{SourcePath: source, CandidateKeys: []string{preview.Candidates[0].CandidateKey}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Status != "skipped" || !strings.Contains(results[0].Message, "no longer exists") {
+		t.Fatalf("results = %+v", results)
+	}
+	listed, err := reg.List()
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("changed candidate was registered: %+v err=%v", listed, err)
+	}
+}
+
+func TestImportReportsRegistryWriteFailureWithoutScanning(t *testing.T) {
+	root := importGitRepo(t)
+	dataDir := t.TempDir()
+	path := filepath.Join(dataDir, "workspaces.yaml")
+	reg := registry.New(path, gitadapter.New())
+	service := New(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, nil)
+	service.importScan = func(string) (models.ScanResult, error) { t.Fatal("scan must not run"); return models.ScanResult{}, nil }
+	source := filepath.Join(t.TempDir(), "workspaces.yaml")
+	writeImportSource(t, source, root)
+	preview, err := service.PreviewImport(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	results, err := service.Import(models.WorkspaceImportRequest{SourcePath: source, CandidateKeys: []string{preview.Candidates[0].CandidateKey}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Status != "failed" || results[0].Workspace != nil {
+		t.Fatalf("results = %+v", results)
+	}
+}
+
+type importAuditRecorder struct{ events []models.AuditEvent }
+
+func (r *importAuditRecorder) Append(event models.AuditEvent) (models.AuditEvent, error) {
+	r.events = append(r.events, event)
+	return event, nil
+}
+
+func writeImportSource(t *testing.T, path string, roots ...string) {
+	t.Helper()
+	var content strings.Builder
+	for i, root := range roots {
+		fmt.Fprintf(&content, "- name: Workspace %d\n  path: %q\n  baselineBranch: main\n  sources: [plans]\n", i+1, root)
+	}
+	if err := os.WriteFile(path, []byte(content.String()), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 

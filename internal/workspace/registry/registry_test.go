@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"plan-manager/internal/common/models"
@@ -92,6 +93,101 @@ func TestCreateRemoteCloneRequiresRemoteURL(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "remote URL") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestBatchCreateWritesAcceptedWorkspacesAtomicallyWithPrivateMode(t *testing.T) {
+	first := newRegistryGitRepo(t)
+	second := newRegistryGitRepo(t)
+	path := filepath.Join(t.TempDir(), "workspaces.yaml")
+	registry := New(path, gitadapter.New())
+	results, err := registry.BatchCreate([]models.WorkspaceInput{
+		{Name: "First", Path: first, BaselineBranch: "main", Sources: []string{"plans"}, RegistrationMode: models.WorkspaceRegistrationModeExisting},
+		{Name: "Duplicate", Path: first, BaselineBranch: "main", Sources: []string{"plans"}, RegistrationMode: models.WorkspaceRegistrationModeExisting},
+		{Name: "Second", Path: second, BaselineBranch: "main", Sources: []string{"plans"}, RegistrationMode: models.WorkspaceRegistrationModeExisting},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 3 || results[0].Err != nil || results[1].Err == nil || results[2].Err != nil {
+		t.Fatalf("results = %+v", results)
+	}
+	listed, err := registry.List()
+	if err != nil || len(listed) != 2 {
+		t.Fatalf("listed=%+v err=%v", listed, err)
+	}
+	for _, workspace := range listed {
+		if workspace.RegistrationMode != models.WorkspaceRegistrationModeExisting || workspace.ClonePathManaged {
+			t.Fatalf("workspace = %+v", workspace)
+		}
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("registry mode = %o", info.Mode().Perm())
+	}
+}
+
+func TestBatchCreatePersistenceFailureDoesNotMutateLoadedRecords(t *testing.T) {
+	root := newRegistryGitRepo(t)
+	path := filepath.Join(t.TempDir(), "workspaces.yaml")
+	registry := New(path, gitadapter.New())
+	if listed, err := registry.List(); err != nil || len(listed) != 0 {
+		t.Fatalf("initial list=%+v err=%v", listed, err)
+	}
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registry.BatchCreate([]models.WorkspaceInput{{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}}); err == nil {
+		t.Fatal("expected atomic replacement failure")
+	}
+	listed, err := registry.List()
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("failed batch mutated records: list=%+v err=%v", listed, err)
+	}
+}
+
+func TestConcurrentBatchCreateRechecksDuplicateUnderLock(t *testing.T) {
+	root := newRegistryGitRepo(t)
+	registry := New(filepath.Join(t.TempDir(), "workspaces.yaml"), gitadapter.New())
+	input := []models.WorkspaceInput{{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}}
+	start := make(chan struct{})
+	results := make(chan []BatchCreateResult, 2)
+	errors := make(chan error, 2)
+	var wait sync.WaitGroup
+	for range 2 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			<-start
+			outcome, err := registry.BatchCreate(input)
+			results <- outcome
+			errors <- err
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(results)
+	close(errors)
+	for err := range errors {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	created := 0
+	conflicted := 0
+	for outcome := range results {
+		if outcome[0].Err == nil {
+			created++
+		} else {
+			conflicted++
+		}
+	}
+	listed, err := registry.List()
+	if err != nil || created != 1 || conflicted != 1 || len(listed) != 1 {
+		t.Fatalf("created=%d conflicted=%d listed=%+v err=%v", created, conflicted, listed, err)
 	}
 }
 
