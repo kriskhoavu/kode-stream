@@ -10,7 +10,7 @@ Implement a review-first import from a current-schema `workspaces.yaml` into Pla
 |-------|--------------------------------------------|----------|
 | B1    | Import contracts and strict preview        | Complete |
 | B2    | Atomic registration and scan orchestration | Complete |
-| F1    | Client contracts and dialog state          | Pending  |
+| F1    | Client contracts and dialog state          | Complete |
 | F2    | Review and result experience               | Pending  |
 | V1    | Cross-track verification and documentation | Pending  |
 
@@ -58,13 +58,13 @@ Implement a review-first import from a current-schema `workspaces.yaml` into Pla
 
 **Deliverables:**
 
-- [ ] Add typed preview and import API methods and normalizers.
-- [ ] Add Existing Workspaces to the Add Workspace mode control.
-- [ ] Add file selection, manual path entry, preview loading, and file-level errors.
-- [ ] Model selecting, previewing, reviewing, importing, complete, and error states.
-- [ ] Derive default selection from selectable candidates only.
-- [ ] Clear stale preview state when the source path changes.
-- [ ] Cover API payloads, state transitions, picker cancellation, and retry behavior.
+- [x] Add typed preview and import API methods and normalizers.
+- [x] Add Existing Workspaces to the Add Workspace mode control.
+- [x] Add file selection, manual path entry, preview loading, and file-level errors.
+- [x] Model selecting, previewing, reviewing, importing, complete, and error states.
+- [x] Derive default selection from selectable candidates only.
+- [x] Clear stale preview state when the source path changes.
+- [x] Cover API payloads, state transitions, picker cancellation, and retry behavior.
 
 **Verification:** `rtk npm test -- --run web/src/shared/api/index.test.ts web/src/pages/WorkspacesPage.test.ts && rtk npm run build`
 

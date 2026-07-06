@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, Fold
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../lib/api';
-import type { JiraConnection, KnowledgeSettings, WorkspaceConfig, WorkspaceInput, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
+import type { JiraConnection, KnowledgeSettings, WorkspaceConfig, WorkspaceImportPreview, WorkspaceInput, WorkspaceRegistrationMode, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -34,10 +34,15 @@ type SettingsEditorState = {
 type WorkspaceDetailTab = 'overview' | 'integrations';
 type WorkspaceEditSection = 'general' | 'sources' | 'integration' | '';
 type OverviewSectionKey = 'general' | 'health' | 'sources';
+export type WorkspaceImportState = 'selecting' | 'previewing' | 'reviewing' | 'importing' | 'complete' | 'error';
+
+export function defaultWorkspaceImportSelection(preview: WorkspaceImportPreview): string[] {
+	return preview.candidates.filter((candidate) => candidate.status === 'valid' && candidate.selected).map((candidate) => candidate.candidateKey);
+}
 
 export function WorkspacesPage({ workspaces, onChanged }: { workspaces: WorkspaceConfig[]; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('');
-  const [registrationMode, setRegistrationMode] = useState<'local_path' | 'remote_clone'>('local_path');
+  const [registrationMode, setRegistrationMode] = useState<WorkspaceRegistrationMode>('local_path');
   const [path, setPath] = useState('');
   const [remoteUrl, setRemoteUrl] = useState('');
   const [cloneRoot, setCloneRoot] = useState('');
@@ -63,13 +68,18 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [activeDetailTab, setActiveDetailTab] = useState<WorkspaceDetailTab>('overview');
   const [registrationStep, setRegistrationStep] = useState<1 | 2>(1);
   const [registrationNameEdited, setRegistrationNameEdited] = useState(false);
+	const [importSourcePath, setImportSourcePath] = useState('');
+	const [importState, setImportState] = useState<WorkspaceImportState>('selecting');
+	const [importPreview, setImportPreview] = useState<WorkspaceImportPreview | null>(null);
+	const [importSelection, setImportSelection] = useState<string[]>([]);
+	const [importError, setImportError] = useState('');
   const [collapsedOverviewSections, setCollapsedOverviewSections] = useState<Record<OverviewSectionKey, boolean>>({ general: false, health: false, sources: false });
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const selectedWorkspaces = workspaces.filter((workspace) => selectedWorkspaceIds.includes(workspace.id));
   const allSelected = workspaces.length > 0 && selectedWorkspaces.length === workspaces.length;
   const busy = pendingOperations.length > 0;
-  const registrationLocationReady = registrationMode === 'local_path' ? Boolean(path.trim()) : Boolean(remoteUrl.trim());
+  const registrationLocationReady = registrationMode === 'local_path' ? Boolean(path.trim()) : registrationMode === 'remote_clone' ? Boolean(remoteUrl.trim()) : Boolean(importSourcePath.trim());
   const operationBusy = (operation: string) => pendingOperations.includes(operation);
   const setBusy = (pending: boolean, operation = 'workspace-form') => {
     setPendingOperations((current) => pending
@@ -101,6 +111,10 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+	if (registrationMode === 'existing_workspace') {
+		void previewExistingWorkspaces();
+		return;
+	}
     setBusy(true);
     setNotice(null);
     setRegistrationLog('');
@@ -230,7 +244,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   };
 
   const closeRegistration = () => {
-    const dirty = Boolean(name.trim() || path.trim() || remoteUrl.trim() || sources.trim() || jira);
+	const dirty = Boolean(name.trim() || path.trim() || remoteUrl.trim() || importSourcePath.trim() || sources.trim() || jira);
     if (dirty && !window.confirm('Discard this workspace registration draft?')) return;
     setName('');
     setRegistrationMode('local_path');
@@ -242,14 +256,65 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     setJira(null);
     setRegistrationStep(1);
     setRegistrationNameEdited(false);
+	resetWorkspaceImport();
     setRegistrationOpen(false);
   };
 
   const advanceRegistration = (event: FormEvent) => {
     event.preventDefault();
+	if (registrationMode === 'existing_workspace') {
+		void previewExistingWorkspaces();
+		return;
+	}
     if (!registrationLocationReady || !name.trim()) return;
     setRegistrationStep(2);
   };
+
+	const resetWorkspaceImport = () => {
+		setImportSourcePath('');
+		setImportState('selecting');
+		setImportPreview(null);
+		setImportSelection([]);
+		setImportError('');
+	};
+
+	const changeImportSourcePath = (value: string) => {
+		setImportSourcePath(value);
+		setImportState('selecting');
+		setImportPreview(null);
+		setImportSelection([]);
+		setImportError('');
+	};
+
+	const browseImportSource = async () => {
+		setImportError('');
+		try {
+			const selection = await api.selectYAMLFile();
+			if (!selection.path) return;
+			changeImportSourcePath(selection.path);
+		} catch (err) {
+			setImportState('error');
+			setImportError(errorMessage(err));
+		}
+	};
+
+	const previewExistingWorkspaces = async () => {
+		if (!importSourcePath.trim()) return;
+		setImportState('previewing');
+		setImportError('');
+		try {
+			const preview = await api.previewWorkspaceImport(importSourcePath.trim());
+			setImportPreview(preview);
+			setImportSourcePath(preview.sourcePath);
+			setImportSelection(defaultWorkspaceImportSelection(preview));
+			setImportState('reviewing');
+		} catch (err) {
+			setImportPreview(null);
+			setImportSelection([]);
+			setImportState('error');
+			setImportError(errorMessage(err));
+		}
+	};
 
   const saveEdit = async (repo: WorkspaceConfig) => {
     setBusy(true);
@@ -568,7 +633,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                       <dl className="workspace-overview-grid">
                         <div><dt>Location</dt><dd><button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} title={repo.path}>{repo.path}</button></dd></div>
                         <div><dt>Base branch</dt><dd>{repo.baselineBranch}</dd></div>
-                        <div><dt>Registration</dt><dd>{repo.registrationMode === 'remote_clone' ? 'Remote clone' : 'Local folder'}</dd></div>
+                        <div><dt>Registration</dt><dd>{repo.registrationMode === 'remote_clone' ? 'Remote clone' : repo.registrationMode === 'existing_workspace' ? 'Imported workspace' : 'Local folder'}</dd></div>
                         {repo.remoteUrl && <div><dt>Remote URL</dt><dd>{repo.remoteUrl}</dd></div>}
                         <div><dt>Created</dt><dd>{repo.createdAt ? new Date(repo.createdAt).toLocaleString() : 'Unknown'}</dd></div>
                       </dl>
@@ -621,13 +686,13 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       {registrationOpen && <section className="modal-backdrop" role="presentation">
         <div className="modal-panel workspace-registration-modal" role="dialog" aria-modal="true" aria-labelledby="add-workspace-title">
           <header>
-            <div><h2 id="add-workspace-title">Add workspace</h2><span>Register a local folder or clone a remote Git repository.</span></div>
+            <div><h2 id="add-workspace-title">Add workspace</h2><span>Register, clone, or import existing workspace definitions.</span></div>
             <button className="icon-button" type="button" onClick={closeRegistration} aria-label="Close add workspace"><X size={16} /></button>
           </header>
-          <ol className="workspace-registration-steps" aria-label="Workspace registration progress">
+          {registrationMode !== 'existing_workspace' && <ol className="workspace-registration-steps" aria-label="Workspace registration progress">
             <li className={registrationStep === 1 ? 'active' : 'complete'}><span>1</span><div><strong>Repository</strong><small>Location and content</small></div></li>
             <li className={registrationStep === 2 ? 'active' : ''}><span>2</span><div><strong>Jira</strong><small>Optional integration</small></div></li>
-          </ol>
+          </ol>}
           <form className="workspace-registration-form" onSubmit={registrationStep === 1 ? advanceRegistration : submit}>
             {registrationStep === 1 ? <>
               <div className="registration-mode-toggle" role="radiogroup" aria-label="Workspace registration mode">
@@ -638,8 +703,25 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                   setRegistrationMode('remote_clone'); setPathDragging(false); setRegistrationNameEdited(false); setName(inferWorkspaceNameFromRemoteURL(remoteUrl));
                   if (!cloneRoot && systemConfig?.cloneRootDir) setCloneRoot(systemConfig.cloneRootDir);
                 }}>Remote Git URL</button>
+				<button className={registrationMode === 'existing_workspace' ? 'secondary active' : 'secondary'} type="button" role="radio" aria-checked={registrationMode === 'existing_workspace'} onClick={() => {
+					setRegistrationMode('existing_workspace'); setPathDragging(false); setRegistrationNameEdited(false); setName('');
+				}}>Existing Workspaces</button>
               </div>
-              {registrationMode === 'local_path' ? <label className={pathDragging ? 'repo-field path-field dragging' : 'repo-field path-field'} onDragOver={(event) => { event.preventDefault(); setPathDragging(true); }} onDragLeave={() => setPathDragging(false)} onDrop={dropPath}>
+				{registrationMode === 'existing_workspace' ? <>
+					<label className="repo-field path-field">Import Source
+						<div className="path-input-row">
+							<input aria-label="Import source path" value={importSourcePath} onChange={(event) => changeImportSourcePath(event.target.value)} placeholder="/path/to/workspaces.yaml" autoFocus />
+							<button className="secondary icon-action" type="button" onClick={() => void browseImportSource()} disabled={importState === 'previewing' || importState === 'importing'} title="Select YAML file"><FolderOpen size={16} /></button>
+						</div>
+					</label>
+					{importError && <div className="metadata-callout" role="alert"><strong>Import preview failed</strong><span>{importError}</span></div>}
+					{importPreview && <div className="metadata-callout" aria-live="polite"><strong>{importPreview.summary.valid} workspace{importPreview.summary.valid === 1 ? '' : 's'} ready to import</strong><span>{importSelection.length} selected from {importPreview.candidates.length} candidates.</span></div>}
+					<div className="workspace-registration-actions">
+						<button className="secondary" type="button" onClick={closeRegistration}>Cancel</button>
+						<button className="primary" type="submit" disabled={!importSourcePath.trim() || importState === 'previewing' || importState === 'importing'}>{importState === 'previewing' ? 'Loading preview...' : importState === 'reviewing' ? 'Refresh preview' : 'Preview workspaces'}</button>
+					</div>
+				</> : <>
+				{registrationMode === 'local_path' ? <label className={pathDragging ? 'repo-field path-field dragging' : 'repo-field path-field'} onDragOver={(event) => { event.preventDefault(); setPathDragging(true); }} onDragLeave={() => setPathDragging(false)} onDrop={dropPath}>
                 Local Path
                 <div className="path-input-row">
                   <input value={path} onChange={(event) => { const next = event.target.value; setPath(next); if (!registrationNameEdited) setName(lastPathSegment(next)); }} placeholder="/Users/me/workspace/repo" autoFocus />
@@ -668,6 +750,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                 <button className="secondary" type="button" onClick={closeRegistration}>Cancel</button>
                 <button className="primary" type="submit" disabled={!registrationLocationReady || !name.trim()}>Next: Jira <span aria-hidden="true">→</span></button>
               </div>
+				</>}
             </> : <>
               <div className="workspace-registration-step-heading"><span>Optional</span><h3>Connect Jira</h3><p>Configure Jira now, or leave it disabled and connect later from Integrations.</p></div>
               <JiraConnectionFields value={jira} onChange={setJira} />

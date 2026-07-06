@@ -66,7 +66,7 @@ export interface WorkspaceConfig {
   name: string;
   path: string;
   baselineBranch: string;
-  registrationMode?: 'local_path' | 'remote_clone';
+  registrationMode?: WorkspaceRegistrationMode;
   remoteUrl?: string;
   clonePathManaged?: boolean;
   lastSelectedBranch?: string;
@@ -122,11 +122,59 @@ export interface WorkspaceInput {
   path?: string;
   baselineBranch: string;
   sources: string[];
-  registrationMode?: 'local_path' | 'remote_clone';
+  registrationMode?: WorkspaceRegistrationMode;
   remoteUrl?: string;
   cloneRoot?: string;
   jira?: JiraConnection;
   knowledge?: KnowledgeSettings;
+}
+
+export type WorkspaceRegistrationMode = 'local_path' | 'remote_clone' | 'existing_workspace';
+
+export interface WorkspaceImportIssue {
+  field: string;
+  code: string;
+  message: string;
+}
+
+export type WorkspaceImportCandidateStatus = 'valid' | 'invalid' | 'duplicate' | 'already_registered';
+export type WorkspaceImportResultStatus = 'indexed' | 'scan_failed' | 'skipped' | 'failed';
+
+export interface WorkspaceImportCandidate {
+  candidateKey: string;
+  position: number;
+  workspace: WorkspaceInput;
+  status: WorkspaceImportCandidateStatus;
+  issues: WorkspaceImportIssue[];
+  selected: boolean;
+}
+
+export interface WorkspaceImportSummary {
+  valid: number;
+  invalid: number;
+  duplicate: number;
+  alreadyRegistered: number;
+}
+
+export interface WorkspaceImportPreview {
+  sourcePath: string;
+  destinationPath: string;
+  sourceFingerprint: string;
+  candidates: WorkspaceImportCandidate[];
+  summary: WorkspaceImportSummary;
+}
+
+export interface WorkspaceImportRequest {
+  sourcePath: string;
+  candidateKeys: string[];
+}
+
+export interface WorkspaceImportResult {
+  candidateKey: string;
+  workspace?: WorkspaceConfig;
+  status: WorkspaceImportResultStatus;
+  scan?: ScanResult;
+  message?: string;
 }
 
 export interface WorkspaceCreateResult {
@@ -138,6 +186,7 @@ export interface SystemConfigPaths {
   dataDir: string;
   defaultDataDir: string;
   cloneRootDir: string;
+  registryFile?: string;
   restartRequired?: boolean;
 }
 

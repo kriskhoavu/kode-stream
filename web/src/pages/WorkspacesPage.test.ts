@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySegmentRole, buildWorkspaceInput, inferCompatibilityFields, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, normalizeKnowledgeSettings, parseSources, previewPathSegments, settingsEditorFromResult, workspaceRemovalMessage } from './WorkspacesPage';
+import { applySegmentRole, buildWorkspaceInput, defaultWorkspaceImportSelection, inferCompatibilityFields, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, normalizeKnowledgeSettings, parseSources, previewPathSegments, settingsEditorFromResult, workspaceRemovalMessage } from './WorkspacesPage';
 
 describe('normalizeDroppedPath', () => {
   it('decodes file URLs dropped onto the path field', () => {
@@ -64,6 +64,20 @@ describe('buildWorkspaceInput', () => {
       jira: { deploymentType: 'cloud', baseUrl: 'https://company.atlassian.net', projectKey: 'DI', accountEmail: 'user@example.com', tokenEnvVar: 'JIRA_TOKEN' }
     }));
   });
+});
+
+describe('workspace import selection', () => {
+	it('selects only selectable candidates recommended by the backend', () => {
+		expect(defaultWorkspaceImportSelection({
+			sourcePath: '/source.yaml', destinationPath: '/data.yaml', sourceFingerprint: 'hash',
+			summary: { valid: 2, invalid: 1, duplicate: 0, alreadyRegistered: 0 },
+			candidates: [
+				{ candidateKey: 'selected', position: 1, status: 'valid', selected: true, issues: [], workspace: { name: 'One', path: '/one', baselineBranch: 'main', sources: [] } },
+				{ candidateKey: 'not-recommended', position: 2, status: 'valid', selected: false, issues: [], workspace: { name: 'Two', path: '/two', baselineBranch: 'main', sources: [] } },
+				{ candidateKey: 'invalid', position: 3, status: 'invalid', selected: true, issues: [], workspace: { name: 'Three', path: '/three', baselineBranch: 'main', sources: [] } }
+			]
+		})).toEqual(['selected']);
+	});
 });
 
 describe('Knowledge settings', () => {
