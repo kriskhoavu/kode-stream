@@ -1,6 +1,6 @@
 # Plan Manager Architecture
 
-This document describes the current architecture through PM-011.
+This document describes the current architecture through PM-023.
 
 Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
@@ -42,16 +42,13 @@ User browser
 ┌──────────────────────────────▼───────────────────────────────┐
 │ Go server on 127.0.0.1                                       │
 │                                                              │
-│ internal/app                                                 │
+│ internal/server                                              │
+│ - wires domain services and repositories                     │
 │ - serves embedded frontend assets                            │
-│ - mounts /api routes                                         │
+│ - mounts the server/api compatibility transport              │
 │                                                              │
-│ internal/api                                                 │
-│ - validates HTTP requests                                    │
-│ - delegates use cases to application services                │
-│                                                              │
-│ internal/application                                         │
-│ - coordinates workspace, item, and Git workflows             │
+│ internal/{workspace,item,knowledge,git,...}                   │
+│ - owns controllers, workflows, repositories, and policies    │
 └───────────────┬───────────────────────────────┬──────────────┘
                 │                               │
 ┌───────────────▼────────────────┐  ┌───────────▼───────────────┐
@@ -67,37 +64,23 @@ User browser
 
 ## Backend Components
 
-| Component              | Package                               | Responsibility                                                         |
-|------------------------|---------------------------------------|------------------------------------------------------------------------|
-| CLI entrypoint         | `cmd/plan-manager`                    | Parses `serve` command and port flag                                   |
-| Server                 | `internal/app`                        | Resolves app paths, wires dependencies, serves API and frontend        |
-| HTTP API               | `internal/api`                        | Defines routes, decodes requests, encodes responses                    |
-| Application services   | `internal/application/*`              | Coordinates workspace, item, and Git use cases                         |
-| App errors             | `internal/application/apperrors`      | Shared not-found sentinels across services and HTTP                    |
-| Config                 | `internal/config`                     | Resolves OS user config path                                           |
-| Registry               | `internal/registry`                   | Stores registered workspaces in `workspaces.yaml`                      |
-| Item index             | `internal/itemindex`                  | Stores cached item scan results in `item-index.yaml`                   |
-| Audit store            | `internal/audit`                      | Appends and reads local operation events in JSONL                      |
-| Navigation store       | `internal/navigation`                 | Stores saved filters and recent items in YAML                          |
-| Health service         | `internal/application/health`         | Runs read-only workspace, source, Git, and index checks                |
-| Safety service         | `internal/application/safety`         | Centralizes write path and Git preflight decisions                     |
-| Search service         | `internal/application/search`         | Ranks indexed item matches without scanning workspaces                 |
-| Scanner                | `internal/scanner`                    | Reads sources and builds item metadata                                 |
-| Scanner metadata       | `internal/scanner/metadata_*`         | Parses `plan.yaml` and document metadata                               |
-| Scanner settings       | `internal/scanner/source_*`           | Matches source item settings to item folders                           |
-| File access            | `internal/fileaccess`                 | Builds file trees, classifies bounded text reads, and writes Markdown  |
-| Workspace file access  | `internal/workspacefiles`             | Lists, searches, creates, renames, and guards workspace paths          |
-| Workspace file service | `internal/application/workspacefiles` | Coordinates file actions, Git state, audit, and targeted refresh       |
-| Content search service | `internal/application/contentsearch`  | Resolves item, source, and full-workspace search scopes                |
-| Item writer            | `internal/itemwriter`                 | Writes Markdown, metadata, status changes, and new items               |
-| Path guard             | `internal/security/pathguard`         | Shared safe-join and configured-source path validation                 |
-| Git adapter            | `internal/gitadapter`                 | Runs Git status and guarded Git commands with timeout                  |
-| System dialog          | `internal/systemdialog`               | Opens native folder picker and reveals local paths                     |
-| AI settings            | `internal/aisettings`                 | Stores provider and terminal launch templates outside workspaces       |
-| AI session service     | `internal/application/aisession`      | Detects tools, validates items, creates context, and launches sessions |
-| Jira client            | `internal/jira`                       | Authenticates and normalizes Cloud and Server/Data Center reads        |
-| Jira service           | `internal/application/jira`           | Matches items, caches issues, and guards attachment access             |
-| Models                 | `internal/models`                     | Defines stable API DTOs and shared data structures                     |
+| Component             | Package               | Responsibility                                                                |
+|-----------------------|-----------------------|-------------------------------------------------------------------------------|
+| CLI entrypoint        | `cmd/plan-manager`    | Parses `serve` and `doctor` commands                                          |
+| Server                | `internal/server`     | Resolves paths, wires dependencies, and serves the API and embedded frontend  |
+| HTTP transport        | `internal/server/api` | Preserves routes and wire contracts while controllers move into domains       |
+| Shared contracts      | `internal/common`     | Owns shared errors, HTTP helpers, and compatibility DTOs                      |
+| Workspace domain      | `internal/workspace`  | Owns registration, scanning, files, source settings, safety, and health       |
+| Item domain           | `internal/item`       | Owns item workflows, cached index data, file writing, and refresh behavior    |
+| Search domain         | `internal/search`     | Owns item, content, and workspace-path search workflows                       |
+| Knowledge domain      | `internal/knowledge`  | Detects, indexes, reads, and enriches structured Markdown Wikis               |
+| Git domain            | `internal/git`        | Owns guarded Git workflows and the concrete Git repository                    |
+| Jira domain           | `internal/jira`       | Owns Jira workflows, caching, HTTP access, and attachment guards              |
+| AI domain             | `internal/ai`         | Owns settings, capability detection, launch, and embedded terminal sessions   |
+| System domain         | `internal/system`     | Owns configuration paths, native dialogs, application health, and diagnostics |
+| Audit domain          | `internal/audit`      | Appends and queries local operation events                                    |
+| Navigation domain     | `internal/navigation` | Stores saved filters and recent items                                         |
+| Filesystem capability | `internal/filesystem` | Provides bounded content access, path validation, and guarded writes          |
 
 ## Frontend Components
 
@@ -127,10 +110,11 @@ User browser
 
 ## Dependency Rules
 
-- `internal/api` owns HTTP details and delegates workflows to `internal/application`.
-- `internal/application` packages coordinate use cases and may depend on registry, index, scanner, file access, writer, Git, and models.
-- Infrastructure packages must not import `internal/api`.
-- Shared path checks belong in `internal/security/pathguard`.
+- `internal/server` is the composition root and contains no domain decisions.
+- Domain packages own workflows, policies, repository ports, and domain-specific implementations.
+- `internal/server/api` preserves HTTP contracts and delegates to domain services.
+- Shared filesystem checks belong under `internal/filesystem`; workspace-specific file behavior belongs under `internal/workspace`.
+- `internal/common/models` contains compatibility DTOs only until ownership can move without duplicating cross-domain contracts.
 - Frontend pages may use feature and shared modules.
 - `web/src/shared/*` must not import page modules.
 - Search reads the item index and must not trigger workspace scans.
@@ -241,7 +225,7 @@ User opens an item and selects Open AI session
 
 Workspace-only starts at the workspace root without card context so the user can reference files and directories manually. Selected-card context works for any editable working-tree item and passes its workspace-relative path directly to the AI with a neutral instruction to read relevant documents and wait for the user's request. No persistent context resource is created. External tools retain their own authentication, approval, and sandbox behavior.
 
-Embedded mode keeps the provider process in a bounded PTY session owned by `internal/ptysession`. The browser connects through a loopback WebSocket using an in-memory, session-scoped grant. Output buffering and a short lease allow reconnect; cancellation, lease expiry, startup failure, or server shutdown terminates the PTY process group. Grants and terminal content are excluded from request logs and audit payloads.
+Embedded mode keeps the provider process in a bounded PTY session owned by `internal/ai`. The browser connects through a loopback WebSocket using an in-memory, session-scoped grant. Output buffering and a short lease allow reconnect; cancellation, lease expiry, startup failure, or server shutdown terminates the PTY process group. Grants and terminal content are excluded from request logs and audit payloads.
 
 ### Read-Only Jira Integration
 
@@ -654,10 +638,10 @@ Production build flow:
 
 ```text
 npm run build
-  -> writes frontend assets to internal/app/frontend
+  -> writes frontend assets to internal/server/frontend
 
 go build -o ./bin/plan-manager ./cmd/plan-manager
-  -> embeds internal/app/frontend
+  -> embeds internal/server/frontend
   -> produces one local binary
 ```
 

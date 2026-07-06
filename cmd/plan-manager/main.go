@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"plan-manager/internal/app"
-	"plan-manager/internal/doctor"
+	"plan-manager/internal/server"
+	"plan-manager/internal/system"
 )
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 		if err := fs.Parse(os.Args[2:]); err != nil {
 			log.Fatal(err)
 		}
-		server, err := app.NewServer(*port)
+		server, err := server.NewServer(*port)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -58,8 +58,8 @@ func runDoctor(args []string) error {
 		return fmt.Errorf("unsupported --format %q (expected text or json)", *format)
 	}
 
-	svc := doctor.NewService()
-	result := svc.Run(doctor.Options{
+	svc := system.NewDoctorService()
+	result := svc.Run(system.Options{
 		Provider: strings.TrimSpace(*provider),
 		Repo:     strings.TrimSpace(*repo),
 		Port:     *port,

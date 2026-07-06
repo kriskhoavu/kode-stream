@@ -3,7 +3,7 @@ package knowledge
 import (
 	"time"
 
-	"plan-manager/internal/models"
+	"plan-manager/internal/common/models"
 )
 
 type LinkResolution string
