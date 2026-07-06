@@ -261,6 +261,8 @@ func workspaceFileID(path string) string {
 
 type gitIgnoreChecker struct{}
 
+func NewGitIgnoreChecker() IgnoreChecker { return gitIgnoreChecker{} }
+
 func (gitIgnoreChecker) Ignored(workspaceRoot string, paths []string) (map[string]bool, error) {
 	cmd := exec.Command("git", "check-ignore", "-z", "--stdin")
 	cmd.Dir = workspaceRoot
@@ -271,6 +273,9 @@ func (gitIgnoreChecker) Ignored(workspaceRoot string, paths []string) (map[strin
 	err := cmd.Run()
 	if err != nil {
 		if exit, ok := err.(*exec.ExitError); ok && exit.ExitCode() == 1 {
+			return map[string]bool{}, nil
+		}
+		if strings.Contains(stderr.String(), "not a git repository") {
 			return map[string]bool{}, nil
 		}
 		return nil, fmt.Errorf("git check-ignore: %s", strings.TrimSpace(stderr.String()))

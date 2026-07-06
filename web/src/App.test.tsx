@@ -21,6 +21,8 @@ describe('routeFromLocation', () => {
     expect(routeFromLocation()).toEqual({ name: 'workspaces' });
     window.history.pushState(null, '', '/settings');
     expect(routeFromLocation()).toEqual({ name: 'settings' });
+    window.history.pushState(null, '', '/knowledge?view=graph');
+    expect(routeFromLocation()).toEqual({ name: 'knowledge', location: { view: 'graph' } });
   });
 
   it('defaults unknown paths to kanban', () => {

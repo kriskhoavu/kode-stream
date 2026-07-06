@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySegmentRole, buildWorkspaceInput, inferCompatibilityFields, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, parseSources, previewPathSegments, settingsEditorFromResult, workspaceRemovalMessage } from './WorkspacesPage';
+import { applySegmentRole, buildWorkspaceInput, inferCompatibilityFields, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, normalizeKnowledgeSettings, parseSources, previewPathSegments, settingsEditorFromResult, workspaceRemovalMessage } from './WorkspacesPage';
 
 describe('normalizeDroppedPath', () => {
   it('decodes file URLs dropped onto the path field', () => {
@@ -64,6 +64,13 @@ describe('buildWorkspaceInput', () => {
       jira: { deploymentType: 'cloud', baseUrl: 'https://company.atlassian.net', projectKey: 'DI', accountEmail: 'user@example.com', tokenEnvVar: 'JIRA_TOKEN' }
     }));
   });
+});
+
+describe('Knowledge settings', () => {
+	it('defaults detection on and preserves literal argument order', () => {
+		expect(normalizeKnowledgeSettings({ enrichExecutable: ' wiki-enrich ', enrichArgs: [' --source ', '', 'docs/$HOME'] })).toEqual({ enabled: true, enrichExecutable: 'wiki-enrich', enrichArgs: [' --source ', '', 'docs/$HOME'] });
+	});
+	it('preserves an explicit disabled state', () => expect(normalizeKnowledgeSettings({ enabled: false })).toEqual({ enabled: false, enrichExecutable: '', enrichArgs: [] }));
 });
 
 describe('inferWorkspaceNameFromRemoteURL', () => {

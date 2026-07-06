@@ -188,7 +188,14 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     api.files(itemId).then((tree) => {
       setFiles(tree);
       const first = preferredFile(tree);
-      if (first) void openFile(first.id);
+      if (first) {
+        setSelectedDirectoryPath('');
+        setSelectedTreeNode({ path: first.path, type: 'file' });
+        void openFile(first.id);
+      } else {
+        setSelectedDirectoryPath('');
+        setSelectedTreeNode(null);
+      }
     }).catch((err: Error) => setError(err.message));
     void loadDiff();
   }, [itemId, refreshKey]);
@@ -251,6 +258,8 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
 	const openContentResult = async (result: WorkspaceContentSearchResult) => {
 		if (!result.fileId) return;
 		if (dirtyFile && !(await editor.saveNow())) return;
+		setSelectedDirectoryPath('');
+		setSelectedTreeNode({ path: result.path, type: 'file' });
 		setMatchContext({ workspaceId: result.workspaceId, itemId: result.itemId, path: result.path, fileId: result.fileId, lineNumber: result.lineNumber, columnStart: result.columnStart, columnEnd: result.columnEnd });
 		await openFile(result.fileId);
 	};
@@ -501,7 +510,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
       <div className="workspace-grid" style={gridStyle} ref={workspaceGridRef}>
         <aside className={leftCollapsed ? 'file-tree side-panel collapsed' : 'file-tree side-panel'}>
           <div className="panel-header">
-            <button className={selectedDirectoryPath ? 'ghost' : 'ghost active'} type="button" title="Select item root" onClick={() => { setSelectedDirectoryPath(''); setSelectedTreeNode(null); }}><FolderOpen size={16} /> Files</button>
+            <button className={selectedTreeNode ? 'ghost' : 'ghost active'} type="button" title="Select item root" onClick={() => { setSelectedDirectoryPath(''); setSelectedTreeNode(null); }}><FolderOpen size={16} /> Files</button>
             <div className="workspace-header-actions">
               {!leftCollapsed && <button className="icon-button" type="button" aria-label="New file" title="New file" onClick={() => setCreatePathKind('file')}><FilePlus2 size={16} /></button>}
               {!leftCollapsed && <button className="icon-button" type="button" aria-label="New folder" title="New folder" onClick={() => setCreatePathKind('directory')}><FolderPlus size={16} /></button>}
@@ -519,7 +528,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
 		  )}
 		  {!leftCollapsed && (
 			<div className="file-tree-list" ref={fileTreeRef} tabIndex={-1}>
-              {files.map((node) => <TreeNode node={node} key={node.id} onOpen={openTreeFile} activeId={file?.id} depth={0} fileStateByPath={fileStateByPath} selectedDirectoryPath={selectedDirectoryPath} onSelectDirectory={(path) => { setSelectedDirectoryPath(path); setSelectedTreeNode({ path, type: 'directory' }); }} onSelectFile={(path) => setSelectedTreeNode({ path, type: 'file' })} />)}
+              {files.map((node) => <TreeNode node={node} key={node.id} onOpen={openTreeFile} activePath={selectedTreeNode?.type === 'file' ? selectedTreeNode.path : undefined} depth={0} fileStateByPath={fileStateByPath} selectedDirectoryPath={selectedDirectoryPath} onSelectDirectory={(path) => { setSelectedDirectoryPath(path); setSelectedTreeNode({ path, type: 'directory' }); }} onSelectFile={(path) => { setSelectedDirectoryPath(''); setSelectedTreeNode({ path, type: 'file' }); }} />)}
             </div>
           )}
           {!leftCollapsed && (
@@ -833,7 +842,7 @@ function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, rever
   );
 }
 
-const TreeNode = memo(function TreeNode({ node, onOpen, activeId, depth, fileStateByPath, selectedDirectoryPath, onSelectDirectory, onSelectFile }: { node: FileNode; onOpen: (id: string) => void; activeId?: string; depth: number; fileStateByPath: Map<string, TreeFileState>; selectedDirectoryPath: string; onSelectDirectory: (path: string) => void; onSelectFile: (path: string) => void }) {
+const TreeNode = memo(function TreeNode({ node, onOpen, activePath, depth, fileStateByPath, selectedDirectoryPath, onSelectDirectory, onSelectFile }: { node: FileNode; onOpen: (id: string) => void; activePath?: string; depth: number; fileStateByPath: Map<string, TreeFileState>; selectedDirectoryPath: string; onSelectDirectory: (path: string) => void; onSelectFile: (path: string) => void }) {
   const indent = { '--tree-indent': `${depth * 14}px` } as CSSProperties & Record<'--tree-indent', string>;
   const [expanded, setExpanded] = useState(true);
 
@@ -846,14 +855,14 @@ const TreeNode = memo(function TreeNode({ node, onOpen, activeId, depth, fileSta
           <span className="tree-label">{node.name}</span>
         </summary>
         <div className="tree-children">
-          {node.children?.map((child) => <TreeNode node={child} key={child.id} onOpen={onOpen} activeId={activeId} depth={depth + 1} fileStateByPath={fileStateByPath} selectedDirectoryPath={selectedDirectoryPath} onSelectDirectory={onSelectDirectory} onSelectFile={onSelectFile} />)}
+          {node.children?.map((child) => <TreeNode node={child} key={child.id} onOpen={onOpen} activePath={activePath} depth={depth + 1} fileStateByPath={fileStateByPath} selectedDirectoryPath={selectedDirectoryPath} onSelectDirectory={onSelectDirectory} onSelectFile={onSelectFile} />)}
         </div>
       </details>
     );
   }
   const state = fileStateByPath.get(normalizePath(node.path));
   return (
-    <button className={activeId === node.id ? 'tree-row tree-file active' : 'tree-row tree-file'} style={indent} title={node.path} onClick={() => { onSelectFile(node.path); onOpen(node.id); }}>
+    <button className={activePath === node.path ? 'tree-row tree-file active' : 'tree-row tree-file'} style={indent} title={node.path} onClick={() => { onSelectFile(node.path); onOpen(node.id); }}>
       <span className="tree-spacer" />
       <FileIcon className="tree-icon" size={16} />
       <span className="tree-label">{node.name}</span>

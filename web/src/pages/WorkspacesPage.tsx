@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, Fold
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../lib/api';
-import type { JiraConnection, WorkspaceConfig, WorkspaceInput, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
+import type { JiraConnection, KnowledgeSettings, WorkspaceConfig, WorkspaceInput, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -52,7 +52,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [editingSection, setEditingSection] = useState<WorkspaceEditSection>('');
-  const [editDraft, setEditDraft] = useState<{ name: string; path: string; baselineBranch: string; sources: string; jira: JiraConnection | null }>({ name: '', path: '', baselineBranch: '', sources: '', jira: null });
+  const [editDraft, setEditDraft] = useState<{ name: string; path: string; baselineBranch: string; sources: string; jira: JiraConnection | null; knowledge: KnowledgeSettings }>({ name: '', path: '', baselineBranch: '', sources: '', jira: null, knowledge: {} });
   const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([]);
   const [workspacesToRemove, setWorkspacesToRemove] = useState<WorkspaceConfig[] | null>(null);
   const [settingsEditor, setSettingsEditor] = useState<SettingsEditorState | null>(null);
@@ -197,7 +197,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       path: repo.path,
       baselineBranch: repo.baselineBranch,
       sources: repo.sources.join(', '),
-      jira: repo.jira ? { ...repo.jira } : null
+      jira: repo.jira ? { ...repo.jira } : null,
+      knowledge: { enabled: repo.knowledge?.enabled ?? true, enrichExecutable: repo.knowledge?.enrichExecutable ?? '', enrichArgs: [...(repo.knowledge?.enrichArgs ?? [])] }
     });
     setNotice(null);
   };
@@ -261,7 +262,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         sources: parseSources(editDraft.sources),
         registrationMode: repo.registrationMode,
         remoteUrl: repo.remoteUrl,
-        jira: editDraft.jira ?? undefined
+        jira: editDraft.jira ?? undefined,
+        knowledge: normalizeKnowledgeSettings(editDraft.knowledge)
       });
       setEditingId('');
       setEditingSection('');
@@ -601,11 +603,12 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                 {activeDetailTab === 'integrations' && <section className="workspace-detail-section">
                   {editingId === repo.id && editingSection === 'integration' ? <>
                     <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />
+                    <KnowledgeSettingsFields value={editDraft.knowledge} onChange={(value) => setEditDraft({ ...editDraft, knowledge: value })} />
                     <div className="repo-row-actions"><button className="secondary" type="button" onClick={discardEdit}>Cancel</button><button className="primary" type="button" onClick={() => saveEdit(repo)}>Save integration</button></div>
-                  </> : <div className="workspace-integration-card">
+                  </> : <><div className="workspace-integration-card">
                     <div><strong>Jira</strong><span>{repo.jira ? `${repo.jira.projectKey} · ${repo.jira.deploymentType === 'cloud' ? 'Cloud' : 'Server / Data Center'}` : 'Not configured'}</span></div>
                     <button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
-                  </div>}
+                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>Configure Knowledge</button></div></>}
                 </section>}
 
               </article>
@@ -1050,6 +1053,30 @@ export function buildWorkspaceInput(input: {
 
 function normalizeJiraDraft(value: JiraConnection): JiraConnection {
   return { deploymentType: value.deploymentType, baseUrl: value.baseUrl.trim().replace(/\/$/, ''), projectKey: value.projectKey.trim().toUpperCase(), accountEmail: value.deploymentType === 'cloud' ? value.accountEmail?.trim() : undefined, tokenEnvVar: value.tokenEnvVar.trim() };
+}
+
+export function normalizeKnowledgeSettings(value: KnowledgeSettings): KnowledgeSettings {
+	return { enabled: value.enabled !== false, enrichExecutable: value.enrichExecutable?.trim() ?? '', enrichArgs: [...(value.enrichArgs ?? [])] };
+}
+
+function KnowledgeSettingsFields({ value, onChange }: { value: KnowledgeSettings; onChange: (value: KnowledgeSettings) => void }) {
+	const args = value.enrichArgs ?? [];
+	const updateArg = (index: number, argument: string) => onChange({ ...value, enrichArgs: args.map((current, currentIndex) => currentIndex === index ? argument : current) });
+	const moveArg = (index: number, offset: number) => { const target=index+offset; if(target<0||target>=args.length)return; const next=[...args]; [next[index],next[target]]=[next[target],next[index]]; onChange({...value,enrichArgs:next}); };
+	return <section className="knowledge-settings-fields" aria-label="Knowledge settings"><label className="repo-field jira-connection-toggle"><span className="jira-connection-title"><input type="checkbox" checked={value.enabled !== false} onChange={(event) => onChange({ ...value, enabled: event.target.checked })} />Knowledge Wiki detection</span></label><label className="repo-field">Enrichment executable<input aria-label="Knowledge enrichment executable" value={value.enrichExecutable ?? ''} onChange={(event) => onChange({ ...value, enrichExecutable: event.target.value })} placeholder="wiki-enrich" /><small>This is a command name or path, not a secret.</small></label><div className="repo-field"><span>Literal arguments</span>{args.map((argument,index)=><div className="path-input-row" key={index}><input aria-label={`Knowledge enrichment argument ${index+1}`} value={argument} onChange={(event)=>updateArg(index,event.target.value)} /><button className="secondary icon-action" type="button" aria-label={`Move argument ${index+1} up`} disabled={index===0} onClick={()=>moveArg(index,-1)}>↑</button><button className="secondary icon-action" type="button" aria-label={`Move argument ${index+1} down`} disabled={index===args.length-1} onClick={()=>moveArg(index,1)}>↓</button><button className="secondary icon-action" type="button" aria-label={`Remove argument ${index+1}`} onClick={()=>onChange({...value,enrichArgs:args.filter((_,currentIndex)=>currentIndex!==index)})}>×</button></div>)}<button className="secondary" type="button" onClick={()=>onChange({...value,enrichArgs:[...args,'']})}>Add argument</button><small>Arguments are passed exactly as listed. Shell expansion and environment values are not supported.</small></div></section>;
+}
+
+function KnowledgeRoots({ workspaceId, enabled }: { workspaceId: string; enabled: boolean }) {
+	const [roots, setRoots] = useState<string[]>([]);
+	useEffect(() => {
+		let active = true;
+		if (!enabled) { setRoots([]); return; }
+		const loadWikis = api.knowledgeWikis;
+		if (typeof loadWikis !== 'function') { setRoots([]); return; }
+		void loadWikis(workspaceId).then((wikis) => { if (active) setRoots(wikis.map((wiki) => wiki.root)); }).catch(() => { if (active) setRoots([]); });
+		return () => { active = false; };
+	}, [enabled, workspaceId]);
+	return <small>{enabled ? roots.length ? `Detected: ${roots.join(', ')}` : 'No compatible Wiki roots detected yet.' : 'Detection is disabled.'}</small>;
 }
 
 function JiraConnectionFields({ value, onChange, workspaceId }: { value: JiraConnection | null; onChange: (value: JiraConnection | null) => void; workspaceId?: string }) {

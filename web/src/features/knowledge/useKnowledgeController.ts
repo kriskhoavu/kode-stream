@@ -1,0 +1,107 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KnowledgeLocation } from '../../app/router';
+import { api } from '../../lib/api';
+import type { KnowledgeActionResult, KnowledgeGraph, KnowledgePage, KnowledgePageDetail, KnowledgeWarning, KnowledgeWiki, WorkspaceConfig } from '../../lib/types';
+
+export function useKnowledgeController(workspaces: WorkspaceConfig[], location: KnowledgeLocation | undefined, onLocationChange: (location: KnowledgeLocation) => void) {
+	const [wikis, setWikis] = useState<KnowledgeWiki[]>([]);
+	const [pages, setPages] = useState<KnowledgePage[]>([]);
+	const [warnings, setWarnings] = useState<KnowledgeWarning[]>([]);
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState('');
+	const [notice, setNotice] = useState('');
+	const [actionResult, setActionResult] = useState<KnowledgeActionResult | null>(null);
+	const [actionBusy, setActionBusy] = useState(false);
+	const [detail, setDetail] = useState<KnowledgePageDetail | null>(null);
+	const [detailLoading, setDetailLoading] = useState(false);
+	const [graph, setGraph] = useState<KnowledgeGraph | null>(null);
+	const [graphLoading, setGraphLoading] = useState(false);
+	const requestVersion = useRef(0);
+	const detailVersion = useRef(0);
+	const graphVersion = useRef(0);
+	const locationRef = useRef(location);
+	const onLocationChangeRef = useRef(onLocationChange);
+	locationRef.current = location;
+	onLocationChangeRef.current = onLocationChange;
+	const workspace = workspaces.find((candidate) => candidate.id === location?.workspaceId) ?? workspaces[0];
+	const workspaceRef = useRef(workspace);
+	workspaceRef.current = workspace;
+	const wiki = wikis.find((candidate) => candidate.root === location?.root) ?? wikis[0];
+	const page = pages.find((candidate) => candidate.slug === location?.slug);
+
+	const updateLocation = useCallback((patch: Partial<KnowledgeLocation>) => {
+		onLocationChangeRef.current({ ...locationRef.current, ...patch });
+	}, []);
+
+	const load = useCallback(async () => {
+		const version = ++requestVersion.current;
+		setError(''); setNotice(''); setLoading(true);
+		const selectedWorkspace = workspaceRef.current;
+		if (!selectedWorkspace) { setWikis([]); setPages([]); setWarnings([]); setLoading(false); return; }
+		try {
+			const currentLocation = locationRef.current;
+			const loadedWikis = await api.knowledgeWikis(selectedWorkspace.id);
+			if (version !== requestVersion.current) return;
+			setWikis(loadedWikis);
+			const selectedWiki = loadedWikis.find((candidate) => candidate.root === currentLocation?.root) ?? loadedWikis[0];
+			if (!selectedWiki) { setPages([]); setWarnings([]); setLoading(false); if (currentLocation?.workspaceId !== selectedWorkspace.id || currentLocation?.root) onLocationChangeRef.current({ workspaceId: selectedWorkspace.id, view: 'browse' }); return; }
+			const response = await api.knowledgePages(selectedWorkspace.id, selectedWiki.root);
+			if (version !== requestVersion.current) return;
+			setPages(response.pages); setWarnings(response.warnings);
+			const selectedPage = response.pages.find((candidate) => candidate.slug === currentLocation?.slug);
+			const next: KnowledgeLocation = { workspaceId: selectedWorkspace.id, root: selectedWiki.root, view: currentLocation?.view ?? 'browse' };
+			if (selectedPage) next.slug = selectedPage.slug;
+			else if (currentLocation?.slug) setNotice('The selected page is no longer available.');
+			if (!sameLocation(currentLocation, next)) onLocationChangeRef.current(next);
+		} catch (requestError) {
+			if (version === requestVersion.current) { setError(requestError instanceof Error ? requestError.message : 'Knowledge could not be loaded.'); setPages([]); setWarnings([]); }
+		} finally { if (version === requestVersion.current) setLoading(false); }
+	}, [workspace?.id, location?.workspaceId, location?.root]);
+
+	useEffect(() => { void load(); return () => { requestVersion.current++; }; }, [load]);
+
+	useEffect(() => {
+		const version = ++detailVersion.current;
+		if (!workspace || !wiki || !location?.slug || location.view !== 'read') { setDetail(null); setDetailLoading(false); return; }
+		setDetailLoading(true);
+		void api.knowledgePage(workspace.id, wiki.root, location.slug).then((loaded) => {
+			if (version === detailVersion.current) setDetail(loaded);
+		}).catch(() => {
+			if (version !== detailVersion.current) return;
+			setDetail(null); setNotice('The selected page could not be loaded. It may have been removed.');
+			onLocationChangeRef.current({ workspaceId: workspace.id, root: wiki.root, view: 'browse' });
+		}).finally(() => { if (version === detailVersion.current) setDetailLoading(false); });
+		return () => { detailVersion.current++; };
+	}, [workspace, wiki, location?.slug, location?.view]);
+
+	useEffect(() => {
+		const version = ++graphVersion.current;
+		if (!workspace || !wiki || location?.view !== 'graph') { setGraph(null); setGraphLoading(false); return; }
+		setGraphLoading(true);
+		void api.knowledgeGraph(workspace.id, wiki.root).then((loaded) => { if (version === graphVersion.current) setGraph(loaded); }).catch(() => { if (version === graphVersion.current) setError('Knowledge graph could not be loaded.'); }).finally(() => { if (version === graphVersion.current) setGraphLoading(false); });
+		return () => { graphVersion.current++; };
+	}, [workspace, wiki, location?.view]);
+
+	const runAction = useCallback(async (operation: 'rescan' | 'sync' | 'enrich', confirm = false) => {
+		if (!workspace || (operation === 'rescan' && !wiki)) return null;
+		setActionBusy(true); setError('');
+		try {
+			const result = operation === 'rescan' ? await api.rescanKnowledge(workspace.id, wiki!.root)
+				: operation === 'sync' ? await api.syncKnowledge(workspace.id, confirm) : await api.enrichKnowledge(workspace.id, confirm);
+			setActionResult(result); await load(); return result;
+		} catch (actionError) {
+			const message = actionError instanceof Error ? actionError.message : 'Knowledge action failed.';
+			setError(message);
+			const operationLog = actionError && typeof actionError === 'object' && 'operationLog' in actionError && typeof actionError.operationLog === 'string' ? actionError.operationLog : undefined;
+			setActionResult({ ok: false, operation, message, wikis: [], warnings: [], log: operationLog, logTruncated: false, completedAt: new Date().toISOString() });
+			return null;
+		}
+		finally { setActionBusy(false); }
+	}, [load, wiki, workspace]);
+
+	return useMemo(() => ({ workspace, wiki, page, detail, detailLoading, graph, graphLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, reload: load, runAction }), [workspace, wiki, page, detail, detailLoading, graph, graphLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, load, runAction]);
+}
+
+function sameLocation(left: KnowledgeLocation | undefined, right: KnowledgeLocation): boolean {
+	return left?.workspaceId === right.workspaceId && left?.root === right.root && left?.slug === right.slug && left?.view === right.view;
+}

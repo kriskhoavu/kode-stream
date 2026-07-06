@@ -114,6 +114,13 @@ type WorkspaceConfig struct {
 	CreatedAt          time.Time                 `json:"createdAt" yaml:"createdAt"`
 	LastScannedAt      time.Time                 `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
 	Jira               *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
+	Knowledge          *KnowledgeSettings        `json:"knowledge,omitempty" yaml:"knowledge,omitempty"`
+}
+
+type KnowledgeSettings struct {
+	Enabled          *bool    `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	EnrichExecutable string   `json:"enrichExecutable,omitempty" yaml:"enrichExecutable,omitempty"`
+	EnrichArgs       []string `json:"enrichArgs,omitempty" yaml:"enrichArgs,omitempty"`
 }
 
 type JiraConnection struct {
@@ -152,6 +159,7 @@ type WorkspaceInput struct {
 	RemoteURL        string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
 	CloneRoot        string                    `json:"cloneRoot,omitempty" yaml:"cloneRoot,omitempty"`
 	Jira             *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
+	Knowledge        *KnowledgeSettings        `json:"knowledge,omitempty" yaml:"knowledge,omitempty"`
 }
 
 type SourceStructureSettings struct {

@@ -230,8 +230,8 @@
 }
 
 .explorer-tree-row.selected {
-  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
-  box-shadow: inset 3px 0 var(--blue);
+  background: rgba(148, 163, 184, 0.14);
+  box-shadow: inset 3px 0 var(--selection-accent);
 }
 
 .explorer-row-toggle,
@@ -294,11 +294,6 @@
 .explorer-node-icon {
   flex: none;
   color: var(--muted);
-}
-
-.explorer-tree-row.selected .explorer-row-label.file,
-.explorer-tree-row.selected .explorer-node-icon {
-  color: var(--blue);
 }
 
 .dialog-backdrop {
