@@ -24,7 +24,7 @@ describe('Knowledge graph', () => {
 		expect(model.edges[0]).toEqual(expect.objectContaining({ id: 'a->b', source: 'a', target: 'b', animated: true }));
 	});
 
-	it('filters graph nodes, selects them, and exposes a relationship list', async () => {
+	it('filters graph nodes and selects them', async () => {
 		const { KnowledgeGraph } = await import('./KnowledgeGraph');
 		const onSelect = vi.fn();
 		render(<KnowledgeGraph graph={graph} onSelect={onSelect} />);
@@ -32,6 +32,20 @@ describe('Knowledge graph', () => {
 		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' })); expect(onSelect).toHaveBeenCalledWith('a');
 		fireEvent.change(screen.getByRole('combobox', { name: 'Filter graph domain' }), { target: { value: 'offer' } });
 		expect(within(screen.getByTestId('flow')).queryByRole('button', { name: 'Beta' })).not.toBeInTheDocument();
-		expect(screen.getByText('No relationships match the filters.')).toBeInTheDocument();
+		expect(screen.queryByRole('region', { name: 'Knowledge relationships' })).not.toBeInTheDocument();
+	});
+
+	it('focuses the graph on the selected node and its direct relationships', async () => {
+		const { KnowledgeGraph } = await import('./KnowledgeGraph');
+		const graphWithUnrelatedNode: GraphData = {
+			...graph,
+			nodes: [...graph.nodes, { id: 'c', title: 'Gamma', domain: 'other', pageType: 'REFERENCE', roles: [], topics: [], path: 'c.md', inbound: 0, outbound: 0 }]
+		};
+		render(<KnowledgeGraph graph={graphWithUnrelatedNode} selectedSlug="a" onSelect={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Focus relationships' }));
+		expect(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
+		expect(within(screen.getByTestId('flow')).getByRole('button', { name: 'Beta' })).toBeInTheDocument();
+		expect(within(screen.getByTestId('flow')).queryByRole('button', { name: 'Gamma' })).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Show all components' })).toHaveAttribute('aria-pressed', 'true');
 	});
 });
