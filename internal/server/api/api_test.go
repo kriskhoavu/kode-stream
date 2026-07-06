@@ -361,6 +361,51 @@ func TestCreateWorkspaceSupportsRemoteClonePayload(t *testing.T) {
 	}
 }
 
+func TestWorkspaceImportPreviewEndpointReturnsCandidatesWithoutWriting(t *testing.T) {
+	root := t.TempDir()
+	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	commit := exec.Command("git", "-C", root, "commit", "--allow-empty", "-m", "init")
+	commit.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if output, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v: %s", err, output)
+	}
+	source := filepath.Join(t.TempDir(), "workspaces.yaml")
+	if err := os.WriteFile(source, []byte("- name: Imported\n  path: "+root+"\n  baselineBranch: main\n  sources: [plans]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	registryPath := filepath.Join(dataDir, "workspaces.yaml")
+	git := gitadapter.New()
+	reg := registry.New(registryPath, git)
+	handler := New(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, nil, nil, git, nil).Routes()
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/workspaces/import-preview", strings.NewReader(`{"sourcePath":"`+source+`"}`)))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	var preview models.WorkspaceImportPreview
+	if err := json.Unmarshal(response.Body.Bytes(), &preview); err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Candidates) != 1 || preview.Candidates[0].Status != "valid" || preview.DestinationPath != registryPath {
+		t.Fatalf("preview = %+v", preview)
+	}
+	if _, err := os.Stat(registryPath); !os.IsNotExist(err) {
+		t.Fatalf("preview wrote registry: %v", err)
+	}
+
+	invalid := httptest.NewRecorder()
+	handler.ServeHTTP(invalid, httptest.NewRequest(http.MethodPost, "/api/workspaces/import-preview", strings.NewReader(`{"sourcePath":"relative.yaml"}`)))
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid status = %d body = %s", invalid.Code, invalid.Body.String())
+	}
+}
+
 func TestReliabilityEndpointsReturnWorkspaceHealthAndRecentAuditEvents(t *testing.T) {
 	apiHandler, workspace, _, auditStore := reliabilityTestAPI(t)
 	if _, err := auditStore.Append(models.AuditEvent{WorkspaceID: workspace.ID, Operation: "scan", Status: models.AuditStatusSuccess, Message: "Scanned"}); err != nil {

@@ -138,7 +138,51 @@ type WorkspaceRegistrationMode string
 const (
 	WorkspaceRegistrationModeLocalPath   WorkspaceRegistrationMode = "local_path"
 	WorkspaceRegistrationModeRemoteClone WorkspaceRegistrationMode = "remote_clone"
+	WorkspaceRegistrationModeExisting    WorkspaceRegistrationMode = "existing_workspace"
 )
+
+type WorkspaceImportIssue struct {
+	Field   string `json:"field" yaml:"field"`
+	Code    string `json:"code" yaml:"code"`
+	Message string `json:"message" yaml:"message"`
+}
+
+type WorkspaceImportCandidate struct {
+	CandidateKey string                 `json:"candidateKey" yaml:"candidateKey"`
+	Position     int                    `json:"position" yaml:"position"`
+	Workspace    WorkspaceInput         `json:"workspace" yaml:"workspace"`
+	Status       string                 `json:"status" yaml:"status"`
+	Issues       []WorkspaceImportIssue `json:"issues" yaml:"issues"`
+	Selected     bool                   `json:"selected" yaml:"selected"`
+}
+
+type WorkspaceImportSummary struct {
+	Valid             int `json:"valid" yaml:"valid"`
+	Invalid           int `json:"invalid" yaml:"invalid"`
+	Duplicate         int `json:"duplicate" yaml:"duplicate"`
+	AlreadyRegistered int `json:"alreadyRegistered" yaml:"alreadyRegistered"`
+}
+
+type WorkspaceImportPreview struct {
+	SourcePath        string                     `json:"sourcePath" yaml:"sourcePath"`
+	DestinationPath   string                     `json:"destinationPath" yaml:"destinationPath"`
+	SourceFingerprint string                     `json:"sourceFingerprint" yaml:"sourceFingerprint"`
+	Candidates        []WorkspaceImportCandidate `json:"candidates" yaml:"candidates"`
+	Summary           WorkspaceImportSummary     `json:"summary" yaml:"summary"`
+}
+
+type WorkspaceImportRequest struct {
+	SourcePath    string   `json:"sourcePath" yaml:"sourcePath"`
+	CandidateKeys []string `json:"candidateKeys" yaml:"candidateKeys"`
+}
+
+type WorkspaceImportResult struct {
+	CandidateKey string           `json:"candidateKey" yaml:"candidateKey"`
+	Workspace    *WorkspaceConfig `json:"workspace,omitempty" yaml:"workspace,omitempty"`
+	Status       string           `json:"status" yaml:"status"`
+	Scan         *ScanResult      `json:"scan,omitempty" yaml:"scan,omitempty"`
+	Message      string           `json:"message,omitempty" yaml:"message,omitempty"`
+}
 
 type BranchScanMetadata struct {
 	WorkspaceID             string        `json:"workspaceId" yaml:"workspaceId"`

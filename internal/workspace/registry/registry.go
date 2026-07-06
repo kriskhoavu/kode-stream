@@ -80,6 +80,15 @@ func (r *Registry) Create(input models.WorkspaceInput) (models.WorkspaceConfig, 
 	return normalizeWorkspace(workspace), r.saveLocked()
 }
 
+// Validate checks and normalizes a workspace without changing the registry.
+func (r *Registry) Validate(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
+	return r.validate(input)
+}
+
+func (r *Registry) Path() string {
+	return r.path
+}
+
 func (r *Registry) Update(id string, input models.WorkspaceInput) (models.WorkspaceConfig, error) {
 	if err := r.load(); err != nil {
 		return models.WorkspaceConfig{}, err
@@ -188,7 +197,7 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 		branch = "main"
 	}
 	pathValue := strings.TrimSpace(input.Path)
-	if mode == models.WorkspaceRegistrationModeLocalPath {
+	if mode != models.WorkspaceRegistrationModeRemoteClone {
 		if pathValue == "" {
 			return models.WorkspaceConfig{}, errors.New("workspace path is required")
 		}
@@ -212,6 +221,9 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 		return models.WorkspaceConfig{}, fmt.Errorf("baseline branch is invalid: %w", err)
 	}
 	dirs := input.Sources
+	if len(dirs) == 0 {
+		return models.WorkspaceConfig{}, errors.New("at least one workspace source is required")
+	}
 	cleanDirs := make([]string, 0, len(dirs))
 	for _, dir := range dirs {
 		clean := filepath.Clean(strings.TrimSpace(dir))
@@ -312,10 +324,14 @@ func normalizeKnowledgeSettings(settings *models.KnowledgeSettings) *models.Know
 }
 
 func normalizeRegistrationMode(mode models.WorkspaceRegistrationMode) models.WorkspaceRegistrationMode {
-	if strings.TrimSpace(string(mode)) == string(models.WorkspaceRegistrationModeRemoteClone) {
+	switch strings.TrimSpace(string(mode)) {
+	case string(models.WorkspaceRegistrationModeRemoteClone):
 		return models.WorkspaceRegistrationModeRemoteClone
+	case string(models.WorkspaceRegistrationModeExisting):
+		return models.WorkspaceRegistrationModeExisting
+	default:
+		return models.WorkspaceRegistrationModeLocalPath
 	}
-	return models.WorkspaceRegistrationModeLocalPath
 }
 
 func (r *Registry) load() error {

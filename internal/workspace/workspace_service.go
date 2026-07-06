@@ -573,10 +573,14 @@ func remoteRepositoryName(remoteURL string) string {
 }
 
 func normalizeRegistrationMode(mode models.WorkspaceRegistrationMode) models.WorkspaceRegistrationMode {
-	if strings.TrimSpace(string(mode)) == string(models.WorkspaceRegistrationModeRemoteClone) {
+	switch strings.TrimSpace(string(mode)) {
+	case string(models.WorkspaceRegistrationModeRemoteClone):
 		return models.WorkspaceRegistrationModeRemoteClone
+	case string(models.WorkspaceRegistrationModeExisting):
+		return models.WorkspaceRegistrationModeExisting
+	default:
+		return models.WorkspaceRegistrationModeLocalPath
 	}
-	return models.WorkspaceRegistrationModeLocalPath
 }
 
 func expandHome(path string) string {
