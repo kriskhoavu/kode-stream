@@ -15,7 +15,6 @@ import (
 )
 
 const SourceStructureSettingsFile = "workspace-settings.yaml"
-const legacySourceStructureSettingsFile = "repository-settings.yaml"
 
 var settingVariablePattern = regexp.MustCompile(`^\{([A-Za-z][A-Za-z0-9_]*)\}$`)
 
@@ -59,11 +58,7 @@ func ReadSourceStructureSettingsFromReader(reader SourceReader, root string) (mo
 	path := filepath.ToSlash(filepath.Join(root, SourceStructureSettingsFile))
 	data, err := reader.ReadFile(path)
 	if os.IsNotExist(err) {
-		path = filepath.ToSlash(filepath.Join(root, legacySourceStructureSettingsFile))
-		data, err = reader.ReadFile(path)
-		if os.IsNotExist(err) {
-			return DefaultSourceStructureSettings(), false, nil
-		}
+		return DefaultSourceStructureSettings(), false, nil
 	}
 	if err != nil {
 		return DefaultSourceStructureSettings(), false, []models.ScanWarning{{ItemPath: filepath.ToSlash(path), Message: err.Error()}}
@@ -72,36 +67,8 @@ func ReadSourceStructureSettingsFromReader(reader SourceReader, root string) (mo
 	if err := yaml.Unmarshal(data, &settings); err != nil {
 		return DefaultSourceStructureSettings(), true, []models.ScanWarning{{ItemPath: SourceStructureSettingsFile, Message: "invalid workspace settings: " + err.Error()}}
 	}
-	applyLegacySourceFields(data, &settings)
 	warnings := ValidateSourceStructureSettings(settings)
 	return settings, true, warnings
-}
-
-func applyLegacySourceFields(data []byte, settings *models.SourceStructureSettings) {
-	var legacy struct {
-		Cards []struct {
-			Fields struct {
-				Service string `yaml:"scope"`
-				Ticket  string `yaml:"identifier"`
-				Source  string `yaml:"source"`
-				Item    string `yaml:"item"`
-			} `yaml:"fields"`
-		} `yaml:"cards"`
-	}
-	if err := yaml.Unmarshal(data, &legacy); err != nil {
-		return
-	}
-	for i := range settings.Cards {
-		if i >= len(legacy.Cards) {
-			break
-		}
-		if settings.Cards[i].Fields.Source == "" {
-			settings.Cards[i].Fields.Source = firstNonEmpty(legacy.Cards[i].Fields.Source, legacy.Cards[i].Fields.Service)
-		}
-		if settings.Cards[i].Fields.Item == "" {
-			settings.Cards[i].Fields.Item = firstNonEmpty(legacy.Cards[i].Fields.Item, legacy.Cards[i].Fields.Ticket)
-		}
-	}
 }
 
 func SourceSettingsMode(root string) string {
@@ -146,11 +113,9 @@ func normalizeSourceStructureSettingsForWrite(settings models.SourceStructureSet
 }
 
 func RemoveSourceStructureSettings(root string) error {
-	for _, name := range []string{SourceStructureSettingsFile, legacySourceStructureSettingsFile} {
-		err := os.Remove(filepath.Join(root, name))
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
+	err := os.Remove(filepath.Join(root, SourceStructureSettingsFile))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	return nil
 }

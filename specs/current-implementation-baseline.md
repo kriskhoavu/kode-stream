@@ -122,7 +122,6 @@ Requirements:
 
 - support one or more card rules (`pathPattern` + `fields`)
 - accept canonical fields (`source`, `item`) and aliases (`scope`, `identifier`)
-- accept legacy filename `repository-settings.yaml`
 - support literal and `{variable}` path segments
 - return warnings for invalid settings without blocking fallback scanning
 
@@ -565,7 +564,7 @@ Limits for item and explorer content-search endpoints:
 - max file size: 2 MiB
 - max snippet length: 240 characters
 
-## 12. Persistence and Compatibility Requirements
+## 12. Persistence Requirements
 
 ### 12.1 Local App Data
 
@@ -581,13 +580,6 @@ Required files:
 - `saved-filters.yaml`
 - `recent-items.yaml`
 - `ai-settings.yaml`
-
-### 12.2 Startup Compatibility Migration
-
-At startup:
-
-- copy `repositories.yaml` to `workspaces.yaml` if target is missing
-- copy `plan-index.yaml` to `item-index.yaml` if target is missing
 
 ## 13. AI Sessions
 

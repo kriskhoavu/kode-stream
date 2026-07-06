@@ -284,19 +284,15 @@ func TestSourceStructureProposalsExplainTopLevelFolderWithRootMarkdown(t *testin
 	}
 }
 
-func TestRemoveSourceStructureSettingsDeletesCurrentAndLegacyFiles(t *testing.T) {
+func TestRemoveSourceStructureSettingsDeletesCurrentFile(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "docs/workspace-settings.yaml", "version: 1\ncards: []\n")
-	writeTestFile(t, root, "docs/repository-settings.yaml", "version: 1\ncards: []\n")
 
 	if err := RemoveSourceStructureSettings(filepath.Join(root, "docs")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "docs", "workspace-settings.yaml")); !os.IsNotExist(err) {
 		t.Fatalf("workspace-settings.yaml still exists or stat failed unexpectedly: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(root, "docs", "repository-settings.yaml")); !os.IsNotExist(err) {
-		t.Fatalf("repository-settings.yaml still exists or stat failed unexpectedly: %v", err)
 	}
 }
 

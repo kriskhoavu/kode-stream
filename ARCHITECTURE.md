@@ -384,7 +384,7 @@ plan:
 
 The scanner infers `source` and `item` from the directory path, title from the first `README.md` heading, and documents recursively from Markdown files. It also infers document roles, tracks, labels, IDs, and display order from conventional paths such as `scenario/`, `design/`, and `implementation-plan.md`. Therefore, `plan.yaml` normally contains only workflow metadata that cannot be derived from the source tree: `status`, optional `owner`, and optional `tags`. Set `title` only when it intentionally differs from the README heading. Optional `documents` entries are sparse overrides merged by path onto discovered Markdown files; use them only when a role, track, or label cannot be inferred correctly.
 
-This file lets a non-standard docs tree behave like a structured item source. The scanner currently supports segment-based path patterns where each segment is literal text or a `{variable}`. Generic product language uses `source` and `item`; legacy `repository-settings.yaml`, `service`, and `ticket` are read for migration compatibility.
+This file lets a non-standard docs tree behave like a structured item source. The scanner currently supports segment-based path patterns where each segment is literal text or a `{variable}`. Generic product language uses `source` and `item`.
 
 Example:
 

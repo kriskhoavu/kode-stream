@@ -52,8 +52,6 @@ func ResolvePaths() (Paths, error) {
 		AISettingsFile:     filepath.Join(dir, "ai-settings.yaml"),
 		CloneRootDir:       cloneRootDir,
 	}
-	copyLegacyFile(filepath.Join(dir, "repositories.yaml"), paths.RegistryFile)
-	copyLegacyFile(filepath.Join(dir, "plan-index.yaml"), paths.PlanIndexFile)
 	return paths, nil
 }
 
@@ -139,15 +137,4 @@ func expandHome(path string) string {
 		}
 	}
 	return path
-}
-
-func copyLegacyFile(oldPath, newPath string) {
-	if _, err := os.Stat(newPath); err == nil {
-		return
-	}
-	data, err := os.ReadFile(oldPath)
-	if err != nil {
-		return
-	}
-	_ = os.WriteFile(newPath, data, 0o600)
 }

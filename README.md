@@ -212,7 +212,6 @@ Jira token lookup checks the running process environment first and then falls ba
 ### Workspace-Level Files
 
 - `workspace-settings.yaml`: source mapping rules for non-standard docs layouts
-- `repository-settings.yaml`: legacy alias still supported
 - `plan.yaml`: item metadata (`status`, owner, tags, title, document overrides)
 
 `workspace-settings.yaml` example:

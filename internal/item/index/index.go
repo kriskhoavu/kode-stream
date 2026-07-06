@@ -24,45 +24,9 @@ type Index struct {
 
 type state struct {
 	Items       []models.ItemDetail                             `json:"items" yaml:"items"`
-	LegacyItems []models.ItemDetail                             `json:"plans,omitempty" yaml:"plans,omitempty"`
 	Warnings    []models.ScanWarning                            `json:"warnings" yaml:"warnings"`
 	Scans       map[string]time.Time                            `json:"scans" yaml:"scans"`
 	BranchScans map[string]map[string]models.BranchScanMetadata `json:"branchScans" yaml:"branchScans"`
-}
-
-type legacyState struct {
-	Plans []legacyItemDetail `yaml:"plans"`
-}
-
-type legacyItemDetail struct {
-	PlanSummary legacyItemSummary          `yaml:"plansummary"`
-	Documents   []models.ItemDocument      `yaml:"documents"`
-	Metadata    map[string]any             `yaml:"metadata"`
-	Warnings    []models.ScanWarning       `yaml:"warnings"`
-	Counts      models.ItemWorkspaceCounts `yaml:"counts"`
-}
-
-type legacyItemSummary struct {
-	ID             string            `yaml:"id"`
-	WorkspaceID    string            `yaml:"workspaceId"`
-	RepositoryID   string            `yaml:"repositoryId"`
-	WorkspaceName  string            `yaml:"workspaceName"`
-	RepositoryName string            `yaml:"repositoryName"`
-	Branch         string            `yaml:"branch"`
-	Scope          string            `yaml:"scope"`
-	Service        string            `yaml:"service"`
-	Identifier     string            `yaml:"identifier"`
-	Ticket         string            `yaml:"ticket"`
-	Title          string            `yaml:"title"`
-	Status         models.ItemStatus `yaml:"status"`
-	Owner          string            `yaml:"owner"`
-	Author         string            `yaml:"author"`
-	Tags           []string          `yaml:"tags"`
-	UpdatedAt      time.Time         `yaml:"updatedAt"`
-	Description    string            `yaml:"description"`
-	MetadataSource string            `yaml:"metadataSource"`
-	ItemPath       string            `yaml:"itemPath"`
-	PlanRoot       string            `yaml:"planRoot"`
 }
 
 type Query struct {
@@ -266,15 +230,6 @@ func (i *Index) load() error {
 	if err := yaml.Unmarshal(data, &i.state); err != nil {
 		return err
 	}
-	if len(i.state.Items) == 0 && len(i.state.LegacyItems) > 0 {
-		i.state.Items = i.state.LegacyItems
-	}
-	if len(i.state.Items) > 0 && i.state.Items[0].ID == "" {
-		if migrated := migrateLegacyState(data); len(migrated) > 0 {
-			i.state.Items = migrated
-		}
-	}
-	i.state.LegacyItems = nil
 	if i.state.Scans == nil {
 		i.state.Scans = map[string]time.Time{}
 	}
@@ -315,42 +270,6 @@ func (i *Index) migrateBranchScanMetadataLocked() {
 			Warnings:    []models.ScanWarning{},
 		}
 	}
-}
-
-func migrateLegacyState(data []byte) []models.ItemDetail {
-	var legacy legacyState
-	if err := yaml.Unmarshal(data, &legacy); err != nil || len(legacy.Plans) == 0 {
-		return nil
-	}
-	items := make([]models.ItemDetail, 0, len(legacy.Plans))
-	for _, old := range legacy.Plans {
-		summary := old.PlanSummary
-		item := models.ItemDetail{
-			ItemSummary: models.ItemSummary{
-				ID:             summary.ID,
-				WorkspaceID:    firstNonEmpty(summary.WorkspaceID, summary.RepositoryID),
-				WorkspaceName:  firstNonEmpty(summary.WorkspaceName, summary.RepositoryName),
-				Branch:         summary.Branch,
-				Scope:          firstNonEmpty(summary.Scope, summary.Service),
-				Identifier:     firstNonEmpty(summary.Identifier, summary.Ticket),
-				Title:          summary.Title,
-				Status:         summary.Status,
-				Owner:          summary.Owner,
-				Author:         summary.Author,
-				Tags:           summary.Tags,
-				UpdatedAt:      summary.UpdatedAt,
-				Description:    summary.Description,
-				MetadataSource: summary.MetadataSource,
-				ItemPath:       firstNonEmpty(summary.ItemPath, summary.PlanRoot),
-			},
-			Documents: old.Documents,
-			Metadata:  old.Metadata,
-			Warnings:  old.Warnings,
-			Counts:    old.Counts,
-		}
-		items = append(items, item)
-	}
-	return items
 }
 
 func firstNonEmpty(values ...string) string {

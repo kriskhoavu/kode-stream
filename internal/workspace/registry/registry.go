@@ -336,22 +336,6 @@ func (r *Registry) load() error {
 	if err := yaml.Unmarshal(data, &r.records); err != nil {
 		return err
 	}
-	var legacy []struct {
-		ID              string    `yaml:"id"`
-		Name            string    `yaml:"name"`
-		Path            string    `yaml:"path"`
-		BaselineBranch  string    `yaml:"baselineBranch"`
-		PlanDirectories []string  `yaml:"planDirectories"`
-		CreatedAt       time.Time `yaml:"createdAt"`
-		LastScannedAt   time.Time `yaml:"lastScannedAt,omitempty"`
-	}
-	if err := yaml.Unmarshal(data, &legacy); err == nil {
-		for i := range r.records {
-			if len(r.records[i].Sources) == 0 && i < len(legacy) {
-				r.records[i].Sources = legacy[i].PlanDirectories
-			}
-		}
-	}
 	r.loaded = true
 	return nil
 }
