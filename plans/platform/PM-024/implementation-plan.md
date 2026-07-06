@@ -11,7 +11,7 @@ Implement a review-first import from a current-schema `workspaces.yaml` into Pla
 | B1    | Import contracts and strict preview        | Complete |
 | B2    | Atomic registration and scan orchestration | Complete |
 | F1    | Client contracts and dialog state          | Complete |
-| F2    | Review and result experience               | Pending  |
+| F2    | Review and result experience               | Complete |
 | V1    | Cross-track verification and documentation | Pending  |
 
 ## Backend Phases
@@ -76,14 +76,14 @@ Implement a review-first import from a current-schema `workspaces.yaml` into Pla
 
 **Deliverables:**
 
-- [ ] Show source and backend-resolved destination paths.
-- [ ] Show candidate configuration, status, and field-level issues.
-- [ ] Add per-candidate and selectable-only bulk selection.
-- [ ] Require explicit confirmation before import.
-- [ ] Show indexed, scan-failed, skipped, and failed result states.
-- [ ] Refresh app data after successful registrations.
-- [ ] Add accessible focus, busy, alert, keyboard, and responsive behavior.
-- [ ] Cover mixed candidate and result rendering with component tests.
+- [x] Show source and backend-resolved destination paths.
+- [x] Show candidate configuration, status, and field-level issues.
+- [x] Add per-candidate and selectable-only bulk selection.
+- [x] Require explicit confirmation before import.
+- [x] Show indexed, scan-failed, skipped, and failed result states.
+- [x] Refresh app data after successful registrations.
+- [x] Add accessible focus, busy, alert, keyboard, and responsive behavior.
+- [x] Cover mixed candidate and result rendering with component tests.
 
 **Verification:** `rtk npm test -- --run web/src/features/workspaces web/src/pages/WorkspacesPage.test.ts && rtk npm run build`
 

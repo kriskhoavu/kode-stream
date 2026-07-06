@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, Fold
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../lib/api';
-import type { JiraConnection, KnowledgeSettings, WorkspaceConfig, WorkspaceImportPreview, WorkspaceInput, WorkspaceRegistrationMode, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
+import type { JiraConnection, KnowledgeSettings, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -72,9 +72,12 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 	const [importState, setImportState] = useState<WorkspaceImportState>('selecting');
 	const [importPreview, setImportPreview] = useState<WorkspaceImportPreview | null>(null);
 	const [importSelection, setImportSelection] = useState<string[]>([]);
+	const [importResults, setImportResults] = useState<WorkspaceImportResult[]>([]);
 	const [importError, setImportError] = useState('');
+	const [importConfirmOpen, setImportConfirmOpen] = useState(false);
   const [collapsedOverviewSections, setCollapsedOverviewSections] = useState<Record<OverviewSectionKey, boolean>>({ general: false, health: false, sources: false });
   const selectAllRef = useRef<HTMLInputElement | null>(null);
+	const importStatusRef = useRef<HTMLDivElement | null>(null);
 
   const selectedWorkspaces = workspaces.filter((workspace) => selectedWorkspaceIds.includes(workspace.id));
   const allSelected = workspaces.length > 0 && selectedWorkspaces.length === workspaces.length;
@@ -108,6 +111,10 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       active = false;
     };
   }, []);
+
+	useEffect(() => {
+		if (importState === 'reviewing' || importState === 'complete') importStatusRef.current?.focus();
+	}, [importState]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -275,7 +282,9 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 		setImportState('selecting');
 		setImportPreview(null);
 		setImportSelection([]);
+		setImportResults([]);
 		setImportError('');
+		setImportConfirmOpen(false);
 	};
 
 	const changeImportSourcePath = (value: string) => {
@@ -283,7 +292,34 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 		setImportState('selecting');
 		setImportPreview(null);
 		setImportSelection([]);
+		setImportResults([]);
 		setImportError('');
+	};
+
+	const toggleImportCandidate = (candidateKey: string) => {
+		setImportSelection((current) => current.includes(candidateKey) ? current.filter((key) => key !== candidateKey) : [...current, candidateKey]);
+	};
+
+	const toggleAllImportCandidates = () => {
+		if (!importPreview) return;
+		const selectable = importPreview.candidates.filter((candidate) => candidate.status === 'valid').map((candidate) => candidate.candidateKey);
+		setImportSelection((current) => selectable.every((key) => current.includes(key)) ? [] : selectable);
+	};
+
+	const importExistingWorkspaces = async () => {
+		if (!importPreview || importSelection.length === 0) return;
+		setImportConfirmOpen(false);
+		setImportState('importing');
+		setImportError('');
+		try {
+			const results = await api.importWorkspaces({ sourcePath: importPreview.sourcePath, candidateKeys: importSelection });
+			setImportResults(results);
+			setImportState('complete');
+			if (results.some((result) => result.workspace)) await onChanged();
+		} catch (err) {
+			setImportState('error');
+			setImportError(errorMessage(err));
+		}
 	};
 
 	const browseImportSource = async () => {
@@ -710,15 +746,17 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 				{registrationMode === 'existing_workspace' ? <>
 					<label className="repo-field path-field">Import Source
 						<div className="path-input-row">
-							<input aria-label="Import source path" value={importSourcePath} onChange={(event) => changeImportSourcePath(event.target.value)} placeholder="/path/to/workspaces.yaml" autoFocus />
+							<input aria-label="Import source path" value={importSourcePath} onChange={(event) => changeImportSourcePath(event.target.value)} placeholder="/path/to/workspaces.yaml" disabled={importState === 'importing'} autoFocus />
 							<button className="secondary icon-action" type="button" onClick={() => void browseImportSource()} disabled={importState === 'previewing' || importState === 'importing'} title="Select YAML file"><FolderOpen size={16} /></button>
 						</div>
 					</label>
-					{importError && <div className="metadata-callout" role="alert"><strong>Import preview failed</strong><span>{importError}</span></div>}
-					{importPreview && <div className="metadata-callout" aria-live="polite"><strong>{importPreview.summary.valid} workspace{importPreview.summary.valid === 1 ? '' : 's'} ready to import</strong><span>{importSelection.length} selected from {importPreview.candidates.length} candidates.</span></div>}
+					{importError && <div className="metadata-callout" role="alert"><strong>{importPreview ? 'Workspace import failed' : 'Import preview failed'}</strong><span>{importError}</span></div>}
+					<div ref={importStatusRef} tabIndex={-1}>{importPreview && importState !== 'complete' && <WorkspaceImportReview preview={importPreview} selectedKeys={importSelection} onToggle={toggleImportCandidate} onToggleAll={toggleAllImportCandidates} />}
+					{importState === 'complete' && <WorkspaceImportResults results={importResults} />}</div>
 					<div className="workspace-registration-actions">
-						<button className="secondary" type="button" onClick={closeRegistration}>Cancel</button>
-						<button className="primary" type="submit" disabled={!importSourcePath.trim() || importState === 'previewing' || importState === 'importing'}>{importState === 'previewing' ? 'Loading preview...' : importState === 'reviewing' ? 'Refresh preview' : 'Preview workspaces'}</button>
+						<button className="secondary" type="button" onClick={closeRegistration}>{importState === 'complete' ? 'Done' : 'Cancel'}</button>
+						{importState !== 'complete' && <button className={importPreview ? 'secondary' : 'primary'} type="submit" disabled={!importSourcePath.trim() || importState === 'previewing' || importState === 'importing'}>{importState === 'previewing' ? 'Loading preview...' : importPreview ? 'Refresh preview' : 'Preview workspaces'}</button>}
+						{importPreview && importState !== 'complete' && <button className="primary" type="button" onClick={() => setImportConfirmOpen(true)} disabled={importSelection.length === 0 || importState === 'previewing' || importState === 'importing'}>{importState === 'importing' ? 'Importing...' : `Import ${importSelection.length} selected`}</button>}
 					</div>
 				</> : <>
 				{registrationMode === 'local_path' ? <label className={pathDragging ? 'repo-field path-field dragging' : 'repo-field path-field'} onDragOver={(event) => { event.preventDefault(); setPathDragging(true); }} onDragLeave={() => setPathDragging(false)} onDrop={dropPath}>
@@ -763,6 +801,14 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
           </form>
         </div>
       </section>}
+		{importConfirmOpen && <ConfirmDialog
+			title="Import selected workspaces"
+			message={`Import ${importSelection.length} workspace${importSelection.length === 1 ? '' : 's'} into ${importPreview?.destinationPath ?? 'the effective registry'} and start indexing?`}
+			confirmLabel={`Import ${importSelection.length} workspace${importSelection.length === 1 ? '' : 's'}`}
+			busy={importState === 'importing'}
+			onCancel={() => setImportConfirmOpen(false)}
+			onConfirm={() => void importExistingWorkspaces()}
+		/>}
       {workspacesToRemove && (
         <ConfirmDialog
           title={workspacesToRemove.length === 1 ? 'Remove workspace' : 'Remove selected workspaces'}
@@ -834,6 +880,77 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       )}
     </section>
   );
+}
+
+function WorkspaceImportReview({ preview, selectedKeys, onToggle, onToggleAll }: {
+	preview: WorkspaceImportPreview;
+	selectedKeys: string[];
+	onToggle: (candidateKey: string) => void;
+	onToggleAll: () => void;
+}) {
+	const selectable = preview.candidates.filter((candidate) => candidate.status === 'valid');
+	const allSelected = selectable.length > 0 && selectable.every((candidate) => selectedKeys.includes(candidate.candidateKey));
+	return <section className="workspace-import-review" aria-label="Workspace import review">
+		<div className="workspace-import-paths">
+			<div><strong>Import source</strong><span title={preview.sourcePath}>{preview.sourcePath}</span></div>
+			<div><strong>Effective registry</strong><span title={preview.destinationPath}>{preview.destinationPath}</span></div>
+		</div>
+		<div className="workspace-import-summary" aria-live="polite">
+			<div><strong>{preview.summary.valid} workspace{preview.summary.valid === 1 ? '' : 's'} ready to import</strong><span>{selectedKeys.length} selected from {preview.candidates.length} candidates.</span></div>
+			<button className="secondary" type="button" onClick={onToggleAll} disabled={selectable.length === 0}>{allSelected ? 'Clear selectable' : 'Select all valid'}</button>
+		</div>
+		<div className="workspace-import-candidates">
+			{preview.candidates.map((candidate) => <WorkspaceImportCandidateCard key={candidate.candidateKey} candidate={candidate} selected={selectedKeys.includes(candidate.candidateKey)} onToggle={onToggle} />)}
+		</div>
+	</section>;
+}
+
+function WorkspaceImportCandidateCard({ candidate, selected, onToggle }: { candidate: WorkspaceImportCandidate; selected: boolean; onToggle: (candidateKey: string) => void }) {
+	const workspace = candidate.workspace;
+	const selectable = candidate.status === 'valid';
+	return <article className={`workspace-import-candidate status-${candidate.status}`}>
+		<header>
+			<label><input type="checkbox" checked={selected} disabled={!selectable} onChange={() => onToggle(candidate.candidateKey)} /><span><strong>{workspace.name || `Candidate ${candidate.position}`}</strong><small>{workspace.path || 'No workspace path'}</small></span></label>
+			<span className="workspace-import-status">{workspaceImportStatusLabel(candidate.status)}</span>
+		</header>
+		<dl>
+			<div><dt>Base branch</dt><dd>{workspace.baselineBranch || 'Not set'}</dd></div>
+			<div><dt>Sources</dt><dd>{workspace.sources.join(', ') || 'None'}</dd></div>
+			{workspace.remoteUrl && <div><dt>Original remote</dt><dd>{workspace.remoteUrl}</dd></div>}
+			{workspace.jira && <div><dt>Jira</dt><dd>{workspace.jira.deploymentType} · {workspace.jira.baseUrl} · project {workspace.jira.projectKey}{workspace.jira.accountEmail ? ` · ${workspace.jira.accountEmail}` : ''} · token from {workspace.jira.tokenEnvVar}</dd></div>}
+			{workspace.knowledge && <div><dt>Knowledge</dt><dd>{workspace.knowledge.enabled === false ? 'Disabled' : `Enabled${workspace.knowledge.enrichExecutable ? ` · ${workspace.knowledge.enrichExecutable}` : ''}${workspace.knowledge.enrichArgs?.length ? ` · arguments: ${workspace.knowledge.enrichArgs.join(', ')}` : ''}`}</dd></div>}
+		</dl>
+		{candidate.issues.length > 0 && <ul className="workspace-import-issues" aria-label={`${workspace.name || `Candidate ${candidate.position}`} issues`}>{candidate.issues.map((issue, index) => <li key={`${issue.code}-${index}`}><strong>{issue.field}</strong><span>{issue.message}</span></li>)}</ul>}
+	</article>;
+}
+
+function WorkspaceImportResults({ results }: { results: WorkspaceImportResult[] }) {
+	return <section className="workspace-import-results" aria-label="Workspace import results" aria-live="polite">
+		<header><h3>Import complete</h3><span>{results.filter((result) => result.workspace).length} registered</span></header>
+		{results.length === 0 && <div className="empty-inline">No candidates were imported.</div>}
+		<ul>{results.map((result) => <li key={result.candidateKey} className={`status-${result.status}`}>
+			<span><strong>{result.workspace?.name ?? 'Selected candidate'}</strong><small>{result.message || workspaceImportResultLabel(result.status)}</small></span>
+			<span className="workspace-import-status">{workspaceImportResultLabel(result.status)}</span>
+		</li>)}</ul>
+	</section>;
+}
+
+function workspaceImportStatusLabel(status: WorkspaceImportCandidate['status']): string {
+	switch (status) {
+	case 'already_registered': return 'Already registered';
+	case 'duplicate': return 'Duplicate';
+	case 'invalid': return 'Invalid';
+	default: return 'Valid';
+	}
+}
+
+function workspaceImportResultLabel(status: WorkspaceImportResult['status']): string {
+	switch (status) {
+	case 'indexed': return 'Indexed';
+	case 'scan_failed': return 'Scan failed';
+	case 'skipped': return 'Skipped';
+	default: return 'Failed';
+	}
 }
 
 function SourceStructureProposalList({

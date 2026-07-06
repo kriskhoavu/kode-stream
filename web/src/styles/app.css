@@ -2840,6 +2840,168 @@ body.is-resizing-drawer {
   padding-top: 4px;
 }
 
+.workspace-import-review,
+.workspace-import-results {
+  display: grid;
+  gap: 12px;
+}
+
+.workspace-import-paths {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workspace-import-paths > div,
+.workspace-import-summary {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 10px 12px;
+}
+
+.workspace-import-paths > div {
+  display: grid;
+  gap: 4px;
+}
+
+.workspace-import-paths span,
+.workspace-import-candidate small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workspace-import-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workspace-import-summary > div,
+.workspace-import-candidate header label,
+.workspace-import-candidate header label > span,
+.workspace-import-results li > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.workspace-import-summary span,
+.workspace-import-results small {
+  color: var(--muted);
+}
+
+.workspace-import-candidates {
+  display: grid;
+  gap: 10px;
+}
+
+.workspace-import-candidate {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.workspace-import-candidate.status-invalid,
+.workspace-import-candidate.status-duplicate,
+.workspace-import-candidate.status-already_registered {
+  background: var(--panel-soft);
+}
+
+.workspace-import-candidate > header,
+.workspace-import-results > header,
+.workspace-import-results li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workspace-import-candidate header label {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.workspace-import-candidate header input {
+  margin-top: 3px;
+}
+
+.workspace-import-status {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  padding: 3px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.status-indexed > .workspace-import-status,
+.status-valid > header .workspace-import-status {
+  color: var(--green);
+}
+
+.status-failed > .workspace-import-status,
+.status-scan_failed > .workspace-import-status,
+.status-invalid > header .workspace-import-status {
+  color: var(--red);
+}
+
+.workspace-import-candidate dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.workspace-import-candidate dl > div {
+  min-width: 0;
+}
+
+.workspace-import-candidate dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.workspace-import-candidate dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.workspace-import-issues,
+.workspace-import-results ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workspace-import-issues li {
+  display: grid;
+  gap: 2px;
+  border-left: 3px solid var(--red);
+  padding-left: 9px;
+  font-size: 12px;
+}
+
+.workspace-import-results > header h3 {
+  margin: 0;
+}
+
+.workspace-import-results li {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
 .workspace-registration-step-heading {
   display: grid;
   gap: 5px;
@@ -5529,6 +5691,21 @@ body.is-resizing-panel {
 }
 
 @media (max-width: 640px) {
+  .workspace-import-paths,
+  .workspace-import-candidate dl {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-import-summary,
+  .workspace-registration-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-registration-actions > button {
+    width: 100%;
+  }
+
   .modal-panel.workspace-registration-modal {
     width: calc(100vw - 20px);
     max-height: calc(100vh - 20px);
