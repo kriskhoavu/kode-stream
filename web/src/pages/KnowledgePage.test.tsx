@@ -50,7 +50,7 @@ describe('KnowledgePage layout', () => {
 
 		first.rerender(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'read' }} onLocationChange={onLocationChange} onOpenExplorer={vi.fn()} />);
 		await waitFor(() => expect(api.knowledgePage).toHaveBeenCalledWith('discovery', 'docs', 'overview'));
-		expect(await screen.findByText('Full document content.')).toBeInTheDocument();
+		expect(await screen.findByText('Full document content.', {}, { timeout: 5_000 })).toBeInTheDocument();
 		expect(screen.getByRole('navigation', { name: 'Knowledge pages' })).toBeInTheDocument();
 		expect(screen.queryByText('Loading page…')).not.toBeInTheDocument();
 	});

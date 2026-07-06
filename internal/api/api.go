@@ -735,7 +735,7 @@ func (a *API) knowledgeEnrich(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) respondKnowledgeAction(w http.ResponseWriter, result knowledgeindex.KnowledgeActionResult, err error) {
 	switch {
-	case errors.Is(err, appknowledge.ErrConfirmationRequired), errors.Is(err, appknowledge.ErrEnrichNotConfigured):
+	case errors.Is(err, appknowledge.ErrConfirmationRequired), errors.Is(err, appknowledge.ErrEnrichNotConfigured), errors.Is(err, appknowledge.ErrKnowledgeDisabled):
 		writeError(w, http.StatusConflict, err.Error())
 	case err != nil:
 		a.respondKnowledge(w, result, err)
@@ -754,6 +754,8 @@ func (a *API) respondKnowledge(w http.ResponseWriter, data any, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, appknowledge.ErrUnsafePath), errors.Is(err, fileaccess.ErrUnsupportedContent):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, appknowledge.ErrKnowledgeDisabled):
+		writeError(w, http.StatusConflict, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "knowledge request failed")
 	}

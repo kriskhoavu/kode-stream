@@ -64,6 +64,9 @@ func TestResolveRelationshipsBuildsDeterministicBacklinksAndGraph(t *testing.T) 
 	}
 
 	resolved, warnings, graph := ResolveRelationships(pages)
+	if len(resolved) != 2 {
+		t.Fatalf("duplicate page remained indexed: %#v", resolved)
+	}
 	if resolved[0].Slug != "source" {
 		t.Fatalf("pages are not path sorted: %#v", resolved)
 	}

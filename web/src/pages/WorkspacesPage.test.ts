@@ -68,7 +68,7 @@ describe('buildWorkspaceInput', () => {
 
 describe('Knowledge settings', () => {
 	it('defaults detection on and preserves literal argument order', () => {
-		expect(normalizeKnowledgeSettings({ enrichExecutable: ' wiki-enrich ', enrichArgs: [' --source ', '', 'docs/$HOME'] })).toEqual({ enabled: true, enrichExecutable: 'wiki-enrich', enrichArgs: ['--source', 'docs/$HOME'] });
+		expect(normalizeKnowledgeSettings({ enrichExecutable: ' wiki-enrich ', enrichArgs: [' --source ', '', 'docs/$HOME'] })).toEqual({ enabled: true, enrichExecutable: 'wiki-enrich', enrichArgs: [' --source ', '', 'docs/$HOME'] });
 	});
 	it('preserves an explicit disabled state', () => expect(normalizeKnowledgeSettings({ enabled: false })).toEqual({ enabled: false, enrichExecutable: '', enrichArgs: [] }));
 });

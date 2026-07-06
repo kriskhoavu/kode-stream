@@ -25,6 +25,7 @@ var (
 	ErrUnsafePath           = errors.New("unsafe knowledge path")
 	ErrConfirmationRequired = errors.New("confirmation required")
 	ErrEnrichNotConfigured  = errors.New("knowledge enrichment is not configured")
+	ErrKnowledgeDisabled    = errors.New("knowledge is disabled for this workspace")
 )
 
 const (
@@ -36,6 +37,7 @@ const (
 
 type workspaceDetector interface {
 	DetectWorkspace(context.Context, models.WorkspaceConfig) ([]knowledgeindex.KnowledgeWiki, error)
+	DetectSource(context.Context, models.WorkspaceConfig, string) (knowledgeindex.KnowledgeWiki, bool, error)
 }
 type gitPuller interface {
 	Pull(string, models.GitOperationInput) models.GitOperationResult
@@ -71,15 +73,18 @@ func (s *Service) Rescan(ctx context.Context, workspaceID, root string) (knowled
 	if s.detector == nil {
 		return knowledgeindex.KnowledgeActionResult{}, errors.New("knowledge detector is unavailable")
 	}
-	wikis, err := s.detector.DetectWorkspace(ctx, workspace)
+	if err := requireKnowledgeEnabled(workspace); err != nil {
+		return knowledgeindex.KnowledgeActionResult{}, err
+	}
+	if !containsSource(workspace.Sources, root) {
+		return knowledgeindex.KnowledgeActionResult{}, ErrWikiNotFound
+	}
+	wiki, ok, err := s.detector.DetectSource(ctx, workspace, root)
 	if err != nil {
 		s.recordAudit(workspaceID, "knowledge_rescan", root, started, err)
 		return knowledgeindex.KnowledgeActionResult{}, err
 	}
-	for _, wiki := range wikis {
-		if wiki.Root != root {
-			continue
-		}
+	if ok {
 		if err := s.store.ReplaceWiki(workspaceID, root, wiki); err != nil {
 			s.recordAudit(workspaceID, "knowledge_rescan", root, started, err)
 			return knowledgeindex.KnowledgeActionResult{}, err
@@ -100,6 +105,9 @@ func (s *Service) Sync(ctx context.Context, workspaceID string, input models.Git
 	}
 	if s.git == nil || s.detector == nil {
 		return knowledgeindex.KnowledgeActionResult{}, errors.New("knowledge sync is unavailable")
+	}
+	if err := requireKnowledgeEnabled(workspace); err != nil {
+		return knowledgeindex.KnowledgeActionResult{}, err
 	}
 	gitResult := s.git.Pull(workspaceID, input)
 	if !gitResult.OK {
@@ -124,6 +132,9 @@ func (s *Service) Enrich(ctx context.Context, workspaceID string, confirm bool) 
 	started := time.Now()
 	workspace, err := s.workspace(workspaceID)
 	if err != nil {
+		return knowledgeindex.KnowledgeActionResult{}, err
+	}
+	if err := requireKnowledgeEnabled(workspace); err != nil {
 		return knowledgeindex.KnowledgeActionResult{}, err
 	}
 	if !confirm {
@@ -231,8 +242,12 @@ func sanitizeError(err error) string {
 }
 
 func (s *Service) Wikis(workspaceID string) ([]knowledgeindex.KnowledgeWiki, error) {
-	if _, err := s.workspace(workspaceID); err != nil {
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
 		return nil, err
+	}
+	if requireKnowledgeEnabled(workspace) != nil {
+		return []knowledgeindex.KnowledgeWiki{}, nil
 	}
 	wikis, err := s.store.List(workspaceID)
 	if err != nil {
@@ -353,7 +368,11 @@ func (s *Service) workspace(id string) (models.WorkspaceConfig, error) {
 }
 
 func (s *Service) wiki(workspaceID, root string) (knowledgeindex.KnowledgeWiki, error) {
-	if _, err := s.workspace(workspaceID); err != nil {
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return knowledgeindex.KnowledgeWiki{}, err
+	}
+	if err := requireKnowledgeEnabled(workspace); err != nil {
 		return knowledgeindex.KnowledgeWiki{}, err
 	}
 	if clean := filepath.ToSlash(filepath.Clean(root)); clean != root || clean == "." || filepath.IsAbs(root) || strings.HasPrefix(clean, "../") {
@@ -369,6 +388,22 @@ func (s *Service) wiki(workspaceID, root string) (knowledgeindex.KnowledgeWiki, 
 		}
 	}
 	return knowledgeindex.KnowledgeWiki{}, ErrWikiNotFound
+}
+
+func requireKnowledgeEnabled(workspace models.WorkspaceConfig) error {
+	if workspace.Knowledge != nil && workspace.Knowledge.Enabled != nil && !*workspace.Knowledge.Enabled {
+		return ErrKnowledgeDisabled
+	}
+	return nil
+}
+
+func containsSource(sources []string, root string) bool {
+	for _, source := range sources {
+		if filepath.ToSlash(filepath.Clean(strings.TrimSpace(source))) == root {
+			return true
+		}
+	}
+	return false
 }
 
 func guardedPagePath(workspaceRoot, wikiRoot, pagePath string) (string, error) {

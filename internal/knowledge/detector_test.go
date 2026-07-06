@@ -10,6 +10,18 @@ import (
 	"plan-manager/internal/models"
 )
 
+type detectorIgnoreChecker struct{}
+
+func (detectorIgnoreChecker) Ignored(_ string, paths []string) (map[string]bool, error) {
+	ignored := map[string]bool{}
+	for _, path := range paths {
+		if path == "docs/private.md" {
+			ignored[path] = true
+		}
+	}
+	return ignored, nil
+}
+
 func TestDetectorFindsOnlyRegisteredCompatibleWikiSources(t *testing.T) {
 	root := t.TempDir()
 	writePage(t, root, "docs/index.md", "index", "Index", "[[guide]]")
@@ -52,6 +64,21 @@ func TestDetectorPreservesPartialPagesForOversizedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(wikis) != 1 || len(wikis[0].Warnings) == 0 {
+		t.Fatalf("wikis = %#v", wikis)
+	}
+}
+
+func TestDetectorExcludesGitIgnoredMarkdownAndDeduplicatesSources(t *testing.T) {
+	root := t.TempDir()
+	writePage(t, root, "docs/index.md", "index", "Index", "")
+	writePage(t, root, "docs/private.md", "private", "Private", "")
+	detector := NewDetector()
+	detector.ignore = detectorIgnoreChecker{}
+	wikis, err := detector.DetectWorkspace(context.Background(), models.WorkspaceConfig{ID: "ws", Path: root, Sources: []string{"docs", "docs"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wikis) != 1 || len(wikis[0].Pages) != 1 || wikis[0].Pages[0].Slug != "index" {
 		t.Fatalf("wikis = %#v", wikis)
 	}
 }

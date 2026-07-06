@@ -1056,7 +1056,7 @@ function normalizeJiraDraft(value: JiraConnection): JiraConnection {
 }
 
 export function normalizeKnowledgeSettings(value: KnowledgeSettings): KnowledgeSettings {
-	return { enabled: value.enabled !== false, enrichExecutable: value.enrichExecutable?.trim() ?? '', enrichArgs: (value.enrichArgs ?? []).map((argument) => argument.trim()).filter(Boolean) };
+	return { enabled: value.enabled !== false, enrichExecutable: value.enrichExecutable?.trim() ?? '', enrichArgs: [...(value.enrichArgs ?? [])] };
 }
 
 function KnowledgeSettingsFields({ value, onChange }: { value: KnowledgeSettings; onChange: (value: KnowledgeSettings) => void }) {

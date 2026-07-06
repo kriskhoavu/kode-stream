@@ -29,4 +29,11 @@ describe('KnowledgeActions', () => {
 		expect(screen.getByText('enrich completed')).toBeInTheDocument();
 		expect(screen.getByText(/Action log \(truncated\)/)).toBeInTheDocument();
 	});
+
+	it('disables every action when Knowledge is disabled', () => {
+		render(<KnowledgeActions workspaceId="ws" root="docs" settings={{ enabled: false, enrichExecutable: 'wiki-enrich' }} busy={false} result={null} onRun={vi.fn()} />);
+		expect(screen.getByRole('button', { name: 'Rescan' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Sync' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Enrich' })).toBeDisabled();
+	});
 });

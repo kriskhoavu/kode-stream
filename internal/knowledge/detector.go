@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"plan-manager/internal/models"
+	"plan-manager/internal/workspacefiles"
 )
 
 const (
@@ -36,26 +37,28 @@ func DefaultScanLimits() ScanLimits {
 	return ScanLimits{DefaultMaxFiles, DefaultMaxFileBytes, DefaultMaxTotalBytes, DefaultMaxPages, DefaultMaxLinks, DefaultScanTimeout}
 }
 
-type Detector struct{ Limits ScanLimits }
+type Detector struct {
+	Limits ScanLimits
+	ignore workspacefiles.IgnoreChecker
+}
 
-func NewDetector() *Detector { return &Detector{Limits: DefaultScanLimits()} }
+func NewDetector() *Detector {
+	return &Detector{Limits: DefaultScanLimits(), ignore: workspacefiles.NewGitIgnoreChecker()}
+}
 
 func (d *Detector) DetectWorkspace(ctx context.Context, workspace models.WorkspaceConfig) ([]KnowledgeWiki, error) {
 	if workspace.Knowledge != nil && workspace.Knowledge.Enabled != nil && !*workspace.Knowledge.Enabled {
 		return []KnowledgeWiki{}, nil
 	}
-	root, err := filepath.Abs(workspace.Path)
-	if err != nil {
-		return nil, fmt.Errorf("resolve workspace: %w", err)
-	}
-	root, err = filepath.EvalSymlinks(root)
-	if err != nil {
-		return nil, fmt.Errorf("resolve workspace: %w", err)
-	}
-
 	wikis := make([]KnowledgeWiki, 0)
+	seen := make(map[string]struct{}, len(workspace.Sources))
 	for _, source := range workspace.Sources {
-		wiki, ok, err := d.detectSource(ctx, workspace.ID, root, source)
+		key := filepath.ToSlash(filepath.Clean(strings.TrimSpace(source)))
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		wiki, ok, err := d.DetectSource(ctx, workspace, source)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +70,18 @@ func (d *Detector) DetectWorkspace(ctx context.Context, workspace models.Workspa
 	return wikis, nil
 }
 
-func (d *Detector) detectSource(parent context.Context, workspaceID, workspaceRoot, source string) (KnowledgeWiki, bool, error) {
+func (d *Detector) DetectSource(parent context.Context, workspace models.WorkspaceConfig, source string) (KnowledgeWiki, bool, error) {
+	if workspace.Knowledge != nil && workspace.Knowledge.Enabled != nil && !*workspace.Knowledge.Enabled {
+		return KnowledgeWiki{}, false, nil
+	}
+	workspaceRoot, err := filepath.Abs(workspace.Path)
+	if err != nil {
+		return KnowledgeWiki{}, false, fmt.Errorf("resolve workspace: %w", err)
+	}
+	workspaceRoot, err = filepath.EvalSymlinks(workspaceRoot)
+	if err != nil {
+		return KnowledgeWiki{}, false, fmt.Errorf("resolve workspace: %w", err)
+	}
 	limits := d.Limits
 	if limits.Timeout <= 0 {
 		limits = DefaultScanLimits()
@@ -94,9 +108,13 @@ func (d *Detector) detectSource(parent context.Context, workspaceID, workspaceRo
 		return KnowledgeWiki{}, false, nil
 	}
 
-	pages := make([]KnowledgePage, 0)
-	warnings := make([]KnowledgeWarning, 0)
-	files, totalBytes, links := 0, int64(0), 0
+	type candidate struct {
+		path string
+		rel  string
+		size int64
+	}
+	candidates := make([]candidate, 0)
+	workspacePaths := make([]string, 0)
 	err = filepath.WalkDir(resolved, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -112,65 +130,91 @@ func (d *Detector) detectSource(parent context.Context, workspaceID, workspaceRo
 			}
 			return nil
 		}
-		if entry.Type()&os.ModeSymlink != 0 {
+		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() || !strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
 			return nil
 		}
-		if !entry.Type().IsRegular() || !strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
-			return nil
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			return infoErr
 		}
-		files++
-		if files > limits.MaxFiles {
+		rel, relErr := filepath.Rel(resolved, current)
+		if relErr != nil {
+			return relErr
+		}
+		relWorkspace, relErr := filepath.Rel(workspaceRoot, current)
+		if relErr != nil {
+			return relErr
+		}
+		candidates = append(candidates, candidate{path: current, rel: filepath.ToSlash(rel), size: info.Size()})
+		workspacePaths = append(workspacePaths, filepath.ToSlash(relWorkspace))
+		if len(candidates) > limits.MaxFiles {
 			return fmt.Errorf("file budget exceeded")
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(resolved, current)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		if info.Size() > limits.MaxFileBytes {
-			warnings = append(warnings, KnowledgeWarning{WorkspaceID: workspaceID, WikiRoot: filepath.ToSlash(cleanSource), Path: rel, Code: "file_too_large", Message: "file exceeds scan size limit"})
-			return nil
-		}
-		totalBytes += info.Size()
-		if totalBytes > limits.MaxTotalBytes {
-			return fmt.Errorf("byte budget exceeded")
-		}
-		data, err := os.ReadFile(current)
-		if err != nil {
-			return err
-		}
-		page, pageWarnings, err := ParsePage(rel, data)
-		for index := range pageWarnings {
-			pageWarnings[index].WorkspaceID = workspaceID
-			pageWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
-		}
-		warnings = append(warnings, pageWarnings...)
-		if err != nil {
-			return nil
-		}
-		pages = append(pages, page)
-		if len(pages) > limits.MaxPages {
-			return fmt.Errorf("page budget exceeded")
-		}
-		links += len(page.Links)
-		if links > limits.MaxLinks {
-			return fmt.Errorf("link budget exceeded")
 		}
 		return nil
 	})
 	if err != nil {
 		return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", cleanSource, err)
 	}
+	ignored := map[string]bool{}
+	if d.ignore != nil {
+		ignored, err = d.ignore.Ignored(workspaceRoot, workspacePaths)
+		if err != nil {
+			return KnowledgeWiki{}, false, fmt.Errorf("scan ignores: %w", err)
+		}
+	}
+
+	pages := make([]KnowledgePage, 0)
+	warnings := make([]KnowledgeWarning, 0)
+	files, totalBytes, links := 0, int64(0), 0
+	for index, file := range candidates {
+		select {
+		case <-ctx.Done():
+			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", cleanSource, ctx.Err())
+		default:
+		}
+		if ignored[workspacePaths[index]] {
+			continue
+		}
+		files++
+		if files > limits.MaxFiles {
+			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: file budget exceeded", cleanSource)
+		}
+		if file.size > limits.MaxFileBytes {
+			warnings = append(warnings, KnowledgeWarning{WorkspaceID: workspace.ID, WikiRoot: filepath.ToSlash(cleanSource), Path: file.rel, Code: "file_too_large", Message: "file exceeds scan size limit"})
+			continue
+		}
+		totalBytes += file.size
+		if totalBytes > limits.MaxTotalBytes {
+			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: byte budget exceeded", cleanSource)
+		}
+		data, err := os.ReadFile(file.path)
+		if err != nil {
+			return KnowledgeWiki{}, false, err
+		}
+		page, pageWarnings, err := ParsePage(file.rel, data)
+		for index := range pageWarnings {
+			pageWarnings[index].WorkspaceID = workspace.ID
+			pageWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
+		}
+		warnings = append(warnings, pageWarnings...)
+		if err != nil {
+			continue
+		}
+		pages = append(pages, page)
+		if len(pages) > limits.MaxPages {
+			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: page budget exceeded", cleanSource)
+		}
+		links += len(page.Links)
+		if links > limits.MaxLinks {
+			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: link budget exceeded", cleanSource)
+		}
+	}
 	if len(pages) == 0 {
 		return KnowledgeWiki{}, false, nil
 	}
 	pages, relationshipWarnings, _ := ResolveRelationships(pages)
 	for index := range relationshipWarnings {
-		relationshipWarnings[index].WorkspaceID = workspaceID
+		relationshipWarnings[index].WorkspaceID = workspace.ID
 		relationshipWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
 	}
 	warnings = append(warnings, relationshipWarnings...)
@@ -180,7 +224,7 @@ func (d *Detector) detectSource(parent context.Context, workspaceID, workspaceRo
 		}
 		return warnings[i].Path < warnings[j].Path
 	})
-	return KnowledgeWiki{WorkspaceID: workspaceID, Root: filepath.ToSlash(cleanSource), DisplayName: displayName(cleanSource), Pages: pages, Warnings: warnings, IndexedAt: time.Now().UTC()}, true, nil
+	return KnowledgeWiki{WorkspaceID: workspace.ID, Root: filepath.ToSlash(cleanSource), DisplayName: displayName(cleanSource), Pages: pages, Warnings: warnings, IndexedAt: time.Now().UTC()}, true, nil
 }
 
 func withinPath(root, candidate string) bool {

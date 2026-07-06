@@ -16,14 +16,31 @@ import (
 )
 
 type stubDetector struct {
-	wikis []knowledgeindex.KnowledgeWiki
-	err   error
-	calls int
+	wikis          []knowledgeindex.KnowledgeWiki
+	err            error
+	calls          int
+	workspaceCalls int
+	sourceCalls    int
 }
 
 func (d *stubDetector) DetectWorkspace(_ context.Context, _ models.WorkspaceConfig) ([]knowledgeindex.KnowledgeWiki, error) {
 	d.calls++
+	d.workspaceCalls++
 	return d.wikis, d.err
+}
+
+func (d *stubDetector) DetectSource(_ context.Context, _ models.WorkspaceConfig, source string) (knowledgeindex.KnowledgeWiki, bool, error) {
+	d.calls++
+	d.sourceCalls++
+	if d.err != nil {
+		return knowledgeindex.KnowledgeWiki{}, false, d.err
+	}
+	for _, wiki := range d.wikis {
+		if wiki.Root == source {
+			return wiki, true, nil
+		}
+	}
+	return knowledgeindex.KnowledgeWiki{}, false, nil
 }
 
 type stubPuller struct {
@@ -92,6 +109,9 @@ func TestRescanAndSyncReplaceOnlyAfterSuccessfulDetection(t *testing.T) {
 	if err != nil || !result.OK {
 		t.Fatalf("rescan=%#v err=%v", result, err)
 	}
+	if detector.sourceCalls != 1 || detector.workspaceCalls != 0 {
+		t.Fatalf("rescan calls: source=%d workspace=%d", detector.sourceCalls, detector.workspaceCalls)
+	}
 	if len(audits.events) != 1 || audits.events[0].Operation != "knowledge_rescan" {
 		t.Fatalf("audits=%#v", audits.events)
 	}
@@ -119,6 +139,39 @@ func TestEnrichRequiresConfirmationAndConfiguration(t *testing.T) {
 	}
 	if _, err := service.Enrich(context.Background(), "ws", true); err != ErrEnrichNotConfigured {
 		t.Fatalf("configuration err=%v", err)
+	}
+}
+
+func TestDisabledKnowledgeRejectsActionsAndHidesPersistedWikis(t *testing.T) {
+	disabled := false
+	directory, workspaceRoot := t.TempDir(), t.TempDir()
+	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: workspaceRoot, Sources: []string{"docs"}, Knowledge: &models.KnowledgeSettings{Enabled: &disabled, EnrichExecutable: "/bin/echo"}}
+	data, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(directory, "workspaces.yaml")
+	if err := os.WriteFile(registryPath, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := knowledgeindex.NewStore(filepath.Join(directory, "knowledge-index.yaml"))
+	if err := store.ReplaceWorkspace("ws", []knowledgeindex.KnowledgeWiki{{Root: "docs", Pages: []knowledgeindex.KnowledgePage{}, Warnings: []knowledgeindex.KnowledgeWarning{}}}); err != nil {
+		t.Fatal(err)
+	}
+	service := New(registry.New(registryPath, gitadapter.New()), store)
+	wikis, err := service.Wikis("ws")
+	if err != nil || len(wikis) != 0 {
+		t.Fatalf("wikis=%#v err=%v", wikis, err)
+	}
+	service.ConfigureActions(&stubDetector{}, &stubPuller{}, &stubAudit{})
+	if _, err := service.Rescan(context.Background(), "ws", "docs"); err != ErrKnowledgeDisabled {
+		t.Fatalf("rescan err=%v", err)
+	}
+	if _, err := service.Sync(context.Background(), "ws", models.GitOperationInput{}); err != ErrKnowledgeDisabled {
+		t.Fatalf("sync err=%v", err)
+	}
+	if _, err := service.Enrich(context.Background(), "ws", true); err != ErrKnowledgeDisabled {
+		t.Fatalf("enrich err=%v", err)
 	}
 }
 

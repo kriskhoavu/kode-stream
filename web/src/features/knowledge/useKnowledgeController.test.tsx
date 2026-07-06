@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 import type { KnowledgeWiki, WorkspaceConfig } from '../../lib/types';
 import { useKnowledgeController } from './useKnowledgeController';
 
-vi.mock('../../lib/api', () => ({ api: { knowledgeWikis: vi.fn(), knowledgePages: vi.fn(), rescanKnowledge: vi.fn(), syncKnowledge: vi.fn(), enrichKnowledge: vi.fn() } }));
+vi.mock('../../lib/api', () => ({ api: { knowledgeWikis: vi.fn(), knowledgePages: vi.fn(), knowledgePage: vi.fn(), knowledgeGraph: vi.fn(), rescanKnowledge: vi.fn(), syncKnowledge: vi.fn(), enrichKnowledge: vi.fn() } }));
 
 const workspaces: WorkspaceConfig[] = [
 	{ id: 'one', name: 'One', path: '/one', baselineBranch: 'main', sources: ['docs'], createdAt: '' },
@@ -43,5 +43,17 @@ describe('useKnowledgeController', () => {
 		await act(async () => { await result.current.runAction('rescan'); });
 		expect(api.knowledgeWikis).toHaveBeenCalledTimes(2);
 		expect(result.current.actionResult?.operation).toBe('rescan');
+	});
+
+	it('does not reload Wiki indexes when only the page or view changes', async () => {
+		vi.mocked(api.knowledgeWikis).mockResolvedValue([wiki('one', 'docs')]);
+		vi.mocked(api.knowledgePages).mockResolvedValue({ pages: [{ slug: 'guide', title: 'Guide', path: 'guide.md', domain: 'root', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }], warnings: [] });
+		vi.mocked(api.knowledgePage).mockResolvedValue({ slug: 'guide', title: 'Guide', path: 'guide.md', domain: 'root', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [], warnings: [], content: { id: 'guide', path: 'guide.md', content: '', language: 'markdown', hash: '', kind: 'markdown', sizeBytes: 0, editable: false } });
+		const { rerender } = renderHook(({ slug, view }) => useKnowledgeController(workspaces, { workspaceId: 'one', root: 'docs', slug, view }, vi.fn()), { initialProps: { slug: undefined as string | undefined, view: 'browse' as 'browse' | 'read' } });
+		await waitFor(() => expect(api.knowledgePages).toHaveBeenCalledTimes(1));
+		rerender({ slug: 'guide', view: 'read' });
+		await act(async () => { await Promise.resolve(); });
+		expect(api.knowledgeWikis).toHaveBeenCalledTimes(1);
+		expect(api.knowledgePages).toHaveBeenCalledTimes(1);
 	});
 });

@@ -31,6 +31,7 @@ func TestKnowledgeErrorMapping(t *testing.T) {
 		{appknowledge.ErrWikiNotFound, http.StatusNotFound},
 		{appknowledge.ErrPageNotFound, http.StatusNotFound},
 		{appknowledge.ErrUnsafePath, http.StatusBadRequest},
+		{appknowledge.ErrKnowledgeDisabled, http.StatusConflict},
 	}
 	api := &API{}
 	for _, test := range tests {
@@ -51,6 +52,7 @@ func TestKnowledgeActionStatusMapping(t *testing.T) {
 	}{
 		{knowledgeindex.KnowledgeActionResult{}, appknowledge.ErrConfirmationRequired, http.StatusConflict},
 		{knowledgeindex.KnowledgeActionResult{}, appknowledge.ErrEnrichNotConfigured, http.StatusConflict},
+		{knowledgeindex.KnowledgeActionResult{}, appknowledge.ErrKnowledgeDisabled, http.StatusConflict},
 		{knowledgeindex.KnowledgeActionResult{OK: false, Operation: "sync", Message: "pull failed"}, nil, http.StatusUnprocessableEntity},
 		{knowledgeindex.KnowledgeActionResult{OK: true, Operation: "rescan"}, nil, http.StatusOK},
 	}

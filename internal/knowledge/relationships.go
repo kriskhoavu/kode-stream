@@ -11,15 +11,20 @@ func ResolveRelationships(pages []KnowledgePage) ([]KnowledgePage, []KnowledgeWa
 	pages = append([]KnowledgePage(nil), pages...)
 	sort.SliceStable(pages, func(i, j int) bool { return pages[i].Path < pages[j].Path })
 	bySlug := make(map[string]int, len(pages))
-	byPath := make(map[string]int, len(pages))
 	warnings := make([]KnowledgeWarning, 0)
-	for index := range pages {
-		pages[index].Backlinks = []string{}
-		if first, exists := bySlug[pages[index].Slug]; exists {
-			warnings = append(warnings, KnowledgeWarning{Path: pages[index].Path, Slug: pages[index].Slug, Code: WarningDuplicateSlug, Message: fmt.Sprintf("duplicate slug; using %s", pages[first].Path)})
+	canonical := make([]KnowledgePage, 0, len(pages))
+	for _, page := range pages {
+		page.Backlinks = []string{}
+		if first, exists := bySlug[page.Slug]; exists {
+			warnings = append(warnings, KnowledgeWarning{Path: page.Path, Slug: page.Slug, Code: WarningDuplicateSlug, Message: fmt.Sprintf("duplicate slug; using %s", canonical[first].Path)})
 		} else {
-			bySlug[pages[index].Slug] = index
+			bySlug[page.Slug] = len(canonical)
+			canonical = append(canonical, page)
 		}
+	}
+	pages = canonical
+	byPath := make(map[string]int, len(pages))
+	for index := range pages {
 		byPath[normalizePath(pages[index].Path)] = index
 	}
 
