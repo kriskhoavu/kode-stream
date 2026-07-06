@@ -308,7 +308,7 @@
   border-color: color-mix(in srgb, var(--blue) 34%, var(--line));
   background: color-mix(in srgb, var(--blue) 7%, var(--panel));
   color: var(--text);
-  box-shadow: inset 3px 0 0 var(--blue);
+  box-shadow: inset 3px 0 0 var(--selection-accent);
 }
 
 .knowledge-page-row.active .knowledge-page-title {

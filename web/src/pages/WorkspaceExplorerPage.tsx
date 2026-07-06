@@ -252,7 +252,7 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   return (
     <section className="workspace-explorer-page">
       <header className="explorer-header">
-        <div><span className="eyebrow">All workspaces</span><h1>Workspace Explorer</h1></div>
+        <div><span className="eyebrow">{workspace?.name ?? 'No workspace selected'}</span><h1>Workspace Explorer</h1></div>
         <div className="explorer-header-actions">
           <button className="secondary" type="button" disabled={!workspace} onClick={() => setPathDialog({ kind: 'file', parentPath: selectedParentPath() })}><FilePlus2 size={15} /> New file</button>
           <button className="secondary" type="button" disabled={!workspace} onClick={() => setPathDialog({ kind: 'directory', parentPath: selectedParentPath() })}><FolderPlus size={15} /> New folder</button>

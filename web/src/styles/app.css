@@ -15,6 +15,7 @@
   --nav-text: #e7eefb;
   --blue: #4f46e5;
   --green: #079669;
+  --selection-accent: #34d399;
   --orange: #c2410c;
   --purple: #6d28d9;
   --shadow: 0 16px 36px rgba(17, 24, 39, 0.08);
@@ -368,7 +369,7 @@ button:disabled {
 }
 
 .workspace-menu-item.active {
-  box-shadow: inset 3px 0 0 var(--blue);
+  box-shadow: inset 3px 0 0 var(--selection-accent);
 }
 
 .workspace-menu-item span {
@@ -1127,7 +1128,7 @@ select {
 
 .workspace-button.active {
   background: rgba(148, 163, 184, 0.14);
-  box-shadow: inset 4px 0 0 #34d399;
+  box-shadow: inset 4px 0 0 var(--selection-accent);
 }
 
 .workspace-button span {
@@ -2647,7 +2648,8 @@ body.is-resizing-drawer {
 }
 
 .workspace-manager-list-item.active {
-  background: color-mix(in srgb, var(--blue) 9%, var(--panel));
+  background: rgba(148, 163, 184, 0.14);
+  box-shadow: inset 3px 0 0 var(--selection-accent);
 }
 
 .workspace-manager-list-item > button {
@@ -2663,9 +2665,12 @@ body.is-resizing-drawer {
 }
 
 .workspace-manager-list-item > button:hover,
-.workspace-manager-list-item > button:focus-visible,
-.workspace-manager-list-item.active > button {
+.workspace-manager-list-item > button:focus-visible {
   border-color: color-mix(in srgb, var(--blue) 32%, var(--line));
+}
+
+.workspace-manager-list-item.active > button {
+  border-color: transparent;
 }
 
 .workspace-manager-checkbox {
@@ -4114,8 +4119,9 @@ body.is-resizing-panel {
 }
 
 .tree-row-dir.active {
-  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
-  color: var(--blue);
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--text);
+  box-shadow: inset 3px 0 0 var(--selection-accent);
 }
 
 .tree-dir[open] > .tree-row-dir .tree-chevron {
@@ -4182,12 +4188,13 @@ body.is-resizing-panel {
 }
 
 .tree-file.active {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--text);
+  box-shadow: inset 3px 0 0 var(--selection-accent);
 }
 
 .tree-file.active .tree-icon {
-  color: #1d4ed8;
+  color: var(--muted);
 }
 
 .tabs {
