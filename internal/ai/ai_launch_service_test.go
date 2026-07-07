@@ -115,6 +115,37 @@ func TestWorkspaceOnlyLaunchesWithoutCardContext(t *testing.T) {
 	}
 }
 
+func TestLaunchExpandsPresetPrompt(t *testing.T) {
+	service, item, _, runner, _, _ := launchTestService(t, true)
+	result, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context", PresetID: "implementation-plan"})
+	if err != nil || !result.Accepted || result.PresetID != "implementation-plan" {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if len(runner.processes) != 1 || !contains(runner.processes[0].args, "Create or update the implementation plan") {
+		t.Fatalf("processes=%#v", runner.processes)
+	}
+}
+
+func TestLaunchExpandsFreePromptAndRejectsInvalidPromptInput(t *testing.T) {
+	service, item, _, runner, _, _ := launchTestService(t, true)
+	result, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context", CustomPrompt: "Use the Jira context first."})
+	if err != nil || !result.Accepted {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if len(runner.processes) != 1 || !contains(runner.processes[0].args, "Use the Jira context first.") {
+		t.Fatalf("processes=%#v", runner.processes)
+	}
+	_, err = service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context", PresetID: "missing"})
+	var launchErr *LaunchError
+	if !errors.As(err, &launchErr) || launchErr.Code != "invalid_prompt" {
+		t.Fatalf("err=%#v", err)
+	}
+	_, err = service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context", PresetID: "implementation-plan", CustomPrompt: "also"})
+	if !errors.As(err, &launchErr) || launchErr.Code != "invalid_prompt" {
+		t.Fatalf("err=%#v", err)
+	}
+}
+
 func TestLaunchFailureIsAuditedAsFailed(t *testing.T) {
 	service, item, _, runner, _, auditStore := launchTestService(t, true)
 	runner.err = errors.New("terminal refused launch")
@@ -181,7 +212,7 @@ func launchTestService(t *testing.T, structured bool) (*Service, models.ItemDeta
 	store := NewSettingsRepository(filepath.Join(dataDir, "ai-settings.yaml"))
 	_, err = store.Save(Settings{
 		DefaultProvider: "test-ai", DefaultTerminal: "wezterm",
-		Providers: map[string]LaunchTemplate{"test-ai": {Enabled: true, Executable: executable, Args: []string{"Read {contextFile}", "{contextMode}", "{identifier}"}}},
+		Providers: map[string]LaunchTemplate{"test-ai": {Enabled: true, Executable: executable, Args: []string{"Read {contextFile}", "{contextMode}", "{identifier}", "{prompt}"}}},
 		Terminals: map[string]LaunchTemplate{"wezterm": {Enabled: true, Executable: executable}},
 	})
 	if err != nil {

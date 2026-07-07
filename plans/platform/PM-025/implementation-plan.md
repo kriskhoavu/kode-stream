@@ -22,7 +22,7 @@ Do not keep `/kanban` route compatibility.
 |-------|-------------------------------|--------|
 | B1    | Workspace Jira Lookup         | Done   |
 | B2    | Jira-Backed Item Creation     | Done   |
-| B3    | AI Preset Launch Contract     | Draft  |
+| B3    | AI Preset Launch Contract     | Done   |
 | F1    | Workspace Route Rename        | Draft  |
 | F2    | Jira Intake UI                | Draft  |
 | F3    | AI Preset Launch UI           | Draft  |
@@ -64,10 +64,10 @@ Do not keep `/kanban` route compatibility.
 
 **Deliverables:**
 
-- [ ] Add built-in AI planning presets for implementation plan, technical design, and test scenarios.
-- [ ] Add `GET /api/ai/presets`.
-- [ ] Allow AI launch requests to include preset ID or free prompt while preserving existing context modes.
-- [ ] Add tests for preset lookup, prompt expansion, invalid preset handling, and existing launch behavior.
+- [x] Add built-in AI planning presets for implementation plan, technical design, and test scenarios.
+- [x] Add `GET /api/ai/presets`.
+- [x] Allow AI launch requests to include preset ID or free prompt while preserving existing context modes.
+- [x] Add tests for preset lookup, prompt expansion, invalid preset handling, and existing launch behavior.
 
 **Verification:** `rtk go test ./internal/ai ./internal/server/api`
 

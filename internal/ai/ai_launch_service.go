@@ -19,9 +19,11 @@ import (
 )
 
 type LaunchInput struct {
-	Provider    string `json:"provider"`
-	Terminal    string `json:"terminal"`
-	ContextMode string `json:"contextMode"`
+	Provider     string `json:"provider"`
+	Terminal     string `json:"terminal"`
+	ContextMode  string `json:"contextMode"`
+	PresetID     string `json:"presetId,omitempty"`
+	CustomPrompt string `json:"customPrompt,omitempty"`
 }
 
 type LaunchResult struct {
@@ -29,7 +31,16 @@ type LaunchResult struct {
 	Provider    string    `json:"provider"`
 	Terminal    string    `json:"terminal"`
 	ContextMode string    `json:"contextMode"`
+	PresetID    string    `json:"presetId,omitempty"`
 	StartedAt   time.Time `json:"startedAt"`
+}
+
+type PlanPreset struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Prompt      string `json:"prompt"`
+	ContextMode string `json:"contextMode"`
+	Provider    string `json:"provider,omitempty"`
 }
 
 type Eligibility struct {
@@ -70,6 +81,14 @@ type launchDependencies struct {
 func (s *Service) ConfigureLaunch(reg *registry.Registry, index *itemindex.Index, auditStore *audit.Store, wrapperDir string) *Service {
 	s.launch = &launchDependencies{registry: reg, index: index, audit: auditStore, wrapperDir: wrapperDir, runner: execRunner{}, now: time.Now}
 	return s
+}
+
+func (s *Service) Presets() []PlanPreset {
+	return []PlanPreset{
+		{ID: "implementation-plan", Name: "Create implementation plan", ContextMode: "card_context", Prompt: "Create or update the implementation plan from the selected item context. Read the Jira context and local plan files first, then produce concrete backend, frontend, verification, and rollout steps."},
+		{ID: "technical-design", Name: "Create technical design", ContextMode: "card_context", Prompt: "Draft the technical design for the selected item. Cover affected modules, API contracts, data flow, edge cases, and compatibility decisions."},
+		{ID: "test-scenarios", Name: "Create test scenarios", ContextMode: "card_context", Prompt: "Create test scenarios for the selected item. Include happy paths, validation failures, remote integration failures, regression checks, and acceptance criteria."},
+	}
 }
 
 func (s *Service) Eligibility(itemID string) (Eligibility, error) {
@@ -181,9 +200,13 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	if !s.detect(terminal.Executable).Detected {
 		return LaunchResult{}, launchError("terminal_missing", "selected terminal executable was not found")
 	}
+	prompt, presetID, promptErr := s.resolvePrompt(input.PresetID, input.CustomPrompt)
+	if promptErr != nil {
+		return LaunchResult{}, promptErr
+	}
 	values := map[string]string{
 		"workspace": workspace.Path, "contextFile": item.ItemPath, "itemPath": item.ItemPath,
-		"identifier": item.Identifier, "contextMode": contextMode, "intent": contextMode,
+		"identifier": item.Identifier, "contextMode": contextMode, "intent": contextMode, "prompt": prompt,
 	}
 	providerName := expand(provider.Executable, values)
 	providerArgs := []string{}
@@ -194,7 +217,27 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	if startErr := s.startTerminal(terminalID, terminal, terminalArgs, workspace.Path, providerName, providerArgs); startErr != nil {
 		return LaunchResult{}, launchErrorWith("launch_failed", startErr)
 	}
-	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, StartedAt: s.launch.now().UTC()}, nil
+	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, PresetID: presetID, StartedAt: s.launch.now().UTC()}, nil
+}
+
+func (s *Service) resolvePrompt(presetID, customPrompt string) (string, string, error) {
+	presetID = strings.TrimSpace(presetID)
+	customPrompt = strings.TrimSpace(customPrompt)
+	if presetID != "" && customPrompt != "" {
+		return "", "", launchError("invalid_prompt", "choose either an AI preset or a free prompt")
+	}
+	if customPrompt != "" {
+		return customPrompt, "", nil
+	}
+	if presetID == "" {
+		return "", "", nil
+	}
+	for _, preset := range s.Presets() {
+		if preset.ID == presetID {
+			return preset.Prompt, preset.ID, nil
+		}
+	}
+	return "", "", launchError("invalid_prompt", "selected AI preset is unavailable")
 }
 
 func (s *Service) startTerminal(id string, terminal LaunchTemplate, terminalArgs []string, workspace, provider string, providerArgs []string) error {

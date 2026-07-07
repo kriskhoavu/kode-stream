@@ -111,6 +111,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/state", a.state)
 	mux.HandleFunc("GET /api/search", a.searchItems)
 	mux.HandleFunc("GET /api/ai/capabilities", a.aiCapabilities)
+	mux.HandleFunc("GET /api/ai/presets", a.aiPresets)
 	mux.HandleFunc("GET /api/ai/settings", a.aiSettings)
 	mux.HandleFunc("PUT /api/ai/settings", a.saveAISettings)
 	mux.HandleFunc("GET /api/workspaces", a.listWorkspaces)
@@ -424,6 +425,14 @@ func (a *API) aiCapabilities(w http.ResponseWriter, _ *http.Request) {
 	}
 	capabilities, err := a.aiSessions.Capabilities()
 	respond(w, capabilities, err)
+}
+
+func (a *API) aiPresets(w http.ResponseWriter, _ *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, a.aiSessions.Presets())
 }
 
 func (a *API) aiSettings(w http.ResponseWriter, _ *http.Request) {

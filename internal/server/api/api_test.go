@@ -307,6 +307,14 @@ func TestWorkspaceJiraIssueRouteRequiresService(t *testing.T) {
 	}
 }
 
+func TestAIPresetsRouteRequiresService(t *testing.T) {
+	unavailable := httptest.NewRecorder()
+	New(nil, nil, nil, nil, nil, nil, nil).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodGet, "/api/ai/presets", nil))
+	if unavailable.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unavailable status = %d", unavailable.Code)
+	}
+}
+
 func TestJiraAttachmentResponseHelpersAreSafe(t *testing.T) {
 	if !safeInlineMediaType("image/png") || safeInlineMediaType("text/html") || safeInlineMediaType("application/pdf") {
 		t.Fatal("unexpected inline media policy")
