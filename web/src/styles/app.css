@@ -970,12 +970,20 @@ button:disabled {
   font-weight: 700;
 }
 
-.ai-launch-fields select {
+.ai-launch-fields select,
+.ai-launch-fields textarea {
   min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--panel-soft);
+  color: var(--text);
   padding: 0 10px;
+}
+
+.ai-launch-fields textarea {
+  min-height: 88px;
+  padding: 10px;
+  resize: vertical;
 }
 
 .ai-launch-fields fieldset {

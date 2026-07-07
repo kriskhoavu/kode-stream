@@ -214,6 +214,14 @@ export interface AISettings {
   terminals: Record<string, AILaunchTemplate>;
 }
 
+export interface AIPlanPreset {
+  id: string;
+  name: string;
+  prompt: string;
+  contextMode: AISessionLaunchInput['contextMode'];
+  provider?: string;
+}
+
 export interface AISessionEligibility {
   editable: boolean;
   cardContextAvailable: boolean;

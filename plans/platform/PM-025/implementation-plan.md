@@ -25,7 +25,7 @@ Do not keep `/kanban` route compatibility.
 | B3    | AI Preset Launch Contract     | Done   |
 | F1    | Workspace Route Rename        | Done   |
 | F2    | Jira Intake UI                | Done   |
-| F3    | AI Preset Launch UI           | Draft  |
+| F3    | AI Preset Launch UI           | Done   |
 | F4    | Verification And Copy Cleanup | Draft  |
 
 ## Backend Phases
@@ -110,10 +110,10 @@ Do not keep `/kanban` route compatibility.
 
 **Deliverables:**
 
-- [ ] Load built-in AI presets from the API.
-- [ ] Add preset and free prompt controls to the post-create launch path.
-- [ ] Pass selected preset or prompt into embedded and external AI launch requests.
-- [ ] Preserve existing workspace-only and card-context launch choices.
+- [x] Load built-in AI presets from the API.
+- [x] Add preset and free prompt controls to the post-create launch path.
+- [x] Pass selected preset or prompt into embedded and external AI launch requests.
+- [x] Preserve existing workspace-only and card-context launch choices.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
