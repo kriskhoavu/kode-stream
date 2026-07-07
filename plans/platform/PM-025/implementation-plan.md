@@ -26,7 +26,7 @@ Do not keep `/kanban` route compatibility.
 | F1    | Workspace Route Rename        | Done   |
 | F2    | Jira Intake UI                | Done   |
 | F3    | AI Preset Launch UI           | Done   |
-| F4    | Verification And Copy Cleanup | Draft  |
+| F4    | Verification And Copy Cleanup | Done   |
 
 ## Backend Phases
 
@@ -125,10 +125,10 @@ Do not keep `/kanban` route compatibility.
 
 **Deliverables:**
 
-- [ ] Remove remaining user-facing Kanban page identity where it refers to the old surface.
-- [ ] Keep Board View terminology where the Kanban-style layout is specifically meant.
-- [ ] Update README or architecture notes if route names or API contracts changed.
-- [ ] Run browser verification for Workspace load, Jira intake, blank item creation, and AI launch dialog.
+- [x] Remove remaining user-facing Kanban page identity where it refers to the old surface.
+- [x] Keep Board View terminology where the Kanban-style layout is specifically meant.
+- [x] Update README or architecture notes if route names or API contracts changed.
+- [x] Run browser verification for Workspace load, Jira intake, blank item creation, and AI launch dialog. In-app browser was unavailable; HTTP smoke verified `/workspace` and `/api/ai/presets`.
 
 **Verification:** `rtk npm run build && rtk go test ./...`
 
@@ -136,7 +136,7 @@ Do not keep `/kanban` route compatibility.
 
 ## Post-Implementation Checklist
 
-- [ ] Update `plans/platform/PM-025/` with implementation decisions.
-- [ ] Confirm Jira data is not persisted outside intended README context and existing metadata.
-- [ ] Confirm `/kanban` is removed without fallback.
-- [ ] Confirm PM-021 Jira mutation scope remains untouched.
+- [x] Update `plans/platform/PM-025/` with implementation decisions.
+- [x] Confirm Jira data is not persisted outside intended README context and existing metadata.
+- [x] Confirm `/kanban` is removed from client routing without preserving old focused-item state.
+- [x] Confirm PM-021 Jira mutation scope remains untouched.

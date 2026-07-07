@@ -20,7 +20,7 @@
 ## Playwright Acceptance Checklist
 
 - Register this repository with `plans` as the Plan Directory.
-- Run Scan and confirm PM-001 appears on the Kanban board.
+- Run Scan and confirm PM-001 appears in the Workspace board view.
 - Filter by repository, branch, status, and text.
 - Open PM-001 and confirm file tree, raw Markdown, preview, metadata, and diff tabs.
 - Capture desktop screenshot at 1536 x 1024.

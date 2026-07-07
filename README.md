@@ -13,7 +13,7 @@ and flow: progress is hard to track across folders, branches, and multiple repos
 
 Plan Manager addresses that gap by providing:
 
-- A Kanban view over document-backed items
+- A Workspace with a board view over document-backed items
 - Multi-workspace and multi-source support (`plans`, `docs`, `specs`, etc.)
 - One place to edit Markdown, metadata, status, and related files
 - Built-in Git actions with guardrails for risky operations
@@ -32,7 +32,7 @@ Plan Manager addresses that gap by providing:
 - Edit item metadata and move status from either board or metadata form
 - Create new structured items
 - Search indexed items across one or all workspaces with keyboard navigation
-- Save and restore Kanban filter views
+- Save and restore Workspace board filter views
 - Reopen recently viewed items quickly
 - Use guarded Git flows for commit, fetch, pull, push, branch create/switch
 - Inspect workspace health and recent operation history
@@ -45,15 +45,15 @@ See implementation details in [plans/platform/PM-002/README.md](plans/platform/P
 
 ## Tech Stack
 
-| Area              | Technology                               | Purpose                                            |
-|-------------------|------------------------------------------|----------------------------------------------------|
-| Backend           | Go 1.22                                  | Local HTTP API, filesystem access, Git integration |
-| Frontend          | React 19 + TypeScript 5                  | UI shell, Kanban, Explorer, item workspace         |
-| Build             | Vite 6                                   | Frontend build and dev tooling                     |
-| Testing           | Vitest, React Testing Library, `go test` | UI and backend validation                          |
-| Content Rendering | Unified, KaTeX, highlight.js, YAML       | Safe rich preview for multiple file types          |
-| Persistence       | YAML files in user config directory      | Workspace registry and index cache                 |
-| Distribution      | Go binary with embedded frontend assets  | Single local runtime                               |
+| Area              | Technology                               | Purpose                                             |
+|-------------------|------------------------------------------|-----------------------------------------------------|
+| Backend           | Go 1.22                                  | Local HTTP API, filesystem access, Git integration  |
+| Frontend          | React 19 + TypeScript 5                  | UI shell, Workspace board, Explorer, item workspace |
+| Build             | Vite 6                                   | Frontend build and dev tooling                      |
+| Testing           | Vitest, React Testing Library, `go test` | UI and backend validation                           |
+| Content Rendering | Unified, KaTeX, highlight.js, YAML       | Safe rich preview for multiple file types           |
+| Persistence       | YAML files in user config directory      | Workspace registry and index cache                  |
+| Distribution      | Go binary with embedded frontend assets  | Single local runtime                                |
 
 ## Requirements
 

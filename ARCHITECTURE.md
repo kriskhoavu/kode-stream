@@ -8,7 +8,7 @@ Plan Manager is a local web app. A Go server exposes a JSON API and serves embed
 
 - Run locally on the developer machine.
 - Keep planning files in Git.
-- Keep Kanban scoped to one active workspace while Explorer spans every registered workspace.
+- Keep the Workspace board scoped to one active workspace while Explorer spans every registered workspace.
 - Support multiple sources per workspace.
 - Support structured items, configured document sources, and freestyle docs.
 - Allow explicit, guarded writes to managed workspaces.
@@ -33,7 +33,7 @@ User browser
 │                                                              │
 │ React app                                                    │
 │ - App shell                                                  │
-│ - Kanban board                                               │
+│ - Workspace board                                            │
 │ - Workspace management                                       │
 │ - Item workspace                                             │
 │ - Global workspace explorer                                  │
@@ -92,7 +92,7 @@ User browser
 | API facade                | `web/src/lib/api.ts`                      | Compatibility export for existing feature imports                     |
 | Shared API implementation | `web/src/shared/api`                      | Fetch wrapper, endpoint methods, and response normalization           |
 | Shared domain helpers     | `web/src/shared/domain`                   | Reusable diff parsing and domain helpers                              |
-| Feature helpers           | `web/src/features/*`                      | Kanban filtering and workspace source settings helper logic           |
+| Feature helpers           | `web/src/features/*`                      | Board filtering and workspace source settings helper logic            |
 | Shared types              | `web/src/lib/types.ts`                    | Frontend API types                                                    |
 | Reliability hooks         | `web/src/features/reliability`            | Workspace health and activity loading and refresh                     |
 | Search hooks              | `web/src/features/search`                 | Debounced search, quick switcher, and keyboard navigation             |
@@ -101,7 +101,7 @@ User browser
 | File editor session       | `web/src/features/file-editor`            | Shared Markdown autosave, stale-write, and settled-save state         |
 | Workspace explorer        | `web/src/features/workspace-explorer`     | Lazy tree, path search, Git markers, mutations, and keyboard state    |
 | Search dialog             | `web/src/components/SearchDialog.tsx`     | Global search, grouped results, and recent items                      |
-| Kanban page               | `web/src/pages/KanbanPage.tsx`            | Board, cards, and preview drawer composition                          |
+| Workspace page            | `web/src/pages/WorkspacePage.tsx`         | Board, cards, intake, and preview drawer composition                  |
 | Workspace page            | `web/src/pages/WorkspacesPage.tsx`        | Workspace create, import, edit, delete, scan, reveal                  |
 | Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`     | File tree, preview, Markdown editor, diff, metadata, Git controls     |
 | Explorer page             | `web/src/pages/WorkspaceExplorerPage.tsx` | Global filesystem tree, file editor, and context inspector            |
@@ -129,7 +129,7 @@ User browser
 - Scanner branch matching lists branches once per workspace scan instead of once per item identifier.
 - Scanner source settings matching and metadata parsing are split into focused files behind the same `Scanner.Scan` facade.
 - Frontend route and app state behavior moved out of `App.tsx`.
-- Kanban filtering, workspace source settings helpers, and Git diff parsing moved into feature or shared modules.
+- Board filtering, workspace source settings helpers, and Git diff parsing moved into feature or shared modules.
 - App shell CSS is split into `web/src/styles/app-shell.css` and imported by `app.css`.
 
 ## Data Flow
@@ -211,7 +211,7 @@ User opens a source's Source Items settings
   -> user saves a path pattern and field mapping
   -> PUT /api/workspaces/{id}/source-structure?directory={dir}
   -> API validates the pattern, writes workspace-settings.yaml, rescans the workspace
-  -> configured source cards appear on the Kanban board
+  -> configured source cards appear on the Workspace board
 ```
 
 ### Item Editing
@@ -493,7 +493,7 @@ Freestyle docs roots are supported when:
 - The configured root contains Markdown files, and
 - It does not contain structured item children.
 
-Plain freestyle docs roots are assigned the `unsorted` status so the Kanban board separates unstructured sources from normal workflow columns. Once a source root has a valid `workspace-settings.yaml`, matched cards use the configured status or `plan.yaml`.
+Plain freestyle docs roots are assigned the `unsorted` status so the Workspace board separates unstructured sources from normal workflow columns. Once a source root has a valid `workspace-settings.yaml`, matched cards use the configured status or `plan.yaml`.
 
 Metadata precedence:
 
@@ -520,12 +520,13 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
 | `GET`    | `/api/state`                                            | App state version, workspace count, item count   |
 | `GET`    | `/api/audit-events`                                     | Recent local operation events                    |
 | `GET`    | `/api/search`                                           | Ranked indexed item search                       |
-| `GET`    | `/api/saved-filters`                                    | List saved Kanban filter views                   |
+| `GET`    | `/api/saved-filters`                                    | List saved Workspace board filter views          |
 | `POST`   | `/api/saved-filters`                                    | Create or update a saved filter                  |
 | `DELETE` | `/api/saved-filters/{id}`                               | Delete a saved filter                            |
 | `GET`    | `/api/recent-items`                                     | List recently opened items                       |
 | `POST`   | `/api/recent-items`                                     | Record an opened item                            |
 | `POST`   | `/api/items/{id}/ai-sessions/embedded`                  | Start a managed embedded AI session              |
+| `GET`    | `/api/ai/presets`                                       | List built-in AI planning prompt presets         |
 | `GET`    | `/api/ai/sessions/{sessionId}`                          | Read embedded session state                      |
 | `DELETE` | `/api/ai/sessions/{sessionId}`                          | Cancel an embedded session                       |
 | `GET`    | `/api/ai/sessions/{sessionId}/channel`                  | Upgrade to the typed terminal WebSocket channel  |
@@ -534,7 +535,9 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
 | `PUT`    | `/api/workspaces/{id}`                                  | Update workspace registration                    |
 | `DELETE` | `/api/workspaces/{id}`                                  | Delete workspace registration and cached items   |
 | `POST`   | `/api/workspaces/{id}/scan`                             | Scan one workspace                               |
+| `POST`   | `/api/workspaces/{id}/workspace/branch`                 | Load current or snapshot branch board items      |
 | `GET`    | `/api/workspaces/{id}/health`                           | Read workspace health checks                     |
+| `GET`    | `/api/workspaces/{id}/jira/issues/{issueKey}`           | Fetch Jira issue context before item creation    |
 | `GET`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Read source item settings                        |
 | `PUT`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Save source item settings and rescan             |
 | `GET`    | `/api/items`                                            | List cached item summaries                       |

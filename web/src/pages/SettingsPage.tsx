@@ -27,9 +27,9 @@ export function SettingsPage({ settings, onChange }: { settings: AppSettings; on
       <section className="settings-section">
         <header>
           <div>
-            <span className="settings-group-label">Kanban board</span>
+            <span className="settings-group-label">Board View</span>
             <h2>Status columns</h2>
-            <p>Show or hide the statuses that appear as Kanban columns.</p>
+            <p>Show or hide the statuses that appear as board columns.</p>
           </div>
           <span className="settings-count">{settings.visibleKanbanStatuses.length} visible</span>
         </header>

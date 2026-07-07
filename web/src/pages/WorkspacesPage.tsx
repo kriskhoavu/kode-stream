@@ -833,7 +833,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               </button>
             </header>
             <p className="modal-help">
-              Define how this source should be split into Kanban items.
+              Define how this source should be split into board items.
             </p>
             {!settingsEditor.exists && settingsEditor.mode === 'structured' && (
               <div className="metadata-callout source-structure-supported">
