@@ -5033,6 +5033,69 @@ body.is-resizing-panel {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 12%, transparent);
 }
 
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 82%, var(--line));
+}
+
+.segmented-control button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.segmented-control button.active {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-soft);
+}
+
+.jira-intake {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.jira-issue-preview {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--green) 8%, var(--panel));
+}
+
+.jira-issue-preview.warning {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--line));
+  background: color-mix(in srgb, var(--amber) 9%, var(--panel));
+}
+
+.jira-issue-preview strong,
+.jira-issue-preview span,
+.jira-issue-preview small,
+.jira-issue-preview p {
+  margin: 0;
+  min-width: 0;
+}
+
+.jira-issue-preview p {
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .workspace-actions {
   display: flex;
   flex-wrap: wrap;

@@ -50,6 +50,85 @@ describe('WorkspacePage', () => {
     await waitFor(() => expect(screen.getByText('Item Manager')).toBeInTheDocument());
   });
 
+  it('creates a work item from Jira context', async () => {
+    const onOpenPlan = vi.fn();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workspace/branch') return Promise.resolve(response(branchLoadResult([], 'main')));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      if (url === '/api/workspaces/r1/jira/issues/PM-025') return Promise.resolve(response({
+        state: 'available',
+        issue: {
+          key: 'PM-025',
+          summary: 'Jira First Workspace',
+          status: 'In Progress',
+          description: 'Create from Jira first.',
+          issueType: 'Story',
+          assignee: { displayName: 'Kim' },
+          reporter: { displayName: 'BA' },
+          priority: 'High',
+          labels: ['planning'],
+          browserUrl: 'https://jira.example/browse/PM-025',
+          attachments: [{ id: 'a1', filename: 'spec.pdf', mediaType: 'application/pdf', sizeBytes: 120, author: { displayName: 'BA' } }]
+        }
+      }));
+      if (url === '/api/items' && init?.method === 'POST') return Promise.resolve(response({
+        item: { ...draftItem, id: 'created', identifier: 'PM-025', title: 'Jira First Workspace', status: 'draft', documents: [], metadata: {}, counts: { files: 2 } },
+        scannedAt: '2026-06-23T00:00:00Z'
+      }));
+      return Promise.resolve(response([]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<WorkspacePage workspace={workspace} refreshKey={0} onOpenPlan={onOpenPlan} onWorkspacesChanged={() => undefined} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ New Work Item/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'From Jira' }));
+    fireEvent.change(screen.getByLabelText('Jira key'), { target: { value: 'pm-025' } });
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Jira/i }));
+
+    expect(await screen.findByText('PM-025: Jira First Workspace')).toBeInTheDocument();
+    expect(screen.getByLabelText('Item name')).toHaveValue('PM-025');
+    expect(screen.getByLabelText('Title')).toHaveValue('Jira First Workspace');
+    expect(screen.getByLabelText('Owner')).toHaveValue('Kim');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create Item' }));
+
+    await waitFor(() => expect(onOpenPlan).toHaveBeenCalledWith('created'));
+    const createCall = fetchMock.mock.calls.find(([url, init]) => String(url) === '/api/items' && init?.method === 'POST');
+    const body = JSON.parse(String(createCall?.[1]?.body ?? '{}')) as Record<string, unknown>;
+    expect(body).toMatchObject({ workspaceId: 'r1', source: 'items', scope: 'items', identifier: 'PM-025', title: 'Jira First Workspace', owner: 'Kim', jiraKey: 'PM-025' });
+    expect(body.tags).toEqual(['priority-high', 'story', 'planning']);
+    expect(String(body.initialReadme)).toContain('## Jira Context');
+    expect(String(body.initialReadme)).toContain('spec.pdf');
+  });
+
+  it('does not create files when Jira lookup fails', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workspace/branch') return Promise.resolve(response(branchLoadResult([], 'main')));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      if (url === '/api/workspaces/r1/jira/issues/PM-404') return Promise.resolve(response({ state: 'not_found', message: 'No Jira ticket exists for this item' }));
+      return Promise.resolve(response([]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<WorkspacePage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ New Work Item/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'From Jira' }));
+    fireEvent.change(screen.getByLabelText('Jira key'), { target: { value: 'PM-404' } });
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Jira/i }));
+
+    expect(await screen.findByText('No Jira ticket exists for this item')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Item' })).toBeDisabled();
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url) === '/api/items' && init?.method === 'POST')).toBe(false);
+  });
+
   it('does not repeat placeholder docs metadata on docs cards', async () => {
     const docsItem: ItemSummary = {
       id: 'docs',

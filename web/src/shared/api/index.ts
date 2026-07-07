@@ -189,6 +189,7 @@ export const api = {
   },
   updateWorkspace: (id: string, input: WorkspaceInput) => request<WorkspaceConfig>(`/api/workspaces/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   testJiraConnection: (workspaceId: string, connection: JiraConnection) => request<JiraConnectionTest>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/test`, { method: 'POST', body: JSON.stringify(connection) }),
+  workspaceJiraIssue: (workspaceId: string, issueKey: string) => request<JiraIssueState>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/issues/${encodeURIComponent(issueKey)}`),
   jiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira`),
   refreshJiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira/refresh`, { method: 'POST' }),
   jiraAttachmentURL: (itemId: string, attachmentId: string) => `/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`,

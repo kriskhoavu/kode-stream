@@ -24,7 +24,7 @@ Do not keep `/kanban` route compatibility.
 | B2    | Jira-Backed Item Creation     | Done   |
 | B3    | AI Preset Launch Contract     | Done   |
 | F1    | Workspace Route Rename        | Done   |
-| F2    | Jira Intake UI                | Draft  |
+| F2    | Jira Intake UI                | Done   |
 | F3    | AI Preset Launch UI           | Draft  |
 | F4    | Verification And Copy Cleanup | Draft  |
 
@@ -94,11 +94,11 @@ Do not keep `/kanban` route compatibility.
 
 **Deliverables:**
 
-- [ ] Replace the New item modal with `New Work Item`.
-- [ ] Add Blank and From Jira modes.
-- [ ] Add Jira key fetch, preview, editable creation defaults, and failure states.
-- [ ] Create Jira-backed items through the extended API and open the created item.
-- [ ] Add focused component tests for lookup, success, failures, and no-write failure behavior.
+- [x] Replace the New item modal with `New Work Item`.
+- [x] Add Blank and From Jira modes.
+- [x] Add Jira key fetch, preview, editable creation defaults, and failure states.
+- [x] Create Jira-backed items through the extended API and open the created item.
+- [x] Add focused component tests for lookup, success, failures, and no-write failure behavior.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

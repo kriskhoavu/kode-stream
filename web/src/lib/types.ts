@@ -224,6 +224,8 @@ export interface AISessionLaunchInput {
   provider: string;
   terminal: string;
   contextMode: 'workspace_only' | 'card_context';
+	presetId?: string;
+	customPrompt?: string;
 	surface?: 'external' | 'embedded';
 }
 
@@ -544,6 +546,8 @@ export interface NewItemInput {
   status?: ItemStatus;
   owner?: string;
   tags?: string[];
+  jiraKey?: string;
+  initialReadme?: string;
 }
 
 export interface WriteResult {

@@ -16,6 +16,8 @@ import type {
   ItemMetadataUpdateInput,
   ItemStatus,
   ItemSummary,
+  JiraIssue,
+  JiraIssueState,
   SavedFilter,
   SourceSettingsResult,
   SourceStructureCard,
@@ -50,6 +52,32 @@ type SourceItemsEditorState = {
   preview: SourceStructurePreview[];
 };
 
+type NewItemOrigin = 'blank' | 'jira';
+
+type NewWorkItemDraft = {
+  origin: NewItemOrigin;
+  source: string;
+  scope: string;
+  identifier: string;
+  title: string;
+  status: ItemStatus;
+  owner: string;
+  tags: string;
+  jiraKey: string;
+};
+
+const emptyNewWorkItemDraft = (): NewWorkItemDraft => ({
+  origin: 'blank',
+  source: '',
+  scope: '',
+  identifier: '',
+  title: '',
+  status: 'draft',
+  owner: '',
+  tags: '',
+  jiraKey: ''
+});
+
 export { filterPlans };
 
 export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
@@ -70,9 +98,11 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
   const [drawerPlanId, setDrawerPlanId] = useState('');
   const [newPlanOpen, setNewPlanOpen] = useState(false);
-  const [newPlanDraft, setNewPlanDraft] = useState({ source: '', scope: '', identifier: '', status: 'draft' as ItemStatus });
+  const [newPlanDraft, setNewPlanDraft] = useState<NewWorkItemDraft>(() => emptyNewWorkItemDraft());
   const [newPlanError, setNewPlanError] = useState('');
   const [creatingPlan, setCreatingPlan] = useState(false);
+  const [jiraLookup, setJiraLookup] = useState<JiraIssueState | null>(null);
+  const [jiraLookupLoading, setJiraLookupLoading] = useState(false);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [saveFilterOpen, setSaveFilterOpen] = useState(false);
   const [saveFilterName, setSaveFilterName] = useState('');
@@ -359,22 +389,55 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
     void moveItem(itemId, status);
   };
 
+  const fetchJiraIssue = async () => {
+    if (!workspace || !newPlanDraft.jiraKey.trim()) return;
+    setJiraLookupLoading(true);
+    setNewPlanError('');
+    try {
+      const result = await api.workspaceJiraIssue(workspace.id, newPlanDraft.jiraKey.trim());
+      setJiraLookup(result);
+      if (result.state === 'available' && result.issue) {
+        const issue = result.issue;
+        const nextTags = jiraTags(issue).join(', ');
+        setNewPlanDraft((draft) => ({
+          ...draft,
+          identifier: draft.identifier.trim() || issue.key,
+          title: draft.title.trim() || issue.summary,
+          owner: draft.owner.trim() || issue.assignee?.displayName || '',
+          tags: draft.tags.trim() || nextTags
+        }));
+      }
+    } catch (err) {
+      setJiraLookup(null);
+      setNewPlanError(err instanceof Error ? err.message : 'Jira lookup failed');
+    } finally {
+      setJiraLookupLoading(false);
+    }
+  };
+
   const createPlan = async () => {
     if (!workspace) return;
     setCreatingPlan(true);
     setNewPlanError('');
     try {
       const source = newPlanDraft.source || workspace.sources[0] || 'plans';
+      const jiraIssue = newPlanDraft.origin === 'jira' && jiraLookup?.state === 'available' ? jiraLookup.issue : undefined;
       const result = await api.createItem({
         workspaceId: workspace.id,
         source,
-        scope: source,
+        scope: newPlanDraft.scope.trim() || source,
         identifier: newPlanDraft.identifier.trim(),
-        status: newPlanDraft.status
+        title: newPlanDraft.title.trim() || undefined,
+        status: newPlanDraft.status,
+        owner: newPlanDraft.owner.trim() || undefined,
+        tags: parseTags(newPlanDraft.tags),
+        jiraKey: jiraIssue?.key,
+        initialReadme: jiraIssue ? jiraReadme(jiraIssue) : undefined
       });
       notifyReliabilityChanged();
       setNewPlanOpen(false);
-      setNewPlanDraft({ source: '', scope: '', identifier: '', status: 'draft' });
+      setNewPlanDraft(emptyNewWorkItemDraft());
+      setJiraLookup(null);
       await onWorkspacesChanged();
       await reloadPlans();
       onOpenPlan(result.item.id);
@@ -593,10 +656,10 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
         </label>
         <button className="secondary" onClick={scan}>
           <RotateCw size={16} /> Refresh
-        </button>
-        <button className="primary" onClick={() => setNewPlanOpen(true)} disabled={sourceMode === 'snapshot'}>
-          + New Item
-        </button>
+            </button>
+            <button className="primary" onClick={() => setNewPlanOpen(true)} disabled={sourceMode === 'snapshot'}>
+              + New Work Item
+            </button>
         <span className="scan-state">{scanState}</span>
       </div>
       <div className="facet-bar">
@@ -769,28 +832,142 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
       )}
       {newPlanOpen && workspace && (
         <div className="modal-backdrop" role="presentation">
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Create new item">
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Create new work item">
             <header>
-              <h2>New item</h2>
-              <button type="button" className="icon-button" onClick={() => setNewPlanOpen(false)}><X size={16} /></button>
+              <h2>New Work Item</h2>
+              <button type="button" className="icon-button" onClick={() => {
+                setNewPlanOpen(false);
+                setJiraLookup(null);
+                setNewPlanError('');
+              }}><X size={16} /></button>
             </header>
             <div className="metadata-form">
+              <div className="segmented-control" role="group" aria-label="Item origin">
+                <button
+                  type="button"
+                  className={newPlanDraft.origin === 'blank' ? 'active' : ''}
+                  onClick={() => {
+                    setNewPlanDraft((draft) => ({ ...emptyNewWorkItemDraft(), source: draft.source, origin: 'blank' }));
+                    setJiraLookup(null);
+                    setNewPlanError('');
+                  }}
+                >
+                  Blank
+                </button>
+                <button
+                  type="button"
+                  className={newPlanDraft.origin === 'jira' ? 'active' : ''}
+                  onClick={() => {
+                    setNewPlanDraft((draft) => ({ ...draft, origin: 'jira' }));
+                    setNewPlanError('');
+                  }}
+                >
+                  From Jira
+                </button>
+              </div>
               <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
                 {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
               </select></label>
-              <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Any item name" /></label>
+              {newPlanDraft.origin === 'jira' && (
+                <div className="jira-intake">
+                  <label>Jira key<input value={newPlanDraft.jiraKey} onChange={(event) => {
+                    setNewPlanDraft((draft) => ({ ...draft, jiraKey: event.target.value.toUpperCase() }));
+                    setJiraLookup(null);
+                  }} placeholder="PM-025" /></label>
+                  <button type="button" className="secondary" disabled={jiraLookupLoading || !newPlanDraft.jiraKey.trim()} onClick={() => void fetchJiraIssue()}>
+                    <Search size={15} />
+                    {jiraLookupLoading ? 'Fetching...' : 'Fetch Jira'}
+                  </button>
+                  {jiraLookup && (
+                    <section className={jiraLookup.state === 'available' ? 'jira-issue-preview' : 'jira-issue-preview warning'} aria-label="Jira issue preview">
+                      {jiraLookup.issue ? (
+                        <>
+                          <strong>{jiraLookup.issue.key}: {jiraLookup.issue.summary}</strong>
+                          <span>{jiraLookup.issue.issueType || 'Issue'} · {jiraLookup.issue.status || 'Unknown'} · {jiraLookup.issue.assignee?.displayName || 'Unassigned'}</span>
+                          {jiraLookup.issue.description && <p>{jiraLookup.issue.description}</p>}
+                          {jiraLookup.issue.attachments.length > 0 && <small>{jiraLookup.issue.attachments.length} attachment{jiraLookup.issue.attachments.length === 1 ? '' : 's'} referenced</small>}
+                        </>
+                      ) : (
+                        <>
+                          <strong>{jiraLookup.message || jiraLookup.state}</strong>
+                          {jiraLookup.recoveryHint && <span>{jiraLookup.recoveryHint}</span>}
+                        </>
+                      )}
+                    </section>
+                  )}
+                </div>
+              )}
+              <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder={newPlanDraft.origin === 'jira' ? 'Jira key or local item name' : 'Any item name'} /></label>
+              {newPlanDraft.origin === 'jira' && (
+                <>
+                  <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Jira summary" /></label>
+                  <label>Owner<input value={newPlanDraft.owner} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, owner: event.target.value }))} placeholder="Assignee" /></label>
+                  <label>Tags<input value={newPlanDraft.tags} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, tags: event.target.value }))} placeholder="story, priority-high" /></label>
+                </>
+              )}
               <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
             </div>
             {newPlanError && <p className="error">{newPlanError}</p>}
             <footer className="modal-actions">
               <button type="button" className="ghost" onClick={() => setNewPlanOpen(false)}>Cancel</button>
-              <button type="button" className="primary" disabled={creatingPlan || !newPlanDraft.identifier} onClick={createPlan}>{creatingPlan ? 'Creating...' : 'Create Item'}</button>
+              <button
+                type="button"
+                className="primary"
+                disabled={creatingPlan || !newPlanDraft.identifier.trim() || (newPlanDraft.origin === 'jira' && jiraLookup?.state !== 'available')}
+                onClick={createPlan}
+              >
+                {creatingPlan ? 'Creating...' : 'Create Item'}
+              </button>
             </footer>
           </section>
         </div>
       )}
     </section>
   );
+}
+
+function parseTags(value: string): string[] {
+  return Array.from(new Set(value.split(',').map((tag) => tag.trim()).filter(Boolean)));
+}
+
+function slugTag(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function jiraTags(issue: JiraIssue): string[] {
+  const tags = [...issue.labels];
+  const issueType = slugTag(issue.issueType);
+  const priority = slugTag(issue.priority ?? '');
+  if (issueType) tags.unshift(issueType);
+  if (priority) tags.unshift(`priority-${priority}`);
+  return Array.from(new Set(tags.filter(Boolean)));
+}
+
+function jiraReadme(issue: JiraIssue): string {
+  const lines = [
+    `# ${issue.key}: ${issue.summary}`,
+    '',
+    '## Jira Context',
+    '',
+    `- Key: ${issue.key}`,
+    `- Status: ${issue.status || 'Unknown'}`,
+    `- Type: ${issue.issueType || 'Unknown'}`,
+    `- Priority: ${issue.priority || 'Unspecified'}`,
+    `- Assignee: ${issue.assignee?.displayName || 'Unassigned'}`,
+    `- Reporter: ${issue.reporter?.displayName || 'Unknown'}`,
+    issue.browserUrl ? `- Jira: ${issue.browserUrl}` : '',
+    '',
+    '## Description',
+    '',
+    issue.description?.trim() || '_No Jira description available._'
+  ].filter((line) => line !== '');
+  if (issue.attachments.length > 0) {
+    lines.push('', '## Attachments', '');
+    for (const attachment of issue.attachments) {
+      lines.push(`- ${attachment.filename} (${attachment.mediaType || 'unknown'}, ${attachment.sizeBytes.toLocaleString()} bytes)`);
+    }
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 function SourceStructureProposalList({
