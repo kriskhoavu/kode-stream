@@ -83,7 +83,7 @@ describe('shared api facade', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/workspace%2Fone/git/branches', expect.any(Object));
   });
 
-  it('loads and normalizes a Kanban branch snapshot', async () => {
+  it('loads and normalizes a Workspace branch snapshot', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -101,7 +101,7 @@ describe('shared api facade', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(api.loadKanbanBranch('workspace/one', { branch: 'feature', force: true })).resolves.toMatchObject({
+    await expect(api.loadWorkspaceBranch('workspace/one', { branch: 'feature', force: true })).resolves.toMatchObject({
       workspaceId: 'workspace/one',
       branch: 'feature',
       sourceMode: 'snapshot',
@@ -111,7 +111,7 @@ describe('shared api facade', () => {
       warnings: [],
       items: [{ id: 'item-1', sourceMode: 'snapshot', editable: false, tags: [] }]
     });
-    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/workspace%2Fone/kanban/branch', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/workspace%2Fone/workspace/branch', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ branch: 'feature', force: true })
     }));
@@ -200,14 +200,14 @@ describe('shared api facade', () => {
   it('normalizes search, saved filter, and recent item responses', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 'one', type: 'unknown', title: 'One', route: '/items/one' }] })
-      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 'filter', name: 'Drafts', route: '/kanban' }] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 'filter', name: 'Drafts', route: '/workspace' }] })
       .mockResolvedValueOnce({ ok: true, json: async () => [{ itemId: 'one', workspaceId: 'w1', title: 'One', openedAt: '2026-06-20T00:00:00Z' }] });
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(api.search({ q: 'one', workspaceId: 'w1', limit: 5 })).resolves.toEqual([
       { id: 'one', type: 'item', title: 'One', subtitle: '', context: '', route: '/items/one', score: 0 }
     ]);
-    await expect(api.savedFilters()).resolves.toEqual([{ id: 'filter', name: 'Drafts', route: '/kanban', filters: {} }]);
+    await expect(api.savedFilters()).resolves.toEqual([{ id: 'filter', name: 'Drafts', route: '/workspace', filters: {} }]);
     await expect(api.recentItems()).resolves.toEqual([
       { itemId: 'one', workspaceId: 'w1', title: 'One', subtitle: '', route: '/items/one', openedAt: '2026-06-20T00:00:00Z' }
     ]);

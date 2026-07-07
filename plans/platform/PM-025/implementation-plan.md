@@ -23,7 +23,7 @@ Do not keep `/kanban` route compatibility.
 | B1    | Workspace Jira Lookup         | Done   |
 | B2    | Jira-Backed Item Creation     | Done   |
 | B3    | AI Preset Launch Contract     | Done   |
-| F1    | Workspace Route Rename        | Draft  |
+| F1    | Workspace Route Rename        | Done   |
 | F2    | Jira Intake UI                | Draft  |
 | F3    | AI Preset Launch UI           | Draft  |
 | F4    | Verification And Copy Cleanup | Draft  |
@@ -79,10 +79,10 @@ Do not keep `/kanban` route compatibility.
 
 **Deliverables:**
 
-- [ ] Rename `KanbanPage` surface and visible labels to Workspace.
-- [ ] Make `/workspace` the canonical board route.
-- [ ] Remove `/kanban` route handling, route labels, and navigation copy.
-- [ ] Update route tests and saved navigation assumptions.
+- [x] Rename `KanbanPage` surface and visible labels to Workspace.
+- [x] Make `/workspace` the canonical board route.
+- [x] Remove `/kanban` route handling, route labels, and navigation copy.
+- [x] Update route tests and saved navigation assumptions.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

@@ -52,7 +52,7 @@ type SourceItemsEditorState = {
 
 export { filterPlans };
 
-export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
+export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
   workspace?: WorkspaceConfig;
   refreshKey: number;
   visibleStatuses?: ItemStatus[];
@@ -102,7 +102,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
     setLoading(true);
     setError('');
     try {
-      const result = await api.loadKanbanBranch(workspace.id, { branch: branch || undefined, force });
+      const result = await api.loadWorkspaceBranch(workspace.id, { branch: branch || undefined, force });
       setBranchContext(result);
       setSelectedBranch(result.branch);
       setPlans(result.items);
@@ -270,7 +270,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
     if (!workspace) return;
     setScanState('Refreshing');
     try {
-      const result = await api.loadKanbanBranch(workspace.id, { branch: selectedBranch || undefined, force: true });
+      const result = await api.loadWorkspaceBranch(workspace.id, { branch: selectedBranch || undefined, force: true });
       notifyReliabilityChanged();
       setScanState(`${result.itemCount} items indexed`);
       setBranchContext(result);
@@ -477,7 +477,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
     if (!saveFilterName.trim()) return;
     const saved = await api.saveFilter({
       name: saveFilterName.trim(),
-      route: '/kanban',
+      route: '/workspace',
       workspaceId: workspace?.id,
       filters: { filters: { ...filters, branches: [] }, query }
     });
@@ -505,8 +505,8 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
   if (!workspace && !loading) {
     return (
       <section className="empty-state">
-        <h1>Kanban</h1>
-        <p>Register a local Git workspace to create a board.</p>
+        <h1>Workspace</h1>
+        <p>Register a local Git workspace to create a board view.</p>
       </section>
     );
   }
@@ -516,7 +516,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
       <div className="page-title kanban-title">
         <div className="kanban-heading">
           <div>
-            <h1><KanbanSquare size={22} /> Kanban board</h1>
+            <h1><KanbanSquare size={22} /> Workspace</h1>
             <span><FolderGit2 size={15} /> {workspace?.name ?? 'No workspace selected'}</span>
           </div>
         </div>
@@ -529,7 +529,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
                 <button
                   type="button"
                   className="branch-picker-trigger"
-                  aria-label="Select Kanban branch"
+                  aria-label="Select board branch"
                   aria-haspopup="listbox"
                   aria-expanded={branchMenuOpen}
                   onClick={() => {
@@ -552,7 +552,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
                         autoFocus
                       />
                     </label>
-                    <div className="branch-picker-options" role="listbox" aria-label="Kanban branches">
+                    <div className="branch-picker-options" role="listbox" aria-label="Board branches">
                       {filteredBranchOptions.map((branch) => (
                         <button
                           type="button"
@@ -717,7 +717,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
                 </select>
               </label>
             )}
-            <p className="modal-help">Define how this source should be split into Kanban items.</p>
+            <p className="modal-help">Define how this source should be split into board items.</p>
             {sourceItemsLoading && <span className="reliability-muted">Loading source settings...</span>}
             {!sourceItemsLoading && sourceItemsError && <span className="error">{sourceItemsError}</span>}
             {!sourceItemsLoading && sourceItemsEditor && (

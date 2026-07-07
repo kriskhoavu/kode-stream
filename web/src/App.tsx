@@ -4,7 +4,7 @@ import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
 export { routeFromLocation } from './app/router';
-import { KanbanPage } from './pages/KanbanPage';
+import { WorkspacePage } from './pages/WorkspacePage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -69,9 +69,9 @@ export function App() {
     setWorkspaceMenuOpen(false);
   };
 
-  const openWorkspaceKanban = (repo: WorkspaceConfig, itemId?: string) => {
+  const openWorkspaceBoard = (repo: WorkspaceConfig, itemId?: string) => {
     selectWorkspaceState(repo);
-    navigate({ name: 'kanban', focusedItemId: itemId });
+    navigate({ name: 'workspace', focusedItemId: itemId });
   };
 
   const openWorkspaceExplorer = (workspaceId: string, path: string) => {
@@ -89,13 +89,13 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="left-nav">
-        <button className="brand" onClick={() => navigate({ name: 'kanban' })} aria-label="Plan Manager home">
+        <button className="brand" onClick={() => navigate({ name: 'workspace' })} aria-label="Plan Manager home">
           <Boxes size={20} />
           <span>Plan Manager</span>
         </button>
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>
-          <NavButton active={route.name === 'kanban'} onClick={() => navigate({ name: 'kanban' })} icon={<KanbanSquare size={18} />} label="Kanban" />
+          <NavButton active={route.name === 'workspace'} onClick={() => navigate({ name: 'workspace' })} icon={<KanbanSquare size={18} />} label="Workspace" />
           <NavButton active={route.name === 'explorer'} onClick={() => navigate({ name: 'explorer' })} icon={<FolderTree size={18} />} label="Explorer" />
           <NavButton active={route.name === 'knowledge'} onClick={() => navigate({ name: 'knowledge' })} icon={<BookOpen size={18} />} label="Knowledge" />
         </div>
@@ -221,26 +221,26 @@ export function App() {
       }} />}
 
       <main className="main-content">
-        {route.name === 'kanban' && (
-          <KanbanPage
+        {route.name === 'workspace' && (
+          <WorkspacePage
             workspace={activeRepo}
             refreshKey={contentRefreshKey}
             visibleStatuses={appSettings.visibleKanbanStatuses}
             focusedItemId={route.focusedItemId}
-            onOpenPlan={(itemId) => navigate({ name: 'workspace', itemId })}
+            onOpenPlan={(itemId) => navigate({ name: 'item', itemId })}
             onWorkspacesChanged={() => refreshAppData()}
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
           />
         )}
-        {route.name === 'workspace' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly()} />}
+        {route.name === 'item' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'workspace' })} onContentChanged={() => refreshAppStateOnly()} />}
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData()} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
-        {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkspaceExplorerPage workspaces={activeRepo ? [activeRepo] : []} location={explorerLocation} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenKanban={openWorkspaceKanban} /></Suspense>}
+        {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkspaceExplorerPage workspaces={activeRepo ? [activeRepo] : []} location={explorerLocation} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenWorkspace={openWorkspaceBoard} /></Suspense>}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} onOpenExplorer={openWorkspaceExplorer} /></Suspense>}
       </main>
 
       <nav className="bottom-nav">
-        <button className={route.name === 'kanban' ? 'active' : ''} onClick={() => navigate({ name: 'kanban' })}><KanbanSquare size={18} />Kanban</button>
+        <button className={route.name === 'workspace' ? 'active' : ''} onClick={() => navigate({ name: 'workspace' })}><KanbanSquare size={18} />Workspace</button>
         <button className={route.name === 'explorer' ? 'active' : ''} onClick={() => navigate({ name: 'explorer' })}><FolderTree size={18} />Explorer</button>
         <button className={route.name === 'knowledge' ? 'active' : ''} onClick={() => navigate({ name: 'knowledge' })}><BookOpen size={18} />Knowledge</button>
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>

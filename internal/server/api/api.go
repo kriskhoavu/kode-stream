@@ -131,7 +131,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/jira/test", a.testJiraConnection)
 	mux.HandleFunc("GET /api/workspaces/{id}/jira/issues/{issueKey}", a.workspaceJiraIssue)
-	mux.HandleFunc("POST /api/workspaces/{id}/kanban/branch", a.loadKanbanBranch)
+	mux.HandleFunc("POST /api/workspaces/{id}/workspace/branch", a.loadWorkspaceBranch)
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
 	mux.HandleFunc("PUT /api/workspaces/{id}/source-structure", a.saveSourceStructure)
@@ -711,7 +711,7 @@ func (a *API) recordRecentItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func validAppRoute(route string) bool {
-	return route == "/kanban" || route == "/items" || route == "/branches" || route == "/workspaces" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/kanban?") || strings.HasPrefix(route, "/knowledge?")
+	return route == "/workspace" || route == "/items" || route == "/branches" || route == "/workspaces" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/workspace?") || strings.HasPrefix(route, "/knowledge?")
 }
 
 func (a *API) knowledgeWikis(w http.ResponseWriter, r *http.Request) {
@@ -929,7 +929,7 @@ func (a *API) scanWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-func (a *API) loadKanbanBranch(w http.ResponseWriter, r *http.Request) {
+func (a *API) loadWorkspaceBranch(w http.ResponseWriter, r *http.Request) {
 	var input models.BranchLoadInput
 	if r.Body != nil {
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -939,7 +939,7 @@ func (a *API) loadKanbanBranch(w http.ResponseWriter, r *http.Request) {
 	}
 	started := time.Now()
 	result, err := a.workspaces.LoadBranch(r.PathValue("id"), input)
-	a.record(r.PathValue("id"), "", "kanban_branch_load", "Kanban branch loaded.", nil, started, err)
+	a.record(r.PathValue("id"), "", "workspace_branch_load", "Workspace branch loaded.", nil, started, err)
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return

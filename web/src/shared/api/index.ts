@@ -194,8 +194,8 @@ export const api = {
   jiraAttachmentURL: (itemId: string, attachmentId: string) => `/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`,
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
   scan: (workspaceId: string) => request<ScanResult>(`/api/workspaces/${workspaceId}/scan`, { method: 'POST' }),
-  loadKanbanBranch: (workspaceId: string, input: { branch?: string; force?: boolean } = {}) =>
-    request<BranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/kanban/branch`, {
+  loadWorkspaceBranch: (workspaceId: string, input: { branch?: string; force?: boolean } = {}) =>
+    request<BranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/workspace/branch`, {
       method: 'POST',
       body: JSON.stringify(input)
     }).then(normalizeBranchLoadResult),

@@ -816,7 +816,7 @@ func TestSavedFilterEndpointsValidateCreateListAndDelete(t *testing.T) {
 	}
 
 	createdResponse := httptest.NewRecorder()
-	apiHandler.Routes().ServeHTTP(createdResponse, httptest.NewRequest(http.MethodPost, "/api/saved-filters", strings.NewReader(`{"name":"Drafts","route":"/kanban","filters":{"statuses":["draft"]}}`)))
+	apiHandler.Routes().ServeHTTP(createdResponse, httptest.NewRequest(http.MethodPost, "/api/saved-filters", strings.NewReader(`{"name":"Drafts","route":"/workspace","filters":{"statuses":["draft"]}}`)))
 	var created models.SavedFilter
 	if err := json.Unmarshal(createdResponse.Body.Bytes(), &created); err != nil || created.ID == "" {
 		t.Fatalf("created = %#v, err=%v", created, err)

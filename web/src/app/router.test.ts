@@ -5,15 +5,15 @@ describe('router', () => {
   it('parses item workspace routes', () => {
     window.history.pushState(null, '', '/items/PM-003%20Architecture');
 
-    expect(routeFromLocation()).toEqual({ name: 'workspace', itemId: 'PM-003 Architecture' });
+    expect(routeFromLocation()).toEqual({ name: 'item', itemId: 'PM-003 Architecture' });
   });
 
   it('builds paths for routes', () => {
-    expect(pathForRoute({ name: 'kanban' })).toBe('/kanban');
-    expect(pathForRoute({ name: 'kanban', focusedItemId: 'item 1' })).toBe('/kanban?itemId=item+1');
+    expect(pathForRoute({ name: 'workspace' })).toBe('/workspace');
+    expect(pathForRoute({ name: 'workspace', focusedItemId: 'item 1' })).toBe('/workspace?itemId=item+1');
     expect(pathForRoute({ name: 'workspaces' })).toBe('/workspaces');
     expect(pathForRoute({ name: 'settings' })).toBe('/settings');
-    expect(pathForRoute({ name: 'workspace', itemId: 'PM-003 Architecture' })).toBe('/items/PM-003%20Architecture');
+    expect(pathForRoute({ name: 'item', itemId: 'PM-003 Architecture' })).toBe('/items/PM-003%20Architecture');
     expect(pathForRoute({ name: 'explorer', location: { workspaceId: 'workspace one', path: 'plans/PM-007' } }))
       .toBe('/explorer?workspaceId=workspace+one&path=plans%2FPM-007');
 	expect(pathForRoute({ name: 'knowledge', location: { workspaceId: 'workspace one', root: 'master-data/article', slug: 'article overview', view: 'read' } }))
@@ -27,13 +27,15 @@ describe('router', () => {
 		expect(knowledgePath()).toBe('/knowledge');
 	});
 
-  it('falls removed top-level list routes back to Kanban', () => {
+  it('falls removed top-level list routes back to Workspace', () => {
     window.history.pushState(null, '', '/items');
-    expect(routeFromLocation()).toEqual({ name: 'kanban' });
+    expect(routeFromLocation()).toEqual({ name: 'workspace' });
     window.history.pushState(null, '', '/branches');
-    expect(routeFromLocation()).toEqual({ name: 'kanban' });
+    expect(routeFromLocation()).toEqual({ name: 'workspace' });
+    window.history.pushState(null, '', '/workspace?itemId=item-1');
+    expect(routeFromLocation()).toEqual({ name: 'workspace', focusedItemId: 'item-1' });
     window.history.pushState(null, '', '/kanban?itemId=item-1');
-    expect(routeFromLocation()).toEqual({ name: 'kanban', focusedItemId: 'item-1' });
+    expect(routeFromLocation()).toEqual({ name: 'workspace' });
     window.history.pushState(null, '', '/settings');
     expect(routeFromLocation()).toEqual({ name: 'settings' });
   });

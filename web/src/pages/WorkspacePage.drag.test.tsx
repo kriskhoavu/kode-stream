@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { BranchLoadResult, ItemSummary } from '../lib/types';
-import { KanbanPage } from './KanbanPage';
+import { WorkspacePage } from './WorkspacePage';
 
 const workspace = { id: 'workspace-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans', 'docs'], createdAt: '2026-06-23T00:00:00Z' };
 const items: ItemSummary[] = [
@@ -185,7 +185,7 @@ describe('Kanban card drag and drop', () => {
 });
 
 function renderPage() {
-  return render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+  return render(<WorkspacePage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 }
 
 function column(name: string): HTMLElement {
@@ -223,7 +223,7 @@ function createDataTransfer(): DataTransfer {
 function boardFetchMock(boardItems: ItemSummary[] = items) {
   return vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
-    if (url === '/api/workspaces/workspace-1/kanban/branch') return Promise.resolve(response(branchLoadResult(boardItems)));
+    if (url === '/api/workspaces/workspace-1/workspace/branch') return Promise.resolve(response(branchLoadResult(boardItems)));
     if (url.startsWith('/api/items?')) return Promise.resolve(response(boardItems));
     if (url === '/api/saved-filters') return Promise.resolve(response([]));
     if (url === '/api/items/item-1') return Promise.resolve(response({ ...boardItems[0], documents: [], metadata: {}, counts: { files: 0 } }));

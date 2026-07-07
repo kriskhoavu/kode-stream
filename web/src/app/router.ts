@@ -10,17 +10,17 @@ export type KnowledgeView = 'browse' | 'read' | 'graph';
 export interface KnowledgeLocation { workspaceId?: string; root?: string; slug?: string; view?: KnowledgeView; }
 
 export type Route =
-  | { name: 'kanban'; focusedItemId?: string }
+  | { name: 'workspace'; focusedItemId?: string }
   | { name: 'workspaces' }
   | { name: 'settings' }
   | { name: 'explorer'; location?: ExplorerLocation }
   | { name: 'knowledge'; location?: KnowledgeLocation }
-  | { name: 'workspace'; itemId: string };
+  | { name: 'item'; itemId: string };
 
 export function routeFromLocation(): Route {
   const path = window.location.pathname;
   if (path.startsWith('/items/')) {
-    return { name: 'workspace', itemId: decodeURIComponent(path.split('/')[2] ?? '') };
+    return { name: 'item', itemId: decodeURIComponent(path.split('/')[2] ?? '') };
   }
   if (path.startsWith('/workspaces')) {
     return { name: 'workspaces' };
@@ -34,7 +34,10 @@ export function routeFromLocation(): Route {
   if (path === '/knowledge') {
 	return { name: 'knowledge', location: knowledgeLocationFromSearch(window.location.search) };
   }
-  return { name: 'kanban', focusedItemId: kanbanFocusedItemFromSearch(window.location.search) };
+  if (path === '/workspace' || path === '/') {
+    return { name: 'workspace', focusedItemId: workspaceFocusedItemFromSearch(window.location.search) };
+  }
+  return { name: 'workspace' };
 }
 
 export function pathForRoute(route: Route): string {
@@ -42,13 +45,13 @@ export function pathForRoute(route: Route): string {
 		return explorerPath(route.location);
 	}
 	if (route.name === 'knowledge') return knowledgePath(route.location);
-  return route.name === 'workspace'
+  return route.name === 'item'
     ? `/items/${encodeURIComponent(route.itemId)}`
     : route.name === 'workspaces'
       ? '/workspaces'
       : route.name === 'settings'
         ? '/settings'
-        : kanbanPath(route.focusedItemId);
+        : workspacePath(route.focusedItemId);
 }
 
 export function knowledgeLocationFromSearch(search: string): KnowledgeLocation | undefined {
@@ -87,11 +90,11 @@ export function explorerPath(location?: ExplorerLocation): string {
   return query.size ? `/explorer?${query.toString()}` : '/explorer';
 }
 
-function kanbanFocusedItemFromSearch(search: string): string | undefined {
+function workspaceFocusedItemFromSearch(search: string): string | undefined {
   return new URLSearchParams(search).get('itemId')?.trim() || undefined;
 }
 
-function kanbanPath(focusedItemId?: string): string {
-  if (!focusedItemId) return '/kanban';
-  return `/kanban?${new URLSearchParams({ itemId: focusedItemId }).toString()}`;
+function workspacePath(focusedItemId?: string): string {
+  if (!focusedItemId) return '/workspace';
+  return `/workspace?${new URLSearchParams({ itemId: focusedItemId }).toString()}`;
 }
