@@ -21,7 +21,7 @@ Do not keep `/kanban` route compatibility.
 | Phase | Name                          | Status |
 |-------|-------------------------------|--------|
 | B1    | Workspace Jira Lookup         | Done   |
-| B2    | Jira-Backed Item Creation     | Draft  |
+| B2    | Jira-Backed Item Creation     | Done   |
 | B3    | AI Preset Launch Contract     | Draft  |
 | F1    | Workspace Route Rename        | Draft  |
 | F2    | Jira Intake UI                | Draft  |
@@ -49,10 +49,10 @@ Do not keep `/kanban` route compatibility.
 
 **Deliverables:**
 
-- [ ] Extend `NewItemInput` with optional Jira key and initial README context.
-- [ ] Update item writer to create README content when supplied instead of always writing an empty file.
-- [ ] Keep blank item creation behavior valid.
-- [ ] Add tests for Jira-backed README creation, duplicate item rejection, validation, and rescan behavior.
+- [x] Extend `NewItemInput` with optional Jira key and initial README context.
+- [x] Update item writer to create README content when supplied instead of always writing an empty file.
+- [x] Keep blank item creation behavior valid.
+- [x] Add tests for Jira-backed README creation, duplicate item rejection, validation, and rescan behavior.
 
 **Verification:** `rtk go test ./internal/item ./internal/server/api`
 

@@ -184,8 +184,21 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 	if err := os.MkdirAll(fullRoot, 0o755); err != nil {
 		return models.WriteResult{}, err
 	}
-	if err := os.WriteFile(filepath.Join(fullRoot, "README.md"), nil, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(fullRoot, "README.md"), []byte(input.InitialReadme), 0o644); err != nil {
 		return models.WriteResult{}, err
+	}
+	if strings.TrimSpace(input.JiraKey) != "" {
+		meta := planYAML{Plan: planFields{
+			Identifier: input.Identifier,
+			Title:      strings.TrimSpace(input.Title),
+			Scope:      input.Scope,
+			Status:     string(status),
+			Owner:      strings.TrimSpace(input.Owner),
+			Tags:       cleanTags(input.Tags),
+		}}
+		if err := writePlanMetadataAt(fullRoot, meta); err != nil {
+			return models.WriteResult{}, err
+		}
 	}
 	return w.refresh(workspace, itemRoot)
 }

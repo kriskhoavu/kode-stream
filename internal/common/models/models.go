@@ -521,14 +521,16 @@ type ItemStatusUpdateInput struct {
 }
 
 type NewItemInput struct {
-	WorkspaceID string     `json:"workspaceId" yaml:"workspaceId"`
-	Source      string     `json:"source" yaml:"source"`
-	Scope       string     `json:"scope" yaml:"scope"`
-	Identifier  string     `json:"identifier" yaml:"identifier"`
-	Title       string     `json:"title" yaml:"title"`
-	Status      ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	Owner       string     `json:"owner,omitempty" yaml:"owner,omitempty"`
-	Tags        []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
+	WorkspaceID   string     `json:"workspaceId" yaml:"workspaceId"`
+	Source        string     `json:"source" yaml:"source"`
+	Scope         string     `json:"scope" yaml:"scope"`
+	Identifier    string     `json:"identifier" yaml:"identifier"`
+	Title         string     `json:"title" yaml:"title"`
+	Status        ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Owner         string     `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Tags          []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
+	JiraKey       string     `json:"jiraKey,omitempty" yaml:"jiraKey,omitempty"`
+	InitialReadme string     `json:"initialReadme,omitempty" yaml:"initialReadme,omitempty"`
 }
 
 type WriteResult struct {
