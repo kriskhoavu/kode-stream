@@ -3,8 +3,10 @@ package system
 // This package owns application path configuration persistence.
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -56,9 +58,31 @@ func ResolvePaths() (Paths, error) {
 }
 
 func DefaultDataDir() (string, error) {
-	base, err := os.UserConfigDir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
+	}
+	return defaultDataDirForOS(runtime.GOOS, os.Getenv, home)
+}
+
+func defaultDataDirForOS(goos string, getenv func(string) string, home string) (string, error) {
+	var base string
+	switch goos {
+	case "darwin":
+		base = filepath.Join(home, "Library", "Application Support")
+	case "windows":
+		base = strings.TrimSpace(getenv("AppData"))
+		if base == "" {
+			base = strings.TrimSpace(getenv("APPDATA"))
+		}
+		if base == "" {
+			return "", errors.New("AppData is not defined")
+		}
+	default:
+		base = strings.TrimSpace(getenv("XDG_CONFIG_HOME"))
+		if base == "" {
+			base = filepath.Join(home, ".config")
+		}
 	}
 	return filepath.Join(base, "plan-manager"), nil
 }

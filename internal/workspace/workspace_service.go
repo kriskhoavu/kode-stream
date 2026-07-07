@@ -45,6 +45,17 @@ type WorkspaceService struct {
 	scanner  *scanner.Scanner
 	writer   *itemwriter.Writer
 	git      *gitadapter.GitAdapter
+	audit    interface {
+		Append(models.AuditEvent) (models.AuditEvent, error)
+	}
+	importScan func(string) (models.ScanResult, error)
+}
+
+func (s *WorkspaceService) ConfigureAudit(store interface {
+	Append(models.AuditEvent) (models.AuditEvent, error)
+}) *WorkspaceService {
+	s.audit = store
+	return s
 }
 
 type Service = WorkspaceService
@@ -573,10 +584,14 @@ func remoteRepositoryName(remoteURL string) string {
 }
 
 func normalizeRegistrationMode(mode models.WorkspaceRegistrationMode) models.WorkspaceRegistrationMode {
-	if strings.TrimSpace(string(mode)) == string(models.WorkspaceRegistrationModeRemoteClone) {
+	switch strings.TrimSpace(string(mode)) {
+	case string(models.WorkspaceRegistrationModeRemoteClone):
 		return models.WorkspaceRegistrationModeRemoteClone
+	case string(models.WorkspaceRegistrationModeExisting):
+		return models.WorkspaceRegistrationModeExisting
+	default:
+		return models.WorkspaceRegistrationModeLocalPath
 	}
-	return models.WorkspaceRegistrationModeLocalPath
 }
 
 func expandHome(path string) string {

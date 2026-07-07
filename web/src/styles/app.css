@@ -2840,6 +2840,231 @@ body.is-resizing-drawer {
   padding-top: 4px;
 }
 
+.workspace-import-review,
+.workspace-import-results {
+  display: grid;
+  gap: 12px;
+}
+
+.workspace-import-summary {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 10px 12px;
+}
+
+.workspace-import-candidate small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workspace-import-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workspace-import-summary > div,
+.workspace-import-candidate header label,
+.workspace-import-candidate header label > span,
+.workspace-import-results li > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.workspace-import-summary span,
+.workspace-import-results small {
+  color: var(--muted);
+}
+
+.workspace-import-candidates {
+  display: grid;
+  gap: 10px;
+}
+
+.workspace-import-candidate {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.workspace-import-candidate.status-invalid,
+.workspace-import-candidate.status-duplicate,
+.workspace-import-candidate.status-already_registered {
+  background: var(--panel-soft);
+}
+
+.workspace-import-candidate > header,
+.workspace-import-results > header,
+.workspace-import-results li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workspace-import-candidate header label {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.workspace-import-candidate header input {
+  margin-top: 3px;
+}
+
+.workspace-import-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  --workspace-import-status-light: var(--muted);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  padding: 3px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workspace-import-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--workspace-import-status-light);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-import-status-light) 22%, transparent);
+}
+
+.status-indexed > .workspace-import-status,
+.status-valid > header .workspace-import-status {
+  --workspace-import-status-light: #22c55e;
+  color: #86efac;
+}
+
+.status-failed > .workspace-import-status,
+.status-scan_failed > .workspace-import-status,
+.status-invalid > header .workspace-import-status,
+.status-duplicate > header .workspace-import-status,
+.status-already_registered > header .workspace-import-status {
+  --workspace-import-status-light: #ef4444;
+  color: #fca5a5;
+}
+
+.workspace-import-candidate dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.workspace-import-detail-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.22);
+  padding: 0;
+  overflow: hidden;
+}
+
+.workspace-import-detail-card-wide {
+  grid-column: 1 / -1;
+}
+
+.workspace-import-candidate dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.workspace-import-candidate dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.workspace-import-detail-card > dt {
+  border-bottom: 1px solid var(--line);
+  background: rgba(30, 41, 59, 0.32);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+}
+
+.workspace-import-detail-card > dd {
+  margin: 0;
+  padding: 10px 12px 12px;
+}
+
+.workspace-import-candidate .workspace-import-jira {
+  grid-column: 1 / -1;
+}
+
+.workspace-import-jira dd {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 18px;
+  align-items: baseline;
+}
+
+.workspace-import-jira span {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  overflow-wrap: anywhere;
+}
+
+.workspace-import-jira span strong {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.workspace-import-jira span em {
+  color: var(--text);
+  font-style: normal;
+}
+
+.workspace-import-jira span.wide {
+  grid-column: 1 / -1;
+}
+
+.workspace-import-issues,
+.workspace-import-results ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workspace-import-issues li {
+  display: grid;
+  gap: 2px;
+  border-left: 3px solid var(--red);
+  padding-left: 9px;
+  font-size: 12px;
+}
+
+.workspace-import-results > header h3 {
+  margin: 0;
+}
+
+.workspace-import-results li {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
 .workspace-registration-step-heading {
   display: grid;
   gap: 5px;
@@ -5529,6 +5754,25 @@ body.is-resizing-panel {
 }
 
 @media (max-width: 640px) {
+  .workspace-import-paths,
+  .workspace-import-candidate dl {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-import-jira dd {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-import-summary,
+  .workspace-registration-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-registration-actions > button {
+    width: 100%;
+  }
+
   .modal-panel.workspace-registration-modal {
     width: calc(100vw - 20px);
     max-height: calc(100vh - 20px);

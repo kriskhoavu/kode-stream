@@ -22,6 +22,7 @@ Plan Manager addresses that gap by providing:
 ## Feature Highlights
 
 - Register workspaces from local paths or remote Git URLs (HTTPS/SSH)
+- Import selected entries from a current-schema `workspaces.yaml` after validation and review
 - Configure one or more sources per workspace
 - Index structured items, configured docs, and freestyle docs in one board
 - Keep unmatched docs in an `Unsorted` lane until mapping rules are added
@@ -61,7 +62,7 @@ See implementation details in [plans/platform/PM-002/README.md](plans/platform/P
 - npm
 - Git
 
-Platform-specific tools used for native folder selection and path reveal:
+Platform-specific tools used for native folder/file selection and path reveal:
 
 - macOS: `osascript`, `open`
 - Windows: PowerShell, Explorer
@@ -242,6 +243,9 @@ If source settings are missing or invalid, Plan Manager falls back to freestyle 
 
 Plan Manager writes into managed repositories only for explicit user actions (edit, metadata/status update, item
 creation, source settings save, commit/pull/push, branch operations). Registry and cache remain app-owned.
+Import preview is read-only. Confirmed imports merge into the effective app registry with one atomic replacement, then
+scan each new workspace independently. Imported directories are never treated as app-managed clones and are not removed
+when their registrations are deleted.
 
 ## Project Layout
 
@@ -278,4 +282,5 @@ plan-manager/
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): system architecture and design decisions
+- [Workspace import API](docs/workspace-import-api.md): preview, confirmation, and native file-selection contracts
 - [plans/platform/PM-002/README.md](plans/platform/PM-002/README.md): product capability baseline

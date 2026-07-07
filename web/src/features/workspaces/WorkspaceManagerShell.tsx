@@ -67,7 +67,7 @@ export function WorkspaceList({
             </span>
             <span className="workspace-manager-item-path" title={workspace.path}>{workspace.path}</span>
             <span className="workspace-manager-item-meta">
-              {workspace.registrationMode === 'remote_clone' ? 'Remote' : 'Local'} · {workspace.sources.length} source{workspace.sources.length === 1 ? '' : 's'}
+              {workspace.registrationMode === 'remote_clone' ? 'Remote' : workspace.registrationMode === 'existing_workspace' ? 'Imported' : 'Local'} · {workspace.sources.length} source{workspace.sources.length === 1 ? '' : 's'}
             </span>
           </button>
         </div>;

@@ -37,6 +37,16 @@ git status --short
 
 Managed repositories must not show new changes caused by Plan Manager scanning.
 
+## Existing Workspace Import Checklist
+
+- Preview a current-schema `workspaces.yaml` and verify the effective destination path is backend-resolved.
+- Confirm invalid, duplicate, and already-registered candidates remain visible but cannot be selected.
+- Change the source path and verify stale candidates disappear.
+- Cancel the native file picker and verify the current manual path remains unchanged.
+- Confirm an import and verify indexed, scan-failed, skipped, and failed results are distinguishable.
+- Verify preview writes no registry or index data and imported workspace deletion leaves its directory intact.
+- Repeat the dialog pass at desktop width and at 390 px width using keyboard-only selection and confirmation.
+
 ## Release Notes For Future Homebrew Packaging
 
 - Package the Go binary after `npm run build`.

@@ -26,6 +26,11 @@ type Registry struct {
 	loaded  bool
 }
 
+type BatchCreateResult struct {
+	Workspace models.WorkspaceConfig
+	Err       error
+}
+
 func New(path string, git *gitadapter.GitAdapter) *Registry {
 	return &Registry{path: path, git: git}
 }
@@ -78,6 +83,63 @@ func (r *Registry) Create(input models.WorkspaceInput) (models.WorkspaceConfig, 
 	}
 	r.records = append(r.records, workspace)
 	return normalizeWorkspace(workspace), r.saveLocked()
+}
+
+// Validate checks and normalizes a workspace without changing the registry.
+func (r *Registry) Validate(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
+	return r.validate(input)
+}
+
+func (r *Registry) Path() string {
+	return r.path
+}
+
+// BatchCreate validates all inputs, rechecks duplicates while locked, and
+// persists every accepted workspace with one atomic registry replacement.
+func (r *Registry) BatchCreate(inputs []models.WorkspaceInput) ([]BatchCreateResult, error) {
+	if err := r.load(); err != nil {
+		return nil, err
+	}
+	results := make([]BatchCreateResult, len(inputs))
+	validated := make([]models.WorkspaceConfig, len(inputs))
+	for i, input := range inputs {
+		workspace, err := r.validate(input)
+		if err != nil {
+			results[i].Err = err
+			continue
+		}
+		validated[i] = workspace
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	accepted := append([]models.WorkspaceConfig(nil), r.records...)
+	for i, workspace := range validated {
+		if results[i].Err != nil {
+			continue
+		}
+		duplicate := false
+		for _, existing := range accepted {
+			if samePath(existing.Path, workspace.Path) {
+				duplicate = true
+				break
+			}
+		}
+		if duplicate {
+			results[i].Err = errors.New("workspace already registered")
+			continue
+		}
+		accepted = append(accepted, workspace)
+		results[i].Workspace = normalizeWorkspace(workspace)
+	}
+	if len(accepted) == len(r.records) {
+		return results, nil
+	}
+	if err := r.saveRecordsLocked(accepted); err != nil {
+		return results, err
+	}
+	r.records = accepted
+	return results, nil
 }
 
 func (r *Registry) Update(id string, input models.WorkspaceInput) (models.WorkspaceConfig, error) {
@@ -188,7 +250,7 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 		branch = "main"
 	}
 	pathValue := strings.TrimSpace(input.Path)
-	if mode == models.WorkspaceRegistrationModeLocalPath {
+	if mode != models.WorkspaceRegistrationModeRemoteClone {
 		if pathValue == "" {
 			return models.WorkspaceConfig{}, errors.New("workspace path is required")
 		}
@@ -212,6 +274,9 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 		return models.WorkspaceConfig{}, fmt.Errorf("baseline branch is invalid: %w", err)
 	}
 	dirs := input.Sources
+	if len(dirs) == 0 {
+		return models.WorkspaceConfig{}, errors.New("at least one workspace source is required")
+	}
 	cleanDirs := make([]string, 0, len(dirs))
 	for _, dir := range dirs {
 		clean := filepath.Clean(strings.TrimSpace(dir))
@@ -312,10 +377,14 @@ func normalizeKnowledgeSettings(settings *models.KnowledgeSettings) *models.Know
 }
 
 func normalizeRegistrationMode(mode models.WorkspaceRegistrationMode) models.WorkspaceRegistrationMode {
-	if strings.TrimSpace(string(mode)) == string(models.WorkspaceRegistrationModeRemoteClone) {
+	switch strings.TrimSpace(string(mode)) {
+	case string(models.WorkspaceRegistrationModeRemoteClone):
 		return models.WorkspaceRegistrationModeRemoteClone
+	case string(models.WorkspaceRegistrationModeExisting):
+		return models.WorkspaceRegistrationModeExisting
+	default:
+		return models.WorkspaceRegistrationModeLocalPath
 	}
-	return models.WorkspaceRegistrationModeLocalPath
 }
 
 func (r *Registry) load() error {
@@ -341,14 +410,39 @@ func (r *Registry) load() error {
 }
 
 func (r *Registry) saveLocked() error {
+	return r.saveRecordsLocked(r.records)
+}
+
+func (r *Registry) saveRecordsLocked(records []models.WorkspaceConfig) error {
 	if err := os.MkdirAll(filepath.Dir(r.path), 0o755); err != nil {
 		return err
 	}
-	data, err := yaml.Marshal(r.records)
+	data, err := yaml.Marshal(records)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(r.path, data, 0o600)
+	temporary, err := os.CreateTemp(filepath.Dir(r.path), ".workspaces-*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, r.path)
 }
 
 func expandHome(path string) string {

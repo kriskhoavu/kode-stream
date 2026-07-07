@@ -15,9 +15,19 @@ func NewController(repository *Dialog) *SystemController {
 
 func (c *SystemController) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/system/select-directory", c.selectDirectory)
+	mux.HandleFunc("POST /api/system/select-file", c.selectFile)
 	mux.HandleFunc("POST /api/system/open-path", c.openPath)
 	mux.HandleFunc("GET /api/system/config-paths", c.configPaths)
 	mux.HandleFunc("PUT /api/system/config-paths", c.updateConfigPaths)
+}
+
+func (c *SystemController) selectFile(w http.ResponseWriter, _ *http.Request) {
+	path, err := c.repository.SelectYAMLFile()
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"path": path})
 }
 
 func (c *SystemController) selectDirectory(w http.ResponseWriter, _ *http.Request) {
@@ -50,7 +60,7 @@ func (c *SystemController) configPaths(w http.ResponseWriter, _ *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"dataDir": paths.Dir, "defaultDataDir": paths.DefaultDir, "cloneRootDir": paths.CloneRootDir})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"dataDir": paths.Dir, "defaultDataDir": paths.DefaultDir, "cloneRootDir": paths.CloneRootDir, "registryFile": paths.RegistryFile})
 }
 
 func (c *SystemController) updateConfigPaths(w http.ResponseWriter, r *http.Request) {
@@ -66,5 +76,5 @@ func (c *SystemController) updateConfigPaths(w http.ResponseWriter, r *http.Requ
 		httpx.WriteError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"dataDir": paths.Dir, "defaultDataDir": paths.DefaultDir, "cloneRootDir": paths.CloneRootDir, "restartRequired": true})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"dataDir": paths.Dir, "defaultDataDir": paths.DefaultDir, "cloneRootDir": paths.CloneRootDir, "registryFile": paths.RegistryFile, "restartRequired": true})
 }

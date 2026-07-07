@@ -27,6 +27,34 @@ describe('shared api facade', () => {
     ]);
   });
 
+	it('normalizes import previews and sends import selections', async () => {
+		const fetchMock = vi.fn()
+			.mockResolvedValueOnce({ ok: true, json: async () => ({
+				sourcePath: '/source/workspaces.yaml', destinationPath: '/data/workspaces.yaml', sourceFingerprint: 'abc',
+				candidates: [{ candidateKey: 'one', position: 1, status: 'valid', selected: true, workspace: { name: 'One', path: '/one', baselineBranch: 'main' } }],
+				summary: { valid: 1 }
+			}) })
+			.mockResolvedValueOnce({ ok: true, json: async () => [{ candidateKey: 'one', status: 'indexed', workspace: { id: 'one', name: 'One', path: '/one', baselineBranch: 'main', registrationMode: 'existing_workspace', createdAt: '' }, scan: { workspaceId: 'one' } }] });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await expect(api.previewWorkspaceImport('/source/workspaces.yaml')).resolves.toMatchObject({
+			candidates: [{ candidateKey: 'one', selected: true, issues: [], workspace: { registrationMode: 'existing_workspace', sources: [] } }],
+			summary: { valid: 1, invalid: 0, duplicate: 0, alreadyRegistered: 0 }
+		});
+		await expect(api.importWorkspaces({ sourcePath: '/source/workspaces.yaml', candidateKeys: ['one'] })).resolves.toMatchObject([
+			{ candidateKey: 'one', status: 'indexed', workspace: { registrationMode: 'existing_workspace', sources: [] }, scan: { warnings: [] }, message: '' }
+		]);
+		expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/workspaces/import-preview', expect.objectContaining({ method: 'POST', body: JSON.stringify({ sourcePath: '/source/workspaces.yaml' }) }));
+		expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/workspaces/import', expect.objectContaining({ method: 'POST', body: JSON.stringify({ sourcePath: '/source/workspaces.yaml', candidateKeys: ['one'] }) }));
+	});
+
+	it('treats file picker cancellation as an empty path response', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ path: '' }) });
+		vi.stubGlobal('fetch', fetchMock);
+		await expect(api.selectYAMLFile()).resolves.toEqual({ path: '' });
+		expect(fetchMock).toHaveBeenCalledWith('/api/system/select-file', expect.objectContaining({ method: 'POST' }));
+	});
+
   it('normalizes Git status defaults', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

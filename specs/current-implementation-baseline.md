@@ -96,6 +96,17 @@ Workspace CRUD endpoints must exist:
 - `PUT /api/workspaces/{id}`
 - `DELETE /api/workspaces/{id}`
 
+Existing workspace import endpoints must exist:
+
+- `POST /api/workspaces/import-preview`
+- `POST /api/workspaces/import`
+
+Import preview must strictly parse one bounded current-schema `workspaces.yaml`, return every candidate and its
+field-level issues, detect source and registry duplicates, and perform no writes. Confirmed import must reread the
+source, match selected candidate keys, atomically register still-valid candidates, and scan each registration without
+rolling back registrations whose scan fails. Imported registrations must use destination identity and
+`existing_workspace` ownership so deleting one never removes its directory.
+
 ### 4.2 Validation Rules
 
 On create/update, the system must validate:
@@ -110,7 +121,9 @@ On create/update, the system must validate:
 The workspace UI must be supported by:
 
 - `POST /api/system/select-directory`
+- `POST /api/system/select-file`
 - `POST /api/system/open-path`
+- `GET /api/system/config-paths` including backend-resolved `registryFile`
 
 ## 5. Source Configuration, Discovery, and Indexing
 

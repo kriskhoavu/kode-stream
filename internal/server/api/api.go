@@ -84,8 +84,12 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 		refresher = writer
 	}
 	workspaceFileAccess := workspaceaccess.New()
+	workspaceService := appworkspace.New(reg, idx, scan, writer, git)
+	if auditStore != nil {
+		workspaceService.ConfigureAudit(auditStore)
+	}
 	return &API{
-		workspaces:     appworkspace.New(reg, idx, scan, writer, git),
+		workspaces:     workspaceService,
 		items:          appitem.New(reg, idx, files, writer, git),
 		gitOps:         appgit.NewService(reg, writer, git),
 		dialog:         dialog,
@@ -118,6 +122,8 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /api/knowledge/workspaces/{workspaceID}/sync", a.knowledgeSync)
 	mux.HandleFunc("POST /api/knowledge/workspaces/{workspaceID}/enrich", a.knowledgeEnrich)
 	mux.HandleFunc("POST /api/workspaces", a.createWorkspace)
+	mux.HandleFunc("POST /api/workspaces/import-preview", a.previewWorkspaceImport)
+	mux.HandleFunc("POST /api/workspaces/import", a.importWorkspaces)
 	mux.HandleFunc("POST /api/workspaces/stream-create", a.createWorkspaceStream)
 	mux.HandleFunc("PUT /api/workspaces/{id}", a.updateWorkspace)
 	mux.HandleFunc("DELETE /api/workspaces/{id}", a.deleteWorkspace)
@@ -169,6 +175,40 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /api/workspaces/{id}/git/branches", a.gitCreateBranch)
 	mux.HandleFunc("POST /api/workspaces/{id}/git/switch", a.gitSwitchBranch)
 	return mux
+}
+
+func (a *API) previewWorkspaceImport(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		SourcePath string `json:"sourcePath"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	preview, err := a.workspaces.PreviewImport(input.SourcePath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, preview)
+}
+
+func (a *API) importWorkspaces(w http.ResponseWriter, r *http.Request) {
+	var input models.WorkspaceImportRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	results, err := a.workspaces.Import(input)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, results)
 }
 
 func (a *API) startEmbeddedAISession(w http.ResponseWriter, r *http.Request) {

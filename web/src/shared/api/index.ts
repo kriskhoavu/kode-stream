@@ -42,6 +42,9 @@ import type {
   WorkspaceBranches,
   WorkspaceInput,
   WorkspaceHealth,
+	WorkspaceImportPreview,
+	WorkspaceImportRequest,
+	WorkspaceImportResult,
   WorkspaceDirectoryListing,
 	ExplorerTreeMode,
   WorkspaceDirectoryCreateInput,
@@ -127,6 +130,8 @@ export const api = {
     return ((await request<AuditEvent[] | null>(`/api/audit-events${suffix}`)) ?? []).map(normalizeAuditEvent);
   },
   workspaces: async () => ((await request<WorkspaceConfig[] | null>('/api/workspaces')) ?? []).map(normalizeWorkspace),
+	previewWorkspaceImport: (sourcePath: string) => request<WorkspaceImportPreview>('/api/workspaces/import-preview', { method: 'POST', body: JSON.stringify({ sourcePath }) }).then(normalizeWorkspaceImportPreview),
+	importWorkspaces: (input: WorkspaceImportRequest) => request<WorkspaceImportResult[] | null>('/api/workspaces/import', { method: 'POST', body: JSON.stringify(input) }).then((results) => (Array.isArray(results) ? results : []).map(normalizeWorkspaceImportResult)),
   createWorkspace: async (input: WorkspaceInput) => {
     const payload = await request<WorkspaceConfig | WorkspaceCreateResult>('/api/workspaces', { method: 'POST', body: JSON.stringify(input) });
     if (isWorkspaceCreateResult(payload)) {
@@ -241,6 +246,7 @@ export const api = {
   revertWorkspaceFile: (workspaceId: string, input: WorkspaceFileRevertInput) =>
     request<WorkspaceFileWriteResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/files/revert`, { method: 'POST', body: JSON.stringify(input) }),
   selectDirectory: () => request<PathSelection>('/api/system/select-directory', { method: 'POST' }),
+	selectYAMLFile: () => request<PathSelection>('/api/system/select-file', { method: 'POST', body: JSON.stringify({ extensions: ['yaml', 'yml'] }) }),
   openPath: (path: string) => request<{ ok: boolean }>('/api/system/open-path', { method: 'POST', body: JSON.stringify({ path }) }),
   systemConfigPaths: () => request<SystemConfigPaths>('/api/system/config-paths').then(normalizeSystemConfigPaths),
   updateSystemConfigPaths: (input: { dataDir: string }) =>
@@ -312,7 +318,7 @@ function normalizeContentSearchResponse(response: WorkspaceContentSearchResponse
 function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
   return {
     ...workspace,
-    registrationMode: workspace.registrationMode === 'remote_clone' ? 'remote_clone' : 'local_path',
+		registrationMode: workspace.registrationMode === 'remote_clone' || workspace.registrationMode === 'existing_workspace' ? workspace.registrationMode : 'local_path',
     remoteUrl: workspace.remoteUrl ?? '',
     clonePathManaged: Boolean(workspace.clonePathManaged),
     sources: Array.isArray(workspace.sources) ? workspace.sources : []
@@ -324,8 +330,44 @@ function normalizeSystemConfigPaths(input: SystemConfigPaths): SystemConfigPaths
     dataDir: input.dataDir ?? '',
     defaultDataDir: input.defaultDataDir ?? '',
     cloneRootDir: input.cloneRootDir ?? '',
+		registryFile: input.registryFile ?? '',
     restartRequired: Boolean(input.restartRequired)
   };
+}
+
+function normalizeWorkspaceImportPreview(input: WorkspaceImportPreview): WorkspaceImportPreview {
+	return {
+		...input,
+		sourcePath: input.sourcePath ?? '',
+		destinationPath: input.destinationPath ?? '',
+		sourceFingerprint: input.sourceFingerprint ?? '',
+		candidates: (Array.isArray(input.candidates) ? input.candidates : []).map((candidate) => ({
+			...candidate,
+			position: Number(candidate.position) || 0,
+			workspace: {
+				...candidate.workspace,
+				registrationMode: 'existing_workspace',
+				sources: Array.isArray(candidate.workspace?.sources) ? candidate.workspace.sources : []
+			},
+			issues: Array.isArray(candidate.issues) ? candidate.issues : [],
+			selected: candidate.status === 'valid' && Boolean(candidate.selected)
+		})),
+		summary: {
+			valid: Number(input.summary?.valid) || 0,
+			invalid: Number(input.summary?.invalid) || 0,
+			duplicate: Number(input.summary?.duplicate) || 0,
+			alreadyRegistered: Number(input.summary?.alreadyRegistered) || 0
+		}
+	};
+}
+
+function normalizeWorkspaceImportResult(result: WorkspaceImportResult): WorkspaceImportResult {
+	return {
+		...result,
+		workspace: result.workspace ? normalizeWorkspace(result.workspace) : undefined,
+		scan: result.scan ? { ...result.scan, warnings: Array.isArray(result.scan.warnings) ? result.scan.warnings : [] } : undefined,
+		message: result.message ?? ''
+	};
 }
 
 function isWorkspaceCreateResult(input: WorkspaceConfig | WorkspaceCreateResult): input is WorkspaceCreateResult {

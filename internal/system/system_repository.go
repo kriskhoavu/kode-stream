@@ -45,6 +45,52 @@ func (d *Dialog) SelectDirectory() (string, error) {
 	}
 }
 
+func (d *Dialog) SelectYAMLFile() (string, error) {
+	var out []byte
+	var err error
+	switch runtime.GOOS {
+	case "darwin":
+		out, err = exec.Command("osascript", "-e", `try
+POSIX path of (choose file with prompt "Select workspaces.yaml" of type {"public.yaml"})
+on error number -128
+return ""
+end try`).Output()
+	case "windows":
+		script := `Add-Type -AssemblyName System.Windows.Forms; $dialog = New-Object System.Windows.Forms.OpenFileDialog; $dialog.Title = "Select workspaces.yaml"; $dialog.Filter = "YAML files (*.yaml;*.yml)|*.yaml;*.yml"; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Write($dialog.FileName) }`
+		out, err = exec.Command("powershell", "-NoProfile", "-STA", "-Command", script).Output()
+	default:
+		commands := [][]string{
+			{"zenity", "--file-selection", "--title=Select workspaces.yaml", "--file-filter=YAML files | *.yaml *.yml"},
+			{"kdialog", "--getopenfilename", ".", "YAML files (*.yaml *.yml)"},
+		}
+		for _, command := range commands {
+			if _, lookupErr := exec.LookPath(command[0]); lookupErr != nil {
+				continue
+			}
+			selected, selectErr := exec.Command(command[0], command[1:]...).Output()
+			if selectErr != nil {
+				var exitErr *exec.ExitError
+				if errors.As(selectErr, &exitErr) {
+					return "", nil
+				}
+				return "", selectErr
+			}
+			if strings.TrimSpace(string(selected)) == "" {
+				return "", nil
+			}
+			return cleanSelectedPath(string(selected))
+		}
+		return "", errors.New("native file picker is not available on this platform")
+	}
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(string(out)) == "" {
+		return "", nil
+	}
+	return cleanSelectedPath(string(out))
+}
+
 func (d *Dialog) OpenPath(path string) error {
 	clean, err := cleanSelectedPath(path)
 	if err != nil {
