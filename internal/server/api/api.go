@@ -129,6 +129,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/workspaces/{id}", a.deleteWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/jira/test", a.testJiraConnection)
+	mux.HandleFunc("GET /api/workspaces/{id}/jira/issues/{issueKey}", a.workspaceJiraIssue)
 	mux.HandleFunc("POST /api/workspaces/{id}/kanban/branch", a.loadKanbanBranch)
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
@@ -499,6 +500,24 @@ func (a *API) jiraIssue(w http.ResponseWriter, r *http.Request) { a.respondJiraI
 func (a *API) refreshJiraIssue(w http.ResponseWriter, r *http.Request) {
 	a.respondJiraIssue(w, r, true)
 }
+
+func (a *API) workspaceJiraIssue(w http.ResponseWriter, r *http.Request) {
+	if a.jira == nil {
+		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
+		return
+	}
+	result, err := a.jira.WorkspaceIssue(r.Context(), r.PathValue("id"), r.PathValue("issueKey"), false)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (a *API) respondJiraIssue(w http.ResponseWriter, r *http.Request, refresh bool) {
 	if a.jira == nil {
 		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
