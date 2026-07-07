@@ -891,10 +891,6 @@ function WorkspaceImportReview({ preview, selectedKeys, onToggle, onToggleAll }:
 	const selectable = preview.candidates.filter((candidate) => candidate.status === 'valid');
 	const allSelected = selectable.length > 0 && selectable.every((candidate) => selectedKeys.includes(candidate.candidateKey));
 	return <section className="workspace-import-review" aria-label="Workspace import review">
-		<div className="workspace-import-paths">
-			<div><strong>Import source</strong><span title={preview.sourcePath}>{preview.sourcePath}</span></div>
-			<div><strong>Effective registry</strong><span title={preview.destinationPath}>{preview.destinationPath}</span></div>
-		</div>
 		<div className="workspace-import-summary" aria-live="polite">
 			<div><strong>{preview.summary.valid} workspace{preview.summary.valid === 1 ? '' : 's'} ready to import</strong><span>{selectedKeys.length} selected from {preview.candidates.length} candidates.</span></div>
 			<button className="secondary" type="button" onClick={onToggleAll} disabled={selectable.length === 0}>{allSelected ? 'Clear selectable' : 'Select all valid'}</button>
@@ -908,20 +904,39 @@ function WorkspaceImportReview({ preview, selectedKeys, onToggle, onToggleAll }:
 function WorkspaceImportCandidateCard({ candidate, selected, onToggle }: { candidate: WorkspaceImportCandidate; selected: boolean; onToggle: (candidateKey: string) => void }) {
 	const workspace = candidate.workspace;
 	const selectable = candidate.status === 'valid';
+	const issues = workspaceImportVisibleIssues(candidate);
 	return <article className={`workspace-import-candidate status-${candidate.status}`}>
 		<header>
 			<label><input type="checkbox" checked={selected} disabled={!selectable} onChange={() => onToggle(candidate.candidateKey)} /><span><strong>{workspace.name || `Candidate ${candidate.position}`}</strong><small>{workspace.path || 'No workspace path'}</small></span></label>
 			<span className="workspace-import-status">{workspaceImportStatusLabel(candidate.status)}</span>
 		</header>
 		<dl>
-			<div><dt>Base branch</dt><dd>{workspace.baselineBranch || 'Not set'}</dd></div>
-			<div><dt>Sources</dt><dd>{workspace.sources.join(', ') || 'None'}</dd></div>
-			{workspace.remoteUrl && <div><dt>Original remote</dt><dd>{workspace.remoteUrl}</dd></div>}
-			{workspace.jira && <div><dt>Jira</dt><dd>{workspace.jira.deploymentType} · {workspace.jira.baseUrl} · project {workspace.jira.projectKey}{workspace.jira.accountEmail ? ` · ${workspace.jira.accountEmail}` : ''} · token from {workspace.jira.tokenEnvVar}</dd></div>}
-			{workspace.knowledge && <div><dt>Knowledge</dt><dd>{workspace.knowledge.enabled === false ? 'Disabled' : `Enabled${workspace.knowledge.enrichExecutable ? ` · ${workspace.knowledge.enrichExecutable}` : ''}${workspace.knowledge.enrichArgs?.length ? ` · arguments: ${workspace.knowledge.enrichArgs.join(', ')}` : ''}`}</dd></div>}
+			<div className="workspace-import-detail-card"><dt>Base branch</dt><dd>{workspace.baselineBranch || 'Not set'}</dd></div>
+			<div className="workspace-import-detail-card"><dt>Sources</dt><dd>{workspace.sources.join(', ') || 'None'}</dd></div>
+			{workspace.remoteUrl && <div className="workspace-import-detail-card workspace-import-detail-card-wide"><dt>Original remote</dt><dd>{workspace.remoteUrl}</dd></div>}
+			{workspace.jira && <WorkspaceImportJiraSummary jira={workspace.jira} />}
+			{workspace.knowledge && <div className="workspace-import-detail-card workspace-import-detail-card-wide"><dt>Knowledge</dt><dd>{workspace.knowledge.enabled === false ? 'Disabled' : `Enabled${workspace.knowledge.enrichExecutable ? ` · ${workspace.knowledge.enrichExecutable}` : ''}${workspace.knowledge.enrichArgs?.length ? ` · arguments: ${workspace.knowledge.enrichArgs.join(', ')}` : ''}`}</dd></div>}
 		</dl>
-		{candidate.issues.length > 0 && <ul className="workspace-import-issues" aria-label={`${workspace.name || `Candidate ${candidate.position}`} issues`}>{candidate.issues.map((issue, index) => <li key={`${issue.code}-${index}`}><strong>{issue.field}</strong><span>{issue.message}</span></li>)}</ul>}
+		{issues.length > 0 && <ul className="workspace-import-issues" aria-label={`${workspace.name || `Candidate ${candidate.position}`} issues`}>{issues.map((issue, index) => <li key={`${issue.code}-${index}`}><strong>{issue.field}</strong><span>{issue.message}</span></li>)}</ul>}
 	</article>;
+}
+
+function WorkspaceImportJiraSummary({ jira }: { jira: JiraConnection }) {
+	return <div className="workspace-import-detail-card workspace-import-jira">
+		<dt>Jira</dt>
+		<dd>
+			<span><strong>Deployment</strong><em>{jira.deploymentType}</em></span>
+			<span><strong>Project</strong><em>{jira.projectKey || 'Not set'}</em></span>
+			<span className="wide"><strong>URL</strong><em>{jira.baseUrl}</em></span>
+			{jira.accountEmail && <span className="wide"><strong>Account</strong><em>{jira.accountEmail}</em></span>}
+			<span className="wide"><strong>Token env</strong><em>{jira.tokenEnvVar}</em></span>
+		</dd>
+	</div>;
+}
+
+function workspaceImportVisibleIssues(candidate: WorkspaceImportCandidate): WorkspaceImportCandidate['issues'] {
+	if (candidate.status !== 'already_registered') return candidate.issues;
+	return candidate.issues.filter((issue) => issue.field !== 'path');
 }
 
 function WorkspaceImportResults({ results }: { results: WorkspaceImportResult[] }) {

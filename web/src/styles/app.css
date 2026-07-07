@@ -2846,13 +2846,6 @@ body.is-resizing-drawer {
   gap: 12px;
 }
 
-.workspace-import-paths {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.workspace-import-paths > div,
 .workspace-import-summary {
   min-width: 0;
   border: 1px solid var(--line);
@@ -2861,12 +2854,6 @@ body.is-resizing-drawer {
   padding: 10px 12px;
 }
 
-.workspace-import-paths > div {
-  display: grid;
-  gap: 4px;
-}
-
-.workspace-import-paths span,
 .workspace-import-candidate small {
   overflow-wrap: anywhere;
   color: var(--muted);
@@ -2933,6 +2920,10 @@ body.is-resizing-drawer {
 
 .workspace-import-status {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  --workspace-import-status-light: var(--muted);
   border-radius: 999px;
   background: var(--panel-soft);
   padding: 3px 8px;
@@ -2941,26 +2932,48 @@ body.is-resizing-drawer {
   font-weight: 800;
 }
 
+.workspace-import-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--workspace-import-status-light);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-import-status-light) 22%, transparent);
+}
+
 .status-indexed > .workspace-import-status,
 .status-valid > header .workspace-import-status {
-  color: var(--green);
+  --workspace-import-status-light: #22c55e;
+  color: #86efac;
 }
 
 .status-failed > .workspace-import-status,
 .status-scan_failed > .workspace-import-status,
-.status-invalid > header .workspace-import-status {
-  color: var(--red);
+.status-invalid > header .workspace-import-status,
+.status-duplicate > header .workspace-import-status,
+.status-already_registered > header .workspace-import-status {
+  --workspace-import-status-light: #ef4444;
+  color: #fca5a5;
 }
 
 .workspace-import-candidate dl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 16px;
+  gap: 10px;
   margin: 0;
 }
 
-.workspace-import-candidate dl > div {
+.workspace-import-detail-card {
   min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.22);
+  padding: 0;
+  overflow: hidden;
+}
+
+.workspace-import-detail-card-wide {
+  grid-column: 1 / -1;
 }
 
 .workspace-import-candidate dt {
@@ -2973,6 +2986,56 @@ body.is-resizing-drawer {
 .workspace-import-candidate dd {
   margin: 2px 0 0;
   overflow-wrap: anywhere;
+}
+
+.workspace-import-detail-card > dt {
+  border-bottom: 1px solid var(--line);
+  background: rgba(30, 41, 59, 0.32);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+}
+
+.workspace-import-detail-card > dd {
+  margin: 0;
+  padding: 10px 12px 12px;
+}
+
+.workspace-import-candidate .workspace-import-jira {
+  grid-column: 1 / -1;
+}
+
+.workspace-import-jira dd {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 18px;
+  align-items: baseline;
+}
+
+.workspace-import-jira span {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  overflow-wrap: anywhere;
+}
+
+.workspace-import-jira span strong {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.workspace-import-jira span em {
+  color: var(--text);
+  font-style: normal;
+}
+
+.workspace-import-jira span.wide {
+  grid-column: 1 / -1;
 }
 
 .workspace-import-issues,
@@ -5693,6 +5756,10 @@ body.is-resizing-panel {
 @media (max-width: 640px) {
   .workspace-import-paths,
   .workspace-import-candidate dl {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-import-jira dd {
     grid-template-columns: 1fr;
   }
 

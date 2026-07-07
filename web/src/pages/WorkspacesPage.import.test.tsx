@@ -57,6 +57,23 @@ describe('existing workspace import state', () => {
 		expect(screen.queryByText('1 workspace ready to import')).not.toBeInTheDocument();
 	});
 
+	it('does not repeat the path issue for already registered candidates', async () => {
+		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
+		vi.spyOn(api, 'previewWorkspaceImport').mockResolvedValue({
+			sourcePath: '/data/workspaces.yaml', destinationPath: '/data/workspaces.yaml', sourceFingerprint: 'hash',
+			summary: { valid: 0, invalid: 0, duplicate: 0, alreadyRegistered: 1 },
+			candidates: [{ candidateKey: 'existing', position: 1, status: 'already_registered', selected: false, issues: [{ field: 'path', code: 'already_registered', message: 'workspace path is already registered' }], workspace: { name: 'Existing', path: '/existing', baselineBranch: 'main', sources: ['plans'] } }]
+		});
+		render(<WorkspacesPage workspaces={[]} onChanged={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Add workspace' }));
+		fireEvent.click(screen.getByRole('radio', { name: 'Existing Workspaces' }));
+		fireEvent.change(screen.getByLabelText('Import source path'), { target: { value: '/data/workspaces.yaml' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Preview workspaces' }));
+
+		expect(await screen.findByText('Already registered')).toBeInTheDocument();
+		expect(screen.queryByText('workspace path is already registered')).not.toBeInTheDocument();
+	});
+
 	it('reviews mixed candidates, confirms selection, and renders mixed results', async () => {
 		const onChanged = vi.fn();
 		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
@@ -83,9 +100,10 @@ describe('existing workspace import state', () => {
 		fireEvent.change(screen.getByLabelText('Import source path'), { target: { value: '/source/workspaces.yaml' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Preview workspaces' }));
 
-		expect(await screen.findByText('/effective/workspaces.yaml')).toBeInTheDocument();
+		expect(await screen.findByText('2 workspaces ready to import')).toBeInTheDocument();
 		expect(screen.getByText('branch does not exist')).toBeInTheDocument();
-		expect(screen.getByText((_, element) => element?.tagName === 'DD' && Boolean(element.textContent?.includes('token from JIRA_TOKEN')))).toBeInTheDocument();
+		expect(screen.getByText('Token env')).toBeInTheDocument();
+		expect(screen.getByText('JIRA_TOKEN')).toBeInTheDocument();
 		expect(screen.getByRole('checkbox', { name: /Bad/ })).toBeDisabled();
 		fireEvent.click(screen.getByRole('button', { name: 'Select all valid' }));
 		expect(screen.getByRole('button', { name: 'Import 2 selected' })).toBeEnabled();
