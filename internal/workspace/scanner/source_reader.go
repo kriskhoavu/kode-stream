@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	gitadapter "plan-manager/internal/git"
+	gitadapter "kode-stream/internal/git"
 )
 
 type DirEntry interface {

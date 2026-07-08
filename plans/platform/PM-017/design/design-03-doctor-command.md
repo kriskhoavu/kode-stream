@@ -2,18 +2,18 @@
 
 ## Overview
 
-`plan-manager doctor` is a diagnostics-first command for local setup validation. It should give fast pass/fail feedback, machine-readable output, and actionable remediation steps for each failed check.
+`kode-stream doctor` is a diagnostics-first command for local setup validation. It should give fast pass/fail feedback, machine-readable output, and actionable remediation steps for each failed check.
 
 ## CLI Contract (v1)
 
 | Command | Purpose |
 |---------|---------|
-| `plan-manager doctor` | Run full local prerequisites and auth checks |
-| `plan-manager doctor --provider github` | Run provider-targeted auth/repo checks |
-| `plan-manager doctor --provider bitbucket` | Run provider-targeted auth/repo checks |
-| `plan-manager doctor --format json` | Emit structured check results |
-| `plan-manager doctor --repo <url-or-path>` | Validate repository access against explicit target |
-| `plan-manager doctor --strict` | Return non-zero for warnings as well as failures |
+| `kode-stream doctor` | Run full local prerequisites and auth checks |
+| `kode-stream doctor --provider github` | Run provider-targeted auth/repo checks |
+| `kode-stream doctor --provider bitbucket` | Run provider-targeted auth/repo checks |
+| `kode-stream doctor --format json` | Emit structured check results |
+| `kode-stream doctor --repo <url-or-path>` | Validate repository access against explicit target |
+| `kode-stream doctor --strict` | Return non-zero for warnings as well as failures |
 
 ## Exit Codes
 
@@ -62,9 +62,9 @@ Doctor must never mutate repository state. No commit, push, branch switch, or fi
 ### Human Output
 
 ```text
-plan-manager doctor
+kode-stream doctor
 
-PASS runtime.binary        plan-manager executable found
+PASS runtime.binary        kode-stream executable found
 PASS git.installed         git version 2.45.1
 PASS repo.context          /Users/me/work/acme-repo
 FAIL auth.provider         cannot read remote refs from git@github.com:acme/repo.git
@@ -115,7 +115,7 @@ Result: 3 passed, 1 failed, 0 warnings
 
 | Layer | Responsibility |
 |-------|----------------|
-| `cmd/plan-manager` | Parse flags and print output format |
+| `cmd/kode-stream` | Parse flags and print output format |
 | `internal/application/health` | Reuse health check patterns and compose doctor checks |
 | `internal/gitadapter` | Execute non-destructive Git probes |
 | `internal/config` | Resolve and validate app data/config directories |

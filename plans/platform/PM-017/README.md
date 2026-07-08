@@ -1,6 +1,6 @@
 # PM-017: Local-First Rollout And Distribution
 
-PM-017 defines the v1 rollout plan to ship Plan Manager as a local-first CLI across macOS, Windows, and Linux. The plan keeps all repository work, credentials, and Git identity on user machines and adds release, distribution, and support workflows needed for broad adoption.
+PM-017 defines the v1 rollout plan to ship Kode Stream as a local-first CLI across macOS, Windows, and Linux. The plan keeps all repository work, credentials, and Git identity on user machines and adds release, distribution, and support workflows needed for broad adoption.
 
 ## Related Plans
 
@@ -15,7 +15,7 @@ PM-017 defines the v1 rollout plan to ship Plan Manager as a local-first CLI acr
 
 ### Goal
 
-Ship Plan Manager as a local tool on macOS/Windows/Linux with reproducible releases and clear onboarding so teammates can install quickly and publish plans/docs to GitHub and Bitbucket.
+Ship Kode Stream as a local tool on macOS/Windows/Linux with reproducible releases and clear onboarding so teammates can install quickly and publish plans/docs to GitHub and Bitbucket.
 
 ### Non-Goals
 
@@ -43,7 +43,7 @@ Developer bumps version
   -> CI signs artifacts when available and generates SHA256SUMS
   -> CI publishes GitHub Release artifacts and changelog
   -> package channels (brew/winget/tarball docs) reference the new artifacts
-  -> user installs locally and runs `plan-manager doctor`
+  -> user installs locally and runs `kode-stream doctor`
   -> user runs core flow (init -> plan create -> plan publish -> git push)
 ```
 

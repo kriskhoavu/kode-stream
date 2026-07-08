@@ -1,12 +1,12 @@
-# PM-001: Plan Manager Read-Only MVP
+# PM-001: Kode Stream Read-Only MVP
 
 ## Overview
 
-Plan Manager is a local Git-native web app for browsing planning documents.
+Kode Stream is a local Git-native web app for browsing planning documents.
 
 The MVP lets a developer register local Git repositories as workspaces, scan one or more sources, view one active workspace on a Kanban board, and open an item workspace with a file tree, Markdown preview, raw Markdown view, metadata, and read-only Git diff.
 
-The MVP is read-only for managed repositories. It does not edit plan files. It does not run Git write operations. It only writes Plan Manager registry and cache files in the app data directory.
+The MVP is read-only for managed repositories. It does not edit plan files. It does not run Git write operations. It only writes Kode Stream registry and cache files in the app data directory.
 
 ## Source Material
 
@@ -19,7 +19,7 @@ The MVP is read-only for managed repositories. It does not edit plan files. It d
 
 | Term                 | Meaning                                                                             | Maps To (code)              |
 |----------------------|-------------------------------------------------------------------------------------|-----------------------------|
-| Workspace            | A local Git repository registered in Plan Manager                                   | `RepositoryConfig`          |
+| Workspace            | A local Git repository registered in Kode Stream                                   | `RepositoryConfig`          |
 | Source               | A configured scan root such as `plans`, `docs`, or `docs/plans`                     | `planDirectories`           |
 | Structured Item Root | An item root resolved from a configured source, such as `plans/api/DI-170` | `PlanScanner`               |
 | Freestyle Docs Root  | A Markdown docs root that does not use source/item folders                     | `metadataSource: docs`      |
@@ -50,7 +50,7 @@ The MVP is read-only for managed repositories. It does not edit plan files. It d
 ## Data Flow
 
 ```text
-Developer starts Plan Manager
+Developer starts Kode Stream
   -> backend loads app config from user data directory
   -> frontend asks for repositories
   -> developer selects one active workspace from the left nav
@@ -81,7 +81,7 @@ Developer starts Plan Manager
 | Limit Kanban to one active workspace        | Mix all repositories on one board           | A board should represent one project workspace. Repository switching belongs in the left nav.                                       |
 | Use client-side multi-select board filters  | Add many query params to `/api/plans`       | The board loads cached summaries for the active workspace. Source, status, author, and branch facets give OR filters without churn. |
 | Show stale-content prompt                   | Auto-reload pages                           | Reading and detail views should not be interrupted. Users decide when to refresh in-place.                                          |
-| Keep repository edit/delete app-local       | Treat registry changes as managed repo ops  | Registry writes only touch Plan Manager data. They do not modify registered repositories.                                           |
+| Keep repository edit/delete app-local       | Treat registry changes as managed repo ops  | Registry writes only touch Kode Stream data. They do not modify registered repositories.                                           |
 | Do not auto fetch in v1                     | Fetch every 15 seconds                      | Fetch changes `.git` refs and can trigger credentials. Manual scan is safer for v1.                                                 |
 | Treat `specs/design.png` as visual baseline | Treat image as inspiration only             | The UI must not drift away from the documented proposal.                                                                            |
 | Use Playwright MCP as a phase gate          | Manual browser checks only                  | AI-agent-run browser checks make layout and workflow regressions visible during development.                                        |

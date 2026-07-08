@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 const (

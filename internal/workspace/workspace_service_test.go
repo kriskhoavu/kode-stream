@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	gitadapter "plan-manager/internal/git"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/item/writer"
-	"plan-manager/internal/workspace/registry"
-	"plan-manager/internal/workspace/scanner"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	gitadapter "kode-stream/internal/git"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/item/writer"
+	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
 )
 
 func TestStateReflectsWorkspaceAndItemChanges(t *testing.T) {
@@ -68,80 +68,6 @@ func TestStateReflectsWorkspaceAndItemChanges(t *testing.T) {
 func TestNonNilWarningsReturnsEmptySlice(t *testing.T) {
 	if got := NonNilWarnings(nil); got == nil || len(got) != 0 {
 		t.Fatalf("NonNilWarnings(nil) = %#v", got)
-	}
-}
-
-func TestLoadBranchScansSnapshotWithoutCheckout(t *testing.T) {
-	root := newWorkspaceGitRepo(t)
-	writeWorkspaceGitFile(t, root, "plans/platform/PM-001/README.md", "# PM-001: Main\n")
-	workspaceGitCommit(t, root, "main plan")
-	workspaceGitRun(t, root, "switch", "-c", "feature")
-	writeWorkspaceGitFile(t, root, "plans/platform/PM-013/README.md", "# PM-013: Snapshot\n")
-	writeWorkspaceGitFile(t, root, "plans/platform/PM-013/plan.yaml", "plan:\n  status: review\n")
-	workspaceGitCommit(t, root, "snapshot plan")
-	workspaceGitRun(t, root, "switch", "main")
-
-	dir := t.TempDir()
-	git := gitadapter.New()
-	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	idx := itemindex.New(filepath.Join(dir, "items.yaml"))
-	service := New(reg, idx, scanner.New(git), nil, git)
-
-	result, err := service.LoadBranch(workspace.ID, models.BranchLoadInput{Branch: "feature", Force: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.SourceMode != "snapshot" || result.CurrentCheckoutBranch != "main" || result.Branch != "feature" || result.ItemCount != 2 {
-		t.Fatalf("branch result = %+v", result)
-	}
-	current, err := git.CurrentBranch(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if current != "main" {
-		t.Fatalf("branch load checked out %q", current)
-	}
-	if result.Items[0].SourceMode != "snapshot" || result.Items[0].Editable {
-		t.Fatalf("snapshot item metadata = %+v", result.Items[0])
-	}
-}
-
-func TestLoadBranchRescansWorkingTreeWhenItemDirectoryIsDeleted(t *testing.T) {
-	root := newWorkspaceGitRepo(t)
-	itemPath := "plans/platform/PM-001"
-	writeWorkspaceGitFile(t, root, itemPath+"/README.md", "# PM-001\n")
-	workspaceGitCommit(t, root, "add plan")
-
-	dir := t.TempDir()
-	git := gitadapter.New()
-	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), nil, git)
-
-	first, err := service.LoadBranch(workspace.ID, models.BranchLoadInput{Branch: "main"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first.ItemCount != 1 {
-		t.Fatalf("initial item count = %d, want 1", first.ItemCount)
-	}
-	if err := os.RemoveAll(filepath.Join(root, filepath.FromSlash(itemPath))); err != nil {
-		t.Fatal(err)
-	}
-
-	refreshed, err := service.LoadBranch(workspace.ID, models.BranchLoadInput{Branch: "main"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if refreshed.ItemCount != 0 || len(refreshed.Items) != 0 {
-		t.Fatalf("items after directory deletion = %#v, want none", refreshed.Items)
 	}
 }
 
@@ -314,8 +240,8 @@ func newWorkspaceGitRepo(t *testing.T) string {
 	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
-	workspaceGitRun(t, root, "config", "user.name", "Plan Manager")
-	workspaceGitRun(t, root, "config", "user.email", "plan-manager@example.test")
+	workspaceGitRun(t, root, "config", "user.name", "Kode Stream")
+	workspaceGitRun(t, root, "config", "user.email", "kode-stream@example.test")
 	return root
 }
 

@@ -13,16 +13,16 @@ import (
 	"testing"
 	"time"
 
-	appaisession "plan-manager/internal/ai"
-	"plan-manager/internal/audit"
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	gitadapter "plan-manager/internal/git"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/navigation"
-	appsearch "plan-manager/internal/search"
-	workspacehealth "plan-manager/internal/workspace"
-	"plan-manager/internal/workspace/registry"
+	appaisession "kode-stream/internal/ai"
+	"kode-stream/internal/audit"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	gitadapter "kode-stream/internal/git"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/navigation"
+	appsearch "kode-stream/internal/search"
+	workspacehealth "kode-stream/internal/workspace"
+	"kode-stream/internal/workspace/registry"
 )
 
 func TestAISettingsRoutesReadValidateAndPersist(t *testing.T) {
@@ -294,6 +294,22 @@ func TestRoutesMissingItemReturnsNotFoundJSON(t *testing.T) {
 func TestJiraConnectionRouteRequiresServiceAndValidBody(t *testing.T) {
 	unavailable := httptest.NewRecorder()
 	New(nil, nil, nil, nil, nil, nil, nil).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodPost, "/api/workspaces/w1/jira/test", strings.NewReader(`{}`)))
+	if unavailable.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unavailable status = %d", unavailable.Code)
+	}
+}
+
+func TestWorkspaceJiraIssueRouteRequiresService(t *testing.T) {
+	unavailable := httptest.NewRecorder()
+	New(nil, nil, nil, nil, nil, nil, nil).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodGet, "/api/workspaces/w1/jira/issues/DI-1", nil))
+	if unavailable.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unavailable status = %d", unavailable.Code)
+	}
+}
+
+func TestAIPresetsRouteRequiresService(t *testing.T) {
+	unavailable := httptest.NewRecorder()
+	New(nil, nil, nil, nil, nil, nil, nil).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodGet, "/api/ai/presets", nil))
 	if unavailable.Code != http.StatusServiceUnavailable {
 		t.Fatalf("unavailable status = %d", unavailable.Code)
 	}
@@ -800,7 +816,7 @@ func TestSavedFilterEndpointsValidateCreateListAndDelete(t *testing.T) {
 	}
 
 	createdResponse := httptest.NewRecorder()
-	apiHandler.Routes().ServeHTTP(createdResponse, httptest.NewRequest(http.MethodPost, "/api/saved-filters", strings.NewReader(`{"name":"Drafts","route":"/kanban","filters":{"statuses":["draft"]}}`)))
+	apiHandler.Routes().ServeHTTP(createdResponse, httptest.NewRequest(http.MethodPost, "/api/saved-filters", strings.NewReader(`{"name":"Drafts","route":"/workspace","filters":{"statuses":["draft"]}}`)))
 	var created models.SavedFilter
 	if err := json.Unmarshal(createdResponse.Body.Bytes(), &created); err != nil || created.ID == "" {
 		t.Fatalf("created = %#v, err=%v", created, err)

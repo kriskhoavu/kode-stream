@@ -13,21 +13,21 @@ import (
 	"strings"
 	"syscall"
 
-	"plan-manager/internal/ai"
-	"plan-manager/internal/audit"
-	"plan-manager/internal/filesystem/content"
-	appgit "plan-manager/internal/git"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/item/writer"
-	appjira "plan-manager/internal/jira"
-	"plan-manager/internal/knowledge"
-	"plan-manager/internal/navigation"
-	appsearch "plan-manager/internal/search"
-	"plan-manager/internal/server/api"
-	"plan-manager/internal/system"
-	"plan-manager/internal/workspace"
-	"plan-manager/internal/workspace/registry"
-	"plan-manager/internal/workspace/scanner"
+	"kode-stream/internal/ai"
+	"kode-stream/internal/audit"
+	"kode-stream/internal/filesystem/content"
+	appgit "kode-stream/internal/git"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/item/writer"
+	appjira "kode-stream/internal/jira"
+	"kode-stream/internal/knowledge"
+	"kode-stream/internal/navigation"
+	appsearch "kode-stream/internal/search"
+	"kode-stream/internal/server/api"
+	"kode-stream/internal/system"
+	"kode-stream/internal/workspace"
+	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
 )
 
 //go:embed all:frontend
@@ -82,7 +82,7 @@ func (s *Server) Serve() error {
 		return err
 	}
 	url := "http://" + listener.Addr().String()
-	fmt.Printf("Plan Manager running at %s\n", url)
+	fmt.Printf("Kode Stream running at %s\n", url)
 	stopping := make(chan os.Signal, 1)
 	signal.Notify(stopping, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(stopping)
@@ -95,7 +95,7 @@ func (s *Server) Serve() error {
 }
 
 func envPort() int {
-	raw := strings.TrimSpace(os.Getenv("PLAN_MANAGER_PORT"))
+	raw := strings.TrimSpace(os.Getenv("KODE_STREAM_PORT"))
 	if raw == "" {
 		return 4317
 	}
@@ -113,6 +113,10 @@ func spaHandler() http.Handler {
 	}
 	files := http.FileServer(http.FS(sub))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if deprecatedSPAPath(r.URL.Path) {
+			http.NotFound(w, r)
+			return
+		}
 		if r.URL.Path != "/" {
 			if _, err := fs.Stat(sub, strings.TrimPrefix(r.URL.Path, "/")); err == nil {
 				files.ServeHTTP(w, r)
@@ -122,4 +126,13 @@ func spaHandler() http.Handler {
 		r.URL.Path = "/"
 		files.ServeHTTP(w, r)
 	})
+}
+
+func deprecatedSPAPath(path string) bool {
+	return path == "/kanban" ||
+		strings.HasPrefix(path, "/kanban/") ||
+		path == "/workbench" ||
+		strings.HasPrefix(path, "/workbench/") ||
+		path == "/workspace" ||
+		strings.HasPrefix(path, "/workspace/")
 }

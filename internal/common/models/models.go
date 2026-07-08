@@ -192,6 +192,7 @@ type BranchScanMetadata struct {
 	SourceMode              string        `json:"sourceMode,omitempty" yaml:"sourceMode,omitempty"`
 	Editable                bool          `json:"editable" yaml:"editable"`
 	SourceConfigurationHash string        `json:"sourceConfigurationHash,omitempty" yaml:"sourceConfigurationHash,omitempty"`
+	WorkingTreeHash         string        `json:"workingTreeHash,omitempty" yaml:"workingTreeHash,omitempty"`
 	ScannedAt               time.Time     `json:"scannedAt" yaml:"scannedAt"`
 	Warnings                []ScanWarning `json:"warnings" yaml:"warnings"`
 }
@@ -477,12 +478,12 @@ type ScanResult struct {
 	Warnings    []ScanWarning `json:"warnings" yaml:"warnings"`
 }
 
-type BranchLoadInput struct {
+type WorkstreamBranchLoadInput struct {
 	Branch string `json:"branch,omitempty" yaml:"branch,omitempty"`
 	Force  bool   `json:"force,omitempty" yaml:"force,omitempty"`
 }
 
-type BranchLoadResult struct {
+type WorkstreamBranchLoadResult struct {
 	WorkspaceID           string        `json:"workspaceId" yaml:"workspaceId"`
 	Branch                string        `json:"branch" yaml:"branch"`
 	SelectedBranch        string        `json:"selectedBranch" yaml:"selectedBranch"`
@@ -521,14 +522,16 @@ type ItemStatusUpdateInput struct {
 }
 
 type NewItemInput struct {
-	WorkspaceID string     `json:"workspaceId" yaml:"workspaceId"`
-	Source      string     `json:"source" yaml:"source"`
-	Scope       string     `json:"scope" yaml:"scope"`
-	Identifier  string     `json:"identifier" yaml:"identifier"`
-	Title       string     `json:"title" yaml:"title"`
-	Status      ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	Owner       string     `json:"owner,omitempty" yaml:"owner,omitempty"`
-	Tags        []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
+	WorkspaceID   string     `json:"workspaceId" yaml:"workspaceId"`
+	Source        string     `json:"source" yaml:"source"`
+	Scope         string     `json:"scope" yaml:"scope"`
+	Identifier    string     `json:"identifier" yaml:"identifier"`
+	Title         string     `json:"title" yaml:"title"`
+	Status        ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Owner         string     `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Tags          []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
+	JiraKey       string     `json:"jiraKey,omitempty" yaml:"jiraKey,omitempty"`
+	InitialReadme string     `json:"initialReadme,omitempty" yaml:"initialReadme,omitempty"`
 }
 
 type WriteResult struct {

@@ -107,7 +107,7 @@ User opens a matched Jira item
 - Cloud Atlassian Document Format and Server description variants normalize safely.
 - A project mismatch or malformed identifier never performs an unrelated Jira lookup.
 - Refresh bypasses cache; normal reads use a five-minute in-memory TTL.
-- Attachments cannot execute active content inside the Plan Manager origin.
+- Attachments cannot execute active content inside the Kode Stream origin.
 - The workspace list never expands into an edit, Jira, source, or health form.
 - Selecting tabs does not discard unsaved changes without warning.
 - Jira is optional and appears under the selected workspace's Integrations tab.

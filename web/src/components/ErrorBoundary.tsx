@@ -23,7 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <main className="runtime-error">
-          <h1>Plan Manager hit a UI error</h1>
+          <h1>Kode Stream hit a UI error</h1>
           <p>{this.state.error.message}</p>
           <button onClick={() => window.location.reload()}>Reload</button>
         </main>

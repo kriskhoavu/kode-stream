@@ -126,18 +126,18 @@ func (s *DoctorService) Run(opts Options) Result {
 func (s *DoctorService) checkRuntimeBinary() (string, Check) {
 	path, err := s.runtime.CurrentExecutable()
 	if err != nil {
-		return "", fail("runtime.binary", true, "plan-manager executable is unavailable", "Reinstall plan-manager and ensure PATH includes the binary.")
+		return "", fail("runtime.binary", true, "kode-stream executable is unavailable", "Reinstall kode-stream and ensure PATH includes the binary.")
 	}
 	if _, err := os.Stat(path); err != nil {
-		return "", fail("runtime.binary", true, fmt.Sprintf("executable path is invalid: %s", path), "Reinstall plan-manager and verify the install location exists.")
+		return "", fail("runtime.binary", true, fmt.Sprintf("executable path is invalid: %s", path), "Reinstall kode-stream and verify the install location exists.")
 	}
-	return path, pass("runtime.binary", true, fmt.Sprintf("plan-manager executable found at %s", path))
+	return path, pass("runtime.binary", true, fmt.Sprintf("kode-stream executable found at %s", path))
 }
 
 func (s *DoctorService) checkConfigPath() Check {
 	paths, err := s.runtime.ResolvePaths()
 	if err != nil {
-		return fail("runtime.config-path", true, "config path could not be resolved", "Set PLAN_MANAGER_DATA_DIR to a writable path and retry.")
+		return fail("runtime.config-path", true, "config path could not be resolved", "Set KODE_STREAM_DATA_DIR to a writable path and retry.")
 	}
 	if err := s.runtime.CanWriteDir(paths.Dir); err != nil {
 		return fail("runtime.config-path", true, fmt.Sprintf("config path is not writable: %s", paths.Dir), "Grant write permission to the config directory or choose another data directory.")

@@ -1,14 +1,14 @@
-# Plan Manager Architecture
+# Kode Stream Architecture
 
-This document describes the current architecture through PM-024.
+This document describes the current architecture.
 
-Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
+Kode Stream is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
 ## Goals
 
 - Run locally on the developer machine.
 - Keep planning files in Git.
-- Keep Kanban scoped to one active workspace while Explorer spans every registered workspace.
+- Keep the Workstream board scoped to one active workspace while Explorer spans every registered workspace.
 - Support multiple sources per workspace.
 - Support structured items, configured document sources, and freestyle docs.
 - Allow explicit, guarded writes to managed workspaces.
@@ -33,10 +33,10 @@ User browser
 │                                                              │
 │ React app                                                    │
 │ - App shell                                                  │
-│ - Kanban board                                               │
+│ - Workstream                                                 │
 │ - Workspace management                                       │
 │ - Item workspace                                             │
-│ - Global workspace explorer                                  │
+│ - Workstream Explorer                                        │
 └──────────────────────────────┬───────────────────────────────┘
                                │ HTTP JSON
 ┌──────────────────────────────▼───────────────────────────────┐
@@ -47,7 +47,7 @@ User browser
 │ - serves embedded frontend assets                            │
 │ - mounts the server/api compatibility transport              │
 │                                                              │
-│ internal/{workspace,item,knowledge,git,...}                   │
+│ internal/{workspace,workstream,item,knowledge,git,...}        │
 │ - owns controllers, workflows, repositories, and policies    │
 └───────────────┬───────────────────────────────┬──────────────┘
                 │                               │
@@ -66,11 +66,12 @@ User browser
 
 | Component             | Package               | Responsibility                                                                  |
 |-----------------------|-----------------------|---------------------------------------------------------------------------------|
-| CLI entrypoint        | `cmd/plan-manager`    | Parses `serve` and `doctor` commands                                            |
+| CLI entrypoint        | `cmd/kode-stream`    | Parses `serve` and `doctor` commands                                            |
 | Server                | `internal/server`     | Resolves paths, wires dependencies, and serves the API and embedded frontend    |
 | HTTP transport        | `internal/server/api` | Preserves routes and wire contracts while controllers move into domains         |
 | Shared contracts      | `internal/common`     | Owns shared errors, HTTP helpers, and compatibility DTOs                        |
 | Workspace domain      | `internal/workspace`  | Owns registration, import, scanning, files, source settings, safety, and health |
+| Workstream domain     | `internal/workstream` | Owns branch-scoped planning context, board snapshots, and selected branch state |
 | Item domain           | `internal/item`       | Owns item workflows, cached index data, file writing, and refresh behavior      |
 | Search domain         | `internal/search`     | Owns item, content, and workspace-path search workflows                         |
 | Knowledge domain      | `internal/knowledge`  | Detects, indexes, reads, and enriches structured Markdown Wikis                 |
@@ -84,29 +85,29 @@ User browser
 
 ## Frontend Components
 
-| Component                 | Path                                      | Responsibility                                                        |
-|---------------------------|-------------------------------------------|-----------------------------------------------------------------------|
-| App shell                 | `web/src/App.tsx`                         | Layout and navigation composition                                     |
-| App state                 | `web/src/app/useAppState.ts`              | Workspace, theme, refresh, route, and stale-content state             |
-| Router helpers            | `web/src/app/router.ts`                   | Browser path parsing and path generation                              |
-| API facade                | `web/src/lib/api.ts`                      | Compatibility export for existing feature imports                     |
-| Shared API implementation | `web/src/shared/api`                      | Fetch wrapper, endpoint methods, and response normalization           |
-| Shared domain helpers     | `web/src/shared/domain`                   | Reusable diff parsing and domain helpers                              |
-| Feature helpers           | `web/src/features/*`                      | Kanban filtering and workspace source settings helper logic           |
-| Shared types              | `web/src/lib/types.ts`                    | Frontend API types                                                    |
-| Reliability hooks         | `web/src/features/reliability`            | Workspace health and activity loading and refresh                     |
-| Search hooks              | `web/src/features/search`                 | Debounced search, quick switcher, and keyboard navigation             |
-| Content search            | `web/src/features/content-search`         | Targeted content query state, results, highlighting, and line context |
-| Content viewer            | `web/src/features/content-viewer`         | Secure Markdown, HTML, JSON, YAML, code, and text rendering           |
-| File editor session       | `web/src/features/file-editor`            | Shared Markdown autosave, stale-write, and settled-save state         |
-| Workspace explorer        | `web/src/features/workspace-explorer`     | Lazy tree, path search, Git markers, mutations, and keyboard state    |
-| Search dialog             | `web/src/components/SearchDialog.tsx`     | Global search, grouped results, and recent items                      |
-| Kanban page               | `web/src/pages/KanbanPage.tsx`            | Board, cards, and preview drawer composition                          |
-| Workspace page            | `web/src/pages/WorkspacesPage.tsx`        | Workspace create, import, edit, delete, scan, reveal                  |
-| Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`     | File tree, preview, Markdown editor, diff, metadata, Git controls     |
-| Explorer page             | `web/src/pages/WorkspaceExplorerPage.tsx` | Global filesystem tree, file editor, and context inspector            |
-| Error boundary            | `web/src/components/ErrorBoundary.tsx`    | Catches frontend render failures                                      |
-| Styles                    | `web/src/styles`                          | Global styles plus app-shell stylesheet                               |
+| Component                 | Path                                   | Responsibility                                                        |
+|---------------------------|----------------------------------------|-----------------------------------------------------------------------|
+| App shell                 | `web/src/App.tsx`                      | Layout and navigation composition                                     |
+| App state                 | `web/src/app/useAppState.ts`           | Workspace, theme, refresh, route, and stale-content state             |
+| Router helpers            | `web/src/app/router.ts`                | Browser path parsing and path generation                              |
+| API facade                | `web/src/lib/api.ts`                   | Compatibility export for existing feature imports                     |
+| Shared API implementation | `web/src/shared/api`                   | Fetch wrapper, endpoint methods, and response normalization           |
+| Shared domain helpers     | `web/src/shared/domain`                | Reusable diff parsing and domain helpers                              |
+| Feature helpers           | `web/src/features/*`                   | Workstream filtering and workspace source settings helper logic       |
+| Shared types              | `web/src/lib/types.ts`                 | Frontend API types                                                    |
+| Reliability hooks         | `web/src/features/reliability`         | Workspace health and activity loading and refresh                     |
+| Search hooks              | `web/src/features/search`              | Debounced search, quick switcher, and keyboard navigation             |
+| Content search            | `web/src/features/content-search`      | Targeted content query state, results, highlighting, and line context |
+| Content viewer            | `web/src/features/content-viewer`      | Secure Markdown, HTML, JSON, YAML, code, and text rendering           |
+| File editor session       | `web/src/features/file-editor`         | Shared Markdown autosave, stale-write, and settled-save state         |
+| Workstream Explorer       | `web/src/features/workstream-explorer` | Lazy tree, path search, Git markers, mutations, and keyboard state    |
+| Search dialog             | `web/src/components/SearchDialog.tsx`  | Global search, grouped results, and recent items                      |
+| Workstream page           | `web/src/pages/WorkstreamPage.tsx`     | Board, cards, intake, and preview drawer composition                  |
+| Workspaces page           | `web/src/pages/WorkspacesPage.tsx`     | Workspace create, import, edit, delete, scan, reveal                  |
+| Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`  | File tree, preview, Markdown editor, diff, metadata, Git controls     |
+| Workstream Explorer page  | `web/src/pages/WorkstreamExplorer.tsx` | Global filesystem tree, file editor, and context inspector            |
+| Error boundary            | `web/src/components/ErrorBoundary.tsx` | Catches frontend render failures                                      |
+| Styles                    | `web/src/styles`                       | Global styles plus app-shell stylesheet                               |
 
 ## Dependency Rules
 
@@ -129,7 +130,7 @@ User browser
 - Scanner branch matching lists branches once per workspace scan instead of once per item identifier.
 - Scanner source settings matching and metadata parsing are split into focused files behind the same `Scanner.Scan` facade.
 - Frontend route and app state behavior moved out of `App.tsx`.
-- Kanban filtering, workspace source settings helpers, and Git diff parsing moved into feature or shared modules.
+- Workstream filtering, workspace source settings helpers, and Git diff parsing moved into feature or shared modules.
 - App shell CSS is split into `web/src/styles/app-shell.css` and imported by `app.css`.
 
 ## Data Flow
@@ -211,7 +212,7 @@ User opens a source's Source Items settings
   -> user saves a path pattern and field mapping
   -> PUT /api/workspaces/{id}/source-structure?directory={dir}
   -> API validates the pattern, writes workspace-settings.yaml, rescans the workspace
-  -> configured source cards appear on the Kanban board
+  -> configured source cards appear on the Workstream board
 ```
 
 ### Item Editing
@@ -252,9 +253,9 @@ Item identifier -> exact project-key match -> Cloud or Server Jira client
   -> explicit attachment action -> ownership check -> bounded backend proxy
 ```
 
-Only Jira connection metadata is persisted with the workspace. Tokens remain in the Plan Manager process environment, and fetched issues and attachments are not written to Git or the item index. Jira descriptions render as text. Attachment responses enforce issue ownership, same-origin access, size limits, safe filenames, `nosniff`, and a narrow inline image allowlist.
+Only Jira connection metadata is persisted with the workspace. Tokens remain in the Kode Stream process environment, and fetched issues and attachments are not written to Git or the item index. Jira descriptions render as text. Attachment responses enforce issue ownership, same-origin access, size limits, safe filenames, `nosniff`, and a narrow inline image allowlist.
 
-### Workspace Explorer
+### Workstream Explorer
 
 ```text
 User opens /explorer
@@ -319,10 +320,10 @@ Frontend polls /api/state
 
 ## Storage Design
 
-Plan Manager does not use a database server. It uses YAML files in the OS user config directory.
+Kode Stream does not use a database server. It uses YAML files in the OS user config directory.
 
 ```text
-<user-config-dir>/plan-manager/
+<user-config-dir>/kode-stream/
   workspaces.yaml
   item-index.yaml
   audit-log.jsonl
@@ -493,7 +494,7 @@ Freestyle docs roots are supported when:
 - The configured root contains Markdown files, and
 - It does not contain structured item children.
 
-Plain freestyle docs roots are assigned the `unsorted` status so the Kanban board separates unstructured sources from normal workflow columns. Once a source root has a valid `workspace-settings.yaml`, matched cards use the configured status or `plan.yaml`.
+Plain freestyle docs roots are assigned the `unsorted` status so the Workstream board separates unstructured sources from normal workflow columns. Once a source root has a valid `workspace-settings.yaml`, matched cards use the configured status or `plan.yaml`.
 
 Metadata precedence:
 
@@ -520,12 +521,13 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
 | `GET`    | `/api/state`                                            | App state version, workspace count, item count   |
 | `GET`    | `/api/audit-events`                                     | Recent local operation events                    |
 | `GET`    | `/api/search`                                           | Ranked indexed item search                       |
-| `GET`    | `/api/saved-filters`                                    | List saved Kanban filter views                   |
+| `GET`    | `/api/saved-filters`                                    | List saved Workstream filter views               |
 | `POST`   | `/api/saved-filters`                                    | Create or update a saved filter                  |
 | `DELETE` | `/api/saved-filters/{id}`                               | Delete a saved filter                            |
 | `GET`    | `/api/recent-items`                                     | List recently opened items                       |
 | `POST`   | `/api/recent-items`                                     | Record an opened item                            |
 | `POST`   | `/api/items/{id}/ai-sessions/embedded`                  | Start a managed embedded AI session              |
+| `GET`    | `/api/ai/presets`                                       | List built-in AI planning prompt presets         |
 | `GET`    | `/api/ai/sessions/{sessionId}`                          | Read embedded session state                      |
 | `DELETE` | `/api/ai/sessions/{sessionId}`                          | Cancel an embedded session                       |
 | `GET`    | `/api/ai/sessions/{sessionId}/channel`                  | Upgrade to the typed terminal WebSocket channel  |
@@ -534,7 +536,9 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
 | `PUT`    | `/api/workspaces/{id}`                                  | Update workspace registration                    |
 | `DELETE` | `/api/workspaces/{id}`                                  | Delete workspace registration and cached items   |
 | `POST`   | `/api/workspaces/{id}/scan`                             | Scan one workspace                               |
+| `POST`   | `/api/workspaces/{id}/workstream/branch`                | Load current or snapshot branch Workstream items |
 | `GET`    | `/api/workspaces/{id}/health`                           | Read workspace health checks                     |
+| `GET`    | `/api/workspaces/{id}/jira/issues/{issueKey}`           | Fetch Jira issue context before item creation    |
 | `GET`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Read source item settings                        |
 | `PUT`    | `/api/workspaces/{id}/source-structure?directory={dir}` | Save source item settings and rescan             |
 | `GET`    | `/api/items`                                            | List cached item summaries                       |
@@ -658,7 +662,7 @@ Production build flow:
 npm run build
   -> writes frontend assets to internal/server/frontend
 
-go build -o ./bin/plan-manager ./cmd/plan-manager
+go build -o ./bin/kode-stream ./cmd/kode-stream
   -> embeds internal/server/frontend
   -> produces one local binary
 ```
@@ -666,7 +670,7 @@ go build -o ./bin/plan-manager ./cmd/plan-manager
 Runtime flow:
 
 ```text
-./bin/plan-manager serve -port 4317
+./bin/kode-stream serve -port 4317
   -> resolves config paths
   -> opens or creates registry and index files
   -> serves API and embedded frontend

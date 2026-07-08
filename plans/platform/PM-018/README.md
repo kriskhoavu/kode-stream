@@ -1,6 +1,6 @@
 # PM-018: External AI Session Launch
 
-PM-018 lets a user open Claude, Codex, Copilot, or OpenCode in an external terminal. Plan Manager selects the registered Git workspace and can either start clean or provide the selected card paths as neutral context before waiting for the user's request.
+PM-018 lets a user open Claude, Codex, Copilot, or OpenCode in an external terminal. Kode Stream selects the registered Git workspace and can either start clean or provide the selected card paths as neutral context before waiting for the user's request.
 
 ## Related Plans
 

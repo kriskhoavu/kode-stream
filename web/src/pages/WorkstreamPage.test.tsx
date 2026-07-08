@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { filterPlans, KanbanPage } from './KanbanPage';
-import type { BranchLoadResult, ItemSummary, SourceMode } from '../lib/types';
+import { filterPlans, WorkstreamPage } from './WorkstreamPage';
+import type { WorkstreamBranchLoadResult, ItemSummary, SourceMode } from '../lib/types';
 
 const workspace = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', sources: ['items'], createdAt: new Date().toISOString() };
 const draftItem: ItemSummary = {
@@ -22,7 +22,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('KanbanPage', () => {
+describe('WorkstreamPage', () => {
   it('renders status columns from cached plan summaries', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -43,11 +43,93 @@ describe('KanbanPage', () => {
       ]
     }));
 
-    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
     expect(screen.getByRole('heading', { name: 'Unsorted' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Draft' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Item Manager')).toBeInTheDocument());
+  });
+
+  it('creates a work item from Jira context', async () => {
+    const onOpenPlan = vi.fn();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([], 'main')));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      if (url === '/api/workspaces/r1/jira/issues/PM-025') return Promise.resolve(response({
+        state: 'available',
+        issue: {
+          key: 'PM-025',
+          summary: 'Jira First Workspace',
+          status: 'In Progress',
+          description: 'Create from Jira first.',
+          issueType: 'Story',
+          assignee: { displayName: 'Kim' },
+          reporter: { displayName: 'BA' },
+          priority: 'High',
+          labels: ['planning'],
+          browserUrl: 'https://jira.example/browse/PM-025',
+          attachments: [{ id: 'a1', filename: 'spec.pdf', mediaType: 'application/pdf', sizeBytes: 120, author: { displayName: 'BA' } }]
+        }
+      }));
+      if (url === '/api/items' && init?.method === 'POST') return Promise.resolve(response({
+        item: { ...draftItem, id: 'created', identifier: 'PM-025', title: 'Jira First Workspace', status: 'draft', documents: [], metadata: {}, counts: { files: 2 } },
+        scannedAt: '2026-06-23T00:00:00Z'
+      }));
+      return Promise.resolve(response([]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={onOpenPlan} onWorkspacesChanged={() => undefined} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ New Work Item/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'From Jira' }));
+    fireEvent.change(screen.getByLabelText('Jira key'), { target: { value: 'pm-025' } });
+    fireEvent.keyDown(screen.getByLabelText('Jira key'), { key: 'Enter' });
+
+    expect(await screen.findByText('PM-025: Jira First Workspace')).toBeInTheDocument();
+    expect(screen.getByLabelText('Item name')).toHaveValue('PM-025');
+    expect(screen.getByLabelText('Title')).toHaveValue('Jira First Workspace');
+    expect(screen.getByLabelText('Owner')).toHaveValue('Kim');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create Item' }));
+
+    await waitFor(() => expect(onOpenPlan).toHaveBeenCalledWith('created'));
+    const createCall = fetchMock.mock.calls.find(([url, init]) => String(url) === '/api/items' && init?.method === 'POST');
+    const body = JSON.parse(String(createCall?.[1]?.body ?? '{}')) as Record<string, unknown>;
+    expect(body).toMatchObject({ workspaceId: 'r1', source: 'items', scope: 'items', identifier: 'PM-025', title: 'Jira First Workspace', owner: 'Kim', jiraKey: 'PM-025' });
+    expect(body.tags).toEqual(['priority-high', 'story', 'planning']);
+    expect(String(body.initialReadme)).toContain('## Jira Context');
+    expect(String(body.initialReadme)).toContain('spec.pdf');
+  });
+
+  it('does not create files when Jira lookup fails', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([], 'main')));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      if (url === '/api/workspaces/r1/jira/issues/PM-404') return Promise.resolve(response({ state: 'not_found', message: 'No Jira ticket exists for this item' }));
+      return Promise.resolve(response([]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ New Work Item/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'From Jira' }));
+    fireEvent.change(screen.getByLabelText('Jira key'), { target: { value: 'PM-404' } });
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Jira/i }));
+
+    expect(await screen.findByText('No Jira ticket exists for this item')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Item' })).toBeDisabled();
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url) === '/api/items' && init?.method === 'POST')).toBe(false);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Create new work item' })).not.toBeInTheDocument();
   });
 
   it('does not repeat placeholder docs metadata on docs cards', async () => {
@@ -68,14 +150,14 @@ describe('KanbanPage', () => {
     };
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === '/api/workspaces/r1/kanban/branch') return Promise.resolve(response(branchLoadResult([docsItem], 'main')));
+      if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([docsItem], 'main')));
       if (url === '/api/saved-filters') return Promise.resolve(response([]));
       if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
       if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
       return Promise.resolve(response({}));
     }));
 
-    render(<KanbanPage workspace={{ ...workspace, sources: ['items', 'docs'] }} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={{ ...workspace, sources: ['items', 'docs'] }} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
     await screen.findByRole('button', { name: 'Docs' });
     const card = document.querySelector('.docs-plan');
@@ -85,17 +167,17 @@ describe('KanbanPage', () => {
     expect(within(card as HTMLElement).queryByText('No date')).not.toBeInTheDocument();
   });
 
-  it('shows only configured Kanban status columns', async () => {
+  it('shows only configured Workstream status columns', async () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === '/api/workspaces/r1/kanban/branch') return Promise.resolve(response(branchLoadResult([draftItem], 'main')));
+      if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([draftItem], 'main')));
       if (url === '/api/saved-filters') return Promise.resolve(response([]));
       if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
       if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
       return Promise.resolve(response({}));
     }));
 
-    render(<KanbanPage workspace={workspace} refreshKey={0} visibleStatuses={['draft', 'review']} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} visibleStatuses={['draft', 'review']} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
     expect(await screen.findByRole('heading', { name: 'Draft' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument();
@@ -108,7 +190,7 @@ describe('KanbanPage', () => {
     const detail = { ...draftItem, documents: [], metadata: {}, counts: { files: 0 } };
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === '/api/workspaces/r1/kanban/branch') return Promise.resolve(response(branchLoadResult([draftItem], 'main')));
+      if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([draftItem], 'main')));
       if (url === '/api/items/p1') return Promise.resolve(response(detail));
       if (url === '/api/items/p1/files') return Promise.resolve(response([]));
       if (url === '/api/items/p1/diff') return Promise.resolve(response({ diff: '' }));
@@ -118,11 +200,52 @@ describe('KanbanPage', () => {
       return Promise.resolve(response({}));
     }));
 
-    render(<KanbanPage workspace={workspace} refreshKey={0} focusedItemId="p1" onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} focusedItemId="p1" onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
     await waitFor(() => expect(screen.getByPlaceholderText('Search items...')).toHaveValue('PM-012'));
     expect(await screen.findByLabelText('Item preview')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Drag cards' })).toBeInTheDocument();
+  });
+
+  it('shows Jira next to Git in the item preview drawer', async () => {
+    const detail = { ...draftItem, documents: [], metadata: {}, counts: { files: 0 } };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([draftItem], 'main')));
+      if (url === '/api/items/p1') return Promise.resolve(response(detail));
+      if (url === '/api/items/p1/files') return Promise.resolve(response([]));
+      if (url === '/api/items/p1/diff') return Promise.resolve(response({ diff: '' }));
+      if (url === '/api/items/p1/jira') return Promise.resolve(response({
+        state: 'available',
+        issue: {
+          key: 'PM-012',
+          summary: 'Drag cards Jira ticket',
+          status: 'Done',
+          description: 'Jira context for this item.',
+          issueType: 'Story',
+          assignee: { displayName: 'Kim' },
+          reporter: { displayName: 'BA' },
+          priority: 'Medium',
+          labels: ['frontend'],
+          browserUrl: 'https://jira.example/browse/PM-012',
+          attachments: []
+        }
+      }));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} focusedItemId="p1" onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    const drawer = await screen.findByLabelText('Item preview');
+    const tablist = within(drawer).getByRole('tablist', { name: 'Work item side panel' });
+    expect(within(tablist).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Info', 'Git', 'Jira']);
+
+    fireEvent.click(within(tablist).getByRole('button', { name: 'Jira' }));
+
+    expect(await within(drawer).findByText('Drag cards Jira ticket')).toBeInTheDocument();
   });
 
   it('shows the active branch context and switches the loaded branch', async () => {
@@ -130,8 +253,8 @@ describe('KanbanPage', () => {
     const featureItems = [{ ...draftItem, id: 'p2', title: 'Feature item', branch: 'feature/pm-012' }];
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === '/api/workspaces/r1/kanban/branch') {
-        return Promise.resolve(response(branchLoadResult(mainItems, 'main')));
+      if (url === '/api/workspaces/r1/workstream/branch') {
+        return Promise.resolve(response(workstreamBranchLoadResult(mainItems, 'main')));
       }
       if (url === '/api/saved-filters') return Promise.resolve(response([]));
       if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
@@ -139,9 +262,9 @@ describe('KanbanPage', () => {
       return Promise.resolve(response({}));
     }));
 
-    const { container } = render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    const { container } = render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
-    const branchSelect = await screen.findByRole('button', { name: 'Select Kanban branch' });
+    const branchSelect = await screen.findByRole('button', { name: 'Select board branch' });
     await waitFor(() => expect(screen.queryByText('Feature item')).not.toBeInTheDocument());
     expect(screen.getByText('Drag cards')).toBeInTheDocument();
     expect(screen.queryByText('working tree')).not.toBeInTheDocument();
@@ -154,7 +277,7 @@ describe('KanbanPage', () => {
 
     fireEvent.click(branchSelect);
     const searchInput = screen.getByRole('textbox', { name: 'Search branches' });
-    const branchMenu = screen.getByRole('listbox', { name: 'Kanban branches' });
+    const branchMenu = screen.getByRole('listbox', { name: 'Board branches' });
     expect(within(branchMenu).getAllByRole('option').map((option) => option.textContent)).toEqual(['main', 'master', 'feature/pm-012', 'release/old']);
     expect(within(branchMenu).getByRole('option', { name: 'main' }).querySelector('.branch-option-check')).not.toBeNull();
     expect(within(branchMenu).getByRole('option', { name: 'main' }).querySelector('.branch-option-checkout')).not.toBeNull();
@@ -164,8 +287,8 @@ describe('KanbanPage', () => {
     expect(within(branchMenu).queryByRole('option', { name: 'feature/pm-012' })).not.toBeInTheDocument();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === '/api/workspaces/r1/kanban/branch') {
-        return Promise.resolve(response(branchLoadResult(featureItems, 'feature/pm-012', 'snapshot')));
+      if (url === '/api/workspaces/r1/workstream/branch') {
+        return Promise.resolve(response(workstreamBranchLoadResult(featureItems, 'feature/pm-012', 'snapshot')));
       }
       if (url === '/api/saved-filters') return Promise.resolve(response([]));
       if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
@@ -183,40 +306,40 @@ describe('KanbanPage', () => {
   it('closes the branch selector when clicking outside', async () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === '/api/workspaces/r1/kanban/branch') return Promise.resolve(response(branchLoadResult([draftItem], 'main')));
+      if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([draftItem], 'main')));
       if (url === '/api/saved-filters') return Promise.resolve(response([]));
       if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
       if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main', 'feature/pm-012'] }));
       return Promise.resolve(response({}));
     }));
 
-    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Select Kanban branch' }));
-    expect(screen.getByRole('listbox', { name: 'Kanban branches' })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Select board branch' }));
+    expect(screen.getByRole('listbox', { name: 'Board branches' })).toBeInTheDocument();
 
     fireEvent.pointerDown(document.body);
 
-    await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Kanban branches' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Board branches' })).not.toBeInTheDocument());
   });
 
   it('offers the current branch selector option even when no indexed item is on it', async () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === '/api/workspaces/r1/kanban/branch') return Promise.resolve(response(branchLoadResult([], 'main')));
+      if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([], 'main')));
       if (url === '/api/saved-filters') return Promise.resolve(response([]));
       if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
       if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main', 'feature/pm-012'] }));
       return Promise.resolve(response({}));
     }));
 
-    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
     await waitFor(() => expect(screen.queryByText('Drag cards')).not.toBeInTheDocument());
-    const branchSelect = await screen.findByRole('button', { name: 'Select Kanban branch' });
+    const branchSelect = await screen.findByRole('button', { name: 'Select board branch' });
 
     fireEvent.click(branchSelect);
-    const branchMenu = screen.getByRole('listbox', { name: 'Kanban branches' });
+    const branchMenu = screen.getByRole('listbox', { name: 'Board branches' });
     expect(within(branchMenu).getByRole('option', { name: 'main' })).toBeInTheDocument();
     expect(within(branchMenu).getByRole('option', { name: 'feature/pm-012' })).toBeInTheDocument();
   });
@@ -228,7 +351,7 @@ describe('KanbanPage', () => {
     }));
     const onWorkspacesChanged = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={onWorkspacesChanged} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={onWorkspacesChanged} />);
     await screen.findByText('Drag cards');
 
     selectCardStatus('Review');
@@ -241,7 +364,7 @@ describe('KanbanPage', () => {
 
   it('rolls back the item when status persistence fails', async () => {
     vi.stubGlobal('fetch', statusFetchMock(async () => response({ error: 'Status update failed' }, false, 500)));
-    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
     await screen.findByText('Drag cards');
 
     selectCardStatus('Review');
@@ -256,7 +379,7 @@ describe('KanbanPage', () => {
     const update = new Promise<Response>((resolve) => { resolveUpdate = resolve; });
     const fetchMock = statusFetchMock(() => update);
     vi.stubGlobal('fetch', fetchMock);
-    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
     await screen.findByText('Drag cards');
 
     selectCardStatus('Review');
@@ -279,7 +402,7 @@ describe('KanbanPage', () => {
       scannedAt: '2026-06-23T00:00:00Z'
     }), snapshotItem);
     vi.stubGlobal('fetch', fetchMock);
-    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
     await screen.findByText('Drag cards');
 
     selectCardStatus('Review');
@@ -294,7 +417,7 @@ describe('KanbanPage', () => {
     vi.stubGlobal('confirm', vi.fn(() => false));
     const fetchMock = statusFetchMock(async () => response({}), snapshotItem);
     vi.stubGlobal('fetch', fetchMock);
-    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
     await screen.findByText('Drag cards');
 
     selectCardStatus('Review');
@@ -307,7 +430,7 @@ describe('KanbanPage', () => {
     const snapshotItem = { ...draftItem, sourceMode: 'snapshot' as const, editable: false };
     vi.stubGlobal('confirm', vi.fn(() => true));
     vi.stubGlobal('fetch', statusFetchMock(async () => response({ error: 'Target file already exists' }, false, 409), snapshotItem));
-    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
     await screen.findByText('Drag cards');
 
     selectCardStatus('Review');
@@ -318,7 +441,7 @@ describe('KanbanPage', () => {
 });
 
 function column(name: string): HTMLElement {
-  const element = screen.getByRole('heading', { name }).closest('.kanban-column');
+  const element = screen.getByRole('heading', { name }).closest('.workstream-column');
   if (!element) throw new Error(`Missing ${name} column`);
   return element as HTMLElement;
 }
@@ -331,7 +454,7 @@ function selectCardStatus(status: string): void {
 function statusFetchMock(updateStatus: () => Promise<Response>, item: ItemSummary = draftItem) {
   return vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
-    if (url === '/api/workspaces/r1/kanban/branch') return Promise.resolve(response(branchLoadResult([item], item.branch, item.sourceMode)));
+    if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([item], item.branch, item.sourceMode)));
     if (url.startsWith('/api/items?')) return Promise.resolve(response([item]));
     if (url === '/api/saved-filters') return Promise.resolve(response([]));
     if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
@@ -346,7 +469,7 @@ function statusRequestBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, 
   return JSON.parse(String(call?.[1]?.body ?? '{}')) as Record<string, unknown>;
 }
 
-function branchLoadResult(items: ItemSummary[], branch: string, sourceMode: SourceMode = 'working_tree'): BranchLoadResult {
+function workstreamBranchLoadResult(items: ItemSummary[], branch: string, sourceMode: SourceMode = 'working_tree'): WorkstreamBranchLoadResult {
   return {
     workspaceId: 'r1',
     branch,

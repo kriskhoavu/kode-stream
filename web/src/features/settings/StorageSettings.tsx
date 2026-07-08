@@ -49,7 +49,7 @@ export function StorageSettings() {
       const updated = await api.updateSystemConfigPaths({ dataDir: dataDir.trim() });
       setConfig(updated);
       setDataDir(updated.dataDir);
-      setMessage('Storage settings saved. Restart Plan Manager to apply registry and index paths.');
+      setMessage('Storage settings saved. Restart Kode Stream to apply registry and index paths.');
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -62,7 +62,7 @@ export function StorageSettings() {
       <div>
         <span className="settings-group-label">Application storage</span>
         <h2>Storage</h2>
-        <p>Choose where Plan Manager stores its registry, indexes, and managed repository clones.</p>
+        <p>Choose where Kode Stream stores its registry, indexes, and managed repository clones.</p>
       </div>
     </header>
     {config ? <div className="storage-settings-fields">

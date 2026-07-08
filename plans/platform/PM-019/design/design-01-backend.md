@@ -59,7 +59,7 @@ Issue state values are `not_configured`, `invalid_identifier`, `project_mismatch
 | Decision                     | Rationale                                                  |
 |------------------------------|------------------------------------------------------------|
 | One connection per workspace | Matches the existing workspace-to-project requirement      |
-| Environment token reference  | Keeps secret lifecycle outside Plan Manager                |
+| Environment token reference  | Keeps secret lifecycle outside Kode Stream                |
 | Typed issue states           | Makes expected absence distinct from server errors         |
 | Backend attachment proxy     | Keeps authentication and validation outside the browser    |
 | No persistent Jira cache     | Avoids stale remote data becoming a second source of truth |

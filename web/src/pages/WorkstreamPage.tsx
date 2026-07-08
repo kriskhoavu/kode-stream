@@ -1,13 +1,14 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, SetStateAction } from 'react';
-import { BookmarkPlus, Check, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GitCommitHorizontal, GripVertical, Info, KanbanSquare, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Check, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GitCommitHorizontal, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
+import { JiraItemPanel } from '../features/jira/JiraItemPanel';
 import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
 import type {
-  BranchLoadResult,
+  WorkstreamBranchLoadResult,
   FileContent,
   FileNode,
   GitStatus,
@@ -16,6 +17,8 @@ import type {
   ItemMetadataUpdateInput,
   ItemStatus,
   ItemSummary,
+  JiraIssue,
+  JiraIssueState,
   SavedFilter,
   SourceSettingsResult,
   SourceStructureCard,
@@ -25,14 +28,14 @@ import type {
   WorkspaceConfig
 } from '../lib/types';
 import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
-import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/kanban/filtering';
-import type { FacetOption, FilterKey, Filters } from '../features/kanban/filtering';
-import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/kanban/dragAndDrop';
+import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/workstream/filtering';
+import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
+import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
 import { inferCompatibilityFields, lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
-type DrawerSideTab = 'info' | 'git';
+type DrawerSideTab = 'info' | 'git' | 'jira';
 type DrawerFileOption = { id: string; path: string; label: string };
 const DRAG_CLICK_SUPPRESSION_MS = 350;
 const UNSORTED_SELECTION_ID = 'unsorted';
@@ -50,9 +53,35 @@ type SourceItemsEditorState = {
   preview: SourceStructurePreview[];
 };
 
+type NewItemOrigin = 'blank' | 'jira';
+
+type NewWorkItemDraft = {
+  origin: NewItemOrigin;
+  source: string;
+  scope: string;
+  identifier: string;
+  title: string;
+  status: ItemStatus;
+  owner: string;
+  tags: string;
+  jiraKey: string;
+};
+
+const emptyNewWorkItemDraft = (): NewWorkItemDraft => ({
+  origin: 'blank',
+  source: '',
+  scope: '',
+  identifier: '',
+  title: '',
+  status: 'draft',
+  owner: '',
+  tags: '',
+  jiraKey: ''
+});
+
 export { filterPlans };
 
-export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
+export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
   workspace?: WorkspaceConfig;
   refreshKey: number;
   visibleStatuses?: ItemStatus[];
@@ -70,9 +99,11 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
   const [drawerPlanId, setDrawerPlanId] = useState('');
   const [newPlanOpen, setNewPlanOpen] = useState(false);
-  const [newPlanDraft, setNewPlanDraft] = useState({ source: '', scope: '', identifier: '', status: 'draft' as ItemStatus });
+  const [newPlanDraft, setNewPlanDraft] = useState<NewWorkItemDraft>(() => emptyNewWorkItemDraft());
   const [newPlanError, setNewPlanError] = useState('');
   const [creatingPlan, setCreatingPlan] = useState(false);
+  const [jiraLookup, setJiraLookup] = useState<JiraIssueState | null>(null);
+  const [jiraLookupLoading, setJiraLookupLoading] = useState(false);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [saveFilterOpen, setSaveFilterOpen] = useState(false);
   const [saveFilterName, setSaveFilterName] = useState('');
@@ -83,7 +114,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
   const [workspaceBranchCurrent, setWorkspaceBranchCurrent] = useState('');
   const [workspaceBranchList, setWorkspaceBranchList] = useState<string[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
-  const [branchContext, setBranchContext] = useState<BranchLoadResult | null>(null);
+  const [branchContext, setBranchContext] = useState<WorkstreamBranchLoadResult | null>(null);
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const [branchSearch, setBranchSearch] = useState('');
   const [sourceItemsOpen, setSourceItemsOpen] = useState(false);
@@ -102,7 +133,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
     setLoading(true);
     setError('');
     try {
-      const result = await api.loadKanbanBranch(workspace.id, { branch: branch || undefined, force });
+      const result = await api.loadWorkstreamBranch(workspace.id, { branch: branch || undefined, force });
       setBranchContext(result);
       setSelectedBranch(result.branch);
       setPlans(result.items);
@@ -171,6 +202,33 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [branchMenuOpen]);
+
+  useEffect(() => {
+    if (!newPlanOpen && !sourceItemsOpen) return;
+    const previousBodyOverflow = document.body.style.overflow;
+    const mainContent = document.querySelector<HTMLElement>('.main-content');
+    const previousMainContentOverflow = mainContent?.style.overflow ?? '';
+    document.body.style.overflow = 'hidden';
+    if (mainContent) mainContent.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      if (mainContent) mainContent.style.overflow = previousMainContentOverflow;
+    };
+  }, [newPlanOpen, sourceItemsOpen]);
+
+  useEffect(() => {
+    if (!newPlanOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setNewPlanOpen(false);
+      setJiraLookup(null);
+      setNewPlanError('');
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [newPlanOpen]);
 
   useEffect(() => {
     api.savedFilters()
@@ -270,7 +328,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
     if (!workspace) return;
     setScanState('Refreshing');
     try {
-      const result = await api.loadKanbanBranch(workspace.id, { branch: selectedBranch || undefined, force: true });
+      const result = await api.loadWorkstreamBranch(workspace.id, { branch: selectedBranch || undefined, force: true });
       notifyReliabilityChanged();
       setScanState(`${result.itemCount} items indexed`);
       setBranchContext(result);
@@ -359,22 +417,55 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
     void moveItem(itemId, status);
   };
 
+  const fetchJiraIssue = async () => {
+    if (!workspace || !newPlanDraft.jiraKey.trim()) return;
+    setJiraLookupLoading(true);
+    setNewPlanError('');
+    try {
+      const result = await api.workspaceJiraIssue(workspace.id, newPlanDraft.jiraKey.trim());
+      setJiraLookup(result);
+      if (result.state === 'available' && result.issue) {
+        const issue = result.issue;
+        const nextTags = jiraTags(issue).join(', ');
+        setNewPlanDraft((draft) => ({
+          ...draft,
+          identifier: draft.identifier.trim() || issue.key,
+          title: draft.title.trim() || issue.summary,
+          owner: draft.owner.trim() || issue.assignee?.displayName || '',
+          tags: draft.tags.trim() || nextTags
+        }));
+      }
+    } catch (err) {
+      setJiraLookup(null);
+      setNewPlanError(err instanceof Error ? err.message : 'Jira lookup failed');
+    } finally {
+      setJiraLookupLoading(false);
+    }
+  };
+
   const createPlan = async () => {
     if (!workspace) return;
     setCreatingPlan(true);
     setNewPlanError('');
     try {
       const source = newPlanDraft.source || workspace.sources[0] || 'plans';
+      const jiraIssue = newPlanDraft.origin === 'jira' && jiraLookup?.state === 'available' ? jiraLookup.issue : undefined;
       const result = await api.createItem({
         workspaceId: workspace.id,
         source,
-        scope: source,
+        scope: newPlanDraft.scope.trim() || source,
         identifier: newPlanDraft.identifier.trim(),
-        status: newPlanDraft.status
+        title: newPlanDraft.title.trim() || undefined,
+        status: newPlanDraft.status,
+        owner: newPlanDraft.owner.trim() || undefined,
+        tags: parseTags(newPlanDraft.tags),
+        jiraKey: jiraIssue?.key,
+        initialReadme: jiraIssue ? jiraReadme(jiraIssue) : undefined
       });
       notifyReliabilityChanged();
       setNewPlanOpen(false);
-      setNewPlanDraft({ source: '', scope: '', identifier: '', status: 'draft' });
+      setNewPlanDraft(emptyNewWorkItemDraft());
+      setJiraLookup(null);
       await onWorkspacesChanged();
       await reloadPlans();
       onOpenPlan(result.item.id);
@@ -477,7 +568,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
     if (!saveFilterName.trim()) return;
     const saved = await api.saveFilter({
       name: saveFilterName.trim(),
-      route: '/kanban',
+      route: '/workstream',
       workspaceId: workspace?.id,
       filters: { filters: { ...filters, branches: [] }, query }
     });
@@ -505,18 +596,18 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
   if (!workspace && !loading) {
     return (
       <section className="empty-state">
-        <h1>Kanban</h1>
-        <p>Register a local Git workspace to create a board.</p>
+        <h1>Workstream</h1>
+        <p>Register a local Git workspace to create a workstream view.</p>
       </section>
     );
   }
 
   return (
-    <section className="kanban-page">
-      <div className="page-title kanban-title">
-        <div className="kanban-heading">
+    <section className="workstream-page">
+      <div className="page-title workstream-title">
+        <div className="workstream-heading">
           <div>
-            <h1><KanbanSquare size={22} /> Kanban board</h1>
+            <h1><WorkstreamIcon size={22} /> Workstream</h1>
             <span><FolderGit2 size={15} /> {workspace?.name ?? 'No workspace selected'}</span>
           </div>
         </div>
@@ -529,7 +620,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
                 <button
                   type="button"
                   className="branch-picker-trigger"
-                  aria-label="Select Kanban branch"
+                  aria-label="Select board branch"
                   aria-haspopup="listbox"
                   aria-expanded={branchMenuOpen}
                   onClick={() => {
@@ -552,7 +643,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
                         autoFocus
                       />
                     </label>
-                    <div className="branch-picker-options" role="listbox" aria-label="Kanban branches">
+                    <div className="branch-picker-options" role="listbox" aria-label="Board branches">
                       {filteredBranchOptions.map((branch) => (
                         <button
                           type="button"
@@ -593,10 +684,10 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
         </label>
         <button className="secondary" onClick={scan}>
           <RotateCw size={16} /> Refresh
-        </button>
-        <button className="primary" onClick={() => setNewPlanOpen(true)} disabled={sourceMode === 'snapshot'}>
-          + New Item
-        </button>
+            </button>
+            <button className="primary" onClick={() => setNewPlanOpen(true)} disabled={sourceMode === 'snapshot'}>
+              + New Work Item
+            </button>
         <span className="scan-state">{scanState}</span>
       </div>
       <div className="facet-bar">
@@ -635,10 +726,10 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
         {activeFilterCount > 0 && <span>{activeFilterCount} active filters</span>}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
-      <div className="kanban-board" style={boardStyle} aria-busy={loading}>
+      <div className="workstream-board" style={boardStyle} aria-busy={loading}>
         {displayedStatuses.map((column) => (
           <Fragment key={column}>
-            <KanbanColumn
+            <WorkstreamColumn
               status={column}
               itemCount={grouped.get(column)?.length ?? 0}
               loading={loading}
@@ -673,9 +764,9 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
                   onMove={(status) => moveItem(plan.id, status)}
                 />
               ))}
-            </KanbanColumn>
+            </WorkstreamColumn>
             {column === 'unsorted' && (
-              <button className="kanban-separator" type="button" onClick={() => void openSourceItemsDialog()} title="Configure source items">
+              <button className="workstream-separator" type="button" onClick={() => void openSourceItemsDialog()} title="Configure source items">
                 <span className="separator-arrow">▶</span>
                 <span className="separator-count">{grouped.get('unsorted')?.length ?? 0}</span>
                 <span className="separator-label">Configure source items</span>
@@ -717,7 +808,7 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
                 </select>
               </label>
             )}
-            <p className="modal-help">Define how this source should be split into Kanban items.</p>
+            <p className="modal-help">Define how this source should be split into board items.</p>
             {sourceItemsLoading && <span className="reliability-muted">Loading source settings...</span>}
             {!sourceItemsLoading && sourceItemsError && <span className="error">{sourceItemsError}</span>}
             {!sourceItemsLoading && sourceItemsEditor && (
@@ -769,28 +860,179 @@ export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrde
       )}
       {newPlanOpen && workspace && (
         <div className="modal-backdrop" role="presentation">
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Create new item">
+          <section className={newPlanDraft.origin === 'jira' ? 'modal-panel new-work-item-modal jira-mode' : 'modal-panel new-work-item-modal'} role="dialog" aria-modal="true" aria-label="Create new work item">
             <header>
-              <h2>New item</h2>
-              <button type="button" className="icon-button" onClick={() => setNewPlanOpen(false)}><X size={16} /></button>
+              <h2>New Work Item</h2>
+              <button type="button" className="icon-button" onClick={() => {
+                setNewPlanOpen(false);
+                setJiraLookup(null);
+                setNewPlanError('');
+              }}><X size={16} /></button>
             </header>
-            <div className="metadata-form">
-              <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
-                {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
-              </select></label>
-              <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Any item name" /></label>
-              <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
+            <div className={newPlanDraft.origin === 'jira' ? 'metadata-form jira-work-item-form' : 'metadata-form'}>
+              <div className="segmented-control" role="group" aria-label="Item origin">
+                <button
+                  type="button"
+                  className={newPlanDraft.origin === 'blank' ? 'active' : ''}
+                  onClick={() => {
+                    setNewPlanDraft((draft) => ({ ...emptyNewWorkItemDraft(), source: draft.source, origin: 'blank' }));
+                    setJiraLookup(null);
+                    setNewPlanError('');
+                  }}
+                >
+                  Blank
+                </button>
+                <button
+                  type="button"
+                  className={newPlanDraft.origin === 'jira' ? 'active' : ''}
+                  onClick={() => {
+                    setNewPlanDraft((draft) => ({ ...draft, origin: 'jira' }));
+                    setNewPlanError('');
+                  }}
+                >
+                  From Jira
+                </button>
+              </div>
+              {newPlanDraft.origin === 'blank' ? (
+                <>
+                  <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
+                    {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
+                  </select></label>
+                  <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Any item name" /></label>
+                  <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
+                </>
+              ) : (
+                <div className="jira-create-layout">
+                  <section className="jira-ticket-column">
+                    <div className="jira-column-heading">
+                      <strong>Jira ticket</strong>
+                      <span>Fetch the source issue and review its context.</span>
+                    </div>
+                    <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
+                      {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
+                    </select></label>
+                    <div className="jira-intake">
+                      <label>Jira key<input
+                        value={newPlanDraft.jiraKey}
+                        onChange={(event) => {
+                          setNewPlanDraft((draft) => ({ ...draft, jiraKey: event.target.value.toUpperCase() }));
+                          setJiraLookup(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' || jiraLookupLoading || !newPlanDraft.jiraKey.trim()) return;
+                          event.preventDefault();
+                          void fetchJiraIssue();
+                        }}
+                        placeholder="PM-025"
+                      /></label>
+                      <button type="button" className="secondary" disabled={jiraLookupLoading || !newPlanDraft.jiraKey.trim()} onClick={() => void fetchJiraIssue()}>
+                        <Search size={15} />
+                        {jiraLookupLoading ? 'Fetching...' : 'Fetch Jira'}
+                      </button>
+                    </div>
+                    {jiraLookup && (
+                      <section className={jiraLookup.state === 'available' ? 'jira-issue-preview' : 'jira-issue-preview warning'} aria-label="Jira issue preview">
+                        {jiraLookup.issue ? (
+                          <>
+                            <header className="jira-issue-preview-header">
+                              <strong>{jiraLookup.issue.key}: {jiraLookup.issue.summary}</strong>
+                              {jiraLookup.issue.browserUrl && <a href={jiraLookup.issue.browserUrl} target="_blank" rel="noreferrer">Open Jira</a>}
+                            </header>
+                            <dl className="jira-issue-preview-meta">
+                              <div><dt>Type</dt><dd>{jiraLookup.issue.issueType || 'Issue'}</dd></div>
+                              <div><dt>Status</dt><dd>{jiraLookup.issue.status || 'Unknown'}</dd></div>
+                              <div><dt>Assignee</dt><dd>{jiraLookup.issue.assignee?.displayName || 'Unassigned'}</dd></div>
+                              {jiraLookup.issue.priority && <div><dt>Priority</dt><dd>{jiraLookup.issue.priority}</dd></div>}
+                            </dl>
+                            {jiraLookup.issue.description && <p className="jira-issue-preview-description">{jiraLookup.issue.description}</p>}
+                            {jiraLookup.issue.attachments.length > 0 && <small>{jiraLookup.issue.attachments.length} attachment{jiraLookup.issue.attachments.length === 1 ? '' : 's'} referenced</small>}
+                          </>
+                        ) : (
+                          <>
+                            <strong>{jiraLookup.message || jiraLookup.state}</strong>
+                            {jiraLookup.recoveryHint && <span>{jiraLookup.recoveryHint}</span>}
+                          </>
+                        )}
+                      </section>
+                    )}
+                  </section>
+                  <section className="jira-details-column">
+                    <div className="jira-column-heading">
+                      <strong>Work item details</strong>
+                      <span>Review the values imported from Jira before creation.</span>
+                    </div>
+                    <div className="jira-field-row">
+                      <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Jira key or local item name" /></label>
+                      <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
+                    </div>
+                    <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Jira summary" /></label>
+                    <label>Owner<input value={newPlanDraft.owner} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, owner: event.target.value }))} placeholder="Assignee" /></label>
+                    <label>Tags<input value={newPlanDraft.tags} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, tags: event.target.value }))} placeholder="story, priority-high" /></label>
+                  </section>
+                </div>
+              )}
             </div>
             {newPlanError && <p className="error">{newPlanError}</p>}
             <footer className="modal-actions">
               <button type="button" className="ghost" onClick={() => setNewPlanOpen(false)}>Cancel</button>
-              <button type="button" className="primary" disabled={creatingPlan || !newPlanDraft.identifier} onClick={createPlan}>{creatingPlan ? 'Creating...' : 'Create Item'}</button>
+              <button
+                type="button"
+                className="primary"
+                disabled={creatingPlan || !newPlanDraft.identifier.trim() || (newPlanDraft.origin === 'jira' && jiraLookup?.state !== 'available')}
+                onClick={createPlan}
+              >
+                {creatingPlan ? 'Creating...' : 'Create Item'}
+              </button>
             </footer>
           </section>
         </div>
       )}
     </section>
   );
+}
+
+function parseTags(value: string): string[] {
+  return Array.from(new Set(value.split(',').map((tag) => tag.trim()).filter(Boolean)));
+}
+
+function slugTag(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function jiraTags(issue: JiraIssue): string[] {
+  const tags = [...issue.labels];
+  const issueType = slugTag(issue.issueType);
+  const priority = slugTag(issue.priority ?? '');
+  if (issueType) tags.unshift(issueType);
+  if (priority) tags.unshift(`priority-${priority}`);
+  return Array.from(new Set(tags.filter(Boolean)));
+}
+
+function jiraReadme(issue: JiraIssue): string {
+  const lines = [
+    `# ${issue.key}: ${issue.summary}`,
+    '',
+    '## Jira Context',
+    '',
+    `- Key: ${issue.key}`,
+    `- Status: ${issue.status || 'Unknown'}`,
+    `- Type: ${issue.issueType || 'Unknown'}`,
+    `- Priority: ${issue.priority || 'Unspecified'}`,
+    `- Assignee: ${issue.assignee?.displayName || 'Unassigned'}`,
+    `- Reporter: ${issue.reporter?.displayName || 'Unknown'}`,
+    issue.browserUrl ? `- Jira: ${issue.browserUrl}` : '',
+    '',
+    '## Description',
+    '',
+    issue.description?.trim() || '_No Jira description available._'
+  ].filter((line) => line !== '');
+  if (issue.attachments.length > 0) {
+    lines.push('', '## Attachments', '');
+    for (const attachment of issue.attachments) {
+      lines.push(`- ${attachment.filename} (${attachment.mediaType || 'unknown'}, ${attachment.sizeBytes.toLocaleString()} bytes)`);
+    }
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 function SourceStructureProposalList({
@@ -1242,11 +1484,11 @@ function confirmSnapshotMaterialization(item: ItemSummary | ItemDetail | null, o
     ? 'only this docs file'
     : `the whole plan at ${item.itemPath || item.identifier}`;
   const action = operation === 'status' ? 'move it' : operation === 'metadata' ? 'edit its metadata' : 'edit it';
-  const message = `This item is loaded from branch ${item.branch}. To ${action}, Plan Manager will copy ${copyTarget} into the current checkout branch, then apply your change there.`;
+  const message = `This item is loaded from branch ${item.branch}. To ${action}, Kode Stream will copy ${copyTarget} into the current checkout branch, then apply your change there.`;
   return window.confirm(message) ? true : null;
 }
 
-function KanbanColumn({ status, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
+function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
   status: ItemStatus;
   itemCount: number;
   loading: boolean;
@@ -1259,7 +1501,7 @@ function KanbanColumn({ status, itemCount, loading, dragActive, dragTargetStatus
   children: React.ReactNode;
 }) {
   const droppable = isDropStatus(status);
-  const classes = ['kanban-column', status];
+  const classes = ['workstream-column', status];
   if (dragActive && droppable) classes.push('drop-enabled');
   if (dragTargetStatus === status && droppable) classes.push('drop-target');
 
@@ -1370,13 +1612,17 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
   const [branchName, setBranchName] = useState('');
   const [gitBusy, setGitBusy] = useState('');
-  const [gitActivityOpen, setGitActivityOpen] = useState(() => readStoredToggle('kanban.drawer.gitActivityOpen'));
+  const [gitActivityOpen, setGitActivityOpen] = useState(() => readStoredToggle('workstream.drawer.gitActivityOpen'));
   const [error, setError] = useState('');
   const [width, setWidth] = useState(1120);
+  const [topOffset, setTopOffset] = useState(() => Math.max(0, 68 - window.scrollY));
   const autoSaveTimerRef = useRef<number | null>(null);
   const autoSaveSettledTimerRef = useRef<number | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
-  const drawerStyle = { '--drawer-width': `${width}px` } as CSSProperties & Record<'--drawer-width', string>;
+  const drawerStyle = {
+    '--drawer-width': `${width}px`,
+    '--drawer-top': `${topOffset}px`,
+  } as CSSProperties & Record<'--drawer-width' | '--drawer-top', string>;
   const compact = width < 700;
   const dirtyFile = file !== null && editorContent !== savedContent;
   const activityPath = plan?.itemPath || '';
@@ -1410,6 +1656,12 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [dirtyFile, editorContent, file, onClose, savedContent]);
+
+  useEffect(() => {
+    const updateTopOffset = () => setTopOffset(Math.max(0, 68 - window.scrollY));
+    window.addEventListener('scroll', updateTopOffset, { passive: true });
+    return () => window.removeEventListener('scroll', updateTopOffset);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1707,7 +1959,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
 
   return (
     <>
-      <button className="drawer-scrim" type="button" aria-label="Close preview" onClick={closeDrawer} />
+      <button className="drawer-scrim" style={drawerStyle} type="button" aria-label="Close preview" onClick={closeDrawer} />
       <aside className={compact ? 'plan-drawer compact' : 'plan-drawer'} style={drawerStyle} aria-label="Item preview">
         <button className="drawer-resize-handle" type="button" aria-label="Resize preview panel" onPointerDown={startResize}>
           <GripVertical size={16} />
@@ -1768,6 +2020,9 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
               </button>
               <button type="button" className={sideTab === 'git' ? 'active' : ''} onClick={() => setSideTab('git')}>
                 <GitBranch size={14} /> Git
+              </button>
+              <button type="button" className={sideTab === 'jira' ? 'active' : ''} onClick={() => setSideTab('jira')}>
+                <Ticket size={14} /> Jira
               </button>
             </div>
             <div className="drawer-work-item-content">
@@ -1834,7 +2089,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                   <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
                     const open = event.currentTarget.open;
                     setGitActivityOpen(open);
-                    localStorage.setItem('kanban.drawer.gitActivityOpen', open ? '1' : '0');
+                    localStorage.setItem('workstream.drawer.gitActivityOpen', open ? '1' : '0');
                   }}>
                     <summary>
                       <span>Recent Activity</span>
@@ -1850,6 +2105,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                   </div>
                 )
               )}
+              {sideTab === 'jira' && <JiraItemPanel itemId={itemId} />}
             </div>
           </aside>
         </div>

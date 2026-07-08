@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"plan-manager/internal/common/httpx"
+	"kode-stream/internal/common/httpx"
 )
 
 type SystemController struct{ repository *Dialog }

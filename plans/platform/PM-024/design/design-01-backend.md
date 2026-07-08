@@ -50,7 +50,7 @@ The file picker cancellation returns an empty path as a normal response. Preview
 
 ## Parsing and Validation
 
-Use `yaml.Decoder.KnownFields(true)` against a dedicated import DTO. The DTO accepts current `WorkspaceConfig` fields so a normal Plan Manager registry can be reused, but ignores source identity fields only after successful strict decoding. `id`, `createdAt`, `lastScannedAt`, `lastSelectedBranch`, and `clonePathManaged` never control destination state.
+Use `yaml.Decoder.KnownFields(true)` against a dedicated import DTO. The DTO accepts current `WorkspaceConfig` fields so a normal Kode Stream registry can be reused, but ignores source identity fields only after successful strict decoding. `id`, `createdAt`, `lastScannedAt`, `lastSelectedBranch`, and `clonePathManaged` never control destination state.
 
 For each entry:
 

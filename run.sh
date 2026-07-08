@@ -4,18 +4,18 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-PORT="${PLAN_MANAGER_PORT:-4317}"
-BIN="$ROOT_DIR/bin/plan-manager"
+PORT="${KODE_STREAM_PORT:-4317}"
+BIN="$ROOT_DIR/bin/kode-stream"
 RUN_DIR="$ROOT_DIR/.run"
-PID_FILE="$RUN_DIR/plan-manager.pid"
-LOG_FILE="$RUN_DIR/plan-manager.log"
+PID_FILE="$RUN_DIR/kode-stream.pid"
+LOG_FILE="$RUN_DIR/kode-stream.log"
 
 usage() {
   cat <<EOF
 Usage: ./run.sh {start|stop|restart|status}
 
 Environment:
-  PLAN_MANAGER_PORT   Port to bind, default: 4317
+  KODE_STREAM_PORT   Port to bind, default: 4317
 
 Logs:
   $LOG_FILE
@@ -39,11 +39,11 @@ process_command() {
   ps -p "$pid" -o command= 2>/dev/null || true
 }
 
-is_plan_manager_process() {
+is_kode_stream_process() {
   local pid="$1"
   local command
   command="$(process_command "$pid")"
-  [[ "$command" == *"plan-manager serve"* ]]
+  [[ "$command" == *"kode-stream serve"* ]]
 }
 
 build_app() {
@@ -52,7 +52,7 @@ build_app() {
 
   echo "Building Go binary..."
   mkdir -p "$ROOT_DIR/bin"
-  go build -o "$BIN" ./cmd/plan-manager
+  go build -o "$BIN" ./cmd/kode-stream
 }
 
 port_owner() {
@@ -63,7 +63,7 @@ port_owner() {
 
 stop_pid() {
   local pid="$1"
-  echo "Stopping Plan Manager PID $pid ..."
+  echo "Stopping Kode Stream PID $pid ..."
   kill "$pid"
 
   for _ in {1..30}; do
@@ -95,7 +95,7 @@ start_app() {
 
   local existing_owner
   existing_owner="$(port_owner)"
-  if [[ -n "$existing_owner" ]] && is_plan_manager_process "$existing_owner"; then
+  if [[ -n "$existing_owner" ]] && is_kode_stream_process "$existing_owner"; then
     stop_pid "$existing_owner"
   fi
 
@@ -105,17 +105,17 @@ start_app() {
   owner="$(port_owner)"
   if [[ -n "$owner" ]]; then
     echo "Port $PORT is already in use by PID $owner; not starting."
-    echo "Set PLAN_MANAGER_PORT to another port or stop that process."
+    echo "Set KODE_STREAM_PORT to another port or stop that process."
     exit 1
   fi
 
-  echo "Starting Plan Manager on http://127.0.0.1:$PORT ..."
+  echo "Starting Kode Stream on http://127.0.0.1:$PORT ..."
   nohup "$BIN" serve -port "$PORT" >"$LOG_FILE" 2>&1 &
   echo "$!" >"$PID_FILE"
 
   sleep 1
   if ! is_running; then
-    echo "Plan Manager failed to start. Recent logs:"
+    echo "Kode Stream failed to start. Recent logs:"
     tail -n 40 "$LOG_FILE" || true
     rm -f "$PID_FILE"
     exit 1
@@ -140,20 +140,20 @@ stop_app() {
   local owner
   owner="$(port_owner)"
   if [[ -n "$owner" ]]; then
-    if is_plan_manager_process "$owner"; then
+    if is_kode_stream_process "$owner"; then
       stop_pid "$owner"
       return 0
     fi
-    echo "Port $PORT is in use by PID $owner, but it is not a Plan Manager process."
+    echo "Port $PORT is in use by PID $owner, but it is not a Kode Stream process."
     return 0
   fi
 
-  echo "Plan Manager is not running."
+  echo "Kode Stream is not running."
 }
 
 status_app() {
   if is_running; then
-    echo "Plan Manager is running with PID $(pid_value)."
+    echo "Kode Stream is running with PID $(pid_value)."
     echo "Open http://127.0.0.1:$PORT"
     echo "Log: $LOG_FILE"
     return 0
@@ -161,12 +161,12 @@ status_app() {
 
   local owner
   owner="$(port_owner)"
-  if [[ -n "$owner" ]] && is_plan_manager_process "$owner"; then
-    echo "Plan Manager is running with PID $owner."
+  if [[ -n "$owner" ]] && is_kode_stream_process "$owner"; then
+    echo "Kode Stream is running with PID $owner."
     echo "Open http://127.0.0.1:$PORT"
     echo "Log: unmanaged process; no $LOG_FILE"
   else
-    echo "Plan Manager is not running."
+    echo "Kode Stream is not running."
   fi
 }
 

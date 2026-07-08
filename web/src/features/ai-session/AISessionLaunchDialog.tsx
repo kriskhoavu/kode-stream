@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, X } from 'lucide-react';
 import { api } from '../../lib/api';
-import type { AICapability, AISessionEligibility, AISettings, AISessionLaunchInput, AISessionLaunchResult, EmbeddedAISessionResult } from '../../lib/types';
+import type { AICapability, AIPlanPreset, AISessionEligibility, AISettings, AISessionLaunchInput, AISessionLaunchResult, EmbeddedAISessionResult } from '../../lib/types';
 
 export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched }: { itemId: string; preference?: AISessionLaunchInput | null; onClose: () => void; onLaunched: (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => void }) {
   const [settings, setSettings] = useState<AISettings | null>(null);
   const [capabilities, setCapabilities] = useState<AICapability[]>([]);
+  const [presets, setPresets] = useState<AIPlanPreset[]>([]);
   const [eligibility, setEligibility] = useState<AISessionEligibility | null>(null);
   const [provider, setProvider] = useState('');
   const [terminal, setTerminal] = useState('');
   const [contextMode, setContextMode] = useState<AISessionLaunchInput['contextMode']>('card_context');
+  const [presetId, setPresetId] = useState('');
+  const [customPrompt, setCustomPrompt] = useState('');
 	const [surface, setSurface] = useState<'external' | 'embedded'>('external');
   const [loading, setLoading] = useState(true);
   const [launching, setLaunching] = useState(false);
@@ -19,14 +22,17 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 
   useEffect(() => {
     let active = true;
-    Promise.all([api.aiSettings(), api.aiCapabilities(), api.aiSessionEligibility(itemId)]).then(([nextSettings, nextCapabilities, nextEligibility]) => {
+    Promise.all([api.aiSettings(), api.aiCapabilities(), api.aiPresets(), api.aiSessionEligibility(itemId)]).then(([nextSettings, nextCapabilities, nextPresets, nextEligibility]) => {
       if (!active) return;
       setSettings(nextSettings);
       setCapabilities(nextCapabilities);
+      setPresets(nextPresets);
       setEligibility(nextEligibility);
       setProvider(preference?.provider ?? nextSettings.defaultProvider);
       setTerminal(preference?.terminal ?? nextSettings.defaultTerminal);
       setContextMode(preference?.contextMode ?? 'card_context');
+      setPresetId(preference?.presetId ?? nextPresets[0]?.id ?? '');
+      setCustomPrompt(preference?.customPrompt ?? '');
 			setSurface(preference?.surface ?? 'external');
     }).catch((caught) => active && setError(caught instanceof Error ? caught.message : 'AI session options are unavailable.')).finally(() => active && setLoading(false));
     return () => { active = false; };
@@ -37,7 +43,7 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !launching) onClose();
       if (event.key !== 'Tab' || !dialogRef.current) return;
-      const controls = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), select:not([disabled]), input:not([disabled])'));
+      const controls = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled])'));
       if (controls.length === 0) return;
       const first = controls[0];
       const last = controls[controls.length - 1];
@@ -52,10 +58,11 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
     setLaunching(true);
     setError('');
     try {
-		const input = { provider, terminal, contextMode, surface };
+		const promptInput = { presetId: presetId || undefined, customPrompt: presetId ? undefined : customPrompt.trim() || undefined };
+		const input = { provider, terminal, contextMode, surface, ...promptInput };
 		const result = surface === 'embedded'
-			? await api.startEmbeddedAISession(itemId, { provider, contextMode, columns: 80, rows: 24 })
-			: await api.launchAISession(itemId, { provider, terminal, contextMode });
+			? await api.startEmbeddedAISession(itemId, { provider, contextMode, ...promptInput, columns: 80, rows: 24 })
+			: await api.launchAISession(itemId, { provider, terminal, contextMode, ...promptInput });
 		onLaunched(result, input);
       onClose();
     } catch (caught) {
@@ -82,6 +89,14 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
           <fieldset><legend>Session context</legend><label><input type="radio" name="ai-context" checked={contextMode === 'workspace_only'} onChange={() => setContextMode('workspace_only')} /> Workspace only — start with a free prompt</label><label><input type="radio" name="ai-context" checked={contextMode === 'card_context'} disabled={!eligibility.cardContextAvailable} aria-describedby="card-context-readiness" onChange={() => setContextMode('card_context')} /> Selected card — provide its path and related documents</label></fieldset>
           {contextMode === 'workspace_only' && <p className="eligibility-ready">No card context will be injected. The AI opens at the workspace root so you can manually reference any relevant file or directory.</p>}
           {contextMode === 'card_context' && <p id="card-context-readiness" className={eligibility.cardContextAvailable ? 'eligibility-ready' : 'eligibility-blocked'}>{eligibility.cardContextAvailable ? 'The selected card path will be provided as context. The AI will read relevant documents from that path and wait for your request.' : `Card context unavailable: ${eligibility.missing.join(', ') || 'the card is not available in the working tree'}.`}</p>}
+          <label>AI prompt<select value={presetId} onChange={(event) => {
+            setPresetId(event.target.value);
+            if (event.target.value) setCustomPrompt('');
+          }}>
+            {presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
+            <option value="">Free prompt</option>
+          </select></label>
+          {!presetId && <label>Free prompt<textarea rows={4} value={customPrompt} onChange={(event) => setCustomPrompt(event.target.value)} placeholder="Tell the AI what to do with this item." /></label>}
           {!eligibility.editable && contextMode !== 'workspace_only' && <p className="error">Card context requires an editable working-tree item.</p>}
 			{(providers.length === 0 || (surface === 'external' && terminals.length === 0)) && <p className="error">Enable and detect the tools required for this session in Settings.</p>}
         </div>}

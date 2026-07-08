@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/workspace/files"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/workspace/files"
 )
 
 type fakeRegistry struct{ workspaces []models.WorkspaceConfig }

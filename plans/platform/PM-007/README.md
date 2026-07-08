@@ -64,7 +64,7 @@ PM-007 adds a global filesystem explorer for every registered workspace. Kanban 
 
 ```text
 Workspace Explorer
-├── Plan Manager
+├── Kode Stream
 │   ├── cmd/
 │   ├── docs/
 │   ├── internal/

@@ -14,8 +14,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
 )
 
 const (

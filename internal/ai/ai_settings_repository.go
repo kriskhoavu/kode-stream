@@ -21,6 +21,7 @@ var (
 	allowedPlaceholders = map[string]bool{
 		"workspace": true, "contextFile": true, "itemPath": true,
 		"identifier": true, "contextMode": true, "intent": true,
+		"prompt": true,
 	}
 	placeholderPattern = regexp.MustCompile(`\{([^{}]+)\}`)
 )

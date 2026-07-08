@@ -214,6 +214,14 @@ export interface AISettings {
   terminals: Record<string, AILaunchTemplate>;
 }
 
+export interface AIPlanPreset {
+  id: string;
+  name: string;
+  prompt: string;
+  contextMode: AISessionLaunchInput['contextMode'];
+  provider?: string;
+}
+
 export interface AISessionEligibility {
   editable: boolean;
   cardContextAvailable: boolean;
@@ -224,6 +232,8 @@ export interface AISessionLaunchInput {
   provider: string;
   terminal: string;
   contextMode: 'workspace_only' | 'card_context';
+	presetId?: string;
+	customPrompt?: string;
 	surface?: 'external' | 'embedded';
 }
 
@@ -383,7 +393,7 @@ export interface BranchScanMetadata {
   warnings: { itemPath?: string; message: string }[];
 }
 
-export interface BranchLoadResult {
+export interface WorkstreamBranchLoadResult {
   workspaceId: string;
   branch: string;
   selectedBranch: string;
@@ -544,6 +554,8 @@ export interface NewItemInput {
   status?: ItemStatus;
   owner?: string;
   tags?: string[];
+  jiraKey?: string;
+  initialReadme?: string;
 }
 
 export interface WriteResult {

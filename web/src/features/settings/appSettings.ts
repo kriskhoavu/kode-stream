@@ -5,11 +5,11 @@ import type { ItemStatus } from '../../lib/types';
 const storageKey = 'planManager.appSettings';
 
 export interface AppSettings {
-  visibleKanbanStatuses: ItemStatus[];
+  visibleWorkstreamStatuses: ItemStatus[];
 }
 
 export const defaultAppSettings: AppSettings = {
-  visibleKanbanStatuses: [...statusOrder]
+  visibleWorkstreamStatuses: [...statusOrder]
 };
 
 export function useAppSettings(): [AppSettings, (settings: AppSettings) => void] {
@@ -33,9 +33,9 @@ export function loadAppSettings(): AppSettings {
 }
 
 function normalizeAppSettings(settings: Partial<AppSettings>): AppSettings {
-  const visible = new Set(settings.visibleKanbanStatuses);
-  const visibleKanbanStatuses = statusOrder.filter((status) => visible.has(status));
+  const visible = new Set(settings.visibleWorkstreamStatuses);
+  const visibleWorkstreamStatuses = statusOrder.filter((status) => visible.has(status));
   return {
-    visibleKanbanStatuses: visibleKanbanStatuses.length > 0 ? visibleKanbanStatuses : [...statusOrder]
+    visibleWorkstreamStatuses: visibleWorkstreamStatuses.length > 0 ? visibleWorkstreamStatuses : [...statusOrder]
   };
 }

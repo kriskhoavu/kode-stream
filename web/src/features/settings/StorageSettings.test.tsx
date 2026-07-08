@@ -21,6 +21,6 @@ describe('StorageSettings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save storage settings' }));
 
     await waitFor(() => expect(api.updateSystemConfigPaths).toHaveBeenCalledWith({ dataDir: '/new' }));
-    expect(await screen.findByText(/Restart Plan Manager/)).toBeInTheDocument();
+    expect(await screen.findByText(/Restart Kode Stream/)).toBeInTheDocument();
   });
 });

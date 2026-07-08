@@ -2,7 +2,7 @@
 
 ## Goals
 
-- Run a local HTTP API for Plan Manager.
+- Run a local HTTP API for Kode Stream.
 - Register, edit, and remove local Git repositories.
 - Scan structured plan folders and freestyle documentation roots without writing to managed repositories.
 - Serve board, workspace, file, and diff data.

@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 import { AISessionLaunchDialog } from './AISessionLaunchDialog';
 
 vi.mock('../../lib/api', () => ({ api: {
-  aiSettings: vi.fn(), aiCapabilities: vi.fn(), aiSessionEligibility: vi.fn(), launchAISession: vi.fn(), startEmbeddedAISession: vi.fn()
+  aiSettings: vi.fn(), aiCapabilities: vi.fn(), aiPresets: vi.fn(), aiSessionEligibility: vi.fn(), launchAISession: vi.fn(), startEmbeddedAISession: vi.fn()
 } }));
 
 function mockOptions(cardContextAvailable = true) {
@@ -16,6 +16,10 @@ function mockOptions(cardContextAvailable = true) {
   vi.mocked(api.aiCapabilities).mockResolvedValue([
     { id: 'codex', kind: 'provider', detected: true, configured: true, executable: '/bin/codex' },
     { id: 'terminal', kind: 'terminal', detected: true, configured: true, executable: '/Terminal.app' }
+  ]);
+  vi.mocked(api.aiPresets).mockResolvedValue([
+    { id: 'implementation-plan', name: 'Create implementation plan', prompt: 'Create a plan', contextMode: 'card_context' },
+    { id: 'technical-design', name: 'Create technical design', prompt: 'Create a design', contextMode: 'card_context' }
   ]);
   vi.mocked(api.aiSessionEligibility).mockResolvedValue({ editable: cardContextAvailable, cardContextAvailable, missing: cardContextAvailable ? [] : ['editable working-tree item'] });
 }
@@ -30,7 +34,7 @@ describe('AISessionLaunchDialog', () => {
     render(<AISessionLaunchDialog itemId="item-1" onClose={onClose} onLaunched={vi.fn()} />);
     expect(await screen.findByText(/selected card path will be provided/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
-    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', terminal: 'terminal', contextMode: 'card_context' }));
+    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', terminal: 'terminal', contextMode: 'card_context', presetId: 'implementation-plan', customPrompt: undefined }));
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -64,7 +68,18 @@ describe('AISessionLaunchDialog', () => {
     expect(screen.getByText(/no card context will be injected/i)).toBeInTheDocument();
     expect(screen.queryByText(/selected card path will be provided/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
-    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('snapshot', { provider: 'codex', terminal: 'terminal', contextMode: 'workspace_only' }));
+    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('snapshot', { provider: 'codex', terminal: 'terminal', contextMode: 'workspace_only', presetId: 'implementation-plan', customPrompt: undefined }));
+  });
+
+  it('passes a free prompt when selected', async () => {
+    mockOptions();
+    vi.mocked(api.launchAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', contextMode: 'card_context', startedAt: '2026-07-02T00:00:00Z' });
+    render(<AISessionLaunchDialog itemId="item-1" onClose={vi.fn()} onLaunched={vi.fn()} />);
+    await screen.findByText(/selected card path/i);
+    fireEvent.change(screen.getByLabelText('AI prompt'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Free prompt'), { target: { value: 'Use the Jira context first.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
+    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', terminal: 'terminal', contextMode: 'card_context', presetId: undefined, customPrompt: 'Use the Jira context first.' }));
   });
 
 	it('starts an embedded session without requiring an external terminal', async () => {
@@ -75,7 +90,7 @@ describe('AISessionLaunchDialog', () => {
 		fireEvent.click(await screen.findByLabelText('Embedded terminal'));
 		expect(screen.queryByLabelText('Terminal')).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
-		await waitFor(() => expect(api.startEmbeddedAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', contextMode: 'card_context', columns: 80, rows: 24 }));
+		await waitFor(() => expect(api.startEmbeddedAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', contextMode: 'card_context', presetId: 'implementation-plan', customPrompt: undefined, columns: 80, rows: 24 }));
 		expect(launched).toHaveBeenCalledWith(expect.objectContaining({ session: expect.objectContaining({ id: 'session-1' }) }), expect.objectContaining({ surface: 'embedded' }));
 	});
 });

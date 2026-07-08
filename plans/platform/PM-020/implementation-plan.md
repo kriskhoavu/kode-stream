@@ -55,7 +55,7 @@ Add bounded embedded AI terminals using PM-018 contracts while retaining externa
 - [x] Confirm session grants and terminal content never enter logs or audit payloads.
 - [x] Update architecture, requirements baseline, security guidance, and user documentation.
 
-**Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/plan-manager`
+**Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/kode-stream`
 
 **Commit:** `PM-020: Verify embedded AI terminal`
 

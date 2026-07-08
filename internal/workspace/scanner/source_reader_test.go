@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	gitadapter "plan-manager/internal/git"
+	gitadapter "kode-stream/internal/git"
 )
 
 func TestFilesystemSourceReaderReadsRelativeWorkspacePaths(t *testing.T) {
@@ -111,8 +111,8 @@ func newReaderGitRepo(t *testing.T) string {
 	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
-	readerGitRun(t, root, "config", "user.name", "Plan Manager")
-	readerGitRun(t, root, "config", "user.email", "plan-manager@example.test")
+	readerGitRun(t, root, "config", "user.name", "Kode Stream")
+	readerGitRun(t, root, "config", "user.email", "kode-stream@example.test")
 	return root
 }
 

@@ -17,8 +17,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/pathguard"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/pathguard"
 )
 
 type Access struct{}

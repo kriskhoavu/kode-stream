@@ -6,8 +6,8 @@
 - Frontend typecheck: `npm run typecheck`
 - Frontend tests: `npm test`
 - Frontend production build: `npm run build`
-- Local binary build: `go build ./cmd/plan-manager`
-- Run app: `./plan-manager serve -port 4317`
+- Local binary build: `go build ./cmd/kode-stream`
+- Run app: `./kode-stream serve -port 4317`
 
 ## Embedded AI Terminal Checklist
 
@@ -20,7 +20,7 @@
 ## Playwright Acceptance Checklist
 
 - Register this repository with `plans` as the Plan Directory.
-- Run Scan and confirm PM-001 appears on the Kanban board.
+- Run Scan and confirm PM-001 appears in the Workstream board view.
 - Filter by repository, branch, status, and text.
 - Open PM-001 and confirm file tree, raw Markdown, preview, metadata, and diff tabs.
 - Capture desktop screenshot at 1536 x 1024.
@@ -35,7 +35,7 @@ After scan, run:
 git status --short
 ```
 
-Managed repositories must not show new changes caused by Plan Manager scanning.
+Managed repositories must not show new changes caused by Kode Stream scanning.
 
 ## Existing Workspace Import Checklist
 

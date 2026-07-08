@@ -7,31 +7,31 @@ import type { AICapabilityKind, AILaunchTemplate, AISettings } from '../lib/type
 import { StorageSettings } from '../features/settings/StorageSettings';
 
 export function SettingsPage({ settings, onChange }: { settings: AppSettings; onChange: (settings: AppSettings) => void }) {
-  const visible = new Set(settings.visibleKanbanStatuses);
+  const visible = new Set(settings.visibleWorkstreamStatuses);
   const ai = useAISettings();
 
   const toggleStatus = (status: ItemStatus) => {
     const next = visible.has(status)
-      ? settings.visibleKanbanStatuses.filter((item) => item !== status)
+      ? settings.visibleWorkstreamStatuses.filter((item) => item !== status)
       : statusOrder.filter((item) => item === status || visible.has(item));
-    onChange({ ...settings, visibleKanbanStatuses: next.length > 0 ? next : [status] });
+    onChange({ ...settings, visibleWorkstreamStatuses: next.length > 0 ? next : [status] });
   };
 
   return (
     <section className="settings-page">
       <header className="settings-title">
         <h1><SettingsIcon size={22} /> Settings</h1>
-        <p>Configure how Plan Manager presents workspace and board metadata.</p>
+        <p>Configure how Kode Stream presents workspace and board metadata.</p>
       </header>
 
       <section className="settings-section">
         <header>
           <div>
-            <span className="settings-group-label">Kanban board</span>
+            <span className="settings-group-label">Board View</span>
             <h2>Status columns</h2>
-            <p>Show or hide the statuses that appear as Kanban columns.</p>
+            <p>Show or hide the statuses that appear as board columns.</p>
           </div>
-          <span className="settings-count">{settings.visibleKanbanStatuses.length} visible</span>
+          <span className="settings-count">{settings.visibleWorkstreamStatuses.length} visible</span>
         </header>
         <div className="settings-toggle-list">
           {statusOrder.map((status) => (

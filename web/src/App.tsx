@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Bell, BookOpen, ChevronDown, KanbanSquare, Moon, Plus, Search, Sun, Boxes, FolderGit2, FolderTree, Settings } from 'lucide-react';
+import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Plus, Search, Sun, Boxes, FolderGit2, FolderTree, Settings } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
 export { routeFromLocation } from './app/router';
-import { KanbanPage } from './pages/KanbanPage';
+import { WorkstreamPage } from './pages/WorkstreamPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -14,7 +14,7 @@ import { useQuickSwitcher } from './features/search/hooks';
 import { useAppSettings } from './features/settings/appSettings';
 import { EmbeddedTerminalDock } from './features/ai-session/EmbeddedTerminalDock';
 
-const WorkspaceExplorerPage = lazy(() => import('./pages/WorkspaceExplorerPage').then((module) => ({ default: module.WorkspaceExplorerPage })));
+const WorkstreamExplorer = lazy(() => import('./pages/WorkstreamExplorer').then((module) => ({ default: module.WorkstreamExplorer })));
 const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((module) => ({ default: module.KnowledgePage })));
 
 export function App() {
@@ -69,12 +69,12 @@ export function App() {
     setWorkspaceMenuOpen(false);
   };
 
-  const openWorkspaceKanban = (repo: WorkspaceConfig, itemId?: string) => {
+  const openWorkstream = (repo: WorkspaceConfig, itemId?: string) => {
     selectWorkspaceState(repo);
-    navigate({ name: 'kanban', focusedItemId: itemId });
+    navigate({ name: 'workstream', focusedItemId: itemId });
   };
 
-  const openWorkspaceExplorer = (workspaceId: string, path: string) => {
+  const openWorkstreamExplorer = (workspaceId: string, path: string) => {
     const workspace = workspaces.find((repo) => repo.id === workspaceId);
     if (workspace) selectWorkspaceState(workspace);
     navigate({ name: 'explorer', location: { workspaceId, path, mode: 'sources' } });
@@ -89,13 +89,13 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="left-nav">
-        <button className="brand" onClick={() => navigate({ name: 'kanban' })} aria-label="Plan Manager home">
+        <button className="brand" onClick={() => navigate({ name: 'workstream' })} aria-label="Kode Stream home">
           <Boxes size={20} />
-          <span>Plan Manager</span>
+          <span>Kode Stream</span>
         </button>
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>
-          <NavButton active={route.name === 'kanban'} onClick={() => navigate({ name: 'kanban' })} icon={<KanbanSquare size={18} />} label="Kanban" />
+          <NavButton active={route.name === 'workstream'} onClick={() => navigate({ name: 'workstream' })} icon={<WorkstreamIcon size={18} />} label="Workstream" />
           <NavButton active={route.name === 'explorer'} onClick={() => navigate({ name: 'explorer' })} icon={<FolderTree size={18} />} label="Explorer" />
           <NavButton active={route.name === 'knowledge'} onClick={() => navigate({ name: 'knowledge' })} icon={<BookOpen size={18} />} label="Knowledge" />
         </div>
@@ -127,7 +127,7 @@ export function App() {
       <header className="topbar">
         <div className="workspace-switcher" ref={workspaceMenuRef}>
           <button className="workspace-title" type="button" onClick={() => setWorkspaceMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={workspaceMenuOpen}>
-            <KanbanSquare size={16} />
+            <WorkstreamIcon size={16} />
             <span>{activeRepo?.name ?? 'No workspace selected'}</span>
             <ChevronDown className={workspaceMenuOpen ? 'workspace-title-chevron open' : 'workspace-title-chevron'} size={15} />
           </button>
@@ -221,26 +221,26 @@ export function App() {
       }} />}
 
       <main className="main-content">
-        {route.name === 'kanban' && (
-          <KanbanPage
+        {route.name === 'workstream' && (
+          <WorkstreamPage
             workspace={activeRepo}
             refreshKey={contentRefreshKey}
-            visibleStatuses={appSettings.visibleKanbanStatuses}
+            visibleStatuses={appSettings.visibleWorkstreamStatuses}
             focusedItemId={route.focusedItemId}
-            onOpenPlan={(itemId) => navigate({ name: 'workspace', itemId })}
+            onOpenPlan={(itemId) => navigate({ name: 'item', itemId })}
             onWorkspacesChanged={() => refreshAppData()}
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
           />
         )}
-        {route.name === 'workspace' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly()} />}
+        {route.name === 'item' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'workstream' })} onContentChanged={() => refreshAppStateOnly()} />}
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData()} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
-        {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkspaceExplorerPage workspaces={activeRepo ? [activeRepo] : []} location={explorerLocation} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenKanban={openWorkspaceKanban} /></Suspense>}
-        {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} onOpenExplorer={openWorkspaceExplorer} /></Suspense>}
+        {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkstreamExplorer workspaces={activeRepo ? [activeRepo] : []} location={explorerLocation} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenWorkstream={openWorkstream} /></Suspense>}
+        {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} onOpenExplorer={openWorkstreamExplorer} /></Suspense>}
       </main>
 
       <nav className="bottom-nav">
-        <button className={route.name === 'kanban' ? 'active' : ''} onClick={() => navigate({ name: 'kanban' })}><KanbanSquare size={18} />Kanban</button>
+        <button className={route.name === 'workstream' ? 'active' : ''} onClick={() => navigate({ name: 'workstream' })}><WorkstreamIcon size={18} />Workstream</button>
         <button className={route.name === 'explorer' ? 'active' : ''} onClick={() => navigate({ name: 'explorer' })}><FolderTree size={18} />Explorer</button>
         <button className={route.name === 'knowledge' ? 'active' : ''} onClick={() => navigate({ name: 'knowledge' })}><BookOpen size={18} />Knowledge</button>
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>

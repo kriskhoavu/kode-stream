@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { BranchLoadResult, ItemSummary } from '../lib/types';
-import { KanbanPage } from './KanbanPage';
+import type { WorkstreamBranchLoadResult, ItemSummary } from '../lib/types';
+import { WorkstreamPage } from './WorkstreamPage';
 
 const workspace = { id: 'workspace-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans', 'docs'], createdAt: '2026-06-23T00:00:00Z' };
 const items: ItemSummary[] = [
@@ -24,7 +24,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Kanban card drag and drop', () => {
+describe('Workstream card drag and drop', () => {
   it('marks only editable cards as draggable without rendering a drag control', async () => {
     vi.stubGlobal('fetch', boardFetchMock());
     renderPage();
@@ -185,11 +185,11 @@ describe('Kanban card drag and drop', () => {
 });
 
 function renderPage() {
-  return render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+  return render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 }
 
 function column(name: string): HTMLElement {
-  const element = screen.getByRole('heading', { name }).closest('.kanban-column');
+  const element = screen.getByRole('heading', { name }).closest('.workstream-column');
   if (!element) throw new Error(`Missing ${name} column`);
   return element as HTMLElement;
 }
@@ -223,7 +223,7 @@ function createDataTransfer(): DataTransfer {
 function boardFetchMock(boardItems: ItemSummary[] = items) {
   return vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
-    if (url === '/api/workspaces/workspace-1/kanban/branch') return Promise.resolve(response(branchLoadResult(boardItems)));
+    if (url === '/api/workspaces/workspace-1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult(boardItems)));
     if (url.startsWith('/api/items?')) return Promise.resolve(response(boardItems));
     if (url === '/api/saved-filters') return Promise.resolve(response([]));
     if (url === '/api/items/item-1') return Promise.resolve(response({ ...boardItems[0], documents: [], metadata: {}, counts: { files: 0 } }));
@@ -245,7 +245,7 @@ function statusRequestBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, 
   return JSON.parse(String(call?.[1]?.body ?? '{}')) as Record<string, unknown>;
 }
 
-function branchLoadResult(items: ItemSummary[]): BranchLoadResult {
+function workstreamBranchLoadResult(items: ItemSummary[]): WorkstreamBranchLoadResult {
   return {
     workspaceId: workspace.id,
     branch: 'main',

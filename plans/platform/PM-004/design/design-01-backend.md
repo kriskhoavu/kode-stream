@@ -42,7 +42,7 @@ PM-004 adds backend support for audit events, workspace health checks, operation
 ## Storage
 
 ```text
-<user-config-dir>/plan-manager/
+<user-config-dir>/kode-stream/
   audit-log.jsonl
   workspaces.yaml
   item-index.yaml

@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/workspace/registry"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/workspace/registry"
 )
 
 type IssueState struct {
@@ -74,10 +74,25 @@ func (s *Service) Issue(ctx context.Context, itemID string, refresh bool) (Issue
 	if !found {
 		return IssueState{}, errors.New("workspace not found")
 	}
+	return s.issueByKey(ctx, workspace, item.Identifier, refresh)
+}
+
+func (s *Service) WorkspaceIssue(ctx context.Context, workspaceID, issueKey string, refresh bool) (IssueState, error) {
+	workspace, found, err := s.registry.Get(workspaceID)
+	if err != nil {
+		return IssueState{}, err
+	}
+	if !found {
+		return IssueState{}, errors.New("workspace not found")
+	}
+	return s.issueByKey(ctx, workspace, issueKey, refresh)
+}
+
+func (s *Service) issueByKey(ctx context.Context, workspace models.WorkspaceConfig, issueKey string, refresh bool) (IssueState, error) {
 	if workspace.Jira == nil {
 		return IssueState{State: "not_configured", Message: "Jira is not configured for this workspace"}, nil
 	}
-	key := strings.ToUpper(strings.TrimSpace(item.Identifier))
+	key := strings.ToUpper(strings.TrimSpace(issueKey))
 	project := workspace.Jira.ProjectKey
 	if !regexp.MustCompile(`^[A-Z][A-Z0-9_]*-[1-9][0-9]*$`).MatchString(key) {
 		return IssueState{State: "invalid_identifier", Message: "Item identifier is not a Jira issue key"}, nil
@@ -106,7 +121,7 @@ func (s *Service) Issue(ctx context.Context, itemID string, refresh bool) (Issue
 	case errors.Is(err, ErrAuthentication):
 		state.State = "authentication_failed"
 		state.Message = err.Error()
-		state.RecoveryHint = "Check the configured token environment variable and restart Plan Manager."
+		state.RecoveryHint = "Check the configured token environment variable and restart Kode Stream."
 	case errors.Is(err, ErrForbidden):
 		state.State = "forbidden"
 		state.Message = err.Error()

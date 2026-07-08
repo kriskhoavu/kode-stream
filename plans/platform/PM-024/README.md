@@ -1,6 +1,6 @@
 # PM-024: Import Existing Workspaces
 
-PM-024 adds **Existing Workspaces** as a third Add Workspace mode. A user selects a predefined `workspaces.yaml`, reviews validation and configuration for every entry, selects the entries to keep, and confirms one import. Plan Manager writes valid selections into its effective OS-specific `workspaces.yaml`, then scans and indexes each new workspace.
+PM-024 adds **Existing Workspaces** as a third Add Workspace mode. A user selects a predefined `workspaces.yaml`, reviews validation and configuration for every entry, selects the entries to keep, and confirms one import. Kode Stream writes valid selections into its effective OS-specific `workspaces.yaml`, then scans and indexes each new workspace.
 
 ## Scope
 
@@ -29,7 +29,7 @@ PM-024 adds **Existing Workspaces** as a third Add Workspace mode. A user select
 |---------------------|-----------------------------------------------------------------------|----------------------------|
 | Existing Workspaces | Add Workspace mode that imports registrations from a predefined file  | `existing_workspace`       |
 | Import Source       | User-selected, read-only YAML file                                    | `sourcePath`               |
-| Effective Registry  | Active OS-specific or overridden Plan Manager workspace configuration | `Paths.RegistryFile`       |
+| Effective Registry  | Active OS-specific or overridden Kode Stream workspace configuration | `Paths.RegistryFile`       |
 | Import Preview      | Read-only candidate list with normalized configuration and validation | `WorkspaceImportPreview`   |
 | Candidate           | One source-file entry considered for import                           | `WorkspaceImportCandidate` |
 | Candidate Key       | Stable digest used to select the same entry during confirmation       | `candidateKey`             |
@@ -68,11 +68,11 @@ Imports always merge into `Paths.RegistryFile`. With no override this resolves f
 
 | OS      | Typical effective registry path                                                 |
 |---------|---------------------------------------------------------------------------------|
-| macOS   | `~/Library/Application Support/plan-manager/workspaces.yaml`                    |
-| Linux   | `$XDG_CONFIG_HOME/plan-manager/workspaces.yaml` or `~/.config/plan-manager/...` |
-| Windows | `%AppData%\plan-manager\workspaces.yaml`                                        |
+| macOS   | `~/Library/Application Support/kode-stream/workspaces.yaml`                    |
+| Linux   | `$XDG_CONFIG_HOME/kode-stream/workspaces.yaml` or `~/.config/kode-stream/...` |
+| Windows | `%AppData%\kode-stream\workspaces.yaml`                                        |
 
-`PLAN_MANAGER_DATA_DIR` or `bootstrap.yaml` may override the data directory. The preview must display the actual backend-resolved destination rather than constructing an OS path in the browser.
+`KODE_STREAM_DATA_DIR` or `bootstrap.yaml` may override the data directory. The preview must display the actual backend-resolved destination rather than constructing an OS path in the browser.
 
 ## Design Decisions
 

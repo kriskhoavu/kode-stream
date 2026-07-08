@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	apperrors "plan-manager/internal/common"
-	"plan-manager/internal/common/httpx"
-	"plan-manager/internal/common/models"
+	apperrors "kode-stream/internal/common"
+	"kode-stream/internal/common/httpx"
+	"kode-stream/internal/common/models"
 )
 
 type ItemReader interface {
@@ -138,5 +138,5 @@ func (c *NavigationController) respond(w http.ResponseWriter, data any, err erro
 }
 
 func validAppRoute(route string) bool {
-	return route == "/kanban" || route == "/items" || route == "/branches" || route == "/workspaces" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/kanban?") || strings.HasPrefix(route, "/knowledge?")
+	return route == "/workspace" || route == "/items" || route == "/branches" || route == "/workspaces" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/workspace?") || strings.HasPrefix(route, "/knowledge?")
 }

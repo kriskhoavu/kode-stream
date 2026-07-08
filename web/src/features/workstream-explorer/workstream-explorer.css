@@ -1,4 +1,4 @@
-.workspace-explorer-page {
+.workstream-explorer-page {
   height: calc(100vh - 108px);
   min-height: 620px;
   display: flex;
@@ -464,7 +464,7 @@
 }
 
 @media (max-width: 760px) {
-  .workspace-explorer-page {
+  .workstream-explorer-page {
     height: auto;
     min-height: 0;
   }

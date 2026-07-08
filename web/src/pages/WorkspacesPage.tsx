@@ -775,7 +775,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                 {registrationMode === 'remote_clone' && <>
                   <label className="repo-field">Clone Root
                     <div className="path-input-row">
-                      <input value={cloneRoot} onChange={(event) => setCloneRoot(event.target.value)} placeholder={systemConfig?.cloneRootDir ?? '/path/to/plan-manager/clone-root'} />
+                      <input value={cloneRoot} onChange={(event) => setCloneRoot(event.target.value)} placeholder={systemConfig?.cloneRootDir ?? '/path/to/kode-stream/clone-root'} />
                       <button className="secondary icon-action" type="button" onClick={browseCloneRoot} disabled={busy} title="Browse"><FolderOpen size={16} /></button>
                       <button className="secondary icon-action" type="button" onClick={() => revealPath(cloneRoot)} disabled={busy || !cloneRoot} title="Reveal"><ExternalLink size={16} /></button>
                     </div>
@@ -833,7 +833,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               </button>
             </header>
             <p className="modal-help">
-              Define how this source should be split into Kanban items.
+              Define how this source should be split into board items.
             </p>
             {!settingsEditor.exists && settingsEditor.mode === 'structured' && (
               <div className="metadata-callout source-structure-supported">
@@ -1324,7 +1324,7 @@ function JiraConnectionFields({ value, onChange, workspaceId }: { value: JiraCon
       <div className="registration-mode-toggle" role="radiogroup" aria-label="Jira deployment type"><button type="button" role="radio" aria-checked={value.deploymentType === 'cloud'} className={value.deploymentType === 'cloud' ? 'secondary active' : 'secondary'} onClick={() => update({ deploymentType: 'cloud' })}>Cloud</button><button type="button" role="radio" aria-checked={value.deploymentType === 'server'} className={value.deploymentType === 'server' ? 'secondary active' : 'secondary'} onClick={() => update({ deploymentType: 'server', accountEmail: '' })}>Server / Data Center</button></div>
       <div className="repo-field-grid"><label className="repo-field">Base URL<input aria-label="Jira base URL" value={value.baseUrl} onChange={(event) => update({ baseUrl: event.target.value })} placeholder="https://company.atlassian.net" /></label><label className="repo-field">Project Key<input aria-label="Jira project key" value={value.projectKey} onChange={(event) => update({ projectKey: event.target.value.toUpperCase() })} placeholder="DI" /></label></div>
       {value.deploymentType === 'cloud' && <label className="repo-field">Account Email<input aria-label="Jira account email" value={value.accountEmail ?? ''} onChange={(event) => update({ accountEmail: event.target.value })} /></label>}
-      <label className="repo-field">Token Environment Variable<input aria-label="Jira token environment variable" value={value.tokenEnvVar} onChange={(event) => update({ tokenEnvVar: event.target.value })} /><small>Store the token in this environment variable before starting Plan Manager.</small></label>
+      <label className="repo-field">Token Environment Variable<input aria-label="Jira token environment variable" value={value.tokenEnvVar} onChange={(event) => update({ tokenEnvVar: event.target.value })} /><small>Store the token in this environment variable before starting Kode Stream.</small></label>
       {workspaceId && <div className="jira-test-row"><button className="secondary" type="button" disabled={testing} onClick={() => void test()}>{testing ? 'Testing...' : 'Test Jira connection'}</button>{result && <span className={`jira-connection-status ${resultTone ?? 'success'}`} role="status"><span className={`jira-connection-status-dot ${resultTone ?? 'success'}`} aria-hidden="true" />{result}</span>}</div>}
     </>}
   </section>;

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document evaluates a Chrome extension as a companion surface for Plan Manager. It is explicitly not a replacement for the local CLI runtime.
+This document evaluates a Chrome extension as a companion surface for Kode Stream. It is explicitly not a replacement for the local CLI runtime.
 
 ## Constraints
 
@@ -18,7 +18,7 @@ This document evaluates a Chrome extension as a companion surface for Plan Manag
 | Component                 | Responsibility                                                    |
 |--------------------------|-------------------------------------------------------------------|
 | Chrome extension UI      | Capture browser context and trigger user workflows                |
-| Local Plan Manager CLI   | Own all file operations, plan generation, and Git operations      |
+| Local Kode Stream CLI   | Own all file operations, plan generation, and Git operations      |
 | Local bridge             | Native messaging host or localhost API bound to `127.0.0.1`       |
 
 ## Scope Recommendation

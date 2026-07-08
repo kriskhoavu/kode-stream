@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	gitadapter "plan-manager/internal/git"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/workspace/scanner"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	gitadapter "kode-stream/internal/git"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/workspace/scanner"
 )
 
 func TestSaveMetadataCreatesPlanYAML(t *testing.T) {
@@ -156,6 +156,87 @@ func TestCreateItemWritesOnlyEmptyReadme(t *testing.T) {
 	}
 	if len(data) != 0 {
 		t.Fatalf("expected an empty README.md, got %q", data)
+	}
+}
+
+func TestCreateJiraBackedItemWritesReadmeAndMetadata(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "items"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	writer := New(fileaccess.New(), nil, nil, nil)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	if _, err := writer.CreateItem(workspace, models.NewItemInput{
+		Source:        "items",
+		Scope:         "platform",
+		Identifier:    "PM-025",
+		Title:         "Jira First Workspace",
+		Status:        models.StatusInProgress,
+		Owner:         "Kim",
+		Tags:          []string{"jira", "jira", "planning"},
+		JiraKey:       "PM-025",
+		InitialReadme: "# PM-025: Jira First Workspace\n\n## Jira Context\n\nTicket summary.\n",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	itemRoot := filepath.Join(root, "items", "platform", "PM-025")
+	readme, err := os.ReadFile(filepath.Join(itemRoot, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(readme); !strings.Contains(got, "## Jira Context") || !strings.Contains(got, "Ticket summary.") {
+		t.Fatalf("README content = %q", got)
+	}
+	data, err := os.ReadFile(filepath.Join(itemRoot, "plan.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{"status: in_progress", "owner: Kim", "- jira", "- planning"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("plan.yaml missing %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "identifier:") || strings.Contains(text, "scope:") || strings.Contains(text, "title:") {
+		t.Fatalf("plan.yaml should remain compact:\n%s", text)
+	}
+}
+
+func TestCreateJiraBackedItemRefreshesIndex(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	if err := os.MkdirAll(filepath.Join(root, "items"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	git := gitadapter.New()
+	idx := itemindex.New(filepath.Join(t.TempDir(), "index.yaml"))
+	writer := New(fileaccess.New(), scanner.New(git), idx, nil)
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "workspace", Path: root, BaselineBranch: "main", Sources: []string{"items"}}
+	result, err := writer.CreateItem(workspace, models.NewItemInput{
+		Source:        "items",
+		Scope:         "platform",
+		Identifier:    "PM-026",
+		Title:         "Indexed Jira Item",
+		Status:        models.StatusDraft,
+		Tags:          []string{"jira"},
+		JiraKey:       "PM-026",
+		InitialReadme: "# PM-026: Indexed Jira Item\n\nIndexed context.\n",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Item.ID == "" || result.Item.Identifier != "PM-026" {
+		t.Fatalf("result item=%#v", result.Item)
+	}
+	items, err := idx.Query(itemindex.Query{WorkspaceID: workspace.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Identifier != "PM-026" || items[0].Title != "Indexed Jira Item" {
+		t.Fatalf("items=%#v", items)
 	}
 }
 

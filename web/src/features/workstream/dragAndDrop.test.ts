@@ -16,7 +16,7 @@ const item: ItemSummary = {
   metadataSource: 'plan.yaml'
 };
 
-describe('Kanban drag and drop helpers', () => {
+describe('Workstream drag and drop helpers', () => {
   it('allows structured workflow items to move between editable statuses', () => {
     expect(isItemDraggable(item)).toBe(true);
     expect(isDropStatus('review')).toBe(true);

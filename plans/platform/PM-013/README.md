@@ -1,6 +1,6 @@
 # PM-013: Kanban Branch Snapshot Materialization
 
-PM-013 lets Kanban view one selected branch at a time without checking it out. When a user edits content loaded from a non-checkout branch, Plan Manager copies safe plan content into the current checkout branch and applies the edit there.
+PM-013 lets Kanban view one selected branch at a time without checking it out. When a user edits content loaded from a non-checkout branch, Kode Stream copies safe plan content into the current checkout branch and applies the edit there.
 
 ## Related Plans
 
@@ -20,7 +20,7 @@ PM-013 lets Kanban view one selected branch at a time without checking it out. W
 - Keep writes aligned with the current checkout branch.
 - Materialize a structured snapshot plan into the current checkout branch on first edit.
 - Block materialization when target files already exist.
-- Keep Plan Manager writes inside configured sources and detected plan item boundaries.
+- Keep Kode Stream writes inside configured sources and detected plan item boundaries.
 
 ## Out Of Scope
 
@@ -98,7 +98,7 @@ Edit snapshot item
 
 ## Safety Boundary
 
-Plan Manager only owns supported plan content under configured workspace sources. It must never reset, clean, checkout, or restore a whole repository.
+Kode Stream only owns supported plan content under configured workspace sources. It must never reset, clean, checkout, or restore a whole repository.
 
 Allowed write targets must pass all checks:
 

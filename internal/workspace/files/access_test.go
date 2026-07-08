@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
 )
 
 type fakeIgnoreChecker struct {

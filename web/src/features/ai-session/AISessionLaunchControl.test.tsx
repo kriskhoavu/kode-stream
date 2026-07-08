@@ -25,7 +25,7 @@ describe('AISessionLaunchControl', () => {
     expect(screen.getByRole('button', { name: /using saved choice: Codex · iTerm2 · workspace only/i })).toHaveAttribute('title', 'Saved choice: Codex · iTerm2 · workspace only');
     fireEvent.click(screen.getByRole('button', { name: /using saved choice/i }));
 
-    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only' }));
+    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only', presetId: undefined, customPrompt: undefined }));
   });
 
   it('always opens configuration from the settings segment', () => {

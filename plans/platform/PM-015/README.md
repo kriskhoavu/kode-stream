@@ -1,6 +1,6 @@
 # PM-015: Implementation Performance And Render Architecture Review
 
-PM-015 reviews the current Plan Manager backend and frontend implementation and turns the findings into a phased improvement plan. The work focuses on performance, render mechanics, code conventions, design-pattern based decomposition, and future extension points without changing current user workflows.
+PM-015 reviews the current Kode Stream backend and frontend implementation and turns the findings into a phased improvement plan. The work focuses on performance, render mechanics, code conventions, design-pattern based decomposition, and future extension points without changing current user workflows.
 
 ## Related Plans
 

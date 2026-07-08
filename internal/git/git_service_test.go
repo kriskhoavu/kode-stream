@@ -5,7 +5,7 @@ package git
 import (
 	"testing"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 func TestValidatePathsRequiresConfiguredSourcePaths(t *testing.T) {

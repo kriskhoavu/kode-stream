@@ -16,7 +16,7 @@ PM-017 introduces a release architecture that produces reproducible binaries, ch
 
 | Command         | Purpose                                             |
 |-----------------|-----------------------------------------------------|
-| `init`          | Initialize Plan Manager config in local repository  |
+| `init`          | Initialize Kode Stream config in local repository  |
 | `plan create`   | Create a plan artifact locally                      |
 | `plan publish`  | Publish docs/plans through local Git workflow       |
 | `doctor`        | Validate local runtime, auth, and repo access       |

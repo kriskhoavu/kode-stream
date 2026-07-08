@@ -1,6 +1,7 @@
 import type {
   AICapability,
   AISettings,
+  AIPlanPreset,
   AISessionEligibility,
   AISessionLaunchInput,
   AISessionLaunchResult,
@@ -8,7 +9,7 @@ import type {
 	EmbeddedAISessionResult,
   AppState,
   AuditEvent,
-  BranchLoadResult,
+  WorkstreamBranchLoadResult,
   BranchCreateInput,
   BranchSwitchInput,
   FileContent,
@@ -77,19 +78,34 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options?.headers ?? {})
+const inFlightRequests = new Map<string, Promise<unknown>>();
+
+async function request<T>(path: string, options?: RequestInit, dedupe = options?.method === undefined || options.method === 'GET'): Promise<T> {
+  const key = dedupe ? `${options?.method ?? 'GET'} ${path} ${options?.body ?? ''}` : '';
+  const existing = key ? inFlightRequests.get(key) : undefined;
+  if (existing) return existing as Promise<T>;
+
+  const pending = (async () => {
+    const res = await fetch(path, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options?.headers ?? {})
+      }
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog ?? payload.log);
     }
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog ?? payload.log);
+    return payload as T;
+  })();
+
+  if (key) inFlightRequests.set(key, pending);
+  try {
+    return await pending;
+  } finally {
+    if (key && inFlightRequests.get(key) === pending) inFlightRequests.delete(key);
   }
-  return payload as T;
 }
 
 export const api = {
@@ -101,11 +117,12 @@ export const api = {
 	syncKnowledge: (workspaceId: string, confirm = false) => request<KnowledgeActionResult>(`/api/knowledge/workspaces/${encodeURIComponent(workspaceId)}/sync`, { method: 'POST', body: JSON.stringify({ confirm }) }),
 	enrichKnowledge: (workspaceId: string, confirm: boolean) => request<KnowledgeActionResult>(`/api/knowledge/workspaces/${encodeURIComponent(workspaceId)}/enrich`, { method: 'POST', body: JSON.stringify({ confirm }) }),
   aiCapabilities: () => request<AICapability[]>('/api/ai/capabilities'),
+  aiPresets: () => request<AIPlanPreset[]>('/api/ai/presets'),
   aiSettings: () => request<AISettings>('/api/ai/settings'),
   saveAISettings: (settings: AISettings) => request<AISettings>('/api/ai/settings', { method: 'PUT', body: JSON.stringify(settings) }),
   aiSessionEligibility: (itemId: string) => request<AISessionEligibility>(`/api/items/${encodeURIComponent(itemId)}/ai-session-eligibility`),
   launchAISession: (itemId: string, input: AISessionLaunchInput) => request<AISessionLaunchResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions`, { method: 'POST', body: JSON.stringify(input) }),
-	startEmbeddedAISession: (itemId: string, input: Pick<AISessionLaunchInput, 'provider' | 'contextMode'> & { columns?: number; rows?: number }) => request<EmbeddedAISessionResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }),
+	startEmbeddedAISession: (itemId: string, input: Pick<AISessionLaunchInput, 'provider' | 'contextMode' | 'presetId' | 'customPrompt'> & { columns?: number; rows?: number }) => request<EmbeddedAISessionResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }),
 	embeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
 	cancelEmbeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
   state: () => request<AppState>('/api/state'),
@@ -189,16 +206,17 @@ export const api = {
   },
   updateWorkspace: (id: string, input: WorkspaceInput) => request<WorkspaceConfig>(`/api/workspaces/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   testJiraConnection: (workspaceId: string, connection: JiraConnection) => request<JiraConnectionTest>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/test`, { method: 'POST', body: JSON.stringify(connection) }),
+  workspaceJiraIssue: (workspaceId: string, issueKey: string) => request<JiraIssueState>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/issues/${encodeURIComponent(issueKey)}`),
   jiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira`),
   refreshJiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira/refresh`, { method: 'POST' }),
   jiraAttachmentURL: (itemId: string, attachmentId: string) => `/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`,
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
   scan: (workspaceId: string) => request<ScanResult>(`/api/workspaces/${workspaceId}/scan`, { method: 'POST' }),
-  loadKanbanBranch: (workspaceId: string, input: { branch?: string; force?: boolean } = {}) =>
-    request<BranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/kanban/branch`, {
+  loadWorkstreamBranch: (workspaceId: string, input: { branch?: string; force?: boolean } = {}) =>
+    request<WorkstreamBranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/workstream/branch`, {
       method: 'POST',
       body: JSON.stringify(input)
-    }).then(normalizeBranchLoadResult),
+    }, true).then(normalizeWorkstreamBranchLoadResult),
   workspaceHealth: (workspaceId: string) => request<WorkspaceHealth>(`/api/workspaces/${workspaceId}/health`).then(normalizeWorkspaceHealth),
   sourceStructure: (workspaceId: string, directory: string) =>
     request<SourceSettingsResult>(`/api/workspaces/${workspaceId}/source-structure?directory=${encodeURIComponent(directory)}`),
@@ -424,7 +442,7 @@ function normalizeItem(item: ItemSummary): ItemSummary {
   };
 }
 
-function normalizeBranchLoadResult(result: BranchLoadResult): BranchLoadResult {
+function normalizeWorkstreamBranchLoadResult(result: WorkstreamBranchLoadResult): WorkstreamBranchLoadResult {
   if (Array.isArray(result)) {
     const items = result.map(normalizeItem);
     const branch = items[0]?.branch ?? '';

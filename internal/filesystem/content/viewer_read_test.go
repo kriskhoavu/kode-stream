@@ -10,7 +10,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 func TestReadFileContentReturnsViewerMetadata(t *testing.T) {

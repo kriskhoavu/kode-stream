@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 func TestValidateStatus(t *testing.T) {

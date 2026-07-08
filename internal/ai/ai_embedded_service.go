@@ -3,14 +3,16 @@ package ai
 import (
 	"strings"
 
-	"plan-manager/internal/filesystem/pathguard"
+	"kode-stream/internal/filesystem/pathguard"
 )
 
 type EmbeddedInput struct {
-	Provider    string `json:"provider"`
-	ContextMode string `json:"contextMode"`
-	Columns     uint16 `json:"columns"`
-	Rows        uint16 `json:"rows"`
+	Provider     string `json:"provider"`
+	ContextMode  string `json:"contextMode"`
+	PresetID     string `json:"presetId,omitempty"`
+	CustomPrompt string `json:"customPrompt,omitempty"`
+	Columns      uint16 `json:"columns"`
+	Rows         uint16 `json:"rows"`
 }
 
 type EmbeddedResult struct {
@@ -61,7 +63,11 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	if !capability.Detected {
 		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
 	}
-	values := map[string]string{"workspace": workspace.Path, "contextFile": item.ItemPath, "itemPath": item.ItemPath, "identifier": item.Identifier, "contextMode": mode, "intent": mode}
+	prompt, _, promptErr := s.resolvePrompt(input.PresetID, input.CustomPrompt)
+	if promptErr != nil {
+		return EmbeddedResult{}, promptErr
+	}
+	values := map[string]string{"workspace": workspace.Path, "contextFile": item.ItemPath, "itemPath": item.ItemPath, "identifier": item.Identifier, "contextMode": mode, "intent": mode, "prompt": prompt}
 	args := []string{}
 	if mode == "card_context" {
 		args = expandAll(provider.Args, values)

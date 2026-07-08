@@ -13,7 +13,7 @@ import (
 
 func TestResolvePathsIncludesKnowledgeIndexInDataDirectory(t *testing.T) {
 	directory := t.TempDir()
-	t.Setenv("PLAN_MANAGER_DATA_DIR", directory)
+	t.Setenv("KODE_STREAM_DATA_DIR", directory)
 
 	paths, err := ResolvePaths()
 	if err != nil {
@@ -32,10 +32,10 @@ func TestDefaultDataDirForSupportedOperatingSystems(t *testing.T) {
 		home string
 		want string
 	}{
-		{name: "macOS", goos: "darwin", home: "/Users/test", want: filepath.Join("/Users/test", "Library", "Application Support", "plan-manager")},
-		{name: "Linux XDG", goos: "linux", env: map[string]string{"XDG_CONFIG_HOME": "/xdg"}, home: "/home/test", want: filepath.Join("/xdg", "plan-manager")},
-		{name: "Linux fallback", goos: "linux", home: "/home/test", want: filepath.Join("/home/test", ".config", "plan-manager")},
-		{name: "Windows", goos: "windows", env: map[string]string{"AppData": `C:\\Users\\test\\AppData\\Roaming`}, home: `C:\\Users\\test`, want: filepath.Join(`C:\\Users\\test\\AppData\\Roaming`, "plan-manager")},
+		{name: "macOS", goos: "darwin", home: "/Users/test", want: filepath.Join("/Users/test", "Library", "Application Support", "kode-stream")},
+		{name: "Linux XDG", goos: "linux", env: map[string]string{"XDG_CONFIG_HOME": "/xdg"}, home: "/home/test", want: filepath.Join("/xdg", "kode-stream")},
+		{name: "Linux fallback", goos: "linux", home: "/home/test", want: filepath.Join("/home/test", ".config", "kode-stream")},
+		{name: "Windows", goos: "windows", env: map[string]string{"AppData": `C:\\Users\\test\\AppData\\Roaming`}, home: `C:\\Users\\test`, want: filepath.Join(`C:\\Users\\test\\AppData\\Roaming`, "kode-stream")},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestDefaultDataDirForSupportedOperatingSystems(t *testing.T) {
 
 func TestResolvePathsPrefersEnvironmentOverride(t *testing.T) {
 	override := t.TempDir()
-	t.Setenv("PLAN_MANAGER_DATA_DIR", override)
+	t.Setenv("KODE_STREAM_DATA_DIR", override)
 	paths, err := ResolvePaths()
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestResolvePathsUsesBootstrapOverride(t *testing.T) {
 	home := t.TempDir()
 	override := filepath.Join(t.TempDir(), "custom-data")
 	t.Setenv("HOME", home)
-	t.Setenv("PLAN_MANAGER_DATA_DIR", "")
+	t.Setenv("KODE_STREAM_DATA_DIR", "")
 	defaultDir, err := DefaultDataDir()
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +91,7 @@ func TestResolvePathsUsesBootstrapOverride(t *testing.T) {
 
 func TestConfigPathsIncludesEffectiveRegistryFile(t *testing.T) {
 	directory := t.TempDir()
-	t.Setenv("PLAN_MANAGER_DATA_DIR", directory)
+	t.Setenv("KODE_STREAM_DATA_DIR", directory)
 	mux := http.NewServeMux()
 	NewController(New()).RegisterRoutes(mux)
 	response := httptest.NewRecorder()

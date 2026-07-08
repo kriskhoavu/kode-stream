@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 func TestSavedFiltersCreateListUpdateAndDelete(t *testing.T) {
 	store := New(filepath.Join(t.TempDir(), "filters.yaml"), filepath.Join(t.TempDir(), "recents.yaml"))
 	times := []time.Time{time.Unix(1, 0), time.Unix(2, 0)}
 	store.now = func() time.Time { value := times[0]; times = times[1:]; return value }
-	first, err := store.SaveFilter(models.SavedFilter{Name: "Drafts", Route: "/kanban", Filters: map[string]any{"status": "draft"}})
+	first, err := store.SaveFilter(models.SavedFilter{Name: "Drafts", Route: "/workspace", Filters: map[string]any{"status": "draft"}})
 	if err != nil || first.ID == "" {
 		t.Fatalf("SaveFilter() = %#v, %v", first, err)
 	}

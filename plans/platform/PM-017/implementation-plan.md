@@ -2,7 +2,7 @@
 
 ## Overview
 
-Deliver a production-ready local distribution model for Plan Manager across macOS, Windows, and Linux with phased channels, release automation, diagnostics-first onboarding, and pilot-driven hardening.
+Deliver a production-ready local distribution model for Kode Stream across macOS, Windows, and Linux with phased channels, release automation, diagnostics-first onboarding, and pilot-driven hardening.
 
 ## Terminology Lock
 
@@ -62,16 +62,16 @@ Use consistently:
 **Deliverables:**
 
 - [ ] Create Homebrew tap repository (`<org>/homebrew-tap`).
-- [ ] Add `plan-manager` formula referencing release artifact and sha256.
+- [ ] Add `kode-stream` formula referencing release artifact and sha256.
 - [ ] Validate install/upgrade/uninstall on clean macOS Intel and Apple Silicon environments.
 - [ ] Publish macOS install and quickstart documentation.
 
 **Verification:**
 
 - `brew tap <org>/homebrew-tap`
-- `brew install plan-manager`
-- `brew upgrade plan-manager`
-- `brew uninstall plan-manager`
+- `brew install kode-stream`
+- `brew upgrade kode-stream`
+- `brew uninstall kode-stream`
 
 ---
 
@@ -84,7 +84,7 @@ Use consistently:
 - [ ] Validate install/upgrade/uninstall on a clean Windows VM.
 - [ ] Publish Windows docs for Git Credential Manager and SSH checks.
 
-**Verification:** clean-VM install matrix and `plan-manager doctor` pass on each method.
+**Verification:** clean-VM install matrix and `kode-stream doctor` pass on each method.
 
 ---
 
@@ -97,7 +97,7 @@ Use consistently:
 - [ ] Validate on Ubuntu LTS and one RHEL/Fedora-family distribution.
 - [ ] Capture deferred decision for deb/rpm packaging.
 
-**Verification:** checksum verification + install + `plan-manager doctor` + first publish flow.
+**Verification:** checksum verification + install + `kode-stream doctor` + first publish flow.
 
 ---
 
@@ -108,7 +108,7 @@ Use consistently:
 - [ ] Recruit 5-10 pilot users across macOS/Windows/Linux.
 - [ ] Run pilot checklist end to end:
   - [ ] install succeeds.
-  - [ ] `plan-manager doctor` passes.
+  - [ ] `kode-stream doctor` passes.
   - [ ] create/update/publish docs/plans to GitHub and Bitbucket.
   - [ ] complete one real workflow from start to push.
 - [ ] Collect friction points and prioritize top fixes before GA.

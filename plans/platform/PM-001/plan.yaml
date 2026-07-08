@@ -2,12 +2,12 @@ schemaVersion: 1
 
 plan:
   ticket: PM-001
-  title: Plan Manager Read-Only MVP
+  title: Kode Stream Read-Only MVP
   service: platform
   status: draft
   owner: null
   tags:
-    - plan-manager
+    - kode-stream
     - local-app
     - kanban
     - readonly

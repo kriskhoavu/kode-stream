@@ -15,7 +15,7 @@
 
 ## Starting State
 
-- Plan Manager already has zero or more registered workspaces.
+- Kode Stream already has zero or more registered workspaces.
 - The user has a predefined current-schema `workspaces.yaml` outside the effective data directory.
 - Referenced repositories already exist on the machine.
 - The Add Workspace dialog offers Local Path, Remote Git URL, and Existing Workspaces.
@@ -75,7 +75,7 @@ The frontend gets `registryFile` from `/api/system/config-paths` and shows it in
 - The preview includes all entries, including invalid and duplicate entries.
 - Only selected, still-valid entries are registered.
 - Registry persistence is one atomic batch operation with mode `0600`.
-- Imported repositories are never marked as Plan Manager-managed clones.
+- Imported repositories are never marked as Kode Stream-managed clones.
 - Every new registration receives an automatic scan attempt.
 - One scan failure does not block scans for other imported workspaces.
 - The final response distinguishes registration success from indexing success.

@@ -56,7 +56,7 @@ export function useAppState() {
   const selectWorkspace = (repo: WorkspaceConfig) => {
     setActiveWorkspaceId(repo.id);
     localStorage.setItem('activeWorkspaceId', repo.id);
-    navigate({ name: 'kanban' });
+    navigate({ name: 'workstream' });
   };
 
   const activeRepo = workspaces.find((repo) => repo.id === activeWorkspaceId) ?? workspaces[0];

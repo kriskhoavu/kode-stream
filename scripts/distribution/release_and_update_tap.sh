@@ -19,8 +19,8 @@ TAP_PATH="${2:-../homebrew-tap}"
 TAG="v${VERSION}"
 OUT_DIR="$ROOT_DIR/release/${VERSION}"
 SUMS_FILE="/tmp/SHA256SUMS-v${VERSION}"
-FORMULA_FILE="$TAP_PATH/Formula/plan-manager.rb"
-REPO="kriskhoavu/plan-manager"
+FORMULA_FILE="$TAP_PATH/Formula/kode-stream.rb"
+REPO="kriskhoavu/kode-stream"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -61,20 +61,20 @@ for target in "darwin arm64" "darwin amd64" "linux amd64" "windows amd64"; do
   GOARCH="$(awk '{print $2}' <<<"$target")"
 
   workdir="$(mktemp -d)"
-  bin_name="plan-manager"
+  bin_name="kode-stream"
   if [[ "$GOOS" == "windows" ]]; then
-    bin_name="plan-manager.exe"
+    bin_name="kode-stream.exe"
   fi
 
   CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-    go build -trimpath -ldflags "-s -w" -o "$workdir/$bin_name" ./cmd/plan-manager
+    go build -trimpath -ldflags "-s -w" -o "$workdir/$bin_name" ./cmd/kode-stream
 
   cp "$ROOT_DIR/README.md" "$workdir/"
   if compgen -G "$ROOT_DIR/LICENSE*" >/dev/null; then
     cp "$ROOT_DIR"/LICENSE* "$workdir/"
   fi
 
-  base="plan-manager_${VERSION}_${GOOS}_${GOARCH}"
+  base="kode-stream_${VERSION}_${GOOS}_${GOARCH}"
   if [[ "$GOOS" == "windows" ]]; then
     (cd "$workdir" && zip -qr "$OUT_DIR/${base}.zip" .)
   else
@@ -87,7 +87,7 @@ done
 echo "==> Generating checksums"
 (
   cd "$OUT_DIR"
-  shasum -a 256 plan-manager_* > SHA256SUMS
+  shasum -a 256 kode-stream_* > SHA256SUMS
 )
 
 echo "==> Ensuring git tag exists on origin: $TAG"
@@ -105,16 +105,16 @@ fi
 
 echo "==> Publishing GitHub release assets"
 if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-  gh release upload "$TAG" "$OUT_DIR"/plan-manager_* "$OUT_DIR"/SHA256SUMS --repo "$REPO" --clobber
+  gh release upload "$TAG" "$OUT_DIR"/kode-stream_* "$OUT_DIR"/SHA256SUMS --repo "$REPO" --clobber
 else
-  gh release create "$TAG" "$OUT_DIR"/plan-manager_* "$OUT_DIR"/SHA256SUMS --repo "$REPO" --title "$TAG" --generate-notes
+  gh release create "$TAG" "$OUT_DIR"/kode-stream_* "$OUT_DIR"/SHA256SUMS --repo "$REPO" --title "$TAG" --generate-notes
 fi
 
 echo "==> Downloading release SHA256SUMS"
-curl -fL "https://github.com/kriskhoavu/plan-manager/releases/download/${TAG}/SHA256SUMS" -o "$SUMS_FILE"
+curl -fL "https://github.com/kriskhoavu/kode-stream/releases/download/${TAG}/SHA256SUMS" -o "$SUMS_FILE"
 
-ARM64_SHA="$(awk '/plan-manager_'"${VERSION}"'_darwin_arm64.tar.gz/{print $1}' "$SUMS_FILE")"
-AMD64_SHA="$(awk '/plan-manager_'"${VERSION}"'_darwin_amd64.tar.gz/{print $1}' "$SUMS_FILE")"
+ARM64_SHA="$(awk '/kode-stream_'"${VERSION}"'_darwin_arm64.tar.gz/{print $1}' "$SUMS_FILE")"
+AMD64_SHA="$(awk '/kode-stream_'"${VERSION}"'_darwin_amd64.tar.gz/{print $1}' "$SUMS_FILE")"
 
 if [[ -z "$ARM64_SHA" || -z "$AMD64_SHA" ]]; then
   echo "Could not extract darwin checksums from $SUMS_FILE"
@@ -151,15 +151,15 @@ print(f"Updated {formula}")
 PY
 
 echo "==> Committing and pushing tap update"
-git -C "$TAP_PATH" add Formula/plan-manager.rb
+git -C "$TAP_PATH" add Formula/kode-stream.rb
 if git -C "$TAP_PATH" diff --cached --quiet; then
   echo "No tap changes to commit."
 else
-  git -C "$TAP_PATH" commit -m "plan-manager: update to v${VERSION}"
+  git -C "$TAP_PATH" commit -m "kode-stream: update to v${VERSION}"
   git -C "$TAP_PATH" push
 fi
 
 echo "==> Done"
 echo "Release assets: $OUT_DIR"
 echo "Checksums file: $SUMS_FILE"
-echo "Next: brew tap kriskhoavu/homebrew-tap && brew install plan-manager"
+echo "Next: brew tap kriskhoavu/homebrew-tap && brew install kode-stream"

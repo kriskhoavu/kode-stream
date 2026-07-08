@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/pathguard"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/pathguard"
 )
 
 type SafetyService struct{}

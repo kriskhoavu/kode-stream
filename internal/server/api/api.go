@@ -17,30 +17,32 @@ import (
 	"strings"
 	"time"
 
-	appaisession "plan-manager/internal/ai"
-	"plan-manager/internal/audit"
-	apperrors "plan-manager/internal/common"
-	"plan-manager/internal/common/httpx"
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	appgit "plan-manager/internal/git"
-	appitem "plan-manager/internal/item"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/item/writer"
-	appjira "plan-manager/internal/jira"
-	knowledgeindex "plan-manager/internal/knowledge"
-	"plan-manager/internal/navigation"
-	appsearch "plan-manager/internal/search"
-	"plan-manager/internal/system"
-	appworkspace "plan-manager/internal/workspace"
-	workspacehealth "plan-manager/internal/workspace"
-	workspaceaccess "plan-manager/internal/workspace/files"
-	"plan-manager/internal/workspace/registry"
-	"plan-manager/internal/workspace/scanner"
+	appaisession "kode-stream/internal/ai"
+	"kode-stream/internal/audit"
+	apperrors "kode-stream/internal/common"
+	"kode-stream/internal/common/httpx"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	appgit "kode-stream/internal/git"
+	appitem "kode-stream/internal/item"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/item/writer"
+	appjira "kode-stream/internal/jira"
+	knowledgeindex "kode-stream/internal/knowledge"
+	"kode-stream/internal/navigation"
+	appsearch "kode-stream/internal/search"
+	"kode-stream/internal/system"
+	appworkspace "kode-stream/internal/workspace"
+	workspacehealth "kode-stream/internal/workspace"
+	workspaceaccess "kode-stream/internal/workspace/files"
+	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
+	appworkstream "kode-stream/internal/workstream"
 )
 
 type API struct {
 	workspaces     *appworkspace.Service
+	workstream     *appworkstream.Service
 	items          *appitem.Service
 	gitOps         *appgit.Service
 	dialog         *system.Dialog
@@ -90,6 +92,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 	}
 	return &API{
 		workspaces:     workspaceService,
+		workstream:     appworkstream.New(reg, idx, scan, git),
 		items:          appitem.New(reg, idx, files, writer, git),
 		gitOps:         appgit.NewService(reg, writer, git),
 		dialog:         dialog,
@@ -111,6 +114,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/state", a.state)
 	mux.HandleFunc("GET /api/search", a.searchItems)
 	mux.HandleFunc("GET /api/ai/capabilities", a.aiCapabilities)
+	mux.HandleFunc("GET /api/ai/presets", a.aiPresets)
 	mux.HandleFunc("GET /api/ai/settings", a.aiSettings)
 	mux.HandleFunc("PUT /api/ai/settings", a.saveAISettings)
 	mux.HandleFunc("GET /api/workspaces", a.listWorkspaces)
@@ -129,7 +133,8 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/workspaces/{id}", a.deleteWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/jira/test", a.testJiraConnection)
-	mux.HandleFunc("POST /api/workspaces/{id}/kanban/branch", a.loadKanbanBranch)
+	mux.HandleFunc("GET /api/workspaces/{id}/jira/issues/{issueKey}", a.workspaceJiraIssue)
+	mux.HandleFunc("POST /api/workspaces/{id}/workstream/branch", a.loadWorkstreamBranch)
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
 	mux.HandleFunc("PUT /api/workspaces/{id}/source-structure", a.saveSourceStructure)
@@ -425,6 +430,14 @@ func (a *API) aiCapabilities(w http.ResponseWriter, _ *http.Request) {
 	respond(w, capabilities, err)
 }
 
+func (a *API) aiPresets(w http.ResponseWriter, _ *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, a.aiSessions.Presets())
+}
+
 func (a *API) aiSettings(w http.ResponseWriter, _ *http.Request) {
 	if a.aiSessions == nil {
 		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
@@ -499,6 +512,24 @@ func (a *API) jiraIssue(w http.ResponseWriter, r *http.Request) { a.respondJiraI
 func (a *API) refreshJiraIssue(w http.ResponseWriter, r *http.Request) {
 	a.respondJiraIssue(w, r, true)
 }
+
+func (a *API) workspaceJiraIssue(w http.ResponseWriter, r *http.Request) {
+	if a.jira == nil {
+		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
+		return
+	}
+	result, err := a.jira.WorkspaceIssue(r.Context(), r.PathValue("id"), r.PathValue("issueKey"), false)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (a *API) respondJiraIssue(w http.ResponseWriter, r *http.Request, refresh bool) {
 	if a.jira == nil {
 		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
@@ -683,7 +714,7 @@ func (a *API) recordRecentItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func validAppRoute(route string) bool {
-	return route == "/kanban" || route == "/items" || route == "/branches" || route == "/workspaces" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/kanban?") || strings.HasPrefix(route, "/knowledge?")
+	return route == "/workspace" || route == "/items" || route == "/branches" || route == "/workspaces" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/workspace?") || strings.HasPrefix(route, "/knowledge?")
 }
 
 func (a *API) knowledgeWikis(w http.ResponseWriter, r *http.Request) {
@@ -901,8 +932,8 @@ func (a *API) scanWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-func (a *API) loadKanbanBranch(w http.ResponseWriter, r *http.Request) {
-	var input models.BranchLoadInput
+func (a *API) loadWorkstreamBranch(w http.ResponseWriter, r *http.Request) {
+	var input models.WorkstreamBranchLoadInput
 	if r.Body != nil {
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -910,8 +941,8 @@ func (a *API) loadKanbanBranch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	started := time.Now()
-	result, err := a.workspaces.LoadBranch(r.PathValue("id"), input)
-	a.record(r.PathValue("id"), "", "kanban_branch_load", "Kanban branch loaded.", nil, started, err)
+	result, err := a.workstream.LoadBranch(r.PathValue("id"), input)
+	a.record(r.PathValue("id"), "", "workstream_branch_load", "Workstream branch loaded.", nil, started, err)
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
@@ -1482,7 +1513,7 @@ func recoveryHint(message string) string {
 	lower := strings.ToLower(message)
 	switch {
 	case strings.Contains(lower, "jira token environment variable"):
-		return "Set the configured environment variable or add it to ~/.creds.zsh or ~/.creds.sh, then restart Plan Manager."
+		return "Set the configured environment variable or add it to ~/.creds.zsh or ~/.creds.sh, then restart Kode Stream."
 	case strings.Contains(lower, "jira authentication"):
 		return "Check the Jira account and token configured for this workspace."
 	case strings.Contains(lower, "jira project"):

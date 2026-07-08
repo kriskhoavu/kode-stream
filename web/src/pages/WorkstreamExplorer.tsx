@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   ChevronDown, ChevronRight, Clipboard, Code2, Eye, File, Folder, FolderGit2, GitCompare,
-  FilePlus2, FolderPlus, KanbanSquare, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, X
+  FilePlus2, FolderPlus, KanbanSquare as WorkstreamIcon, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, X
 } from 'lucide-react';
 import type { ExplorerLocation } from '../app/router';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -10,15 +10,15 @@ import { RecentGitActivity } from '../components/RecentGitActivity';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
 import { FileStateIcon } from '../features/file-tree/FileStateIcon';
-import { treeKeyboardAction } from '../features/workspace-explorer/keyboard';
-import { explorerNodeId } from '../features/workspace-explorer/tree';
-import type { VisibleExplorerRow } from '../features/workspace-explorer/types';
-import { useWorkspaceExplorer } from '../features/workspace-explorer/useWorkspaceExplorer';
-import { WorkspaceBranchSelector } from '../features/workspace-explorer/WorkspaceBranchSelector';
-import { useWorkspaceBranches } from '../features/workspace-explorer/useWorkspaceBranches';
-import type { WorkspaceBranchState } from '../features/workspace-explorer/useWorkspaceBranches';
-import { useWorkspacePathSearch } from '../features/workspace-explorer/useWorkspacePathSearch';
-import { useWorkspacePathMutations } from '../features/workspace-explorer/useWorkspacePathMutations';
+import { treeKeyboardAction } from '../features/workstream-explorer/keyboard';
+import { explorerNodeId } from '../features/workstream-explorer/tree';
+import type { VisibleExplorerRow } from '../features/workstream-explorer/types';
+import { useWorkstreamExplorer } from '../features/workstream-explorer/useWorkstreamExplorer';
+import { WorkspaceBranchSelector } from '../features/workstream-explorer/WorkspaceBranchSelector';
+import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
+import type { WorkspaceBranchState } from '../features/workstream-explorer/useWorkspaceBranches';
+import { useWorkspacePathSearch } from '../features/workstream-explorer/useWorkspacePathSearch';
+import { useWorkspacePathMutations } from '../features/workstream-explorer/useWorkspacePathMutations';
 import { ApiError, api } from '../lib/api';
 import type { GitActivityEntry, GitStatus, ItemSummary, WorkspaceConfig, WorkspaceHealth, WorkspacePathGitState, WorkspacePathSearchResult } from '../lib/types';
 import { parseGitDiff } from '../shared/domain/diff';
@@ -30,13 +30,13 @@ type EditorTab = 'preview' | 'raw' | 'diff';
 type PathDialog = { kind: 'file' | 'directory' | 'rename'; parentPath: string; currentPath?: string; initialName?: string };
 type ExplorerUnifiedResult = { kind: 'path'; result: WorkspacePathSearchResult } | { kind: 'content'; result: WorkspaceContentSearchResult };
 
-export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, onOpenKanban }: {
+export function WorkstreamExplorer({ workspaces, location, onLocationChange, onOpenWorkstream }: {
   workspaces: WorkspaceConfig[];
   location?: ExplorerLocation;
   onLocationChange: (location?: ExplorerLocation) => void;
-  onOpenKanban: (workspace: WorkspaceConfig, itemId?: string) => void;
+  onOpenWorkstream: (workspace: WorkspaceConfig, itemId?: string) => void;
 }) {
-  const explorer = useWorkspaceExplorer(workspaces, location, onLocationChange);
+  const explorer = useWorkstreamExplorer(workspaces, location, onLocationChange);
   const [tab, setTab] = useState<EditorTab>('preview');
   const [diff, setDiff] = useState('');
   const [error, setError] = useState('');
@@ -44,8 +44,8 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   const [revertOpen, setRevertOpen] = useState(false);
   const [reverting, setReverting] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [leftWidth, setLeftWidth] = useState(() => boundedNumber(localStorage.getItem('workspaceExplorer.leftWidth'), 340));
-  const [rightWidth, setRightWidth] = useState(() => boundedNumber(localStorage.getItem('workspaceExplorer.rightWidth'), 300));
+  const [leftWidth, setLeftWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.leftWidth'), 340));
+  const [rightWidth, setRightWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.rightWidth'), 300));
   const [searchIndex, setSearchIndex] = useState(0);
   const [pathDialog, setPathDialog] = useState<PathDialog | null>(null);
 	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
@@ -238,7 +238,7 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
-      localStorage.setItem(side === 'left' ? 'workspaceExplorer.leftWidth' : 'workspaceExplorer.rightWidth', String(latest));
+      localStorage.setItem(side === 'left' ? 'workstreamExplorer.leftWidth' : 'workstreamExplorer.rightWidth', String(latest));
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up, { once: true });
@@ -250,9 +250,9 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   } as CSSProperties;
 
   return (
-    <section className="workspace-explorer-page">
+    <section className="workstream-explorer-page">
       <header className="explorer-header">
-        <div><span className="eyebrow">{workspace?.name ?? 'No workspace selected'}</span><h1>Workspace Explorer</h1></div>
+        <div><span className="eyebrow">{workspace?.name ?? 'No workspace selected'}</span><h1>Workstream Explorer</h1></div>
         <div className="explorer-header-actions">
           <button className="secondary" type="button" disabled={!workspace} onClick={() => setPathDialog({ kind: 'file', parentPath: selectedParentPath() })}><FilePlus2 size={15} /> New file</button>
           <button className="secondary" type="button" disabled={!workspace} onClick={() => setPathDialog({ kind: 'directory', parentPath: selectedParentPath() })}><FolderPlus size={15} /> New folder</button>
@@ -314,7 +314,7 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
         </main>
         <aside className={inspectorOpen ? 'explorer-inspector' : 'explorer-inspector collapsed'}>
           <div className="panel-header"><h2>Inspector</h2><button className="icon-button" type="button" aria-label={inspectorOpen ? 'Collapse inspector' : 'Expand inspector'} onClick={() => setInspectorOpen((value) => !value)}>{inspectorOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button></div>
-          {inspectorOpen && <ExplorerInspector workspace={workspace} row={selectedRow} file={editor.file} onOpenKanban={onOpenKanban} />}
+          {inspectorOpen && <ExplorerInspector workspace={workspace} row={selectedRow} file={editor.file} onOpenWorkstream={onOpenWorkstream} />}
           {inspectorOpen && <button className="explorer-resize-handle right" aria-label="Resize inspector" onPointerDown={(event) => startResize('right', event)} />}
         </aside>
       </div>
@@ -374,7 +374,7 @@ function ExplorerDiff({ diff, onRevert, disabled }: { diff: string; onRevert: ()
   return <section className="diff-panel"><header className="diff-toolbar"><strong>{files.length ? `${files.length} changed file` : 'No local changes'}</strong><button className="danger-action" disabled={disabled || !diff} onClick={onRevert}><RotateCcw size={15} /> Revert File</button></header><pre className="diff-view">{diff || 'No local changes.'}</pre></section>;
 }
 
-function ExplorerInspector({ workspace, row, file, onOpenKanban }: { workspace?: WorkspaceConfig; row?: VisibleExplorerRow; file: ReturnType<typeof useFileEditorSession>['file']; onOpenKanban: (workspace: WorkspaceConfig, itemId?: string) => void }) {
+function ExplorerInspector({ workspace, row, file, onOpenWorkstream }: { workspace?: WorkspaceConfig; row?: VisibleExplorerRow; file: ReturnType<typeof useFileEditorSession>['file']; onOpenWorkstream: (workspace: WorkspaceConfig, itemId?: string) => void }) {
   const [git, setGit] = useState<GitStatus | null>(null);
   const [activity, setActivity] = useState<GitActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -418,7 +418,7 @@ function ExplorerInspector({ workspace, row, file, onOpenKanban }: { workspace?:
   }, [row?.item?.itemId]);
   if (!workspace) return <p className="explorer-empty">Select a workspace or file.</p>;
   return <div className="inspector-content">
-    <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl><button className="secondary" onClick={() => onOpenKanban(workspace, row?.item?.itemId)}><KanbanSquare size={15} /> Open Kanban</button></section>
+    <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl><button className="secondary" onClick={() => onOpenWorkstream(workspace, row?.item?.itemId)}><WorkstreamIcon size={15} /> Open Workstream</button></section>
     {file && <section><h3>File</h3><dl><dt>Path</dt><dd>{file.path}</dd><dt>Kind</dt><dd>{file.kind}</dd><dt>Size</dt><dd>{file.sizeBytes.toLocaleString()} bytes</dd><dt>Editable</dt><dd>{file.editable ? 'Text' : 'Read only'}</dd></dl></section>}
     {row?.item && <section><h3>Item</h3><dl><dt>ID</dt><dd>{row.item.identifier}</dd><dt>Title</dt><dd>{row.item.title}</dd><dt>Status</dt><dd>{row.item.status}</dd><dt>Owner</dt><dd>{item?.owner || 'Unassigned'}</dd></dl><a className="secondary button-link" href={`/items/${encodeURIComponent(row.item.itemId)}`}>Open details</a></section>}
     <section>

@@ -7,11 +7,11 @@ import type { DirectoryCacheEntry, ExplorerSelection } from './types';
 import { ancestorDirectoryPaths, buildWorkspaceGitStateMap } from './productivity';
 import type { WorkspacePathGitState } from '../../lib/types';
 
-const expandedStorageKey = 'workspaceExplorer.expandedNodeIds';
-const ignoredStorageKey = 'workspaceExplorer.showIgnored';
-const modeStorageKey = 'workspaceExplorer.treeMode';
+const expandedStorageKey = 'workstreamExplorer.expandedNodeIds';
+const ignoredStorageKey = 'workstreamExplorer.showIgnored';
+const modeStorageKey = 'workstreamExplorer.treeMode';
 
-export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: ExplorerLocation, onLocationChange?: (location?: ExplorerLocation) => void) {
+export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: ExplorerLocation, onLocationChange?: (location?: ExplorerLocation) => void) {
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() => readExpanded());
   const [showIgnored, setShowIgnoredState] = useState(() => localStorage.getItem(ignoredStorageKey) === 'true');
 	const [mode, setModeState] = useState<ExplorerTreeMode>(() => location?.mode ?? readMode());

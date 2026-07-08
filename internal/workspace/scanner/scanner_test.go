@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"plan-manager/internal/common/models"
-	gitadapter "plan-manager/internal/git"
+	"kode-stream/internal/common/models"
+	gitadapter "kode-stream/internal/git"
 )
 
 func TestNormalizeStatus(t *testing.T) {

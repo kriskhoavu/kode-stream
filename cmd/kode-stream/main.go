@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"plan-manager/internal/server"
-	"plan-manager/internal/system"
+	"kode-stream/internal/server"
+	"kode-stream/internal/system"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 	switch os.Args[1] {
 	case "serve":
 		fs := flag.NewFlagSet("serve", flag.ExitOnError)
-		port := fs.Int("port", 0, "localhost port, defaults to 4317 or PLAN_MANAGER_PORT")
+		port := fs.Int("port", 0, "localhost port, defaults to 4317 or KODE_STREAM_PORT")
 		if err := fs.Parse(os.Args[2:]); err != nil {
 			log.Fatal(err)
 		}
@@ -73,7 +73,7 @@ func runDoctor(args []string) error {
 			return err
 		}
 	} else {
-		fmt.Fprintln(os.Stdout, "plan-manager doctor")
+		fmt.Fprintln(os.Stdout, "kode-stream doctor")
 		fmt.Fprintln(os.Stdout, "")
 		for _, check := range result.Checks {
 			status := strings.ToUpper(string(check.Status))
@@ -92,6 +92,6 @@ func runDoctor(args []string) error {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "Usage:")
-	fmt.Fprintln(os.Stderr, "  plan-manager serve [-port 4317]")
-	fmt.Fprintln(os.Stderr, "  plan-manager doctor [--provider github|bitbucket] [--repo <path-or-url>] [--format text|json] [--strict] [--port <n>]")
+	fmt.Fprintln(os.Stderr, "  kode-stream serve [-port 4317]")
+	fmt.Fprintln(os.Stderr, "  kode-stream doctor [--provider github|bitbucket] [--repo <path-or-url>] [--format text|json] [--strict] [--port <n>]")
 }

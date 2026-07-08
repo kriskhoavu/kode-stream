@@ -44,7 +44,7 @@ Stable warning codes include `invalid_front_matter`, `missing_identity`, `duplic
 
 ## Persisted Index
 
-Store `knowledge-index.yaml` under the resolved Plan Manager data directory. The file contains a schema version and entries keyed by workspace ID plus normalized Wiki root. Writes use a temporary file, file sync, and atomic rename. A failed scan does not replace the last valid entry.
+Store `knowledge-index.yaml` under the resolved Kode Stream data directory. The file contains a schema version and entries keyed by workspace ID plus normalized Wiki root. Writes use a temporary file, file sync, and atomic rename. A failed scan does not replace the last valid entry.
 
 The index stores metadata and relationships, not full Markdown content. Page content is read on selection through guarded access so local edits are visible after rescan and the app-owned file remains bounded.
 

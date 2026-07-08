@@ -28,7 +28,7 @@ Let users deliberately update supported Jira issue fields, execute valid transit
 | Term                  | Meaning                                                                      |
 |-----------------------|------------------------------------------------------------------------------|
 | Jira Edit View        | Dedicated interface for supported issue fields, transitions, and attachments |
-| Editable Field Policy | Explicit allowlist derived from Jira metadata and Plan Manager rules         |
+| Editable Field Policy | Explicit allowlist derived from Jira metadata and Kode Stream rules         |
 | Issue Version         | Freshness token used to reject stale updates                                 |
 | Attachment Result     | Per-file success or failure returned after an attachment mutation            |
 

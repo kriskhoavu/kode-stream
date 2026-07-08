@@ -1,5 +1,5 @@
 @import "./app-shell.css";
-@import "../features/workspace-explorer/workspace-explorer.css";
+@import "../features/workstream-explorer/workstream-explorer.css";
 @import "../features/content-search/content-search.css";
 
 :root {
@@ -510,7 +510,7 @@ button:disabled {
 }
 
 .settings-title h1,
-.kanban-heading h1 {
+.workstream-heading h1 {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -970,12 +970,20 @@ button:disabled {
   font-weight: 700;
 }
 
-.ai-launch-fields select {
+.ai-launch-fields select,
+.ai-launch-fields textarea {
   min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--panel-soft);
+  color: var(--text);
   padding: 0 10px;
+}
+
+.ai-launch-fields textarea {
+  min-height: 88px;
+  padding: 10px;
+  resize: vertical;
 }
 
 .ai-launch-fields fieldset {
@@ -1206,41 +1214,41 @@ select {
   margin-bottom: 18px;
 }
 
-.kanban-title {
+.workstream-title {
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
 
-.kanban-heading {
+.workstream-heading {
   display: flex;
   align-items: center;
   gap: 11px;
   min-width: 0;
 }
 
-.kanban-heading > div {
+.workstream-heading > div {
   display: grid;
   gap: 6px;
 }
 
-.kanban-heading h1,
-.kanban-heading span {
+.workstream-heading h1,
+.workstream-heading span {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.kanban-heading h1 {
+.workstream-heading h1 {
   margin-bottom: 0;
   font-size: 25px;
   letter-spacing: 0;
 }
 
-.kanban-heading h1 svg {
+.workstream-heading h1 svg {
   color: var(--blue);
 }
 
-.kanban-heading > div > span svg {
+.workstream-heading > div > span svg {
   color: var(--muted);
 }
 
@@ -1710,13 +1718,13 @@ select:disabled {
   font-size: 13px;
 }
 
-.kanban-board {
+.workstream-board {
   display: grid;
   gap: 12px;
   min-height: 620px;
 }
 
-.kanban-separator {
+.workstream-separator {
   min-width: 0;
   min-height: 620px;
   border: 1px solid color-mix(in srgb, var(--green) 36%, var(--line));
@@ -1731,12 +1739,12 @@ select:disabled {
   box-shadow: none;
 }
 
-.kanban-separator:hover {
+.workstream-separator:hover {
   border-color: color-mix(in srgb, var(--green) 64%, var(--line));
   background: linear-gradient(180deg, color-mix(in srgb, var(--green) 15%, var(--panel)), color-mix(in srgb, var(--green) 7%, var(--panel)));
 }
 
-.kanban-separator:disabled {
+.workstream-separator:disabled {
   cursor: default;
   opacity: 0.72;
 }
@@ -1764,7 +1772,7 @@ select:disabled {
   line-height: 1.15;
 }
 
-.kanban-column {
+.workstream-column {
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel) 78%, var(--panel-soft));
   border-radius: 8px;
@@ -1776,38 +1784,38 @@ select:disabled {
   transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
 
-.kanban-column.drop-enabled {
+.workstream-column.drop-enabled {
   border-color: color-mix(in srgb, var(--blue) 32%, var(--line));
 }
 
-.kanban-column.drop-target {
+.workstream-column.drop-target {
   border-color: color-mix(in srgb, var(--blue) 78%, var(--line));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 18%, transparent), var(--shadow-soft);
 }
 
-.kanban-column.drop-target .card-stack {
+.workstream-column.drop-target .card-stack {
   background: color-mix(in srgb, var(--blue) 7%, transparent);
 }
 
-.kanban-column.unsorted { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 84%, #e5e7eb), var(--panel)); }
-.kanban-column.draft { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dbeafe), var(--panel)); }
-.kanban-column.in_progress { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #fed7aa), var(--panel)); }
-.kanban-column.review { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #ede9fe), var(--panel)); }
-.kanban-column.done { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dcfce7), var(--panel)); }
+.workstream-column.unsorted { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 84%, #e5e7eb), var(--panel)); }
+.workstream-column.draft { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dbeafe), var(--panel)); }
+.workstream-column.in_progress { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #fed7aa), var(--panel)); }
+.workstream-column.review { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #ede9fe), var(--panel)); }
+.workstream-column.done { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dcfce7), var(--panel)); }
 
-.kanban-column header {
+.workstream-column header {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 16px 16px 10px;
 }
 
-.kanban-column h2 {
+.workstream-column h2 {
   font-size: 15px;
   margin: 0;
 }
 
-.kanban-column header span {
+.workstream-column header span {
   min-width: 26px;
   height: 24px;
   border-radius: 99px;
@@ -1818,7 +1826,7 @@ select:disabled {
   font-weight: 700;
 }
 
-.kanban-column header svg {
+.workstream-column header svg {
   margin-left: auto;
   color: var(--muted);
 }
@@ -1886,7 +1894,7 @@ select:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .kanban-column,
+  .workstream-column,
   .plan-card,
   .drag-overlay-card {
     transition: none;
@@ -2005,7 +2013,7 @@ select:disabled {
 
 .drawer-scrim {
   position: fixed;
-  inset: 68px 0 0 232px;
+  inset: var(--drawer-top, 68px) 0 0 232px;
   z-index: 45;
   border: 0;
   background: transparent;
@@ -2014,7 +2022,7 @@ select:disabled {
 
 .plan-drawer {
   position: fixed;
-  top: 68px;
+  top: var(--drawer-top, 68px);
   right: 0;
   bottom: 0;
   z-index: 46;
@@ -5033,6 +5041,189 @@ body.is-resizing-panel {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 12%, transparent);
 }
 
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 82%, var(--line));
+}
+
+.segmented-control button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.segmented-control button.active {
+  background: var(--blue);
+  color: #ffffff;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--blue) 32%, transparent);
+}
+
+.segmented-control button + button {
+  border-left: 1px solid var(--line);
+}
+
+.jira-intake {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.jira-work-item-form {
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 2px;
+}
+
+.jira-work-item-form > .segmented-control {
+  align-self: start;
+  width: 100%;
+}
+
+.jira-create-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(360px, .8fr);
+  gap: 24px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.jira-ticket-column,
+.jira-details-column {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 96%, var(--panel-soft));
+}
+
+.jira-column-heading {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.jira-column-heading strong {
+  font-size: 14px;
+}
+
+.jira-column-heading span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.jira-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, .65fr);
+  gap: 10px;
+}
+
+.jira-issue-preview {
+  display: grid;
+  gap: 14px;
+  min-height: 320px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--green) 8%, var(--panel));
+}
+
+.jira-issue-preview.warning {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--line));
+  background: color-mix(in srgb, var(--amber) 9%, var(--panel));
+}
+
+.jira-issue-preview strong,
+.jira-issue-preview span,
+.jira-issue-preview small,
+.jira-issue-preview p {
+  margin: 0;
+  min-width: 0;
+}
+
+.jira-issue-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.jira-issue-preview-header strong {
+  line-height: 1.3;
+}
+
+.jira-issue-preview-header a {
+  flex: 0 0 auto;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.jira-issue-preview-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.jira-issue-preview-meta div {
+  min-width: 0;
+  min-height: 66px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  border: 1px solid color-mix(in srgb, var(--green) 20%, var(--line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.jira-issue-preview-meta dt,
+.jira-issue-preview-meta dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.jira-issue-preview-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.jira-issue-preview-meta dd {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.jira-issue-preview-description {
+  max-height: 240px;
+  padding: 0 4px;
+  color: var(--muted);
+  line-height: 1.35;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
 .workspace-actions {
   display: flex;
   flex-wrap: wrap;
@@ -5227,7 +5418,19 @@ body.is-resizing-panel {
   gap: 12px;
 }
 
-.modal-panel header,
+.new-work-item-modal {
+  width: min(760px, calc(100vw - 40px));
+  overscroll-behavior: contain;
+}
+
+.new-work-item-modal.jira-mode {
+  width: min(1240px, calc(100vw - 40px));
+  height: min(860px, calc(100vh - 40px));
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+}
+
+.modal-panel > header,
 .modal-actions {
   display: flex;
   align-items: center;
@@ -5240,7 +5443,7 @@ body.is-resizing-panel {
   font-size: 18px;
 }
 
-.modal-panel header span,
+.modal-panel > header span,
 .modal-help {
   margin: 0;
   color: var(--muted);
@@ -5606,11 +5809,11 @@ body.is-resizing-panel {
     min-width: 128px;
   }
 
-  .kanban-board {
+  .workstream-board {
     grid-template-columns: 1fr;
   }
 
-  .kanban-separator {
+  .workstream-separator {
     min-height: 58px;
     grid-template-columns: 32px 32px minmax(0, 1fr) 32px;
     grid-template-rows: 1fr;
@@ -5623,7 +5826,7 @@ body.is-resizing-panel {
     writing-mode: horizontal-tb;
   }
 
-  .kanban-column {
+  .workstream-column {
     min-height: 230px;
   }
 
@@ -5753,6 +5956,12 @@ body.is-resizing-panel {
   }
 }
 
+@media (max-width: 900px) {
+  .jira-create-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .workspace-import-paths,
   .workspace-import-candidate dl {
@@ -5777,6 +5986,35 @@ body.is-resizing-panel {
     width: calc(100vw - 20px);
     max-height: calc(100vh - 20px);
     padding: 14px;
+  }
+
+  .new-work-item-modal {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    padding: 14px;
+  }
+
+  .jira-create-layout,
+  .jira-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .jira-intake {
+    grid-template-columns: 1fr;
+  }
+
+  .jira-intake .secondary {
+    width: 100%;
+  }
+
+  .jira-issue-preview-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .jira-issue-preview-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .workspace-registration-steps {

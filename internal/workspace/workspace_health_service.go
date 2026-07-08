@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	apperrors "plan-manager/internal/common"
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/item/index"
+	apperrors "kode-stream/internal/common"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/item/index"
 )
 
 type workspaceReader interface {
