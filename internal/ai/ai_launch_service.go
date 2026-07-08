@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"plan-manager/internal/audit"
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/pathguard"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/workspace/registry"
+	"kode-stream/internal/audit"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/pathguard"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/workspace/registry"
 )
 
 type LaunchInput struct {

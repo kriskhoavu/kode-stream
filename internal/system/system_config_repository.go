@@ -84,7 +84,7 @@ func defaultDataDirForOS(goos string, getenv func(string) string, home string) (
 			base = filepath.Join(home, ".config")
 		}
 	}
-	return filepath.Join(base, "plan-manager"), nil
+	return filepath.Join(base, "kode-stream"), nil
 }
 
 func SetDataDir(path string) (Paths, error) {
@@ -125,7 +125,7 @@ type bootstrapSettings struct {
 }
 
 func resolveDataDirOverride(defaultDir string) (string, error) {
-	if env := strings.TrimSpace(os.Getenv("PLAN_MANAGER_DATA_DIR")); env != "" {
+	if env := strings.TrimSpace(os.Getenv("KODE_STREAM_DATA_DIR")); env != "" {
 		resolved, err := filepath.Abs(expandHome(env))
 		if err != nil {
 			return "", err

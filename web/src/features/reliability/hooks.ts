@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { AuditEvent, WorkspaceHealth } from '../../lib/types';
 
-const reliabilityChangedEvent = 'plan-manager:reliability-changed';
+const reliabilityChangedEvent = 'kode-stream:reliability-changed';
 
 export function notifyReliabilityChanged() {
   window.dispatchEvent(new Event(reliabilityChangedEvent));

@@ -1,17 +1,17 @@
-# Plan Manager
+# Kode Stream
 
-Plan Manager is a local, Git-native web application for browsing and editing planning documents across repositories and
+Kode Stream is a local, Git-native web application for browsing and editing planning documents across repositories and
 workspaces. It turns file-based plans into a workflow-oriented UI without moving content out of Git.
 
 It is designed for engineers who want faster visibility, safer edits, and cleaner Git operations when plans and specs
 are stored as Markdown.
 
-## Why Plan Manager
+## Why Kode Stream
 
 Teams often keep plans in Git because it gives strong review, ownership, and history. The tradeoff is discoverability
 and flow: progress is hard to track across folders, branches, and multiple repositories.
 
-Plan Manager addresses that gap by providing:
+Kode Stream addresses that gap by providing:
 
 - A Workstream with a board view over document-backed items
 - Multi-workspace and multi-source support (`plans`, `docs`, `specs`, etc.)
@@ -69,7 +69,7 @@ Platform-specific tools used for native folder/file selection and path reveal:
 - Windows: PowerShell, Explorer
 - Linux: `zenity` or `kdialog` (picker), `xdg-open` (reveal)
 
-External AI session launch currently supports macOS Terminal, iTerm2, and WezTerm. Install and authenticate at least one supported AI CLI separately. Plan Manager does not bypass the CLI's permission prompts or sandbox.
+External AI session launch currently supports macOS Terminal, iTerm2, and WezTerm. Install and authenticate at least one supported AI CLI separately. Kode Stream does not bypass the CLI's permission prompts or sandbox.
 
 Embedded AI sessions are also available on macOS and supported Unix hosts. They run the selected provider in an app-owned terminal with explicit cancel, reconnect, and exit state. External launch remains the fallback on unsupported platforms or when users prefer a native terminal.
 
@@ -80,32 +80,32 @@ The terminal dock supports multiple concurrent sessions across workspaces. Minim
 ```bash
 npm install
 npm run build
-go build -o ./bin/plan-manager ./cmd/plan-manager
-./bin/plan-manager serve -port 4317
+go build -o ./bin/kode-stream ./cmd/kode-stream
+./bin/kode-stream serve -port 4317
 ```
 
 Open `http://127.0.0.1:4317`.
 
-Default port is `4317`. You can also set `PLAN_MANAGER_PORT`:
+Default port is `4317`. You can also set `KODE_STREAM_PORT`:
 
 ```bash
-PLAN_MANAGER_PORT=4317 ./bin/plan-manager serve
+KODE_STREAM_PORT=4317 ./bin/kode-stream serve
 ```
 
 ## Install With Homebrew (macOS)
 
-For macOS users, Plan Manager can be installed from the public tap:
+For macOS users, Kode Stream can be installed from the public tap:
 
 ```bash
 brew update
 brew tap kriskhoavu/homebrew-tap
-brew install plan-manager
+brew install kode-stream
 ```
 
 Run the app:
 
 ```bash
-plan-manager serve -port 4317
+kode-stream serve -port 4317
 ```
 
 Open `http://127.0.0.1:4317` in your browser.
@@ -113,13 +113,13 @@ Open `http://127.0.0.1:4317` in your browser.
 Run in the background (optional):
 
 ```bash
-nohup plan-manager serve -port 4317 >/dev/null 2>&1 &
+nohup kode-stream serve -port 4317 >/dev/null 2>&1 &
 ```
 
 Stop the app:
 
 ```bash
-pkill -f "plan-manager serve"
+pkill -f "kode-stream serve"
 ```
 
 If running in the foreground, press `Ctrl+C` in the same terminal.
@@ -127,14 +127,14 @@ If running in the foreground, press `Ctrl+C` in the same terminal.
 Validate the installed formula:
 
 ```bash
-plan-manager doctor
-brew test plan-manager
+kode-stream doctor
+brew test kode-stream
 ```
 
 Notes:
 
 - Homebrew formula support is currently macOS only.
-- Use `brew upgrade plan-manager` for updates.
+- Use `brew upgrade kode-stream` for updates.
 
 ## Development
 
@@ -148,14 +148,14 @@ Useful build commands:
 
 ```bash
 npm run build
-go build -o ./bin/plan-manager ./cmd/plan-manager
+go build -o ./bin/kode-stream ./cmd/kode-stream
 ```
 
 ## CLI Commands
 
 ```text
-plan-manager serve [-port 4317]
-plan-manager doctor [--provider github|bitbucket] [--repo <path-or-url>] [--format text|json] [--strict] [--port <n>]
+kode-stream serve [-port 4317]
+kode-stream doctor [--provider github|bitbucket] [--repo <path-or-url>] [--format text|json] [--strict] [--port <n>]
 ```
 
 - `serve`: starts the local app server (binds to `127.0.0.1`)
@@ -163,17 +163,17 @@ plan-manager doctor [--provider github|bitbucket] [--repo <path-or-url>] [--form
 
 ## Data Directory and Settings
 
-Plan Manager stores app-owned state in a user-level data directory (resolved via `os.UserConfigDir()`).
+Kode Stream stores app-owned state in a user-level data directory (resolved via `os.UserConfigDir()`).
 
 Typical defaults:
 
-- macOS: `~/Library/Application Support/plan-manager/`
-- Linux: `~/.config/plan-manager/`
-- Windows: `%AppData%\plan-manager\`
+- macOS: `~/Library/Application Support/kode-stream/`
+- Linux: `~/.config/kode-stream/`
+- Windows: `%AppData%\kode-stream\`
 
 Resolution order at startup:
 
-1. `PLAN_MANAGER_DATA_DIR` environment variable
+1. `KODE_STREAM_DATA_DIR` environment variable
 2. `bootstrap.yaml` override in the default OS data directory
 3. Default OS data directory
 
@@ -186,14 +186,14 @@ When changed from the UI, override is written to:
 Example:
 
 ```yaml
-dataDir: /Users/me/.plan-manager-data
+dataDir: /Users/me/.kode-stream-data
 ```
 
 Changing `dataDir` requires a restart.
 
 AI settings contain executable paths and argument templates only. Workspace-only sessions open at the workspace root without generated context, allowing manual file and directory references. Selected-card sessions pass the card's workspace-relative path directly to the AI, which can read relevant documents from that directory before waiting for the user's request. No context file or directory is created.
 
-Embedded terminal grants remain in browser memory and expire quickly. Closing or navigating away from a running session requires confirmation; cancellation, disconnect timeout, and Plan Manager shutdown clean up the provider process.
+Embedded terminal grants remain in browser memory and expire quickly. Closing or navigating away from a running session requires confirmation; cancellation, disconnect timeout, and Kode Stream shutdown clean up the provider process.
 
 Jira token lookup checks the running process environment first and then falls back to `~/.creds.zsh` and `~/.creds.sh` if the environment variable is missing. The file must contain an exported variable such as `export CC_JIRA_API_TOKEN="..."`.
 
@@ -230,7 +230,7 @@ cards:
       tags: [docs]
 ```
 
-If source settings are missing or invalid, Plan Manager falls back to freestyle docs handling.
+If source settings are missing or invalid, Kode Stream falls back to freestyle docs handling.
 
 ## Safety Model
 
@@ -242,7 +242,7 @@ If source settings are missing or invalid, Plan Manager falls back to freestyle 
 - Pull and branch switch protect dirty trees unless risk is explicitly confirmed
 - No credential storage
 
-Plan Manager writes into managed repositories only for explicit user actions (edit, metadata/status update, item
+Kode Stream writes into managed repositories only for explicit user actions (edit, metadata/status update, item
 creation, source settings save, commit/pull/push, branch operations). Registry and cache remain app-owned.
 Import preview is read-only. Confirmed imports merge into the effective app registry with one atomic replacement, then
 scan each new workspace independently. Imported directories are never treated as app-managed clones and are not removed
@@ -251,9 +251,9 @@ when their registrations are deleted.
 ## Project Layout
 
 ```text
-plan-manager/
+kode-stream/
 ├── cmd/
-│   └── plan-manager/                # CLI entrypoint
+│   └── kode-stream/                # CLI entrypoint
 ├── internal/
 │   ├── server/                      # Composition root, API transport, embedded frontend
 │   ├── common/                      # Shared errors, HTTP helpers, compatibility contracts

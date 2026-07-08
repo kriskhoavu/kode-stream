@@ -1419,7 +1419,7 @@ function confirmSnapshotMaterialization(item: ItemSummary | ItemDetail | null, o
     ? 'only this docs file'
     : `the whole plan at ${item.itemPath || item.identifier}`;
   const action = operation === 'status' ? 'move it' : operation === 'metadata' ? 'edit its metadata' : 'edit it';
-  const message = `This item is loaded from branch ${item.branch}. To ${action}, Plan Manager will copy ${copyTarget} into the current checkout branch, then apply your change there.`;
+  const message = `This item is loaded from branch ${item.branch}. To ${action}, Kode Stream will copy ${copyTarget} into the current checkout branch, then apply your change there.`;
   return window.confirm(message) ? true : null;
 }
 

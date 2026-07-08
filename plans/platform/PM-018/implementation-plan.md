@@ -79,7 +79,7 @@ Deliver provider detection, safe context selection, macOS external-terminal laun
 - [x] Update architecture, requirements baseline, and user documentation.
 - [x] Run full backend, frontend, and production build checks.
 
-**Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/plan-manager`
+**Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/kode-stream`
 
 **Commit:** `PM-018: Verify external AI session launch`
 

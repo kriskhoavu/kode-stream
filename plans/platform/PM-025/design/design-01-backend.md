@@ -77,7 +77,7 @@ Add a workspace-scoped Jira lookup that does not require an existing item, exten
 
 | Decision                                  | Rationale                                                                   |
 |-------------------------------------------|-----------------------------------------------------------------------------|
-| Workspace-scoped Jira lookup              | A ticket can exist before any Plan Manager item exists                      |
+| Workspace-scoped Jira lookup              | A ticket can exist before any Kode Stream item exists                      |
 | No new Jira persistence                   | Jira remains authoritative and PM-019 avoids a stale local issue cache      |
 | README context instead of ticket snapshot | Gives AI enough context while keeping the plan folder simple                |
 | Built-in presets for v1                   | Enables guided AI planning without creating a new registry or settings file |

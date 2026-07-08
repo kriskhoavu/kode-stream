@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	"plan-manager/internal/filesystem/pathguard"
-	"plan-manager/internal/filesystem/writeguard"
-	gitadapter "plan-manager/internal/git"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/workspace/registry"
-	"plan-manager/internal/workspace/scanner"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	"kode-stream/internal/filesystem/pathguard"
+	"kode-stream/internal/filesystem/writeguard"
+	gitadapter "kode-stream/internal/git"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
 )
 
 type Writer struct {

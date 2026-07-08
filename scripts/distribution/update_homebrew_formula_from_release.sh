@@ -17,7 +17,7 @@ fi
 
 TAP_PATH="${2:-../homebrew-tap}"
 TAG="v${VERSION}"
-FORMULA_FILE="$TAP_PATH/Formula/plan-manager.rb"
+FORMULA_FILE="$TAP_PATH/Formula/kode-stream.rb"
 SUMS_FILE="/tmp/SHA256SUMS-v${VERSION}"
 
 if [[ ! -f "$FORMULA_FILE" ]]; then
@@ -26,10 +26,10 @@ if [[ ! -f "$FORMULA_FILE" ]]; then
 fi
 
 echo "==> Downloading checksums for ${TAG}"
-curl -fL "https://github.com/kriskhoavu/plan-manager/releases/download/${TAG}/SHA256SUMS" -o "$SUMS_FILE"
+curl -fL "https://github.com/kriskhoavu/kode-stream/releases/download/${TAG}/SHA256SUMS" -o "$SUMS_FILE"
 
-ARM64_SHA="$(awk '/plan-manager_'"${VERSION}"'_darwin_arm64.tar.gz/{print $1}' "$SUMS_FILE")"
-AMD64_SHA="$(awk '/plan-manager_'"${VERSION}"'_darwin_amd64.tar.gz/{print $1}' "$SUMS_FILE")"
+ARM64_SHA="$(awk '/kode-stream_'"${VERSION}"'_darwin_arm64.tar.gz/{print $1}' "$SUMS_FILE")"
+AMD64_SHA="$(awk '/kode-stream_'"${VERSION}"'_darwin_amd64.tar.gz/{print $1}' "$SUMS_FILE")"
 
 if [[ -z "$ARM64_SHA" || -z "$AMD64_SHA" ]]; then
   echo "Could not extract darwin checksums from $SUMS_FILE"
@@ -66,12 +66,12 @@ print(f"Updated {formula}")
 PY
 
 echo "==> Committing tap update"
-git -C "$TAP_PATH" add Formula/plan-manager.rb
+git -C "$TAP_PATH" add Formula/kode-stream.rb
 if git -C "$TAP_PATH" diff --cached --quiet; then
   echo "No formula changes to commit."
   exit 0
 fi
 
-git -C "$TAP_PATH" commit -m "plan-manager: update to v${VERSION}"
+git -C "$TAP_PATH" commit -m "kode-stream: update to v${VERSION}"
 git -C "$TAP_PATH" push
 echo "==> Done"

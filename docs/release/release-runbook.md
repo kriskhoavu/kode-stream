@@ -1,6 +1,6 @@
 # Release Runbook
 
-Canonical runbook for packaging Plan Manager, publishing GitHub releases, and updating Homebrew tap metadata.
+Canonical runbook for packaging Kode Stream, publishing GitHub releases, and updating Homebrew tap metadata.
 
 ## Scope
 
@@ -12,12 +12,12 @@ Canonical runbook for packaging Plan Manager, publishing GitHub releases, and up
 ## Prerequisites
 
 - `git`, `gh`, `npm`, `go`, `python3`, `zip`, `tar`, `shasum`.
-- GitHub authentication for `kriskhoavu/plan-manager` and `kriskhoavu/homebrew-tap`.
+- GitHub authentication for `kriskhoavu/kode-stream` and `kriskhoavu/homebrew-tap`.
 - Tap repo cloned as sibling directory: `../homebrew-tap`.
 
 ## Primary Automation
 
-Use the one-shot script from the `plan-manager` repository root:
+Use the one-shot script from the `kode-stream` repository root:
 
 ```bash
 ./scripts/distribution/release_and_update_tap.sh 1.0.0 ../homebrew-tap
@@ -31,7 +31,7 @@ What it does:
 4. Creates/pushes `v<version>` tag if needed.
 5. Creates or updates GitHub release assets.
 6. Downloads `SHA256SUMS` from the release.
-7. Updates `../homebrew-tap/Formula/plan-manager.rb` checksums.
+7. Updates `../homebrew-tap/Formula/kode-stream.rb` checksums.
 8. Commits and pushes the tap formula update.
 
 ## Homebrew-only Helper
@@ -53,9 +53,9 @@ This script:
 ```bash
 brew update
 brew tap kriskhoavu/homebrew-tap
-brew install plan-manager
-plan-manager doctor
-brew test plan-manager
+brew install kode-stream
+kode-stream doctor
+brew test kode-stream
 ```
 
 ## Troubleshooting
@@ -68,5 +68,5 @@ brew test plan-manager
 
 - `scripts/distribution/release_and_update_tap.sh`
 - `scripts/distribution/update_homebrew_formula_from_release.sh`
-- `packaging/homebrew/Formula/plan-manager.rb`
+- `packaging/homebrew/Formula/kode-stream.rb`
 - `docs/distribution/homebrew-tap-setup.md`

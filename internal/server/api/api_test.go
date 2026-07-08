@@ -13,16 +13,16 @@ import (
 	"testing"
 	"time"
 
-	appaisession "plan-manager/internal/ai"
-	"plan-manager/internal/audit"
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	gitadapter "plan-manager/internal/git"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/navigation"
-	appsearch "plan-manager/internal/search"
-	workspacehealth "plan-manager/internal/workspace"
-	"plan-manager/internal/workspace/registry"
+	appaisession "kode-stream/internal/ai"
+	"kode-stream/internal/audit"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	gitadapter "kode-stream/internal/git"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/navigation"
+	appsearch "kode-stream/internal/search"
+	workspacehealth "kode-stream/internal/workspace"
+	"kode-stream/internal/workspace/registry"
 )
 
 func TestAISettingsRoutesReadValidateAndPersist(t *testing.T) {

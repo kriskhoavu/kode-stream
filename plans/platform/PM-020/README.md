@@ -15,12 +15,12 @@ PM-020 builds on PM-018 by adding managed embedded PTYs as an alternative AI-ses
 
 ### Goal
 
-Let users interact with a supported AI CLI inside Plan Manager through a bounded, workspace-contained terminal session.
+Let users interact with a supported AI CLI inside Kode Stream through a bounded, workspace-contained terminal session.
 
 ### Non-Goals
 
 - No unattended AI agents or background implementation queue.
-- No remote PTY access outside the loopback Plan Manager origin.
+- No remote PTY access outside the loopback Kode Stream origin.
 - No Jira writes; PM-021 owns Jira editing.
 - No replacement of the existing external terminal launch path.
 
@@ -28,7 +28,7 @@ Let users interact with a supported AI CLI inside Plan Manager through a bounded
 
 | Term             | Meaning                                                                     |
 |------------------|-----------------------------------------------------------------------------|
-| Embedded Session | AI provider process attached to a Plan Manager-owned pseudo-terminal        |
+| Embedded Session | AI provider process attached to a Kode Stream-owned pseudo-terminal        |
 | Session Channel  | Loopback WebSocket carrying terminal input, output, resize, and lifecycle   |
 | Session Lease    | Bounded ownership period renewed while the browser remains connected        |
 | Terminal Dock    | App-level owner for switching, minimizing, maximizing, and closing sessions |

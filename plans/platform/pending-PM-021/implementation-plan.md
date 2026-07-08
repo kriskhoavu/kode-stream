@@ -78,6 +78,6 @@ Add controlled Jira field, transition, and attachment writes using PM-019 contra
 - [ ] Confirm Jira values and attachment contents never enter logs or audit payloads.
 - [ ] Update architecture, requirements baseline, security guidance, and user documentation.
 
-**Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/plan-manager`
+**Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/kode-stream`
 
 **Commit:** `PM-021: Verify guarded Jira editing`

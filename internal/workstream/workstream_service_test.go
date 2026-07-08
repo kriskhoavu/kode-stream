@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"plan-manager/internal/common/models"
-	gitadapter "plan-manager/internal/git"
-	itemindex "plan-manager/internal/item/index"
-	"plan-manager/internal/workspace/registry"
-	"plan-manager/internal/workspace/scanner"
+	"kode-stream/internal/common/models"
+	gitadapter "kode-stream/internal/git"
+	itemindex "kode-stream/internal/item/index"
+	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
 )
 
 func TestLoadBranchScansSnapshotWithoutCheckout(t *testing.T) {
@@ -94,8 +94,8 @@ func newWorkstreamGitRepo(t *testing.T) string {
 	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
-	workstreamGitRun(t, root, "config", "user.name", "Plan Manager")
-	workstreamGitRun(t, root, "config", "user.email", "plan-manager@example.test")
+	workstreamGitRun(t, root, "config", "user.name", "Kode Stream")
+	workstreamGitRun(t, root, "config", "user.email", "kode-stream@example.test")
 	return root
 }
 

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 type ConnectionTest struct {

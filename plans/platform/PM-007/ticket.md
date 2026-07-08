@@ -10,7 +10,7 @@ As a developer, I want to browse every registered workspace from one global Expl
 
 ## Problem
 
-Plan Manager only exposed indexed item folders. Users could not browse the real repository tree, preview files outside items, or use the existing Markdown workflow across a workspace.
+Kode Stream only exposed indexed item folders. Users could not browse the real repository tree, preview files outside items, or use the existing Markdown workflow across a workspace.
 
 ## Scope
 

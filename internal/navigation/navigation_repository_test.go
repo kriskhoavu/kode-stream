@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 func TestSavedFiltersCreateListUpdateAndDelete(t *testing.T) {

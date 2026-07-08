@@ -2,7 +2,7 @@
 
 ## Overview
 
-Refactor Plan Manager architecture in small behavior-preserving phases. Each phase must keep current workflows, routes, API payloads, storage files, and UI unchanged.
+Refactor Kode Stream architecture in small behavior-preserving phases. Each phase must keep current workflows, routes, API payloads, storage files, and UI unchanged.
 
 ## Phases Summary
 

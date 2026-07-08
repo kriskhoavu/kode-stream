@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/item/index"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/item/index"
 )
 
 type workspaceStub struct{ workspace models.WorkspaceConfig }

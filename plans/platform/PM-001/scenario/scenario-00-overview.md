@@ -41,7 +41,7 @@
 
 ## Starting State
 
-- The developer runs `plan-manager serve`.
+- The developer runs `kode-stream serve`.
 - The browser opens the local app.
 - This repository exists on disk.
 
@@ -49,7 +49,7 @@
 
 1. Developer opens Repositories.
 2. Developer enters:
-   - Name: `Plan Manager`
+   - Name: `Kode Stream`
    - Path: current repository path
    - Baseline branch: `main`
    - Plan directories: `plans`, optionally `docs`
@@ -80,7 +80,7 @@
 4. Backend parses `plan.yaml` when present.
 5. Backend creates normal plan cards with inferred metadata when structured folders are missing `plan.yaml`.
 6. Backend creates docs cards when a docs root contains Markdown without plan structure.
-7. Backend writes only to the Plan Manager app cache.
+7. Backend writes only to the Kode Stream app cache.
 
 ## Expected Result
 

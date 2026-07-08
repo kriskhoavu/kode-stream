@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 type workspaceSettingsMatch struct {

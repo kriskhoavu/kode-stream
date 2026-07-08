@@ -21,7 +21,7 @@ export function SettingsPage({ settings, onChange }: { settings: AppSettings; on
     <section className="settings-page">
       <header className="settings-title">
         <h1><SettingsIcon size={22} /> Settings</h1>
-        <p>Configure how Plan Manager presents workspace and board metadata.</p>
+        <p>Configure how Kode Stream presents workspace and board metadata.</p>
       </header>
 
       <section className="settings-section">

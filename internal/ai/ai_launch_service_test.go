@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"plan-manager/internal/audit"
-	"plan-manager/internal/common/models"
-	gitadapter "plan-manager/internal/git"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/workspace/registry"
+	"kode-stream/internal/audit"
+	"kode-stream/internal/common/models"
+	gitadapter "kode-stream/internal/git"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/workspace/registry"
 )
 
 type recordedProcess struct {

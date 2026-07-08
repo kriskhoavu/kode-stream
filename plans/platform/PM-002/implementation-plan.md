@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement safe plan authoring and guarded Git operations for the local Plan Manager app.
+Implement safe plan authoring and guarded Git operations for the local Kode Stream app.
 
 PM-002 builds on PM-001. It keeps existing read APIs stable and adds write APIs, editor UI, metadata editing, new plan creation, status moves, and Git controls.
 
@@ -234,7 +234,7 @@ PM-002: Add plan editing UI
 - [x] Restart the app on port `4317`.
 - [x] Smoke test the running app.
 
-**Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go build -o ./bin/plan-manager ./cmd/plan-manager`
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go build -o ./bin/kode-stream ./cmd/kode-stream`
 
 **Draft Commit:**
 ```text

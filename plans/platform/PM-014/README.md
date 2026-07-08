@@ -1,6 +1,6 @@
 # PM-014: Visual Source Items Proposals
 
-PM-014 makes Source Items configuration easier by letting Plan Manager inspect a source directory, propose likely card rules, and preview how each rule maps real paths into Kanban items before the user saves `workspace-settings.yaml`.
+PM-014 makes Source Items configuration easier by letting Kode Stream inspect a source directory, propose likely card rules, and preview how each rule maps real paths into Kanban items before the user saves `workspace-settings.yaml`.
 
 ## Related Plans
 

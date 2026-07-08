@@ -44,7 +44,7 @@ PM-005 adds read-only search APIs and local saved-filter storage. It uses the ex
 ## Storage
 
 ```text
-<user-config-dir>/plan-manager/
+<user-config-dir>/kode-stream/
   saved-filters.yaml
   recent-items.yaml
   item-index.yaml

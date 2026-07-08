@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	gitadapter "plan-manager/internal/git"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/workspace/scanner"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	gitadapter "kode-stream/internal/git"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/workspace/scanner"
 )
 
 func TestSaveMetadataCreatesPlanYAML(t *testing.T) {

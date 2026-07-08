@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement a review-first import from a current-schema `workspaces.yaml` into Plan Manager's effective OS-specific registry. Registration is atomic; indexing runs per imported workspace and reports partial failures.
+Implement a review-first import from a current-schema `workspaces.yaml` into Kode Stream's effective OS-specific registry. Registration is atomic; indexing runs per imported workspace and reports partial failures.
 
 ## Phases Summary
 

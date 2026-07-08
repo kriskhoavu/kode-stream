@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
-	"plan-manager/internal/common/models"
-	gitadapter "plan-manager/internal/git"
+	"kode-stream/internal/common/models"
+	gitadapter "kode-stream/internal/git"
 )
 
 func TestCreateDefaultsRegistrationModeToLocalPath(t *testing.T) {

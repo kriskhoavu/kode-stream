@@ -87,21 +87,21 @@ Snapshot mode:
 
 - Cards, details, and files are viewable.
 - First edit to a snapshot item shows a confirmation dialog.
-- Structured plans say Plan Manager will copy the whole plan folder.
-- Freestyle docs say Plan Manager will copy the edited file.
+- Structured plans say Kode Stream will copy the whole plan folder.
+- Freestyle docs say Kode Stream will copy the edited file.
 - After confirmation, the write request includes `materializeConfirmed: true`.
 - On success, the board reloads current checkout branch data enough to show the materialized item as working-tree content.
 
 Confirmation copy:
 
 ```text
-This item is loaded from branch DI-445. To edit it, Plan Manager will copy plans/DI-445 into the current checkout branch master, then apply your change there.
+This item is loaded from branch DI-445. To edit it, Kode Stream will copy plans/DI-445 into the current checkout branch master, then apply your change there.
 ```
 
 Docs copy:
 
 ```text
-This file is loaded from branch docs-update. To edit it, Plan Manager will copy this file into the current checkout branch master, then apply your change there.
+This file is loaded from branch docs-update. To edit it, Kode Stream will copy this file into the current checkout branch master, then apply your change there.
 ```
 
 Conflict error:

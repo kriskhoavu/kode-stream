@@ -17,7 +17,7 @@ PM-016 adds a second workspace registration mode so users can register by remote
 | Registration Mode       | How a workspace is created: `local_path` or `remote_clone`            |
 | Remote URL              | Git repository URL using HTTPS or SSH                                 |
 | Clone Root              | Local directory selected by user where the repository is cloned        |
-| Managed Clone Workspace | Workspace cloned by Plan Manager but used as a normal local Git path   |
+| Managed Clone Workspace | Workspace cloned by Kode Stream but used as a normal local Git path   |
 
 ## Data Flow
 

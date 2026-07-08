@@ -171,7 +171,7 @@ User selects Enrich
 - Timeout terminates the process, records failure, and does not rescan.
 - Non-zero exit records failure and preserves the previous index.
 - Output beyond the limit is truncated with an explicit indicator.
-- Workspace files changed by a failed process remain visible in Git status; Plan Manager never resets them.
+- Workspace files changed by a failed process remain visible in Git status; Kode Stream never resets them.
 
 ## Scenario 7: Recover From Bad Content
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 var (

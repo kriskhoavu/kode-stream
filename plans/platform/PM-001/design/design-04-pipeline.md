@@ -27,8 +27,8 @@ Prepare
 | Frontend typecheck  | `npm run typecheck`                            |
 | Frontend unit tests | `npm test`                                     |
 | Frontend build      | `npm run build`                                |
-| Binary build        | `go build ./cmd/plan-manager`                  |
-| App smoke           | `plan-manager serve`                           |
+| Binary build        | `go build ./cmd/kode-stream`                  |
+| App smoke           | `kode-stream serve`                           |
 | Browser acceptance  | AI agent runs Playwright MCP against localhost |
 
 ## Playwright MCP Acceptance Flow
@@ -82,7 +82,7 @@ The AI agent must run this flow during UI and integration phases.
 | Build matrix      | Build binaries for supported OS and CPU targets |
 | Package archive   | Create release artifacts                        |
 | Generate checksum | Support Homebrew formula                        |
-| Publish formula   | Enable `brew install plan-manager`              |
+| Publish formula   | Enable `brew install kode-stream`              |
 
 ## Design Decisions
 

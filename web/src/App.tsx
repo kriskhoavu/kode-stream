@@ -89,9 +89,9 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="left-nav">
-        <button className="brand" onClick={() => navigate({ name: 'workstream' })} aria-label="Plan Manager home">
+        <button className="brand" onClick={() => navigate({ name: 'workstream' })} aria-label="Kode Stream home">
           <Boxes size={20} />
-          <span>Plan Manager</span>
+          <span>Kode Stream</span>
         </button>
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>

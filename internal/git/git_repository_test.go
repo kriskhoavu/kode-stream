@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 func TestParseBranchLine(t *testing.T) {
@@ -95,7 +95,7 @@ func TestTreeReadsBranchSnapshotWithoutCheckout(t *testing.T) {
 	if strings.Join(filePaths, ",") != "plans/snapshot/README.md,plans/snapshot/design/backend.md" {
 		t.Fatalf("walked files = %#v", filePaths)
 	}
-	if author := adapter.LastAuthorAtRef(root, ref, "plans/snapshot/README.md"); author != "Plan Manager" {
+	if author := adapter.LastAuthorAtRef(root, ref, "plans/snapshot/README.md"); author != "Kode Stream" {
 		t.Fatalf("author = %q", author)
 	}
 	if updated := adapter.LastUpdateAtRef(root, ref, "plans/snapshot/README.md"); updated.IsZero() {
@@ -192,8 +192,8 @@ func newGitRepo(t *testing.T) string {
 	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
-	gitRun(t, root, "config", "user.name", "Plan Manager")
-	gitRun(t, root, "config", "user.email", "plan-manager@example.test")
+	gitRun(t, root, "config", "user.name", "Kode Stream")
+	gitRun(t, root, "config", "user.email", "kode-stream@example.test")
 	return root
 }
 

@@ -155,7 +155,7 @@ PM-013: Enforce branch materialization safety
 Change summary:
 - Guard direct writes by current checkout branch
 - Validate materialized target paths before writes
-- Keep destructive Git operations outside Plan Manager ownership
+- Keep destructive Git operations outside Kode Stream ownership
 ```
 
 ## Frontend Phases
@@ -279,4 +279,4 @@ Change summary:
 - [x] Snapshot freestyle docs edit copies only the edited file.
 - [x] Existing target files block materialization.
 - [x] Refreshing one branch preserves other branch indexed items.
-- [x] All writes remain inside Plan Manager safety boundary.
+- [x] All writes remain inside Kode Stream safety boundary.

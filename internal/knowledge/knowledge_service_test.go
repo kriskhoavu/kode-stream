@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
-	"plan-manager/internal/common/models"
-	gitadapter "plan-manager/internal/git"
-	"plan-manager/internal/workspace/registry"
+	"kode-stream/internal/common/models"
+	gitadapter "kode-stream/internal/git"
+	"kode-stream/internal/workspace/registry"
 )
 
 type stubDetector struct {

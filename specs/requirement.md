@@ -1,8 +1,8 @@
-# Plan Manager
+# Kode Stream
 
 ## Vision
 
-Plan Manager is a lightweight Git-native web application running locally on the developer machine.
+Kode Stream is a lightweight Git-native web application running locally on the developer machine.
 
 Instead of browsing plans through Git branches and folders, users can manage them through a Kanban-style interface while still keeping everything in Git.
 
@@ -10,7 +10,7 @@ Instead of browsing plans through Git branches and folders, users can manage the
 
 ### Repository
 
-A local Git repository registered with Plan Manager.
+A local Git repository registered with Kode Stream.
 
 ### Plan
 
@@ -27,9 +27,9 @@ plans/{service}/{ticket-id}/
 │ └── design-0N-infrastructure.md
 └── implementation-plan.md # Phase-by-phase with draft commit per phase
 
-Repositories may define their own plan structure through a repository configuration file. When no custom configuration is provided, Plan Manager falls back to the default plans/ structure described above.
+Repositories may define their own plan structure through a repository configuration file. When no custom configuration is provided, Kode Stream falls back to the default plans/ structure described above.
 
-Plan Manager automatically discovers, indexes, and visualizes plans across branches, enabling teams to browse, review, edit, and track planning artifacts in a unified interface.
+Kode Stream automatically discovers, indexes, and visualizes plans across branches, enabling teams to browse, review, edit, and track planning artifacts in a unified interface.
 ⸻
 
 ## Functional Requirements
@@ -198,11 +198,11 @@ Preferred: Homebrew
 Install:
 
 ```bash
-brew install plan-manager
+brew install kode-stream
 ```
 
 Update:
 
 ```bash
-brew upgrade plan-manager
+brew upgrade kode-stream
 ```

@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/workspace/registry"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/workspace/registry"
 )
 
 type IssueState struct {
@@ -121,7 +121,7 @@ func (s *Service) issueByKey(ctx context.Context, workspace models.WorkspaceConf
 	case errors.Is(err, ErrAuthentication):
 		state.State = "authentication_failed"
 		state.Message = err.Error()
-		state.RecoveryHint = "Check the configured token environment variable and restart Plan Manager."
+		state.RecoveryHint = "Check the configured token environment variable and restart Kode Stream."
 	case errors.Is(err, ErrForbidden):
 		state.State = "forbidden"
 		state.Message = err.Error()

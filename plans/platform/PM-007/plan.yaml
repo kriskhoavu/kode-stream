@@ -7,7 +7,7 @@ plan:
   status: implemented
   owner: null
   tags:
-    - plan-manager
+    - kode-stream
     - explorer
     - workspace
     - filesystem

@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	gitadapter "plan-manager/internal/git"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/item/writer"
-	"plan-manager/internal/workspace/registry"
-	"plan-manager/internal/workspace/scanner"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	gitadapter "kode-stream/internal/git"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/item/writer"
+	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
 )
 
 func TestDetailNormalizesCollectionsAndReadsFullReadmeDescription(t *testing.T) {
@@ -256,8 +256,8 @@ func newItemGitRepo(t *testing.T) string {
 	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
-	itemGitRun(t, root, "config", "user.name", "Plan Manager")
-	itemGitRun(t, root, "config", "user.email", "plan-manager@example.test")
+	itemGitRun(t, root, "config", "user.name", "Kode Stream")
+	itemGitRun(t, root, "config", "user.email", "kode-stream@example.test")
 	return root
 }
 

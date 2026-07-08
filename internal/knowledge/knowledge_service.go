@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	"plan-manager/internal/workspace/registry"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	"kode-stream/internal/workspace/registry"
 )
 
 var (

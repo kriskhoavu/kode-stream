@@ -2,7 +2,7 @@
 
 ## Goals
 
-- Package Plan Manager as a local app.
+- Package Kode Stream as a local app.
 - Keep the managed repositories clean.
 - Support Homebrew distribution later.
 - Provide repeatable local build and test commands.
@@ -22,7 +22,7 @@
 ## Storage Layout
 
 ```text
-{user-data}/plan-manager/
+{user-data}/kode-stream/
   repositories.yaml
   plan-index.yaml
   logs/
@@ -36,8 +36,8 @@
 | `npm run typecheck`           | Frontend TypeScript check          |
 | `npm test`                    | Frontend unit tests                |
 | `npm run build`               | Frontend production build          |
-| `go build ./cmd/plan-manager` | Build local binary                 |
-| `plan-manager serve`          | Start local app                    |
+| `go build ./cmd/kode-stream` | Build local binary                 |
+| `kode-stream serve`          | Start local app                    |
 
 ## Binary Packaging
 
@@ -63,11 +63,11 @@
 
 | Step                 | Output                      |
 |----------------------|-----------------------------|
-| Build release binary | `plan-manager`              |
+| Build release binary | `kode-stream`              |
 | Archive binary       | tarball or zip              |
 | Publish checksum     | SHA256                      |
-| Formula install      | `brew install plan-manager` |
-| Formula upgrade      | `brew upgrade plan-manager` |
+| Formula install      | `brew install kode-stream` |
+| Formula upgrade      | `brew upgrade kode-stream` |
 
 ## Security
 
@@ -79,7 +79,7 @@
 - Do not allow file reads outside configured plan directories.
 - Do not follow symlinks that escape configured plan directories.
 - Directory picker and reveal actions must not bypass indexed file access rules.
-- Repository edit and delete actions write only Plan Manager app data.
+- Repository edit and delete actions write only Kode Stream app data.
 
 ## Performance Constraints
 

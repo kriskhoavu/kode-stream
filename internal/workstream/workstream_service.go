@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	apperrors "plan-manager/internal/common"
-	"plan-manager/internal/common/models"
-	gitadapter "plan-manager/internal/git"
-	itemindex "plan-manager/internal/item/index"
-	"plan-manager/internal/workspace/registry"
-	"plan-manager/internal/workspace/scanner"
+	apperrors "kode-stream/internal/common"
+	"kode-stream/internal/common/models"
+	gitadapter "kode-stream/internal/git"
+	itemindex "kode-stream/internal/item/index"
+	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
 )
 
 type Service struct {

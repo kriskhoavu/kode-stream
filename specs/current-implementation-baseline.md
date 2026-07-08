@@ -1,11 +1,11 @@
-# Plan Manager Requirement (Current Implementation Baseline)
+# Kode Stream Requirement (Current Implementation Baseline)
 
 This document defines the currently implemented product scope, based on
 `plans/platform/current-spec/*`.
 
 ## 1. Vision and Scope
 
-Plan Manager is a local Git-native web application for managing planning artifacts
+Kode Stream is a local Git-native web application for managing planning artifacts
 from one or more Git workspaces. It provides Kanban, explorer, and item-level
 editing workflows while keeping all source-of-truth data in Git repositories.
 
@@ -19,9 +19,9 @@ The system is single-user and local-first:
 
 ### 2.1 CLI and Server Runtime
 
-- The CLI must support `plan-manager serve [-port]`.
+- The CLI must support `kode-stream serve [-port]`.
 - Default port is `4317`.
-- If `-port` is not provided, `PLAN_MANAGER_PORT` must be used when set.
+- If `-port` is not provided, `KODE_STREAM_PORT` must be used when set.
 - Server must expose JSON API under `/api/*` and serve the SPA frontend.
 - Unknown top-level frontend routes must resolve to Kanban behavior.
 
@@ -529,7 +529,7 @@ Audit events must store operation, status (`success`, `blocked`, `failed`),
 message, paths, duration, and error metadata.
 
 Frontend reliability surfaces must refresh health/activity on initial mount,
-explicit refresh, and `plan-manager:reliability-changed` events after write/Git
+explicit refresh, and `kode-stream:reliability-changed` events after write/Git
 actions.
 
 ### 10.2 Stale Content Awareness
@@ -583,7 +583,7 @@ Limits for item and explorer content-search endpoints:
 
 App-managed files must be stored under:
 
-`<user-config-dir>/plan-manager/`
+`<user-config-dir>/kode-stream/`
 
 Required files:
 
@@ -598,7 +598,7 @@ Required files:
 
 ### 13.1 Settings and Detection
 
-Plan Manager must detect supported local AI providers and terminal applications without starting them. Machine-specific settings are stored in `ai-settings.yaml` with mode `0600` and expose:
+Kode Stream must detect supported local AI providers and terminal applications without starting them. Machine-specific settings are stored in `ai-settings.yaml` with mode `0600` and expose:
 
 - `GET /api/ai/capabilities`
 - `GET /api/ai/settings`

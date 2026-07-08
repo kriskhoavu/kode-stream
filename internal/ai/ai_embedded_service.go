@@ -3,7 +3,7 @@ package ai
 import (
 	"strings"
 
-	"plan-manager/internal/filesystem/pathguard"
+	"kode-stream/internal/filesystem/pathguard"
 )
 
 type EmbeddedInput struct {

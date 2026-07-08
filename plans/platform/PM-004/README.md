@@ -1,6 +1,6 @@
 # PM-004: Reliability, Safety, And Observability
 
-PM-004 makes Plan Manager safer to use when it reads files, writes files, and runs Git commands. It adds local audit history, stronger operation feedback, workspace health checks, and better stale-file protection. It does not add cloud storage.
+PM-004 makes Kode Stream safer to use when it reads files, writes files, and runs Git commands. It adds local audit history, stronger operation feedback, workspace health checks, and better stale-file protection. It does not add cloud storage.
 
 ## Implementation Status
 
@@ -18,7 +18,7 @@ Verification: `go test ./...`, `npm run typecheck`, `npm test -- --run`, and `np
 
 ### What Existing Plans Established
 
-- **Workspace**: a local Git repository registered in Plan Manager.
+- **Workspace**: a local Git repository registered in Kode Stream.
 - **Source**: a configured scan root such as `plans` or `docs`.
 - **Item**: a planning folder or docs card.
 - **Write Guard**: backend checks that keep writes inside configured sources.

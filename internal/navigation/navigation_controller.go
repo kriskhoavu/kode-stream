@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	apperrors "plan-manager/internal/common"
-	"plan-manager/internal/common/httpx"
-	"plan-manager/internal/common/models"
+	apperrors "kode-stream/internal/common"
+	"kode-stream/internal/common/httpx"
+	"kode-stream/internal/common/models"
 )
 
 type ItemReader interface {

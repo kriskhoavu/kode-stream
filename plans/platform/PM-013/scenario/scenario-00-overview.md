@@ -139,7 +139,7 @@ User edits docs/reference/install.md
 ## Expected Result
 
 - Only the edited docs file is created in `master`.
-- Plan Manager does not copy the full `docs/` source.
+- Kode Stream does not copy the full `docs/` source.
 - If the docs path maps to a detected structured item, the structured whole-item rule applies instead.
 
 ## Scenario 5: Block Materialization Conflict

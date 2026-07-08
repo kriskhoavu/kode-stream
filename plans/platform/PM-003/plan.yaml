@@ -7,7 +7,7 @@ plan:
   status: draft
   owner: null
   tags:
-    - plan-manager
+    - kode-stream
     - architecture
     - refactoring
     - maintainability

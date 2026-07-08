@@ -1,6 +1,6 @@
 # PM-019: Read-Only Jira Integration and Workspace Settings Redesign
 
-PM-019 connects a registered workspace to Jira Cloud or Jira Server/Data Center. It also redesigns the Workspaces page so Jira and future workspace settings do not turn the workspace list into a collection of inline forms. Plan Manager matches an item's identifier to its Jira issue, presents normalized issue details in the item workspace, and provides guarded attachment access without writing to Jira.
+PM-019 connects a registered workspace to Jira Cloud or Jira Server/Data Center. It also redesigns the Workspaces page so Jira and future workspace settings do not turn the workspace list into a collection of inline forms. Kode Stream matches an item's identifier to its Jira issue, presents normalized issue details in the item workspace, and provides guarded attachment access without writing to Jira.
 
 ## Related Plans
 
@@ -23,7 +23,7 @@ Display a matching Jira ticket, safely access its attachments, and provide a sca
 - No Jira field, status, comment, or attachment mutations; PM-021 owns writes.
 - No Jira-driven Kanban synchronization.
 - No automatic attachment loading or untrusted Jira HTML rendering.
-- No token persistence by Plan Manager.
+- No token persistence by Kode Stream.
 - No backend workspace or Jira contract changes solely for the page redesign.
 - No redesign of Kanban, Explorer, or item workspace navigation.
 
@@ -33,7 +33,7 @@ Display a matching Jira ticket, safely access its attachments, and provide a sca
 |----------------------------|----------------------------------------------------------------------------|
 | Jira Connection            | Per-workspace deployment, base URL, project, identity, and token reference |
 | Deployment Type            | `cloud` or `server`                                                        |
-| Token Environment Variable | Environment variable read by the Plan Manager process                      |
+| Token Environment Variable | Environment variable read by the Kode Stream process                      |
 | Issue Key                  | Uppercase project key and number, such as `DI-170`                         |
 | Normalized Issue           | Common API model produced from Cloud or Server/Data Center responses       |
 | Attachment Proxy           | Backend route that validates and streams Jira attachment content           |

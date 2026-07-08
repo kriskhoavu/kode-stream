@@ -44,7 +44,7 @@ vitest.config.js
 vitest.config.d.ts
 
 ### Local builds ###
-/plan-manager
+/kode-stream
 /.run/
 /internal/server/frontend/assets/
 /release/

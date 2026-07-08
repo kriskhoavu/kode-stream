@@ -1,8 +1,8 @@
-# Plan Manager Architecture
+# Kode Stream Architecture
 
 This document describes the current architecture.
 
-Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
+Kode Stream is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
 ## Goals
 
@@ -66,7 +66,7 @@ User browser
 
 | Component             | Package               | Responsibility                                                                  |
 |-----------------------|-----------------------|---------------------------------------------------------------------------------|
-| CLI entrypoint        | `cmd/plan-manager`    | Parses `serve` and `doctor` commands                                            |
+| CLI entrypoint        | `cmd/kode-stream`    | Parses `serve` and `doctor` commands                                            |
 | Server                | `internal/server`     | Resolves paths, wires dependencies, and serves the API and embedded frontend    |
 | HTTP transport        | `internal/server/api` | Preserves routes and wire contracts while controllers move into domains         |
 | Shared contracts      | `internal/common`     | Owns shared errors, HTTP helpers, and compatibility DTOs                        |
@@ -253,7 +253,7 @@ Item identifier -> exact project-key match -> Cloud or Server Jira client
   -> explicit attachment action -> ownership check -> bounded backend proxy
 ```
 
-Only Jira connection metadata is persisted with the workspace. Tokens remain in the Plan Manager process environment, and fetched issues and attachments are not written to Git or the item index. Jira descriptions render as text. Attachment responses enforce issue ownership, same-origin access, size limits, safe filenames, `nosniff`, and a narrow inline image allowlist.
+Only Jira connection metadata is persisted with the workspace. Tokens remain in the Kode Stream process environment, and fetched issues and attachments are not written to Git or the item index. Jira descriptions render as text. Attachment responses enforce issue ownership, same-origin access, size limits, safe filenames, `nosniff`, and a narrow inline image allowlist.
 
 ### Workstream Explorer
 
@@ -320,10 +320,10 @@ Frontend polls /api/state
 
 ## Storage Design
 
-Plan Manager does not use a database server. It uses YAML files in the OS user config directory.
+Kode Stream does not use a database server. It uses YAML files in the OS user config directory.
 
 ```text
-<user-config-dir>/plan-manager/
+<user-config-dir>/kode-stream/
   workspaces.yaml
   item-index.yaml
   audit-log.jsonl
@@ -662,7 +662,7 @@ Production build flow:
 npm run build
   -> writes frontend assets to internal/server/frontend
 
-go build -o ./bin/plan-manager ./cmd/plan-manager
+go build -o ./bin/kode-stream ./cmd/kode-stream
   -> embeds internal/server/frontend
   -> produces one local binary
 ```
@@ -670,7 +670,7 @@ go build -o ./bin/plan-manager ./cmd/plan-manager
 Runtime flow:
 
 ```text
-./bin/plan-manager serve -port 4317
+./bin/kode-stream serve -port 4317
   -> resolves config paths
   -> opens or creates registry and index files
   -> serves API and embedded frontend

@@ -17,27 +17,27 @@ import (
 	"strings"
 	"time"
 
-	appaisession "plan-manager/internal/ai"
-	"plan-manager/internal/audit"
-	apperrors "plan-manager/internal/common"
-	"plan-manager/internal/common/httpx"
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
-	appgit "plan-manager/internal/git"
-	appitem "plan-manager/internal/item"
-	"plan-manager/internal/item/index"
-	"plan-manager/internal/item/writer"
-	appjira "plan-manager/internal/jira"
-	knowledgeindex "plan-manager/internal/knowledge"
-	"plan-manager/internal/navigation"
-	appsearch "plan-manager/internal/search"
-	"plan-manager/internal/system"
-	appworkspace "plan-manager/internal/workspace"
-	workspacehealth "plan-manager/internal/workspace"
-	workspaceaccess "plan-manager/internal/workspace/files"
-	"plan-manager/internal/workspace/registry"
-	"plan-manager/internal/workspace/scanner"
-	appworkstream "plan-manager/internal/workstream"
+	appaisession "kode-stream/internal/ai"
+	"kode-stream/internal/audit"
+	apperrors "kode-stream/internal/common"
+	"kode-stream/internal/common/httpx"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
+	appgit "kode-stream/internal/git"
+	appitem "kode-stream/internal/item"
+	"kode-stream/internal/item/index"
+	"kode-stream/internal/item/writer"
+	appjira "kode-stream/internal/jira"
+	knowledgeindex "kode-stream/internal/knowledge"
+	"kode-stream/internal/navigation"
+	appsearch "kode-stream/internal/search"
+	"kode-stream/internal/system"
+	appworkspace "kode-stream/internal/workspace"
+	workspacehealth "kode-stream/internal/workspace"
+	workspaceaccess "kode-stream/internal/workspace/files"
+	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
+	appworkstream "kode-stream/internal/workstream"
 )
 
 type API struct {
@@ -1513,7 +1513,7 @@ func recoveryHint(message string) string {
 	lower := strings.ToLower(message)
 	switch {
 	case strings.Contains(lower, "jira token environment variable"):
-		return "Set the configured environment variable or add it to ~/.creds.zsh or ~/.creds.sh, then restart Plan Manager."
+		return "Set the configured environment variable or add it to ~/.creds.zsh or ~/.creds.sh, then restart Kode Stream."
 	case strings.Contains(lower, "jira authentication"):
 		return "Check the Jira account and token configured for this workspace."
 	case strings.Contains(lower, "jira project"):

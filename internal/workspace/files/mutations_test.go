@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 func TestCreateFileAndDirectory(t *testing.T) {

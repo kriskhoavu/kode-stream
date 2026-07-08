@@ -5,10 +5,10 @@ import (
 	"sort"
 	"strings"
 
-	apperrors "plan-manager/internal/common"
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/pathguard"
-	"plan-manager/internal/filesystem/writeguard"
+	apperrors "kode-stream/internal/common"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/pathguard"
+	"kode-stream/internal/filesystem/writeguard"
 )
 
 type WorkspaceRepository interface {

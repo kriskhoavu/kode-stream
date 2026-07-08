@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	gitadapter "plan-manager/internal/git"
-	knowledgeindex "plan-manager/internal/knowledge"
-	"plan-manager/internal/workspace/registry"
+	gitadapter "kode-stream/internal/git"
+	knowledgeindex "kode-stream/internal/knowledge"
+	"kode-stream/internal/workspace/registry"
 )
 
 func TestKnowledgeRoutesRequireConfiguredService(t *testing.T) {

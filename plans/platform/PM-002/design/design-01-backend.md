@@ -2,7 +2,7 @@
 
 ## Overview
 
-PM-002 adds guarded write operations to the local Plan Manager backend.
+PM-002 adds guarded write operations to the local Kode Stream backend.
 
 The backend remains the only layer that can write to registered repositories. It validates repository IDs, plan IDs, file IDs, and paths before each write. It runs Git through the Git adapter and returns clear status results to the frontend.
 

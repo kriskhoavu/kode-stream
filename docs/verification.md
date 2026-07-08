@@ -6,8 +6,8 @@
 - Frontend typecheck: `npm run typecheck`
 - Frontend tests: `npm test`
 - Frontend production build: `npm run build`
-- Local binary build: `go build ./cmd/plan-manager`
-- Run app: `./plan-manager serve -port 4317`
+- Local binary build: `go build ./cmd/kode-stream`
+- Run app: `./kode-stream serve -port 4317`
 
 ## Embedded AI Terminal Checklist
 
@@ -35,7 +35,7 @@ After scan, run:
 git status --short
 ```
 
-Managed repositories must not show new changes caused by Plan Manager scanning.
+Managed repositories must not show new changes caused by Kode Stream scanning.
 
 ## Existing Workspace Import Checklist
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-PM-003 improves the internal architecture of Plan Manager without changing behavior, APIs, workflows, or UI. The app is stable, but several modules now combine routing, orchestration, parsing, state, and rendering in the same files. This plan documents the current debt, the target architecture, and a low-risk migration path.
+PM-003 improves the internal architecture of Kode Stream without changing behavior, APIs, workflows, or UI. The app is stable, but several modules now combine routing, orchestration, parsing, state, and rendering in the same files. This plan documents the current debt, the target architecture, and a low-risk migration path.
 
 ## Related Plans
 
@@ -13,7 +13,7 @@ PM-003 improves the internal architecture of Plan Manager without changing behav
 
 ### What PM-002 Established
 
-- **Workspace**: a local Git repository registered in Plan Manager.
+- **Workspace**: a local Git repository registered in Kode Stream.
 - **Source**: a configured scan root such as `plans`, `docs`, or `specs`.
 - **Item**: a planning folder or docs item shown in the app.
 - **Source Items**: source-owned settings that map arbitrary folders to cards.
@@ -51,7 +51,7 @@ PM-003 improves the internal architecture of Plan Manager without changing behav
 ## Target Architecture
 
 ```text
-cmd/plan-manager
+cmd/kode-stream
   -> internal/app
   -> internal/httpapi
   -> internal/application

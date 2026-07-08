@@ -5,8 +5,8 @@ package search
 import (
 	"testing"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/item/index"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/item/index"
 )
 
 type itemStub struct{ items []models.ItemSummary }
@@ -23,7 +23,7 @@ func (s itemStub) Query(query itemindex.Query) ([]models.ItemSummary, error) {
 
 func TestSearchRanksExactIdentifierBeforeOtherMatches(t *testing.T) {
 	service := New(itemStub{items: []models.ItemSummary{
-		{ID: "1", Identifier: "PM-005", Title: "Search", WorkspaceID: "w1", WorkspaceName: "Plan Manager"},
+		{ID: "1", Identifier: "PM-005", Title: "Search", WorkspaceID: "w1", WorkspaceName: "Kode Stream"},
 		{ID: "2", Identifier: "PM-005-NOTES", Title: "Notes", WorkspaceID: "w1"},
 		{ID: "3", Identifier: "OTHER", Title: "PM-005 follow up", WorkspaceID: "w1"},
 	}})

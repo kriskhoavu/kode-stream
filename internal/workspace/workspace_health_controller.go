@@ -3,7 +3,7 @@ package workspace
 import (
 	"net/http"
 
-	"plan-manager/internal/common/httpx"
+	"kode-stream/internal/common/httpx"
 )
 
 type HealthController struct{}

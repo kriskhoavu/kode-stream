@@ -46,14 +46,14 @@ describe('buildWorkspaceInput', () => {
       registrationMode: 'remote_clone',
       path: '/ignored',
       remoteUrl: ' git@bitbucket.org:team/repo.git ',
-      cloneRoot: ' /Users/me/Library/Application Support/plan-manager/clone-root ',
+      cloneRoot: ' /Users/me/Library/Application Support/kode-stream/clone-root ',
       baselineBranch: 'develop',
       sources: 'plans'
     })).toEqual({
       name: 'Remote',
       registrationMode: 'remote_clone',
       remoteUrl: 'git@bitbucket.org:team/repo.git',
-      cloneRoot: '/Users/me/Library/Application Support/plan-manager/clone-root',
+      cloneRoot: '/Users/me/Library/Application Support/kode-stream/clone-root',
       baselineBranch: 'develop',
       sources: ['plans']
     });
@@ -89,7 +89,7 @@ describe('Knowledge settings', () => {
 
 describe('inferWorkspaceNameFromRemoteURL', () => {
   it('infers name from SSH URLs', () => {
-    expect(inferWorkspaceNameFromRemoteURL('git@bitbucket.org:team/plan-manager.git')).toBe('plan-manager');
+    expect(inferWorkspaceNameFromRemoteURL('git@bitbucket.org:team/kode-stream.git')).toBe('kode-stream');
   });
 
   it('infers name from HTTPS URLs', () => {

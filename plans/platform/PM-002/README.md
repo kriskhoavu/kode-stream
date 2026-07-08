@@ -2,7 +2,7 @@
 
 ## Overview
 
-PM-002 turns Plan Manager from a read-only browser into a safe local authoring tool.
+PM-002 turns Kode Stream from a read-only browser into a safe local authoring tool.
 
 Users can edit Markdown files, update item metadata, create new items, move cards across the Kanban board, and run guarded Git operations from the app. The app still runs locally. It still writes only to registered workspaces that the user selected.
 
@@ -14,7 +14,7 @@ Users can edit Markdown files, update item metadata, create new items, move card
 
 ### What PM-001 Established
 
-- **Workspace**: a local Git repository registered in Plan Manager.
+- **Workspace**: a local Git repository registered in Kode Stream.
 - **Source**: a configured scan root such as `plans` or `docs`.
 - **Item**: a planning folder or docs item shown on the board and in the workspace.
 - **Freestyle Docs Root**: a Markdown docs folder that does not use the source/item shape.
@@ -26,7 +26,7 @@ Users can edit Markdown files, update item metadata, create new items, move card
 
 | Term             | Meaning                                                                              | Maps To (code)              |
 |------------------|--------------------------------------------------------------------------------------|-----------------------------|
-| Workspace        | A local Git repository registered in Plan Manager                                    | `RepositoryConfig`          |
+| Workspace        | A local Git repository registered in Kode Stream                                    | `RepositoryConfig`          |
 | Source           | A configured scan root such as `plans`, `docs`, or `docs/plans`                      | `planDirectories`           |
 | Source Items | Optional `repository-settings.yaml` in a source that maps arbitrary folders to cards | `RepositorySettings`        |
 | Item             | A planning folder or docs item                                                       | `PlanSummary`, `PlanDetail` |
@@ -86,7 +86,7 @@ User runs a Git operation
 | Keep freestyle docs simple, but configurable | Force all docs roots to use `plan.yaml` | Plain docs should still work as one card. When users want cards, `repository-settings.yaml` describes the source layout.                                  |
 | Rescan after metadata/status/Git writes      | Patch the in-memory index only          | A scan keeps fallback parsing, Git dates, authors, and warnings aligned. File autosave keeps the editor fast by returning the updated file/hash directly. |
 | Guard and confirm risky Git actions          | Strict blocking, power-user passthrough | Users need useful Git operations without accidental data loss.                                                                                            |
-| Keep Git credential handling external        | Store tokens in Plan Manager            | Local Git already owns credentials. The app should not store secrets.                                                                                     |
+| Keep Git credential handling external        | Store tokens in Kode Stream            | Local Git already owns credentials. The app should not store secrets.                                                                                     |
 
 ## Implementation Clarifications
 

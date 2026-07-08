@@ -21,7 +21,7 @@ Keep the same endpoint and expand request shape:
   "baselineBranch": "main",
   "sources": ["plans", "docs"],
   "registrationMode": "local_path",
-  "path": "/Users/me/repos/plan-manager",
+  "path": "/Users/me/repos/kode-stream",
   "remoteUrl": "git@bitbucket.org:team/repo.git",
   "cloneRoot": "/Users/me/workspaces"
 }

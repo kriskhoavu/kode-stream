@@ -1,8 +1,8 @@
-# Implementation Plan: PM-001 - Plan Manager Read-Only MVP
+# Implementation Plan: PM-001 - Kode Stream Read-Only MVP
 
 ## Overview
 
-Implement a local read-only Plan Manager app.
+Implement a local read-only Kode Stream app.
 
 The MVP registers local Git repositories as workspaces, scans one or more configured plan or documentation roots, renders the active workspace on a Kanban board, and opens a read-only workspace for plan files. It follows `specs/requirement.md` for behavior and `specs/design.png` for the visual baseline.
 
@@ -57,8 +57,8 @@ Avoid:
 
 **Deliverables:**
 
-- [x] Go module and `cmd/plan-manager` entrypoint.
-- [x] `plan-manager serve` command.
+- [x] Go module and `cmd/kode-stream` entrypoint.
+- [x] `kode-stream serve` command.
 - [x] Local config path in OS user data directory.
 - [x] Repository registration model and validation.
 - [x] Repository list and create API endpoints.
@@ -71,7 +71,7 @@ Avoid:
 ```text
 PM-001: Add local app skeleton and repository registry
 
-- Add Go CLI entrypoint for Plan Manager
+- Add Go CLI entrypoint for Kode Stream
 - Add repository config storage
 - Add repository validation API
 ```
@@ -258,7 +258,7 @@ PM-001: Add responsive visual parity
 - [x] Startup output with local URL.
 - [ ] App smoke test against the built binary.
 
-**Verification:** `npm run build && go build ./cmd/plan-manager`
+**Verification:** `npm run build && go build ./cmd/kode-stream`
 
 **Draft Commit:**
 ```text

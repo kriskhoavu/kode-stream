@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/models"
 )
 
 type Index struct {

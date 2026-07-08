@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
-	"plan-manager/internal/common/models"
-	gitadapter "plan-manager/internal/git"
+	"kode-stream/internal/common/models"
+	gitadapter "kode-stream/internal/git"
 )
 
 type Registry struct {

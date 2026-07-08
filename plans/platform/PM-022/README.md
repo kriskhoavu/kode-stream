@@ -164,7 +164,7 @@ The first valid page for a slug is indexed deterministically by normalized relat
 Implemented on `feature/PM-022-structured-knowledge-wiki` in nine phase commits.
 
 - The real Discovery `docs` source indexed 50 pages, 50 graph nodes, 131 directed edges, and 5 non-blocking content warnings on 2026-07-04.
-- Live API verification covered Wiki listing, `offer-overview` detail, graph response, Rescan, and configured shell-free Enrich using `/bin/echo` against temporary Plan Manager data.
+- Live API verification covered Wiki listing, `offer-overview` detail, graph response, Rescan, and configured shell-free Enrich using `/bin/echo` against temporary Kode Stream data.
 - Sync confirmation/failure preservation, process start failure, non-zero exit, timeout, output truncation, and audit behavior are covered by disposable fixtures.
 - Backend verification: 256 tests passed across 34 Go packages.
 - Frontend verification: 170 tests passed across 43 test files; TypeScript and the production build passed.

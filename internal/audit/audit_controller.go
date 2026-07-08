@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"plan-manager/internal/common/httpx"
-	"plan-manager/internal/common/models"
+	"kode-stream/internal/common/httpx"
+	"kode-stream/internal/common/models"
 )
 
 type AuditController struct{ repository *AuditRepository }

@@ -1,4 +1,4 @@
-module plan-manager
+module kode-stream
 
 go 1.22
 

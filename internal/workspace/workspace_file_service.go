@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	apperrors "plan-manager/internal/common"
-	"plan-manager/internal/common/models"
-	workspaceaccess "plan-manager/internal/workspace/files"
+	apperrors "kode-stream/internal/common"
+	"kode-stream/internal/common/models"
+	workspaceaccess "kode-stream/internal/workspace/files"
 )
 
 type Registry interface {

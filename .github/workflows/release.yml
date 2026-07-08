@@ -114,24 +114,24 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           mkdir -p dist
-          BIN_NAME="plan-manager"
+          BIN_NAME="kode-stream"
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            BIN_NAME="plan-manager.exe"
+            BIN_NAME="kode-stream.exe"
           fi
-          go build -trimpath -ldflags "-s -w" -o "dist/${BIN_NAME}" ./cmd/plan-manager
+          go build -trimpath -ldflags "-s -w" -o "dist/${BIN_NAME}" ./cmd/kode-stream
 
       - name: Package artifact
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          ARTIFACT_BASE="plan-manager_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          ARTIFACT_BASE="kode-stream_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
           mkdir -p package
           cp README.md package/
           cp LICENSE* package/ 2>/dev/null || true
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            cp dist/plan-manager.exe package/
+            cp dist/kode-stream.exe package/
             (cd package && zip -r "../${ARTIFACT_BASE}.zip" .)
           else
-            cp dist/plan-manager package/
+            cp dist/kode-stream package/
             tar -C package -czf "${ARTIFACT_BASE}.tar.gz" .
           fi
 
@@ -140,8 +140,8 @@ jobs:
         with:
           name: release-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
-            plan-manager_*_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz
-            plan-manager_*_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+            kode-stream_*_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz
+            kode-stream_*_${{ matrix.goos }}_${{ matrix.goarch }}.zip
 
   checksums:
     needs: build
@@ -155,12 +155,12 @@ jobs:
       - name: Flatten release assets
         run: |
           mkdir -p out
-          find release-assets -type f -name "plan-manager_*" -exec cp {} out/ \;
+          find release-assets -type f -name "kode-stream_*" -exec cp {} out/ \;
 
       - name: Generate SHA256SUMS
         run: |
           cd out
-          sha256sum plan-manager_* > SHA256SUMS
+          sha256sum kode-stream_* > SHA256SUMS
 
       - name: Upload checksums
         uses: actions/upload-artifact@v4
@@ -197,11 +197,11 @@ jobs:
           MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
         run: |
           mkdir -p signed
-          for archive in macos-artifacts/plan-manager_*_darwin_*.tar.gz; do
+          for archive in macos-artifacts/kode-stream_*_darwin_*.tar.gz; do
             base="$(basename "$archive" .tar.gz)"
             workdir="$(mktemp -d)"
             tar -xzf "$archive" -C "$workdir"
-            codesign --force --options runtime --timestamp --sign "$MACOS_CODESIGN_IDENTITY" "$workdir/plan-manager"
+            codesign --force --options runtime --timestamp --sign "$MACOS_CODESIGN_IDENTITY" "$workdir/kode-stream"
             tar -C "$workdir" -czf "signed/${base}-signed.tar.gz" .
           done
 
@@ -209,7 +209,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-darwin-signed
-          path: signed/plan-manager_*_darwin_*-signed.tar.gz
+          path: signed/kode-stream_*_darwin_*-signed.tar.gz
 
   sign-windows:
     needs: [ build, signing-config ]
@@ -233,11 +233,11 @@ jobs:
           [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
           $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source
           New-Item -Path signed -ItemType Directory -Force | Out-Null
-          Get-ChildItem -Path windows-artifacts -Filter "plan-manager_*_windows_amd64.zip" | ForEach-Object {
+          Get-ChildItem -Path windows-artifacts -Filter "kode-stream_*_windows_amd64.zip" | ForEach-Object {
             $base = $_.BaseName
             $work = Join-Path $PWD ("work-" + $base)
             Expand-Archive -Path $_.FullName -DestinationPath $work -Force
-            & $signtool sign /fd SHA256 /f $certPath /p $env:WINDOWS_CERT_PASSWORD /tr "http://timestamp.digicert.com" /td SHA256 (Join-Path $work "plan-manager.exe")
+            & $signtool sign /fd SHA256 /f $certPath /p $env:WINDOWS_CERT_PASSWORD /tr "http://timestamp.digicert.com" /td SHA256 (Join-Path $work "kode-stream.exe")
             Compress-Archive -Path (Join-Path $work "*") -DestinationPath (Join-Path $PWD "signed\$base-signed.zip") -Force
           }
 
@@ -245,7 +245,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-windows-signed
-          path: signed/plan-manager_*_windows_amd64-signed.zip
+          path: signed/kode-stream_*_windows_amd64-signed.zip
 
   publish:
     needs: checksums
@@ -274,7 +274,7 @@ jobs:
       - name: Collect release files
         run: |
           mkdir -p release
-          find release-assets -type f -name "plan-manager_*" -exec cp {} release/ \;
+          find release-assets -type f -name "kode-stream_*" -exec cp {} release/ \;
           find release-assets -type f -name "SHA256SUMS" -exec cp {} release/ \;
 
       - name: Create GitHub Release
@@ -282,8 +282,8 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            release/plan-manager_*.tar.gz
-            release/plan-manager_*.zip
-            release/plan-manager_*-signed.tar.gz
-            release/plan-manager_*-signed.zip
+            release/kode-stream_*.tar.gz
+            release/kode-stream_*.zip
+            release/kode-stream_*-signed.tar.gz
+            release/kode-stream_*-signed.zip
             release/SHA256SUMS

@@ -16,8 +16,8 @@ import (
 	"strings"
 	"unicode"
 
-	"plan-manager/internal/common/models"
-	"plan-manager/internal/filesystem/content"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/content"
 )
 
 var (
@@ -130,7 +130,7 @@ func (a *Access) WriteMarkdown(workspace models.WorkspaceConfig, input models.Wo
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	temp, err := os.CreateTemp(filepath.Dir(full), ".plan-manager-*")
+	temp, err := os.CreateTemp(filepath.Dir(full), ".kode-stream-*")
 	if err != nil {
 		return models.FileContent{}, err
 	}
