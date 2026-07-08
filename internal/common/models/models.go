@@ -477,12 +477,12 @@ type ScanResult struct {
 	Warnings    []ScanWarning `json:"warnings" yaml:"warnings"`
 }
 
-type BranchLoadInput struct {
+type WorkstreamBranchLoadInput struct {
 	Branch string `json:"branch,omitempty" yaml:"branch,omitempty"`
 	Force  bool   `json:"force,omitempty" yaml:"force,omitempty"`
 }
 
-type BranchLoadResult struct {
+type WorkstreamBranchLoadResult struct {
 	WorkspaceID           string        `json:"workspaceId" yaml:"workspaceId"`
 	Branch                string        `json:"branch" yaml:"branch"`
 	SelectedBranch        string        `json:"selectedBranch" yaml:"selectedBranch"`

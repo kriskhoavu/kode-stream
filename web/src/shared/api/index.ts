@@ -9,7 +9,7 @@ import type {
 	EmbeddedAISessionResult,
   AppState,
   AuditEvent,
-  BranchLoadResult,
+  WorkstreamBranchLoadResult,
   BranchCreateInput,
   BranchSwitchInput,
   FileContent,
@@ -197,11 +197,11 @@ export const api = {
   jiraAttachmentURL: (itemId: string, attachmentId: string) => `/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`,
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
   scan: (workspaceId: string) => request<ScanResult>(`/api/workspaces/${workspaceId}/scan`, { method: 'POST' }),
-  loadWorkspaceBranch: (workspaceId: string, input: { branch?: string; force?: boolean } = {}) =>
-    request<BranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/workspace/branch`, {
+  loadWorkstreamBranch: (workspaceId: string, input: { branch?: string; force?: boolean } = {}) =>
+    request<WorkstreamBranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/workstream/branch`, {
       method: 'POST',
       body: JSON.stringify(input)
-    }).then(normalizeBranchLoadResult),
+    }).then(normalizeWorkstreamBranchLoadResult),
   workspaceHealth: (workspaceId: string) => request<WorkspaceHealth>(`/api/workspaces/${workspaceId}/health`).then(normalizeWorkspaceHealth),
   sourceStructure: (workspaceId: string, directory: string) =>
     request<SourceSettingsResult>(`/api/workspaces/${workspaceId}/source-structure?directory=${encodeURIComponent(directory)}`),
@@ -427,7 +427,7 @@ function normalizeItem(item: ItemSummary): ItemSummary {
   };
 }
 
-function normalizeBranchLoadResult(result: BranchLoadResult): BranchLoadResult {
+function normalizeWorkstreamBranchLoadResult(result: WorkstreamBranchLoadResult): WorkstreamBranchLoadResult {
   if (Array.isArray(result)) {
     const items = result.map(normalizeItem);
     const branch = items[0]?.branch ?? '';

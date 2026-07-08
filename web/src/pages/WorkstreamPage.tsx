@@ -1,13 +1,13 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, SetStateAction } from 'react';
-import { BookmarkPlus, Check, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GitCommitHorizontal, GripVertical, Info, KanbanSquare, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Check, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GitCommitHorizontal, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
 import type {
-  BranchLoadResult,
+  WorkstreamBranchLoadResult,
   FileContent,
   FileNode,
   GitStatus,
@@ -27,9 +27,9 @@ import type {
   WorkspaceConfig
 } from '../lib/types';
 import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
-import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/kanban/filtering';
-import type { FacetOption, FilterKey, Filters } from '../features/kanban/filtering';
-import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/kanban/dragAndDrop';
+import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/workstream/filtering';
+import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
+import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
 import { inferCompatibilityFields, lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
@@ -80,7 +80,7 @@ const emptyNewWorkItemDraft = (): NewWorkItemDraft => ({
 
 export { filterPlans };
 
-export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
+export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
   workspace?: WorkspaceConfig;
   refreshKey: number;
   visibleStatuses?: ItemStatus[];
@@ -113,7 +113,7 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
   const [workspaceBranchCurrent, setWorkspaceBranchCurrent] = useState('');
   const [workspaceBranchList, setWorkspaceBranchList] = useState<string[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
-  const [branchContext, setBranchContext] = useState<BranchLoadResult | null>(null);
+  const [branchContext, setBranchContext] = useState<WorkstreamBranchLoadResult | null>(null);
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const [branchSearch, setBranchSearch] = useState('');
   const [sourceItemsOpen, setSourceItemsOpen] = useState(false);
@@ -132,7 +132,7 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
     setLoading(true);
     setError('');
     try {
-      const result = await api.loadWorkspaceBranch(workspace.id, { branch: branch || undefined, force });
+      const result = await api.loadWorkstreamBranch(workspace.id, { branch: branch || undefined, force });
       setBranchContext(result);
       setSelectedBranch(result.branch);
       setPlans(result.items);
@@ -300,7 +300,7 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
     if (!workspace) return;
     setScanState('Refreshing');
     try {
-      const result = await api.loadWorkspaceBranch(workspace.id, { branch: selectedBranch || undefined, force: true });
+      const result = await api.loadWorkstreamBranch(workspace.id, { branch: selectedBranch || undefined, force: true });
       notifyReliabilityChanged();
       setScanState(`${result.itemCount} items indexed`);
       setBranchContext(result);
@@ -540,7 +540,7 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
     if (!saveFilterName.trim()) return;
     const saved = await api.saveFilter({
       name: saveFilterName.trim(),
-      route: '/workspace',
+      route: '/workstream',
       workspaceId: workspace?.id,
       filters: { filters: { ...filters, branches: [] }, query }
     });
@@ -568,18 +568,18 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
   if (!workspace && !loading) {
     return (
       <section className="empty-state">
-        <h1>Workspace</h1>
-        <p>Register a local Git workspace to create a board view.</p>
+        <h1>Workstream</h1>
+        <p>Register a local Git workspace to create a workstream view.</p>
       </section>
     );
   }
 
   return (
-    <section className="kanban-page">
-      <div className="page-title kanban-title">
-        <div className="kanban-heading">
+    <section className="workstream-page">
+      <div className="page-title workstream-title">
+        <div className="workstream-heading">
           <div>
-            <h1><KanbanSquare size={22} /> Workspace</h1>
+            <h1><WorkstreamIcon size={22} /> Workstream</h1>
             <span><FolderGit2 size={15} /> {workspace?.name ?? 'No workspace selected'}</span>
           </div>
         </div>
@@ -698,10 +698,10 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
         {activeFilterCount > 0 && <span>{activeFilterCount} active filters</span>}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
-      <div className="kanban-board" style={boardStyle} aria-busy={loading}>
+      <div className="workstream-board" style={boardStyle} aria-busy={loading}>
         {displayedStatuses.map((column) => (
           <Fragment key={column}>
-            <KanbanColumn
+            <WorkstreamColumn
               status={column}
               itemCount={grouped.get(column)?.length ?? 0}
               loading={loading}
@@ -736,9 +736,9 @@ export function WorkspacePage({ workspace, refreshKey, visibleStatuses = statusO
                   onMove={(status) => moveItem(plan.id, status)}
                 />
               ))}
-            </KanbanColumn>
+            </WorkstreamColumn>
             {column === 'unsorted' && (
-              <button className="kanban-separator" type="button" onClick={() => void openSourceItemsDialog()} title="Configure source items">
+              <button className="workstream-separator" type="button" onClick={() => void openSourceItemsDialog()} title="Configure source items">
                 <span className="separator-arrow">▶</span>
                 <span className="separator-count">{grouped.get('unsorted')?.length ?? 0}</span>
                 <span className="separator-label">Configure source items</span>
@@ -1423,7 +1423,7 @@ function confirmSnapshotMaterialization(item: ItemSummary | ItemDetail | null, o
   return window.confirm(message) ? true : null;
 }
 
-function KanbanColumn({ status, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
+function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
   status: ItemStatus;
   itemCount: number;
   loading: boolean;
@@ -1436,7 +1436,7 @@ function KanbanColumn({ status, itemCount, loading, dragActive, dragTargetStatus
   children: React.ReactNode;
 }) {
   const droppable = isDropStatus(status);
-  const classes = ['kanban-column', status];
+  const classes = ['workstream-column', status];
   if (dragActive && droppable) classes.push('drop-enabled');
   if (dragTargetStatus === status && droppable) classes.push('drop-target');
 
@@ -1547,7 +1547,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
   const [branchName, setBranchName] = useState('');
   const [gitBusy, setGitBusy] = useState('');
-  const [gitActivityOpen, setGitActivityOpen] = useState(() => readStoredToggle('kanban.drawer.gitActivityOpen'));
+  const [gitActivityOpen, setGitActivityOpen] = useState(() => readStoredToggle('workstream.drawer.gitActivityOpen'));
   const [error, setError] = useState('');
   const [width, setWidth] = useState(1120);
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -2011,7 +2011,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                   <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
                     const open = event.currentTarget.open;
                     setGitActivityOpen(open);
-                    localStorage.setItem('kanban.drawer.gitActivityOpen', open ? '1' : '0');
+                    localStorage.setItem('workstream.drawer.gitActivityOpen', open ? '1' : '0');
                   }}>
                     <summary>
                       <span>Recent Activity</span>

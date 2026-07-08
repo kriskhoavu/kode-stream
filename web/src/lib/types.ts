@@ -393,7 +393,7 @@ export interface BranchScanMetadata {
   warnings: { itemPath?: string; message: string }[];
 }
 
-export interface BranchLoadResult {
+export interface WorkstreamBranchLoadResult {
   workspaceId: string;
   branch: string;
   selectedBranch: string;

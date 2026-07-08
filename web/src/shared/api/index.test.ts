@@ -101,7 +101,7 @@ describe('shared api facade', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(api.loadWorkspaceBranch('workspace/one', { branch: 'feature', force: true })).resolves.toMatchObject({
+    await expect(api.loadWorkstreamBranch('workspace/one', { branch: 'feature', force: true })).resolves.toMatchObject({
       workspaceId: 'workspace/one',
       branch: 'feature',
       sourceMode: 'snapshot',
@@ -111,7 +111,7 @@ describe('shared api facade', () => {
       warnings: [],
       items: [{ id: 'item-1', sourceMode: 'snapshot', editable: false, tags: [] }]
     });
-    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/workspace%2Fone/workspace/branch', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/workspace%2Fone/workstream/branch', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ branch: 'feature', force: true })
     }));

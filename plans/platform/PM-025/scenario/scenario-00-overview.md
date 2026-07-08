@@ -4,39 +4,39 @@
 
 | #   | Title                     | Description                                                                  |
 |-----|---------------------------|------------------------------------------------------------------------------|
-| 0   | Current board intake      | User can create only a minimal structured item from the Kanban page          |
+| 0   | Workstream branch context | User opens Workstream and loads board context for the selected branch        |
 | 1   | Jira-first item creation  | User fetches a Jira ticket, reviews context, creates an item, and opens it   |
 | 2   | AI-assisted plan drafting | User starts an AI session from the created item with a preset or free prompt |
 | 3   | Lookup failures           | Workspace, Jira, auth, project, and missing-ticket errors do not write files |
 
 ---
 
-# Scenario 0: Current Board Intake
+# Scenario 0: Workstream Branch Context
 
 ## Starting State
 
-- The main board route is named Kanban.
-- New item creation asks for source, item name, and status.
-- Jira lookup is available only after an indexed item exists.
-- AI sessions can start from an existing item path or workspace root.
+- At least one registered workspace exists.
+- The workspace has one or more configured item sources.
+- The user has an active branch selection or a baseline branch.
 
 ## Visual State
 
 ```text
-Kanban Page
-  -> New item modal
-  -> create empty README.md
-  -> open item workspace
-  -> optional AI launch
+Workstream
+  -> select workspace
+  -> load selected branch context
+  -> show board columns and item cards
+  -> open item workspace or create a new work item
 ```
 
 ## Available Actions
 
-| Action               | Description                                             | Limitation                                      |
-|----------------------|---------------------------------------------------------|-------------------------------------------------|
-| Create blank item    | Creates a structured item folder and empty README       | User must manually bring Jira context afterward |
-| Open Jira side panel | Reads Jira for the selected indexed item's identifier   | Requires item to exist first                    |
-| Launch AI session    | Starts provider with workspace or selected card context | No intake-specific prompt preset                |
+| Action           | Description                                                        |
+|------------------|--------------------------------------------------------------------|
+| Change branch    | Loads snapshot or working-tree context for the selected branch     |
+| Filter board     | Narrows cards by source, status, author, branch, and free text     |
+| Create work item | Opens blank or Jira-first intake                                   |
+| Open item        | Navigates to the item workspace with files, preview, diff, and Git |
 
 ---
 
@@ -49,7 +49,7 @@ Create a structured implementation item from a Jira ticket before any local item
 ## Execution Flow
 
 ```text
-User opens Workspace
+User opens Workstream
   -> clicks New Work Item
   -> chooses From Jira
   -> enters Jira key
@@ -82,7 +82,7 @@ Start implementation planning immediately after creating the Jira-backed item.
 
 ```text
 Created item opens
-  -> Workspace shows Start AI option
+  -> Workstream shows Start AI option
   -> user chooses preset or free prompt
   -> frontend launches embedded or external AI session
   -> provider receives the item path and selected prompt

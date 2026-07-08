@@ -113,6 +113,10 @@ func spaHandler() http.Handler {
 	}
 	files := http.FileServer(http.FS(sub))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if deprecatedSPAPath(r.URL.Path) {
+			http.NotFound(w, r)
+			return
+		}
 		if r.URL.Path != "/" {
 			if _, err := fs.Stat(sub, strings.TrimPrefix(r.URL.Path, "/")); err == nil {
 				files.ServeHTTP(w, r)
@@ -122,4 +126,13 @@ func spaHandler() http.Handler {
 		r.URL.Path = "/"
 		files.ServeHTTP(w, r)
 	})
+}
+
+func deprecatedSPAPath(path string) bool {
+	return path == "/kanban" ||
+		strings.HasPrefix(path, "/kanban/") ||
+		path == "/workbench" ||
+		strings.HasPrefix(path, "/workbench/") ||
+		path == "/workspace" ||
+		strings.HasPrefix(path, "/workspace/")
 }

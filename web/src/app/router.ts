@@ -10,7 +10,7 @@ export type KnowledgeView = 'browse' | 'read' | 'graph';
 export interface KnowledgeLocation { workspaceId?: string; root?: string; slug?: string; view?: KnowledgeView; }
 
 export type Route =
-  | { name: 'workspace'; focusedItemId?: string }
+  | { name: 'workstream'; focusedItemId?: string }
   | { name: 'workspaces' }
   | { name: 'settings' }
   | { name: 'explorer'; location?: ExplorerLocation }
@@ -34,10 +34,10 @@ export function routeFromLocation(): Route {
   if (path === '/knowledge') {
 	return { name: 'knowledge', location: knowledgeLocationFromSearch(window.location.search) };
   }
-  if (path === '/workspace' || path === '/') {
-    return { name: 'workspace', focusedItemId: workspaceFocusedItemFromSearch(window.location.search) };
+  if (path === '/workstream' || path === '/') {
+    return { name: 'workstream', focusedItemId: workstreamFocusedItemFromSearch(window.location.search) };
   }
-  return { name: 'workspace' };
+  return { name: 'workstream' };
 }
 
 export function pathForRoute(route: Route): string {
@@ -51,7 +51,7 @@ export function pathForRoute(route: Route): string {
       ? '/workspaces'
       : route.name === 'settings'
         ? '/settings'
-        : workspacePath(route.focusedItemId);
+        : workstreamPath(route.focusedItemId);
 }
 
 export function knowledgeLocationFromSearch(search: string): KnowledgeLocation | undefined {
@@ -90,11 +90,11 @@ export function explorerPath(location?: ExplorerLocation): string {
   return query.size ? `/explorer?${query.toString()}` : '/explorer';
 }
 
-function workspaceFocusedItemFromSearch(search: string): string | undefined {
+function workstreamFocusedItemFromSearch(search: string): string | undefined {
   return new URLSearchParams(search).get('itemId')?.trim() || undefined;
 }
 
-function workspacePath(focusedItemId?: string): string {
-  if (!focusedItemId) return '/workspace';
-  return `/workspace?${new URLSearchParams({ itemId: focusedItemId }).toString()}`;
+function workstreamPath(focusedItemId?: string): string {
+  if (!focusedItemId) return '/workstream';
+  return `/workstream?${new URLSearchParams({ itemId: focusedItemId }).toString()}`;
 }

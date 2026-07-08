@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WorkspaceExplorerPage } from './WorkspaceExplorerPage';
+import { WorkstreamExplorer } from './WorkstreamExplorer';
 
 const apiMock = vi.hoisted(() => ({
   items: vi.fn(), workspaceTree: vi.fn(), workspaceFile: vi.fn(), workspaceFileDiff: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock('../lib/api', () => ({
 
 const workspace = { id: 'ws', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: [], createdAt: '' };
 
-describe('WorkspaceExplorerPage', () => {
+describe('WorkstreamExplorer', () => {
   beforeEach(() => {
     localStorage.clear();
     Object.values(apiMock).forEach((mock) => mock.mockReset());
@@ -33,7 +33,7 @@ describe('WorkspaceExplorerPage', () => {
   });
 
   it('loads one directory when a workspace root expands', async () => {
-		const { container } = render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} onOpenWorkspace={vi.fn()} />);
+		const { container } = render(<WorkstreamExplorer workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} onOpenWorkstream={vi.fn()} />);
     fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
     await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', '', false));
     expect(await screen.findByText('README.md')).toBeInTheDocument();
@@ -46,7 +46,7 @@ describe('WorkspaceExplorerPage', () => {
         : []
     }));
     const configuredWorkspace = { ...workspace, sources: ['docs'] };
-    render(<WorkspaceExplorerPage workspaces={[configuredWorkspace]} location={{ mode: 'sources' }} onLocationChange={vi.fn()} onOpenWorkspace={vi.fn()} />);
+    render(<WorkstreamExplorer workspaces={[configuredWorkspace]} location={{ mode: 'sources' }} onLocationChange={vi.fn()} onOpenWorkstream={vi.fn()} />);
 
     const workspaceButton = screen.getByRole('button', { name: 'Workspace' });
     fireEvent.doubleClick(workspaceButton);
@@ -71,7 +71,7 @@ describe('WorkspaceExplorerPage', () => {
     apiMock.workspaceFile.mockResolvedValue({ id: 'guide', path: 'docs/guide.md', content: '# Guide', language: 'markdown', hash: 'hash', kind: 'markdown', sizeBytes: 7, editable: true, truncated: false });
     apiMock.workspaceFileDiff.mockResolvedValue({ diff: '' });
     const configuredWorkspace = { ...workspace, sources: ['docs'] };
-    render(<WorkspaceExplorerPage workspaces={[configuredWorkspace]} location={{ workspaceId: 'ws', path: 'docs/guide.md', mode: 'sources' }} onLocationChange={vi.fn()} onOpenWorkspace={vi.fn()} />);
+    render(<WorkstreamExplorer workspaces={[configuredWorkspace]} location={{ workspaceId: 'ws', path: 'docs/guide.md', mode: 'sources' }} onLocationChange={vi.fn()} onOpenWorkstream={vi.fn()} />);
 
     const docsButton = await screen.findByRole('button', { name: 'docs' });
     fireEvent.doubleClick(docsButton);
@@ -93,7 +93,7 @@ describe('WorkspaceExplorerPage', () => {
       .mockResolvedValueOnce({ workspaceId: 'ws', current: 'main', branches: ['feature/explorer', 'main'] })
       .mockResolvedValue({ workspaceId: 'ws', current: 'feature/explorer', branches: ['feature/explorer', 'main'] });
     const onLocationChange = vi.fn();
-    render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'README.md', mode: 'all' }} onLocationChange={onLocationChange} onOpenWorkspace={vi.fn()} />);
+    render(<WorkstreamExplorer workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'README.md', mode: 'all' }} onLocationChange={onLocationChange} onOpenWorkstream={vi.fn()} />);
     const selector = await screen.findByRole('combobox', { name: 'Branch for Workspace' });
 
     fireEvent.change(selector, { target: { value: 'feature/explorer' } });
@@ -110,7 +110,7 @@ describe('WorkspaceExplorerPage', () => {
         : [{ id: 'guide', name: 'guide.md', path: 'docs/guide.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }]
     }));
     apiMock.workspacePathGitStates.mockResolvedValue([{ path: 'docs/guide.md', status: 'modified', conflict: false }]);
-    const { container } = render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} onOpenWorkspace={vi.fn()} />);
+    const { container } = render(<WorkstreamExplorer workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} onOpenWorkstream={vi.fn()} />);
     fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
     const folderButton = await screen.findByRole('button', { name: 'docs' });
     expect(folderButton.querySelector('.explorer-row-label')).toHaveClass('directory');
@@ -133,11 +133,11 @@ describe('WorkspaceExplorerPage', () => {
     apiMock.workspaceFile.mockResolvedValue({ id: 'main_go', path: 'main.go', content: 'package main\n', language: 'go', hash: 'hash', kind: 'code', sizeBytes: 13, editable: true, truncated: false });
     apiMock.workspaceFileDiff.mockResolvedValue({ diff: '' });
     const onLocationChange = vi.fn();
-    const { container, rerender } = render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={onLocationChange} onOpenWorkspace={vi.fn()} />);
+    const { container, rerender } = render(<WorkstreamExplorer workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={onLocationChange} onOpenWorkstream={vi.fn()} />);
     fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
     fireEvent.click(await screen.findByRole('button', { name: 'main.go' }));
     await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', path: 'main.go' }));
-    rerender(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'main.go', mode: 'all' }} onLocationChange={onLocationChange} onOpenWorkspace={vi.fn()} />);
+    rerender(<WorkstreamExplorer workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'main.go', mode: 'all' }} onLocationChange={onLocationChange} onOpenWorkstream={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /Raw/i }));
     const editor = container.querySelector('.raw-editor') as HTMLTextAreaElement;
     await waitFor(() => expect(editor).toBeEnabled());
@@ -145,19 +145,19 @@ describe('WorkspaceExplorerPage', () => {
     expect(editor).toHaveValue('package planmanager\n');
   });
 
-  it('keeps Open Workspace explicit for a selected workspace root', async () => {
-    const onOpenWorkspace = vi.fn();
-    render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={vi.fn()} onOpenWorkspace={onOpenWorkspace} />);
-    expect(screen.queryByRole('button', { name: /Open Workspace/i })).not.toBeInTheDocument();
+  it('keeps Open Workstream explicit for a selected workspace root', async () => {
+    const onOpenWorkstream = vi.fn();
+    render(<WorkstreamExplorer workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={vi.fn()} onOpenWorkstream={onOpenWorkstream} />);
+    expect(screen.queryByRole('button', { name: /Open Workstream/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Expand inspector' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Open Workspace/i }));
-    expect(onOpenWorkspace).toHaveBeenCalledWith(workspace, undefined);
+    fireEvent.click(await screen.findByRole('button', { name: /Open Workstream/i }));
+    expect(onOpenWorkstream).toHaveBeenCalledWith(workspace, undefined);
   });
 
   it('searches unloaded paths and opens a result', async () => {
     const onLocationChange = vi.fn();
     apiMock.searchWorkspacePaths.mockResolvedValue({ results: [{ id: 'result', workspaceId: 'ws', workspaceName: 'Workspace', name: 'guide.md', path: 'docs/guide.md', type: 'file', ignored: false, context: 'docs' }], truncated: false });
-    render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={onLocationChange} onOpenWorkspace={vi.fn()} />);
+    render(<WorkstreamExplorer workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={onLocationChange} onOpenWorkstream={vi.fn()} />);
 		fireEvent.change(screen.getByRole('textbox', { name: 'Search files' }), { target: { value: 'guide' } });
 		const pathResult = await screen.findByRole('option', { name: /guide.md/i });
 		expect(pathResult).toHaveClass('content-search-result');
@@ -168,7 +168,7 @@ describe('WorkspaceExplorerPage', () => {
 
   it('creates a Markdown file from the selected workspace root', async () => {
     apiMock.createWorkspaceFile.mockResolvedValue({ workspaceId: 'ws', path: 'notes.md', type: 'file', invalidatedPaths: [''], refreshed: false });
-    render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={vi.fn()} onOpenWorkspace={vi.fn()} />);
+    render(<WorkstreamExplorer workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={vi.fn()} onOpenWorkstream={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /New file/i }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'notes.md' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
@@ -181,7 +181,7 @@ describe('WorkspaceExplorerPage', () => {
 			results: [{ id: 'match', workspaceId: 'ws', workspaceName: 'Workspace', path: 'docs/guide.md', name: 'guide.md', kind: 'markdown', language: 'markdown', lineNumber: 7, columnStart: 3, columnEnd: 9, snippet: 'A needle here', ignored: false }],
 			truncated: false, filesVisited: 1, bytesRead: 20, skippedFiles: 0
 		});
-		render(<WorkspaceExplorerPage workspaces={[{ ...workspace, sources: ['docs'] }]} location={{ workspaceId: 'ws' }} onLocationChange={onLocationChange} onOpenWorkspace={vi.fn()} />);
+		render(<WorkstreamExplorer workspaces={[{ ...workspace, sources: ['docs'] }]} location={{ workspaceId: 'ws' }} onLocationChange={onLocationChange} onOpenWorkstream={vi.fn()} />);
 		fireEvent.change(screen.getByRole('combobox', { name: 'Explorer tree mode' }), { target: { value: 'all' } });
 		expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', mode: 'all' });
 		fireEvent.change(screen.getByRole('textbox', { name: 'Search files' }), { target: { value: 'needle' } });

@@ -8,12 +8,12 @@ describe('routeFromLocation', () => {
     expect(routeFromLocation()).toEqual({ name: 'item', itemId: 'PM-003 Architecture' });
   });
 
-  it('falls removed list routes back to Workspace', () => {
+  it('falls removed list routes back to Workstream', () => {
     window.history.pushState(null, '', '/items');
-    expect(routeFromLocation()).toEqual({ name: 'workspace' });
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
 
     window.history.pushState(null, '', '/branches');
-    expect(routeFromLocation()).toEqual({ name: 'workspace' });
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
   });
 
   it('parses retained top-level routes', () => {
@@ -25,9 +25,9 @@ describe('routeFromLocation', () => {
     expect(routeFromLocation()).toEqual({ name: 'knowledge', location: { view: 'graph' } });
   });
 
-  it('defaults unknown paths to Workspace', () => {
+  it('defaults unknown paths to Workstream', () => {
     window.history.pushState(null, '', '/unknown');
 
-    expect(routeFromLocation()).toEqual({ name: 'workspace' });
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
   });
 });

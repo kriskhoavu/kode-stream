@@ -37,10 +37,12 @@ import (
 	workspaceaccess "plan-manager/internal/workspace/files"
 	"plan-manager/internal/workspace/registry"
 	"plan-manager/internal/workspace/scanner"
+	appworkstream "plan-manager/internal/workstream"
 )
 
 type API struct {
 	workspaces     *appworkspace.Service
+	workstream     *appworkstream.Service
 	items          *appitem.Service
 	gitOps         *appgit.Service
 	dialog         *system.Dialog
@@ -90,6 +92,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 	}
 	return &API{
 		workspaces:     workspaceService,
+		workstream:     appworkstream.New(reg, idx, scan, git),
 		items:          appitem.New(reg, idx, files, writer, git),
 		gitOps:         appgit.NewService(reg, writer, git),
 		dialog:         dialog,
@@ -131,7 +134,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/jira/test", a.testJiraConnection)
 	mux.HandleFunc("GET /api/workspaces/{id}/jira/issues/{issueKey}", a.workspaceJiraIssue)
-	mux.HandleFunc("POST /api/workspaces/{id}/workspace/branch", a.loadWorkspaceBranch)
+	mux.HandleFunc("POST /api/workspaces/{id}/workstream/branch", a.loadWorkstreamBranch)
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
 	mux.HandleFunc("PUT /api/workspaces/{id}/source-structure", a.saveSourceStructure)
@@ -929,8 +932,8 @@ func (a *API) scanWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-func (a *API) loadWorkspaceBranch(w http.ResponseWriter, r *http.Request) {
-	var input models.BranchLoadInput
+func (a *API) loadWorkstreamBranch(w http.ResponseWriter, r *http.Request) {
+	var input models.WorkstreamBranchLoadInput
 	if r.Body != nil {
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -938,8 +941,8 @@ func (a *API) loadWorkspaceBranch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	started := time.Now()
-	result, err := a.workspaces.LoadBranch(r.PathValue("id"), input)
-	a.record(r.PathValue("id"), "", "workspace_branch_load", "Workspace branch loaded.", nil, started, err)
+	result, err := a.workstream.LoadBranch(r.PathValue("id"), input)
+	a.record(r.PathValue("id"), "", "workstream_branch_load", "Workstream branch loaded.", nil, started, err)
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return

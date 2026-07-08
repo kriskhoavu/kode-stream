@@ -1,32 +1,37 @@
-# Implementation Plan: PM-025 - Jira-First Workspace
+# Implementation Plan: PM-025 - Jira-First Workstream
 
 ## Overview
 
-Rename the Kanban surface to Workspace, add Jira-first new item intake, scaffold Jira-backed item context, and let users start AI planning with a preset or free prompt after item creation.
+Establish Workstream as the board, intake, branch-context, and AI planning surface. PM-025 adds Jira-first new item intake, scaffolds Jira-backed item context, separates Workstream backend responsibilities from registered workspace ownership, and lets users start AI planning with a preset or free prompt after item creation.
 
 ## Terminology Lock
 
 All new user-facing route and page text must use:
 
-- `Workspace` for the main board/intake surface.
-- `Board View` for the Kanban-style view inside Workspace.
+- `Workstream` for the main board/intake surface.
+- `Workspace` for the sidebar section and registered repository contexts.
+- `Board View` for the status-column view inside Workstream.
 - `New Work Item` for the creation entry point.
 - `Jira Intake` for pre-create Jira lookup.
 - `AI Preset` for named prompt templates.
 
-Do not keep `/kanban` route compatibility.
+Use `/workstream` as the canonical surface route.
 
 ## Phases Summary
 
-| Phase | Name                          | Status |
-|-------|-------------------------------|--------|
-| B1    | Workspace Jira Lookup         | Done   |
-| B2    | Jira-Backed Item Creation     | Done   |
-| B3    | AI Preset Launch Contract     | Done   |
-| F1    | Workspace Route Rename        | Done   |
-| F2    | Jira Intake UI                | Done   |
-| F3    | AI Preset Launch UI           | Done   |
-| F4    | Verification And Copy Cleanup | Done   |
+| Phase | Name                        | Status |
+|-------|-----------------------------|--------|
+| B1    | Workspace Jira Lookup       | Done   |
+| B2    | Jira-Backed Item Creation   | Done   |
+| B3    | AI Preset Launch Contract   | Done   |
+| B4    | Workstream Branch API       | Done   |
+| B5    | Workstream Backend Domain   | Done   |
+| F1    | Workstream Route And Shell  | Done   |
+| F2    | Jira Intake UI              | Done   |
+| F3    | AI Preset Launch UI         | Done   |
+| F4    | Workstream Verification     | Done   |
+| F5    | Workstream Naming Alignment | Done   |
+| F6    | Workstream Explorer         | Done   |
 
 ## Backend Phases
 
@@ -73,20 +78,45 @@ Do not keep `/kanban` route compatibility.
 
 **Commit:** `PM-025: Add AI planning presets`
 
-## Frontend Phases
-
-### Phase F1: Workspace Route Rename
+### Phase B4: Workstream Branch API
 
 **Deliverables:**
 
-- [x] Rename `KanbanPage` surface and visible labels to Workspace.
-- [x] Make `/workspace` the canonical board route.
-- [x] Remove `/kanban` route handling, route labels, and navigation copy.
+- [x] Add `POST /api/workspaces/{id}/workstream/branch`.
+- [x] Use Workstream branch load terminology in the API handler and audit action.
+- [x] Use `WorkstreamBranchLoadInput` and `WorkstreamBranchLoadResult` for the route contract.
+- [x] Keep `/api/workspaces`, `internal/workspace`, `WorkspaceBranches`, and workspace file/tree APIs focused on registered repository workspaces.
+
+**Verification:** `rtk go test ./internal/workspace ./internal/server/api && rtk npm run typecheck && rtk npm test -- --run`
+
+---
+
+### Phase B5: Workstream Backend Domain
+
+**Deliverables:**
+
+- [x] Add `internal/workstream` as the backend domain for branch-scoped board context.
+- [x] Move branch snapshot loading, snapshot caching, working-tree rescan behavior, and selected branch persistence into the Workstream service.
+- [x] Keep `internal/workspace` focused on registered repository lifecycle, scans, files, source settings, safety, and health.
+- [x] Wire `internal/server/api` to delegate Workstream branch loads to the Workstream service.
+- [x] Move branch-context tests into the Workstream package.
+
+**Verification:** `rtk go test ./internal/workstream ./internal/workspace ./internal/server/api`
+
+---
+
+## Frontend Phases
+
+### Phase F1: Workstream Route And Shell
+
+**Deliverables:**
+
+- [x] Use `WorkstreamPage` as the route owner and primary surface.
+- [x] Make `/workstream` the canonical board and intake route.
+- [x] Use Workstream in navigation, route labels, and page heading.
 - [x] Update route tests and saved navigation assumptions.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
-
-**Commit:** `PM-025: Rename Kanban surface to Workspace`
 
 ---
 
@@ -121,22 +151,47 @@ Do not keep `/kanban` route compatibility.
 
 ---
 
-### Phase F4: Verification And Copy Cleanup
+### Phase F4: Workstream Verification
 
 **Deliverables:**
 
-- [x] Remove remaining user-facing Kanban page identity where it refers to the old surface.
-- [x] Keep Board View terminology where the Kanban-style layout is specifically meant.
-- [x] Update README or architecture notes if route names or API contracts changed.
-- [x] Run browser verification for Workspace load, Jira intake, blank item creation, and AI launch dialog. In-app browser was unavailable; HTTP smoke verified `/workspace` and `/api/ai/presets`.
+- [x] Verify user-facing Workstream terminology across the primary surface.
+- [x] Keep Board View terminology where the status-column layout is specifically meant.
+- [x] Update README and architecture notes for route names and API contracts.
+- [x] Run browser verification for Workstream load, Jira intake, blank item creation, and AI launch dialog. In-app browser was unavailable; HTTP smoke verified the active surface route and `/api/ai/presets`.
 
 **Verification:** `rtk npm run build && rtk go test ./...`
 
-**Commit:** `PM-025: Verify Jira-first Workspace`
+---
+
+### Phase F5: Workstream Naming Alignment
+
+**Deliverables:**
+
+- [x] Use the Workstream label for the board/intake navigation item and page heading.
+- [x] Keep `/workstream` as the canonical board route.
+- [x] Use `features/workstream` for Workstream feature helpers.
+- [x] Use `WorkstreamPage` for the main page component.
+- [x] Update PM-025 docs to distinguish Workstream from registered Workspaces.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk go test ./internal/server`
+
+---
+
+### Phase F6: Workstream Explorer
+
+**Deliverables:**
+
+- [x] Use `WorkstreamExplorer` for the global file/tree surface.
+- [x] Use `features/workstream-explorer` for explorer feature helpers.
+- [x] Keep workspace branch/path domain helpers named Workspace where they refer to registered repositories.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build`
 
 ## Post-Implementation Checklist
 
 - [x] Update `plans/platform/PM-025/` with implementation decisions.
 - [x] Confirm Jira data is not persisted outside intended README context and existing metadata.
-- [x] Confirm `/kanban` is removed from client routing without preserving old focused-item state.
+- [x] Confirm `/workstream` is the canonical surface route.
+- [x] Confirm Workstream backend behavior is owned by `internal/workstream`.
 - [x] Confirm PM-021 Jira mutation scope remains untouched.

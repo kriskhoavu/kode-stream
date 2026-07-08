@@ -9,8 +9,8 @@ describe('router', () => {
   });
 
   it('builds paths for routes', () => {
-    expect(pathForRoute({ name: 'workspace' })).toBe('/workspace');
-    expect(pathForRoute({ name: 'workspace', focusedItemId: 'item 1' })).toBe('/workspace?itemId=item+1');
+    expect(pathForRoute({ name: 'workstream' })).toBe('/workstream');
+    expect(pathForRoute({ name: 'workstream', focusedItemId: 'item 1' })).toBe('/workstream?itemId=item+1');
     expect(pathForRoute({ name: 'workspaces' })).toBe('/workspaces');
     expect(pathForRoute({ name: 'settings' })).toBe('/settings');
     expect(pathForRoute({ name: 'item', itemId: 'PM-003 Architecture' })).toBe('/items/PM-003%20Architecture');
@@ -27,15 +27,15 @@ describe('router', () => {
 		expect(knowledgePath()).toBe('/knowledge');
 	});
 
-  it('falls removed top-level list routes back to Workspace', () => {
+  it('falls removed top-level list routes back to Workstream', () => {
     window.history.pushState(null, '', '/items');
-    expect(routeFromLocation()).toEqual({ name: 'workspace' });
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
     window.history.pushState(null, '', '/branches');
-    expect(routeFromLocation()).toEqual({ name: 'workspace' });
-    window.history.pushState(null, '', '/workspace?itemId=item-1');
-    expect(routeFromLocation()).toEqual({ name: 'workspace', focusedItemId: 'item-1' });
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
+    window.history.pushState(null, '', '/workstream?itemId=item-1');
+    expect(routeFromLocation()).toEqual({ name: 'workstream', focusedItemId: 'item-1' });
     window.history.pushState(null, '', '/kanban?itemId=item-1');
-    expect(routeFromLocation()).toEqual({ name: 'workspace' });
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
     window.history.pushState(null, '', '/settings');
     expect(routeFromLocation()).toEqual({ name: 'settings' });
   });

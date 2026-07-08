@@ -1,5 +1,5 @@
 @import "./app-shell.css";
-@import "../features/workspace-explorer/workspace-explorer.css";
+@import "../features/workstream-explorer/workstream-explorer.css";
 @import "../features/content-search/content-search.css";
 
 :root {
@@ -510,7 +510,7 @@ button:disabled {
 }
 
 .settings-title h1,
-.kanban-heading h1 {
+.workstream-heading h1 {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1214,41 +1214,41 @@ select {
   margin-bottom: 18px;
 }
 
-.kanban-title {
+.workstream-title {
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
 
-.kanban-heading {
+.workstream-heading {
   display: flex;
   align-items: center;
   gap: 11px;
   min-width: 0;
 }
 
-.kanban-heading > div {
+.workstream-heading > div {
   display: grid;
   gap: 6px;
 }
 
-.kanban-heading h1,
-.kanban-heading span {
+.workstream-heading h1,
+.workstream-heading span {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.kanban-heading h1 {
+.workstream-heading h1 {
   margin-bottom: 0;
   font-size: 25px;
   letter-spacing: 0;
 }
 
-.kanban-heading h1 svg {
+.workstream-heading h1 svg {
   color: var(--blue);
 }
 
-.kanban-heading > div > span svg {
+.workstream-heading > div > span svg {
   color: var(--muted);
 }
 
@@ -1718,13 +1718,13 @@ select:disabled {
   font-size: 13px;
 }
 
-.kanban-board {
+.workstream-board {
   display: grid;
   gap: 12px;
   min-height: 620px;
 }
 
-.kanban-separator {
+.workstream-separator {
   min-width: 0;
   min-height: 620px;
   border: 1px solid color-mix(in srgb, var(--green) 36%, var(--line));
@@ -1739,12 +1739,12 @@ select:disabled {
   box-shadow: none;
 }
 
-.kanban-separator:hover {
+.workstream-separator:hover {
   border-color: color-mix(in srgb, var(--green) 64%, var(--line));
   background: linear-gradient(180deg, color-mix(in srgb, var(--green) 15%, var(--panel)), color-mix(in srgb, var(--green) 7%, var(--panel)));
 }
 
-.kanban-separator:disabled {
+.workstream-separator:disabled {
   cursor: default;
   opacity: 0.72;
 }
@@ -1772,7 +1772,7 @@ select:disabled {
   line-height: 1.15;
 }
 
-.kanban-column {
+.workstream-column {
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel) 78%, var(--panel-soft));
   border-radius: 8px;
@@ -1784,38 +1784,38 @@ select:disabled {
   transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
 
-.kanban-column.drop-enabled {
+.workstream-column.drop-enabled {
   border-color: color-mix(in srgb, var(--blue) 32%, var(--line));
 }
 
-.kanban-column.drop-target {
+.workstream-column.drop-target {
   border-color: color-mix(in srgb, var(--blue) 78%, var(--line));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 18%, transparent), var(--shadow-soft);
 }
 
-.kanban-column.drop-target .card-stack {
+.workstream-column.drop-target .card-stack {
   background: color-mix(in srgb, var(--blue) 7%, transparent);
 }
 
-.kanban-column.unsorted { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 84%, #e5e7eb), var(--panel)); }
-.kanban-column.draft { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dbeafe), var(--panel)); }
-.kanban-column.in_progress { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #fed7aa), var(--panel)); }
-.kanban-column.review { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #ede9fe), var(--panel)); }
-.kanban-column.done { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dcfce7), var(--panel)); }
+.workstream-column.unsorted { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 84%, #e5e7eb), var(--panel)); }
+.workstream-column.draft { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dbeafe), var(--panel)); }
+.workstream-column.in_progress { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #fed7aa), var(--panel)); }
+.workstream-column.review { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #ede9fe), var(--panel)); }
+.workstream-column.done { background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 82%, #dcfce7), var(--panel)); }
 
-.kanban-column header {
+.workstream-column header {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 16px 16px 10px;
 }
 
-.kanban-column h2 {
+.workstream-column h2 {
   font-size: 15px;
   margin: 0;
 }
 
-.kanban-column header span {
+.workstream-column header span {
   min-width: 26px;
   height: 24px;
   border-radius: 99px;
@@ -1826,7 +1826,7 @@ select:disabled {
   font-weight: 700;
 }
 
-.kanban-column header svg {
+.workstream-column header svg {
   margin-left: auto;
   color: var(--muted);
 }
@@ -1894,7 +1894,7 @@ select:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .kanban-column,
+  .workstream-column,
   .plan-card,
   .drag-overlay-card {
     transition: none;
@@ -5677,11 +5677,11 @@ body.is-resizing-panel {
     min-width: 128px;
   }
 
-  .kanban-board {
+  .workstream-board {
     grid-template-columns: 1fr;
   }
 
-  .kanban-separator {
+  .workstream-separator {
     min-height: 58px;
     grid-template-columns: 32px 32px minmax(0, 1fr) 32px;
     grid-template-rows: 1fr;
@@ -5694,7 +5694,7 @@ body.is-resizing-panel {
     writing-mode: horizontal-tb;
   }
 
-  .kanban-column {
+  .workstream-column {
     min-height: 230px;
   }
 
