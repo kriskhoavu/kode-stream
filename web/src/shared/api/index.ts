@@ -78,19 +78,34 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options?.headers ?? {})
+const inFlightRequests = new Map<string, Promise<unknown>>();
+
+async function request<T>(path: string, options?: RequestInit, dedupe = options?.method === undefined || options.method === 'GET'): Promise<T> {
+  const key = dedupe ? `${options?.method ?? 'GET'} ${path} ${options?.body ?? ''}` : '';
+  const existing = key ? inFlightRequests.get(key) : undefined;
+  if (existing) return existing as Promise<T>;
+
+  const pending = (async () => {
+    const res = await fetch(path, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options?.headers ?? {})
+      }
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog ?? payload.log);
     }
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog ?? payload.log);
+    return payload as T;
+  })();
+
+  if (key) inFlightRequests.set(key, pending);
+  try {
+    return await pending;
+  } finally {
+    if (key && inFlightRequests.get(key) === pending) inFlightRequests.delete(key);
   }
-  return payload as T;
 }
 
 export const api = {
@@ -201,7 +216,7 @@ export const api = {
     request<WorkstreamBranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/workstream/branch`, {
       method: 'POST',
       body: JSON.stringify(input)
-    }).then(normalizeWorkstreamBranchLoadResult),
+    }, true).then(normalizeWorkstreamBranchLoadResult),
   workspaceHealth: (workspaceId: string) => request<WorkspaceHealth>(`/api/workspaces/${workspaceId}/health`).then(normalizeWorkspaceHealth),
   sourceStructure: (workspaceId: string, directory: string) =>
     request<SourceSettingsResult>(`/api/workspaces/${workspaceId}/source-structure?directory=${encodeURIComponent(directory)}`),

@@ -212,4 +212,34 @@ describe('shared api facade', () => {
       { itemId: 'one', workspaceId: 'w1', title: 'One', subtitle: '', route: '/items/one', openedAt: '2026-06-20T00:00:00Z' }
     ]);
   });
+
+  it('coalesces identical reads while the first request is in flight', async () => {
+    let resolveResponse!: (value: { ok: boolean; json: () => Promise<never[]> }) => void;
+    const fetchMock = vi.fn().mockReturnValue(new Promise((resolve) => {
+      resolveResponse = resolve;
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = api.savedFilters();
+    const second = api.savedFilters();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveResponse({ ok: true, json: async () => [] });
+    await expect(Promise.all([first, second])).resolves.toEqual([[], []]);
+  });
+
+  it('coalesces identical workstream branch loads', async () => {
+    let resolveResponse!: (value: { ok: boolean; json: () => Promise<Record<string, unknown>> }) => void;
+    const fetchMock = vi.fn().mockReturnValue(new Promise((resolve) => {
+      resolveResponse = resolve;
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = api.loadWorkstreamBranch('w1', { branch: 'main' });
+    const second = api.loadWorkstreamBranch('w1', { branch: 'main' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveResponse({ ok: true, json: async () => ({ workspaceId: 'w1', branch: 'main', items: [] }) });
+    await Promise.all([first, second]);
+  });
 });

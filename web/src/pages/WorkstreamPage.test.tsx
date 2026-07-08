@@ -87,7 +87,7 @@ describe('WorkstreamPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /\+ New Work Item/i }));
     fireEvent.click(screen.getByRole('button', { name: 'From Jira' }));
     fireEvent.change(screen.getByLabelText('Jira key'), { target: { value: 'pm-025' } });
-    fireEvent.click(screen.getByRole('button', { name: /Fetch Jira/i }));
+    fireEvent.keyDown(screen.getByLabelText('Jira key'), { key: 'Enter' });
 
     expect(await screen.findByText('PM-025: Jira First Workspace')).toBeInTheDocument();
     expect(screen.getByLabelText('Item name')).toHaveValue('PM-025');
@@ -127,6 +127,9 @@ describe('WorkstreamPage', () => {
     expect(await screen.findByText('No Jira ticket exists for this item')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create Item' })).toBeDisabled();
     expect(fetchMock.mock.calls.some(([url, init]) => String(url) === '/api/items' && init?.method === 'POST')).toBe(false);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Create new work item' })).not.toBeInTheDocument();
   });
 
   it('does not repeat placeholder docs metadata on docs cards', async () => {
@@ -202,6 +205,47 @@ describe('WorkstreamPage', () => {
     await waitFor(() => expect(screen.getByPlaceholderText('Search items...')).toHaveValue('PM-012'));
     expect(await screen.findByLabelText('Item preview')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Drag cards' })).toBeInTheDocument();
+  });
+
+  it('shows Jira next to Git in the item preview drawer', async () => {
+    const detail = { ...draftItem, documents: [], metadata: {}, counts: { files: 0 } };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult([draftItem], 'main')));
+      if (url === '/api/items/p1') return Promise.resolve(response(detail));
+      if (url === '/api/items/p1/files') return Promise.resolve(response([]));
+      if (url === '/api/items/p1/diff') return Promise.resolve(response({ diff: '' }));
+      if (url === '/api/items/p1/jira') return Promise.resolve(response({
+        state: 'available',
+        issue: {
+          key: 'PM-012',
+          summary: 'Drag cards Jira ticket',
+          status: 'Done',
+          description: 'Jira context for this item.',
+          issueType: 'Story',
+          assignee: { displayName: 'Kim' },
+          reporter: { displayName: 'BA' },
+          priority: 'Medium',
+          labels: ['frontend'],
+          browserUrl: 'https://jira.example/browse/PM-012',
+          attachments: []
+        }
+      }));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} focusedItemId="p1" onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    const drawer = await screen.findByLabelText('Item preview');
+    const tablist = within(drawer).getByRole('tablist', { name: 'Work item side panel' });
+    expect(within(tablist).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Info', 'Git', 'Jira']);
+
+    fireEvent.click(within(tablist).getByRole('button', { name: 'Jira' }));
+
+    expect(await within(drawer).findByText('Drag cards Jira ticket')).toBeInTheDocument();
   });
 
   it('shows the active branch context and switches the loaded branch', async () => {

@@ -88,6 +88,36 @@ func TestLoadBranchRescansWorkingTreeWhenItemDirectoryIsDeleted(t *testing.T) {
 	}
 }
 
+func TestLoadBranchReusesUnchangedWorkingTreeScan(t *testing.T) {
+	root := newWorkstreamGitRepo(t)
+	writeWorkstreamGitFile(t, root, "plans/platform/PM-001/README.md", "# PM-001\n")
+	workstreamGitCommit(t, root, "add plan")
+
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), git)
+
+	first, err := service.LoadBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.LoadBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !second.ScannedAt.Equal(first.ScannedAt) {
+		t.Fatalf("unchanged working tree was rescanned: first=%s second=%s", first.ScannedAt, second.ScannedAt)
+	}
+	if second.ItemCount != first.ItemCount {
+		t.Fatalf("cached item count = %d, want %d", second.ItemCount, first.ItemCount)
+	}
+}
+
 func newWorkstreamGitRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

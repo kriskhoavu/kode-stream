@@ -192,6 +192,7 @@ type BranchScanMetadata struct {
 	SourceMode              string        `json:"sourceMode,omitempty" yaml:"sourceMode,omitempty"`
 	Editable                bool          `json:"editable" yaml:"editable"`
 	SourceConfigurationHash string        `json:"sourceConfigurationHash,omitempty" yaml:"sourceConfigurationHash,omitempty"`
+	WorkingTreeHash         string        `json:"workingTreeHash,omitempty" yaml:"workingTreeHash,omitempty"`
 	ScannedAt               time.Time     `json:"scannedAt" yaml:"scannedAt"`
 	Warnings                []ScanWarning `json:"warnings" yaml:"warnings"`
 }

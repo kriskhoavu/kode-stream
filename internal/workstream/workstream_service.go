@@ -6,6 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -60,13 +64,20 @@ func (s *Service) LoadBranch(id string, input models.WorkstreamBranchLoadInput) 
 		reader = scanner.NewFilesystemSourceReader(workspace.Path)
 	}
 	sourceHash := sourceConfigurationHash(workspace)
-	// A commit hash only identifies a Git snapshot. It says nothing about
-	// uncommitted additions, edits, or deletions in the checked-out working tree.
-	// Cache immutable branch snapshots, but always rescan the working tree.
-	if !input.Force && sourceMode != "working_tree" {
+	workingTreeHash := ""
+	if sourceMode == "working_tree" {
+		workingTreeHash, err = workingTreeSourceHash(workspace.Path, workspace.Sources)
+		if err != nil {
+			return models.WorkstreamBranchLoadResult{}, err
+		}
+	}
+	if !input.Force {
 		if metadata, ok, err := s.index.BranchScan(workspace.ID, selectedBranch); err != nil {
 			return models.WorkstreamBranchLoadResult{}, err
-		} else if ok && metadata.Commit == commit && metadata.SourceConfigurationHash == sourceHash {
+		} else if ok &&
+			metadata.Commit == commit &&
+			metadata.SourceConfigurationHash == sourceHash &&
+			(sourceMode != "working_tree" || metadata.WorkingTreeHash == workingTreeHash) {
 			items, err := s.index.BranchItems(workspace.ID, selectedBranch)
 			if err != nil {
 				return models.WorkstreamBranchLoadResult{}, err
@@ -96,6 +107,7 @@ func (s *Service) LoadBranch(id string, input models.WorkstreamBranchLoadInput) 
 		SourceMode:              sourceMode,
 		Editable:                editable,
 		SourceConfigurationHash: sourceHash,
+		WorkingTreeHash:         workingTreeHash,
 		ScannedAt:               scannedAt,
 		Warnings:                data.Warnings,
 	}
@@ -118,6 +130,42 @@ func sourceConfigurationHash(workspace models.WorkspaceConfig) string {
 	data, _ := json.Marshal(payload)
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
+}
+
+func workingTreeSourceHash(root string, sources []string) (string, error) {
+	hash := sha256.New()
+	for _, source := range sources {
+		source = filepath.Clean(strings.TrimSpace(source))
+		if source == "." || source == "" || filepath.IsAbs(source) || strings.HasPrefix(source, ".."+string(filepath.Separator)) {
+			continue
+		}
+		sourceRoot := filepath.Join(root, source)
+		err := filepath.WalkDir(sourceRoot, func(path string, entry fs.DirEntry, walkErr error) error {
+			if os.IsNotExist(walkErr) {
+				return nil
+			}
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			relativePath, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(hash, "%s\x00%d\x00%d\x00", filepath.ToSlash(relativePath), info.Size(), info.ModTime().UnixNano())
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func branchLoadResult(workspaceID, branch, ref, commit, checkout, sourceMode string, editable bool, scannedAt time.Time, warnings []models.ScanWarning, items []models.ItemSummary) models.WorkstreamBranchLoadResult {

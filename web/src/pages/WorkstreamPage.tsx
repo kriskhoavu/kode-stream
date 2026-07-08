@@ -1,10 +1,11 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, SetStateAction } from 'react';
-import { BookmarkPlus, Check, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GitCommitHorizontal, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Check, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GitCommitHorizontal, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
+import { JiraItemPanel } from '../features/jira/JiraItemPanel';
 import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
 import type {
   WorkstreamBranchLoadResult,
@@ -34,7 +35,7 @@ import { inferCompatibilityFields, lastPathSegment, previewPathSegments } from '
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
-type DrawerSideTab = 'info' | 'git';
+type DrawerSideTab = 'info' | 'git' | 'jira';
 type DrawerFileOption = { id: string; path: string; label: string };
 const DRAG_CLICK_SUPPRESSION_MS = 350;
 const UNSORTED_SELECTION_ID = 'unsorted';
@@ -201,6 +202,33 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [branchMenuOpen]);
+
+  useEffect(() => {
+    if (!newPlanOpen && !sourceItemsOpen) return;
+    const previousBodyOverflow = document.body.style.overflow;
+    const mainContent = document.querySelector<HTMLElement>('.main-content');
+    const previousMainContentOverflow = mainContent?.style.overflow ?? '';
+    document.body.style.overflow = 'hidden';
+    if (mainContent) mainContent.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      if (mainContent) mainContent.style.overflow = previousMainContentOverflow;
+    };
+  }, [newPlanOpen, sourceItemsOpen]);
+
+  useEffect(() => {
+    if (!newPlanOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setNewPlanOpen(false);
+      setJiraLookup(null);
+      setNewPlanError('');
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [newPlanOpen]);
 
   useEffect(() => {
     api.savedFilters()
@@ -832,7 +860,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       )}
       {newPlanOpen && workspace && (
         <div className="modal-backdrop" role="presentation">
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Create new work item">
+          <section className={newPlanDraft.origin === 'jira' ? 'modal-panel new-work-item-modal jira-mode' : 'modal-panel new-work-item-modal'} role="dialog" aria-modal="true" aria-label="Create new work item">
             <header>
               <h2>New Work Item</h2>
               <button type="button" className="icon-button" onClick={() => {
@@ -841,7 +869,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                 setNewPlanError('');
               }}><X size={16} /></button>
             </header>
-            <div className="metadata-form">
+            <div className={newPlanDraft.origin === 'jira' ? 'metadata-form jira-work-item-form' : 'metadata-form'}>
               <div className="segmented-control" role="group" aria-label="Item origin">
                 <button
                   type="button"
@@ -865,47 +893,84 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                   From Jira
                 </button>
               </div>
-              <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
-                {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
-              </select></label>
-              {newPlanDraft.origin === 'jira' && (
-                <div className="jira-intake">
-                  <label>Jira key<input value={newPlanDraft.jiraKey} onChange={(event) => {
-                    setNewPlanDraft((draft) => ({ ...draft, jiraKey: event.target.value.toUpperCase() }));
-                    setJiraLookup(null);
-                  }} placeholder="PM-025" /></label>
-                  <button type="button" className="secondary" disabled={jiraLookupLoading || !newPlanDraft.jiraKey.trim()} onClick={() => void fetchJiraIssue()}>
-                    <Search size={15} />
-                    {jiraLookupLoading ? 'Fetching...' : 'Fetch Jira'}
-                  </button>
-                  {jiraLookup && (
-                    <section className={jiraLookup.state === 'available' ? 'jira-issue-preview' : 'jira-issue-preview warning'} aria-label="Jira issue preview">
-                      {jiraLookup.issue ? (
-                        <>
-                          <strong>{jiraLookup.issue.key}: {jiraLookup.issue.summary}</strong>
-                          <span>{jiraLookup.issue.issueType || 'Issue'} · {jiraLookup.issue.status || 'Unknown'} · {jiraLookup.issue.assignee?.displayName || 'Unassigned'}</span>
-                          {jiraLookup.issue.description && <p>{jiraLookup.issue.description}</p>}
-                          {jiraLookup.issue.attachments.length > 0 && <small>{jiraLookup.issue.attachments.length} attachment{jiraLookup.issue.attachments.length === 1 ? '' : 's'} referenced</small>}
-                        </>
-                      ) : (
-                        <>
-                          <strong>{jiraLookup.message || jiraLookup.state}</strong>
-                          {jiraLookup.recoveryHint && <span>{jiraLookup.recoveryHint}</span>}
-                        </>
-                      )}
-                    </section>
-                  )}
+              {newPlanDraft.origin === 'blank' ? (
+                <>
+                  <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
+                    {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
+                  </select></label>
+                  <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Any item name" /></label>
+                  <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
+                </>
+              ) : (
+                <div className="jira-create-layout">
+                  <section className="jira-ticket-column">
+                    <div className="jira-column-heading">
+                      <strong>Jira ticket</strong>
+                      <span>Fetch the source issue and review its context.</span>
+                    </div>
+                    <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
+                      {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
+                    </select></label>
+                    <div className="jira-intake">
+                      <label>Jira key<input
+                        value={newPlanDraft.jiraKey}
+                        onChange={(event) => {
+                          setNewPlanDraft((draft) => ({ ...draft, jiraKey: event.target.value.toUpperCase() }));
+                          setJiraLookup(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' || jiraLookupLoading || !newPlanDraft.jiraKey.trim()) return;
+                          event.preventDefault();
+                          void fetchJiraIssue();
+                        }}
+                        placeholder="PM-025"
+                      /></label>
+                      <button type="button" className="secondary" disabled={jiraLookupLoading || !newPlanDraft.jiraKey.trim()} onClick={() => void fetchJiraIssue()}>
+                        <Search size={15} />
+                        {jiraLookupLoading ? 'Fetching...' : 'Fetch Jira'}
+                      </button>
+                    </div>
+                    {jiraLookup && (
+                      <section className={jiraLookup.state === 'available' ? 'jira-issue-preview' : 'jira-issue-preview warning'} aria-label="Jira issue preview">
+                        {jiraLookup.issue ? (
+                          <>
+                            <header className="jira-issue-preview-header">
+                              <strong>{jiraLookup.issue.key}: {jiraLookup.issue.summary}</strong>
+                              {jiraLookup.issue.browserUrl && <a href={jiraLookup.issue.browserUrl} target="_blank" rel="noreferrer">Open Jira</a>}
+                            </header>
+                            <dl className="jira-issue-preview-meta">
+                              <div><dt>Type</dt><dd>{jiraLookup.issue.issueType || 'Issue'}</dd></div>
+                              <div><dt>Status</dt><dd>{jiraLookup.issue.status || 'Unknown'}</dd></div>
+                              <div><dt>Assignee</dt><dd>{jiraLookup.issue.assignee?.displayName || 'Unassigned'}</dd></div>
+                              {jiraLookup.issue.priority && <div><dt>Priority</dt><dd>{jiraLookup.issue.priority}</dd></div>}
+                            </dl>
+                            {jiraLookup.issue.description && <p className="jira-issue-preview-description">{jiraLookup.issue.description}</p>}
+                            {jiraLookup.issue.attachments.length > 0 && <small>{jiraLookup.issue.attachments.length} attachment{jiraLookup.issue.attachments.length === 1 ? '' : 's'} referenced</small>}
+                          </>
+                        ) : (
+                          <>
+                            <strong>{jiraLookup.message || jiraLookup.state}</strong>
+                            {jiraLookup.recoveryHint && <span>{jiraLookup.recoveryHint}</span>}
+                          </>
+                        )}
+                      </section>
+                    )}
+                  </section>
+                  <section className="jira-details-column">
+                    <div className="jira-column-heading">
+                      <strong>Work item details</strong>
+                      <span>Review the values imported from Jira before creation.</span>
+                    </div>
+                    <div className="jira-field-row">
+                      <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Jira key or local item name" /></label>
+                      <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
+                    </div>
+                    <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Jira summary" /></label>
+                    <label>Owner<input value={newPlanDraft.owner} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, owner: event.target.value }))} placeholder="Assignee" /></label>
+                    <label>Tags<input value={newPlanDraft.tags} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, tags: event.target.value }))} placeholder="story, priority-high" /></label>
+                  </section>
                 </div>
               )}
-              <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder={newPlanDraft.origin === 'jira' ? 'Jira key or local item name' : 'Any item name'} /></label>
-              {newPlanDraft.origin === 'jira' && (
-                <>
-                  <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Jira summary" /></label>
-                  <label>Owner<input value={newPlanDraft.owner} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, owner: event.target.value }))} placeholder="Assignee" /></label>
-                  <label>Tags<input value={newPlanDraft.tags} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, tags: event.target.value }))} placeholder="story, priority-high" /></label>
-                </>
-              )}
-              <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
             </div>
             {newPlanError && <p className="error">{newPlanError}</p>}
             <footer className="modal-actions">
@@ -1550,10 +1615,14 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   const [gitActivityOpen, setGitActivityOpen] = useState(() => readStoredToggle('workstream.drawer.gitActivityOpen'));
   const [error, setError] = useState('');
   const [width, setWidth] = useState(1120);
+  const [topOffset, setTopOffset] = useState(() => Math.max(0, 68 - window.scrollY));
   const autoSaveTimerRef = useRef<number | null>(null);
   const autoSaveSettledTimerRef = useRef<number | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
-  const drawerStyle = { '--drawer-width': `${width}px` } as CSSProperties & Record<'--drawer-width', string>;
+  const drawerStyle = {
+    '--drawer-width': `${width}px`,
+    '--drawer-top': `${topOffset}px`,
+  } as CSSProperties & Record<'--drawer-width' | '--drawer-top', string>;
   const compact = width < 700;
   const dirtyFile = file !== null && editorContent !== savedContent;
   const activityPath = plan?.itemPath || '';
@@ -1587,6 +1656,12 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [dirtyFile, editorContent, file, onClose, savedContent]);
+
+  useEffect(() => {
+    const updateTopOffset = () => setTopOffset(Math.max(0, 68 - window.scrollY));
+    window.addEventListener('scroll', updateTopOffset, { passive: true });
+    return () => window.removeEventListener('scroll', updateTopOffset);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1884,7 +1959,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
 
   return (
     <>
-      <button className="drawer-scrim" type="button" aria-label="Close preview" onClick={closeDrawer} />
+      <button className="drawer-scrim" style={drawerStyle} type="button" aria-label="Close preview" onClick={closeDrawer} />
       <aside className={compact ? 'plan-drawer compact' : 'plan-drawer'} style={drawerStyle} aria-label="Item preview">
         <button className="drawer-resize-handle" type="button" aria-label="Resize preview panel" onPointerDown={startResize}>
           <GripVertical size={16} />
@@ -1945,6 +2020,9 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
               </button>
               <button type="button" className={sideTab === 'git' ? 'active' : ''} onClick={() => setSideTab('git')}>
                 <GitBranch size={14} /> Git
+              </button>
+              <button type="button" className={sideTab === 'jira' ? 'active' : ''} onClick={() => setSideTab('jira')}>
+                <Ticket size={14} /> Jira
               </button>
             </div>
             <div className="drawer-work-item-content">
@@ -2027,6 +2105,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                   </div>
                 )
               )}
+              {sideTab === 'jira' && <JiraItemPanel itemId={itemId} />}
             </div>
           </aside>
         </div>
