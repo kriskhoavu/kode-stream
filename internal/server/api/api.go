@@ -125,6 +125,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/search", a.searchItems)
 	mux.HandleFunc("GET /api/ai/capabilities", a.aiCapabilities)
 	mux.HandleFunc("GET /api/ai/presets", a.aiPresets)
+	mux.HandleFunc("GET /api/ai/providers/{id}/capabilities", a.aiProviderCapabilities)
 	mux.HandleFunc("GET /api/ai/settings", a.aiSettings)
 	mux.HandleFunc("PUT /api/ai/settings", a.saveAISettings)
 	mux.HandleFunc("GET /api/workspaces", a.listWorkspaces)
@@ -453,6 +454,24 @@ func (a *API) aiPresets(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, a.aiSessions.Presets())
+}
+
+func (a *API) aiProviderCapabilities(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
+		return
+	}
+	result, err := a.aiSessions.ProviderCapabilities(r.PathValue("id"), r.URL.Query().Get("itemId"))
+	if err == nil {
+		writeJSON(w, http.StatusOK, result)
+		return
+	}
+	var launchErr *appaisession.LaunchError
+	if errors.As(err, &launchErr) && (launchErr.Code == "ai_provider_missing" || launchErr.Code == "item_not_found" || launchErr.Code == "workspace_not_found") {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+		return
+	}
+	writeError(w, http.StatusInternalServerError, err.Error())
 }
 
 func (a *API) aiSettings(w http.ResponseWriter, _ *http.Request) {

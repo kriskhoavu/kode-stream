@@ -18,12 +18,12 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }
       return;
     }
     setLaunching(true);
-    try {
+	try {
 		if (preference.surface === 'embedded') {
-			const result = await api.startEmbeddedAISession(itemId, { provider: preference.provider, contextMode: preference.contextMode, presetId: preference.presetId, customPrompt: preference.customPrompt, columns: 80, rows: 24 });
+			const result = await api.startEmbeddedAISession(itemId, { provider: preference.provider, contextMode: preference.contextMode, presetId: preference.presetId, promptDraft: preference.promptDraft, customPrompt: preference.customPrompt, selectedSkills: undefined, selectedAgents: undefined, columns: 80, rows: 24 });
 			openEmbeddedSession(result); onLaunched(`${label(preference.provider)} opened in the embedded terminal.`);
 		} else {
-			const result = await api.launchAISession(itemId, { provider: preference.provider, terminal: preference.terminal, contextMode: preference.contextMode, presetId: preference.presetId, customPrompt: preference.customPrompt });
+			const result = await api.launchAISession(itemId, { provider: preference.provider, terminal: preference.terminal, contextMode: preference.contextMode, presetId: preference.presetId, promptDraft: preference.promptDraft, customPrompt: preference.customPrompt, selectedSkills: undefined, selectedAgents: undefined });
 			onLaunched(launchMessage(result));
 		}
     } catch (caught) {
@@ -35,7 +35,7 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }
   };
 
   const rememberLaunch = (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => {
-		const next = { provider: input.provider, terminal: input.terminal, contextMode: input.contextMode, surface: input.surface ?? 'external', presetId: input.presetId, customPrompt: input.customPrompt };
+		const next = { provider: input.provider, terminal: input.terminal, contextMode: input.contextMode, surface: input.surface ?? 'external', presetId: input.presetId, promptDraft: input.promptDraft, customPrompt: input.customPrompt };
     saveAISessionPreference(next);
     setPreference(next);
 		if ('session' in result) { openEmbeddedSession(result); onLaunched(`${label(input.provider)} opened in the embedded terminal.`); }
@@ -58,7 +58,7 @@ function launchMessage(result: AISessionLaunchResult) {
 function preferenceLabel(preference: AISessionLaunchInput) {
 	const context = preference.contextMode === 'card_context' ? 'selected card' : 'workspace only';
 	const surface = preference.surface === 'embedded' ? 'Embedded' : label(preference.terminal);
-	const prompt = preference.presetId ? ` · ${preference.presetId}` : preference.customPrompt ? ' · free prompt' : '';
+	const prompt = preference.presetId ? ` · ${preference.presetId}` : preference.promptDraft || preference.customPrompt ? ' · free prompt' : '';
 	return `${label(preference.provider)} · ${surface} · ${context}${prompt}`;
 }
 

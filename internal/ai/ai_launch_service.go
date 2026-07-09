@@ -22,11 +22,14 @@ import (
 )
 
 type LaunchInput struct {
-	Provider     string `json:"provider"`
-	Terminal     string `json:"terminal"`
-	ContextMode  string `json:"contextMode"`
-	PresetID     string `json:"presetId,omitempty"`
-	CustomPrompt string `json:"customPrompt,omitempty"`
+	Provider       string   `json:"provider"`
+	Terminal       string   `json:"terminal"`
+	ContextMode    string   `json:"contextMode"`
+	PresetID       string   `json:"presetId,omitempty"`
+	PromptDraft    string   `json:"promptDraft,omitempty"`
+	CustomPrompt   string   `json:"customPrompt,omitempty"`
+	SelectedSkills []string `json:"selectedSkills,omitempty"`
+	SelectedAgents []string `json:"selectedAgents,omitempty"`
 }
 
 type LaunchResult struct {
@@ -53,6 +56,24 @@ type PlanPreset struct {
 	Prompt      string `json:"prompt"`
 	ContextMode string `json:"contextMode"`
 	Provider    string `json:"provider,omitempty"`
+}
+
+type CapabilityDescriptor struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Kind        string `json:"kind"`
+	Provider    string `json:"provider"`
+	Scope       string `json:"scope"`
+	SourcePath  string `json:"sourcePath"`
+}
+
+type ProviderCapabilityCatalog struct {
+	Provider                string                 `json:"provider"`
+	Skills                  []CapabilityDescriptor `json:"skills"`
+	Agents                  []CapabilityDescriptor `json:"agents"`
+	SupportsNativeSelection bool                   `json:"supportsNativeSelection"`
+	SupportsPromptFallback  bool                   `json:"supportsPromptFallback"`
 }
 
 type Eligibility struct {
@@ -212,7 +233,7 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	if !s.detect(terminal.Executable).Detected {
 		return LaunchResult{}, launchError("terminal_missing", "selected terminal executable was not found")
 	}
-	prompt, presetID, promptErr := s.resolvePrompt(input.PresetID, input.CustomPrompt)
+	prompt, presetID, promptErr := s.composePrompt(input.Provider, itemID, input.ContextMode, input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
 	if promptErr != nil {
 		return LaunchResult{}, promptErr
 	}
@@ -221,10 +242,7 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 		"identifier": item.Identifier, "contextMode": contextMode, "intent": contextMode, "prompt": prompt,
 	}
 	providerName := expand(provider.Executable, values)
-	providerArgs := []string{}
-	if contextMode == "card_context" {
-		providerArgs = expandAll(provider.Args, values)
-	}
+	providerArgs := launchProviderArgs(contextMode, provider.Args, values)
 	terminalArgs := expandAll(terminal.Args, values)
 	sessionID := "external-" + randomID()
 	checkpoint := verificationCheckpoint{
@@ -240,11 +258,21 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, PresetID: presetID, SessionID: sessionID, StartedAt: s.launch.now().UTC()}, nil
 }
 
-func (s *Service) resolvePrompt(presetID, customPrompt string) (string, string, error) {
+func (s *Service) resolvePrompt(presetID, promptDraft, customPrompt string) (string, string, error) {
 	presetID = strings.TrimSpace(presetID)
+	promptDraft = strings.TrimSpace(promptDraft)
 	customPrompt = strings.TrimSpace(customPrompt)
-	if presetID != "" && customPrompt != "" {
+	if promptDraft != "" && customPrompt != "" {
+		return "", "", launchError("invalid_prompt", "choose either promptDraft or customPrompt")
+	}
+	if presetID != "" && customPrompt != "" && promptDraft == "" {
 		return "", "", launchError("invalid_prompt", "choose either an AI preset or a free prompt")
+	}
+	if promptDraft != "" {
+		if presetID == "" {
+			return promptDraft, "", nil
+		}
+		return promptDraft, presetID, nil
 	}
 	if customPrompt != "" {
 		return customPrompt, "", nil
@@ -258,6 +286,73 @@ func (s *Service) resolvePrompt(presetID, customPrompt string) (string, string, 
 		}
 	}
 	return "", "", launchError("invalid_prompt", "selected AI preset is unavailable")
+}
+
+func (s *Service) composePrompt(providerID, itemID, contextMode, presetID, promptDraft, customPrompt string, selectedSkills, selectedAgents []string) (string, string, error) {
+	basePrompt, resolvedPresetID, err := s.resolvePrompt(presetID, promptDraft, customPrompt)
+	if err != nil {
+		return "", "", err
+	}
+	catalog, catalogErr := s.ProviderCapabilities(providerID, itemID)
+	if catalogErr != nil {
+		return "", "", catalogErr
+	}
+	skills := normalizeCapabilitySelection(selectedSkills, catalog.Skills)
+	agents := normalizeCapabilitySelection(selectedAgents, catalog.Agents)
+	if len(skills) == 0 && len(agents) == 0 {
+		return basePrompt, resolvedPresetID, nil
+	}
+	if !catalog.SupportsPromptFallback {
+		return basePrompt, resolvedPresetID, nil
+	}
+	block := buildCapabilityPromptBlock(contextMode, skills, agents)
+	if strings.TrimSpace(basePrompt) == "" {
+		return block, resolvedPresetID, nil
+	}
+	return strings.TrimSpace(basePrompt) + "\n\n" + block, resolvedPresetID, nil
+}
+
+func (s *Service) ProviderCapabilities(providerID, itemID string) (ProviderCapabilityCatalog, error) {
+	settings, err := s.Settings()
+	if err != nil {
+		return ProviderCapabilityCatalog{}, err
+	}
+	id := strings.TrimSpace(providerID)
+	if id == "" {
+		id = settings.DefaultProvider
+	}
+	if _, ok := settings.Providers[id]; !ok {
+		return ProviderCapabilityCatalog{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
+	}
+	workspacePath := ""
+	if strings.TrimSpace(itemID) != "" {
+		if s.launch == nil || s.launch.registry == nil || s.launch.index == nil {
+			return ProviderCapabilityCatalog{}, launchError("launch_failed", "AI session launch is unavailable")
+		}
+		item, found, getErr := s.launch.index.Get(strings.TrimSpace(itemID))
+		if getErr != nil {
+			return ProviderCapabilityCatalog{}, launchErrorWith("launch_failed", getErr)
+		}
+		if !found {
+			return ProviderCapabilityCatalog{}, launchError("item_not_found", "item not found")
+		}
+		workspace, found, getErr := s.launch.registry.Get(item.WorkspaceID)
+		if getErr != nil {
+			return ProviderCapabilityCatalog{}, launchErrorWith("launch_failed", getErr)
+		}
+		if !found {
+			return ProviderCapabilityCatalog{}, launchError("workspace_not_found", "workspace not found")
+		}
+		workspacePath = workspace.Path
+	}
+	skills, agents := discoverProviderCapabilities(id, workspacePath)
+	return ProviderCapabilityCatalog{
+		Provider:                id,
+		Skills:                  skills,
+		Agents:                  agents,
+		SupportsNativeSelection: false,
+		SupportsPromptFallback:  true,
+	}, nil
 }
 
 func (s *Service) startTerminal(id string, terminal LaunchTemplate, terminalArgs []string, workspace, provider string, providerArgs []string, checkpoint verificationCheckpoint) error {
@@ -378,6 +473,82 @@ func expandAll(values []string, replacements map[string]string) []string {
 		result[index] = expand(value, replacements)
 	}
 	return result
+}
+
+func expandProviderArgs(values []string, replacements map[string]string) []string {
+	expanded := expandAll(values, replacements)
+	if containsPlaceholder(values, "{prompt}") {
+		return expanded
+	}
+	if prompt := strings.TrimSpace(replacements["prompt"]); prompt != "" {
+		return append(expanded, prompt)
+	}
+	return expanded
+}
+
+func launchProviderArgs(contextMode string, values []string, replacements map[string]string) []string {
+	if strings.TrimSpace(contextMode) == "workspace_only" {
+		prompt := strings.TrimSpace(replacements["prompt"])
+		if prompt == "" {
+			return nil
+		}
+		return []string{prompt}
+	}
+	return expandProviderArgs(values, replacements)
+}
+
+func containsPlaceholder(values []string, placeholder string) bool {
+	for _, value := range values {
+		if strings.Contains(value, placeholder) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeCapabilitySelection(selected []string, allowed []CapabilityDescriptor) []CapabilityDescriptor {
+	if len(selected) == 0 || len(allowed) == 0 {
+		return nil
+	}
+	allowedByID := map[string]CapabilityDescriptor{}
+	for _, item := range allowed {
+		allowedByID[item.ID] = item
+	}
+	result := make([]CapabilityDescriptor, 0, len(selected))
+	seen := map[string]bool{}
+	for _, id := range selected {
+		id = strings.TrimSpace(id)
+		item, ok := allowedByID[id]
+		if !ok || seen[id] {
+			continue
+		}
+		seen[id] = true
+		result = append(result, item)
+	}
+	return result
+}
+
+func buildCapabilityPromptBlock(contextMode string, skills, agents []CapabilityDescriptor) string {
+	lines := []string{"Capability directives:"}
+	if len(skills) > 0 {
+		names := make([]string, 0, len(skills))
+		for _, skill := range skills {
+			names = append(names, skill.Name)
+		}
+		lines = append(lines, "- Skills: "+strings.Join(names, ", "))
+	}
+	if len(agents) > 0 {
+		names := make([]string, 0, len(agents))
+		for _, agent := range agents {
+			names = append(names, agent.Name)
+		}
+		lines = append(lines, "- Agents: "+strings.Join(names, ", "))
+	}
+	if strings.TrimSpace(contextMode) != "" {
+		lines = append(lines, "- Keep behavior consistent with context mode: "+strings.TrimSpace(contextMode)+".")
+	}
+	lines = append(lines, "- Treat these directives as user-selected guidance for this session.")
+	return strings.Join(lines, "\n")
 }
 
 func shellQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }

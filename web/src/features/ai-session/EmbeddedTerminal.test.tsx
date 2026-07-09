@@ -5,8 +5,10 @@ import { EmbeddedTerminal } from './EmbeddedTerminal';
 
 const write = vi.fn();
 const fit = vi.fn();
+const terminalConstructor = vi.fn();
 vi.mock('@xterm/xterm', () => ({ Terminal: class {
 	cols = 80; rows = 24;
+	constructor(options: unknown) { terminalConstructor(options); }
 	loadAddon() {} open() {} focus() {} dispose() {}
 	write = write;
 	onData() { return { dispose() {} }; }
@@ -27,7 +29,7 @@ class TestSocket {
 }
 
 const initial = { session: { id: 'session-1', itemId: 'item-1', itemIdentifier: 'PM-020', itemTitle: 'Embedded terminal', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context' as const, state: 'running' as const, startedAt: '2026-07-03T00:00:00Z' }, grant: { sessionId: 'session-1', token: 'secret', expiresAt: '2026-07-03T00:01:00Z' } };
-const terminalProps = { visible: true, mode: 'normal' as const, title: 'Codex terminal', subtitle: 'Discovery · PM-020', onToggleMinimize: vi.fn(), onToggleMaximize: vi.fn() };
+const terminalProps = { visible: true, mode: 'floating' as const, title: 'Codex terminal', subtitle: 'Discovery · PM-020', onStartMove: vi.fn(), onToggleDockMode: vi.fn(), onToggleMinimize: vi.fn(), onToggleMaximize: vi.fn() };
 
 describe('EmbeddedTerminal', () => {
 	afterEach(() => { TestSocket.instances = []; vi.clearAllMocks(); });
@@ -37,6 +39,7 @@ describe('EmbeddedTerminal', () => {
 		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 		render(<EmbeddedTerminal initial={initial} {...terminalProps} onClose={vi.fn()} />);
 		await waitFor(() => expect(TestSocket.instances).toHaveLength(1));
+		expect(terminalConstructor).toHaveBeenCalledWith(expect.objectContaining({ fontSize: 12, lineHeight: 1.15 }));
 		const socket = TestSocket.instances[0];
 		act(() => { socket.onopen?.(); socket.onmessage?.({ data: JSON.stringify({ type: 'output', data: btoa('hello'), encoding: 'base64' }) }); });
 		expect(write).toHaveBeenCalled();

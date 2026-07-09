@@ -1,8 +1,8 @@
-# Backend Design: AI Launch Prompt Composer And Capability Picker
+# Backend Design: AI Launch Composer, Capability Picker, And Session Layout Modes
 
 ## Overview
 
-Extend AI launch services with a deterministic prompt composer and provider capability catalog. The backend must build the final launch instruction from preset/free prompt input, selected skills/agents, and context mode while preserving parity across embedded and external launches.
+Extend AI launch services with a deterministic prompt composer and provider capability catalog. The backend must build the final launch instruction from preset/free prompt input, selected skills/agents, and context mode while preserving parity across embedded and external launches. Session layout mode changes introduced in PM-027 remain frontend-owned presentation state and do not require new server session contracts.
 
 ## Data Model
 
@@ -12,15 +12,15 @@ Extend AI launch services with a deterministic prompt composer and provider capa
 | `PromptComposeInput` | `presetId`, `promptDraft`, `contextMode`, `selectedSkills[]`, `selectedAgents[]` | Server-side prompt composition input |
 | `PromptComposeResult` | `resolvedPrompt`, `presetId`, `injectionMode`, `warnings[]` | Final launch prompt and metadata |
 | `ProviderCapabilityCatalog` | `provider`, `skills[]`, `agents[]`, `supportsNativeSelection`, `supportsPromptFallback` | Provider-scoped capability discovery contract |
-| `CapabilityDescriptor` | `id`, `name`, `description`, `kind` | User-selectable skill/agent item |
-| `LaunchAuditMetadata` | `presetId`, `promptEdited`, `selectedSkills[]`, `selectedAgents[]` | Audit context for launch transparency |
+| `CapabilityDescriptor` | `id`, `name`, `description`, `kind`, `scope`, `sourcePath`, `provider` | User-selectable skill/agent item |
+| `LaunchAuditMetadata` | `status`, `message`, `durationMs` | Current launch audit shape; capability-specific metadata is still follow-up work |
 
 ## API Contract
 
 | Method | Endpoint | Request | Response |
 |--------|----------|---------|----------|
 | GET | `/api/ai/presets` | None | `AIPlanPreset[]` |
-| GET | `/api/ai/providers/{id}/capabilities` | None | `ProviderCapabilityCatalog` |
+| GET | `/api/ai/providers/{id}/capabilities?itemId=...` | Optional current item/workspace context | `ProviderCapabilityCatalog` |
 | POST | `/api/items/{id}/ai-sessions` | `LaunchInput` (extended) | `LaunchResult` |
 | POST | `/api/items/{id}/ai-sessions/embedded` | `EmbeddedInput` (extended) | `EmbeddedResult` |
 
@@ -67,28 +67,25 @@ Recommended default behavior for backward compatibility:
 ## Capability Discovery Model
 
 - Provider capability catalogs can be sourced from:
-  - static provider adapter defaults,
-  - provider CLI introspection (when available),
-  - local config override.
+  - workspace-local provider directories and files (for example `.claude/agents`, `.claude/commands`, `.claude/skills/<name>/SKILL.md`, `.codex/skills/<name>/SKILL.md`, `.github/chatmodes`, `.agents`, or provider-specific equivalents),
+  - user-global provider directories and files in the current OS home/config area,
+  - provider CLI introspection or local config override later when needed.
+- Capability discovery should filter entries by selected provider and current item workspace.
+- Capability discovery must ignore nested references, cache/state files, and arbitrary text/json/markdown documents that are not provider capability entrypoints.
+- Catalog items should identify whether they came from `workspace` or `global` scope and expose a source path for UI traceability.
 - Discovery failure must not block session launch.
 - Catalog responses should be cacheable for short periods per provider.
 
 ## Validation Rules
 
 - Reject launch when both incompatible prompt inputs are provided in strict mode.
-- Normalize stale capability IDs into warnings or hard errors based on configured policy.
-- Enforce maximum prompt size and capability selection limits.
+- Normalize stale capability IDs by dropping anything not present in the provider catalog for the launch.
 - Keep provider-neutral behavior when catalog is empty.
 
 ## Audit And Observability
 
-- Extend `ai_session_launch` audit entries with:
-  - `presetId`
-  - `promptEdited`
-  - `selectedSkills`
-  - `selectedAgents`
-  - `injectionMode`
-- Include composition warnings for diagnosability (for example unknown capability IDs).
+- Keep existing `ai_session_launch` success/blocked/failed audit behavior.
+- Do not block PM-027 launch parity on richer audit metadata; preset/capability audit enrichment remains follow-up work.
 
 ## Design Decisions
 
@@ -99,3 +96,4 @@ Recommended default behavior for backward compatibility:
 | Support native and fallback injection modes | Works across uneven provider feature sets |
 | Non-blocking capability discovery failures | AI launch remains available even when catalogs cannot be loaded |
 | Make `{prompt}` usage explicit | Fixes current preset prompt mismatch and prevents silent drift |
+| Discover from workspace and user-global provider locations first | Depend on a static built-in skill list | Real provider assets already live beside the workspace or user profile and should drive the picker |

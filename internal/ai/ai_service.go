@@ -134,8 +134,11 @@ func (s *Service) detect(executable string) Capability {
 func mergeDefaults(saved Settings, goos string) Settings {
 	defaults := defaultSettings(goos)
 	for id, template := range saved.Providers {
-		if len(template.Args) == 1 && (template.Args[0] == "Read {contextFile} and follow its {intent} instructions for {identifier}." || template.Args[0] == "Read {contextFile}. Use it only as context and wait for the user's request.") {
-			template.Args[0] = "The selected card is at {itemPath}. Read that path and its relevant documents as context, then wait for the user's request."
+		if len(template.Args) == 1 && (template.Args[0] == "Read {contextFile} and follow its {intent} instructions for {identifier}." || template.Args[0] == "Read {contextFile}. Use it only as context and wait for the user's request." || template.Args[0] == "The selected card is at {itemPath}. Read that path and its relevant documents as context, then wait for the user's request.") {
+			template.Args[0] = defaultCardContextPrompt()
+		}
+		if len(template.Args) == 2 && template.Args[0] == "--prompt" && template.Args[1] == "The selected card is at {itemPath}. Read that path and its relevant documents as context, then wait for the user's request." {
+			template.Args[1] = defaultCardContextPrompt()
 		}
 		defaults.Providers[id] = template
 	}
@@ -152,7 +155,7 @@ func mergeDefaults(saved Settings, goos string) Settings {
 }
 
 func defaultSettings(goos string) Settings {
-	prompt := "The selected card is at {itemPath}. Read that path and its relevant documents as context, then wait for the user's request."
+	prompt := defaultCardContextPrompt()
 	settings := Settings{
 		Providers: map[string]LaunchTemplate{
 			"claude":   {Enabled: true, Executable: "claude", Args: []string{prompt}},
@@ -197,6 +200,10 @@ func firstEnabled(templates map[string]LaunchTemplate) string {
 		}
 	}
 	return ""
+}
+
+func defaultCardContextPrompt() string {
+	return "The selected card is at {itemPath}. Read that path and its relevant documents as context, then fulfill this request: {prompt}"
 }
 
 func (c Capability) String() string {

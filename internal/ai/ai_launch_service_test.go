@@ -172,6 +172,40 @@ func TestLaunchExpandsFreePromptAndRejectsInvalidPromptInput(t *testing.T) {
 	}
 }
 
+func TestLaunchUsesPromptDraftAndCapabilitySelections(t *testing.T) {
+	service, item, _, runner, _, _ := launchTestService(t, true)
+	catalog, err := service.ProviderCapabilities("test-ai", item.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Skills) == 0 || len(catalog.Agents) == 0 {
+		t.Fatalf("catalog = %#v", catalog)
+	}
+	result, err := service.Launch(item.ID, LaunchInput{
+		Provider:       "test-ai",
+		Terminal:       "wezterm",
+		ContextMode:    "workspace_only",
+		PresetID:       "implementation-plan",
+		PromptDraft:    "Use the preset but add rollout notes.",
+		SelectedSkills: []string{catalog.Skills[0].ID},
+		SelectedAgents: []string{catalog.Agents[0].ID},
+	})
+	if err != nil || !result.Accepted || result.PresetID != "implementation-plan" {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if len(runner.processes) != 1 {
+		t.Fatalf("processes=%#v", runner.processes)
+	}
+	data, readErr := os.ReadFile(runner.processes[0].args[len(runner.processes[0].args)-1])
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	content := string(data)
+	if !strings.Contains(content, "Use the preset but add rollout notes.") || !strings.Contains(content, catalog.Skills[0].Name) || !strings.Contains(content, catalog.Agents[0].Name) {
+		t.Fatalf("wrapper=%q", content)
+	}
+}
+
 func TestLaunchFailureIsAuditedAsFailed(t *testing.T) {
 	service, item, _, runner, _, auditStore := launchTestService(t, true)
 	runner.err = errors.New("terminal refused launch")
@@ -199,6 +233,12 @@ func launchTestService(t *testing.T, structured bool) (*Service, models.ItemDeta
 	root := t.TempDir()
 	planDir := filepath.Join(root, "plans", "platform", "PM-018")
 	if err := os.MkdirAll(planDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".skills", "implementation-planning.md"), []byte("# skill"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if structured {
@@ -247,6 +287,14 @@ func launchTestService(t *testing.T, structured bool) (*Service, models.ItemDeta
 	auditStore := audit.New(filepath.Join(dataDir, "audit.jsonl"))
 	runner := &recordingRunner{}
 	wrapperDir := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.MkdirAll(filepath.Join(home, ".agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".agents", "reviewer.md"), []byte("# agent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	service := New(store).ConfigureLaunch(reg, index, auditStore, wrapperDir)
 	service.goos = "darwin"
 	service.launch.runner = runner

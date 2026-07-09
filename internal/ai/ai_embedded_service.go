@@ -7,12 +7,15 @@ import (
 )
 
 type EmbeddedInput struct {
-	Provider     string `json:"provider"`
-	ContextMode  string `json:"contextMode"`
-	PresetID     string `json:"presetId,omitempty"`
-	CustomPrompt string `json:"customPrompt,omitempty"`
-	Columns      uint16 `json:"columns"`
-	Rows         uint16 `json:"rows"`
+	Provider       string   `json:"provider"`
+	ContextMode    string   `json:"contextMode"`
+	PresetID       string   `json:"presetId,omitempty"`
+	PromptDraft    string   `json:"promptDraft,omitempty"`
+	CustomPrompt   string   `json:"customPrompt,omitempty"`
+	SelectedSkills []string `json:"selectedSkills,omitempty"`
+	SelectedAgents []string `json:"selectedAgents,omitempty"`
+	Columns        uint16   `json:"columns"`
+	Rows           uint16   `json:"rows"`
 }
 
 type EmbeddedResult struct {
@@ -63,15 +66,12 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	if !capability.Detected {
 		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
 	}
-	prompt, _, promptErr := s.resolvePrompt(input.PresetID, input.CustomPrompt)
+	prompt, _, promptErr := s.composePrompt(input.Provider, itemID, input.ContextMode, input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
 	if promptErr != nil {
 		return EmbeddedResult{}, promptErr
 	}
 	values := map[string]string{"workspace": workspace.Path, "contextFile": item.ItemPath, "itemPath": item.ItemPath, "identifier": item.Identifier, "contextMode": mode, "intent": mode, "prompt": prompt}
-	args := []string{}
-	if mode == "card_context" {
-		args = expandAll(provider.Args, values)
-	}
+	args := launchProviderArgs(mode, provider.Args, values)
 	session, grant, err := s.embedded.Start(StartRequest{ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)

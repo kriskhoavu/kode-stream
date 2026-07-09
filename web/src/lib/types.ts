@@ -277,6 +277,24 @@ export interface AICapability {
   reason?: string;
 }
 
+export interface AICapabilityDescriptor {
+  id: string;
+  name: string;
+  description?: string;
+  kind: 'skill' | 'agent' | string;
+  provider: string;
+  scope: 'workspace' | 'global' | string;
+  sourcePath: string;
+}
+
+export interface AIProviderCapabilityCatalog {
+  provider: string;
+  skills: AICapabilityDescriptor[];
+  agents: AICapabilityDescriptor[];
+  supportsNativeSelection: boolean;
+  supportsPromptFallback: boolean;
+}
+
 export interface AILaunchTemplate {
   enabled: boolean;
   executable: string;
@@ -309,7 +327,10 @@ export interface AISessionLaunchInput {
   terminal: string;
   contextMode: 'workspace_only' | 'card_context';
 	presetId?: string;
+	promptDraft?: string;
 	customPrompt?: string;
+	selectedSkills?: string[];
+	selectedAgents?: string[];
 	surface?: 'external' | 'embedded';
 }
 

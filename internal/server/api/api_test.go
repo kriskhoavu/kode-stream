@@ -86,6 +86,31 @@ func TestAICapabilitiesRouteReturnsStableShape(t *testing.T) {
 	}
 }
 
+func TestAIProviderCapabilitiesRouteReturnsCatalog(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.MkdirAll(filepath.Join(home, ".codex", "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".codex", "skills", "implementation-plan.md"), []byte("# skill"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(t.TempDir(), "ai-settings.yaml")))
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/ai/providers/codex/capabilities", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var catalog appaisession.ProviderCapabilityCatalog
+	if err := json.Unmarshal(response.Body.Bytes(), &catalog); err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Provider != "codex" || len(catalog.Skills) == 0 || !catalog.SupportsPromptFallback || catalog.Skills[0].SourcePath == "" {
+		t.Fatalf("catalog = %#v", catalog)
+	}
+}
+
 func TestAIRoutesAreUnavailableWithoutService(t *testing.T) {
 	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
 	for _, endpoint := range []string{"/api/ai/settings", "/api/ai/capabilities"} {

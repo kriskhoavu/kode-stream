@@ -1,5 +1,6 @@
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Copy, Minus, Square, SquareTerminal, X } from 'lucide-react';
+import { Columns2, Copy, Minus, PanelRight, Square, SquareTerminal, X } from 'lucide-react';
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -8,7 +9,7 @@ import type { EmbeddedAISessionResult, EmbeddedAISessionState } from '../../lib/
 
 type ServerFrame = { type: 'output' | 'state' | 'warning' | 'exit'; data?: string; encoding?: string; state?: EmbeddedAISessionState; exitCode?: number; message?: string };
 
-export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onToggleMinimize, onToggleMaximize, onClose, onStateChange }: { initial: EmbeddedAISessionResult; visible: boolean; mode: 'normal' | 'maximized'; title: string; subtitle: string; onToggleMinimize: () => void; onToggleMaximize: () => void; onClose: () => void; onStateChange?: (state: EmbeddedAISessionState, exitCode?: number) => void }) {
+export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onStartMove, onToggleDockMode, onToggleMinimize, onToggleMaximize, onClose, onStateChange }: { initial: EmbeddedAISessionResult; visible: boolean; mode: 'floating' | 'side_panel' | 'maximized'; title: string; subtitle: string; onStartMove: (x: number, y: number) => void; onToggleDockMode: () => void; onToggleMinimize: () => void; onToggleMaximize: () => void; onClose: () => void; onStateChange?: (state: EmbeddedAISessionState, exitCode?: number) => void }) {
 	const [state, setState] = useState<EmbeddedAISessionState>(initial.session.state);
 	const [connection, setConnection] = useState<'connecting' | 'connected' | 'reconnecting' | 'closed'>('connecting');
 	const [exitCode, setExitCode] = useState<number | undefined>(initial.session.exitCode);
@@ -47,7 +48,7 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onTo
 		};
 		void Promise.all([import('@xterm/xterm'), import('@xterm/addon-fit')]).then(([terminalModule, fitModule]) => {
 			if (disposed || !hostRef.current) return;
-			terminal = new terminalModule.Terminal({ convertEol: true, cursorBlink: true, scrollback: 5000, theme: { background: '#090d18' } });
+			terminal = new terminalModule.Terminal({ convertEol: true, cursorBlink: true, fontSize: 12, lineHeight: 1.15, scrollback: 5000, theme: { background: '#090d18' } });
 			const fit = new fitModule.FitAddon(); fitRef.current = fit; terminal.loadAddon(fit); terminal.open(hostRef.current); fit.fit(); terminal.focus(); terminalRef.current = terminal;
 			dataDisposable = terminal.onData((data) => send({ type: 'input', data: btoa(unescape(encodeURIComponent(data))) }));
 			resizeDisposable = terminal.onResize(({ cols, rows }) => send({ type: 'resize', columns: cols, rows }));
@@ -68,9 +69,16 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onTo
 	}, [mode, visible]);
 
 	const close = () => { if (active && !window.confirm('Cancel the running AI session and close the terminal?')) return; if (active) void api.cancelEmbeddedAISession(initial.session.id); onClose(); };
+	const startMove = (event: ReactPointerEvent<HTMLElement>) => {
+		const target = event.target as HTMLElement;
+		if (target.closest('button')) return;
+		if (mode !== 'floating') return;
+		event.preventDefault();
+		onStartMove(event.clientX, event.clientY);
+	};
 
 	return <section className={`embedded-terminal-panel${visible ? ' active' : ''}`} aria-hidden={!visible} role={visible ? 'dialog' : undefined} aria-modal={visible ? 'true' : undefined} aria-labelledby={visible ? `embedded-terminal-title-${initial.session.id}` : undefined}>
-		<header><div className="embedded-terminal-heading"><span className="embedded-terminal-heading-icon"><SquareTerminal size={19} /></span><div><h2 id={`embedded-terminal-title-${initial.session.id}`}>{title}</h2><p>{subtitle} · <span role="status" aria-live="polite">{stateLabel(state, connection, exitCode)}</span></p></div></div><div className="embedded-terminal-window-actions"><button ref={controlsRef} className="icon-button" type="button" title="Minimize" aria-label="Minimize embedded terminal" onClick={onToggleMinimize}><Minus size={18} strokeWidth={1.8} /></button><button className="icon-button" type="button" title={mode === 'maximized' ? 'Restore' : 'Maximize'} aria-label={mode === 'maximized' ? 'Restore embedded terminal size' : 'Maximize embedded terminal'} onClick={onToggleMaximize}>{mode === 'maximized' ? <Copy size={16} strokeWidth={1.8} /> : <Square size={15} strokeWidth={1.8} />}</button><button className="icon-button embedded-terminal-close" type="button" title="Close" aria-label="Close embedded terminal" onClick={close}><X size={18} strokeWidth={1.8} /></button></div></header>
+		<header onPointerDown={startMove}><div className="embedded-terminal-heading"><span className="embedded-terminal-heading-icon"><SquareTerminal size={19} /></span><div><h2 id={`embedded-terminal-title-${initial.session.id}`}>{title}</h2><p>{subtitle} · <span role="status" aria-live="polite">{stateLabel(state, connection, exitCode)}</span></p></div></div><div className="embedded-terminal-window-actions"><button ref={controlsRef} className="icon-button" type="button" title="Minimize" aria-label="Minimize embedded terminal" onClick={onToggleMinimize}><Minus size={18} strokeWidth={1.8} /></button><button className="icon-button" type="button" title={mode === 'side_panel' ? 'Float window' : 'Dock to right side'} aria-label={mode === 'side_panel' ? 'Float embedded terminal window' : 'Dock embedded terminal to right side'} onClick={onToggleDockMode}>{mode === 'side_panel' ? <Columns2 size={16} strokeWidth={1.8} /> : <PanelRight size={16} strokeWidth={1.8} />}</button><button className="icon-button" type="button" title={mode === 'maximized' ? 'Restore' : 'Maximize'} aria-label={mode === 'maximized' ? 'Restore embedded terminal size' : 'Maximize embedded terminal'} onClick={onToggleMaximize}>{mode === 'maximized' ? <Copy size={16} strokeWidth={1.8} /> : <Square size={15} strokeWidth={1.8} />}</button><button className="icon-button embedded-terminal-close" type="button" title="Close" aria-label="Close embedded terminal" onClick={close}><X size={18} strokeWidth={1.8} /></button></div></header>
 		<div ref={hostRef} className="embedded-terminal-canvas" aria-label="AI terminal output" />
 		{message && <p className="error" role="alert">{message}</p>}
 	</section>;
