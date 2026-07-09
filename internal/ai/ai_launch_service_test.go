@@ -46,14 +46,25 @@ func TestLaunchPassesCardPathAndStartsProviderInWorkspace(t *testing.T) {
 		t.Fatalf("result=%#v processes=%#v", result, runner.processes)
 	}
 	process := runner.processes[0]
-	if process.dir != workspace.Path || len(process.args) < 7 || process.args[0] != "start" || process.args[1] != "--cwd" {
+	if process.dir != workspace.Path || len(process.args) < 5 || process.args[0] != "start" || process.args[1] != "--cwd" {
 		t.Fatalf("process = %#v", process)
 	}
-	if !contains(process.args, item.ItemPath) || contains(process.args, filepath.Join(workspace.Path, item.ItemPath)) {
-		t.Fatalf("card path args = %#v", process.args)
+	wrapperPath := process.args[len(process.args)-1]
+	if !strings.HasPrefix(wrapperPath, wrapperDir) {
+		t.Fatalf("wrapper path = %q", wrapperPath)
+	}
+	wrapperContent, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(wrapperContent), item.ItemPath) || strings.Contains(string(wrapperContent), filepath.Join(workspace.Path, item.ItemPath)) {
+		t.Fatalf("wrapper content = %s", string(wrapperContent))
+	}
+	if !strings.Contains(string(wrapperContent), "/verification-checkpoints") {
+		t.Fatalf("wrapper missing checkpoint callback: %s", string(wrapperContent))
 	}
 	entries, err := os.ReadDir(wrapperDir)
-	if err != nil || len(entries) != 0 {
+	if err != nil || len(entries) != 1 {
 		t.Fatalf("unexpected generated resources=%#v err=%v", entries, err)
 	}
 	events, err := auditStore.Recent(10)
@@ -109,8 +120,15 @@ func TestWorkspaceOnlyLaunchesWithoutCardContext(t *testing.T) {
 	if process.dir != workspace.Path || len(process.args) != 5 || process.args[0] != "start" || process.args[4] == "" {
 		t.Fatalf("process=%#v", process)
 	}
+	wrapperContent, err := os.ReadFile(process.args[4])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(wrapperContent), item.ItemPath) {
+		t.Fatalf("workspace-only wrapper unexpectedly includes item path: %s", string(wrapperContent))
+	}
 	entries, err := os.ReadDir(wrapperDir)
-	if err != nil || len(entries) != 0 {
+	if err != nil || len(entries) != 1 {
 		t.Fatalf("workspace-only created resources=%#v err=%v", entries, err)
 	}
 }
@@ -121,8 +139,12 @@ func TestLaunchExpandsPresetPrompt(t *testing.T) {
 	if err != nil || !result.Accepted || result.PresetID != "implementation-plan" {
 		t.Fatalf("result=%#v err=%v", result, err)
 	}
-	if len(runner.processes) != 1 || !contains(runner.processes[0].args, "Create or update the implementation plan") {
+	if len(runner.processes) != 1 {
 		t.Fatalf("processes=%#v", runner.processes)
+	}
+	data, readErr := os.ReadFile(runner.processes[0].args[len(runner.processes[0].args)-1])
+	if readErr != nil || !strings.Contains(string(data), "Create or update the implementation plan") {
+		t.Fatalf("wrapper=%q err=%v", string(data), readErr)
 	}
 }
 
@@ -132,8 +154,12 @@ func TestLaunchExpandsFreePromptAndRejectsInvalidPromptInput(t *testing.T) {
 	if err != nil || !result.Accepted {
 		t.Fatalf("result=%#v err=%v", result, err)
 	}
-	if len(runner.processes) != 1 || !contains(runner.processes[0].args, "Use the Jira context first.") {
+	if len(runner.processes) != 1 {
 		t.Fatalf("processes=%#v", runner.processes)
+	}
+	data, readErr := os.ReadFile(runner.processes[0].args[len(runner.processes[0].args)-1])
+	if readErr != nil || !strings.Contains(string(data), "Use the Jira context first.") {
+		t.Fatalf("wrapper=%q err=%v", string(data), readErr)
 	}
 	_, err = service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context", PresetID: "missing"})
 	var launchErr *LaunchError

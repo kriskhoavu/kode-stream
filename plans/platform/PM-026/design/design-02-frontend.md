@@ -9,8 +9,8 @@ Extend workspace configuration and Workstream run surfaces so users can define p
 | Route | Behavior |
 |-------|----------|
 | `/workspaces` | Workspace settings include Runtime configuration |
-| `/workstream` | Shows run timeline, latest verify result, and artifacts during AI task execution |
-| `/items/:id` | Existing item view remains unchanged and links to latest verification state where available |
+| `/workstream` | Board and intake surface; verification controls are not hosted here |
+| `/items/:id` | Primary verification panel with run controls, trigger badges, timeline, and artifacts |
 
 ## Data Model
 
@@ -28,9 +28,9 @@ Extend workspace configuration and Workstream run surfaces so users can define p
 | State | Owner | Behavior |
 |-------|-------|----------|
 | Runtime form state | Workspace settings feature | Tracks adapter-specific fields and validation |
-| Verify run state | Workstream page | Polls latest job and updates timeline incrementally |
-| Artifact availability | Run panel | Enables links only when artifacts exist |
-| Retry controls | Run panel | Allows rerun with selected profile and handles busy state |
+| Verify run state | Item details page | Polls latest job and updates timeline incrementally |
+| Artifact availability | Verification section | Enables preview/open actions only when artifacts exist |
+| Retry controls | Verification section | Allows rerun with selected profile and handles busy state |
 | Failure summary state | AI integration UI bridge | Displays normalized failure explanation and retry context status |
 | Session context state | Workstream page | Shows provider name and terminal mode without changing verify behavior |
 
@@ -52,7 +52,7 @@ Extend workspace configuration and Workstream run surfaces so users can define p
 
 ## Workstream Run UX
 
-- Add run status timeline with states:
+- In item details `Info` tab, add run status timeline with states:
   - `Preparing`
   - `Coding`
   - `Verifying`
@@ -61,13 +61,32 @@ Extend workspace configuration and Workstream run surfaces so users can define p
   - `Failed`
 - Show current verification profile and elapsed time.
 - Show provider and terminal mode badges (`Embedded`, `External`) as context only.
-- Show latest app preview link when health checks pass.
+- Show latest verification status, trigger source badge, and failure category.
 - Artifacts panel lists logs, report, screenshot, video, and trace.
+- Add in-app Preview dialog for text artifacts and external Open action.
 - Actions:
   - `Re-run Smoke`
   - `Re-run Profile`
   - `Open Trace` (when available)
   - `Open Report`
+
+## Implemented Visualization Flow
+
+```text
+verification job starts
+  -> item details page polls verification job endpoint
+  -> verification section shows profile + status + trigger source badge
+  -> timeline section renders step results (prepare/up/health/verify/down)
+  -> artifact section renders indexed files with Preview/Open actions
+  -> rerun action creates a new job and refreshes the same section
+```
+
+Trigger source badge behavior:
+
+- `manual` for direct Run verify action.
+- `rerun` for rerun requests.
+- `checkpoint:* (embedded)` for embedded session completion.
+- `checkpoint:* (external)` for external terminal completion wrappers.
 
 ## Failure Experience
 

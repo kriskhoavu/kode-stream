@@ -62,6 +62,10 @@ import type {
   SystemConfigPaths,
   SourceStructureSettings,
   ScanResult,
+  VerifyProfile,
+  VerificationJob,
+  WorkspaceRuntimeConfig,
+  RunArtifact,
   SourceSettingsResult,
   WriteResult
 } from '../../lib/types';
@@ -207,6 +211,21 @@ export const api = {
   updateWorkspace: (id: string, input: WorkspaceInput) => request<WorkspaceConfig>(`/api/workspaces/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   testJiraConnection: (workspaceId: string, connection: JiraConnection) => request<JiraConnectionTest>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/test`, { method: 'POST', body: JSON.stringify(connection) }),
   workspaceJiraIssue: (workspaceId: string, issueKey: string) => request<JiraIssueState>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/issues/${encodeURIComponent(issueKey)}`),
+  workspaceRuntime: (workspaceId: string) => request<WorkspaceRuntimeConfig | { runtime: null }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/runtime`).then((payload) => {
+    if ('runtime' in payload) return payload.runtime;
+    return payload;
+  }),
+  saveWorkspaceRuntime: (workspaceId: string, input: WorkspaceRuntimeConfig) => request<WorkspaceRuntimeConfig>(`/api/workspaces/${encodeURIComponent(workspaceId)}/runtime`, { method: 'PUT', body: JSON.stringify(input) }),
+  createVerificationJob: (workspaceId: string, input: { profile?: VerifyProfile; trigger?: string; provider?: string; sessionId?: string; terminalMode?: string } = {}) =>
+    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs`, { method: 'POST', body: JSON.stringify(input) }, false),
+  ingestVerificationCheckpoint: (workspaceId: string, input: { eventType: string; profile?: VerifyProfile; provider?: string; sessionId?: string; terminalMode?: string }) =>
+    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-checkpoints`, { method: 'POST', body: JSON.stringify(input) }, false),
+  verificationJob: (workspaceId: string, jobId: string) =>
+    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}`, undefined, false),
+  verificationArtifacts: (workspaceId: string, jobId: string) =>
+    request<RunArtifact[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}/artifacts`, undefined, false),
+  rerunVerificationJob: (workspaceId: string, jobId: string, profile?: VerifyProfile) =>
+    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}/rerun`, { method: 'POST', body: JSON.stringify({ profile }) }, false),
   jiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira`),
   refreshJiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira/refresh`, { method: 'POST' }),
   jiraAttachmentURL: (itemId: string, attachmentId: string) => `/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`,
@@ -339,7 +358,13 @@ function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
 		registrationMode: workspace.registrationMode === 'remote_clone' || workspace.registrationMode === 'existing_workspace' ? workspace.registrationMode : 'local_path',
     remoteUrl: workspace.remoteUrl ?? '',
     clonePathManaged: Boolean(workspace.clonePathManaged),
-    sources: Array.isArray(workspace.sources) ? workspace.sources : []
+    sources: Array.isArray(workspace.sources) ? workspace.sources : [],
+    runtime: workspace.runtime ? {
+      ...workspace.runtime,
+      rebuildPolicy: workspace.runtime.rebuildPolicy ?? 'changed-only',
+      healthChecks: Array.isArray(workspace.runtime.healthChecks) ? workspace.runtime.healthChecks : [],
+      artifacts: { paths: Array.isArray(workspace.runtime.artifacts?.paths) ? workspace.runtime.artifacts?.paths : [] }
+    } : undefined
   };
 }
 

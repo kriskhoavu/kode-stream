@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bot, Maximize2 } from 'lucide-react';
 import type { EmbeddedAISessionResult, WorkspaceConfig } from '../../lib/types';
+import { api } from '../../lib/api';
 import { EmbeddedTerminal } from './EmbeddedTerminal';
 import { embeddedSessionStartedEvent } from './terminalSessions';
 
@@ -10,6 +11,7 @@ export function EmbeddedTerminalDock({ workspaces }: { workspaces: WorkspaceConf
 	const [sessions, setSessions] = useState<EmbeddedAISessionResult[]>([]);
 	const [activeId, setActiveId] = useState('');
 	const [mode, setMode] = useState<DockMode>('normal');
+	const [autoTriggeredSessions, setAutoTriggeredSessions] = useState<Record<string, boolean>>({});
 	const workspaceNames = useMemo(() => new Map(workspaces.map((workspace) => [workspace.id, workspace.name])), [workspaces]);
 
 	useEffect(() => {
@@ -39,7 +41,20 @@ export function EmbeddedTerminalDock({ workspaces }: { workspaces: WorkspaceConf
 		<div className={`embedded-terminal-backdrop terminal-mode-${mode}`} hidden={mode === 'minimized'}>
 			<section className="embedded-terminal-shell" aria-label="Embedded terminal dock">
 				<nav className="embedded-terminal-tabs" aria-label="Open embedded sessions">{sessions.map((result) => <button key={result.session.id} type="button" className={result.session.id === active.session.id ? 'active' : ''} onClick={() => select(result.session.id)}><Bot size={14} /> {sessionLabel(result)}<small>{workspaceName(result, workspaceNames)}</small></button>)}</nav>
-				{sessions.map((result) => <EmbeddedTerminal key={result.session.id} initial={result} visible={mode !== 'minimized' && result.session.id === active.session.id} mode={mode === 'maximized' ? 'maximized' : 'normal'} title={`${providerLabel(result.session.provider)} terminal`} subtitle={workspaceContext(result, workspaceNames)} onToggleMinimize={() => setMode('minimized')} onToggleMaximize={() => setMode((current) => current === 'maximized' ? 'normal' : 'maximized')} onClose={() => close(result.session.id)} />)}
+			{sessions.map((result) => <EmbeddedTerminal key={result.session.id} initial={result} visible={mode !== 'minimized' && result.session.id === active.session.id} mode={mode === 'maximized' ? 'maximized' : 'normal'} title={`${providerLabel(result.session.provider)} terminal`} subtitle={workspaceContext(result, workspaceNames)} onToggleMinimize={() => setMode('minimized')} onToggleMaximize={() => setMode((current) => current === 'maximized' ? 'normal' : 'maximized')} onClose={() => close(result.session.id)} onStateChange={(state) => {
+				if (state !== 'exited' && state !== 'failed' && state !== 'cancelled') return;
+				if (autoTriggeredSessions[result.session.id]) return;
+				const workspace = workspaces.find((candidate) => candidate.id === result.session.workspaceId);
+				if (!workspace?.runtime) return;
+				setAutoTriggeredSessions((current) => ({ ...current, [result.session.id]: true }));
+				void api.ingestVerificationCheckpoint(result.session.workspaceId, {
+					eventType: 'session_completed',
+					profile: 'smoke',
+					provider: result.session.provider,
+					sessionId: result.session.id,
+					terminalMode: 'embedded'
+				});
+			}} />)}
 			</section>
 		</div>
 	</>;

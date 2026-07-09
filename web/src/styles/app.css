@@ -1546,6 +1546,194 @@ select:disabled {
   font-size: 13px;
 }
 
+.verification-trigger-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel-soft) 86%, var(--panel));
+  overflow-wrap: anywhere;
+}
+
+.verification-harness {
+  gap: 10px;
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--line) 88%, var(--blue));
+  background: color-mix(in srgb, var(--panel) 92%, var(--panel-soft));
+}
+
+.verification-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.verification-harness strong,
+.verification-artifact-meta strong {
+  color: var(--text);
+}
+
+.verification-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.verification-actions .secondary:last-child {
+  grid-column: 1 / -1;
+}
+
+.verification-note,
+.verification-status {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.verification-status {
+  font-weight: 700;
+  color: color-mix(in srgb, var(--blue) 62%, var(--text));
+}
+
+.verification-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.verification-step {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 0 9px;
+  font-size: 12px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel-soft) 86%, var(--panel));
+}
+
+.verification-step.ok {
+  border-color: color-mix(in srgb, var(--green) 34%, var(--line));
+  color: color-mix(in srgb, var(--green) 72%, var(--text));
+}
+
+.verification-step.failed {
+  border-color: color-mix(in srgb, var(--orange) 34%, var(--line));
+  color: color-mix(in srgb, var(--orange) 72%, var(--text));
+}
+
+.verification-artifacts {
+  display: grid;
+  gap: 8px;
+}
+
+.verification-artifact-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 88%, var(--panel-soft));
+  padding: 9px;
+}
+
+.verification-artifact-meta {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.verification-artifact-meta span,
+.verification-artifact-meta small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.verification-artifact-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.verification-artifact-actions .secondary {
+  width: 100%;
+}
+
+.verification-trigger-badge.manual {
+  border-color: color-mix(in srgb, var(--blue) 38%, var(--line));
+  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
+  color: color-mix(in srgb, var(--blue) 70%, var(--text));
+}
+
+.verification-trigger-badge.rerun {
+  border-color: color-mix(in srgb, var(--orange) 42%, var(--line));
+  background: color-mix(in srgb, var(--orange) 12%, var(--panel));
+  color: color-mix(in srgb, var(--orange) 72%, var(--text));
+}
+
+.verification-trigger-badge.auto,
+.verification-trigger-badge.auto-embedded,
+.verification-trigger-badge.auto-external {
+  border-color: color-mix(in srgb, var(--green) 42%, var(--line));
+  background: color-mix(in srgb, var(--green) 12%, var(--panel));
+  color: color-mix(in srgb, var(--green) 70%, var(--text));
+}
+
+.verification-trigger-badge.auto-external {
+  border-style: dashed;
+}
+
+.metadata-callout .filter-summary {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.metadata-callout .filter-summary span {
+  overflow-wrap: anywhere;
+}
+
+.metadata-callout .workspace-source-row {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.metadata-callout .workspace-source-row > div {
+  flex: 1 1 240px;
+}
+
+.metadata-callout .workspace-source-row span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.metadata-callout .workspace-source-row .workspace-actions {
+  margin: 0;
+  justify-content: flex-end;
+}
+
+@media (max-width: 440px) {
+  .verification-actions,
+  .verification-artifact-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .verification-actions .secondary:last-child {
+    grid-column: auto;
+  }
+}
+
 .facet-bar {
   display: flex;
   flex-wrap: wrap;
@@ -5456,6 +5644,25 @@ body.is-resizing-panel {
 
 .source-structure-modal {
   width: min(980px, calc(100vw - 40px));
+}
+
+.artifact-preview-modal {
+  width: min(980px, calc(100vw - 40px));
+}
+
+.artifact-preview-content {
+  margin: 0;
+  max-height: min(60vh, 720px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-soft) 72%, var(--panel));
+  color: var(--text);
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .source-structure-section-heading {

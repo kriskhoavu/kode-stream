@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, Fold
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../lib/api';
-import type { JiraConnection, KnowledgeSettings, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
+import type { JiraConnection, KnowledgeSettings, RuntimeType, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -14,6 +14,19 @@ export { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parse
 const DEFAULT_SOURCES = ['docs', 'plans'];
 const UNSORTED_SELECTION_ID = 'unsorted';
 const emptyJiraConnection = (): JiraConnection => ({ deploymentType: 'cloud', baseUrl: '', projectKey: '', accountEmail: '', tokenEnvVar: 'JIRA_API_TOKEN' });
+const defaultRuntimeConfig = (): WorkspaceRuntimeConfig => ({
+  type: 'docker-compose',
+  configPath: '',
+  rebuildPolicy: 'changed-only',
+  commands: {
+    up: '',
+    down: '',
+    rebuildChanged: '',
+    verify: { smoke: '', critical: '', full: '' }
+  },
+  healthChecks: [],
+  artifacts: { paths: [] }
+});
 type WorkspaceNotice = {
   tone: 'success' | 'error' | 'info';
   title: string;
@@ -57,7 +70,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [editingSection, setEditingSection] = useState<WorkspaceEditSection>('');
-  const [editDraft, setEditDraft] = useState<{ name: string; path: string; baselineBranch: string; sources: string; jira: JiraConnection | null; knowledge: KnowledgeSettings }>({ name: '', path: '', baselineBranch: '', sources: '', jira: null, knowledge: {} });
+  const [editDraft, setEditDraft] = useState<{ name: string; path: string; baselineBranch: string; sources: string; jira: JiraConnection | null; knowledge: KnowledgeSettings; runtime: WorkspaceRuntimeConfig | null }>({ name: '', path: '', baselineBranch: '', sources: '', jira: null, knowledge: {}, runtime: null });
   const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([]);
   const [workspacesToRemove, setWorkspacesToRemove] = useState<WorkspaceConfig[] | null>(null);
   const [settingsEditor, setSettingsEditor] = useState<SettingsEditorState | null>(null);
@@ -213,14 +226,15 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const startEdit = (repo: WorkspaceConfig, section: Exclude<WorkspaceEditSection, ''>) => {
     setEditingId(repo.id);
     setEditingSection(section);
-    setEditDraft({
-      name: repo.name,
-      path: repo.path,
-      baselineBranch: repo.baselineBranch,
-      sources: repo.sources.join(', '),
-      jira: repo.jira ? { ...repo.jira } : null,
-      knowledge: { enabled: repo.knowledge?.enabled ?? true, enrichExecutable: repo.knowledge?.enrichExecutable ?? '', enrichArgs: [...(repo.knowledge?.enrichArgs ?? [])] }
-    });
+      setEditDraft({
+        name: repo.name,
+        path: repo.path,
+        baselineBranch: repo.baselineBranch,
+        sources: repo.sources.join(', '),
+        jira: repo.jira ? { ...repo.jira } : null,
+        knowledge: { enabled: repo.knowledge?.enabled ?? true, enrichExecutable: repo.knowledge?.enrichExecutable ?? '', enrichArgs: [...(repo.knowledge?.enrichArgs ?? [])] },
+        runtime: repo.runtime ? { ...repo.runtime, commands: { ...repo.runtime.commands, verify: { ...repo.runtime.commands.verify } }, healthChecks: [...(repo.runtime.healthChecks ?? [])], artifacts: { paths: [...(repo.runtime.artifacts?.paths ?? [])] } } : null
+      });
     setNotice(null);
   };
 
@@ -364,7 +378,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         registrationMode: repo.registrationMode,
         remoteUrl: repo.remoteUrl,
         jira: editDraft.jira ?? undefined,
-        knowledge: normalizeKnowledgeSettings(editDraft.knowledge)
+        knowledge: normalizeKnowledgeSettings(editDraft.knowledge),
+        runtime: editDraft.runtime ?? undefined
       });
       setEditingId('');
       setEditingSection('');
@@ -705,11 +720,12 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                   {editingId === repo.id && editingSection === 'integration' ? <>
                     <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />
                     <KnowledgeSettingsFields value={editDraft.knowledge} onChange={(value) => setEditDraft({ ...editDraft, knowledge: value })} />
+                    <RuntimeSettingsFields value={editDraft.runtime} onChange={(value) => setEditDraft({ ...editDraft, runtime: value })} />
                     <div className="repo-row-actions"><button className="secondary" type="button" onClick={discardEdit}>Cancel</button><button className="primary" type="button" onClick={() => saveEdit(repo)}>Save integration</button></div>
                   </> : <><div className="workspace-integration-card">
                     <div><strong>Jira</strong><span>{repo.jira ? `${repo.jira.projectKey} · ${repo.jira.deploymentType === 'cloud' ? 'Cloud' : 'Server / Data Center'}` : 'Not configured'}</span></div>
                     <button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
-                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>Configure Knowledge</button></div></>}
+                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>Configure Knowledge</button></div><div className="workspace-integration-card"><div><strong>Runtime and verify</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div></>}
                 </section>}
 
               </article>
@@ -1279,6 +1295,43 @@ function KnowledgeSettingsFields({ value, onChange }: { value: KnowledgeSettings
 	const updateArg = (index: number, argument: string) => onChange({ ...value, enrichArgs: args.map((current, currentIndex) => currentIndex === index ? argument : current) });
 	const moveArg = (index: number, offset: number) => { const target=index+offset; if(target<0||target>=args.length)return; const next=[...args]; [next[index],next[target]]=[next[target],next[index]]; onChange({...value,enrichArgs:next}); };
 	return <section className="knowledge-settings-fields" aria-label="Knowledge settings"><label className="repo-field jira-connection-toggle"><span className="jira-connection-title"><input type="checkbox" checked={value.enabled !== false} onChange={(event) => onChange({ ...value, enabled: event.target.checked })} />Knowledge Wiki detection</span></label><label className="repo-field">Enrichment executable<input aria-label="Knowledge enrichment executable" value={value.enrichExecutable ?? ''} onChange={(event) => onChange({ ...value, enrichExecutable: event.target.value })} placeholder="wiki-enrich" /><small>This is a command name or path, not a secret.</small></label><div className="repo-field"><span>Literal arguments</span>{args.map((argument,index)=><div className="path-input-row" key={index}><input aria-label={`Knowledge enrichment argument ${index+1}`} value={argument} onChange={(event)=>updateArg(index,event.target.value)} /><button className="secondary icon-action" type="button" aria-label={`Move argument ${index+1} up`} disabled={index===0} onClick={()=>moveArg(index,-1)}>↑</button><button className="secondary icon-action" type="button" aria-label={`Move argument ${index+1} down`} disabled={index===args.length-1} onClick={()=>moveArg(index,1)}>↓</button><button className="secondary icon-action" type="button" aria-label={`Remove argument ${index+1}`} onClick={()=>onChange({...value,enrichArgs:args.filter((_,currentIndex)=>currentIndex!==index)})}>×</button></div>)}<button className="secondary" type="button" onClick={()=>onChange({...value,enrichArgs:[...args,'']})}>Add argument</button><small>Arguments are passed exactly as listed. Shell expansion and environment values are not supported.</small></div></section>;
+}
+
+function RuntimeSettingsFields({ value, onChange }: { value: WorkspaceRuntimeConfig | null; onChange: (value: WorkspaceRuntimeConfig | null) => void }) {
+  const runtime = value ?? defaultRuntimeConfig();
+  const update = (patch: Partial<WorkspaceRuntimeConfig>) => onChange({ ...runtime, ...patch });
+  const updateCommands = (patch: Partial<WorkspaceRuntimeConfig['commands']>) => onChange({ ...runtime, commands: { ...runtime.commands, ...patch } });
+  const updateVerify = (patch: Partial<WorkspaceRuntimeConfig['commands']['verify']>) => onChange({ ...runtime, commands: { ...runtime.commands, verify: { ...runtime.commands.verify, ...patch } } });
+  const healthChecks = runtime.healthChecks ?? [];
+  const paths = runtime.artifacts?.paths ?? [];
+
+  return <section className="knowledge-settings-fields" aria-label="Runtime settings">
+    <label className="repo-field jira-connection-toggle">
+      <span className="jira-connection-title">
+        <input type="checkbox" checked={value !== null} onChange={(event) => onChange(event.target.checked ? runtime : null)} />
+        Runtime verification
+      </span>
+    </label>
+    {value && <>
+      <div className="registration-mode-toggle" role="radiogroup" aria-label="Runtime type">
+        {(['docker-compose', 'procfile', 'makefile', 'custom'] as RuntimeType[]).map((option) => (
+          <button key={option} type="button" role="radio" aria-checked={runtime.type === option} className={runtime.type === option ? 'secondary active' : 'secondary'} onClick={() => update({ type: option })}>{option}</button>
+        ))}
+      </div>
+      <label className="repo-field">Runtime config path<input value={runtime.configPath ?? ''} onChange={(event) => update({ configPath: event.target.value })} placeholder="infra/docker-compose.yaml" /></label>
+      <label className="repo-field">Startup command<input value={runtime.commands.up} onChange={(event) => updateCommands({ up: event.target.value })} placeholder="docker compose up -d --no-build" /></label>
+      <label className="repo-field">Teardown command<input value={runtime.commands.down} onChange={(event) => updateCommands({ down: event.target.value })} placeholder="docker compose down" /></label>
+      <label className="repo-field">Changed-only rebuild command<input value={runtime.commands.rebuildChanged ?? ''} onChange={(event) => updateCommands({ rebuildChanged: event.target.value })} placeholder="docker compose build service-a service-b" /></label>
+      <div className="repo-field-grid">
+        <label className="repo-field">Verify smoke<input value={runtime.commands.verify.smoke} onChange={(event) => updateVerify({ smoke: event.target.value })} placeholder="pnpm test:e2e --grep @smoke" /></label>
+        <label className="repo-field">Verify critical<input value={runtime.commands.verify.critical ?? ''} onChange={(event) => updateVerify({ critical: event.target.value })} placeholder="pnpm test:e2e --grep @critical" /></label>
+      </div>
+      <label className="repo-field">Verify full<input value={runtime.commands.verify.full ?? ''} onChange={(event) => updateVerify({ full: event.target.value })} placeholder="pnpm test:e2e" /></label>
+      <label className="repo-field">Rebuild policy<select value={runtime.rebuildPolicy ?? 'changed-only'} onChange={(event) => update({ rebuildPolicy: event.target.value as WorkspaceRuntimeConfig['rebuildPolicy'] })}><option value="never">Never</option><option value="changed-only">Changed only</option><option value="always">Always</option></select></label>
+      <div className="repo-field"><span>Health checks</span>{healthChecks.map((check, index) => <div className="path-input-row" key={`${check.target}-${index}`}><select value={check.type} onChange={(event) => onChange({ ...runtime, healthChecks: healthChecks.map((current, currentIndex) => currentIndex === index ? { ...current, type: event.target.value as 'http' | 'command' } : current) })}><option value="http">HTTP</option><option value="command">Command</option></select><input value={check.target} onChange={(event) => onChange({ ...runtime, healthChecks: healthChecks.map((current, currentIndex) => currentIndex === index ? { ...current, target: event.target.value } : current) })} placeholder={check.type === 'http' ? 'http://localhost:3000/health' : 'curl -f http://localhost:3000/health'} /><button className="secondary icon-action" type="button" aria-label={`Remove health check ${index + 1}`} onClick={() => onChange({ ...runtime, healthChecks: healthChecks.filter((_, currentIndex) => currentIndex !== index) })}>×</button></div>)}<button className="secondary" type="button" onClick={() => onChange({ ...runtime, healthChecks: [...healthChecks, { type: 'http', target: '', timeoutSeconds: 30 }] })}>Add health check</button></div>
+      <div className="repo-field"><span>Artifact paths</span>{paths.map((artifactPath, index) => <div className="path-input-row" key={`${artifactPath}-${index}`}><input value={artifactPath} onChange={(event) => onChange({ ...runtime, artifacts: { paths: paths.map((current, currentIndex) => currentIndex === index ? event.target.value : current) } })} placeholder="playwright-report" /><button className="secondary icon-action" type="button" aria-label={`Remove artifact path ${index + 1}`} onClick={() => onChange({ ...runtime, artifacts: { paths: paths.filter((_, currentIndex) => currentIndex !== index) } })}>×</button></div>)}<button className="secondary" type="button" onClick={() => onChange({ ...runtime, artifacts: { paths: [...paths, ''] } })}>Add artifact path</button></div>
+    </>}
+  </section>;
 }
 
 function KnowledgeRoots({ workspaceId, enabled }: { workspaceId: string; enabled: boolean }) {

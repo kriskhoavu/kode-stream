@@ -75,6 +75,81 @@ export interface WorkspaceConfig {
   lastScannedAt?: string;
   jira?: JiraConnection;
   knowledge?: KnowledgeSettings;
+  runtime?: WorkspaceRuntimeConfig;
+}
+
+export type RuntimeType = 'docker-compose' | 'procfile' | 'makefile' | 'custom';
+export type RebuildPolicy = 'never' | 'changed-only' | 'always';
+export type RuntimeHealthCheckType = 'http' | 'command';
+
+export interface RuntimeHealthCheck {
+  name?: string;
+  type: RuntimeHealthCheckType;
+  target: string;
+  timeoutSeconds?: number;
+}
+
+export interface RuntimeVerifyCommands {
+  smoke: string;
+  critical?: string;
+  full?: string;
+}
+
+export interface RuntimeCommandSet {
+  up: string;
+  down: string;
+  rebuildChanged?: string;
+  verify: RuntimeVerifyCommands;
+}
+
+export interface RuntimeArtifacts {
+  paths?: string[];
+}
+
+export interface WorkspaceRuntimeConfig {
+  type: RuntimeType;
+  configPath?: string;
+  rebuildPolicy?: RebuildPolicy;
+  commands: RuntimeCommandSet;
+  healthChecks?: RuntimeHealthCheck[];
+  artifacts?: RuntimeArtifacts;
+}
+
+export type VerifyProfile = 'smoke' | 'critical' | 'full';
+export type VerificationStatus = 'queued' | 'running' | 'passed' | 'failed';
+export type VerificationFailureType = 'boot_failure' | 'test_failure' | 'infra_failure';
+
+export interface VerificationStepResult {
+  step: string;
+  status: 'ok' | 'failed' | string;
+  message?: string;
+  durationMs: number;
+  at: string;
+}
+
+export interface RunArtifact {
+  kind: string;
+  path: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface VerificationJob {
+  id: string;
+  workspaceId: string;
+  profile: VerifyProfile;
+  status: VerificationStatus;
+  failureType?: VerificationFailureType;
+  exitCode: number;
+  trigger?: string;
+  provider?: string;
+  sessionId?: string;
+  terminalMode?: 'embedded' | 'external' | string;
+  startedAt?: string;
+  finishedAt?: string;
+  steps: VerificationStepResult[];
+  artifacts: RunArtifact[];
+  runtime?: WorkspaceRuntimeConfig;
 }
 
 export interface KnowledgeSettings {
@@ -127,6 +202,7 @@ export interface WorkspaceInput {
   cloneRoot?: string;
   jira?: JiraConnection;
   knowledge?: KnowledgeSettings;
+  runtime?: WorkspaceRuntimeConfig;
 }
 
 export type WorkspaceRegistrationMode = 'local_path' | 'remote_clone' | 'existing_workspace';

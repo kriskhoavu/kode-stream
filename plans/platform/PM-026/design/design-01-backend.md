@@ -23,6 +23,7 @@ Add a workspace-owned runtime contract and a runtime adapter execution layer so 
 | GET | `/api/workspaces/{id}/runtime` | None | `WorkspaceRuntimeConfig` |
 | PUT | `/api/workspaces/{id}/runtime` | `WorkspaceRuntimeConfig` | Saved config |
 | POST | `/api/workspaces/{id}/verification-jobs` | `CreateVerificationJobInput` | `VerificationJob` |
+| POST | `/api/workspaces/{id}/verification-checkpoints` | `CheckpointEvent` | `VerificationJob` |
 | GET | `/api/workspaces/{id}/verification-jobs/{jobId}` | None | `VerificationJobDetail` |
 | GET | `/api/workspaces/{id}/verification-jobs/{jobId}/artifacts` | None | `RunArtifact[]` |
 | POST | `/api/workspaces/{id}/verification-jobs/{jobId}/rerun` | `profile` | New `VerificationJob` |
@@ -49,6 +50,76 @@ Add a workspace-owned runtime contract and a runtime adapter execution layer so 
   - `terminalMode` (`embedded` or `external`)
 - Verification orchestration consumes this normalized event and never branches on provider identity.
 - If a provider cannot emit step events, fallback triggers are manual rerun and file-change thresholds.
+
+## Implemented Under-The-Hood Flows
+
+### Embedded Checkpoint Ingestion
+
+```text
+embedded session state changes to exited/failed/cancelled
+  -> frontend sends CheckpointEvent (session_completed, smoke, embedded)
+  -> POST /api/workspaces/{id}/verification-checkpoints
+  -> verification service creates VerificationJob
+  -> verification worker runs runtime pipeline
+```
+
+```mermaid
+flowchart TD
+  A[Embedded Session State Change] --> B[CheckpointEvent]
+  B --> C[POST /verification-checkpoints]
+  C --> D[VerificationService.IngestCheckpoint]
+  D --> E[VerificationJob]
+  E --> F[Runtime Pipeline]
+```
+
+### External Terminal Checkpoint Ingestion
+
+```text
+Launch() creates wrapper script and starts external terminal
+  -> wrapper executes provider command
+  -> wrapper posts CheckpointEvent to verification-checkpoints endpoint
+  -> verification service creates VerificationJob
+  -> runtime pipeline runs with same job model
+```
+
+```mermaid
+flowchart TD
+  A[Launch External Session] --> B[Write Wrapper Script]
+  B --> C[Terminal Executes Wrapper]
+  C --> D[Provider Command Completes]
+  D --> E[POST /verification-checkpoints]
+  E --> F[VerificationJob Created]
+  F --> G[Runtime Pipeline]
+```
+
+### Verification Worker Pipeline
+
+```text
+VerificationJob queued
+  -> prepare (rebuild policy)
+  -> up
+  -> health
+  -> verify(profile command)
+  -> down
+  -> collect artifacts + classify kinds
+  -> publish passed/failed with exit code + failure type
+```
+
+```mermaid
+stateDiagram-v2
+  [*] --> queued
+  queued --> running: start worker
+  running --> prepare
+  prepare --> up
+  up --> health
+  health --> verify
+  verify --> down
+  down --> collect_artifacts
+  collect_artifacts --> passed: exitCode 0
+  collect_artifacts --> failed: exitCode 10/20/30
+  passed --> [*]
+  failed --> [*]
+```
 
 ## Terminal Session Support
 

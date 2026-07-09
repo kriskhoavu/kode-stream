@@ -16,6 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"kode-stream/internal/common/models"
 	gitadapter "kode-stream/internal/git"
+	appruntime "kode-stream/internal/runtime"
 )
 
 type Registry struct {
@@ -169,6 +170,9 @@ func (r *Registry) Update(id string, input models.WorkspaceInput) (models.Worksp
 	if input.Knowledge == nil {
 		input.Knowledge = existing.Knowledge
 	}
+	if input.Runtime == nil {
+		input.Runtime = existing.Runtime
+	}
 	workspace, err := r.validate(input)
 	if err != nil {
 		return models.WorkspaceConfig{}, err
@@ -239,6 +243,28 @@ func (r *Registry) SetLastSelectedBranch(id, branch string) error {
 	return fmt.Errorf("workspace not found")
 }
 
+func (r *Registry) SetRuntime(id string, runtimeConfig *models.WorkspaceRuntimeConfig) (models.WorkspaceConfig, error) {
+	if err := r.load(); err != nil {
+		return models.WorkspaceConfig{}, err
+	}
+	normalized, err := appruntime.NormalizeRuntimeConfig(runtimeConfig)
+	if err != nil {
+		return models.WorkspaceConfig{}, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.records {
+		if r.records[i].ID == id {
+			r.records[i].Runtime = normalized
+			if err := r.saveLocked(); err != nil {
+				return models.WorkspaceConfig{}, err
+			}
+			return normalizeWorkspace(r.records[i]), nil
+		}
+	}
+	return models.WorkspaceConfig{}, fmt.Errorf("workspace not found")
+}
+
 func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
@@ -294,6 +320,10 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 	if err != nil {
 		return models.WorkspaceConfig{}, err
 	}
+	runtimeConfig, err := appruntime.NormalizeRuntimeConfig(input.Runtime)
+	if err != nil {
+		return models.WorkspaceConfig{}, err
+	}
 
 	return models.WorkspaceConfig{
 		ID:               slug(name) + "-" + shortHash(root),
@@ -307,6 +337,7 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 		CreatedAt:        time.Now().UTC(),
 		Jira:             jira,
 		Knowledge:        normalizeKnowledgeSettings(input.Knowledge),
+		Runtime:          runtimeConfig,
 	}, nil
 }
 
@@ -359,6 +390,11 @@ func normalizeWorkspace(workspace models.WorkspaceConfig) models.WorkspaceConfig
 		workspace.ClonePathManaged = false
 	}
 	workspace.Knowledge = normalizeKnowledgeSettings(workspace.Knowledge)
+	if normalized, err := appruntime.NormalizeRuntimeConfig(workspace.Runtime); err == nil {
+		workspace.Runtime = normalized
+	} else {
+		workspace.Runtime = nil
+	}
 	return workspace
 }
 

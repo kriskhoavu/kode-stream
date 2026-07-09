@@ -47,7 +47,7 @@ PM-026 adds a per-workspace runtime contract so Kode Stream can run, verify, and
 | Verification | Verify orchestrator | Execute install/build/start/health/test/artifact pipeline |
 | AI | Provider bridge and retry context | Consume provider-neutral checkpoints and return failure summaries/artifacts |
 | API | Runtime and verify endpoints | Configure contracts, trigger runs, fetch status and artifacts |
-| Frontend | Workstream run panel | Show live run state, app preview, terminal mode, and verification outputs |
+| Frontend | Item details verification panel | Show run state, trigger source, timeline, and artifact actions from item details |
 
 ## Data Flow
 
@@ -62,6 +62,105 @@ Workspace registered
   -> artifacts collected and surfaced in Workstream
   -> pass: continue/complete
   -> fail: structured retry context sent back to AI session
+```
+
+```mermaid
+flowchart TD
+  A[Workspace Registered] --> B[Runtime Config Saved]
+  B --> C[AI Session Starts\nEmbedded or External]
+  C --> D[Checkpoint Event]
+  D --> E[VerificationJob Created]
+  E --> F[Runtime Prepare/Up/Health]
+  F --> G[Verify Command\nPlaywright Profile]
+  G --> H[Artifacts Indexed]
+  H --> I[Workstream Polls Job]
+  I --> J{Result}
+  J -->|Pass| K[Continue/Complete]
+  J -->|Fail| L[Retry Context to AI]
+```
+
+## Current Implementation Visualization
+
+### Embedded AI Session -> Auto Verify
+
+```text
+Workstream (embedded terminal)
+  -> terminal session exits/fails/cancels
+  -> frontend posts checkpoint:
+     POST /api/workspaces/{id}/verification-checkpoints
+     { eventType: session_completed, profile: smoke, terminalMode: embedded }
+  -> verification service creates VerificationJob
+  -> runtime service executes prepare -> up -> health -> verify -> down
+  -> artifacts indexed from .artifacts/verification/<job-id>/
+  -> Item details page polls /verification-jobs/{jobId}
+  -> status, trigger source, steps, and artifact actions are rendered
+```
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant FE as Workstream Frontend
+  participant API as Server API
+  participant VS as Verification Service
+  participant RS as Runtime Service
+  U->>FE: Finish embedded AI session
+  FE->>API: POST /verification-checkpoints\n(session_completed, smoke, embedded)
+  API->>VS: Ingest checkpoint
+  VS->>VS: Create VerificationJob
+  VS->>RS: prepare -> up -> health -> verify -> down
+  RS-->>VS: step results + logs
+  VS->>VS: index artifacts
+  FE->>API: Poll /verification-jobs/{jobId}
+  API-->>FE: status + trigger + artifacts
+```
+
+### External Terminal (WezTerm/Terminal/iTerm) -> Auto Verify
+
+```text
+User launches external AI session from item
+  -> launch service writes wrapper script
+  -> wrapper runs provider command in workspace
+  -> wrapper posts checkpoint callback on completion
+  -> backend ingests checkpoint and starts VerificationJob (smoke)
+  -> same verification pipeline and artifact indexing
+  -> Item details verification panel shows trigger badge: auto external checkpoint
+```
+
+```mermaid
+sequenceDiagram
+  participant FE as Workstream Frontend
+  participant AI as AI Launch Service
+  participant T as External Terminal
+  participant W as Wrapper Script
+  participant API as Server API
+  participant VS as Verification Service
+  FE->>AI: Launch external AI session
+  AI->>AI: Write wrapper (.command)
+  AI->>T: Start terminal with wrapper
+  T->>W: Execute wrapper
+  W->>W: Run provider command in workspace
+  W->>API: POST /verification-checkpoints\n(session_completed, smoke, external)
+  API->>VS: Ingest checkpoint and start job
+```
+
+### Artifact Surfacing Pipeline
+
+```text
+runtime/verify commands write logs and outputs
+  -> .artifacts/verification/<job-id>/...
+  -> verification service walks files and indexes RunArtifact records
+  -> API returns artifact metadata for the job
+  -> Item details panel renders artifact list, Preview dialog, and Open action per artifact path
+```
+
+```mermaid
+flowchart LR
+  A[Runtime/Verify Output Files] --> B[.artifacts/verification/<job-id>]
+  B --> C[Verification Service Walk + Classify]
+  C --> D[RunArtifact Records]
+  D --> E[Artifacts API]
+  E --> F[Workstream Artifact Panel]
+  F --> G[Open Path Action]
 ```
 
 ## Design Decisions

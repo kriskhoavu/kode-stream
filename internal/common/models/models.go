@@ -117,6 +117,57 @@ type WorkspaceConfig struct {
 	LastScannedAt      time.Time                 `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
 	Jira               *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
 	Knowledge          *KnowledgeSettings        `json:"knowledge,omitempty" yaml:"knowledge,omitempty"`
+	Runtime            *WorkspaceRuntimeConfig   `json:"runtime,omitempty" yaml:"runtime,omitempty"`
+}
+
+type RuntimeType string
+
+const (
+	RuntimeTypeDockerCompose RuntimeType = "docker-compose"
+	RuntimeTypeProcfile      RuntimeType = "procfile"
+	RuntimeTypeMakefile      RuntimeType = "makefile"
+	RuntimeTypeCustom        RuntimeType = "custom"
+)
+
+type RebuildPolicy string
+
+const (
+	RebuildPolicyNever       RebuildPolicy = "never"
+	RebuildPolicyChangedOnly RebuildPolicy = "changed-only"
+	RebuildPolicyAlways      RebuildPolicy = "always"
+)
+
+type RuntimeHealthCheck struct {
+	Name           string `json:"name,omitempty" yaml:"name,omitempty"`
+	Type           string `json:"type" yaml:"type"`
+	Target         string `json:"target" yaml:"target"`
+	TimeoutSeconds int    `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty"`
+}
+
+type RuntimeVerifyCommands struct {
+	Smoke    string `json:"smoke" yaml:"smoke"`
+	Critical string `json:"critical,omitempty" yaml:"critical,omitempty"`
+	Full     string `json:"full,omitempty" yaml:"full,omitempty"`
+}
+
+type RuntimeCommandSet struct {
+	Up             string                `json:"up" yaml:"up"`
+	Down           string                `json:"down" yaml:"down"`
+	RebuildChanged string                `json:"rebuildChanged,omitempty" yaml:"rebuildChanged,omitempty"`
+	Verify         RuntimeVerifyCommands `json:"verify" yaml:"verify"`
+}
+
+type RuntimeArtifacts struct {
+	Paths []string `json:"paths,omitempty" yaml:"paths,omitempty"`
+}
+
+type WorkspaceRuntimeConfig struct {
+	Type          RuntimeType          `json:"type" yaml:"type"`
+	ConfigPath    string               `json:"configPath,omitempty" yaml:"configPath,omitempty"`
+	RebuildPolicy RebuildPolicy        `json:"rebuildPolicy,omitempty" yaml:"rebuildPolicy,omitempty"`
+	Commands      RuntimeCommandSet    `json:"commands" yaml:"commands"`
+	HealthChecks  []RuntimeHealthCheck `json:"healthChecks,omitempty" yaml:"healthChecks,omitempty"`
+	Artifacts     RuntimeArtifacts     `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
 }
 
 type KnowledgeSettings struct {
@@ -207,6 +258,7 @@ type WorkspaceInput struct {
 	CloneRoot        string                    `json:"cloneRoot,omitempty" yaml:"cloneRoot,omitempty"`
 	Jira             *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
 	Knowledge        *KnowledgeSettings        `json:"knowledge,omitempty" yaml:"knowledge,omitempty"`
+	Runtime          *WorkspaceRuntimeConfig   `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 }
 
 type SourceStructureSettings struct {

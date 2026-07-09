@@ -30,8 +30,10 @@ import (
 	appjira "kode-stream/internal/jira"
 	knowledgeindex "kode-stream/internal/knowledge"
 	"kode-stream/internal/navigation"
+	appruntime "kode-stream/internal/runtime"
 	appsearch "kode-stream/internal/search"
 	"kode-stream/internal/system"
+	appverification "kode-stream/internal/verification"
 	appworkspace "kode-stream/internal/workspace"
 	workspacehealth "kode-stream/internal/workspace"
 	workspaceaccess "kode-stream/internal/workspace/files"
@@ -55,6 +57,7 @@ type API struct {
 	aiSessions     *appaisession.Service
 	jira           *appjira.Service
 	knowledge      *knowledgeindex.KnowledgeService
+	verification   *appverification.Service
 }
 
 func (a *API) WithJira(service *appjira.Service) *API {
@@ -69,6 +72,11 @@ func (a *API) WithAISessions(service *appaisession.Service) *API {
 
 func (a *API) WithKnowledge(service *knowledgeindex.KnowledgeService) *API {
 	a.knowledge = service
+	return a
+}
+
+func (a *API) WithVerification(service *appverification.Service) *API {
+	a.verification = service
 	return a
 }
 
@@ -87,6 +95,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 	}
 	workspaceFileAccess := workspaceaccess.New()
 	workspaceService := appworkspace.New(reg, idx, scan, writer, git)
+	runtimeService := appruntime.NewService()
 	if auditStore != nil {
 		workspaceService.ConfigureAudit(auditStore)
 	}
@@ -102,6 +111,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 		navigation:     navigationStore,
 		workspaceFiles: appworkspace.NewWorkspaceFileService(reg, workspaceFileAccess, git, auditStore, refresher),
 		contentSearch:  appsearch.NewContentSearchService(reg, idx, workspaceFileAccess),
+		verification:   appverification.NewService(reg, runtimeService),
 	}
 }
 
@@ -134,6 +144,13 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/jira/test", a.testJiraConnection)
 	mux.HandleFunc("GET /api/workspaces/{id}/jira/issues/{issueKey}", a.workspaceJiraIssue)
+	mux.HandleFunc("GET /api/workspaces/{id}/runtime", a.workspaceRuntime)
+	mux.HandleFunc("PUT /api/workspaces/{id}/runtime", a.saveWorkspaceRuntime)
+	mux.HandleFunc("POST /api/workspaces/{id}/verification-jobs", a.createVerificationJob)
+	mux.HandleFunc("POST /api/workspaces/{id}/verification-checkpoints", a.ingestVerificationCheckpoint)
+	mux.HandleFunc("GET /api/workspaces/{id}/verification-jobs/{jobId}", a.verificationJob)
+	mux.HandleFunc("GET /api/workspaces/{id}/verification-jobs/{jobId}/artifacts", a.verificationArtifacts)
+	mux.HandleFunc("POST /api/workspaces/{id}/verification-jobs/{jobId}/rerun", a.rerunVerificationJob)
 	mux.HandleFunc("POST /api/workspaces/{id}/workstream/branch", a.loadWorkstreamBranch)
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)

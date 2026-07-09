@@ -3,11 +3,14 @@ package ai
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,7 +35,16 @@ type LaunchResult struct {
 	Terminal    string    `json:"terminal"`
 	ContextMode string    `json:"contextMode"`
 	PresetID    string    `json:"presetId,omitempty"`
+	SessionID   string    `json:"sessionId,omitempty"`
 	StartedAt   time.Time `json:"startedAt"`
+}
+
+type verificationCheckpoint struct {
+	WorkspaceID  string
+	Provider     string
+	SessionID    string
+	TerminalMode string
+	Profile      string
 }
 
 type PlanPreset struct {
@@ -214,10 +226,18 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 		providerArgs = expandAll(provider.Args, values)
 	}
 	terminalArgs := expandAll(terminal.Args, values)
-	if startErr := s.startTerminal(terminalID, terminal, terminalArgs, workspace.Path, providerName, providerArgs); startErr != nil {
+	sessionID := "external-" + randomID()
+	checkpoint := verificationCheckpoint{
+		WorkspaceID:  workspace.ID,
+		Provider:     providerID,
+		SessionID:    sessionID,
+		TerminalMode: "external",
+		Profile:      "smoke",
+	}
+	if startErr := s.startTerminal(terminalID, terminal, terminalArgs, workspace.Path, providerName, providerArgs, checkpoint); startErr != nil {
 		return LaunchResult{}, launchErrorWith("launch_failed", startErr)
 	}
-	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, PresetID: presetID, StartedAt: s.launch.now().UTC()}, nil
+	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, PresetID: presetID, SessionID: sessionID, StartedAt: s.launch.now().UTC()}, nil
 }
 
 func (s *Service) resolvePrompt(presetID, customPrompt string) (string, string, error) {
@@ -240,19 +260,24 @@ func (s *Service) resolvePrompt(presetID, customPrompt string) (string, string, 
 	return "", "", launchError("invalid_prompt", "selected AI preset is unavailable")
 }
 
-func (s *Service) startTerminal(id string, terminal LaunchTemplate, terminalArgs []string, workspace, provider string, providerArgs []string) error {
+func (s *Service) startTerminal(id string, terminal LaunchTemplate, terminalArgs []string, workspace, provider string, providerArgs []string, checkpoint verificationCheckpoint) error {
 	terminalExecutable := s.detect(terminal.Executable).Executable
 	providerExecutable := s.detect(provider).Executable
-	if id == "wezterm" {
-		args := append(terminalArgs, "start", "--cwd", workspace, "--", providerExecutable)
-		return s.launch.runner.Start(terminalExecutable, append(args, providerArgs...), workspace)
-	}
-	if s.goos != "darwin" || (id != "terminal" && id != "iterm2") {
-		return launchError("terminal_missing", "selected terminal has no launch adapter on this platform")
-	}
-	wrapper, err := writeWrapper(s.launch.wrapperDir, workspace, providerExecutable, providerArgs)
+	wrapper, err := writeWrapper(s.launch.wrapperDir, workspace, providerExecutable, providerArgs, checkpoint)
 	if err != nil {
 		return err
+	}
+	if id == "wezterm" {
+		args := append(terminalArgs, "start", "--cwd", workspace, "--", wrapper)
+		if err := s.launch.runner.Start(terminalExecutable, args, workspace); err != nil {
+			_ = os.Remove(wrapper)
+			return err
+		}
+		return nil
+	}
+	if s.goos != "darwin" || (id != "terminal" && id != "iterm2") {
+		_ = os.Remove(wrapper)
+		return launchError("terminal_missing", "selected terminal has no launch adapter on this platform")
 	}
 	if err := s.launch.runner.Start("/usr/bin/open", []string{"-a", terminalExecutable, wrapper}, workspace); err != nil {
 		_ = os.Remove(wrapper)
@@ -261,20 +286,62 @@ func (s *Service) startTerminal(id string, terminal LaunchTemplate, terminalArgs
 	return nil
 }
 
-func writeWrapper(wrapperDir, workspace, executable string, args []string) (string, error) {
+func writeWrapper(wrapperDir, workspace, executable string, args []string, checkpoint verificationCheckpoint) (string, error) {
 	if err := os.MkdirAll(wrapperDir, 0o700); err != nil {
 		return "", err
 	}
 	path := filepath.Join(wrapperDir, "launch-"+randomID()+".command")
-	command := "#!/bin/sh\ncd -- " + shellQuote(workspace) + " || exit 1\nself=$0\nrm -f -- \"$self\"\nexec " + shellQuote(executable)
+	command := "#!/bin/sh\ncd -- " + shellQuote(workspace) + " || exit 1\nself=$0\nrm -f -- \"$self\"\n" + shellQuote(executable)
 	for _, arg := range args {
 		command += " " + shellQuote(arg)
 	}
-	command += "\n"
+	command += "\ncode=$?\n"
+	if callback := checkpointCommand(checkpoint); callback != "" {
+		command += callback + "\n"
+	}
+	command += "exit $code\n"
 	if err := writeAtomic(path, []byte(command), 0o700); err != nil {
 		return "", err
 	}
 	return path, nil
+}
+
+func checkpointCommand(checkpoint verificationCheckpoint) string {
+	if strings.TrimSpace(checkpoint.WorkspaceID) == "" {
+		return ""
+	}
+	body, err := json.Marshal(map[string]string{
+		"eventType":    "session_completed",
+		"profile":      firstNonEmpty(strings.TrimSpace(checkpoint.Profile), "smoke"),
+		"provider":     strings.TrimSpace(checkpoint.Provider),
+		"sessionId":    strings.TrimSpace(checkpoint.SessionID),
+		"terminalMode": firstNonEmpty(strings.TrimSpace(checkpoint.TerminalMode), "external"),
+	})
+	if err != nil {
+		return ""
+	}
+	urlValue := fmt.Sprintf("http://127.0.0.1:%s/api/workspaces/%s/verification-checkpoints", serverPort(), url.PathEscape(checkpoint.WorkspaceID))
+	return "if command -v curl >/dev/null 2>&1; then curl -sS -X POST -H 'Content-Type: application/json' --data " + shellQuote(string(body)) + " " + shellQuote(urlValue) + " >/dev/null 2>&1 || true; fi"
+}
+
+func serverPort() string {
+	value := strings.TrimSpace(os.Getenv("KODE_STREAM_PORT"))
+	if value == "" {
+		return "4317"
+	}
+	if _, err := strconv.Atoi(value); err != nil {
+		return "4317"
+	}
+	return value
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func writeAtomic(path string, data []byte, mode os.FileMode) error {

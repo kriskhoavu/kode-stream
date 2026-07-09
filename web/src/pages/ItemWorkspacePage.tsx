@@ -27,7 +27,7 @@ import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels } from '../lib/api';
-import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../lib/types';
+import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, VerificationJob, VerifyProfile, WorkspaceConfig } from '../lib/types';
 import { labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile, DiffLine } from '../shared/domain/diff';
@@ -88,6 +88,11 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
 	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
 	const fileTreeRef = useRef<HTMLDivElement | null>(null);
 	const contentSearch = useContentSearch({ kind: 'item', itemId });
+  const [verificationJob, setVerificationJob] = useState<VerificationJob | null>(null);
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [verificationError, setVerificationError] = useState('');
+  const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
+  const [artifactPreview, setArtifactPreview] = useState<{ title: string; path: string; content: string; loading: boolean; error: string } | null>(null);
 
   const showOperationError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -212,6 +217,42 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     });
     void loadGitStatus(plan.workspaceId);
   }, [plan]);
+
+  useEffect(() => {
+    if (!plan) {
+      setWorkspaceConfig(null);
+      return;
+    }
+    let active = true;
+    void api.workspaces()
+      .then((workspaces) => {
+        if (!active) return;
+        setWorkspaceConfig(workspaces.find((workspace) => workspace.id === plan.workspaceId) ?? null);
+      })
+      .catch(() => {
+        if (active) setWorkspaceConfig(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [plan]);
+
+  useEffect(() => {
+    if (!plan || !verificationJob || verificationJob.status === 'failed' || verificationJob.status === 'passed') return;
+    let active = true;
+    const timer = window.setInterval(() => {
+      void api.verificationJob(plan.workspaceId, verificationJob.id)
+        .then((job) => {
+          if (!active) return;
+          setVerificationJob(job);
+        })
+        .catch(() => undefined);
+    }, 1000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [plan, verificationJob]);
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -492,6 +533,58 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     }
   };
 
+  const runVerification = async (profile: VerifyProfile) => {
+    if (!plan) return;
+    setVerificationBusy(true);
+    setVerificationError('');
+    try {
+      const job = await api.createVerificationJob(plan.workspaceId, { profile, trigger: 'manual_checkpoint', terminalMode: 'embedded' });
+      setVerificationJob(job);
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : 'Failed to start verification');
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
+  const rerunVerification = async (profile?: VerifyProfile) => {
+    if (!plan || !verificationJob) return;
+    setVerificationBusy(true);
+    setVerificationError('');
+    try {
+      const job = await api.rerunVerificationJob(plan.workspaceId, verificationJob.id, profile);
+      setVerificationJob(job);
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : 'Failed to rerun verification');
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
+  const openArtifactPath = async (path: string) => {
+    try {
+      await api.openPath(path);
+    } catch {
+      setVerificationError(`Could not open artifact path: ${path}`);
+    }
+  };
+
+  const previewArtifact = async (kind: string, absolutePath: string) => {
+    if (!plan) return;
+    const relativePath = toWorkspaceRelativePath(workspaceConfig?.path, absolutePath);
+    setArtifactPreview({ title: kind, path: absolutePath, content: '', loading: true, error: '' });
+    if (!relativePath) {
+      setArtifactPreview({ title: kind, path: absolutePath, content: '', loading: false, error: 'Preview unavailable for this artifact path. Use Open to view it externally.' });
+      return;
+    }
+    try {
+      const file = await api.workspaceFile(plan.workspaceId, relativePath);
+      setArtifactPreview({ title: kind, path: absolutePath, content: file.content, loading: false, error: '' });
+    } catch (caught) {
+      setArtifactPreview({ title: kind, path: absolutePath, content: '', loading: false, error: caught instanceof Error ? caught.message : 'Could not load artifact preview' });
+    }
+  };
+
   if (error && !plan) {
     return <section className="empty-state"><button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button><p className="error">{error}</p></section>;
   }
@@ -622,6 +715,47 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
               <div className="workspace-actions">
                 <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
               </div>
+              <section className="metadata-callout verification-harness" aria-label="Verification harness">
+                <div className="verification-header">
+                  <strong>Verification Harness</strong>
+                  {verificationJob && <span className={`verification-trigger-badge ${verificationTriggerTone(verificationJob)}`}>{verificationTriggerLabel(verificationJob)}</span>}
+                </div>
+                <div className="verification-actions">
+                  <button className="secondary" type="button" onClick={() => void runVerification('smoke')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run smoke verify</button>
+                  <button className="secondary" type="button" onClick={() => void runVerification('critical')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run critical verify</button>
+                  <button className="secondary" type="button" onClick={() => void rerunVerification()} disabled={verificationBusy || !verificationJob}>Re-run latest</button>
+                </div>
+                {!plan?.workspaceId && <span className="verification-note">No workspace selected.</span>}
+                {plan?.workspaceId && !workspaceConfig?.runtime && <span className="verification-note">Runtime not configured for this workspace.</span>}
+                {verificationBusy && <span className="verification-note">Starting verification...</span>}
+                {verificationError && <span className="error" role="alert">{verificationError}</span>}
+                {verificationJob && <span className="verification-status">{verificationJob.profile} · {verificationJob.status}{verificationJob.failureType ? ` (${verificationJob.failureType})` : ''}</span>}
+                {verificationJob && <span className="verification-note">{verificationTriggerDescription(verificationJob)}</span>}
+                {verificationJob?.steps?.length ? (
+                  <div className="verification-steps">
+                    {verificationJob.steps.map((step) => (
+                      <span className={`verification-step ${step.status === 'ok' ? 'ok' : 'failed'}`} key={`${step.step}-${step.at}`}>{step.step}: {step.status}</span>
+                    ))}
+                  </div>
+                ) : null}
+                {verificationJob?.artifacts?.length ? (
+                  <div className="verification-artifacts">
+                    {verificationJob.artifacts.map((artifact) => (
+                      <article className="verification-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
+                        <div className="verification-artifact-meta">
+                          <strong>{artifact.kind}</strong>
+                          <span>{artifact.path}</span>
+                          <small>{formatBytes(artifact.sizeBytes)} · {formatAt(artifact.createdAt)}</small>
+                        </div>
+                        <div className="verification-artifact-actions">
+                          <button className="secondary" type="button" onClick={() => void previewArtifact(artifact.kind, artifact.path)}>Preview</button>
+                          <button className="secondary" type="button" onClick={() => void openArtifactPath(artifact.path)}>Open</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
               <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
               {visibleWarnings.length ? (
                 <div className="plan-warnings">
@@ -706,6 +840,25 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           )}
         </aside>
       </div>
+      {artifactPreview && (
+        <section className="modal-backdrop" role="presentation" onClick={() => setArtifactPreview(null)}>
+          <div className="modal-panel artifact-preview-modal" role="dialog" aria-modal="true" aria-label="Artifact preview" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <h2>{artifactPreview.title}</h2>
+                <span>{artifactPreview.path}</span>
+              </div>
+            </header>
+            {artifactPreview.loading && <p>Loading preview...</p>}
+            {!artifactPreview.loading && artifactPreview.error && <p className="error">{artifactPreview.error}</p>}
+            {!artifactPreview.loading && !artifactPreview.error && <pre className="artifact-preview-content">{artifactPreview.content || 'No text content available.'}</pre>}
+            <div className="modal-actions">
+              <button className="secondary" type="button" onClick={() => void openArtifactPath(artifactPreview.path)}>Open externally</button>
+              <button className="primary" type="button" onClick={() => setArtifactPreview(null)}>Close</button>
+            </div>
+          </div>
+        </section>
+      )}
       {createPathKind && (
         <div className="modal-backdrop" role="presentation">
           <section className="modal-panel" role="dialog" aria-modal="true" aria-label={`Create new ${createPathKind}`}>
@@ -945,6 +1098,15 @@ function normalizePath(path: string): string {
   return path.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
+function toWorkspaceRelativePath(workspacePath: string | undefined, absolutePath: string): string {
+  if (!workspacePath) return '';
+  const normalizedWorkspace = workspacePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const normalizedTarget = absolutePath.replace(/\\/g, '/');
+  if (normalizedTarget === normalizedWorkspace) return '';
+  if (!normalizedTarget.startsWith(`${normalizedWorkspace}/`)) return '';
+  return normalizedTarget.slice(normalizedWorkspace.length + 1);
+}
+
 function readStoredToggle(key: string): boolean {
   return localStorage.getItem(key) === '1';
 }
@@ -957,4 +1119,70 @@ function visibleItemWarnings(plan: ItemDetail | null): { itemPath?: string; mess
 function isIgnorableWarning(message: string): boolean {
   const normalized = message.toLowerCase();
   return normalized.includes("plan.yaml") && normalized.includes("does not exist in");
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = value;
+  let index = 0;
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024;
+    index += 1;
+  }
+  return `${size.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function formatAt(value?: string): string {
+  if (!value) return 'Unknown time';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+function verificationTriggerLabel(job: VerificationJob): string {
+  const mode = job.terminalMode ? ` (${job.terminalMode})` : '';
+  if (job.trigger?.startsWith('checkpoint:')) {
+    const eventType = job.trigger.slice('checkpoint:'.length);
+    return `${eventType}${mode}`;
+  }
+  if (job.trigger === 'rerun') {
+    return `rerun${mode}`;
+  }
+  if (job.trigger === 'manual_checkpoint') {
+    return `manual${mode}`;
+  }
+  return `${job.trigger || 'manual'}${mode}`;
+}
+
+function verificationTriggerDescription(job: VerificationJob): string {
+  const provider = job.provider ? ` via ${providerLabel(job.provider)}` : '';
+  if (job.trigger?.startsWith('checkpoint:')) {
+    const eventType = job.trigger.slice('checkpoint:'.length).replaceAll('_', ' ');
+    return `Auto verification from ${eventType}${provider}${job.sessionId ? ` (session ${job.sessionId})` : ''}.`;
+  }
+  if (job.trigger === 'rerun') {
+    return `Re-run requested${provider}${job.sessionId ? ` (session ${job.sessionId})` : ''}.`;
+  }
+  return `Manual verification request${provider}.`;
+}
+
+function verificationTriggerTone(job: VerificationJob): 'manual' | 'rerun' | 'auto-embedded' | 'auto-external' | 'auto' {
+  if (job.trigger === 'rerun') {
+    return 'rerun';
+  }
+  if (job.trigger?.startsWith('checkpoint:')) {
+    if (job.terminalMode === 'embedded') {
+      return 'auto-embedded';
+    }
+    if (job.terminalMode === 'external') {
+      return 'auto-external';
+    }
+    return 'auto';
+  }
+  return 'manual';
+}
+
+function providerLabel(id: string): string {
+  return ({ claude: 'Claude', codex: 'Codex', copilot: 'Copilot', opencode: 'OpenCode' } as Record<string, string>)[id] ?? id;
 }

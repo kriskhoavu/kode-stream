@@ -8,7 +8,7 @@ import type { EmbeddedAISessionResult, EmbeddedAISessionState } from '../../lib/
 
 type ServerFrame = { type: 'output' | 'state' | 'warning' | 'exit'; data?: string; encoding?: string; state?: EmbeddedAISessionState; exitCode?: number; message?: string };
 
-export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onToggleMinimize, onToggleMaximize, onClose }: { initial: EmbeddedAISessionResult; visible: boolean; mode: 'normal' | 'maximized'; title: string; subtitle: string; onToggleMinimize: () => void; onToggleMaximize: () => void; onClose: () => void }) {
+export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onToggleMinimize, onToggleMaximize, onClose, onStateChange }: { initial: EmbeddedAISessionResult; visible: boolean; mode: 'normal' | 'maximized'; title: string; subtitle: string; onToggleMinimize: () => void; onToggleMaximize: () => void; onClose: () => void; onStateChange?: (state: EmbeddedAISessionState, exitCode?: number) => void }) {
 	const [state, setState] = useState<EmbeddedAISessionState>(initial.session.state);
 	const [connection, setConnection] = useState<'connecting' | 'connected' | 'reconnecting' | 'closed'>('connecting');
 	const [exitCode, setExitCode] = useState<number | undefined>(initial.session.exitCode);
@@ -37,10 +37,10 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onTo
 			const socket = new WebSocket(`${scheme}//${location.host}/api/ai/sessions/${encodeURIComponent(initial.session.id)}/channel?token=${encodeURIComponent(initial.grant.token)}`);
 			socketRef.current = socket;
 			socket.onopen = () => { setConnection('connected'); send({ type: 'resize', columns: activeTerminal.cols, rows: activeTerminal.rows }); };
-			socket.onmessage = (event) => {
+				socket.onmessage = (event) => {
 				const frame = JSON.parse(String(event.data)) as ServerFrame;
 				if (frame.type === 'output' && frame.data) activeTerminal.write(frame.encoding === 'base64' ? Uint8Array.from(atob(frame.data), (character) => character.charCodeAt(0)) : frame.data);
-				if (frame.type === 'state' && frame.state) { setState(frame.state); setExitCode(frame.exitCode); }
+				if (frame.type === 'state' && frame.state) { setState(frame.state); setExitCode(frame.exitCode); onStateChange?.(frame.state, frame.exitCode); }
 				if (frame.type === 'warning') setMessage(frame.message ?? 'Terminal warning');
 			};
 			socket.onclose = () => { if (disposed) return; if (Date.now() < deadline && (state === 'starting' || state === 'running')) { setConnection('reconnecting'); retry = window.setTimeout(() => connect(activeTerminal), 500); } else { setConnection('closed'); setMessage('The terminal connection could not be restored.'); } };

@@ -116,6 +116,28 @@ func (s *Service) Get(id string) (models.WorkspaceConfig, bool, error) {
 	return s.registry.Get(id)
 }
 
+func (s *Service) Runtime(id string) (*models.WorkspaceRuntimeConfig, error) {
+	workspace, ok, err := s.registry.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apperrors.ErrWorkspaceNotFound
+	}
+	return workspace.Runtime, nil
+}
+
+func (s *Service) SaveRuntime(id string, runtimeConfig *models.WorkspaceRuntimeConfig) (*models.WorkspaceRuntimeConfig, error) {
+	workspace, err := s.registry.SetRuntime(id, runtimeConfig)
+	if err != nil {
+		if strings.Contains(err.Error(), "workspace not found") {
+			return nil, apperrors.ErrWorkspaceNotFound
+		}
+		return nil, err
+	}
+	return workspace.Runtime, nil
+}
+
 func (s *Service) Create(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
 	result, err := s.CreateWithResult(input)
 	if err != nil {
