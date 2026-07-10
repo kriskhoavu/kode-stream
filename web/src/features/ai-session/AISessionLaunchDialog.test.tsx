@@ -98,7 +98,8 @@ describe('AISessionLaunchDialog', () => {
 		vi.mocked(api.startEmbeddedAISession).mockResolvedValue({ session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '2026-07-03T00:00:00Z' }, grant: { sessionId: 'session-1', token: 'secret', expiresAt: '2026-07-03T00:01:00Z' } });
 		const launched = vi.fn();
 		render(<AISessionLaunchDialog itemId="item-1" onClose={vi.fn()} onLaunched={launched} />);
-		fireEvent.click(await screen.findByLabelText('Embedded terminal'));
+		expect(await screen.findByLabelText('Integrated terminal')).toBeChecked();
+		fireEvent.click(screen.getByLabelText('Embedded terminal'));
 		expect(screen.queryByLabelText('Terminal')).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
 		await waitFor(() => expect(api.startEmbeddedAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', contextMode: 'card_context', presetId: 'implementation-plan', promptDraft: 'Create a plan', selectedSkills: undefined, selectedAgents: undefined, columns: 80, rows: 24 }));

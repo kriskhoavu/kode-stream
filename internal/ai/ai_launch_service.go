@@ -25,6 +25,7 @@ type LaunchInput struct {
 	Provider       string   `json:"provider"`
 	Terminal       string   `json:"terminal"`
 	ContextMode    string   `json:"contextMode"`
+	Surface        string   `json:"surface,omitempty"`
 	PresetID       string   `json:"presetId,omitempty"`
 	PromptDraft    string   `json:"promptDraft,omitempty"`
 	CustomPrompt   string   `json:"customPrompt,omitempty"`
@@ -37,6 +38,7 @@ type LaunchResult struct {
 	Provider    string    `json:"provider"`
 	Terminal    string    `json:"terminal"`
 	ContextMode string    `json:"contextMode"`
+	Surface     string    `json:"surface,omitempty"`
 	PresetID    string    `json:"presetId,omitempty"`
 	SessionID   string    `json:"sessionId,omitempty"`
 	StartedAt   time.Time `json:"startedAt"`
@@ -255,7 +257,7 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	if startErr := s.startTerminal(terminalID, terminal, terminalArgs, workspace.Path, providerName, providerArgs, checkpoint); startErr != nil {
 		return LaunchResult{}, launchErrorWith("launch_failed", startErr)
 	}
-	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, PresetID: presetID, SessionID: sessionID, StartedAt: s.launch.now().UTC()}, nil
+	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, Surface: "external", PresetID: presetID, SessionID: sessionID, StartedAt: s.launch.now().UTC()}, nil
 }
 
 func (s *Service) resolvePrompt(presetID, promptDraft, customPrompt string) (string, string, error) {

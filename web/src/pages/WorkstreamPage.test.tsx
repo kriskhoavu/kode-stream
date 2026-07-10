@@ -254,11 +254,11 @@ describe('WorkstreamPage', () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url === '/api/workspaces/r1/workstream/branch') {
-        return Promise.resolve(response(workstreamBranchLoadResult(mainItems, 'main')));
+        return Promise.resolve(response(workstreamBranchLoadResult(mainItems, 'main', 'working_tree', 'checkout/current')));
       }
       if (url === '/api/saved-filters') return Promise.resolve(response([]));
-      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
-      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['feature/pm-012', 'release/old', 'master', 'main'] }));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'checkout/current', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'checkout/current', branches: ['feature/pm-012', 'release/old', 'master', 'main', 'checkout/current'] }));
       return Promise.resolve(response({}));
     }));
 
@@ -278,21 +278,21 @@ describe('WorkstreamPage', () => {
     fireEvent.click(branchSelect);
     const searchInput = screen.getByRole('textbox', { name: 'Search branches' });
     const branchMenu = screen.getByRole('listbox', { name: 'Board branches' });
-    expect(within(branchMenu).getAllByRole('option').map((option) => option.textContent)).toEqual(['main', 'master', 'feature/pm-012', 'release/old']);
+    expect(within(branchMenu).getAllByRole('option').map((option) => option.textContent)).toEqual(['main', 'master', 'checkout/current', 'feature/pm-012', 'release/old']);
     expect(within(branchMenu).getByRole('option', { name: 'main' }).querySelector('.branch-option-check')).not.toBeNull();
-    expect(within(branchMenu).getByRole('option', { name: 'main' }).querySelector('.branch-option-checkout')).not.toBeNull();
+    expect(within(branchMenu).getByRole('option', { name: 'checkout/current' }).querySelector('.branch-option-checkout')).not.toBeNull();
     expect(within(branchMenu).getByRole('option', { name: 'feature/pm-012' }).querySelector('.branch-option-checkout')).toBeNull();
     fireEvent.change(searchInput, { target: { value: 'release' } });
-    expect(within(branchMenu).getAllByRole('option').map((option) => option.textContent)).toEqual(['main', 'master', 'release/old']);
+    expect(within(branchMenu).getAllByRole('option').map((option) => option.textContent)).toEqual(['main', 'master', 'checkout/current', 'release/old']);
     expect(within(branchMenu).queryByRole('option', { name: 'feature/pm-012' })).not.toBeInTheDocument();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       if (url === '/api/workspaces/r1/workstream/branch') {
-        return Promise.resolve(response(workstreamBranchLoadResult(featureItems, 'feature/pm-012', 'snapshot')));
+        return Promise.resolve(response(workstreamBranchLoadResult(featureItems, 'feature/pm-012', 'snapshot', 'checkout/current')));
       }
       if (url === '/api/saved-filters') return Promise.resolve(response([]));
-      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
-      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['feature/pm-012', 'release/old', 'master', 'main'] }));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'checkout/current', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'checkout/current', branches: ['feature/pm-012', 'release/old', 'master', 'main', 'checkout/current'] }));
       return Promise.resolve(response({}));
     });
     fireEvent.change(searchInput, { target: { value: 'feature' } });
@@ -300,7 +300,7 @@ describe('WorkstreamPage', () => {
 
     await waitFor(() => expect(screen.getByText('Feature item')).toBeInTheDocument());
     expect(screen.queryByText('Drag cards')).not.toBeInTheDocument();
-    expect(screen.getByText('snapshot -> main')).toBeInTheDocument();
+    expect(screen.getByText('snapshot -> checkout/current')).toBeInTheDocument();
   });
 
   it('closes the branch selector when clicking outside', async () => {
@@ -321,6 +321,34 @@ describe('WorkstreamPage', () => {
     fireEvent.pointerDown(document.body);
 
     await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Board branches' })).not.toBeInTheDocument());
+  });
+
+  it('selects a branch from the selector with arrow keys and Enter', async () => {
+    const featureItem = { ...draftItem, id: 'p2', title: 'Feature item', branch: 'feature/pm-012' };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/branch') {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { branch?: string };
+        return Promise.resolve(response(body.branch === 'feature/pm-012'
+          ? workstreamBranchLoadResult([featureItem], 'feature/pm-012', 'snapshot')
+          : workstreamBranchLoadResult([draftItem], 'main')));
+      }
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main', 'feature/pm-012'] }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Select board branch' }));
+    const searchInput = screen.getByRole('textbox', { name: 'Search branches' });
+    fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
+    fireEvent.keyDown(searchInput, { key: 'Enter' });
+
+    await waitFor(() => expect(screen.getByText('Feature item')).toBeInTheDocument());
+    expect(screen.queryByText('Drag cards')).not.toBeInTheDocument();
+    expect(screen.getByText('snapshot -> main')).toBeInTheDocument();
   });
 
   it('offers the current branch selector option even when no indexed item is on it', async () => {
@@ -469,14 +497,14 @@ function statusRequestBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, 
   return JSON.parse(String(call?.[1]?.body ?? '{}')) as Record<string, unknown>;
 }
 
-function workstreamBranchLoadResult(items: ItemSummary[], branch: string, sourceMode: SourceMode = 'working_tree'): WorkstreamBranchLoadResult {
+function workstreamBranchLoadResult(items: ItemSummary[], branch: string, sourceMode: SourceMode = 'working_tree', currentCheckoutBranch = 'main'): WorkstreamBranchLoadResult {
   return {
     workspaceId: 'r1',
     branch,
     selectedBranch: branch,
     branchRef: `refs/heads/${branch}`,
     commit: sourceMode === 'snapshot' ? 'abc123' : '',
-    currentCheckoutBranch: 'main',
+    currentCheckoutBranch,
     sourceMode,
     mode: sourceMode,
     editable: sourceMode !== 'snapshot',

@@ -1,22 +1,23 @@
 .workspace-branch-control {
-  max-width: 140px;
-  flex: 0 1 140px;
+  max-width: 100%;
+  width: 100%;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: stretch;
   gap: 4px;
 }
 
 .workspace-branch-control select {
   width: 100%;
-  min-width: 68px;
-  height: 26px;
+  min-width: 96px;
+  height: 30px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 0 22px 0 7px;
+  padding: 0 24px 0 8px;
   background-color: var(--panel);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
 }
 

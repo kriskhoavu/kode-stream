@@ -1836,17 +1836,23 @@ select {
 }
 
 .branch-context-chip {
-  max-width: min(560px, 58vw);
+  max-width: min(760px, 72vw);
   position: relative;
+  display: inline-grid;
+  grid-template-columns: auto auto minmax(0, auto) auto;
+  align-items: center;
 }
 
 .branch-selector-wrap {
   position: relative;
   min-width: 0;
+  max-width: 100%;
+  width: clamp(72px, calc((var(--branch-name-length, 12) + 3) * 0.62em), min(520px, 52vw));
+  flex: 0 1 auto;
 }
 
 .branch-picker-trigger {
-  width: min(360px, 38vw);
+  width: auto;
   max-width: 100%;
   min-height: 24px;
   border: 0;
@@ -1858,8 +1864,9 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  justify-content: space-between;
+  justify-content: flex-start;
   min-width: 0;
+  overflow: hidden;
 }
 
 .branch-picker-trigger span {
@@ -1971,7 +1978,8 @@ select {
 }
 
 .branch-picker-options button:hover,
-.branch-picker-options button:focus-visible {
+.branch-picker-options button:focus-visible,
+.branch-picker-options button[data-active='true'] {
   background: var(--branch-picker-hover-bg);
   color: var(--branch-picker-accent);
 }
@@ -2014,10 +2022,20 @@ select {
 }
 
 .branch-context-chip small {
+  flex: 0 0 auto;
   color: var(--muted);
   font-size: 12px;
   font-weight: 650;
   white-space: nowrap;
+}
+
+.branch-context-chip > svg,
+.branch-context-chip > span {
+  flex: 0 0 auto;
+}
+
+.branch-context-chip.active .branch-selector-wrap {
+  width: 100%;
 }
 
 .branch-context-chip.active strong {
@@ -4912,6 +4930,10 @@ body.is-resizing-drawer {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
 }
 
 .workspace-header h1 {
@@ -4921,6 +4943,81 @@ body.is-resizing-drawer {
 
 .workspace-header span {
   color: var(--muted);
+}
+
+.workspace-header-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.workspace-header-title {
+  min-width: 0;
+  text-align: center;
+}
+
+.workspace-header-title h1,
+.workspace-header-title span {
+  display: block;
+}
+
+.workspace-item-path {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+}
+
+.workspace-item-path-segment {
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 8px;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 28px;
+}
+
+.workspace-item-path-separator {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.workspace-branch-empty {
+  min-height: 420px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  text-align: center;
+  padding: 28px;
+}
+
+.workspace-branch-empty strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.workspace-branch-empty span {
+  max-width: 620px;
+}
+
+.workspace-header-actions {
+  justify-content: flex-end;
+}
+
+.workspace-header-main > div:last-child,
+.workspace-header-title > div:last-child {
+  min-width: 0;
 }
 
 .workspace-grid {
@@ -5814,6 +5911,19 @@ body.is-resizing-panel {
 
 .segmented-control button + button {
   border-left: 1px solid var(--line);
+}
+
+.segmented-control-compact {
+  display: inline-grid;
+  padding: 2px;
+  min-height: 0;
+}
+
+.segmented-control-compact button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .jira-intake {
@@ -6833,7 +6943,7 @@ body.is-resizing-panel {
   }
 
   .branch-picker-trigger {
-    width: min(260px, calc(100vw - 112px));
+    max-width: calc(100vw - 112px);
   }
 
   .board-toolbar {

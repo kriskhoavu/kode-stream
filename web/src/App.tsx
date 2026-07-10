@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Plus, Search, Sun, Boxes, FolderGit2, FolderTree, Settings } from 'lucide-react';
+import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Plus, Search, Sun, Boxes, FolderGit2, Settings } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
@@ -96,7 +96,6 @@ export function App() {
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>
           <NavButton active={route.name === 'workstream'} onClick={() => navigate({ name: 'workstream' })} icon={<WorkstreamIcon size={18} />} label="Workstream" />
-          <NavButton active={route.name === 'explorer'} onClick={() => navigate({ name: 'explorer' })} icon={<FolderTree size={18} />} label="Explorer" />
           <NavButton active={route.name === 'knowledge'} onClick={() => navigate({ name: 'knowledge' })} icon={<BookOpen size={18} />} label="Knowledge" />
         </div>
         <div className="workspace-list">
@@ -232,7 +231,7 @@ export function App() {
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
           />
         )}
-        {route.name === 'item' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'workstream' })} onContentChanged={() => refreshAppStateOnly()} />}
+        {route.name === 'item' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={() => refreshAppStateOnly()} />}
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData()} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
         {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkstreamExplorer workspaces={activeRepo ? [activeRepo] : []} location={explorerLocation} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenWorkstream={openWorkstream} /></Suspense>}
@@ -241,7 +240,6 @@ export function App() {
 
       <nav className="bottom-nav">
         <button className={route.name === 'workstream' ? 'active' : ''} onClick={() => navigate({ name: 'workstream' })}><WorkstreamIcon size={18} />Workstream</button>
-        <button className={route.name === 'explorer' ? 'active' : ''} onClick={() => navigate({ name: 'explorer' })}><FolderTree size={18} />Explorer</button>
         <button className={route.name === 'knowledge' ? 'active' : ''} onClick={() => navigate({ name: 'knowledge' })}><BookOpen size={18} />Knowledge</button>
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}><Settings size={18} />Settings</button>

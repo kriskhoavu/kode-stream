@@ -40,13 +40,19 @@ import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
 import { AISessionLaunchControl } from '../features/ai-session/AISessionLaunchControl';
 import { JiraItemPanel } from '../features/jira/JiraItemPanel';
+import { WorkstreamExplorer } from './WorkstreamExplorer';
+import type { ExplorerLocation } from '../app/router';
+import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
+import { BranchSnapshotPicker } from '../features/workstream/BranchSnapshotPicker';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'git' | 'jira';
 type DiffMode = 'review' | 'raw';
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
+type DetailViewMode = 'plan' | 'workspace';
+type BranchViewState = { branch: string; currentCheckoutBranch: string; sourceMode: 'working_tree' | 'snapshot'; missing: true };
 
-export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged }: { itemId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
+export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOpenItem, onContentChanged }: { itemId: string; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onOpenItem: (itemId: string) => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
@@ -69,10 +75,13 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('info');
   const [error, setError] = useState('');
   const [recoveryHint, setRecoveryHint] = useState('');
+  const [branchLoading, setBranchLoading] = useState(false);
+  const [branchView, setBranchView] = useState<BranchViewState | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(300);
   const [rightWidth, setRightWidth] = useState(300);
+  const [detailViewMode, setDetailViewMode] = useState<DetailViewMode>('plan');
   const [aiLaunchMessage, setAILaunchMessage] = useState('');
   const [createPathKind, setCreatePathKind] = useState<'file' | 'directory' | null>(null);
   const [createPathName, setCreatePathName] = useState('');
@@ -85,14 +94,15 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
 	const [contentSearchIndex, setContentSearchIndex] = useState(0);
-	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
-	const fileTreeRef = useRef<HTMLDivElement | null>(null);
+  const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
+  const fileTreeRef = useRef<HTMLDivElement | null>(null);
 	const contentSearch = useContentSearch({ kind: 'item', itemId });
   const [verificationJob, setVerificationJob] = useState<VerificationJob | null>(null);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationError, setVerificationError] = useState('');
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
   const [artifactPreview, setArtifactPreview] = useState<{ title: string; path: string; content: string; loading: boolean; error: string } | null>(null);
+  const [workspaceExplorerLocation, setWorkspaceExplorerLocation] = useState<ExplorerLocation>();
 
   const showOperationError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -176,7 +186,11 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   };
 
   const editor = useFileEditorSession({
-    save: (targetFile, content) => api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash }),
+    save: (targetFile, content) => {
+      const materializeConfirmed = confirmSnapshotMaterialization(plan, 'file');
+      if (materializeConfirmed === null) throw new Error('Snapshot materialization canceled');
+      return api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash, materializeConfirmed });
+    },
     onSaved: () => {
       scheduleFileChangeRefresh();
       notifyReliabilityChanged();
@@ -188,6 +202,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   useEffect(() => {
     setError('');
     setRecoveryHint('');
+    setBranchView(null);
     editor.open(null);
     api.item(itemId).then(setPlan).catch((err: Error) => setError(err.message));
     api.files(itemId).then((tree) => {
@@ -223,19 +238,22 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
       setWorkspaceConfig(null);
       return;
     }
-    let active = true;
-    void api.workspaces()
-      .then((workspaces) => {
-        if (!active) return;
-        setWorkspaceConfig(workspaces.find((workspace) => workspace.id === plan.workspaceId) ?? null);
-      })
-      .catch(() => {
-        if (active) setWorkspaceConfig(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [plan]);
+    setWorkspaceConfig(workspaces.find((workspace) => workspace.id === plan.workspaceId) ?? null);
+  }, [plan, workspaces]);
+
+  useEffect(() => {
+    if (!plan) {
+      setWorkspaceExplorerLocation(undefined);
+      return;
+    }
+    setWorkspaceExplorerLocation((current) => current?.workspaceId === plan.workspaceId
+      ? current
+      : {
+          workspaceId: plan.workspaceId,
+          path: normalizePath(plan.itemPath ?? '') || undefined,
+          mode: 'all'
+        });
+  }, [plan?.workspaceId, plan?.itemPath]);
 
   useEffect(() => {
     if (!plan || !verificationJob || verificationJob.status === 'failed' || verificationJob.status === 'passed') return;
@@ -323,10 +341,65 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const hasFiles = useMemo(() => hasFile(files), [files]);
   const visibleWarnings = useMemo(() => visibleItemWarnings(plan), [plan]);
   const fileStateByPath = useMemo(() => buildFileStateMap(plan, gitStatus, file, dirtyFile), [plan, gitStatus, file, dirtyFile]);
+  const explorerWorkspaces = useMemo(() => workspaceConfig ? [workspaceConfig] : [], [workspaceConfig]);
+  const selectedDetailBranch = branchView?.branch ?? plan?.branch ?? '';
+  const detailSourceMode = branchView?.sourceMode ?? plan?.sourceMode ?? 'working_tree';
+  const itemWorkspaceBranches = useWorkspaceBranches(explorerWorkspaces);
+  const currentCheckoutBranch = gitStatus?.branch || itemWorkspaceBranches.states[workspaceConfig?.id ?? '']?.current || workspaceConfig?.baselineBranch || '';
+  const branchOptions = useMemo(() => unique([
+    ...(workspaceConfig ? itemWorkspaceBranches.states[workspaceConfig.id]?.branches ?? [] : []),
+    currentCheckoutBranch,
+    workspaceConfig?.baselineBranch ?? '',
+    selectedDetailBranch
+  ]), [currentCheckoutBranch, itemWorkspaceBranches.states, selectedDetailBranch, workspaceConfig]);
+  const switchItemBranch = async (branch: string) => {
+    if (!workspaceConfig || !plan || branch === selectedDetailBranch) return;
+    if (branch === plan.branch) {
+      setBranchView(null);
+      setError('');
+      setRecoveryHint('');
+      return;
+    }
+    if (dirtyMetadata) {
+      setError('Save metadata changes before loading another branch snapshot.');
+      return;
+    }
+    if (dirtyFile && !(await editor.saveNow())) return;
+    setBranchLoading(true);
+    setError('');
+    setRecoveryHint('');
+    try {
+      const result = await api.loadWorkstreamBranch(workspaceConfig.id, { branch });
+      const matched = matchingBranchItem(result.items, plan);
+      if (!matched) {
+        editor.open(null);
+        setFiles([]);
+        setDiff('');
+        setMatchContext(null);
+        setSelectedDirectoryPath('');
+        setSelectedTreeNode(null);
+        setBranchView({
+          branch: result.branch || branch,
+          currentCheckoutBranch: result.currentCheckoutBranch,
+          sourceMode: result.sourceMode,
+          missing: true
+        });
+        return;
+      }
+      setBranchView(null);
+      onOpenItem(matched.id);
+    } catch (caught) {
+      showOperationError(caught, 'Branch snapshot failed to load');
+    } finally {
+      setBranchLoading(false);
+    }
+  };
   const gridStyle = {
     '--left-panel-width': `${leftCollapsed ? 44 : leftWidth}px`,
     '--right-panel-width': `${rightCollapsed ? 44 : rightWidth}px`,
   } as CSSProperties & Record<'--left-panel-width' | '--right-panel-width', string>;
+  const currentWorkspacePath = workspacePathForSelection(plan, file);
+  const itemRootPath = normalizePath(plan?.itemPath ?? '') || undefined;
 
   useEffect(() => () => {
     clearTimer(autoSaveRefreshTimerRef);
@@ -489,6 +562,27 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     });
   };
 
+  const openWorkspaceView = () => {
+    if (!plan) return;
+    setWorkspaceExplorerLocation((current) => ({
+      workspaceId: plan.workspaceId,
+      path: currentWorkspacePath || current?.path,
+      mode: current?.mode ?? 'all'
+    }));
+    setDetailViewMode('workspace');
+  };
+
+  const openPlanView = () => {
+    if (!plan) return;
+    const rootPath = normalizePath(plan.itemPath ?? '') || undefined;
+    setWorkspaceExplorerLocation((current) => ({
+      workspaceId: plan.workspaceId,
+      path: current?.path && rootPath && current.path.startsWith(`${rootPath}/`) ? current.path : rootPath,
+      mode: 'all'
+    }));
+    setDetailViewMode('plan');
+  };
+
   const scheduleFileChangeRefresh = () => {
     clearTimer(autoSaveRefreshTimerRef);
     autoSaveRefreshTimerRef.current = window.setTimeout(() => {
@@ -521,7 +615,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     setSavingMetadata(true);
     setError('');
     try {
-      const result = await api.saveMetadata(itemId, metadataDraft);
+      const materializeConfirmed = confirmSnapshotMaterialization(plan, 'metadata');
+      if (materializeConfirmed === null) return;
+      const result = await api.saveMetadata(itemId, { ...metadataDraft, materializeConfirmed });
       setPlan(result.item);
       if (plan) await loadGitStatus(plan.workspaceId);
       await onContentChanged?.();
@@ -585,6 +681,169 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     }
   };
 
+  const workItemPanelContent = (
+    <>
+      <div className="side-panel-tabs" role="tablist" aria-label="Item side panel">
+        <button type="button" className={rightPanelTab === 'info' ? 'active' : ''} onClick={() => setRightPanelTab('info')}>
+          <Info size={14} /> Info
+        </button>
+        <button type="button" className={rightPanelTab === 'git' ? 'active' : ''} onClick={() => setRightPanelTab('git')}>
+          <GitBranch size={14} /> Git
+        </button>
+        <button type="button" className={rightPanelTab === 'jira' ? 'active' : ''} onClick={() => setRightPanelTab('jira')}>
+          <Ticket size={14} /> Jira
+        </button>
+      </div>
+      {rightPanelTab === 'info' && (
+        <>
+          {plan?.metadataSource === 'docs' && (
+            <div className="metadata-callout">
+              <strong>Docs</strong>
+              <span>This item is a documentation folder. It is browsable even though it does not use a structured source item layout.</span>
+            </div>
+          )}
+          <dl>
+            <dt>{labels.workspace}</dt><dd>{plan?.workspaceName}</dd>
+            <dt>{labels.scope}</dt><dd>{plan?.scope}</dd>
+            <dt>{labels.identifier}</dt><dd>{plan?.identifier}</dd>
+            <dt>Branch</dt><dd>{plan?.branch}</dd>
+            <dt>Status</dt><dd>{plan?.status && <StatusBadge status={plan.status} />}</dd>
+            <dt>Metadata</dt><dd>{metadataSourceLabel(plan?.metadataSource)}</dd>
+            <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
+            <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
+          </dl>
+          {plan?.metadataSource !== 'docs' && (
+            <div className="metadata-form">
+              <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
+              <label>{labels.scope}<input value={metadataDraft.scope ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, scope: event.target.value }))} /></label>
+              <label>{labels.identifier}<input value={metadataDraft.identifier ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, identifier: event.target.value }))} /></label>
+              <label>Status<StatusMenu value={(metadataDraft.status ?? 'draft') as ItemStatus} onChange={(status) => setMetadataDraft((draft) => ({ ...draft, status }))} /></label>
+              <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
+              <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>
+            </div>
+          )}
+          <div className="workspace-actions">
+            <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
+          </div>
+          <section className="metadata-callout verification-harness" aria-label="Verification harness">
+            <div className="verification-header">
+              <strong>Verification Harness</strong>
+              {verificationJob && <span className={`verification-trigger-badge ${verificationTriggerTone(verificationJob)}`}>{verificationTriggerLabel(verificationJob)}</span>}
+            </div>
+            <div className="verification-actions">
+              <button className="secondary" type="button" onClick={() => void runVerification('smoke')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run smoke verify</button>
+              <button className="secondary" type="button" onClick={() => void runVerification('critical')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run critical verify</button>
+              <button className="secondary" type="button" onClick={() => void rerunVerification()} disabled={verificationBusy || !verificationJob}>Re-run latest</button>
+            </div>
+            {!plan?.workspaceId && <span className="verification-note">No workspace selected.</span>}
+            {plan?.workspaceId && !workspaceConfig?.runtime && <span className="verification-note">Runtime not configured for this workspace.</span>}
+            {verificationBusy && <span className="verification-note">Starting verification...</span>}
+            {verificationError && <span className="error" role="alert">{verificationError}</span>}
+            {verificationJob && <span className="verification-status">{verificationJob.profile} · {verificationJob.status}{verificationJob.failureType ? ` (${verificationJob.failureType})` : ''}</span>}
+            {verificationJob && <span className="verification-note">{verificationTriggerDescription(verificationJob)}</span>}
+            {verificationJob?.steps?.length ? (
+              <div className="verification-steps">
+                {verificationJob.steps.map((step) => (
+                  <span className={`verification-step ${step.status === 'ok' ? 'ok' : 'failed'}`} key={`${step.step}-${step.at}`}>{step.step}: {step.status}</span>
+                ))}
+              </div>
+            ) : null}
+            {verificationJob?.artifacts?.length ? (
+              <div className="verification-artifacts">
+                {verificationJob.artifacts.map((artifact) => (
+                  <article className="verification-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
+                    <div className="verification-artifact-meta">
+                      <strong>{artifact.kind}</strong>
+                      <span>{artifact.path}</span>
+                      <small>{formatBytes(artifact.sizeBytes)} · {formatAt(artifact.createdAt)}</small>
+                    </div>
+                    <div className="verification-artifact-actions">
+                      <button className="secondary" type="button" onClick={() => void previewArtifact(artifact.kind, artifact.path)}>Preview</button>
+                      <button className="secondary" type="button" onClick={() => void openArtifactPath(artifact.path)}>Open</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </section>
+          <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
+          {visibleWarnings.length ? (
+            <div className="plan-warnings">
+              <h3>Warnings</h3>
+              {visibleWarnings.map((warning) => <p key={`${warning.itemPath ?? 'plan'}-${warning.message}`}>{warning.message}</p>)}
+            </div>
+          ) : null}
+        </>
+      )}
+      {rightPanelTab === 'git' && (
+        gitStatus ? (
+          <section className="git-panel">
+            <h3>Git</h3>
+            <div className="git-summary">
+              <span>{gitStatus.branch}</span>
+              <span>{gitStatus.ahead} ahead</span>
+              <span>{gitStatus.behind} behind</span>
+            </div>
+            <div className="workspace-actions">
+              <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('fetch')}>{gitBusy === 'fetch' ? 'Fetching...' : 'Fetch'}</button>
+              <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('pull')}>{gitBusy === 'pull' ? 'Pulling...' : 'Pull'}</button>
+              <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('push')}>{gitBusy === 'push' ? 'Pushing...' : 'Push'}</button>
+            </div>
+            <div className="git-changes">
+              {gitStatus.changes.length === 0 && <span>No local changes</span>}
+              {gitStatus.changes.map((change) => (
+                <label key={`${change.status}-${change.path}`}>
+                  <input type="checkbox" checked={selectedGitPaths.includes(change.path)} onChange={() => toggleGitPath(change.path)} />
+                  <span>{change.status}</span>
+                  <strong>{change.path}</strong>
+                </label>
+              ))}
+            </div>
+            <textarea className="commit-message" value={gitMessage} onChange={(event) => setGitMessage(event.target.value)} placeholder="Commit message" />
+            <button className="primary" type="button" disabled={Boolean(gitBusy) || selectedGitPaths.length === 0 || !gitMessage.trim()} onClick={commitSelectedPaths}>
+              {gitBusy === 'commit' ? 'Committing...' : 'Commit Selected'}
+            </button>
+            <div className="branch-create-row">
+              <input value={branchName} onChange={(event) => setBranchName(event.target.value)} placeholder="new-branch-name" />
+              <button className="secondary" type="button" disabled={Boolean(gitBusy) || !branchName.trim()} onClick={createAndSwitchBranch}>
+                {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
+              </button>
+            </div>
+            <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setGitActivityOpen(open);
+              localStorage.setItem('item.details.gitActivityOpen', open ? '1' : '0');
+            }}>
+              <summary>
+                <span>Recent Activity</span>
+                <small>{gitActivity.length} events</small>
+              </summary>
+              <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
+            </details>
+          </section>
+        ) : (
+          <div className="metadata-callout">
+            <strong>Git status unavailable</strong>
+            <span>Refresh the workspace or scan the source to load Git information.</span>
+          </div>
+        )
+      )}
+      {rightPanelTab === 'jira' && <JiraItemPanel itemId={itemId} />}
+      {error && (
+        <div className="operation-error">
+          <p className="error">{error}</p>
+          {recoveryHint && <p>{recoveryHint}</p>}
+          {recoveryHint && file && (
+            <div className="recovery-actions">
+              <button className="secondary" type="button" onClick={() => void loadFile(file.id)}><RefreshCw size={14} /> Reload file</button>
+              <button className="secondary" type="button" onClick={() => setTab('diff')}><GitCompare size={14} /> View diff</button>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+
   if (error && !plan) {
     return <section className="empty-state"><button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button><p className="error">{error}</p></section>;
   }
@@ -592,14 +851,71 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   return (
     <section className="workspace-page">
       <header className="workspace-header">
-        <button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button>
-        <div>
-          <h1>{plan?.title ?? 'Loading item'}</h1>
-          <span>{plan?.scope} / {plan?.branch} / {plan?.identifier}</span>
+        <div className="workspace-header-main">
+          <button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button>
         </div>
-        <div className="workspace-header-actions"><AISessionLaunchControl itemId={itemId} disabled={!plan} onLaunched={setAILaunchMessage} onError={(caught) => showOperationError(caught, 'AI session launch failed')} /><button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button></div>
+        <div className="workspace-header-title">
+          <h1>{plan?.title ?? 'Loading item'}</h1>
+          <div className="workspace-item-path" aria-label="Item location">
+            <span className="workspace-item-path-segment">{plan?.scope ?? '...'}</span>
+            <span className="workspace-item-path-separator">/</span>
+            {workspaceConfig ? (
+              <BranchSnapshotPicker
+                selectedBranch={selectedDetailBranch}
+                currentCheckoutBranch={currentCheckoutBranch}
+                sourceMode={detailSourceMode}
+                branches={branchOptions}
+                disabled={branchLoading || itemWorkspaceBranches.states[workspaceConfig.id]?.switching}
+                ariaLabel="Select item branch"
+                listboxLabel="Item branches"
+                onSelect={(branch) => void switchItemBranch(branch)}
+              />
+            ) : (
+              <span className="workspace-item-path-segment">{plan?.branch ?? '...'}</span>
+            )}
+            <span className="workspace-item-path-separator">/</span>
+            <span className="workspace-item-path-segment">{plan?.identifier ?? '...'}</span>
+          </div>
+        </div>
+        <div className="workspace-header-actions">
+          <AISessionLaunchControl itemId={itemId} disabled={!plan} onLaunched={setAILaunchMessage} onError={(caught) => showOperationError(caught, 'AI session launch failed')} />
+          <button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button>
+        </div>
       </header>
       {aiLaunchMessage && <div className="operation-notice" role="status">{aiLaunchMessage}</div>}
+      {branchView?.missing ? (
+        <section className="workspace-branch-empty" role="status">
+          <FileText size={28} />
+          <strong>{plan?.identifier ?? 'This item'} is not on {branchView.branch}</strong>
+          <span>The current checkout branch is {branchView.currentCheckoutBranch}. The selected branch was loaded as a snapshot, but no matching item exists there.</span>
+        </section>
+      ) : plan && workspaceConfig && detailSourceMode !== 'snapshot' ? (
+        <WorkstreamExplorer
+          embedded
+          showOpenWorkstreamAction={false}
+          showModeSelector={false}
+          treeRootPath={detailViewMode === 'plan' ? itemRootPath : undefined}
+          rightPanel={{
+            title: <><Info size={16} /> Work Item</>,
+            content: workItemPanelContent,
+            collapsed: rightCollapsed,
+            onToggle: () => setRightCollapsed((value) => !value),
+            className: 'metadata-panel side-panel',
+            collapsedLabel: 'Expand item info',
+            expandedLabel: 'Collapse item info'
+          }}
+          embeddedHeaderContent={
+            <div className="segmented-control segmented-control-compact" role="tablist" aria-label="Item detail view mode">
+              <button type="button" className={detailViewMode === 'plan' ? 'active' : ''} aria-selected={detailViewMode === 'plan'} onClick={openPlanView}>Plan files</button>
+              <button type="button" className={detailViewMode === 'workspace' ? 'active' : ''} aria-selected={detailViewMode === 'workspace'} onClick={openWorkspaceView}>Explorer</button>
+            </div>
+          }
+          workspaces={explorerWorkspaces}
+          location={workspaceExplorerLocation}
+          onLocationChange={setWorkspaceExplorerLocation}
+          onOpenWorkstream={() => undefined}
+        />
+      ) : (
       <div className="workspace-grid" style={gridStyle} ref={workspaceGridRef}>
         <aside className={leftCollapsed ? 'file-tree side-panel collapsed' : 'file-tree side-panel'}>
           <div className="panel-header">
@@ -671,168 +987,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
               {rightCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
             </button>
           </div>
-          {!rightCollapsed && (
-            <>
-              <div className="side-panel-tabs" role="tablist" aria-label="Item side panel">
-                <button type="button" className={rightPanelTab === 'info' ? 'active' : ''} onClick={() => setRightPanelTab('info')}>
-                  <Info size={14} /> Info
-                </button>
-                <button type="button" className={rightPanelTab === 'git' ? 'active' : ''} onClick={() => setRightPanelTab('git')}>
-                  <GitBranch size={14} /> Git
-                </button>
-                <button type="button" className={rightPanelTab === 'jira' ? 'active' : ''} onClick={() => setRightPanelTab('jira')}>
-                  <Ticket size={14} /> Jira
-                </button>
-              </div>
-              {rightPanelTab === 'info' && (
-                <>
-              {plan?.metadataSource === 'docs' && (
-                <div className="metadata-callout">
-                  <strong>Docs</strong>
-                  <span>This item is a documentation folder. It is browsable even though it does not use a structured source item layout.</span>
-                </div>
-              )}
-              <dl>
-                <dt>{labels.workspace}</dt><dd>{plan?.workspaceName}</dd>
-                <dt>{labels.scope}</dt><dd>{plan?.scope}</dd>
-                <dt>{labels.identifier}</dt><dd>{plan?.identifier}</dd>
-                <dt>Branch</dt><dd>{plan?.branch}</dd>
-                <dt>Status</dt><dd>{plan?.status && <StatusBadge status={plan.status} />}</dd>
-                <dt>Metadata</dt><dd>{metadataSourceLabel(plan?.metadataSource)}</dd>
-                <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
-                <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
-              </dl>
-              {plan?.metadataSource !== 'docs' && (
-                <div className="metadata-form">
-                  <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
-                  <label>{labels.scope}<input value={metadataDraft.scope ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, scope: event.target.value }))} /></label>
-                  <label>{labels.identifier}<input value={metadataDraft.identifier ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, identifier: event.target.value }))} /></label>
-                  <label>Status<StatusMenu value={(metadataDraft.status ?? 'draft') as ItemStatus} onChange={(status) => setMetadataDraft((draft) => ({ ...draft, status }))} /></label>
-                  <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
-                  <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>
-                </div>
-              )}
-              <div className="workspace-actions">
-                <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
-              </div>
-              <section className="metadata-callout verification-harness" aria-label="Verification harness">
-                <div className="verification-header">
-                  <strong>Verification Harness</strong>
-                  {verificationJob && <span className={`verification-trigger-badge ${verificationTriggerTone(verificationJob)}`}>{verificationTriggerLabel(verificationJob)}</span>}
-                </div>
-                <div className="verification-actions">
-                  <button className="secondary" type="button" onClick={() => void runVerification('smoke')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run smoke verify</button>
-                  <button className="secondary" type="button" onClick={() => void runVerification('critical')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run critical verify</button>
-                  <button className="secondary" type="button" onClick={() => void rerunVerification()} disabled={verificationBusy || !verificationJob}>Re-run latest</button>
-                </div>
-                {!plan?.workspaceId && <span className="verification-note">No workspace selected.</span>}
-                {plan?.workspaceId && !workspaceConfig?.runtime && <span className="verification-note">Runtime not configured for this workspace.</span>}
-                {verificationBusy && <span className="verification-note">Starting verification...</span>}
-                {verificationError && <span className="error" role="alert">{verificationError}</span>}
-                {verificationJob && <span className="verification-status">{verificationJob.profile} · {verificationJob.status}{verificationJob.failureType ? ` (${verificationJob.failureType})` : ''}</span>}
-                {verificationJob && <span className="verification-note">{verificationTriggerDescription(verificationJob)}</span>}
-                {verificationJob?.steps?.length ? (
-                  <div className="verification-steps">
-                    {verificationJob.steps.map((step) => (
-                      <span className={`verification-step ${step.status === 'ok' ? 'ok' : 'failed'}`} key={`${step.step}-${step.at}`}>{step.step}: {step.status}</span>
-                    ))}
-                  </div>
-                ) : null}
-                {verificationJob?.artifacts?.length ? (
-                  <div className="verification-artifacts">
-                    {verificationJob.artifacts.map((artifact) => (
-                      <article className="verification-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
-                        <div className="verification-artifact-meta">
-                          <strong>{artifact.kind}</strong>
-                          <span>{artifact.path}</span>
-                          <small>{formatBytes(artifact.sizeBytes)} · {formatAt(artifact.createdAt)}</small>
-                        </div>
-                        <div className="verification-artifact-actions">
-                          <button className="secondary" type="button" onClick={() => void previewArtifact(artifact.kind, artifact.path)}>Preview</button>
-                          <button className="secondary" type="button" onClick={() => void openArtifactPath(artifact.path)}>Open</button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : null}
-              </section>
-              <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
-              {visibleWarnings.length ? (
-                <div className="plan-warnings">
-                  <h3>Warnings</h3>
-                  {visibleWarnings.map((warning) => <p key={`${warning.itemPath ?? 'plan'}-${warning.message}`}>{warning.message}</p>)}
-                </div>
-              ) : null}
-                </>
-              )}
-              {rightPanelTab === 'git' && (
-                gitStatus ? (
-                <section className="git-panel">
-                  <h3>Git</h3>
-                  <div className="git-summary">
-                    <span>{gitStatus.branch}</span>
-                    <span>{gitStatus.ahead} ahead</span>
-                    <span>{gitStatus.behind} behind</span>
-                  </div>
-                  <div className="workspace-actions">
-                    <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('fetch')}>{gitBusy === 'fetch' ? 'Fetching...' : 'Fetch'}</button>
-                    <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('pull')}>{gitBusy === 'pull' ? 'Pulling...' : 'Pull'}</button>
-                    <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('push')}>{gitBusy === 'push' ? 'Pushing...' : 'Push'}</button>
-                  </div>
-                  <div className="git-changes">
-                    {gitStatus.changes.length === 0 && <span>No local changes</span>}
-                    {gitStatus.changes.map((change) => (
-                      <label key={`${change.status}-${change.path}`}>
-                        <input type="checkbox" checked={selectedGitPaths.includes(change.path)} onChange={() => toggleGitPath(change.path)} />
-                        <span>{change.status}</span>
-                        <strong>{change.path}</strong>
-                      </label>
-                    ))}
-                  </div>
-                  <textarea className="commit-message" value={gitMessage} onChange={(event) => setGitMessage(event.target.value)} placeholder="Commit message" />
-                  <button className="primary" type="button" disabled={Boolean(gitBusy) || selectedGitPaths.length === 0 || !gitMessage.trim()} onClick={commitSelectedPaths}>
-                    {gitBusy === 'commit' ? 'Committing...' : 'Commit Selected'}
-                  </button>
-                  <div className="branch-create-row">
-                    <input value={branchName} onChange={(event) => setBranchName(event.target.value)} placeholder="new-branch-name" />
-                    <button className="secondary" type="button" disabled={Boolean(gitBusy) || !branchName.trim()} onClick={createAndSwitchBranch}>
-                      {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
-                    </button>
-                  </div>
-                  <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
-                    const open = event.currentTarget.open;
-                    setGitActivityOpen(open);
-                    localStorage.setItem('item.details.gitActivityOpen', open ? '1' : '0');
-                  }}>
-                    <summary>
-                      <span>Recent Activity</span>
-                      <small>{gitActivity.length} events</small>
-                    </summary>
-                    <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
-                  </details>
-                </section>
-                ) : (
-                  <div className="metadata-callout">
-                    <strong>Git status unavailable</strong>
-                    <span>Refresh the workspace or scan the source to load Git information.</span>
-                  </div>
-                )
-              )}
-              {rightPanelTab === 'jira' && <JiraItemPanel itemId={itemId} />}
-              {error && (
-                <div className="operation-error">
-                  <p className="error">{error}</p>
-                  {recoveryHint && <p>{recoveryHint}</p>}
-                  {recoveryHint && file && (
-                    <div className="recovery-actions">
-                      <button className="secondary" type="button" onClick={() => void loadFile(file.id)}><RefreshCw size={14} /> Reload file</button>
-                      <button className="secondary" type="button" onClick={() => setTab('diff')}><GitCompare size={14} /> View diff</button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
+          {!rightCollapsed && workItemPanelContent}
           {!rightCollapsed && (
             <button className="panel-resize-handle panel-resize-handle-right" type="button" aria-label="Resize item info panel" onPointerDown={(event) => startResize('right', event)}>
               <GripVertical size={16} />
@@ -840,6 +995,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           )}
         </aside>
       </div>
+      )}
       {artifactPreview && (
         <section className="modal-backdrop" role="presentation" onClick={() => setArtifactPreview(null)}>
           <div className="modal-panel artifact-preview-modal" role="dialog" aria-modal="true" aria-label="Artifact preview" onClick={(event) => event.stopPropagation()}>
@@ -1068,6 +1224,13 @@ function currentGitPath(plan: ItemDetail | null, file: FileContent | null): stri
   return `${plan.itemPath.replace(/\/$/, '')}/${file.path.replace(/^\//, '')}`;
 }
 
+function workspacePathForSelection(plan: ItemDetail | null, file: FileContent | null): string | undefined {
+  const itemPath = normalizePath(plan?.itemPath ?? '');
+  const filePath = normalizePath(file?.path ?? '');
+  if (itemPath && filePath) return `${itemPath}/${filePath}`;
+  return itemPath || undefined;
+}
+
 function buildFileStateMap(plan: ItemDetail | null, gitStatus: GitStatus | null, file: FileContent | null, dirtyFile: boolean): Map<string, TreeFileState> {
   const stateByPath = new Map<string, TreeFileState>();
   const itemPath = normalizePath(plan?.itemPath ?? '');
@@ -1096,6 +1259,26 @@ function stripItemPath(path: string, itemPath: string): string {
 
 function normalizePath(path: string): string {
   return path.replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
+function matchingBranchItem(items: { id: string; itemPath?: string; scope?: string; identifier?: string }[], current: ItemDetail) {
+  const currentPath = normalizePath(current.itemPath ?? '');
+  return items.find((item) => currentPath && normalizePath(item.itemPath ?? '') === currentPath)
+    ?? items.find((item) => item.scope === current.scope && item.identifier === current.identifier);
+}
+
+function confirmSnapshotMaterialization(item: ItemDetail | null, operation: 'file' | 'metadata'): boolean | null {
+  if (!item || item.sourceMode !== 'snapshot') return false;
+  const copyTarget = item.metadataSource === 'docs'
+    ? 'only this docs file'
+    : `the whole plan at ${item.itemPath || item.identifier}`;
+  const action = operation === 'metadata' ? 'edit its metadata' : 'edit it';
+  const message = `This item is loaded from branch ${item.branch}. To ${action}, Kode Stream will copy ${copyTarget} into the current checkout branch, then apply your change there.`;
+  return window.confirm(message) ? true : null;
+}
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
 function toWorkspaceRelativePath(workspacePath: string | undefined, absolutePath: string): string {

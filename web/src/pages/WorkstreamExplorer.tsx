@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import {
   ChevronDown, ChevronRight, Clipboard, Code2, Eye, File, Folder, FolderGit2, GitCompare,
-  FilePlus2, FolderPlus, KanbanSquare as WorkstreamIcon, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, X
+  FilePlus2, FolderPlus, KanbanSquare as WorkstreamIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, X
 } from 'lucide-react';
 import type { ExplorerLocation } from '../app/router';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -11,7 +11,7 @@ import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
 import { FileStateIcon } from '../features/file-tree/FileStateIcon';
 import { treeKeyboardAction } from '../features/workstream-explorer/keyboard';
-import { explorerNodeId } from '../features/workstream-explorer/tree';
+import { explorerNodeId, normalizeExplorerPath } from '../features/workstream-explorer/tree';
 import type { VisibleExplorerRow } from '../features/workstream-explorer/types';
 import { useWorkstreamExplorer } from '../features/workstream-explorer/useWorkstreamExplorer';
 import { WorkspaceBranchSelector } from '../features/workstream-explorer/WorkspaceBranchSelector';
@@ -29,12 +29,27 @@ import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../li
 type EditorTab = 'preview' | 'raw' | 'diff';
 type PathDialog = { kind: 'file' | 'directory' | 'rename'; parentPath: string; currentPath?: string; initialName?: string };
 type ExplorerUnifiedResult = { kind: 'path'; result: WorkspacePathSearchResult } | { kind: 'content'; result: WorkspaceContentSearchResult };
+type ExplorerRightPanelProps = {
+  title?: ReactNode;
+  content: ReactNode;
+  collapsed?: boolean;
+  onToggle?: () => void;
+  className?: string;
+  collapsedLabel?: string;
+  expandedLabel?: string;
+};
 
-export function WorkstreamExplorer({ workspaces, location, onLocationChange, onOpenWorkstream }: {
+export function WorkstreamExplorer({ workspaces, location, onLocationChange, onOpenWorkstream, embedded = false, showOpenWorkstreamAction = true, treeRootPath, showModeSelector = true, embeddedHeaderContent, rightPanel }: {
   workspaces: WorkspaceConfig[];
   location?: ExplorerLocation;
   onLocationChange: (location?: ExplorerLocation) => void;
   onOpenWorkstream: (workspace: WorkspaceConfig, itemId?: string) => void;
+  embedded?: boolean;
+  showOpenWorkstreamAction?: boolean;
+  treeRootPath?: string;
+  showModeSelector?: boolean;
+  embeddedHeaderContent?: ReactNode;
+  rightPanel?: ExplorerRightPanelProps;
 }) {
   const explorer = useWorkstreamExplorer(workspaces, location, onLocationChange);
   const [tab, setTab] = useState<EditorTab>('preview');
@@ -44,15 +59,22 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
   const [revertOpen, setRevertOpen] = useState(false);
   const [reverting, setReverting] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [leftWidth, setLeftWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.leftWidth'), 340));
-  const [rightWidth, setRightWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.rightWidth'), 300));
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.leftWidth'), 400, boundedLeftPanelWidth));
+  const [rightWidth, setRightWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.rightWidth'), 300, boundedRightPanelWidth));
   const [searchIndex, setSearchIndex] = useState(0);
   const [pathDialog, setPathDialog] = useState<PathDialog | null>(null);
 	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
-	const treeRef = useRef<HTMLDivElement | null>(null);
+  const treeRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const workspace = workspaces.find((item) => item.id === location?.workspaceId);
-  const selectedRow = explorer.rows.find((row) => explorerNodeId(row.workspaceId, row.node.path) === explorer.selection?.nodeId);
+  const rightPanelOpen = rightPanel ? !rightPanel.collapsed : inspectorOpen;
+  const rightPanelTitle = rightPanel?.title ?? 'Inspector';
+  const rightPanelExpandedLabel = rightPanel?.expandedLabel ?? 'Collapse inspector';
+  const rightPanelCollapsedLabel = rightPanel?.collapsedLabel ?? 'Expand inspector';
+  const normalizedTreeRootPath = normalizeExplorerPath(treeRootPath ?? '');
+  const visibleRows = useMemo(() => restrictRowsToRoot(explorer.rows, location?.workspaceId, normalizedTreeRootPath), [explorer.rows, location?.workspaceId, normalizedTreeRootPath]);
+  const selectedRow = visibleRows.find((row) => explorerNodeId(row.workspaceId, row.node.path) === explorer.selection?.nodeId);
 	const pathSearch = useWorkspacePathSearch({ workspaceId: location?.workspaceId, includeIgnored: explorer.showIgnored });
 	const contentSearch = useContentSearch({ kind: 'explorer', mode: explorer.mode, workspaceId: location?.workspaceId, includeIgnored: explorer.showIgnored });
 	const searchResults = useMemo<ExplorerUnifiedResult[]>(() => [
@@ -82,7 +104,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
     setMatchContext(null);
     await explorer.refreshWorkspaceBranch(workspaceId);
   }, [contentSearch, editor, explorer, location?.workspaceId, onLocationChange, pathSearch]);
-  const workspaceBranches = useWorkspaceBranches(workspaces, refreshAfterBranchSwitch);
+  const workspaceBranches = useWorkspaceBranches(embedded ? [] : workspaces, refreshAfterBranchSwitch);
 
   const switchWorkspaceBranch = async (workspace: WorkspaceConfig, branch: string) => {
     if (location?.workspaceId === workspace.id && editor.dirty && !(await editor.saveNow())) return;
@@ -158,7 +180,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
 	};
 
   const selectedParentPath = () => {
-    if (!selectedRow || selectedRow.node.type === 'workspace') return '';
+    if (!selectedRow || selectedRow.node.type === 'workspace') return normalizedTreeRootPath;
     if (selectedRow.node.type === 'directory') return selectedRow.node.path;
     const separator = selectedRow.node.path.lastIndexOf('/');
     return separator >= 0 ? selectedRow.node.path.slice(0, separator) : '';
@@ -193,13 +215,13 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
   };
 
   const onTreeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const result = treeKeyboardAction(event.key, explorer.rows, explorer.activeIndex, explorer.expandedNodeIds);
+    const result = treeKeyboardAction(event.key, visibleRows, explorer.activeIndex, explorer.expandedNodeIds);
     if (result.activeIndex === explorer.activeIndex && !result.toggleNodeId && !result.select) return;
     event.preventDefault();
     explorer.setActiveIndex(result.activeIndex);
     if (result.toggleNodeId) {
-      const row = explorer.rows[result.activeIndex];
-      toggleRow(row);
+      const row = visibleRows[result.activeIndex];
+      if (row) toggleRow(row);
     }
     if (result.select) void selectRow(result.select);
   };
@@ -231,7 +253,9 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
     const initial = side === 'left' ? leftWidth : rightWidth;
     let latest = initial;
     const move = (next: PointerEvent) => {
-      const width = Math.min(520, Math.max(220, initial + (side === 'left' ? next.clientX - start : start - next.clientX)));
+      const width = side === 'left'
+        ? boundedLeftPanelWidth(initial + next.clientX - start)
+        : boundedRightPanelWidth(initial + start - next.clientX);
       latest = width;
       gridRef.current?.style.setProperty(side === 'left' ? '--explorer-left-width' : '--explorer-right-width', `${width}px`);
       if (side === 'left') setLeftWidth(width); else setRightWidth(width);
@@ -245,49 +269,54 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
   };
 
   const gridStyle = {
-    '--explorer-left-width': `${leftWidth}px`,
-    '--explorer-right-width': `${inspectorOpen ? rightWidth : 44}px`
+    '--explorer-left-width': `${leftCollapsed ? 44 : leftWidth}px`,
+    '--explorer-right-width': `${rightPanelOpen ? rightWidth : 44}px`
   } as CSSProperties;
 
-  return (
-    <section className="workstream-explorer-page">
-      <header className="explorer-header">
-        <div><span className="eyebrow">{workspace?.name ?? 'No workspace selected'}</span><h1>Workstream Explorer</h1></div>
-        <div className="explorer-header-actions">
-          <button className="secondary" type="button" disabled={!workspace} onClick={() => setPathDialog({ kind: 'file', parentPath: selectedParentPath() })}><FilePlus2 size={15} /> New file</button>
-          <button className="secondary" type="button" disabled={!workspace} onClick={() => setPathDialog({ kind: 'directory', parentPath: selectedParentPath() })}><FolderPlus size={15} /> New folder</button>
-          <button className="secondary" type="button" disabled={!selectedRow || selectedRow.node.type === 'workspace'} onClick={() => void openRename()}><Pencil size={15} /> Rename</button>
-          <button className="secondary" type="button" onClick={explorer.collapseAll}>Collapse all</button>
-          <button className="secondary" type="button" onClick={explorer.refresh}><RefreshCw size={15} /> Refresh</button>
-        </div>
-      </header>
+  const explorerContent = (
+    <>
+      {!embedded && (
+        <header className="explorer-header">
+          <div><span className="eyebrow">{workspace?.name ?? 'No workspace selected'}</span><h1>Workstream Explorer</h1></div>
+          <div className="explorer-header-actions" />
+        </header>
+      )}
       <div className="explorer-grid" style={gridStyle} ref={gridRef}>
-        <aside className="explorer-tree-panel">
-		  <div className="explorer-panel-header">
-			<strong>Files</strong>
-			<select aria-label="Explorer tree mode" value={explorer.mode} onChange={(event) => explorer.setMode(event.target.value as 'sources' | 'all')}>
-				<option value="sources">Planning folders</option>
+        <aside className={leftCollapsed ? 'explorer-tree-panel collapsed' : 'explorer-tree-panel'}>
+		  <div className={embedded ? 'explorer-panel-header embedded' : 'explorer-panel-header'}>
+			{!leftCollapsed && (embedded ? <div className="explorer-panel-title">{embeddedHeaderContent ?? <strong>Files</strong>}</div> : <strong>Files</strong>)}
+            <div className={embedded ? 'explorer-panel-actions compact' : 'explorer-panel-actions'}>
+              {!leftCollapsed && showModeSelector && (
+                <select aria-label="Explorer tree mode" value={explorer.mode} onChange={(event) => explorer.setMode(event.target.value as 'sources' | 'all')}>
+				<option value="sources">Source folders</option>
 				<option value="all">Entire workspace</option>
 			</select>
+              )}
+              {!leftCollapsed && <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label="New file" title="New file" disabled={!workspace} onClick={() => setPathDialog({ kind: 'file', parentPath: selectedParentPath() })}>{embedded ? <FilePlus2 size={15} /> : <><FilePlus2 size={15} /> New file</>}</button>}
+              {!leftCollapsed && <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label="New folder" title="New folder" disabled={!workspace} onClick={() => setPathDialog({ kind: 'directory', parentPath: selectedParentPath() })}>{embedded ? <FolderPlus size={15} /> : <><FolderPlus size={15} /> New folder</>}</button>}
+              {!leftCollapsed && <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label="Rename selected path" title="Rename" disabled={!selectedRow || selectedRow.node.type === 'workspace'} onClick={() => void openRename()}>{embedded ? <Pencil size={15} /> : <><Pencil size={15} /> Rename</>}</button>}
+              <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label={leftCollapsed ? 'Expand files panel' : 'Collapse files panel'} title={leftCollapsed ? 'Expand files panel' : 'Collapse files panel'} onClick={() => setLeftCollapsed((value) => !value)}>{embedded ? (leftCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />) : <>{leftCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />} {leftCollapsed ? 'Expand files' : 'Collapse files'}</>}</button>
+              {(!embedded && !leftCollapsed) && <button className="secondary" type="button" aria-label="Refresh" title="Refresh" onClick={explorer.refresh}><RefreshCw size={15} /> Refresh</button>}
+            </div>
 		  </div>
-		  <div className="explorer-search-context">Search in {workspace?.name ?? 'all workspaces'}</div>
-		  <div className="explorer-toolbar">
+		  {!leftCollapsed && !embedded && <div className="explorer-search-context">Search in {workspace?.name ?? 'all workspaces'}</div>}
+		  {!leftCollapsed && <div className="explorer-toolbar">
 			<label><Search size={15} /><input aria-label="Search files" value={pathSearch.query} onChange={(event) => setExplorerSearchQuery(event.target.value)} onKeyDown={(event) => {
 			  if (event.key === 'ArrowDown' && searchResults.length) { event.preventDefault(); setSearchIndex((index) => Math.min(index + 1, searchResults.length - 1)); }
 			  if (event.key === 'ArrowUp' && searchResults.length) { event.preventDefault(); setSearchIndex((index) => Math.max(index - 1, 0)); }
 			  if (event.key === 'Enter' && searchResults.length) { event.preventDefault(); openUnifiedSearchResult(searchResults[searchIndex] ?? searchResults[0]); }
 			  if (event.key === 'Escape') setExplorerSearchQuery('');
 			}} placeholder="Search files and text" /></label>
-		  </div>
-		  {pathSearch.query.trim() && <ExplorerUnifiedSearchResults query={pathSearch.query} results={searchResults} loading={pathSearch.loading || contentSearch.loading} error={pathSearch.error || contentSearch.error} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={openUnifiedSearchResult} />}
-		  <div className="explorer-tree" ref={treeRef} role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>
-            {explorer.rows.map((row, index) => (
-              <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={row.node.type === 'file' ? explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path)) : undefined} branchState={workspaceBranches.states[row.workspaceId]} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} onBranchChange={(workspace, branch) => void switchWorkspaceBranch(workspace, branch)} />
+		  </div>}
+		  {!leftCollapsed && pathSearch.query.trim() && <ExplorerUnifiedSearchResults query={pathSearch.query} results={searchResults} loading={pathSearch.loading || contentSearch.loading} error={pathSearch.error || contentSearch.error} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={openUnifiedSearchResult} />}
+		  {!leftCollapsed && <div className="explorer-tree" ref={treeRef} role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>
+            {visibleRows.map((row, index) => (
+              <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={row.node.type === 'file' ? explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path)) : undefined} branchState={workspaceBranches.states[row.workspaceId]} showBranchSelector={!embedded} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} onBranchChange={(workspace, branch) => void switchWorkspaceBranch(workspace, branch)} />
             ))}
-            {explorer.rows.length === 0 && <p className="explorer-empty">No matching paths.</p>}
-			{explorer.mode === 'sources' && workspaces.every((item) => item.sources.length === 0) && <button className="secondary" type="button" onClick={() => explorer.setMode('all')}>Browse All Files</button>}
-          </div>
-          <button className="explorer-resize-handle left" aria-label="Resize workspace tree" onPointerDown={(event) => startResize('left', event)} />
+            {visibleRows.length === 0 && <p className="explorer-empty">No matching paths.</p>}
+			{showModeSelector && explorer.mode === 'sources' && workspaces.every((item) => item.sources.length === 0) && <button className="secondary" type="button" onClick={() => explorer.setMode('all')}>Browse All Files</button>}
+          </div>}
+          {!leftCollapsed && <button className="explorer-resize-handle left" aria-label="Resize workspace tree" onPointerDown={(event) => startResize('left', event)} />}
         </aside>
         <main className="workspace-file-editor">
           <div className="explorer-breadcrumbs">
@@ -312,19 +341,25 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
           {tab === 'raw' && <textarea className="raw-editor" value={editor.file ? editor.content : 'Select a file.'} disabled={!editor.file?.editable} onChange={(event) => editor.setContent(event.target.value)} spellCheck={false} />}
           {tab === 'diff' && <ExplorerDiff diff={diff} onRevert={() => setRevertOpen(true)} disabled={!editor.file || reverting} />}
         </main>
-        <aside className={inspectorOpen ? 'explorer-inspector' : 'explorer-inspector collapsed'}>
-          <div className="panel-header"><h2>Inspector</h2><button className="icon-button" type="button" aria-label={inspectorOpen ? 'Collapse inspector' : 'Expand inspector'} onClick={() => setInspectorOpen((value) => !value)}>{inspectorOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button></div>
-          {inspectorOpen && <ExplorerInspector workspace={workspace} row={selectedRow} file={editor.file} onOpenWorkstream={onOpenWorkstream} />}
-          {inspectorOpen && <button className="explorer-resize-handle right" aria-label="Resize inspector" onPointerDown={(event) => startResize('right', event)} />}
+        <aside className={rightPanelOpen ? `explorer-inspector${rightPanel?.className ? ` ${rightPanel.className}` : ''}` : `explorer-inspector collapsed${rightPanel?.className ? ` ${rightPanel.className}` : ''}`}>
+          <div className="panel-header"><h2>{rightPanelTitle}</h2><button className="icon-button" type="button" aria-label={rightPanelOpen ? rightPanelExpandedLabel : rightPanelCollapsedLabel} onClick={() => rightPanel?.onToggle ? rightPanel.onToggle() : setInspectorOpen((value) => !value)}>{rightPanelOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button></div>
+          {rightPanelOpen && (rightPanel ? rightPanel.content : <ExplorerInspector workspace={workspace} row={selectedRow} file={editor.file} onOpenWorkstream={onOpenWorkstream} showOpenWorkstreamAction={showOpenWorkstreamAction} />)}
+          {rightPanelOpen && <button className="explorer-resize-handle right" aria-label="Resize inspector" onPointerDown={(event) => startResize('right', event)} />}
         </aside>
       </div>
       {revertOpen && editor.file && <ConfirmDialog title="Revert file" message={`Revert ${editor.file.path} to HEAD?`} confirmLabel={reverting ? 'Reverting...' : 'Revert File'} busy={reverting} danger onCancel={() => setRevertOpen(false)} onConfirm={revertFile} />}
       {pathDialog && <ExplorerPathDialog dialog={pathDialog} busy={Boolean(mutations.busy)} error={mutations.error} onCancel={() => { mutations.clearError(); setPathDialog(null); }} onSubmit={submitPathDialog} />}
+    </>
+  );
+
+  return embedded ? explorerContent : (
+    <section className="workstream-explorer-page">
+      {explorerContent}
     </section>
   );
 }
 
-function ExplorerTreeRow({ row, gitState, branchState, active, selected, expanded, onFocus, onSelect, onToggle, onBranchChange }: { row: VisibleExplorerRow; gitState?: WorkspacePathGitState; branchState?: WorkspaceBranchState; active: boolean; selected: boolean; expanded: boolean; onFocus: () => void; onSelect: () => void; onToggle: () => void; onBranchChange: (workspace: WorkspaceConfig, branch: string) => void }) {
+function ExplorerTreeRow({ row, gitState, branchState, showBranchSelector = true, active, selected, expanded, onFocus, onSelect, onToggle, onBranchChange }: { row: VisibleExplorerRow; gitState?: WorkspacePathGitState; branchState?: WorkspaceBranchState; showBranchSelector?: boolean; active: boolean; selected: boolean; expanded: boolean; onFocus: () => void; onSelect: () => void; onToggle: () => void; onBranchChange: (workspace: WorkspaceConfig, branch: string) => void }) {
   const expandable = row.node.type === 'workspace' || row.node.type === 'directory';
   const workspace = row.node.type === 'workspace' ? row.node.workspace : undefined;
   return <div className={`explorer-tree-row${selected ? ' selected' : ''}${active ? ' active' : ''}`} role="treeitem" aria-level={row.level + 1} aria-expanded={expandable ? expanded : undefined} aria-selected={selected} style={{ '--explorer-depth': row.level } as CSSProperties} onMouseEnter={onFocus}>
@@ -334,7 +369,7 @@ function ExplorerTreeRow({ row, gitState, branchState, active, selected, expande
       <span className={`explorer-row-label ${row.node.type}`}>{row.node.name}</span>
       {row.node.type === 'file' && gitState && <FileStateIcon state={gitState.conflict ? 'conflicted' : gitState.status} />}
     </button>
-    {workspace && <WorkspaceBranchSelector workspace={workspace} state={branchState} onChange={(branch) => onBranchChange(workspace, branch)} />}
+    {workspace && showBranchSelector && <WorkspaceBranchSelector workspace={workspace} state={branchState} onChange={(branch) => onBranchChange(workspace, branch)} />}
   </div>;
 }
 
@@ -374,7 +409,7 @@ function ExplorerDiff({ diff, onRevert, disabled }: { diff: string; onRevert: ()
   return <section className="diff-panel"><header className="diff-toolbar"><strong>{files.length ? `${files.length} changed file` : 'No local changes'}</strong><button className="danger-action" disabled={disabled || !diff} onClick={onRevert}><RotateCcw size={15} /> Revert File</button></header><pre className="diff-view">{diff || 'No local changes.'}</pre></section>;
 }
 
-function ExplorerInspector({ workspace, row, file, onOpenWorkstream }: { workspace?: WorkspaceConfig; row?: VisibleExplorerRow; file: ReturnType<typeof useFileEditorSession>['file']; onOpenWorkstream: (workspace: WorkspaceConfig, itemId?: string) => void }) {
+function ExplorerInspector({ workspace, row, file, onOpenWorkstream, showOpenWorkstreamAction }: { workspace?: WorkspaceConfig; row?: VisibleExplorerRow; file: ReturnType<typeof useFileEditorSession>['file']; onOpenWorkstream: (workspace: WorkspaceConfig, itemId?: string) => void; showOpenWorkstreamAction: boolean }) {
   const [git, setGit] = useState<GitStatus | null>(null);
   const [activity, setActivity] = useState<GitActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -418,7 +453,7 @@ function ExplorerInspector({ workspace, row, file, onOpenWorkstream }: { workspa
   }, [row?.item?.itemId]);
   if (!workspace) return <p className="explorer-empty">Select a workspace or file.</p>;
   return <div className="inspector-content">
-    <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl><button className="secondary" onClick={() => onOpenWorkstream(workspace, row?.item?.itemId)}><WorkstreamIcon size={15} /> Open Workstream</button></section>
+    <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl>{showOpenWorkstreamAction && <button className="secondary" onClick={() => onOpenWorkstream(workspace, row?.item?.itemId)}><WorkstreamIcon size={15} /> Open Workstream</button>}</section>
     {file && <section><h3>File</h3><dl><dt>Path</dt><dd>{file.path}</dd><dt>Kind</dt><dd>{file.kind}</dd><dt>Size</dt><dd>{file.sizeBytes.toLocaleString()} bytes</dd><dt>Editable</dt><dd>{file.editable ? 'Text' : 'Read only'}</dd></dl></section>}
     {row?.item && <section><h3>Item</h3><dl><dt>ID</dt><dd>{row.item.identifier}</dd><dt>Title</dt><dd>{row.item.title}</dd><dt>Status</dt><dd>{row.item.status}</dd><dt>Owner</dt><dd>{item?.owner || 'Unassigned'}</dd></dl><a className="secondary button-link" href={`/items/${encodeURIComponent(row.item.itemId)}`}>Open details</a></section>}
     <section>
@@ -437,9 +472,31 @@ function ExplorerInspector({ workspace, row, file, onOpenWorkstream }: { workspa
   </div>;
 }
 
-function boundedNumber(value: string | null, fallback: number): number {
+function boundedNumber(value: string | null, fallback: number, bound: (value: number) => number): number {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.min(520, Math.max(220, parsed)) : fallback;
+  return Number.isFinite(parsed) ? bound(parsed) : fallback;
+}
+
+function boundedLeftPanelWidth(value: number): number {
+  return Math.min(640, Math.max(300, value));
+}
+
+function boundedRightPanelWidth(value: number): number {
+  return Math.min(520, Math.max(220, value));
+}
+
+function restrictRowsToRoot(rows: VisibleExplorerRow[], workspaceId: string | undefined, rootPath: string): VisibleExplorerRow[] {
+  if (!workspaceId || !rootPath) return rows;
+  const rootRow = rows.find((row) => row.workspaceId === workspaceId && normalizeExplorerPath(row.node.path) === rootPath);
+  if (!rootRow) return [];
+  const baseLevel = rootRow.level;
+  return rows
+    .filter((row) => row.workspaceId === workspaceId && (normalizeExplorerPath(row.node.path) === rootPath || normalizeExplorerPath(row.node.path).startsWith(`${rootPath}/`)))
+    .map((row) => ({
+      ...row,
+      level: Math.max(0, row.level - baseLevel),
+      parentId: normalizeExplorerPath(row.node.path) === rootPath ? undefined : row.parentId
+    }));
 }
 
 function readStoredToggle(key: string): boolean {

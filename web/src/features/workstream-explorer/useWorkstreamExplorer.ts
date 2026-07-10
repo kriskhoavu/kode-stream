@@ -12,6 +12,9 @@ const ignoredStorageKey = 'workstreamExplorer.showIgnored';
 const modeStorageKey = 'workstreamExplorer.treeMode';
 
 export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: ExplorerLocation, onLocationChange?: (location?: ExplorerLocation) => void) {
+  const workspaceKey = workspaces
+    .map((workspace) => [workspace.id, workspace.name, workspace.baselineBranch, workspace.sources.join('|')].join(':'))
+    .join('\u0000');
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() => readExpanded());
   const [showIgnored, setShowIgnoredState] = useState(() => localStorage.getItem(ignoredStorageKey) === 'true');
 	const [mode, setModeState] = useState<ExplorerTreeMode>(() => location?.mode ?? readMode());
@@ -21,6 +24,11 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
   const [activeIndex, setActiveIndex] = useState(0);
   const [gitStateByPath, setGitStateByPath] = useState<Map<string, WorkspacePathGitState>>(new Map());
   const lastAutoExpandedLocation = useRef('');
+  const cacheRef = useRef(cache);
+
+  useEffect(() => {
+    cacheRef.current = cache;
+  }, [cache]);
 
   const loadDecorations = useCallback(async () => {
     try {
@@ -30,7 +38,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
     }
   }, []);
 
-  useEffect(() => { void loadDecorations(); }, [loadDecorations, workspaces]);
+  useEffect(() => { void loadDecorations(); }, [loadDecorations]);
 
   const loadGitStates = useCallback(async () => {
     const maps = await Promise.all(workspaces.map(async (workspace) => {
@@ -41,7 +49,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
       }
     }));
     setGitStateByPath(new Map(maps.flatMap((map) => [...map.entries()])));
-  }, [workspaces]);
+  }, [workspaceKey]);
 
   useEffect(() => { void loadGitStates(); }, [loadGitStates]);
 
@@ -60,7 +68,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
   const loadDirectory = useCallback(async (workspaceId: string, path: string, force = false) => {
 		if (mode === 'sources' && path === '') return;
 		const key = directoryCacheKey(workspaceId, path, showIgnored, mode);
-    if (!force && ['loading', 'loaded'].includes(cache.get(key)?.state ?? '')) return;
+    if (!force && ['loading', 'loaded'].includes(cacheRef.current.get(key)?.state ?? '')) return;
     setCache((current) => new Map(current).set(key, { state: 'loading', entries: [], hiddenCount: 0 }));
     try {
       const listing = await api.workspaceTree(workspaceId, path, showIgnored);
@@ -68,7 +76,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
     } catch (error) {
       setCache((current) => new Map(current).set(key, { state: 'error', entries: [], hiddenCount: 0, error: error instanceof Error ? error.message : 'Directory failed to load' }));
     }
-	}, [cache, mode, showIgnored]);
+	}, [mode, showIgnored]);
 
 	const setMode = useCallback((value: ExplorerTreeMode) => {
 		setModeState(value);
@@ -152,12 +160,22 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
     localStorage.setItem(expandedStorageKey, '[]');
   }, []);
 
+  const collapsePath = useCallback((workspaceId: string, path = '') => {
+    const normalizedPath = explorerNodeId(workspaceId, path);
+    const descendantPrefix = normalizedPath.endsWith(':') ? normalizedPath : `${normalizedPath}/`;
+    setExpandedNodeIds((current) => {
+      const next = new Set([...current].filter((id) => id !== normalizedPath && !id.startsWith(descendantPrefix)));
+      localStorage.setItem(expandedStorageKey, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     for (const id of expandedNodeIds) {
       const separator = id.indexOf(':');
       if (separator > 0) void loadDirectory(id.slice(0, separator), id.slice(separator + 1));
     }
-  }, [expandedNodeIds, loadDirectory, showIgnored, workspaces]);
+  }, [expandedNodeIds, loadDirectory, showIgnored]);
 
   useEffect(() => {
     if (!location?.workspaceId) {
@@ -179,9 +197,9 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
     directoryPaths.forEach((path) => void loadDirectory(location.workspaceId!, path));
   }, [loadDirectory, location?.path, location?.workspaceId, mode, showIgnored]);
 
-	const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter, mode }), [cache, decorations, expandedNodeIds, filter, mode, showIgnored, workspaces]);
+	const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter, mode }), [cache, decorations, expandedNodeIds, filter, mode, showIgnored, workspaceKey]);
 
-	return { rows, cache, decorations, gitStateByPath, expandedNodeIds, showIgnored, mode, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, setMode, toggleExpanded, loadDirectory, refresh, refreshWorkspaceBranch, collapseAll, select, invalidateDirectories, expandToPath };
+	return { rows, cache, decorations, gitStateByPath, expandedNodeIds, showIgnored, mode, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, setMode, toggleExpanded, loadDirectory, refresh, refreshWorkspaceBranch, collapseAll, collapsePath, select, invalidateDirectories, expandToPath };
 }
 
 function readMode(): ExplorerTreeMode {

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { WorkspaceConfig } from '../../lib/types';
 import type { WorkspaceBranchState } from './useWorkspaceBranches';
 import './workspace-branch-selector.css';
@@ -10,7 +11,8 @@ export function WorkspaceBranchSelector({ workspace, state, onChange }: {
   const current = state?.current || workspace.baselineBranch;
   const branches = state?.branches.length ? state.branches : current ? [current] : [];
   const errorDetail = [state?.error, state?.recoveryHint].filter(Boolean).join(' ');
-  return <span className="workspace-branch-control" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+  const style = { '--branch-name-length': current.length } as CSSProperties & Record<'--branch-name-length', number>;
+  return <span className="workspace-branch-control" style={style} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
     <select
       aria-label={`Branch for ${workspace.name}`}
       value={current}

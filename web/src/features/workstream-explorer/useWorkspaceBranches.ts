@@ -44,7 +44,10 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
     if (!branch || branch === current?.current || current?.switching) return branch === current?.current;
     setStates((value) => ({ ...value, [workspace.id]: { ...(value[workspace.id] ?? fallbackState(workspace)), switching: true, error: '', recoveryHint: '' } }));
     try {
-      const result = await api.switchBranch(workspace.id, { name: branch, confirm: false });
+      const result = await switchBranchWithConfirmation(workspace.id, branch);
+      if (!result.ok) {
+        throw new ApiError(result.message ?? 'Branch switch failed', result.recoveryHint);
+      }
       await onSwitched?.(workspace.id, result.status.branch || branch);
       setStates((value) => ({
         ...value,
@@ -85,4 +88,20 @@ function fallbackState(workspace: WorkspaceConfig): WorkspaceBranchState {
     error: '',
     recoveryHint: ''
   };
+}
+
+async function switchBranchWithConfirmation(workspaceId: string, branch: string) {
+  try {
+    return await api.switchBranch(workspaceId, { name: branch, confirm: false });
+  } catch (caught) {
+    if (!(caught instanceof ApiError) || !requiresDirtyTreeConfirmation(caught)) throw caught;
+    const confirmed = window.confirm(`${caught.message}\n\n${caught.recoveryHint || 'Review local changes before switching branches.'}`);
+    if (!confirmed) throw caught;
+    return api.switchBranch(workspaceId, { name: branch, confirm: true });
+  }
+}
+
+function requiresDirtyTreeConfirmation(error: ApiError): boolean {
+  const text = `${error.message} ${error.recoveryHint ?? ''}`.toLocaleLowerCase();
+  return text.includes('confirm to switch') || (text.includes('local changes') && text.includes('confirm'));
 }

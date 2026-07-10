@@ -137,6 +137,12 @@ func TestAILaunchRouteValidatesBodyAndReportsUnavailableLauncher(t *testing.T) {
 	if unavailable.Code != http.StatusInternalServerError || !strings.Contains(unavailable.Body.String(), `"code":"launch_failed"`) {
 		t.Fatalf("unavailable status = %d, body = %s", unavailable.Code, unavailable.Body.String())
 	}
+
+	acceptsSurface := httptest.NewRecorder()
+	handler.ServeHTTP(acceptsSurface, httptest.NewRequest(http.MethodPost, "/api/items/item-1/ai-sessions", strings.NewReader(`{"provider":"codex","terminal":"terminal","contextMode":"card_context","surface":"external"}`)))
+	if acceptsSurface.Code != http.StatusInternalServerError || !strings.Contains(acceptsSurface.Body.String(), `"code":"launch_failed"`) {
+		t.Fatalf("acceptsSurface status = %d, body = %s", acceptsSurface.Code, acceptsSurface.Body.String())
+	}
 }
 
 func TestFallbackItemPath(t *testing.T) {

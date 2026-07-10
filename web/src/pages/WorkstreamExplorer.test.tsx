@@ -39,7 +39,7 @@ describe('WorkstreamExplorer', () => {
     expect(await screen.findByText('README.md')).toBeInTheDocument();
   });
 
-  it('toggles workspace roots and configured directories from their names in Planning folders mode', async () => {
+  it('toggles workspace roots and configured directories from their names in Source folders mode', async () => {
     apiMock.workspaceTree.mockImplementation((_workspaceId: string, path: string) => Promise.resolve({
       workspaceId: 'ws', path, hiddenCount: 0, entries: path === 'docs'
         ? [{ id: 'guide', name: 'guide.md', path: 'docs/guide.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }]
@@ -95,6 +95,7 @@ describe('WorkstreamExplorer', () => {
     const onLocationChange = vi.fn();
     render(<WorkstreamExplorer workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'README.md', mode: 'all' }} onLocationChange={onLocationChange} onOpenWorkstream={vi.fn()} />);
     const selector = await screen.findByRole('combobox', { name: 'Branch for Workspace' });
+    await waitFor(() => expect(selector).toBeEnabled());
 
     fireEvent.change(selector, { target: { value: 'feature/explorer' } });
 
@@ -173,6 +174,38 @@ describe('WorkstreamExplorer', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'notes.md' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(apiMock.createWorkspaceFile).toHaveBeenCalledWith('ws', { parentPath: '', name: 'notes.md', content: '' }));
+  });
+
+  it('collapses and expands the embedded files panel without changing tree expansion', async () => {
+    apiMock.workspaceTree.mockImplementation((_workspaceId: string, path: string) => Promise.resolve({
+      workspaceId: 'ws', path, hiddenCount: 0, entries: path === ''
+        ? [{ id: 'docs', name: 'docs', path: 'docs', type: 'directory', hasChildren: true, ignored: false, hidden: false, editable: false }]
+        : [{ id: 'guide', name: 'guide.md', path: 'docs/guide.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }]
+    }));
+    render(
+      <WorkstreamExplorer
+        embedded
+        showModeSelector={false}
+        treeRootPath="docs"
+        workspaces={[workspace]}
+        location={{ workspaceId: 'ws', path: 'docs', mode: 'all' }}
+        onLocationChange={vi.fn()}
+        onOpenWorkstream={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByRole('button', { name: 'docs' })).toBeInTheDocument();
+    fireEvent.doubleClick(screen.getByRole('button', { name: 'docs' }));
+    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
+    expect(await screen.findByText('guide.md')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse files panel' }));
+    expect(screen.queryByText('guide.md')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'docs' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand files panel' }));
+    expect(screen.getByRole('button', { name: 'docs' })).toBeInTheDocument();
+    expect(screen.getByText('guide.md')).toBeInTheDocument();
   });
 
 	it('switches tree mode and opens a highlighted content match', async () => {
