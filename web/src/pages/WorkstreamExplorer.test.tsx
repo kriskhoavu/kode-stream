@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstreamExplorer } from './WorkstreamExplorer';
@@ -139,11 +140,50 @@ describe('WorkstreamExplorer', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'main.go' }));
     await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', path: 'main.go' }));
     rerender(<WorkstreamExplorer workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'main.go', mode: 'all' }} onLocationChange={onLocationChange} onOpenWorkstream={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Raw/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Source/i }));
     const editor = container.querySelector('.raw-editor') as HTMLTextAreaElement;
     await waitFor(() => expect(editor).toBeEnabled());
     fireEvent.change(editor, { target: { value: 'package planmanager\n' } });
     expect(editor).toHaveValue('package planmanager\n');
+  });
+
+  it('keeps the current file open when selecting a directory', async () => {
+    apiMock.workspaceTree.mockImplementation((_workspaceId: string, path: string) => Promise.resolve({
+      workspaceId: 'ws', path, hiddenCount: 0, entries: path === ''
+        ? [{ id: 'docs', name: 'docs', path: 'docs', type: 'directory', hasChildren: true, ignored: false, hidden: false, editable: false }]
+        : [{ id: 'guide', name: 'guide.md', path: 'docs/guide.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }]
+    }));
+    apiMock.workspaceFile.mockResolvedValue({ id: 'guide', path: 'docs/guide.md', content: '# Guide', language: 'markdown', hash: 'hash', kind: 'markdown', sizeBytes: 7, editable: true, truncated: false });
+    apiMock.workspaceFileDiff.mockResolvedValue({ diff: '' });
+
+    function Harness() {
+      const [location, setLocation] = useState<{ workspaceId?: string; path?: string; mode?: 'all' | 'sources' }>({ workspaceId: 'ws', path: 'docs/guide.md', mode: 'all' });
+      return <WorkstreamExplorer workspaces={[workspace]} location={location} onLocationChange={(next) => setLocation(next ?? { workspaceId: 'ws', mode: 'all' })} onOpenWorkstream={vi.fn()} />;
+    }
+
+    const { container } = render(<Harness />);
+    await waitFor(() => expect(container.querySelector('.file-tab-button')).toHaveTextContent('guide.md'));
+    fireEvent.click(screen.getByRole('button', { name: /Source/i }));
+    await waitFor(() => expect((container.querySelector('.raw-editor') as HTMLTextAreaElement).value).toContain('# Guide'));
+
+    const folderButton = screen.getByRole('button', { name: 'docs' });
+    fireEvent.doubleClick(folderButton);
+    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
+    fireEvent.click(folderButton);
+
+    await waitFor(() => expect((container.querySelector('.raw-editor') as HTMLTextAreaElement).value).toContain('# Guide'));
+    expect(container.querySelector('.file-tab-button')).toHaveTextContent('guide.md');
+  });
+
+  it('does not request file content for a directory path during initial resolution', async () => {
+    apiMock.workspaceTree.mockResolvedValue({ workspaceId: 'ws', path: '', hiddenCount: 0, entries: [
+      { id: 'docs', name: 'docs', path: 'docs', type: 'directory', hasChildren: true, ignored: false, hidden: false, editable: false }
+    ] });
+
+    render(<WorkstreamExplorer workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'docs', mode: 'all' }} onLocationChange={vi.fn()} onOpenWorkstream={vi.fn()} />);
+
+    await screen.findByRole('button', { name: 'docs' });
+    expect(apiMock.workspaceFile).not.toHaveBeenCalled();
   });
 
   it('keeps Open Workstream explicit for a selected workspace root', async () => {

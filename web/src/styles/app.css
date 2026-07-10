@@ -771,7 +771,9 @@ button:disabled {
 .workspace-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .ai-launch-split {
@@ -784,6 +786,7 @@ button:disabled {
 
 .ai-launch-main {
   border-radius: 8px 0 0 8px !important;
+  white-space: nowrap;
 }
 
 .ai-launch-main-saved {
@@ -803,6 +806,24 @@ button:disabled {
   border-left: 1px solid rgba(255, 255, 255, 0.28) !important;
   border-radius: 0 8px 8px 0 !important;
   padding: 0 10px;
+}
+
+.workspace-header-actions .ai-launch-main {
+  padding-inline: 14px;
+}
+
+.workspace-header-actions .ai-launch-settings {
+  padding-inline: 9px;
+}
+
+.workspace-git-status-button {
+  flex: 0 0 auto;
+}
+
+.workspace-git-status-button.is-dirty {
+  color: color-mix(in srgb, var(--warning) 82%, var(--text));
+  border-color: color-mix(in srgb, var(--warning) 36%, var(--line));
+  background: color-mix(in srgb, var(--warning) 10%, var(--panel));
 }
 
 .operation-notice {
@@ -5285,12 +5306,87 @@ body.is-resizing-panel {
   background: color-mix(in srgb, var(--panel) 94%, var(--panel-soft));
 }
 
+.editor-file-strip {
+  min-height: 52px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
 .tab-list {
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
   overflow-x: auto;
+}
+
+.file-tab-list {
+  gap: 8px;
+}
+
+.file-tab {
+  min-width: 0;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid color-mix(in srgb, var(--line) 92%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--panel) 92%, var(--panel-soft));
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--panel-soft) 65%, transparent);
+}
+
+.file-tab.active {
+  border-color: color-mix(in srgb, var(--blue) 44%, var(--line));
+  background: color-mix(in srgb, var(--blue) 8%, var(--panel));
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue) 12%, transparent);
+}
+
+.file-tab-button,
+.file-tab-close {
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.file-tab-button {
+  min-width: 0;
+  max-width: 240px;
+  min-height: 34px;
+  padding: 0 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-tab-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  color: #dc2626;
+}
+
+.file-tab-close:hover {
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+  color: #b91c1c;
+}
+
+.file-tab-placeholder {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 4px;
 }
 
 .tab-list button {
@@ -5361,6 +5457,42 @@ body.is-resizing-panel {
   border-color: color-mix(in srgb, var(--green) 36%, var(--line));
   background: color-mix(in srgb, var(--green) 9%, var(--panel));
   color: var(--green);
+}
+
+.editor-toolbar-actions {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.editor-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.editor-view-switch button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.editor-view-switch button.active {
+  background: color-mix(in srgb, var(--blue) 10%, var(--panel));
+  color: var(--blue);
 }
 
 .autosave-state.error {

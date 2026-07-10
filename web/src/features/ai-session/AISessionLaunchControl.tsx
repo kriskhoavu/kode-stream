@@ -6,7 +6,7 @@ import { AISessionLaunchDialog } from './AISessionLaunchDialog';
 import { readAISessionPreference, saveAISessionPreference } from './preferences';
 import { openEmbeddedSession } from './terminalSessions';
 
-export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void }) {
+export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, buttonLabel = 'Open AI session' }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void; buttonLabel?: string }) {
   const [preference, setPreference] = useState<AISessionLaunchInput | null>(readAISessionPreference);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
@@ -44,7 +44,7 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError }
 
   return <>
     <div className="ai-launch-split">
-      <button className={`primary ai-launch-main${preference ? ' ai-launch-main-saved' : ''}`} type="button" disabled={disabled || launching} aria-label={preference ? `Open AI session using saved choice: ${savedChoice}` : 'Open AI session'} title={preference ? `Saved choice: ${savedChoice}` : 'Configure your first AI session'} onClick={() => void quickLaunch()}><Bot size={16} /> {launching ? 'Opening...' : 'Open AI session'} {preference && <span className="ai-launch-saved-indicator" aria-hidden="true" />}</button>
+      <button className={`primary ai-launch-main${preference ? ' ai-launch-main-saved' : ''}`} type="button" disabled={disabled || launching} aria-label={preference ? `Open AI session using saved choice: ${savedChoice}` : 'Open AI session'} title={preference ? `Saved choice: ${savedChoice}` : 'Configure your first AI session'} onClick={() => void quickLaunch()}><Bot size={16} /> {launching ? 'Opening...' : buttonLabel} {preference && <span className="ai-launch-saved-indicator" aria-hidden="true" />}</button>
       <button className="primary ai-launch-settings" type="button" disabled={disabled || launching} aria-label="Configure AI session" title="Configure AI session" onClick={() => setDialogOpen(true)}><Settings2 size={16} /></button>
     </div>
     {dialogOpen && <AISessionLaunchDialog itemId={itemId} preference={preference} onClose={() => setDialogOpen(false)} onLaunched={rememberLaunch} />}

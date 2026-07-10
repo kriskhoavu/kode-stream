@@ -29,6 +29,7 @@ import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../li
 type EditorTab = 'preview' | 'raw' | 'diff';
 type PathDialog = { kind: 'file' | 'directory' | 'rename'; parentPath: string; currentPath?: string; initialName?: string };
 type ExplorerUnifiedResult = { kind: 'path'; result: WorkspacePathSearchResult } | { kind: 'content'; result: WorkspaceContentSearchResult };
+type OpenWorkspaceFileTab = { workspaceId: string; path: string; name: string; editable: boolean };
 type ExplorerRightPanelProps = {
   title?: ReactNode;
   content: ReactNode;
@@ -62,11 +63,14 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.leftWidth'), 400, boundedLeftPanelWidth));
   const [rightWidth, setRightWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.rightWidth'), 300, boundedRightPanelWidth));
+  const [openTabs, setOpenTabs] = useState<OpenWorkspaceFileTab[]>([]);
+  const [activeTabKey, setActiveTabKey] = useState('');
   const [searchIndex, setSearchIndex] = useState(0);
   const [pathDialog, setPathDialog] = useState<PathDialog | null>(null);
 	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const treeRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
+  const openTabsRef = useRef<OpenWorkspaceFileTab[]>([]);
   const workspace = workspaces.find((item) => item.id === location?.workspaceId);
   const rightPanelOpen = rightPanel ? !rightPanel.collapsed : inspectorOpen;
   const rightPanelTitle = rightPanel?.title ?? 'Inspector';
@@ -75,6 +79,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
   const normalizedTreeRootPath = normalizeExplorerPath(treeRootPath ?? '');
   const visibleRows = useMemo(() => restrictRowsToRoot(explorer.rows, location?.workspaceId, normalizedTreeRootPath), [explorer.rows, location?.workspaceId, normalizedTreeRootPath]);
   const selectedRow = visibleRows.find((row) => explorerNodeId(row.workspaceId, row.node.path) === explorer.selection?.nodeId);
+  const activeTab = useMemo(() => openTabs.find((tab) => tabKey(tab.workspaceId, tab.path) === activeTabKey) ?? null, [activeTabKey, openTabs]);
 	const pathSearch = useWorkspacePathSearch({ workspaceId: location?.workspaceId, includeIgnored: explorer.showIgnored });
 	const contentSearch = useContentSearch({ kind: 'explorer', mode: explorer.mode, workspaceId: location?.workspaceId, includeIgnored: explorer.showIgnored });
 	const searchResults = useMemo<ExplorerUnifiedResult[]>(() => [
@@ -92,10 +97,22 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
     onError: (caught) => showError(caught, 'File save failed')
   });
 
+  useEffect(() => {
+    openTabsRef.current = openTabs;
+  }, [openTabs]);
+
   const refreshAfterBranchSwitch = useCallback(async (workspaceId: string) => {
     if (location?.workspaceId === workspaceId) {
-      editor.open(null);
-      setDiff('');
+      const nextTabs = openTabsRef.current.filter((tab) => tab.workspaceId !== workspaceId);
+      setOpenTabs(nextTabs);
+      setActiveTabKey((current) => {
+        if (!current.startsWith(`${workspaceId}:`)) return current;
+        return nextTabs[0] ? tabKey(nextTabs[0].workspaceId, nextTabs[0].path) : '';
+      });
+      if (!nextTabs.some((tab) => tabKey(tab.workspaceId, tab.path) === activeTabKey)) {
+        editor.open(null);
+        setDiff('');
+      }
       onLocationChange({ workspaceId, mode: explorer.mode });
     }
     pathSearch.setQuery('');
@@ -116,8 +133,31 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
     setRecoveryHint(caught instanceof ApiError ? caught.recoveryHint ?? '' : '');
   };
 
-  const loadFile = async () => {
-    if (!location?.workspaceId || !location.path || selectedRow?.node.type !== 'file') {
+  const loadDiff = async (targetWorkspaceId = activeTab?.workspaceId, targetPath = activeTab?.path) => {
+    if (!targetWorkspaceId || !targetPath) return setDiff('');
+    try {
+      setDiff((await api.workspaceFileDiff(targetWorkspaceId, targetPath)).diff ?? '');
+    } catch {
+      setDiff('');
+    }
+  };
+
+  const rememberOpenTab = (file: { path: string; editable: boolean }, workspaceId: string) => {
+    const nextTab = { workspaceId, path: file.path, editable: file.editable, name: lastPathSegment(file.path) };
+    setOpenTabs((current) => {
+      const existingIndex = current.findIndex((tab) => tab.workspaceId === workspaceId && tab.path === file.path);
+      if (existingIndex >= 0) {
+        const next = current.slice();
+        next[existingIndex] = nextTab;
+        return next;
+      }
+      return [...current, nextTab];
+    });
+    setActiveTabKey(tabKey(workspaceId, file.path));
+  };
+
+  const loadFile = async (targetWorkspaceId = activeTab?.workspaceId, targetPath = activeTab?.path) => {
+    if (!targetWorkspaceId || !targetPath) {
       editor.open(null);
       setDiff('');
       return;
@@ -125,24 +165,28 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
     setError('');
     setRecoveryHint('');
     try {
-      editor.open(await api.workspaceFile(location.workspaceId, location.path));
-      await loadDiff();
+      const nextFile = await api.workspaceFile(targetWorkspaceId, targetPath);
+      editor.open(nextFile);
+      rememberOpenTab(nextFile, targetWorkspaceId);
+      await loadDiff(targetWorkspaceId, targetPath);
     } catch (caught) {
       editor.open(null);
       showError(caught, 'File failed to load');
     }
   };
 
-  const loadDiff = async () => {
-    if (!location?.workspaceId || !location.path) return setDiff('');
-    try {
-      setDiff((await api.workspaceFileDiff(location.workspaceId, location.path)).diff ?? '');
-    } catch {
-      setDiff('');
-    }
-  };
+  useEffect(() => {
+    if (!location?.workspaceId || !location.path || selectedRow?.node.type !== 'file') return;
+    const key = tabKey(location.workspaceId, location.path);
+    if (key === activeTabKey && editor.file?.path === location.path) return;
+    void loadFile(location.workspaceId, location.path);
+  }, [activeTabKey, editor.file?.path, location?.path, location?.workspaceId, selectedRow?.node.type]);
 
-  useEffect(() => { void loadFile(); }, [location?.workspaceId, location?.path, selectedRow?.node.type]);
+  useEffect(() => {
+    if (activeTabKey) return;
+    editor.open(null);
+    setDiff('');
+  }, [activeTabKey, editor]);
 
   const selectRow = async (row: VisibleExplorerRow) => {
     if (editor.dirty && !(await editor.saveNow())) return;
@@ -244,8 +288,37 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
 
   const reveal = () => {
     if (!workspace) return;
-    const path = location?.path ? `${workspace.path.replace(/\/$/, '')}/${location.path}` : workspace.path;
+    const path = activeTab?.path ? `${workspace.path.replace(/\/$/, '')}/${activeTab.path}` : workspace.path;
     void api.openPath(path).catch((caught) => showError(caught, 'Could not reveal path'));
+  };
+
+  const activateTab = async (tab: OpenWorkspaceFileTab) => {
+    if (editor.dirty && !(await editor.saveNow())) return;
+    setMatchContext(null);
+    setActiveTabKey(tabKey(tab.workspaceId, tab.path));
+    await explorer.expandToPath(tab.workspaceId, tab.path, 'file');
+  };
+
+  const closeTab = async (tab: OpenWorkspaceFileTab) => {
+    const key = tabKey(tab.workspaceId, tab.path);
+    if (key === activeTabKey && editor.dirty && !(await editor.saveNow())) return;
+    const currentTabs = openTabsRef.current;
+    const index = currentTabs.findIndex((item) => tabKey(item.workspaceId, item.path) === key);
+    const remaining = currentTabs.filter((item) => tabKey(item.workspaceId, item.path) !== key);
+    const nextTab = key === activeTabKey ? remaining[index] ?? remaining[index - 1] ?? null : activeTab;
+    setOpenTabs(remaining);
+    if (nextTab) {
+      setActiveTabKey(tabKey(nextTab.workspaceId, nextTab.path));
+      await explorer.expandToPath(nextTab.workspaceId, nextTab.path, 'file');
+      return;
+    }
+    setActiveTabKey('');
+    editor.open(null);
+    setDiff('');
+    if (location?.workspaceId === tab.workspaceId && location.path === tab.path) {
+      const parentPath = parentDirectoryPath(tab.path);
+      onLocationChange({ workspaceId: tab.workspaceId, path: parentPath || undefined, mode: explorer.mode });
+    }
   };
 
   const startResize = (side: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
@@ -321,19 +394,32 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
         <main className="workspace-file-editor">
           <div className="explorer-breadcrumbs">
             <span>{workspace?.name ?? 'Select a workspace'}</span>
-            {(location?.path?.split('/') ?? []).map((part, index, parts) => <span key={`${part}-${index}`}>{index < parts.length && ' / '}{part}</span>)}
+            {((activeTab?.path ?? location?.path)?.split('/') ?? []).filter(Boolean).map((part, index, parts) => <span key={`${part}-${index}`}>{index < parts.length && ' / '}{part}</span>)}
             <div>
-              <button className="icon-button" type="button" title="Copy path" disabled={!workspace} onClick={() => void navigator.clipboard.writeText(location?.path ?? workspace?.path ?? '')}><Clipboard size={15} /></button>
+              <button className="icon-button" type="button" title="Copy path" disabled={!workspace} onClick={() => void navigator.clipboard.writeText(activeTab?.path ?? location?.path ?? workspace?.path ?? '')}><Clipboard size={15} /></button>
               <button className="secondary" type="button" disabled={!workspace} onClick={reveal}>Reveal</button>
             </div>
           </div>
-          <div className="tabs explorer-editor-tabs">
-            <div className="tab-list">
-              <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><Eye size={15} /> Preview</button>
-              <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
-              <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
+          <div className="editor-file-strip">
+            <div className="tab-list file-tab-list" aria-label="Open files">
+              {openTabs.length > 0 ? openTabs.map((openTab) => {
+                const key = tabKey(openTab.workspaceId, openTab.path);
+                return <div key={key} className={key === activeTabKey ? 'file-tab active' : 'file-tab'}>
+                  <button type="button" className="file-tab-button" onClick={() => void activateTab(openTab)} title={openTab.path}>{openTab.name}</button>
+                  <button type="button" className="file-tab-close" aria-label={`Close ${openTab.name}`} onClick={() => void closeTab(openTab)}><X size={13} /></button>
+                </div>;
+              }) : <span className="file-tab-placeholder">Open a file</span>}
             </div>
-            <span className={`autosave-state ${editor.state}`}>{autoSaveLabel(editor.state)}</span>
+          </div>
+          <div className="tabs explorer-editor-tabs">
+            <div className="editor-toolbar-actions">
+              <div className="editor-view-switch" role="tablist" aria-label="File view mode">
+                <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><Eye size={15} /> Rendered</button>
+                <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Source</button>
+                <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
+              </div>
+              <span className={`autosave-state ${editor.state}`}>{autoSaveLabel(editor.state)}</span>
+            </div>
           </div>
 		  {matchContext && <div className="content-match-context">Line {matchContext.lineNumber}, columns {matchContext.columnStart}–{matchContext.columnEnd}</div>}
           {error && <div className="operation-error"><p className="error">{error}</p>{recoveryHint && <p>{recoveryHint}</p>}<button className="secondary" onClick={() => void loadFile()}>Reload file</button></div>}
@@ -483,6 +569,22 @@ function boundedLeftPanelWidth(value: number): number {
 
 function boundedRightPanelWidth(value: number): number {
   return Math.min(520, Math.max(220, value));
+}
+
+function tabKey(workspaceId: string, path: string): string {
+  return `${workspaceId}:${path}`;
+}
+
+function lastPathSegment(path: string): string {
+  const normalized = path.replace(/\/+$/, '');
+  const separator = normalized.lastIndexOf('/');
+  return separator >= 0 ? normalized.slice(separator + 1) : normalized;
+}
+
+function parentDirectoryPath(path: string): string {
+  const normalized = path.replace(/\/+$/, '');
+  const separator = normalized.lastIndexOf('/');
+  return separator >= 0 ? normalized.slice(0, separator) : '';
 }
 
 function restrictRowsToRoot(rows: VisibleExplorerRow[], workspaceId: string | undefined, rootPath: string): VisibleExplorerRow[] {

@@ -21,6 +21,7 @@ import {
   PanelRightOpen,
   Pencil,
   RefreshCw,
+  X,
 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { RecentGitActivity } from '../components/RecentGitActivity';
@@ -51,6 +52,7 @@ type DiffMode = 'review' | 'raw';
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
 type DetailViewMode = 'plan' | 'workspace';
 type BranchViewState = { branch: string; currentCheckoutBranch: string; sourceMode: 'working_tree' | 'snapshot'; missing: true };
+type OpenItemFileTab = { id: string; path: string; name: string; editable: boolean };
 
 export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOpenItem, onContentChanged }: { itemId: string; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onOpenItem: (itemId: string) => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
@@ -93,7 +95,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [renamingPath, setRenamingPath] = useState(false);
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
-	const [contentSearchIndex, setContentSearchIndex] = useState(0);
+  const [contentSearchIndex, setContentSearchIndex] = useState(0);
   const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const fileTreeRef = useRef<HTMLDivElement | null>(null);
 	const contentSearch = useContentSearch({ kind: 'item', itemId });
@@ -103,6 +105,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
   const [artifactPreview, setArtifactPreview] = useState<{ title: string; path: string; content: string; loading: boolean; error: string } | null>(null);
   const [workspaceExplorerLocation, setWorkspaceExplorerLocation] = useState<ExplorerLocation>();
+  const [openTabs, setOpenTabs] = useState<OpenItemFileTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState('');
+  const openTabsRef = useRef<OpenItemFileTab[]>([]);
 
   const showOperationError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -200,10 +205,16 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const { file, content: editorContent, setContent: setEditorContent, dirty: dirtyFile, state: autoSaveState } = editor;
 
   useEffect(() => {
+    openTabsRef.current = openTabs;
+  }, [openTabs]);
+
+  useEffect(() => {
     setError('');
     setRecoveryHint('');
     setBranchView(null);
     editor.open(null);
+    setOpenTabs([]);
+    setActiveTabId('');
     api.item(itemId).then(setPlan).catch((err: Error) => setError(err.message));
     api.files(itemId).then((tree) => {
       setFiles(tree);
@@ -286,9 +297,24 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     try {
       const nextFile = await api.file(itemId, fileId);
       editor.open(nextFile);
+      rememberOpenTab(nextFile);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File failed to load');
     }
+  };
+
+  const rememberOpenTab = (nextFile: FileContent) => {
+    const nextTab = { id: nextFile.id, path: nextFile.path, editable: nextFile.editable, name: lastPathSegment(nextFile.path) };
+    setOpenTabs((current) => {
+      const existingIndex = current.findIndex((tab) => tab.id === nextTab.id);
+      if (existingIndex >= 0) {
+        const next = current.slice();
+        next[existingIndex] = nextTab;
+        return next;
+      }
+      return [...current, nextTab];
+    });
+    setActiveTabId(nextTab.id);
   };
 
   const openFile = async (fileId: string) => {
@@ -313,6 +339,35 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
 		setMatchContext(null);
 		void openFile(fileId);
 	};
+
+  const activateTab = async (tabToOpen: OpenItemFileTab) => {
+    if (dirtyFile && !(await editor.saveNow())) return;
+    setMatchContext(null);
+    setSelectedDirectoryPath('');
+    setSelectedTreeNode({ path: tabToOpen.path, type: 'file' });
+    setActiveTabId(tabToOpen.id);
+    await loadFile(tabToOpen.id);
+  };
+
+  const closeTab = async (tabToClose: OpenItemFileTab) => {
+    if (tabToClose.id === activeTabId && dirtyFile && !(await editor.saveNow())) return;
+    const currentTabs = openTabsRef.current;
+    const index = currentTabs.findIndex((tab) => tab.id === tabToClose.id);
+    const remaining = currentTabs.filter((tab) => tab.id !== tabToClose.id);
+    const nextTab = tabToClose.id === activeTabId ? remaining[index] ?? remaining[index - 1] ?? null : currentTabs.find((tab) => tab.id === activeTabId) ?? null;
+    setOpenTabs(remaining);
+    if (nextTab) {
+      setActiveTabId(nextTab.id);
+      setSelectedDirectoryPath('');
+      setSelectedTreeNode({ path: nextTab.path, type: 'file' });
+      await loadFile(nextTab.id);
+      return;
+    }
+    setActiveTabId('');
+    editor.open(null);
+    setSelectedTreeNode(parentDirectoryPath(tabToClose.path) ? { path: parentDirectoryPath(tabToClose.path), type: 'directory' } : null);
+    setSelectedDirectoryPath(parentDirectoryPath(tabToClose.path));
+  };
 
 	const openContentResult = async (result: WorkspaceContentSearchResult) => {
 		if (!result.fileId) return;
@@ -878,8 +933,17 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           </div>
         </div>
         <div className="workspace-header-actions">
-          <AISessionLaunchControl itemId={itemId} disabled={!plan} onLaunched={setAILaunchMessage} onError={(caught) => showOperationError(caught, 'AI session launch failed')} />
-          <button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button>
+          <AISessionLaunchControl itemId={itemId} buttonLabel="AI session" disabled={!plan} onLaunched={setAILaunchMessage} onError={(caught) => showOperationError(caught, 'AI session launch failed')} />
+          <button
+            className={`icon-button workspace-git-status-button${gitStatus?.dirty ? ' is-dirty' : ''}`}
+            type="button"
+            aria-label={gitStatus?.dirty ? 'Refresh Git status, local changes present' : 'Refresh Git status'}
+            title={gitStatus?.dirty ? 'Local changes present. Refresh Git status.' : 'Refresh Git status'}
+            disabled={gitLoading || !plan}
+            onClick={() => { if (plan) void loadGitStatus(plan.workspaceId); }}
+          >
+            <RefreshCw size={18} />
+          </button>
         </div>
       </header>
       {aiLaunchMessage && <div className="operation-notice" role="status">{aiLaunchMessage}</div>}
@@ -947,13 +1011,25 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           )}
         </aside>
         <div className="document-panel">
-          <div className="tabs">
-            <div className="tab-list">
-              <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
-              <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
-              <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
+          <div className="editor-file-strip">
+            <div className="tab-list file-tab-list" aria-label="Open files">
+              {openTabs.length > 0 ? openTabs.map((openTab) => (
+                <div key={openTab.id} className={openTab.id === activeTabId ? 'file-tab active' : 'file-tab'}>
+                  <button type="button" className="file-tab-button" onClick={() => void activateTab(openTab)} title={openTab.path}>{openTab.name}</button>
+                  <button type="button" className="file-tab-close" aria-label={`Close ${openTab.name}`} onClick={() => void closeTab(openTab)}><X size={13} /></button>
+                </div>
+              )) : <span className="file-tab-placeholder">Open a file</span>}
             </div>
-            <span className={`autosave-state ${autoSaveState}`}>{autoSaveLabel(autoSaveState)}</span>
+          </div>
+          <div className="tabs">
+            <div className="editor-toolbar-actions">
+              <div className="editor-view-switch" role="tablist" aria-label="File view mode">
+                <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><FileText size={15} /> Rendered</button>
+                <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Source</button>
+                <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
+              </div>
+              <span className={`autosave-state ${autoSaveState}`}>{autoSaveLabel(autoSaveState)}</span>
+            </div>
           </div>
 		  {matchContext && <div className="content-match-context">Line {matchContext.lineNumber}, columns {matchContext.columnStart}–{matchContext.columnEnd}</div>}
           {(dirtyMetadata || dirtyFile || autoSaveState !== 'idle') && <div className="edit-state-banner">{dirtyMetadata ? 'Unsaved metadata changes' : autoSaveLabel(autoSaveState)}</div>}
@@ -1259,6 +1335,18 @@ function stripItemPath(path: string, itemPath: string): string {
 
 function normalizePath(path: string): string {
   return path.replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
+function lastPathSegment(path: string): string {
+  const normalized = path.replace(/\/+$/, '');
+  const separator = normalized.lastIndexOf('/');
+  return separator >= 0 ? normalized.slice(separator + 1) : normalized;
+}
+
+function parentDirectoryPath(path: string): string {
+  const normalized = path.replace(/\/+$/, '');
+  const separator = normalized.lastIndexOf('/');
+  return separator >= 0 ? normalized.slice(0, separator) : '';
 }
 
 function matchingBranchItem(items: { id: string; itemPath?: string; scope?: string; identifier?: string }[], current: ItemDetail) {
