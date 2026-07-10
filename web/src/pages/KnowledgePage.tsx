@@ -28,6 +28,6 @@ export function KnowledgePage({ workspaces, location, onLocationChange, onOpenEx
 			{controller.detailLoading ? <div className="knowledge-welcome">Loading page…</div> : controller.detail && location?.view === 'read' && controller.workspace && controller.wiki ? <KnowledgeReader detail={controller.detail} onNavigate={(slug) => controller.updateLocation({ slug, view: 'read' })} onOpenExplorer={() => onOpenExplorer(controller.workspace!.id, `${controller.wiki!.root}/${controller.detail!.path}`)} /> : undefined}
 		</KnowledgeBrowser>}
 		{controller.graphLoading && <div className="empty-state">Loading graph…</div>}
-		{controller.graph && location?.view === 'graph' && <Suspense fallback={<div className="empty-state">Loading graph renderer…</div>}><KnowledgeGraph graph={controller.graph} selectedSlug={controller.page?.slug} onSelect={(slug) => controller.updateLocation({ slug, view: 'graph' })} /></Suspense>}
+		{controller.graph && location?.view === 'graph' && <Suspense fallback={<div className="empty-state">Loading graph renderer…</div>}><KnowledgeGraph graph={controller.graph} pages={controller.pages} selectedSlug={controller.page?.slug} onSelect={(slug) => controller.updateLocation({ slug, view: 'graph' })} onOpenDetails={(slug) => controller.updateLocation({ slug, view: 'read' })} /></Suspense>}
 	</section>;
 }

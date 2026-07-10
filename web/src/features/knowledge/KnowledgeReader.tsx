@@ -16,19 +16,17 @@ export function KnowledgeReader({ detail, onNavigate, onOpenExplorer }: { detail
 		event.preventDefault(); onNavigate(target);
 	};
 	return <div className="knowledge-reader">
-		<article className="knowledge-reader-content" onClick={interceptLink}><ContentViewer file={detail.content} content={prepareKnowledgeMarkdown(detail.content.content)} /></article>
-		<aside className="knowledge-reader-meta"><p className="eyebrow">{detail.domain} · {detail.pageType || 'PAGE'}</p><h2>{detail.title}</h2><p>{detail.summary || 'No summary provided.'}</p><button className="secondary" onClick={onOpenExplorer}><FolderOpen size={15} /> Open in Explorer</button>
-			<Metadata title="Roles" values={detail.roles} /><Metadata title="Topics" values={detail.topics} /><Metadata title="Source references" values={detail.sourceRefs} />
-			<section><h3>Outgoing links</h3>{detail.links.length ? <ul>{detail.links.map((link, index) => <li key={`${link.rawTarget}-${index}`}>{link.resolution === 'resolved' && link.targetSlug ? <button className="link-button" onClick={() => onNavigate(link.targetSlug!)}>{link.label || link.targetSlug}</button> : <span className="knowledge-unresolved">{link.label || link.rawTarget} (unresolved)</span>}</li>)}</ul> : <p>None</p>}</section>
-			<section><h3>Backlinks</h3>{detail.backlinks.length ? <ul>{detail.backlinks.map((slug) => <li key={slug}><button className="link-button" onClick={() => onNavigate(slug)}>{slug}</button></li>)}</ul> : <p>None</p>}</section>
+		<section className="knowledge-reader-summary"><p className="eyebrow">{detail.domain} · {detail.pageType || 'PAGE'}</p><h2>{detail.title}</h2><p>{detail.summary || 'No summary provided.'}</p><div className="knowledge-reader-actions"><button className="secondary" onClick={onOpenExplorer}><FolderOpen size={15} /> Open in Explorer</button></div>
+			<div className="knowledge-reader-metadata"><Metadata title="Roles" values={detail.roles} compact /><Metadata title="Topics" values={detail.topics} compact /><Metadata title="Source references" values={detail.sourceRefs} compact /><Metadata title="Outgoing links" values={detail.links.map((link) => link.resolution === 'resolved' && link.targetSlug ? (link.label || link.targetSlug) : `${link.label || link.rawTarget} (unresolved)`)} compact interactiveValues={detail.links.map((link) => link.resolution === 'resolved' && link.targetSlug ? { label: link.label || link.targetSlug, onClick: () => onNavigate(link.targetSlug!) } : undefined)} /><Metadata title="Backlinks" values={detail.backlinks} compact interactiveValues={detail.backlinks.map((slug) => ({ label: slug, onClick: () => onNavigate(slug) }))} /></div>
 			<KnowledgeWarnings warnings={detail.warnings} />
-			{detail.links.some((link) => /^https?:/i.test(link.rawTarget)) && <p><ExternalLink size={14} /> External links open in a new tab.</p>}
-		</aside>
+			{detail.links.some((link) => /^https?:/i.test(link.rawTarget)) && <p className="knowledge-reader-note"><ExternalLink size={14} /> External links open in a new tab.</p>}
+		</section>
+		<article className="knowledge-reader-content" onClick={interceptLink}><ContentViewer file={detail.content} content={prepareKnowledgeMarkdown(detail.content.content)} /></article>
 	</div>;
 }
 
-function Metadata({ title, values }: { title: string; values: string[] }) {
-	return <section><h3>{title}</h3>{values.length ? <ul>{values.map((value) => <li key={value}>{value}</li>)}</ul> : <p>None</p>}</section>;
+function Metadata({ title, values, compact = false, interactiveValues }: { title: string; values: string[]; compact?: boolean; interactiveValues?: Array<{ label: string; onClick: () => void } | undefined> }) {
+	return <section className={compact ? 'knowledge-reader-meta-block compact' : 'knowledge-reader-meta-block'}><h3>{title}</h3>{values.length ? <ul>{values.map((value, index) => { const interactive = interactiveValues?.[index]; return <li key={`${title}-${value}-${index}`}>{interactive ? <button className="link-button" onClick={interactive.onClick}>{interactive.label}</button> : value}</li>; })}</ul> : <p>None</p>}</section>;
 }
 
 export function prepareKnowledgeMarkdown(content: string): string {
