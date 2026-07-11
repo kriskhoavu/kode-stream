@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { BookOpen, Maximize, Minus, Network, Plus, X } from 'lucide-react';
+import { BookOpen, Maximize, Minus, Network, Plus, RotateCcw, X } from 'lucide-react';
 import { Background, Handle, Position, ReactFlow, useReactFlow } from '@xyflow/react';
-import type { NodeProps } from '@xyflow/react';
+import type { Node, NodeProps, OnNodeDrag } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { KnowledgeGraph as GraphData, KnowledgeGraphNode as GraphNodeData, KnowledgePage, KnowledgePageDetail } from '../../lib/types';
 import { adaptKnowledgeGraph } from './graphModel';
@@ -46,7 +46,7 @@ function KnowledgeNode({ data }: NodeProps) {
 	</div>;
 }
 
-function KnowledgeGraphControls() {
+function KnowledgeGraphControls({ canResetLayout, onResetLayout }: { canResetLayout: boolean; onResetLayout: () => void }) {
 	const { fitView, zoomIn, zoomOut } = useReactFlow();
 	return <div className="knowledge-graph-controls-panel">
 		<button type="button" className="knowledge-graph-control-button" aria-label="Zoom in" title="Zoom in" onClick={() => void zoomIn()}>
@@ -58,6 +58,9 @@ function KnowledgeGraphControls() {
 		<button type="button" className="knowledge-graph-control-button" aria-label="Fit graph to view" title="Fit graph to view" onClick={() => void fitView({ padding: 0.08, maxZoom: 1.35 })}>
 			<Maximize size={15} />
 		</button>
+		<button type="button" className="knowledge-graph-control-button" aria-label="Reset graph layout" title="Reset graph layout" disabled={!canResetLayout} onClick={onResetLayout}>
+			<RotateCcw size={15} />
+		</button>
 	</div>;
 }
 
@@ -67,6 +70,8 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 	const [pageType, setPageType] = useState('');
 	const [focusRelationships, setFocusRelationships] = useState(false);
 	const [isPanelOpen, setIsPanelOpen] = useState(false);
+	const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>({});
+	const hasCustomLayout = Object.keys(nodePositions).length > 0;
 	useEffect(() => {
 		if (!isPanelOpen) return;
 		const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -99,6 +104,7 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 			...adapted,
 			nodes: adapted.nodes.map((node) => ({
 				...node,
+				position: nodePositions[node.id] ?? node.position,
 				data: {
 					...(node.data as unknown as KnowledgeNodeData),
 					onSelect: handleSelect,
@@ -106,7 +112,14 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 				}
 			}))
 		};
-	}, [filtered, onOpenDetails, selectedSlug]);
+	}, [filtered, nodePositions, onOpenDetails, selectedSlug]);
+	const handleNodeDragStop: OnNodeDrag<Node> = (_, node) => {
+		setNodePositions((current) => {
+			const currentPosition = current[node.id];
+			if (currentPosition?.x === node.position.x && currentPosition.y === node.position.y) return current;
+			return { ...current, [node.id]: node.position };
+		});
+	};
 	const domains = Array.from(new Set(graph.nodes.map((node) => node.domain))).sort();
 	const pageTypes = Array.from(new Set(graph.nodes.map((node) => node.pageType).filter(Boolean))).sort();
 	const selectedPage = pages.find((page) => page.slug === selectedSlug);
@@ -116,7 +129,7 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 		{graph.truncated && <p className="knowledge-graph-notice" role="status">Showing {graph.nodes.length} of {graph.totalNodes} pages and {graph.edges.length} of {graph.totalEdges} relationships. Filter by domain to narrow the graph.</p>}
 		<div className="knowledge-graph-layout">
 			<div className="knowledge-graph-stage">
-				<div className="knowledge-graph-canvas"><ReactFlow nodes={model.nodes} edges={model.edges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.08, maxZoom: 1.35 }} minZoom={0.2} maxZoom={2} onNodeClick={(_, node) => handleSelect(node.id)} nodesDraggable><Background color="var(--line)" gap={20} /><KnowledgeGraphControls /></ReactFlow></div>
+				<div className="knowledge-graph-canvas"><ReactFlow nodes={model.nodes} edges={model.edges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.08, maxZoom: 1.35 }} minZoom={0.2} maxZoom={2} onNodeClick={(_, node) => handleSelect(node.id)} onNodeDragStop={handleNodeDragStop} nodesDraggable><Background color="var(--line)" gap={20} /><KnowledgeGraphControls canResetLayout={hasCustomLayout} onResetLayout={() => setNodePositions({})} /></ReactFlow></div>
 				{isPanelOpen && selectedGraphNode && <aside className="knowledge-graph-panel" aria-label="Knowledge graph review panel">
 					<div className="knowledge-graph-panel-header">
 						<p className="knowledge-graph-panel-eyebrow"><Network size={14} /> {selectedGraphNode.domain || 'root'} · {selectedGraphNode.pageType || 'PAGE'}</p>

@@ -776,6 +776,11 @@
   background: var(--panel-soft);
 }
 
+.knowledge-graph-control-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .knowledge-graph-control-button svg {
   stroke: currentColor;
 }

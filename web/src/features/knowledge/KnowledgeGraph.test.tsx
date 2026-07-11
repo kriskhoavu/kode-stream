@@ -6,13 +6,14 @@ import { adaptKnowledgeGraph } from './graphModel';
 const reactFlowSpy = vi.fn();
 
 vi.mock('@xyflow/react', () => ({
-	ReactFlow: ({ nodes, nodeTypes, onNodeClick, nodesDraggable, children }: { nodes: Array<{ id: string; type?: string; data: { label: string } }>; nodeTypes?: Record<string, React.ComponentType<{ data: { label: string } }>>; onNodeClick: (event: unknown, node: { id: string }) => void; nodesDraggable?: boolean; children: React.ReactNode }) => {
-		reactFlowSpy({ nodesDraggable });
+	ReactFlow: ({ nodes, nodeTypes, onNodeClick, onNodeDragStop, nodesDraggable, children }: { nodes: Array<{ id: string; type?: string; position: { x: number; y: number }; data: { label: string } }>; nodeTypes?: Record<string, React.ComponentType<{ data: { label: string } }>>; onNodeClick: (event: unknown, node: { id: string }) => void; onNodeDragStop?: (event: unknown, node: { id: string; position: { x: number; y: number } }) => void; nodesDraggable?: boolean; children: React.ReactNode }) => {
+		reactFlowSpy({ nodes, nodesDraggable });
 		return <div data-testid="flow" data-draggable={nodesDraggable ? 'true' : 'false'}>
 			{nodes.map((node) => {
 				const NodeComponent = node.type ? nodeTypes?.[node.type] : undefined;
 				return <div key={node.id}>
 					<button onClick={() => onNodeClick({}, node)}>{node.data.label}</button>
+					<button type="button" onClick={() => onNodeDragStop?.({}, { ...node, position: { x: 444, y: 222 } })}>Drag {node.data.label}</button>
 					{NodeComponent ? <NodeComponent data={node.data} /> : null}
 				</div>;
 			})}
@@ -98,6 +99,25 @@ describe('Knowledge graph', () => {
 		fireEvent.click(within(panel).getByRole('button', { name: 'Open details page' }));
 		expect(onOpenDetails).toHaveBeenCalledWith('a');
 		expect(onSelect).toHaveBeenCalledWith('a');
+	});
+
+	it('keeps manually moved node positions until the graph layout is reset', async () => {
+		const { KnowledgeGraph } = await import('./KnowledgeGraph');
+		render(<KnowledgeGraph graph={graph} pages={pages} onSelect={vi.fn()} onOpenDetails={vi.fn()} />);
+
+		expect(screen.getByRole('button', { name: 'Reset graph layout' })).toBeDisabled();
+		const initialNodes = reactFlowSpy.mock.calls.at(-1)?.[0].nodes;
+		expect(initialNodes.find((node: { id: string }) => node.id === 'a')?.position).toEqual({ x: 0, y: 0 });
+
+		fireEvent.click(screen.getByRole('button', { name: 'Drag Alpha' }));
+		expect(screen.getByRole('button', { name: 'Reset graph layout' })).toBeEnabled();
+		const movedNodes = reactFlowSpy.mock.calls.at(-1)?.[0].nodes;
+		expect(movedNodes.find((node: { id: string }) => node.id === 'a')?.position).toEqual({ x: 444, y: 222 });
+
+		fireEvent.click(screen.getByRole('button', { name: 'Reset graph layout' }));
+		expect(screen.getByRole('button', { name: 'Reset graph layout' })).toBeDisabled();
+		const resetNodes = reactFlowSpy.mock.calls.at(-1)?.[0].nodes;
+		expect(resetNodes.find((node: { id: string }) => node.id === 'a')?.position).toEqual({ x: 0, y: 0 });
 	});
 
 	it('allows closing the review panel and reopening it from the same selected node', async () => {
