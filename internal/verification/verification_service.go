@@ -35,6 +35,13 @@ const (
 	FailureTypeInfra FailureType = "infra_failure"
 )
 
+type JobMode string
+
+const (
+	JobModeRuntime    JobMode = "runtime"
+	JobModeAutomation JobMode = "automation"
+)
+
 type StepResult struct {
 	Step       string    `json:"step"`
 	Status     string    `json:"status"`
@@ -51,29 +58,37 @@ type Artifact struct {
 }
 
 type Job struct {
-	ID           string                         `json:"id"`
-	WorkspaceID  string                         `json:"workspaceId"`
-	Profile      appruntime.VerifyProfile       `json:"profile"`
-	Status       JobStatus                      `json:"status"`
-	FailureType  FailureType                    `json:"failureType,omitempty"`
-	ExitCode     int                            `json:"exitCode"`
-	Trigger      string                         `json:"trigger,omitempty"`
-	Provider     string                         `json:"provider,omitempty"`
-	SessionID    string                         `json:"sessionId,omitempty"`
-	TerminalMode string                         `json:"terminalMode,omitempty"`
-	StartedAt    time.Time                      `json:"startedAt"`
-	FinishedAt   time.Time                      `json:"finishedAt,omitempty"`
-	Steps        []StepResult                   `json:"steps"`
-	Artifacts    []Artifact                     `json:"artifacts"`
-	Runtime      *models.WorkspaceRuntimeConfig `json:"runtime,omitempty"`
+	ID                 string                         `json:"id"`
+	WorkspaceID        string                         `json:"workspaceId"`
+	Mode               JobMode                        `json:"mode"`
+	Profile            appruntime.VerifyProfile       `json:"profile"`
+	Environment        string                         `json:"environment,omitempty"`
+	SelectedSpecs      []string                       `json:"selectedSpecs,omitempty"`
+	AutomationRepoPath string                         `json:"automationRepoPath,omitempty"`
+	RenderedCommand    string                         `json:"renderedCommand,omitempty"`
+	Status             JobStatus                      `json:"status"`
+	FailureType        FailureType                    `json:"failureType,omitempty"`
+	ExitCode           int                            `json:"exitCode"`
+	Trigger            string                         `json:"trigger,omitempty"`
+	Provider           string                         `json:"provider,omitempty"`
+	SessionID          string                         `json:"sessionId,omitempty"`
+	TerminalMode       string                         `json:"terminalMode,omitempty"`
+	StartedAt          time.Time                      `json:"startedAt"`
+	FinishedAt         time.Time                      `json:"finishedAt,omitempty"`
+	Steps              []StepResult                   `json:"steps"`
+	Artifacts          []Artifact                     `json:"artifacts"`
+	Runtime            *models.WorkspaceRuntimeConfig `json:"runtime,omitempty"`
 }
 
 type CreateInput struct {
-	Profile      appruntime.VerifyProfile `json:"profile"`
-	Trigger      string                   `json:"trigger,omitempty"`
-	Provider     string                   `json:"provider,omitempty"`
-	SessionID    string                   `json:"sessionId,omitempty"`
-	TerminalMode string                   `json:"terminalMode,omitempty"`
+	Profile       appruntime.VerifyProfile `json:"profile"`
+	Mode          JobMode                  `json:"mode,omitempty"`
+	Environment   string                   `json:"environment,omitempty"`
+	SelectedSpecs []string                 `json:"selectedSpecs,omitempty"`
+	Trigger       string                   `json:"trigger,omitempty"`
+	Provider      string                   `json:"provider,omitempty"`
+	SessionID     string                   `json:"sessionId,omitempty"`
+	TerminalMode  string                   `json:"terminalMode,omitempty"`
 }
 
 type CheckpointEvent struct {
@@ -107,22 +122,32 @@ func (s *Service) Start(workspaceID string, input CreateInput) (Job, error) {
 	if workspace.Runtime == nil {
 		return Job{}, errors.New("workspace runtime is not configured")
 	}
+	mode := normalizeJobMode(input.Mode)
 	profile := input.Profile
 	if profile == "" {
 		profile = appruntime.VerifyProfileSmoke
 	}
+	automation, err := prepareAutomationJob(workspace.Runtime, input)
+	if err != nil {
+		return Job{}, err
+	}
 	job := &Job{
-		ID:           s.nextID(),
-		WorkspaceID:  workspaceID,
-		Profile:      profile,
-		Status:       JobStatusQueued,
-		Trigger:      strings.TrimSpace(input.Trigger),
-		Provider:     strings.TrimSpace(input.Provider),
-		SessionID:    strings.TrimSpace(input.SessionID),
-		TerminalMode: strings.TrimSpace(input.TerminalMode),
-		Runtime:      workspace.Runtime,
-		Steps:        []StepResult{},
-		Artifacts:    []Artifact{},
+		ID:                 s.nextID(),
+		WorkspaceID:        workspaceID,
+		Mode:               mode,
+		Profile:            profile,
+		Status:             JobStatusQueued,
+		Trigger:            strings.TrimSpace(input.Trigger),
+		Provider:           strings.TrimSpace(input.Provider),
+		SessionID:          strings.TrimSpace(input.SessionID),
+		TerminalMode:       strings.TrimSpace(input.TerminalMode),
+		Runtime:            workspace.Runtime,
+		Environment:        automation.environment,
+		SelectedSpecs:      automation.selectedSpecs,
+		AutomationRepoPath: automation.repositoryPath,
+		RenderedCommand:    automation.renderedCommand,
+		Steps:              []StepResult{},
+		Artifacts:          []Artifact{},
 	}
 	s.mu.Lock()
 	s.jobs[job.ID] = job
@@ -161,11 +186,14 @@ func (s *Service) Rerun(workspaceID, jobID string, profile appruntime.VerifyProf
 		return Job{}, errors.New("verification job not found")
 	}
 	return s.Start(workspaceID, CreateInput{
-		Profile:      profile,
-		Trigger:      "rerun",
-		Provider:     previous.Provider,
-		SessionID:    previous.SessionID,
-		TerminalMode: previous.TerminalMode,
+		Profile:       profile,
+		Mode:          previous.Mode,
+		Environment:   previous.Environment,
+		SelectedSpecs: previous.SelectedSpecs,
+		Trigger:       "rerun",
+		Provider:      previous.Provider,
+		SessionID:     previous.SessionID,
+		TerminalMode:  previous.TerminalMode,
 	})
 }
 
@@ -202,7 +230,7 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 		return
 	}
 	runtimeLogPath := filepath.Join(artifactRoot, "runtime.log")
-	verifyLogPath := filepath.Join(artifactRoot, "verify.log")
+	verifyLogPath := filepath.Join(artifactRoot, verifyLogName(job.Mode))
 	runtimeLog, err := os.Create(runtimeLogPath)
 	if err != nil {
 		s.failJob(job, FailureTypeInfra, 30, "open runtime log", err)
@@ -227,25 +255,29 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	if err := s.runStep(job, "up", runtimeLog, func() error {
 		return s.runtime.Up(ctx, workspace.Path, config, runtimeLog)
 	}); err != nil {
+		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
 		s.failJob(job, FailureTypeBoot, 10, "startup failed", err)
 		s.collectArtifacts(job, artifactRoot)
-		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
 		return
 	}
 	if err := s.runStep(job, "health", runtimeLog, func() error {
 		return s.runtime.Health(ctx, workspace.Path, config, runtimeLog)
 	}); err != nil {
+		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
 		s.failJob(job, FailureTypeBoot, 10, "health checks failed", err)
 		s.collectArtifacts(job, artifactRoot)
-		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
 		return
 	}
-	if err := s.runStep(job, "verify", verifyLog, func() error {
+	if err := s.runStep(job, verifyStepName(job.Mode), verifyLog, func() error {
+		if job.Mode == JobModeAutomation {
+			return s.runtime.RunCommand(ctx, job.AutomationRepoPath, job.RenderedCommand, verifyLog)
+		}
 		return s.runtime.Verify(ctx, workspace.Path, config, job.Profile, verifyLog)
 	}); err != nil {
+		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
 		s.failJob(job, FailureTypeTest, 20, "verification failed", err)
 		s.collectArtifacts(job, artifactRoot)
-		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
+		s.collectAutomationArtifacts(job)
 		return
 	}
 	_ = s.runStep(job, "down", runtimeLog, func() error {
@@ -253,9 +285,110 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	})
 
 	s.collectArtifacts(job, artifactRoot)
+	s.collectAutomationArtifacts(job)
 	job.Status = JobStatusPassed
 	job.ExitCode = 0
 	job.FinishedAt = time.Now().UTC()
+}
+
+type automationJobConfig struct {
+	environment     string
+	selectedSpecs   []string
+	repositoryPath  string
+	renderedCommand string
+}
+
+func normalizeJobMode(mode JobMode) JobMode {
+	if mode == "" {
+		return JobModeRuntime
+	}
+	return mode
+}
+
+func prepareAutomationJob(runtimeConfig *models.WorkspaceRuntimeConfig, input CreateInput) (automationJobConfig, error) {
+	if normalizeJobMode(input.Mode) != JobModeAutomation {
+		if input.Mode != "" && input.Mode != JobModeRuntime {
+			return automationJobConfig{}, errors.New("verification mode is invalid")
+		}
+		return automationJobConfig{}, nil
+	}
+	if runtimeConfig.Automation == nil || !runtimeConfig.Automation.Enabled {
+		return automationJobConfig{}, errors.New("runtime automation is not configured")
+	}
+	selectedSpecs, err := validateSelectedSpecs(runtimeConfig.Automation.RepositoryPath, input.SelectedSpecs)
+	if err != nil {
+		return automationJobConfig{}, err
+	}
+	if len(selectedSpecs) == 0 {
+		return automationJobConfig{}, errors.New("selectedSpecs is required for automation verification")
+	}
+	environment := strings.TrimSpace(input.Environment)
+	if environment == "" {
+		environment = runtimeConfig.Automation.DefaultEnvironment
+	}
+	rendered := renderAutomationCommand(runtimeConfig.Automation.CommandTemplate, environment, selectedSpecs)
+	if strings.TrimSpace(rendered) == "" {
+		return automationJobConfig{}, errors.New("runtime automation commandTemplate is required")
+	}
+	return automationJobConfig{
+		environment:     environment,
+		selectedSpecs:   selectedSpecs,
+		repositoryPath:  runtimeConfig.Automation.RepositoryPath,
+		renderedCommand: rendered,
+	}, nil
+}
+
+func validateSelectedSpecs(repositoryPath string, specs []string) ([]string, error) {
+	root, err := filepath.Abs(strings.TrimSpace(repositoryPath))
+	if err != nil || root == "" {
+		return nil, errors.New("runtime automation repositoryPath is invalid")
+	}
+	selected := make([]string, 0, len(specs))
+	seen := map[string]struct{}{}
+	for _, spec := range specs {
+		clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(spec)))
+		if clean == "" || clean == "." {
+			continue
+		}
+		if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, "../") {
+			return nil, fmt.Errorf("selected spec %q must be relative", spec)
+		}
+		full, err := filepath.Abs(filepath.Join(root, filepath.FromSlash(clean)))
+		if err != nil {
+			return nil, err
+		}
+		rel, err := filepath.Rel(root, full)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return nil, fmt.Errorf("selected spec %q must stay inside the automation repository", spec)
+		}
+		if _, ok := seen[clean]; ok {
+			continue
+		}
+		seen[clean] = struct{}{}
+		selected = append(selected, clean)
+	}
+	return selected, nil
+}
+
+func renderAutomationCommand(template, environment string, selectedSpecs []string) string {
+	rendered := strings.TrimSpace(template)
+	rendered = strings.ReplaceAll(rendered, "{env}", environment)
+	rendered = strings.ReplaceAll(rendered, "{specs}", strings.Join(selectedSpecs, ","))
+	return rendered
+}
+
+func verifyLogName(mode JobMode) string {
+	if mode == JobModeAutomation {
+		return "automation.log"
+	}
+	return "verify.log"
+}
+
+func verifyStepName(mode JobMode) string {
+	if mode == JobModeAutomation {
+		return "automation"
+	}
+	return "verify"
 }
 
 func (s *Service) runStep(job *Job, name string, _ *os.File, run func() error) error {
@@ -294,6 +427,35 @@ func (s *Service) collectArtifacts(job *Job, root string) {
 		job.Artifacts = append(job.Artifacts, artifact)
 		return nil
 	})
+}
+
+func (s *Service) collectAutomationArtifacts(job *Job) {
+	if job.Mode != JobModeAutomation || job.Runtime == nil || job.Runtime.Automation == nil {
+		return
+	}
+	root := strings.TrimSpace(job.AutomationRepoPath)
+	if root == "" {
+		return
+	}
+	for _, relRoot := range job.Runtime.Automation.ArtifactPaths {
+		artifactPath := filepath.Join(root, filepath.FromSlash(relRoot))
+		_ = filepath.WalkDir(artifactPath, func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil || entry.IsDir() {
+				return nil
+			}
+			info, err := entry.Info()
+			if err != nil {
+				return nil
+			}
+			job.Artifacts = append(job.Artifacts, Artifact{
+				Kind:      classifyArtifact(path),
+				Path:      filepath.ToSlash(path),
+				SizeBytes: info.Size(),
+				CreatedAt: time.Now().UTC(),
+			})
+			return nil
+		})
+	}
 }
 
 func classifyArtifact(path string) string {
@@ -344,5 +506,6 @@ func cloneJob(job Job) Job {
 	copy := job
 	copy.Steps = append([]StepResult(nil), job.Steps...)
 	copy.Artifacts = append([]Artifact(nil), job.Artifacts...)
+	copy.SelectedSpecs = append([]string(nil), job.SelectedSpecs...)
 	return copy
 }

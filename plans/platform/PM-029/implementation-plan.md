@@ -26,7 +26,7 @@ Avoid:
 | Phase | Name                              | Status |
 |-------|-----------------------------------|--------|
 | B1    | Automation Config And Metadata    | Done   |
-| B2    | Automation Verification Execution | Draft  |
+| B2    | Automation Verification Execution | Done   |
 | F1    | Frontend Types And API            | Draft  |
 | F2    | Settings And Item Harness UI      | Draft  |
 | V1    | End-To-End Verification           | Draft  |
@@ -54,13 +54,13 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Extend verification job input and output with mode, environment, selected specs, automation repo path, and rendered command.
-- [ ] Keep existing profile-only job creation as runtime mode.
-- [ ] Validate selected specs are relative and stay inside the automation repository before command execution.
-- [ ] Add automation execution after `prepare`, `up`, and `health`, running in the automation repository.
-- [ ] Always attempt runtime teardown after automation pass or failure.
-- [ ] Collect automation reports, videos, screenshots, and logs into the existing artifact response.
-- [ ] Add tests for runtime-mode compatibility, automation pass, automation test failure, boot failure skip, and path traversal rejection.
+- [x] Extend verification job input and output with mode, environment, selected specs, automation repo path, and rendered command.
+- [x] Keep existing profile-only job creation as runtime mode.
+- [x] Validate selected specs are relative and stay inside the automation repository before command execution.
+- [x] Add automation execution after `prepare`, `up`, and `health`, running in the automation repository.
+- [x] Always attempt runtime teardown after automation pass or failure.
+- [x] Collect automation reports, videos, screenshots, and logs into the existing artifact response.
+- [x] Add tests for runtime-mode compatibility, automation pass, automation test failure, boot failure skip, and path traversal rejection.
 
 **Verification:** `rtk go test ./internal/verification ./internal/runtime ./internal/server/api && rtk go test ./...`
 
