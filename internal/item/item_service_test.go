@@ -69,6 +69,99 @@ func TestDetailNormalizesCollectionsAndReadsFullReadmeDescription(t *testing.T) 
 	}
 }
 
+func TestVerificationTestsPersistSelectedSpecs(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "plans/platform/PM-029/plan.yaml", "plan:\n  status: draft\n")
+	registryPath := filepath.Join(root, "workspaces.yaml")
+	indexPath := filepath.Join(root, "item-index.yaml")
+	reg := registry.New(registryPath, gitadapter.New())
+	idx := itemindex.New(indexPath)
+	files := fileaccess.New()
+	git := gitadapter.New()
+	writer := itemwriter.New(files, scanner.New(git), idx, reg)
+	service := New(reg, idx, files, writer, git)
+	createdAt := time.Date(2026, 7, 11, 1, 0, 0, 0, time.UTC)
+
+	writeFile(t, root, "workspaces.yaml", `- id: workspace-1
+  name: Workspace
+  path: `+root+`
+  baselineBranch: main
+  sources:
+    - plans
+  createdAt: `+createdAt.Format(time.RFC3339)+`
+`)
+	if err := idx.ReplaceWorkspace("workspace-1", []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{
+			ID:             "item-1",
+			WorkspaceID:    "workspace-1",
+			WorkspaceName:  "Workspace",
+			Branch:         "main",
+			Scope:          "platform",
+			Identifier:     "PM-029",
+			Title:          "Automation runner",
+			Status:         models.StatusDraft,
+			MetadataSource: "plan.yaml",
+			ItemPath:       "plans/platform/PM-029",
+		},
+	}}, nil, createdAt); err != nil {
+		t.Fatal(err)
+	}
+
+	saved, err := service.SaveVerificationTests("item-1", models.VerificationTestSelection{
+		SelectedSpecs: []string{" cypress/e2e/create-offer.cy.ts ", "cypress/e2e/create-offer.cy.ts"},
+		Environment:   " nightly ",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := saved.Selection.SelectedSpecs; len(got) != 1 || got[0] != "cypress/e2e/create-offer.cy.ts" {
+		t.Fatalf("selected specs = %#v", got)
+	}
+	if saved.Selection.Environment != "nightly" || saved.Selection.UpdatedAt.IsZero() {
+		t.Fatalf("selection = %#v", saved.Selection)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "plans/platform/PM-029/plan.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text := string(data); !strings.Contains(text, "verificationTests:") || !strings.Contains(text, "cypress/e2e/create-offer.cy.ts") {
+		t.Fatalf("plan.yaml =\n%s", text)
+	}
+}
+
+func TestDiscoverVerificationSpecsFromAutomationPlanDocs(t *testing.T) {
+	automationRepo := t.TempDir()
+	writeFile(t, automationRepo, "plans/PM-029/test-plan.md", `# PM-029
+
+Spec: cypress/e2e/create-offer.cy.ts
+Future: playwright/create-offer.spec.ts
+`)
+	workspace := models.WorkspaceConfig{
+		Runtime: &models.WorkspaceRuntimeConfig{
+			Automation: &models.RuntimeAutomationConfig{
+				Enabled:        true,
+				RepositoryPath: automationRepo,
+				Runner:         models.AutomationRunnerCypress,
+			},
+		},
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-1", Identifier: "PM-029", Title: "Automation runner"}}
+
+	specs, err := DiscoverVerificationSpecs(workspace, item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) != 2 {
+		t.Fatalf("specs = %#v", specs)
+	}
+	if specs[0].Path != "cypress/e2e/create-offer.cy.ts" || specs[0].Runner != "cypress" || specs[0].SourcePath != "plans/PM-029/test-plan.md" {
+		t.Fatalf("first spec = %#v", specs[0])
+	}
+	if specs[1].Path != "playwright/create-offer.spec.ts" || specs[1].Runner != "playwright" {
+		t.Fatalf("second spec = %#v", specs[1])
+	}
+}
+
 func TestSnapshotMaterializationBlocksExistingTargetFiles(t *testing.T) {
 	root := newItemGitRepo(t)
 	writeItemGitFile(t, root, "plans/platform/PM-013/README.md", "# Existing\n")

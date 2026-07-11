@@ -4,6 +4,8 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"hash/fnv"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,10 +21,12 @@ import (
 	"kode-stream/internal/filesystem/content"
 	gitadapter "kode-stream/internal/git"
 	"kode-stream/internal/item/index"
+	"kode-stream/internal/item/writer"
 	"kode-stream/internal/navigation"
 	appsearch "kode-stream/internal/search"
 	workspacehealth "kode-stream/internal/workspace"
 	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
 )
 
 func TestAISettingsRoutesReadValidateAndPersist(t *testing.T) {
@@ -252,6 +256,53 @@ func TestRoutesListItemsPreservesJSONShape(t *testing.T) {
 	}
 	if item.Tags == nil {
 		t.Fatal("tags should be normalized to an empty array")
+	}
+}
+
+func TestItemVerificationTestsRoutesPersistSelection(t *testing.T) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
+	writeAPITestFile(t, workspace.Path, "plans/platform/PM-029/plan.yaml", "plan:\n  status: draft\n")
+	writeAPITestFile(t, workspace.Path, "plans/platform/PM-029/README.md", "# PM-029\n")
+	itemID := stableAPITestPlanID(workspace.ID, "main", "plans/platform/PM-029")
+	updatedAt := time.Date(2026, 7, 11, 1, 2, 3, 0, time.UTC)
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{
+			ID:             itemID,
+			WorkspaceID:    workspace.ID,
+			WorkspaceName:  workspace.Name,
+			Branch:         "main",
+			Scope:          "platform",
+			Identifier:     "PM-029",
+			Title:          "Automation runner",
+			Status:         models.StatusDraft,
+			UpdatedAt:      updatedAt,
+			MetadataSource: "plan.yaml",
+			ItemPath:       "plans/platform/PM-029",
+		},
+	}}, nil, updatedAt); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apiHandler.items.Detail(itemID); err != nil {
+		t.Fatalf("fixture item detail: %v", err)
+	}
+
+	put := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(put, httptest.NewRequest(http.MethodPut, "/api/items/"+itemID+"/verification-tests", strings.NewReader(`{"selectedSpecs":["cypress/e2e/create.cy.ts"],"environment":"local"}`)))
+	if put.Code != http.StatusOK {
+		t.Fatalf("PUT status = %d, body = %s", put.Code, put.Body.String())
+	}
+
+	get := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/items/"+itemID+"/verification-tests", nil))
+	if get.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, body = %s", get.Code, get.Body.String())
+	}
+	var payload models.ItemVerificationTests
+	if err := json.Unmarshal(get.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Selection.SelectedSpecs) != 1 || payload.Selection.SelectedSpecs[0] != "cypress/e2e/create.cy.ts" {
+		t.Fatalf("payload = %#v", payload)
 	}
 }
 
@@ -922,5 +973,25 @@ func reliabilityTestAPI(t *testing.T) (*API, models.WorkspaceConfig, *itemindex.
 	workspace, _, _ = reg.Get(workspace.ID)
 	auditStore := audit.New(filepath.Join(t.TempDir(), "audit-log.jsonl"))
 	healthService := workspacehealth.NewHealthService(reg, idx, git)
-	return NewWithReliability(reg, idx, nil, fileaccess.New(), nil, git, nil, auditStore, healthService), workspace, idx, auditStore
+	files := fileaccess.New()
+	scan := scanner.New(git)
+	itemWriter := itemwriter.New(files, scan, idx, reg)
+	return NewWithReliability(reg, idx, scan, files, itemWriter, git, nil, auditStore, healthService), workspace, idx, auditStore
+}
+
+func writeAPITestFile(t *testing.T, root, rel, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func stableAPITestPlanID(repoID, branch, relItemPath string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(repoID + "|" + branch + "|" + relItemPath))
+	return fmt.Sprintf("%s-%08x", repoID, h.Sum32())
 }

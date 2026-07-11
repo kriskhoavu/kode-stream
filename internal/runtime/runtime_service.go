@@ -74,6 +74,7 @@ func NormalizeRuntimeConfig(input *models.WorkspaceRuntimeConfig) (*models.Works
 		paths = append(paths, clean)
 	}
 	config.Artifacts.Paths = paths
+	config.Automation = normalizeAutomationConfig(config.Automation)
 
 	if err := ValidateRuntimeConfig(&config); err != nil {
 		return nil, err
@@ -114,7 +115,81 @@ func ValidateRuntimeConfig(config *models.WorkspaceRuntimeConfig) error {
 			return errors.New("runtime health check target is required")
 		}
 	}
+	if err := validateAutomationConfig(config.Automation); err != nil {
+		return err
+	}
 	return nil
+}
+
+func normalizeAutomationConfig(input *models.RuntimeAutomationConfig) *models.RuntimeAutomationConfig {
+	if input == nil {
+		return nil
+	}
+	config := *input
+	config.RepositoryPath = strings.TrimSpace(config.RepositoryPath)
+	config.Runner = models.AutomationRunner(strings.ToLower(strings.TrimSpace(string(config.Runner))))
+	if config.Runner == "" {
+		config.Runner = models.AutomationRunnerCypress
+	}
+	config.DefaultEnvironment = strings.TrimSpace(config.DefaultEnvironment)
+	if config.DefaultEnvironment == "" {
+		config.DefaultEnvironment = "local"
+	}
+	config.CommandTemplate = strings.TrimSpace(config.CommandTemplate)
+	if config.CommandTemplate == "" {
+		config.CommandTemplate = defaultAutomationCommandTemplate(config.Runner)
+	}
+	artifactPaths := make([]string, 0, len(config.ArtifactPaths))
+	for _, p := range config.ArtifactPaths {
+		clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(p)))
+		if clean == "" || clean == "." {
+			continue
+		}
+		artifactPaths = append(artifactPaths, clean)
+	}
+	if len(artifactPaths) == 0 {
+		artifactPaths = defaultAutomationArtifactPaths(config.Runner)
+	}
+	config.ArtifactPaths = artifactPaths
+	return &config
+}
+
+func validateAutomationConfig(config *models.RuntimeAutomationConfig) error {
+	if config == nil {
+		return nil
+	}
+	switch config.Runner {
+	case models.AutomationRunnerCypress, models.AutomationRunnerPlaywright:
+	default:
+		return errors.New("runtime automation runner is invalid")
+	}
+	if !config.Enabled {
+		return nil
+	}
+	if config.RepositoryPath == "" {
+		return errors.New("runtime automation repositoryPath is required")
+	}
+	if stat, err := os.Stat(config.RepositoryPath); err != nil || !stat.IsDir() {
+		return errors.New("runtime automation repositoryPath must be an existing directory")
+	}
+	if strings.TrimSpace(config.CommandTemplate) == "" {
+		return errors.New("runtime automation commandTemplate is required")
+	}
+	return nil
+}
+
+func defaultAutomationCommandTemplate(runner models.AutomationRunner) string {
+	if runner == models.AutomationRunnerPlaywright {
+		return "npx playwright test {specs}"
+	}
+	return "CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec \"{specs}\""
+}
+
+func defaultAutomationArtifactPaths(runner models.AutomationRunner) []string {
+	if runner == models.AutomationRunnerPlaywright {
+		return []string{"playwright-report", "test-results"}
+	}
+	return []string{"cypress/reports", "cypress/screenshots", "cypress/videos"}
 }
 
 func applyAdapterDefaults(config *models.WorkspaceRuntimeConfig) {

@@ -178,6 +178,8 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/items/{id}/jira", a.jiraIssue)
 	mux.HandleFunc("POST /api/items/{id}/jira/refresh", a.refreshJiraIssue)
 	mux.HandleFunc("GET /api/items/{id}/jira/attachments/{attachmentId}", a.jiraAttachment)
+	mux.HandleFunc("GET /api/items/{id}/verification-tests", a.itemVerificationTests)
+	mux.HandleFunc("PUT /api/items/{id}/verification-tests", a.saveItemVerificationTests)
 	mux.HandleFunc("GET /api/items/{id}/files", a.itemFiles)
 	mux.HandleFunc("GET /api/items/{id}/content-search", a.itemContentSearch)
 	mux.HandleFunc("GET /api/items/{id}/files/{fileID}", a.itemFileContent)
@@ -1108,6 +1110,31 @@ func (a *API) saveItemMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, result, err)
+}
+
+func (a *API) itemVerificationTests(w http.ResponseWriter, r *http.Request) {
+	tests, err := a.items.VerificationTests(r.PathValue("id"))
+	if errors.Is(err, apperrors.ErrItemNotFound) {
+		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	respond(w, tests, err)
+}
+
+func (a *API) saveItemVerificationTests(w http.ResponseWriter, r *http.Request) {
+	var input models.VerificationTestSelection
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	tests, err := a.items.SaveVerificationTests(r.PathValue("id"), input)
+	if errors.Is(err, apperrors.ErrItemNotFound) {
+		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	respond(w, tests, err)
 }
 
 func (a *API) updateItemStatus(w http.ResponseWriter, r *http.Request) {

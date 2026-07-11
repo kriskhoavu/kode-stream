@@ -71,6 +71,33 @@ func (w *Writer) SaveMetadata(workspace models.WorkspaceConfig, item models.Item
 	return w.refresh(workspace, item.ItemPath)
 }
 
+func (w *Writer) VerificationTests(workspace models.WorkspaceConfig, item models.ItemDetail) (models.VerificationTestSelection, error) {
+	meta, err := readPlanMetadata(workspace, item)
+	if err != nil {
+		return models.VerificationTestSelection{}, err
+	}
+	return normalizeVerificationTests(meta.VerificationTests), nil
+}
+
+func (w *Writer) SaveVerificationTests(workspace models.WorkspaceConfig, item models.ItemDetail, input models.VerificationTestSelection) (models.WriteResult, error) {
+	if isDocsRoot(item) {
+		return models.WriteResult{}, fmt.Errorf("freestyle docs roots do not support item verification tests")
+	}
+	meta, err := readPlanMetadata(workspace, item)
+	if err != nil {
+		return models.WriteResult{}, err
+	}
+	selection, err := normalizeAndValidateVerificationTests(input)
+	if err != nil {
+		return models.WriteResult{}, err
+	}
+	meta.VerificationTests = selection
+	if err := writePlanMetadata(workspace, item, meta); err != nil {
+		return models.WriteResult{}, err
+	}
+	return w.refresh(workspace, item.ItemPath)
+}
+
 func (w *Writer) UpdateStatus(workspace models.WorkspaceConfig, item models.ItemDetail, input models.ItemStatusUpdateInput) (models.WriteResult, error) {
 	return w.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: input.Status})
 }
@@ -256,8 +283,9 @@ func (w *Writer) refreshWorkspaceData(workspace models.WorkspaceConfig) (models.
 }
 
 type planYAML struct {
-	Plan      planFields            `yaml:"plan"`
-	Documents []models.ItemDocument `yaml:"documents,omitempty"`
+	Plan              planFields                       `yaml:"plan"`
+	Documents         []models.ItemDocument            `yaml:"documents,omitempty"`
+	VerificationTests models.VerificationTestSelection `yaml:"verificationTests,omitempty"`
 }
 
 type planFields struct {
@@ -369,6 +397,40 @@ func compactPlanMetadata(root string, meta *planYAML) {
 	meta.Plan.Ticket = ""
 	meta.Plan.Service = ""
 	meta.Documents = compactDocumentOverrides(root, meta.Documents)
+	if len(meta.VerificationTests.SelectedSpecs) == 0 && strings.TrimSpace(meta.VerificationTests.Environment) == "" {
+		meta.VerificationTests = models.VerificationTestSelection{}
+	}
+}
+
+func normalizeVerificationTests(input models.VerificationTestSelection) models.VerificationTestSelection {
+	selection := input
+	specs := make([]string, 0, len(selection.SelectedSpecs))
+	seen := map[string]struct{}{}
+	for _, spec := range selection.SelectedSpecs {
+		clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(spec)))
+		if clean == "" || clean == "." {
+			continue
+		}
+		if _, ok := seen[clean]; ok {
+			continue
+		}
+		seen[clean] = struct{}{}
+		specs = append(specs, clean)
+	}
+	selection.SelectedSpecs = specs
+	selection.Environment = strings.TrimSpace(selection.Environment)
+	return selection
+}
+
+func normalizeAndValidateVerificationTests(input models.VerificationTestSelection) (models.VerificationTestSelection, error) {
+	selection := normalizeVerificationTests(input)
+	for _, spec := range selection.SelectedSpecs {
+		if filepath.IsAbs(spec) || strings.HasPrefix(spec, "../") || spec == ".." {
+			return models.VerificationTestSelection{}, fmt.Errorf("selected spec %q must be relative", spec)
+		}
+	}
+	selection.UpdatedAt = time.Now().UTC()
+	return selection, nil
 }
 
 func compactDocumentOverrides(root string, documents []models.ItemDocument) []models.ItemDocument {

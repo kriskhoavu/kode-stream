@@ -161,13 +161,30 @@ type RuntimeArtifacts struct {
 	Paths []string `json:"paths,omitempty" yaml:"paths,omitempty"`
 }
 
+type AutomationRunner string
+
+const (
+	AutomationRunnerCypress    AutomationRunner = "cypress"
+	AutomationRunnerPlaywright AutomationRunner = "playwright"
+)
+
+type RuntimeAutomationConfig struct {
+	Enabled            bool             `json:"enabled" yaml:"enabled"`
+	RepositoryPath     string           `json:"repositoryPath,omitempty" yaml:"repositoryPath,omitempty"`
+	Runner             AutomationRunner `json:"runner,omitempty" yaml:"runner,omitempty"`
+	DefaultEnvironment string           `json:"defaultEnvironment,omitempty" yaml:"defaultEnvironment,omitempty"`
+	CommandTemplate    string           `json:"commandTemplate,omitempty" yaml:"commandTemplate,omitempty"`
+	ArtifactPaths      []string         `json:"artifactPaths,omitempty" yaml:"artifactPaths,omitempty"`
+}
+
 type WorkspaceRuntimeConfig struct {
-	Type          RuntimeType          `json:"type" yaml:"type"`
-	ConfigPath    string               `json:"configPath,omitempty" yaml:"configPath,omitempty"`
-	RebuildPolicy RebuildPolicy        `json:"rebuildPolicy,omitempty" yaml:"rebuildPolicy,omitempty"`
-	Commands      RuntimeCommandSet    `json:"commands" yaml:"commands"`
-	HealthChecks  []RuntimeHealthCheck `json:"healthChecks,omitempty" yaml:"healthChecks,omitempty"`
-	Artifacts     RuntimeArtifacts     `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
+	Type          RuntimeType              `json:"type" yaml:"type"`
+	ConfigPath    string                   `json:"configPath,omitempty" yaml:"configPath,omitempty"`
+	RebuildPolicy RebuildPolicy            `json:"rebuildPolicy,omitempty" yaml:"rebuildPolicy,omitempty"`
+	Commands      RuntimeCommandSet        `json:"commands" yaml:"commands"`
+	HealthChecks  []RuntimeHealthCheck     `json:"healthChecks,omitempty" yaml:"healthChecks,omitempty"`
+	Artifacts     RuntimeArtifacts         `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
+	Automation    *RuntimeAutomationConfig `json:"automation,omitempty" yaml:"automation,omitempty"`
 }
 
 type KnowledgeSettings struct {
@@ -566,6 +583,23 @@ type ItemMetadataUpdateInput struct {
 	Owner                string     `json:"owner,omitempty" yaml:"owner,omitempty"`
 	Tags                 []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
 	MaterializeConfirmed bool       `json:"materializeConfirmed,omitempty" yaml:"materializeConfirmed,omitempty"`
+}
+
+type VerificationTestSelection struct {
+	SelectedSpecs []string  `json:"selectedSpecs" yaml:"selectedSpecs"`
+	Environment   string    `json:"environment,omitempty" yaml:"environment,omitempty"`
+	UpdatedAt     time.Time `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
+}
+
+type DiscoveredVerificationSpec struct {
+	Path       string `json:"path" yaml:"path"`
+	Runner     string `json:"runner" yaml:"runner"`
+	SourcePath string `json:"sourcePath,omitempty" yaml:"sourcePath,omitempty"`
+}
+
+type ItemVerificationTests struct {
+	Selection       VerificationTestSelection    `json:"selection" yaml:"selection"`
+	DiscoveredSpecs []DiscoveredVerificationSpec `json:"discoveredSpecs" yaml:"discoveredSpecs"`
 }
 
 type ItemStatusUpdateInput struct {
