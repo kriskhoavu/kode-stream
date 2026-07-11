@@ -9,7 +9,7 @@ import '../features/knowledge/knowledge.css';
 
 const KnowledgeGraph = lazy(() => import('../features/knowledge/KnowledgeGraph').then((module) => ({ default: module.KnowledgeGraph })));
 
-export function KnowledgePage({ workspaces, location, onLocationChange, onOpenExplorer }: { workspaces: WorkspaceConfig[]; location?: KnowledgeLocation; onLocationChange: (location: KnowledgeLocation) => void; onOpenExplorer: (workspaceId: string, path: string) => void }) {
+export function KnowledgePage({ workspaces, location, onLocationChange }: { workspaces: WorkspaceConfig[]; location?: KnowledgeLocation; onLocationChange: (location: KnowledgeLocation) => void }) {
 	const controller = useKnowledgeController(workspaces, location, onLocationChange);
 	if (!workspaces.length) return <section className="empty-state"><h1>Knowledge</h1><p>Add a workspace to discover structured Markdown Wikis.</p></section>;
 	return <section className="knowledge-page">
@@ -25,9 +25,9 @@ export function KnowledgePage({ workspaces, location, onLocationChange, onOpenEx
 		{(controller.loading || controller.error || controller.notice) && <div aria-live="polite" className={controller.error ? 'knowledge-status error' : 'knowledge-status'}>{controller.loading ? 'Loading Knowledge…' : controller.error || controller.notice}</div>}
 		{!controller.loading && !controller.error && !controller.wikis.length && <div className="empty-state"><h2>No structured Wikis detected</h2><p>A source qualifies when it contains <code>index.md</code> and valid pages with <code>slug</code> and <code>title</code> front matter.</p></div>}
 		{controller.wiki && location?.view !== 'graph' && <KnowledgeBrowser pages={controller.pages} selectedSlug={controller.page?.slug} warnings={controller.warnings} onSelect={(slug) => controller.updateLocation({ slug, view: 'read' })}>
-			{controller.detailLoading ? <div className="knowledge-welcome">Loading page…</div> : controller.detail && location?.view === 'read' && controller.workspace && controller.wiki ? <KnowledgeReader detail={controller.detail} onNavigate={(slug) => controller.updateLocation({ slug, view: 'read' })} onOpenExplorer={() => onOpenExplorer(controller.workspace!.id, `${controller.wiki!.root}/${controller.detail!.path}`)} /> : undefined}
+			{controller.detailLoading ? <div className="knowledge-welcome">Loading page…</div> : controller.detail && location?.view === 'read' && controller.workspace && controller.wiki ? <KnowledgeReader detail={controller.detail} onNavigate={(slug) => controller.updateLocation({ slug, view: 'read' })} /> : undefined}
 		</KnowledgeBrowser>}
 		{controller.graphLoading && <div className="empty-state">Loading graph…</div>}
-		{controller.graph && location?.view === 'graph' && <Suspense fallback={<div className="empty-state">Loading graph renderer…</div>}><KnowledgeGraph graph={controller.graph} pages={controller.pages} selectedSlug={controller.page?.slug} onSelect={(slug) => controller.updateLocation({ slug, view: 'graph' })} onOpenDetails={(slug) => controller.updateLocation({ slug, view: 'read' })} /></Suspense>}
+		{controller.graph && location?.view === 'graph' && <Suspense fallback={<div className="empty-state">Loading graph renderer…</div>}><KnowledgeGraph graph={controller.graph} pages={controller.pages} selectedSlug={controller.page?.slug} selectedDetail={controller.detail} onSelect={(slug) => controller.updateLocation({ slug, view: 'graph' })} onOpenDetails={(slug) => controller.updateLocation({ slug, view: 'read' })} /></Suspense>}
 	</section>;
 }

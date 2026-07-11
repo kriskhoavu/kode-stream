@@ -200,14 +200,14 @@ describe('shared api facade', () => {
   it('normalizes search, saved filter, and recent item responses', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 'one', type: 'unknown', title: 'One', route: '/items/one' }] })
-      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 'filter', name: 'Drafts', route: '/workspace' }] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 'filter', name: 'Drafts', route: '/workstream' }] })
       .mockResolvedValueOnce({ ok: true, json: async () => [{ itemId: 'one', workspaceId: 'w1', title: 'One', openedAt: '2026-06-20T00:00:00Z' }] });
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(api.search({ q: 'one', workspaceId: 'w1', limit: 5 })).resolves.toEqual([
       { id: 'one', type: 'item', title: 'One', subtitle: '', context: '', route: '/items/one', score: 0 }
     ]);
-    await expect(api.savedFilters()).resolves.toEqual([{ id: 'filter', name: 'Drafts', route: '/workspace', filters: {} }]);
+    await expect(api.savedFilters()).resolves.toEqual([{ id: 'filter', name: 'Drafts', route: '/workstream', filters: {} }]);
     await expect(api.recentItems()).resolves.toEqual([
       { itemId: 'one', workspaceId: 'w1', title: 'One', subtitle: '', route: '/items/one', openedAt: '2026-06-20T00:00:00Z' }
     ]);

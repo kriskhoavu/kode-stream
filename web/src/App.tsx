@@ -14,7 +14,6 @@ import { useQuickSwitcher } from './features/search/hooks';
 import { useAppSettings } from './features/settings/appSettings';
 import { EmbeddedTerminalDock } from './features/ai-session/EmbeddedTerminalDock';
 
-const WorkstreamExplorer = lazy(() => import('./pages/WorkstreamExplorer').then((module) => ({ default: module.WorkstreamExplorer })));
 const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((module) => ({ default: module.KnowledgePage })));
 
 export function App() {
@@ -68,23 +67,6 @@ export function App() {
     selectWorkspaceState(repo);
     setWorkspaceMenuOpen(false);
   };
-
-  const openWorkstream = (repo: WorkspaceConfig, itemId?: string) => {
-    selectWorkspaceState(repo);
-    navigate({ name: 'workstream', focusedItemId: itemId });
-  };
-
-  const openWorkstreamExplorer = (workspaceId: string, path: string) => {
-    const workspace = workspaces.find((repo) => repo.id === workspaceId);
-    if (workspace) selectWorkspaceState(workspace);
-    navigate({ name: 'explorer', location: { workspaceId, path, mode: 'sources' } });
-  };
-
-  const explorerLocation = activeRepo
-    ? route.name === 'explorer' && route.location?.workspaceId === activeRepo.id
-      ? route.location
-      : { workspaceId: activeRepo.id, mode: route.name === 'explorer' ? route.location?.mode : undefined }
-    : undefined;
 
   return (
     <div className="app-shell">
@@ -234,8 +216,7 @@ export function App() {
         {route.name === 'item' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={() => refreshAppStateOnly()} />}
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData()} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
-        {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkstreamExplorer workspaces={activeRepo ? [activeRepo] : []} location={explorerLocation} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenWorkstream={openWorkstream} /></Suspense>}
-        {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} onOpenExplorer={openWorkstreamExplorer} /></Suspense>}
+        {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
       </main>
 
       <nav className="bottom-nav">

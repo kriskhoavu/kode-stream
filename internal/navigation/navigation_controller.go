@@ -138,5 +138,5 @@ func (c *NavigationController) respond(w http.ResponseWriter, data any, err erro
 }
 
 func validAppRoute(route string) bool {
-	return route == "/workspace" || route == "/items" || route == "/branches" || route == "/workspaces" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/workspace?") || strings.HasPrefix(route, "/knowledge?")
+	return route == "/workstream" || route == "/workspaces" || route == "/settings" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/workstream?") || strings.HasPrefix(route, "/knowledge?")
 }

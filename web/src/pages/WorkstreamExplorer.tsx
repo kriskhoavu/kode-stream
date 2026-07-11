@@ -2,9 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import {
   ChevronDown, ChevronRight, Clipboard, Code2, Eye, File, Folder, FolderGit2, GitCompare,
-  FilePlus2, FolderPlus, KanbanSquare as WorkstreamIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, X
+  FilePlus2, FolderPlus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, X
 } from 'lucide-react';
-import type { ExplorerLocation } from '../app/router';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
@@ -12,7 +11,7 @@ import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/use
 import { FileStateIcon } from '../features/file-tree/FileStateIcon';
 import { treeKeyboardAction } from '../features/workstream-explorer/keyboard';
 import { explorerNodeId, normalizeExplorerPath } from '../features/workstream-explorer/tree';
-import type { VisibleExplorerRow } from '../features/workstream-explorer/types';
+import type { ExplorerLocation, VisibleExplorerRow } from '../features/workstream-explorer/types';
 import { useWorkstreamExplorer } from '../features/workstream-explorer/useWorkstreamExplorer';
 import { WorkspaceBranchSelector } from '../features/workstream-explorer/WorkspaceBranchSelector';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
@@ -40,13 +39,11 @@ type ExplorerRightPanelProps = {
   expandedLabel?: string;
 };
 
-export function WorkstreamExplorer({ workspaces, location, onLocationChange, onOpenWorkstream, embedded = false, showOpenWorkstreamAction = true, treeRootPath, showModeSelector = true, embeddedHeaderContent, rightPanel }: {
+export function WorkstreamExplorer({ workspaces, location, onLocationChange, embedded = false, treeRootPath, showModeSelector = true, embeddedHeaderContent, rightPanel }: {
   workspaces: WorkspaceConfig[];
   location?: ExplorerLocation;
   onLocationChange: (location?: ExplorerLocation) => void;
-  onOpenWorkstream: (workspace: WorkspaceConfig, itemId?: string) => void;
   embedded?: boolean;
-  showOpenWorkstreamAction?: boolean;
   treeRootPath?: string;
   showModeSelector?: boolean;
   embeddedHeaderContent?: ReactNode;
@@ -429,7 +426,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, onO
         </main>
         <aside className={rightPanelOpen ? `explorer-inspector${rightPanel?.className ? ` ${rightPanel.className}` : ''}` : `explorer-inspector collapsed${rightPanel?.className ? ` ${rightPanel.className}` : ''}`}>
           <div className="panel-header"><h2>{rightPanelTitle}</h2><button className="icon-button" type="button" aria-label={rightPanelOpen ? rightPanelExpandedLabel : rightPanelCollapsedLabel} onClick={() => rightPanel?.onToggle ? rightPanel.onToggle() : setInspectorOpen((value) => !value)}>{rightPanelOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button></div>
-          {rightPanelOpen && (rightPanel ? rightPanel.content : <ExplorerInspector workspace={workspace} row={selectedRow} file={editor.file} onOpenWorkstream={onOpenWorkstream} showOpenWorkstreamAction={showOpenWorkstreamAction} />)}
+          {rightPanelOpen && (rightPanel ? rightPanel.content : <ExplorerInspector workspace={workspace} row={selectedRow} file={editor.file} />)}
           {rightPanelOpen && <button className="explorer-resize-handle right" aria-label="Resize inspector" onPointerDown={(event) => startResize('right', event)} />}
         </aside>
       </div>
@@ -495,7 +492,7 @@ function ExplorerDiff({ diff, onRevert, disabled }: { diff: string; onRevert: ()
   return <section className="diff-panel"><header className="diff-toolbar"><strong>{files.length ? `${files.length} changed file` : 'No local changes'}</strong><button className="danger-action" disabled={disabled || !diff} onClick={onRevert}><RotateCcw size={15} /> Revert File</button></header><pre className="diff-view">{diff || 'No local changes.'}</pre></section>;
 }
 
-function ExplorerInspector({ workspace, row, file, onOpenWorkstream, showOpenWorkstreamAction }: { workspace?: WorkspaceConfig; row?: VisibleExplorerRow; file: ReturnType<typeof useFileEditorSession>['file']; onOpenWorkstream: (workspace: WorkspaceConfig, itemId?: string) => void; showOpenWorkstreamAction: boolean }) {
+function ExplorerInspector({ workspace, row, file }: { workspace?: WorkspaceConfig; row?: VisibleExplorerRow; file: ReturnType<typeof useFileEditorSession>['file'] }) {
   const [git, setGit] = useState<GitStatus | null>(null);
   const [activity, setActivity] = useState<GitActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -539,7 +536,7 @@ function ExplorerInspector({ workspace, row, file, onOpenWorkstream, showOpenWor
   }, [row?.item?.itemId]);
   if (!workspace) return <p className="explorer-empty">Select a workspace or file.</p>;
   return <div className="inspector-content">
-    <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl>{showOpenWorkstreamAction && <button className="secondary" onClick={() => onOpenWorkstream(workspace, row?.item?.itemId)}><WorkstreamIcon size={15} /> Open Workstream</button>}</section>
+    <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl></section>
     {file && <section><h3>File</h3><dl><dt>Path</dt><dd>{file.path}</dd><dt>Kind</dt><dd>{file.kind}</dd><dt>Size</dt><dd>{file.sizeBytes.toLocaleString()} bytes</dd><dt>Editable</dt><dd>{file.editable ? 'Text' : 'Read only'}</dd></dl></section>}
     {row?.item && <section><h3>Item</h3><dl><dt>ID</dt><dd>{row.item.identifier}</dd><dt>Title</dt><dd>{row.item.title}</dd><dt>Status</dt><dd>{row.item.status}</dd><dt>Owner</dt><dd>{item?.owner || 'Unassigned'}</dd></dl><a className="secondary button-link" href={`/items/${encodeURIComponent(row.item.itemId)}`}>Open details</a></section>}
     <section>

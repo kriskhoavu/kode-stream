@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { BookOpen, Network, X } from 'lucide-react';
-import { Background, Controls, Handle, Position, ReactFlow } from '@xyflow/react';
+import { BookOpen, Maximize, Minus, Network, Plus, X } from 'lucide-react';
+import { Background, Handle, Position, ReactFlow, useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import type { KnowledgeGraph as GraphData, KnowledgeGraphNode as GraphNodeData, KnowledgePage } from '../../lib/types';
+import type { KnowledgeGraph as GraphData, KnowledgeGraphNode as GraphNodeData, KnowledgePage, KnowledgePageDetail } from '../../lib/types';
 import { adaptKnowledgeGraph } from './graphModel';
+import { KnowledgeReader } from './KnowledgeReader';
 
 const nodeTypes = { knowledge: KnowledgeNode };
 
@@ -45,7 +46,22 @@ function KnowledgeNode({ data }: NodeProps) {
 	</div>;
 }
 
-export function KnowledgeGraph({ graph, pages, selectedSlug, onSelect, onOpenDetails }: { graph: GraphData; pages: KnowledgePage[]; selectedSlug?: string; onSelect: (slug: string) => void; onOpenDetails: (slug: string) => void }) {
+function KnowledgeGraphControls() {
+	const { fitView, zoomIn, zoomOut } = useReactFlow();
+	return <div className="knowledge-graph-controls-panel">
+		<button type="button" className="knowledge-graph-control-button" aria-label="Zoom in" title="Zoom in" onClick={() => void zoomIn()}>
+			<Plus size={15} />
+		</button>
+		<button type="button" className="knowledge-graph-control-button" aria-label="Zoom out" title="Zoom out" onClick={() => void zoomOut()}>
+			<Minus size={15} />
+		</button>
+		<button type="button" className="knowledge-graph-control-button" aria-label="Fit graph to view" title="Fit graph to view" onClick={() => void fitView({ padding: 0.08, maxZoom: 1.35 })}>
+			<Maximize size={15} />
+		</button>
+	</div>;
+}
+
+export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onSelect, onOpenDetails }: { graph: GraphData; pages: KnowledgePage[]; selectedSlug?: string; selectedDetail?: KnowledgePageDetail | null; onSelect: (slug: string) => void; onOpenDetails: (slug: string) => void }) {
 	const [query, setQuery] = useState('');
 	const [domain, setDomain] = useState('');
 	const [pageType, setPageType] = useState('');
@@ -100,24 +116,18 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, onSelect, onOpenDet
 		{graph.truncated && <p className="knowledge-graph-notice" role="status">Showing {graph.nodes.length} of {graph.totalNodes} pages and {graph.edges.length} of {graph.totalEdges} relationships. Filter by domain to narrow the graph.</p>}
 		<div className="knowledge-graph-layout">
 			<div className="knowledge-graph-stage">
-				<div className="knowledge-graph-canvas"><ReactFlow nodes={model.nodes} edges={model.edges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.08, maxZoom: 1.35 }} minZoom={0.2} maxZoom={2} onNodeClick={(_, node) => handleSelect(node.id)} nodesDraggable><Background color="var(--line)" gap={20} /><Controls className="knowledge-graph-controls" showInteractive={false} /></ReactFlow></div>
+				<div className="knowledge-graph-canvas"><ReactFlow nodes={model.nodes} edges={model.edges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.08, maxZoom: 1.35 }} minZoom={0.2} maxZoom={2} onNodeClick={(_, node) => handleSelect(node.id)} nodesDraggable><Background color="var(--line)" gap={20} /><KnowledgeGraphControls /></ReactFlow></div>
 				{isPanelOpen && selectedGraphNode && <aside className="knowledge-graph-panel" aria-label="Knowledge graph review panel">
-				<div className="knowledge-graph-panel-header">
-					<p className="knowledge-graph-panel-eyebrow"><Network size={14} /> {selectedGraphNode.domain || 'root'} · {selectedGraphNode.pageType || 'PAGE'}</p>
-					<button type="button" className="knowledge-graph-panel-close" aria-label="Close review panel" onClick={() => setIsPanelOpen(false)}><X size={16} /></button>
-				</div>
-					<h2>{selectedGraphNode.title}</h2>
-					<p>{selectedPage?.summary || 'No summary available for this knowledge page yet.'}</p>
-					<div className="knowledge-graph-panel-actions">
-						<button type="button" onClick={() => onOpenDetails(selectedGraphNode.id)}><BookOpen size={15} /> Open details</button>
+					<div className="knowledge-graph-panel-header">
+						<p className="knowledge-graph-panel-eyebrow"><Network size={14} /> {selectedGraphNode.domain || 'root'} · {selectedGraphNode.pageType || 'PAGE'}</p>
+						<div className="knowledge-graph-panel-header-actions">
+							<button type="button" className="secondary" onClick={() => onOpenDetails(selectedGraphNode.id)}><BookOpen size={15} /> Open details page</button>
+							<button type="button" className="knowledge-graph-panel-close" aria-label="Close review panel" onClick={() => setIsPanelOpen(false)}><X size={16} /></button>
+						</div>
 					</div>
-					<dl className="knowledge-graph-panel-metadata">
-						<dt>Path</dt><dd>{selectedGraphNode.path}</dd>
-						<dt>Relationships</dt><dd>{selectedGraphNode.inbound} inbound · {selectedGraphNode.outbound} outbound</dd>
-						<dt>Roles</dt><dd>{selectedPage?.roles.length ? selectedPage.roles.join(', ') : 'None'}</dd>
-						<dt>Topics</dt><dd>{selectedPage?.topics.length ? selectedPage.topics.join(', ') : 'None'}</dd>
-						<dt>Wiki links</dt><dd>{selectedPage ? `${selectedPage.links.length} outgoing · ${selectedPage.backlinks.length} backlinks` : 'Unavailable'}</dd>
-					</dl>
+					{selectedDetail && selectedDetail.slug === selectedGraphNode.id
+						? <KnowledgeReader detail={selectedDetail} onNavigate={handleSelect} />
+						: <div className="knowledge-graph-panel-loading"><h2>{selectedGraphNode.title}</h2><p>{selectedPage?.summary || 'Loading page details…'}</p></div>}
 				</aside>}
 			</div>
 		</div>

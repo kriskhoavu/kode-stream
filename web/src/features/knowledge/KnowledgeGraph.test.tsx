@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { KnowledgeGraph as GraphData, KnowledgePage } from '../../lib/types';
+import type { KnowledgeGraph as GraphData, KnowledgePage, KnowledgePageDetail } from '../../lib/types';
 import { adaptKnowledgeGraph } from './graphModel';
 
 const reactFlowSpy = vi.fn();
@@ -20,9 +20,10 @@ vi.mock('@xyflow/react', () => ({
 		</div>;
 	},
 	Background: () => null,
-	Controls: () => <div data-testid="controls" />,
 	Handle: () => null,
-	Position: { Left: 'left', Right: 'right' }
+	Panel: ({ children }: { children: React.ReactNode }) => <div data-testid="controls">{children}</div>,
+	Position: { Left: 'left', Right: 'right' },
+	useReactFlow: () => ({ zoomIn: vi.fn(), zoomOut: vi.fn(), fitView: vi.fn() })
 }));
 
 const graph: GraphData = {
@@ -37,6 +38,12 @@ const pages: KnowledgePage[] = [
 	{ slug: 'a', title: 'Alpha', domain: 'offer', pageType: 'CONCEPT', roles: ['BA'], topics: ['workflow'], path: 'a.md', summary: 'Alpha summary', sourceRefs: [], links: [], backlinks: [] },
 	{ slug: 'b', title: 'Beta', domain: 'article', pageType: 'HOW_TO', roles: [], topics: [], path: 'b.md', summary: 'Beta summary', sourceRefs: [], links: [], backlinks: [] }
 ];
+
+const detail: KnowledgePageDetail = {
+	...pages[0],
+	warnings: [],
+	content: { id: 'a', path: 'a.md', content: '---\nslug: a\ntitle: Alpha\n---\n# Alpha\nMain roadmap preview content with enough text to validate the simplified graph panel preview.', language: 'markdown', hash: 'hash', kind: 'markdown', sizeBytes: 120, editable: false }
+};
 
 describe('Knowledge graph', () => {
 	it('adapts selected nodes, neighbors, and deterministic directed edges', () => {
@@ -75,7 +82,7 @@ describe('Knowledge graph', () => {
 		const { KnowledgeGraph } = await import('./KnowledgeGraph');
 		const onSelect = vi.fn();
 		const onOpenDetails = vi.fn();
-		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" onSelect={onSelect} onOpenDetails={onOpenDetails} />);
+		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" selectedDetail={detail} onSelect={onSelect} onOpenDetails={onOpenDetails} />);
 
 		expect(reactFlowSpy).toHaveBeenCalled();
 		expect(screen.getByTestId('flow')).toHaveAttribute('data-draggable', 'true');
@@ -85,8 +92,10 @@ describe('Knowledge graph', () => {
 
 		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
 		const panel = screen.getByLabelText('Knowledge graph review panel');
-		expect(panel).toHaveTextContent('Alpha summary');
-		fireEvent.click(within(panel).getByRole('button', { name: 'Open details' }));
+		await waitFor(() => expect(panel).toHaveTextContent('Main roadmap preview content'), { timeout: 5_000 });
+		expect(panel).toHaveTextContent('Outgoing links');
+		expect(panel).not.toHaveTextContent('Relationships');
+		fireEvent.click(within(panel).getByRole('button', { name: 'Open details page' }));
 		expect(onOpenDetails).toHaveBeenCalledWith('a');
 		expect(onSelect).toHaveBeenCalledWith('a');
 	});
@@ -94,7 +103,7 @@ describe('Knowledge graph', () => {
 	it('allows closing the review panel and reopening it from the same selected node', async () => {
 		const { KnowledgeGraph } = await import('./KnowledgeGraph');
 		const onSelect = vi.fn();
-		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" onSelect={onSelect} onOpenDetails={vi.fn()} />);
+		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" selectedDetail={detail} onSelect={onSelect} onOpenDetails={vi.fn()} />);
 
 		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
 		expect(screen.getByLabelText('Knowledge graph review panel')).toBeInTheDocument();
@@ -108,7 +117,7 @@ describe('Knowledge graph', () => {
 
 	it('closes the review panel when Escape is pressed', async () => {
 		const { KnowledgeGraph } = await import('./KnowledgeGraph');
-		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" onSelect={vi.fn()} onOpenDetails={vi.fn()} />);
+		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" selectedDetail={detail} onSelect={vi.fn()} onOpenDetails={vi.fn()} />);
 
 		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
 		expect(screen.getByLabelText('Knowledge graph review panel')).toBeInTheDocument();

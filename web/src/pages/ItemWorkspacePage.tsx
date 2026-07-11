@@ -31,7 +31,7 @@ import { ApiError, api, statusLabels } from '../lib/api';
 import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, VerificationJob, VerifyProfile, WorkspaceConfig } from '../lib/types';
 import { labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
-import type { DiffFile, DiffLine } from '../shared/domain/diff';
+import type { DiffFile } from '../shared/domain/diff';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
 import { FileStateIcon } from '../features/file-tree/FileStateIcon';
@@ -42,7 +42,7 @@ import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../li
 import { AISessionLaunchControl } from '../features/ai-session/AISessionLaunchControl';
 import { JiraItemPanel } from '../features/jira/JiraItemPanel';
 import { WorkstreamExplorer } from './WorkstreamExplorer';
-import type { ExplorerLocation } from '../app/router';
+import type { ExplorerLocation } from '../features/workstream-explorer/types';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import { BranchSnapshotPicker } from '../features/workstream/BranchSnapshotPicker';
 
@@ -956,7 +956,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       ) : plan && workspaceConfig && detailSourceMode !== 'snapshot' ? (
         <WorkstreamExplorer
           embedded
-          showOpenWorkstreamAction={false}
           showModeSelector={false}
           treeRootPath={detailViewMode === 'plan' ? itemRootPath : undefined}
           rightPanel={{
@@ -977,7 +976,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           workspaces={explorerWorkspaces}
           location={workspaceExplorerLocation}
           onLocationChange={setWorkspaceExplorerLocation}
-          onOpenWorkstream={() => undefined}
         />
       ) : (
       <div className="workspace-grid" style={gridStyle} ref={workspaceGridRef}>

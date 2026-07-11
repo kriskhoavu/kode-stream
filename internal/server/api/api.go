@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -652,105 +651,6 @@ func (a *API) searchItems(w http.ResponseWriter, r *http.Request) {
 	}
 	results, err := a.search.Search(models.SearchQuery{Text: r.URL.Query().Get("q"), WorkspaceID: r.URL.Query().Get("workspaceId"), Types: types, Limit: limit})
 	respond(w, results, err)
-}
-
-func (a *API) savedFilters(w http.ResponseWriter, r *http.Request) {
-	if a.navigation == nil {
-		writeJSON(w, http.StatusOK, []models.SavedFilter{})
-		return
-	}
-	filters, err := a.navigation.Filters()
-	respond(w, filters, err)
-}
-
-func (a *API) saveFilter(w http.ResponseWriter, r *http.Request) {
-	if a.navigation == nil {
-		writeError(w, http.StatusServiceUnavailable, "saved filters are unavailable")
-		return
-	}
-	var filter models.SavedFilter
-	if err := json.NewDecoder(r.Body).Decode(&filter); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
-	filter.Name = strings.TrimSpace(filter.Name)
-	if filter.Name == "" {
-		writeError(w, http.StatusBadRequest, "saved filter name is required")
-		return
-	}
-	if !validAppRoute(filter.Route) {
-		writeError(w, http.StatusBadRequest, "saved filter route is invalid")
-		return
-	}
-	saved, err := a.navigation.SaveFilter(filter)
-	if err != nil {
-		respond(w, nil, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, saved)
-}
-
-func (a *API) deleteFilter(w http.ResponseWriter, r *http.Request) {
-	if a.navigation == nil {
-		writeError(w, http.StatusServiceUnavailable, "saved filters are unavailable")
-		return
-	}
-	deleted, err := a.navigation.DeleteFilter(r.PathValue("id"))
-	if err != nil {
-		respond(w, nil, err)
-		return
-	}
-	if !deleted {
-		writeError(w, http.StatusNotFound, "saved filter not found")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
-}
-
-func (a *API) recentItems(w http.ResponseWriter, r *http.Request) {
-	if a.navigation == nil {
-		writeJSON(w, http.StatusOK, []models.RecentItem{})
-		return
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit <= 0 || limit > 50 {
-		limit = 10
-	}
-	recents, err := a.navigation.Recents(limit)
-	respond(w, recents, err)
-}
-
-func (a *API) recordRecentItem(w http.ResponseWriter, r *http.Request) {
-	if a.navigation == nil {
-		writeError(w, http.StatusServiceUnavailable, "recent items are unavailable")
-		return
-	}
-	var input struct {
-		ItemID string `json:"itemId"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil || strings.TrimSpace(input.ItemID) == "" {
-		writeError(w, http.StatusBadRequest, "itemId is required")
-		return
-	}
-	item, err := a.items.Detail(input.ItemID)
-	if errors.Is(err, apperrors.ErrItemNotFound) {
-		writeError(w, http.StatusNotFound, "item not found")
-		return
-	}
-	if err != nil {
-		respond(w, nil, err)
-		return
-	}
-	recent := models.RecentItem{ItemID: item.ID, WorkspaceID: item.WorkspaceID, Title: item.Title, Subtitle: strings.Trim(strings.Join([]string{item.WorkspaceName, item.Identifier}, " · "), " ·"), Route: "/items/" + url.PathEscape(item.ID)}
-	if err := a.navigation.RecordRecent(recent); err != nil {
-		respond(w, nil, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
-}
-
-func validAppRoute(route string) bool {
-	return route == "/workspace" || route == "/items" || route == "/branches" || route == "/workspaces" || route == "/knowledge" || strings.HasPrefix(route, "/items/") || strings.HasPrefix(route, "/workspace?") || strings.HasPrefix(route, "/knowledge?")
 }
 
 func (a *API) knowledgeWikis(w http.ResponseWriter, r *http.Request) {

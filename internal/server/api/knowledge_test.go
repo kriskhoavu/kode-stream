@@ -66,12 +66,6 @@ func TestKnowledgeActionStatusMapping(t *testing.T) {
 	}
 }
 
-func TestKnowledgeRouteCanBeSaved(t *testing.T) {
-	if !validAppRoute("/knowledge") || !validAppRoute("/knowledge?workspace=ws&root=docs") {
-		t.Fatal("knowledge route should be valid")
-	}
-}
-
 func TestKnowledgeHTTPContractsReturnListsAndMissingResources(t *testing.T) {
 	directory, workspaceRoot := t.TempDir(), t.TempDir()
 	if err := os.MkdirAll(filepath.Join(workspaceRoot, "docs"), 0o755); err != nil {

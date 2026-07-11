@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ExplorerLocation } from '../../app/router';
+import type { ExplorerLocation } from './types';
 import { api } from '../../lib/api';
 import type { ExplorerTreeMode, WorkspaceConfig } from '../../lib/types';
 import { buildItemDecorations, directoryCacheKey, explorerNodeId, flattenVisibleTree } from './tree';

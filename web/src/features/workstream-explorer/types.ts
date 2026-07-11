@@ -1,5 +1,13 @@
 import type { ItemSummary, WorkspaceConfig, WorkspaceTreeEntry } from '../../lib/types';
 
+import type { ExplorerTreeMode } from '../../lib/types';
+
+export interface ExplorerLocation {
+  workspaceId?: string;
+  path?: string;
+  mode?: ExplorerTreeMode;
+}
+
 export type ExplorerNodeKind = 'workspace' | 'directory' | 'file';
 
 export interface ExplorerSelection {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { KnowledgePageDetail } from '../../lib/types';
 import { KnowledgeReader, prepareKnowledgeMarkdown } from './KnowledgeReader';
@@ -13,21 +13,19 @@ const detail: KnowledgePageDetail = {
 };
 
 describe('KnowledgeReader', () => {
-	it('renders shared Markdown, metadata, relationships, and Explorer action', async () => {
-		const onNavigate = vi.fn(), onOpenExplorer = vi.fn();
-		render(<KnowledgeReader detail={detail} onNavigate={onNavigate} onOpenExplorer={onOpenExplorer} />);
+	it('renders shared Markdown, metadata, and relationships', async () => {
+		const onNavigate = vi.fn();
+		render(<KnowledgeReader detail={detail} onNavigate={onNavigate} />);
 		expect(await screen.findByRole('heading', { name: 'Overview', level: 1 }, { timeout: 3000 })).toBeInTheDocument();
 		expect(screen.getByText('plans/api/PM-1/README.md')).toBeInTheDocument();
 		expect(screen.getByText('Missing target')).toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: 'Open in Explorer' }));
-		expect(onOpenExplorer).toHaveBeenCalled();
 		fireEvent.click(screen.getAllByRole('button', { name: 'Target page' })[0]);
 		expect(onNavigate).toHaveBeenCalledWith('target');
 	});
 
 	it('intercepts rendered Wiki links and keeps external links safe', async () => {
 		const onNavigate = vi.fn();
-		render(<KnowledgeReader detail={detail} onNavigate={onNavigate} onOpenExplorer={vi.fn()} />);
+		render(<KnowledgeReader detail={detail} onNavigate={onNavigate} />);
 		const internal = await screen.findByRole('link', { name: 'Target page' });
 		fireEvent.click(internal);
 		expect(onNavigate).toHaveBeenCalledWith('target');

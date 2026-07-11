@@ -1,10 +1,10 @@
 import type { MouseEvent } from 'react';
-import { ExternalLink, FolderOpen } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { ContentViewer } from '../content-viewer/ContentViewer';
 import type { KnowledgePageDetail } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
 
-export function KnowledgeReader({ detail, onNavigate, onOpenExplorer }: { detail: KnowledgePageDetail; onNavigate: (slug: string) => void; onOpenExplorer: () => void }) {
+export function KnowledgeReader({ detail, onNavigate }: { detail: KnowledgePageDetail; onNavigate: (slug: string) => void }) {
 	const resolvedTargets = new Map(detail.links.filter((link) => link.resolution === 'resolved' && link.targetSlug).map((link) => [normalizeTarget(link.rawTarget), link.targetSlug!]));
 	const interceptLink = (event: MouseEvent<HTMLDivElement>) => {
 		const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a');
@@ -16,7 +16,7 @@ export function KnowledgeReader({ detail, onNavigate, onOpenExplorer }: { detail
 		event.preventDefault(); onNavigate(target);
 	};
 	return <div className="knowledge-reader">
-		<section className="knowledge-reader-summary"><p className="eyebrow">{detail.domain} · {detail.pageType || 'PAGE'}</p><h2>{detail.title}</h2><p>{detail.summary || 'No summary provided.'}</p><div className="knowledge-reader-actions"><button className="secondary" onClick={onOpenExplorer}><FolderOpen size={15} /> Open in Explorer</button></div>
+		<section className="knowledge-reader-summary"><p className="eyebrow">{detail.domain} · {detail.pageType || 'PAGE'}</p><h2>{detail.title}</h2><p>{detail.summary || 'No summary provided.'}</p>
 			<div className="knowledge-reader-metadata"><Metadata title="Roles" values={detail.roles} compact /><Metadata title="Topics" values={detail.topics} compact /><Metadata title="Source references" values={detail.sourceRefs} compact /><Metadata title="Outgoing links" values={detail.links.map((link) => link.resolution === 'resolved' && link.targetSlug ? (link.label || link.targetSlug) : `${link.label || link.rawTarget} (unresolved)`)} compact interactiveValues={detail.links.map((link) => link.resolution === 'resolved' && link.targetSlug ? { label: link.label || link.targetSlug, onClick: () => onNavigate(link.targetSlug!) } : undefined)} /><Metadata title="Backlinks" values={detail.backlinks} compact interactiveValues={detail.backlinks.map((slug) => ({ label: slug, onClick: () => onNavigate(slug) }))} /></div>
 			<KnowledgeWarnings warnings={detail.warnings} />
 			{detail.links.some((link) => /^https?:/i.test(link.rawTarget)) && <p className="knowledge-reader-note"><ExternalLink size={14} /> External links open in a new tab.</p>}

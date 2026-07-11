@@ -28,11 +28,11 @@ describe('KnowledgePage layout', () => {
 	});
 
 	it('uses application controls, removes empty status space, and collapses large warning lists', async () => {
-		const { container } = render(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'browse' }} onLocationChange={vi.fn()} onOpenExplorer={vi.fn()} />);
+		const { container } = render(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'browse' }} onLocationChange={vi.fn()} />);
 
 		await waitFor(() => expect(screen.getByRole('button', { name: /Offer Overview/ })).toBeInTheDocument());
-		expect(screen.getByRole('button', { name: 'Rescan' })).toHaveClass('secondary');
 		expect(screen.getByRole('button', { name: 'Sync' })).toHaveClass('secondary');
+		expect(screen.getByRole('button', { name: 'Pull' })).toHaveClass('secondary');
 		expect(screen.getByRole('button', { name: 'Pages' })).toHaveClass('active');
 		expect(container.querySelector('.knowledge-status')).not.toBeInTheDocument();
 		const warningDetails = screen.getByText('Index diagnostics (26)').closest('details');
@@ -43,12 +43,12 @@ describe('KnowledgePage layout', () => {
 
 	it('opens full page content with one click and keeps the index visible', async () => {
 		const onLocationChange = vi.fn();
-		const first = render(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', view: 'browse' }} onLocationChange={onLocationChange} onOpenExplorer={vi.fn()} />);
+		const first = render(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', view: 'browse' }} onLocationChange={onLocationChange} />);
 		const row = await screen.findByRole('button', { name: /Offer Overview/ });
 		fireEvent.click(row);
 		expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'read' });
 
-		first.rerender(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'read' }} onLocationChange={onLocationChange} onOpenExplorer={vi.fn()} />);
+		first.rerender(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'read' }} onLocationChange={onLocationChange} />);
 		await waitFor(() => expect(api.knowledgePage).toHaveBeenCalledWith('discovery', 'docs', 'overview'));
 		expect(await screen.findByText('Full document content.', {}, { timeout: 5_000 })).toBeInTheDocument();
 		expect(screen.getByRole('navigation', { name: 'Knowledge pages' })).toBeInTheDocument();

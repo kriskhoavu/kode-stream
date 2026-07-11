@@ -62,14 +62,14 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 
 	useEffect(() => {
 		const version = ++detailVersion.current;
-		if (!workspace || !wiki || !location?.slug || location.view !== 'read') { setDetail(null); setDetailLoading(false); return; }
+		if (!workspace || !wiki || !location?.slug || (location.view !== 'read' && location.view !== 'graph')) { setDetail(null); setDetailLoading(false); return; }
 		setDetailLoading(true);
 		void api.knowledgePage(workspace.id, wiki.root, location.slug).then((loaded) => {
 			if (version === detailVersion.current) setDetail(loaded);
 		}).catch(() => {
 			if (version !== detailVersion.current) return;
 			setDetail(null); setNotice('The selected page could not be loaded. It may have been removed.');
-			onLocationChangeRef.current({ workspaceId: workspace.id, root: wiki.root, view: 'browse' });
+			if (locationRef.current?.view === 'read') onLocationChangeRef.current({ workspaceId: workspace.id, root: wiki.root, view: 'browse' });
 		}).finally(() => { if (version === detailVersion.current) setDetailLoading(false); });
 		return () => { detailVersion.current++; };
 	}, [workspace, wiki, location?.slug, location?.view]);
