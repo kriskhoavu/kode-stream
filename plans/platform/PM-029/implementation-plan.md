@@ -27,7 +27,7 @@ Avoid:
 |-------|-----------------------------------|--------|
 | B1    | Automation Config And Metadata    | Done   |
 | B2    | Automation Verification Execution | Done   |
-| F1    | Frontend Types And API            | Draft  |
+| F1    | Frontend Types And API            | Done   |
 | F2    | Settings And Item Harness UI      | Draft  |
 | V1    | End-To-End Verification           | Draft  |
 
@@ -74,10 +74,10 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Extend runtime and verification TypeScript types with automation config and job metadata.
-- [ ] Add API client methods for item verification-test read/save.
-- [ ] Extend `createVerificationJob` input with automation mode, environment, and selected specs.
-- [ ] Add focused tests or type coverage for runtime-mode backward compatibility.
+- [x] Extend runtime and verification TypeScript types with automation config and job metadata.
+- [x] Add API client methods for item verification-test read/save.
+- [x] Extend `createVerificationJob` input with automation mode, environment, and selected specs.
+- [x] Add focused tests or type coverage for runtime-mode backward compatibility.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

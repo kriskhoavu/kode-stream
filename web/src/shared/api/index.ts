@@ -13,6 +13,7 @@ import type {
   WorkstreamBranchLoadResult,
   BranchCreateInput,
   BranchSwitchInput,
+  CreateVerificationJobInput,
   FileContent,
   FileNode,
   FileSaveInput,
@@ -38,6 +39,7 @@ import type {
   ItemDetail,
   ItemMetadataUpdateInput,
   ItemStatusUpdateInput,
+  ItemVerificationTests,
   ItemSummary,
   WorkspaceConfig,
   WorkspaceCreateResult,
@@ -67,6 +69,7 @@ import type {
   VerificationJob,
   WorkspaceRuntimeConfig,
   RunArtifact,
+  VerificationTestSelection,
   SourceSettingsResult,
   WriteResult
 } from '../../lib/types';
@@ -218,7 +221,7 @@ export const api = {
     return payload;
   }),
   saveWorkspaceRuntime: (workspaceId: string, input: WorkspaceRuntimeConfig) => request<WorkspaceRuntimeConfig>(`/api/workspaces/${encodeURIComponent(workspaceId)}/runtime`, { method: 'PUT', body: JSON.stringify(input) }),
-  createVerificationJob: (workspaceId: string, input: { profile?: VerifyProfile; trigger?: string; provider?: string; sessionId?: string; terminalMode?: string } = {}) =>
+  createVerificationJob: (workspaceId: string, input: CreateVerificationJobInput = {}) =>
     request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs`, { method: 'POST', body: JSON.stringify(input) }, false),
   ingestVerificationCheckpoint: (workspaceId: string, input: { eventType: string; profile?: VerifyProfile; provider?: string; sessionId?: string; terminalMode?: string }) =>
     request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-checkpoints`, { method: 'POST', body: JSON.stringify(input) }, false),
@@ -228,6 +231,10 @@ export const api = {
     request<RunArtifact[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}/artifacts`, undefined, false),
   rerunVerificationJob: (workspaceId: string, jobId: string, profile?: VerifyProfile) =>
     request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}/rerun`, { method: 'POST', body: JSON.stringify({ profile }) }, false),
+  itemVerificationTests: (itemId: string) =>
+    request<ItemVerificationTests>(`/api/items/${encodeURIComponent(itemId)}/verification-tests`).then(normalizeItemVerificationTests),
+  saveItemVerificationTests: (itemId: string, input: VerificationTestSelection) =>
+    request<ItemVerificationTests>(`/api/items/${encodeURIComponent(itemId)}/verification-tests`, { method: 'PUT', body: JSON.stringify(input) }).then(normalizeItemVerificationTests),
   jiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira`),
   refreshJiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira/refresh`, { method: 'POST' }),
   jiraAttachmentURL: (itemId: string, attachmentId: string) => `/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`,
@@ -365,8 +372,26 @@ function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
       ...workspace.runtime,
       rebuildPolicy: workspace.runtime.rebuildPolicy ?? 'changed-only',
       healthChecks: Array.isArray(workspace.runtime.healthChecks) ? workspace.runtime.healthChecks : [],
-      artifacts: { paths: Array.isArray(workspace.runtime.artifacts?.paths) ? workspace.runtime.artifacts?.paths : [] }
+      artifacts: { paths: Array.isArray(workspace.runtime.artifacts?.paths) ? workspace.runtime.artifacts?.paths : [] },
+      automation: workspace.runtime.automation ? {
+        ...workspace.runtime.automation,
+        enabled: Boolean(workspace.runtime.automation.enabled),
+        runner: workspace.runtime.automation.runner ?? 'cypress',
+        defaultEnvironment: workspace.runtime.automation.defaultEnvironment ?? 'local',
+        artifactPaths: Array.isArray(workspace.runtime.automation.artifactPaths) ? workspace.runtime.automation.artifactPaths : []
+      } : undefined
     } : undefined
+  };
+}
+
+function normalizeItemVerificationTests(input: ItemVerificationTests): ItemVerificationTests {
+  return {
+    selection: {
+      selectedSpecs: Array.isArray(input.selection?.selectedSpecs) ? input.selection.selectedSpecs : [],
+      environment: input.selection?.environment ?? '',
+      updatedAt: input.selection?.updatedAt
+    },
+    discoveredSpecs: Array.isArray(input.discoveredSpecs) ? input.discoveredSpecs : []
   };
 }
 

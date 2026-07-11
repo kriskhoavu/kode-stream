@@ -106,6 +106,17 @@ export interface RuntimeArtifacts {
   paths?: string[];
 }
 
+export type AutomationRunner = 'cypress' | 'playwright';
+
+export interface RuntimeAutomationConfig {
+  enabled: boolean;
+  repositoryPath?: string;
+  runner?: AutomationRunner;
+  defaultEnvironment?: string;
+  commandTemplate?: string;
+  artifactPaths?: string[];
+}
+
 export interface WorkspaceRuntimeConfig {
   type: RuntimeType;
   configPath?: string;
@@ -113,9 +124,11 @@ export interface WorkspaceRuntimeConfig {
   commands: RuntimeCommandSet;
   healthChecks?: RuntimeHealthCheck[];
   artifacts?: RuntimeArtifacts;
+  automation?: RuntimeAutomationConfig;
 }
 
 export type VerifyProfile = 'smoke' | 'critical' | 'full';
+export type VerificationRunMode = 'runtime' | 'automation';
 export type VerificationStatus = 'queued' | 'running' | 'passed' | 'failed';
 export type VerificationFailureType = 'boot_failure' | 'test_failure' | 'infra_failure';
 
@@ -137,7 +150,12 @@ export interface RunArtifact {
 export interface VerificationJob {
   id: string;
   workspaceId: string;
+  mode?: VerificationRunMode;
   profile: VerifyProfile;
+  environment?: string;
+  selectedSpecs?: string[];
+  automationRepoPath?: string;
+  renderedCommand?: string;
   status: VerificationStatus;
   failureType?: VerificationFailureType;
   exitCode: number;
@@ -150,6 +168,34 @@ export interface VerificationJob {
   steps: VerificationStepResult[];
   artifacts: RunArtifact[];
   runtime?: WorkspaceRuntimeConfig;
+}
+
+export interface VerificationTestSelection {
+  selectedSpecs: string[];
+  environment?: string;
+  updatedAt?: string;
+}
+
+export interface DiscoveredVerificationSpec {
+  path: string;
+  runner: AutomationRunner | string;
+  sourcePath?: string;
+}
+
+export interface ItemVerificationTests {
+  selection: VerificationTestSelection;
+  discoveredSpecs: DiscoveredVerificationSpec[];
+}
+
+export interface CreateVerificationJobInput {
+  profile?: VerifyProfile;
+  mode?: VerificationRunMode;
+  environment?: string;
+  selectedSpecs?: string[];
+  trigger?: string;
+  provider?: string;
+  sessionId?: string;
+  terminalMode?: string;
 }
 
 export interface KnowledgeSettings {
