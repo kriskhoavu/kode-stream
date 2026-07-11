@@ -607,6 +607,11 @@
   box-shadow: var(--shadow-soft);
 }
 
+.react-flow__node:hover,
+.react-flow__node:focus-within {
+  z-index: 80 !important;
+}
+
 .knowledge-flow-node {
   position: relative;
   width: 220px;
@@ -781,6 +786,7 @@
 
 .react-flow__node.selected {
   border: 2px solid var(--blue);
+  z-index: 40 !important;
 }
 
 .react-flow__node.neighbor {
