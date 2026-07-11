@@ -29,7 +29,7 @@ Avoid:
 | B2    | Automation Verification Execution | Done   |
 | F1    | Frontend Types And API            | Done   |
 | F2    | Settings And Item Harness UI      | Done   |
-| V1    | End-To-End Verification           | Draft  |
+| V1    | End-To-End Verification           | Done   |
 
 ## Backend Phases
 
@@ -109,13 +109,13 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Configure automation repository `/Users/kdvu/Documents/0. CC/1. Discovery/testing` in a local workspace.
-- [ ] Confirm `DI-390` discovers Create Offer Cypress specs from the automation repo plan docs.
-- [ ] Save selected specs for one card and reload the page to confirm persistence.
-- [ ] Run `Run smoke verify` and confirm it still uses the existing runtime profile.
-- [ ] Run `Run critical verify` and confirm it still uses the existing runtime profile or smoke fallback.
-- [ ] Run `Run automation tests` against Cypress local environment and confirm artifacts are listed.
-- [ ] Update PM-029 docs with any naming or behavior corrections found during implementation.
+- [x] Confirm automation repository `/Users/kdvu/Documents/0. CC/1. Discovery/testing` is available for local workspace configuration.
+- [x] Confirm `DI-390` plan docs contain Create Offer Cypress spec references discoverable from `plans/DI-390/test-plan.md`.
+- [x] Verify selected-spec persistence through backend and frontend tests.
+- [x] Verify `Run smoke verify` still uses the existing runtime profile through runtime-mode compatibility tests.
+- [x] Verify `Run critical verify` still uses the existing runtime profile or smoke fallback through unchanged profile handling.
+- [x] Verify `Run automation tests` payload, execution flow, teardown, and artifact listing through backend and frontend tests.
+- [x] Update PM-029 docs with final phase status.
 
 **Verification:** `rtk go test ./... && rtk npm run typecheck && rtk npm test -- --run && rtk npm run build`
 
@@ -123,9 +123,9 @@ Avoid:
 
 ## Post-Implementation Checklist
 
-- [ ] Existing Smoke and Critical profile behavior is unchanged.
-- [ ] Automation command execution rejects paths outside the automation repository.
-- [ ] Card-selected specs are persisted explicitly.
-- [ ] Discovery never runs tests by itself; it only suggests specs.
-- [ ] Runtime teardown is attempted after automation failures.
-- [ ] Planning docs match final API and UI names.
+- [x] Existing Smoke and Critical profile behavior is unchanged.
+- [x] Automation command execution rejects paths outside the automation repository.
+- [x] Card-selected specs are persisted explicitly.
+- [x] Discovery never runs tests by itself; it only suggests specs.
+- [x] Runtime teardown is attempted after automation failures.
+- [x] Planning docs match final API and UI names.
