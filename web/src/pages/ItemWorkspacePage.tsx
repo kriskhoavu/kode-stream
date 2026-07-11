@@ -28,7 +28,7 @@ import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels } from '../lib/api';
-import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, VerificationJob, VerifyProfile, WorkspaceConfig } from '../lib/types';
+import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile, WorkspaceConfig } from '../lib/types';
 import { labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile } from '../shared/domain/diff';
@@ -102,6 +102,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [verificationJob, setVerificationJob] = useState<VerificationJob | null>(null);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationError, setVerificationError] = useState('');
+  const [verificationTests, setVerificationTests] = useState<ItemVerificationTests | null>(null);
+  const [verificationTestsBusy, setVerificationTestsBusy] = useState(false);
+  const [manualSpec, setManualSpec] = useState('');
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
   const [artifactPreview, setArtifactPreview] = useState<{ title: string; path: string; content: string; loading: boolean; error: string } | null>(null);
   const [workspaceExplorerLocation, setWorkspaceExplorerLocation] = useState<ExplorerLocation>();
@@ -251,6 +254,26 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     }
     setWorkspaceConfig(workspaces.find((workspace) => workspace.id === plan.workspaceId) ?? null);
   }, [plan, workspaces]);
+
+  useEffect(() => {
+    if (!plan) {
+      setVerificationTests(null);
+      return;
+    }
+    let active = true;
+    setVerificationTestsBusy(true);
+    const loadVerificationTests = api.itemVerificationTests;
+    if (typeof loadVerificationTests !== 'function') {
+      setVerificationTests(null);
+      setVerificationTestsBusy(false);
+      return;
+    }
+    void loadVerificationTests(plan.id)
+      .then((tests) => { if (active) setVerificationTests(tests); })
+      .catch(() => { if (active) setVerificationTests(null); })
+      .finally(() => { if (active) setVerificationTestsBusy(false); });
+    return () => { active = false; };
+  }, [plan?.id]);
 
   useEffect(() => {
     if (!plan) {
@@ -698,6 +721,62 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     }
   };
 
+  const saveVerificationTests = async (selection: VerificationTestSelection) => {
+    if (!plan) return null;
+    setVerificationTestsBusy(true);
+    setVerificationError('');
+    try {
+      const tests = await api.saveItemVerificationTests(plan.id, selection);
+      setVerificationTests(tests);
+      return tests;
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : 'Failed to save automation tests');
+      return null;
+    } finally {
+      setVerificationTestsBusy(false);
+    }
+  };
+
+  const selectedSpecs = verificationTests?.selection.selectedSpecs ?? [];
+  const automationEnvironment = verificationTests?.selection.environment || workspaceConfig?.runtime?.automation?.defaultEnvironment || 'local';
+  const setSelectedSpecs = async (specs: string[]) => {
+    await saveVerificationTests({ selectedSpecs: specs, environment: automationEnvironment });
+  };
+  const addSelectedSpec = async (spec: string) => {
+    const clean = spec.trim();
+    if (!clean || selectedSpecs.includes(clean)) return;
+    await setSelectedSpecs([...selectedSpecs, clean]);
+  };
+  const removeSelectedSpec = async (spec: string) => {
+    await setSelectedSpecs(selectedSpecs.filter((candidate) => candidate !== spec));
+  };
+  const saveAutomationEnvironment = async (environment: string) => {
+    await saveVerificationTests({ selectedSpecs, environment });
+  };
+  const addManualSpec = async () => {
+    const clean = manualSpec.trim();
+    if (!clean) return;
+    await addSelectedSpec(clean);
+    setManualSpec('');
+  };
+
+  const runAutomationVerification = async () => {
+    if (!plan) return;
+    setVerificationBusy(true);
+    setVerificationError('');
+    try {
+      const tests = await saveVerificationTests({ selectedSpecs, environment: automationEnvironment });
+      const specs = tests?.selection.selectedSpecs ?? selectedSpecs;
+      const environment = tests?.selection.environment || automationEnvironment;
+      const job = await api.createVerificationJob(plan.workspaceId, { mode: 'automation', environment, selectedSpecs: specs, trigger: 'manual_checkpoint', terminalMode: 'embedded' });
+      setVerificationJob(job);
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : 'Failed to start automation verification');
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
   const rerunVerification = async (profile?: VerifyProfile) => {
     if (!plan || !verificationJob) return;
     setVerificationBusy(true);
@@ -788,13 +867,36 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
             <div className="verification-actions">
               <button className="secondary" type="button" onClick={() => void runVerification('smoke')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run smoke verify</button>
               <button className="secondary" type="button" onClick={() => void runVerification('critical')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run critical verify</button>
+              <button className="secondary" type="button" onClick={() => void runAutomationVerification()} disabled={verificationBusy || verificationTestsBusy || !plan?.workspaceId || !workspaceConfig?.runtime?.automation?.enabled || selectedSpecs.length === 0}>Run automation tests</button>
               <button className="secondary" type="button" onClick={() => void rerunVerification()} disabled={verificationBusy || !verificationJob}>Re-run latest</button>
             </div>
             {!plan?.workspaceId && <span className="verification-note">No workspace selected.</span>}
             {plan?.workspaceId && !workspaceConfig?.runtime && <span className="verification-note">Runtime not configured for this workspace.</span>}
+            {workspaceConfig?.runtime && !workspaceConfig.runtime.automation?.enabled && <span className="verification-note">Automation tests are not configured for this workspace.</span>}
+            {workspaceConfig?.runtime?.automation?.enabled && (
+              <div className="automation-test-panel">
+                <label className="repo-field">Automation environment<input value={automationEnvironment} onChange={(event) => void saveAutomationEnvironment(event.target.value)} placeholder="local" /></label>
+                <div className="automation-spec-list" aria-label="Selected automation specs">
+                  {selectedSpecs.length ? selectedSpecs.map((spec) => <span className="automation-spec-chip" key={spec}>{spec}<button type="button" aria-label={`Remove ${spec}`} onClick={() => void removeSelectedSpec(spec)}>×</button></span>) : <span className="verification-note">No selected specs.</span>}
+                </div>
+                <div className="path-input-row">
+                  <input aria-label="Manual automation spec" value={manualSpec} onChange={(event) => setManualSpec(event.target.value)} placeholder="cypress/e2e/example.cy.ts" />
+                  <button className="secondary" type="button" onClick={() => void addManualSpec()} disabled={!manualSpec.trim()}>Add spec</button>
+                </div>
+                {verificationTests?.discoveredSpecs?.length ? (
+                  <div className="automation-discovered-specs" aria-label="Discovered automation specs">
+                    {verificationTests.discoveredSpecs.map((spec) => (
+                      <button className="secondary" type="button" key={`${spec.path}-${spec.sourcePath ?? ''}`} disabled={selectedSpecs.includes(spec.path)} onClick={() => void addSelectedSpec(spec.path)}>
+                        {selectedSpecs.includes(spec.path) ? 'Selected' : 'Accept'} {spec.path}
+                      </button>
+                    ))}
+                  </div>
+                ) : <span className="verification-note">No discovered specs for this card.</span>}
+              </div>
+            )}
             {verificationBusy && <span className="verification-note">Starting verification...</span>}
             {verificationError && <span className="error" role="alert">{verificationError}</span>}
-            {verificationJob && <span className="verification-status">{verificationJob.profile} · {verificationJob.status}{verificationJob.failureType ? ` (${verificationJob.failureType})` : ''}</span>}
+            {verificationJob && <span className="verification-status">{verificationJob.mode === 'automation' ? 'automation' : verificationJob.profile} · {verificationJob.status}{verificationJob.failureType ? ` (${verificationJob.failureType})` : ''}</span>}
             {verificationJob && <span className="verification-note">{verificationTriggerDescription(verificationJob)}</span>}
             {verificationJob?.steps?.length ? (
               <div className="verification-steps">

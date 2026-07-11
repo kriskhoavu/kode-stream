@@ -248,6 +248,96 @@ describe('ItemWorkspacePage', () => {
     expect(onOpenItem).not.toHaveBeenCalled();
     expect(screen.queryByText('# Assistant Showcase')).not.toBeInTheDocument();
   });
+
+  it('selects discovered automation specs and starts an automation verification job', async () => {
+    const requests: Array<{ url: string; method: string; body?: unknown }> = [];
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push({ url, method: init?.method ?? 'GET', body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (url === '/api/items/item-1') {
+        return Promise.resolve(response({
+          id: 'item-1',
+          workspaceId: 'ws-1',
+          workspaceName: 'Workspace',
+          scope: 'platform',
+          branch: 'main',
+          identifier: 'PM-029',
+          title: 'Automation runner',
+          status: 'draft',
+          tags: [],
+          metadataSource: 'plan.yaml',
+          itemPath: 'plans/platform/PM-029',
+          counts: { files: 1 },
+          warnings: []
+        }));
+      }
+      if (url === '/api/items/item-1/files') return Promise.resolve(response([]));
+      if (url === '/api/items/item-1/diff') return Promise.resolve(response({ diff: '' }));
+      if (url === '/api/workspaces/ws-1/git/status') return Promise.resolve(response({ workspaceId: 'ws-1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/ws-1/git/branches') return Promise.resolve(response({ workspaceId: 'ws-1', current: 'main', branches: ['main'] }));
+      if (url === '/api/workspaces/ws-1/git/activity?path=plans%2Fplatform%2FPM-029&limit=8') return Promise.resolve(response([]));
+      if (url === '/api/items/item-1/jira') return Promise.resolve(response({ state: 'not_configured' }));
+      if (url === '/api/items/item-1/verification-tests' && (init?.method ?? 'GET') === 'GET') {
+        return Promise.resolve(response({
+          selection: { selectedSpecs: [], environment: 'local' },
+          discoveredSpecs: [{ path: 'cypress/e2e/create.cy.ts', runner: 'cypress', sourcePath: 'plans/PM-029/test-plan.md' }]
+        }));
+      }
+      if (url === '/api/items/item-1/verification-tests' && init?.method === 'PUT') {
+        return Promise.resolve(response({
+          selection: { selectedSpecs: ['cypress/e2e/create.cy.ts'], environment: 'local', updatedAt: '2026-07-11T00:00:00Z' },
+          discoveredSpecs: [{ path: 'cypress/e2e/create.cy.ts', runner: 'cypress', sourcePath: 'plans/PM-029/test-plan.md' }]
+        }));
+      }
+      if (url === '/api/workspaces/ws-1/verification-jobs' && init?.method === 'POST') {
+        return Promise.resolve(response({
+          id: 'verify-1',
+          workspaceId: 'ws-1',
+          mode: 'automation',
+          profile: 'smoke',
+          environment: 'local',
+          selectedSpecs: ['cypress/e2e/create.cy.ts'],
+          status: 'passed',
+          exitCode: 0,
+          steps: [],
+          artifacts: []
+        }));
+      }
+      return Promise.resolve(response({}));
+    }));
+
+    render(createElement(ItemWorkspacePage, {
+      itemId: 'item-1',
+      refreshKey: 0,
+      workspaces: [{
+        id: 'ws-1',
+        name: 'Workspace',
+        path: '/repo',
+        baselineBranch: 'main',
+        sources: ['plans'],
+        createdAt: '2026-07-10T00:00:00Z',
+        runtime: {
+          type: 'custom',
+          commands: { up: 'true', down: 'true', verify: { smoke: 'true' } },
+          automation: { enabled: true, repositoryPath: '/automation', runner: 'cypress', defaultEnvironment: 'local', commandTemplate: 'npx cypress run --spec "{specs}"', artifactPaths: [] }
+        }
+      }],
+      onBack: vi.fn(),
+      onOpenItem: vi.fn(),
+      onContentChanged: vi.fn()
+    }));
+
+    const runAutomation = await screen.findByRole('button', { name: 'Run automation tests' });
+    expect(runAutomation).toBeDisabled();
+    fireEvent.click(await screen.findByRole('button', { name: /Accept cypress\/e2e\/create\.cy\.ts/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run automation tests' })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Run automation tests' }));
+
+    await waitFor(() => expect(requests.some((request) => request.url === '/api/workspaces/ws-1/verification-jobs' && request.method === 'POST')).toBe(true));
+    const jobRequest = requests.find((request) => request.url === '/api/workspaces/ws-1/verification-jobs' && request.method === 'POST');
+    expect(jobRequest?.body).toMatchObject({ mode: 'automation', environment: 'local', selectedSpecs: ['cypress/e2e/create.cy.ts'] });
+    expect(await screen.findByText('automation · passed')).toBeInTheDocument();
+  });
 });
 
 function response(payload: unknown) {

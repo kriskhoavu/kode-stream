@@ -2189,6 +2189,43 @@ select:disabled {
   grid-column: 1 / -1;
 }
 
+.automation-test-panel {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.automation-spec-list,
+.automation-discovered-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.automation-spec-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 26px;
+  border: 1px solid color-mix(in srgb, var(--blue) 32%, var(--line));
+  border-radius: 999px;
+  padding: 0 4px 0 9px;
+  background: color-mix(in srgb, var(--blue) 10%, var(--panel));
+  color: var(--text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.automation-spec-chip button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 4px;
+}
+
 .verification-note,
 .verification-status {
   color: var(--muted);

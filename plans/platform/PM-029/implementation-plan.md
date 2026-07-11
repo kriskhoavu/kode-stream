@@ -28,7 +28,7 @@ Avoid:
 | B1    | Automation Config And Metadata    | Done   |
 | B2    | Automation Verification Execution | Done   |
 | F1    | Frontend Types And API            | Done   |
-| F2    | Settings And Item Harness UI      | Draft  |
+| F2    | Settings And Item Harness UI      | Done   |
 | V1    | End-To-End Verification           | Draft  |
 
 ## Backend Phases
@@ -89,13 +89,13 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Add Automation tests controls to workspace Runtime and verify settings.
-- [ ] Show automation setup status in the item verification harness.
-- [ ] Show discovered specs and selected specs with accept, remove, and manual-add actions.
-- [ ] Persist selected specs before running automation.
-- [ ] Add `Run automation tests` beside existing Smoke and Critical actions.
-- [ ] Reuse current verification polling, steps, artifact preview, and open-path actions.
-- [ ] Add frontend tests for settings editing, disabled states, spec selection, and automation run payload.
+- [x] Add Automation tests controls to workspace Runtime and verify settings.
+- [x] Show automation setup status in the item verification harness.
+- [x] Show discovered specs and selected specs with accept, remove, and manual-add actions.
+- [x] Persist selected specs before running automation.
+- [x] Add `Run automation tests` beside existing Smoke and Critical actions.
+- [x] Reuse current verification polling, steps, artifact preview, and open-path actions.
+- [x] Add frontend tests for settings editing, disabled states, spec selection, and automation run payload.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
