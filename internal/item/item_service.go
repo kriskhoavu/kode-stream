@@ -265,7 +265,7 @@ func verificationDiscoveryCandidateRoots(plansRoot string, item models.ItemDetai
 }
 
 type verificationPlanYAML struct {
-	AutomationTestPaths []models.AutomationTestPath `yaml:"automation-test-paths"`
+	AutomationTests []models.AutomationTestPath `yaml:"automation-test"`
 }
 
 func discoverVerificationSpecsInPlanYAML(repoRoot, planRoot string, fallbackRunner models.AutomationRunner, seen map[string]struct{}) ([]models.DiscoveredVerificationSpec, error) {
@@ -285,7 +285,7 @@ func discoverVerificationSpecsInPlanYAML(repoRoot, planRoot string, fallbackRunn
 		sourcePath = filepath.Join(planRoot, "plan.yaml")
 	}
 	specs := []models.DiscoveredVerificationSpec{}
-	for _, entry := range meta.AutomationTestPaths {
+	for _, entry := range meta.AutomationTests {
 		specPath := filepath.ToSlash(filepath.Clean(strings.TrimSpace(entry.Path)))
 		if specPath == "." || specPath == "" {
 			continue

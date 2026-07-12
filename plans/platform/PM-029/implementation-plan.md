@@ -50,7 +50,7 @@ Use these terms consistently:
 
 **Deliverables:**
 
-- [x] Add planned automation path parsing from `automation-test-paths[].path` in automation repo `plan.yaml`.
+- [x] Add planned automation path parsing from `automation-test[].path` in automation repo `plan.yaml`.
 - [x] Check likely plan YAML locations without scanning Markdown files.
 - [x] Ignore empty placeholder paths.
 - [x] Remove Markdown fallback for automation suggestions.
@@ -107,7 +107,7 @@ Use these terms consistently:
 
 **Deliverables:**
 
-- [x] Backend tests for `automation-test-paths` YAML parsing and discovery precedence.
+- [x] Backend tests for `automation-test` YAML parsing and discovery precedence.
 - [x] Backend tests that empty planned paths are ignored.
 - [x] Frontend tests remain green for Quality panel, spec browse, display mode, and run payload.
 - [x] Confirm `wiki_enriched` move does not affect Knowledge page indexing.

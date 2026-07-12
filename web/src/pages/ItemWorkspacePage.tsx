@@ -933,7 +933,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           <div className="automation-suggestions">
             <div className="quality-subsection-heading">
               <strong>Suggested specs</strong>
-              <span>From automation-test-paths in plan.yaml</span>
+              <span>From automation-test in plan.yaml</span>
             </div>
             {verificationTests?.discoveredSpecs?.length ? (
               <div className="automation-discovered-specs" aria-label="Suggested automation specs">

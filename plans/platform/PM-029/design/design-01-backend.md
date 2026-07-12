@@ -32,10 +32,10 @@ No database schema is required. Workspace settings live in workspace config, ite
 
 | Field                          | Type    | Purpose                                            |
 |--------------------------------|---------|----------------------------------------------------|
-| `automation-test-paths[].path` | string  | Planned Cypress or Playwright spec path suggestion |
+| `automation-test[].path`       | string  | Planned Cypress or Playwright spec path suggestion |
 | `plan.wiki_enriched`           | boolean | Wiki enrichment state stored in `plan.yaml`        |
 
-Empty `automation-test-paths[].path` entries are valid placeholders and must be ignored by discovery.
+Empty `automation-test[].path` entries are valid placeholders and must be ignored by discovery.
 
 ## API Contract
 
@@ -54,7 +54,7 @@ Automation job payload includes `mode: automation`, selected specs, environment,
 Spec discovery must be fast and metadata-first:
 
 1. Look for likely `plan.yaml` files in the automation repo using item identifier, scope, and item ID.
-2. Return non-empty `automation-test-paths[].path` entries as discovered specs.
+2. Return non-empty `automation-test[].path` entries as discovered specs.
 
 This avoids slow full-repo Markdown scans during Quality panel load.
 

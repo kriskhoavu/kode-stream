@@ -9,7 +9,7 @@
 | 2   | Link Specs To A Card            | User saves specs by accepting suggestions, browsing, or typing |
 | 3   | Run Silent Automation           | User runs selected specs in the background                     |
 | 4   | Run Visible Browser Automation  | User starts a headed Chrome/Chromium runner                    |
-| 5   | Metadata-Based Discovery        | Suggestions come from `automation-test-paths` in `plan.yaml`   |
+| 5   | Metadata-Based Discovery        | Suggestions come from `automation-test` in `plan.yaml`         |
 
 ---
 
@@ -126,10 +126,10 @@ Avoid Markdown scanning for automation suggestions.
 ```text
 Quality panel requests verification tests
   -> backend reads current item and likely automation repo plan.yaml files
-  -> backend extracts non-empty automation-test-paths[].path entries
+  -> backend extracts non-empty automation-test[].path entries
   -> frontend displays them as discovered specs
 ```
 
 ## Expected Result
 
-Discovery is fast and only returns structured `automation-test-paths` metadata.
+Discovery is fast and only returns structured `automation-test` metadata.

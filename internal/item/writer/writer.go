@@ -283,10 +283,10 @@ func (w *Writer) refreshWorkspaceData(workspace models.WorkspaceConfig) (models.
 }
 
 type planYAML struct {
-	Plan                planFields                       `yaml:"plan"`
-	Documents           []models.ItemDocument            `yaml:"documents,omitempty"`
-	AutomationTestPaths []models.AutomationTestPath      `yaml:"automation-test-paths,omitempty"`
-	VerificationTests   models.VerificationTestSelection `yaml:"verificationTests,omitempty"`
+	Plan              planFields                       `yaml:"plan"`
+	Documents         []models.ItemDocument            `yaml:"documents,omitempty"`
+	AutomationTests   []models.AutomationTestPath      `yaml:"automation-test,omitempty"`
+	VerificationTests models.VerificationTestSelection `yaml:"verificationTests,omitempty"`
 }
 
 type planFields struct {

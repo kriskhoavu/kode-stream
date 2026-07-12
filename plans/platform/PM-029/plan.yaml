@@ -5,5 +5,5 @@ plan:
     - verification
     - knowledge
   wiki_enriched: false
-automation-test-paths:
+automation-test:
   - path: ""

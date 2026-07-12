@@ -19,7 +19,7 @@ The implementation keeps workspace Smoke and Critical verification separate from
 | Runtime Verification Profile | Existing workspace-level `smoke`, `critical`, or `full` command                 | `VerifyProfile`                        |
 | Automation Repository        | Separate registered workspace that owns Cypress or Playwright tests             | Workspace automation settings          |
 | Selected Spec                | Spec path explicitly saved for one item                                         | `verificationTests.selectedSpecs`      |
-| Planned Automation Path      | Spec path authored by feature or test planning skills before it is selected     | `automation-test-paths[].path`         |
+| Planned Automation Path      | Spec path authored by feature or test planning skills before it is selected     | `automation-test[].path`               |
 | Discovered Spec              | Suggested spec read from automation repo plan metadata                          | Item verification-test API             |
 | Run Mode                     | Silent/headless or visible headed browser execution                             | `displayMode`                          |
 | Runtime Setup Log            | `prepare`, `up`, `health`, and `down` output for the app runtime around the job | `runtime.log` / Runtime setup log card |
@@ -40,11 +40,11 @@ The implementation keeps workspace Smoke and Critical verification separate from
 | Location            | Field                     | Purpose                                                                 |
 |---------------------|---------------------------|-------------------------------------------------------------------------|
 | Item `plan.yaml`    | `verificationTests`       | Runtime state: selected specs, environment, display mode, updated time  |
-| Feature `plan.yaml` | `automation-test-paths`   | Planning metadata: known automation spec paths authored by skills/users |
+| Feature `plan.yaml` | `automation-test`         | Planning metadata: known automation spec paths authored by skills/users |
 | Feature `plan.yaml` | `plan.wiki_enriched`      | Wiki enrichment state for plan ingestion                                |
 | Feature `README.md` | None for machine metadata | Human-readable plan only                                                |
 
-`verificationTests` and `automation-test-paths` are intentionally separate. `verificationTests` is what the card will run. `automation-test-paths` is a source for suggestions and can contain empty placeholders until a tester provides real paths.
+`verificationTests` and `automation-test` are intentionally separate. `verificationTests` is what the card will run. `automation-test` is a source for suggestions and can contain empty placeholders until a tester provides real paths.
 
 ## Automation Spec Discovery
 
@@ -54,7 +54,7 @@ Discovery uses structured metadata only:
    - `plans/{ticket}/plan.yaml`
    - `plans/{scope}/{ticket}/plan.yaml`
    - `plans/{itemID}/plan.yaml`
-2. Extract non-empty `automation-test-paths[].path` entries.
+2. Extract non-empty `automation-test[].path` entries.
 
 This keeps `/api/items/{id}/verification-tests` responsive and avoids scanning test-plan Markdown files whenever the Quality panel opens.
 

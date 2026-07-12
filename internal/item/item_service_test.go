@@ -71,7 +71,7 @@ func TestDetailNormalizesCollectionsAndReadsFullReadmeDescription(t *testing.T) 
 
 func TestVerificationTestsPersistSelectedSpecs(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, root, "plans/platform/PM-029/plan.yaml", "plan:\n  status: draft\nautomation-test-paths:\n  - path: \"\"\n")
+	writeFile(t, root, "plans/platform/PM-029/plan.yaml", "plan:\n  status: draft\nautomation-test:\n  - path: \"\"\n")
 	registryPath := filepath.Join(root, "workspaces.yaml")
 	indexPath := filepath.Join(root, "item-index.yaml")
 	reg := registry.New(registryPath, gitadapter.New())
@@ -127,8 +127,8 @@ func TestVerificationTestsPersistSelectedSpecs(t *testing.T) {
 	if text := string(data); !strings.Contains(text, "verificationTests:") || !strings.Contains(text, "cypress/e2e/create-offer.cy.ts") {
 		t.Fatalf("plan.yaml =\n%s", text)
 	}
-	if !strings.Contains(string(data), "automation-test-paths:") {
-		t.Fatalf("plan.yaml lost automation-test-paths:\n%s", string(data))
+	if !strings.Contains(string(data), "automation-test:") {
+		t.Fatalf("plan.yaml lost automation-test:\n%s", string(data))
 	}
 }
 
@@ -136,7 +136,7 @@ func TestDiscoverVerificationSpecsPrefersAutomationPlanYAML(t *testing.T) {
 	automationRepo := t.TempDir()
 	writeFile(t, automationRepo, "plans/platform/PM-029/plan.yaml", `plan:
   status: draft
-automation-test-paths:
+automation-test:
   - path: cypress/e2e/create-offer.cy.ts
   - path: ""
   - path: playwright/create-offer.spec.ts
@@ -176,12 +176,12 @@ func TestDiscoverVerificationSpecsReadsCurrentItemPlanYAML(t *testing.T) {
 	automationRepo := t.TempDir()
 	writeFile(t, workspaceRoot, "plans/api/DI-170/plan.yaml", `plan:
   status: done
-automation-test-paths:
+automation-test:
   - path: cypress/e2e/01-base/01-logging-to-console.cy.ts
 `)
 	writeFile(t, automationRepo, "plans/api/DI-170/plan.yaml", `plan:
   status: draft
-automation-test-paths:
+automation-test:
   - path: ""
 `)
 	workspace := models.WorkspaceConfig{
