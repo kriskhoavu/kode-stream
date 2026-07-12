@@ -1,5 +1,5 @@
 import { type DragEvent, type Dispatch, type FormEvent, type ReactNode, type SetStateAction, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../lib/api';
@@ -52,9 +52,9 @@ type SettingsEditorState = {
   unsortedPreview: SourceStructurePreview[];
   preview: SourceStructurePreview[];
 };
-type WorkspaceDetailTab = 'overview' | 'integrations';
-type WorkspaceEditSection = 'general' | 'sources' | 'integration' | '';
-type OverviewSectionKey = 'general' | 'health' | 'sources';
+type WorkspaceDetailTab = 'overview' | 'health' | 'integrations';
+type WorkspaceEditSection = 'general' | 'sources' | 'jira' | 'knowledge' | 'runtime' | '';
+type OverviewSectionKey = 'general' | 'sources';
 export type WorkspaceImportState = 'selecting' | 'previewing' | 'reviewing' | 'importing' | 'complete' | 'error';
 
 export function defaultWorkspaceImportSelection(preview: WorkspaceImportPreview): string[] {
@@ -96,7 +96,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 	const [importResults, setImportResults] = useState<WorkspaceImportResult[]>([]);
 	const [importError, setImportError] = useState('');
 	const [importConfirmOpen, setImportConfirmOpen] = useState(false);
-  const [collapsedOverviewSections, setCollapsedOverviewSections] = useState<Record<OverviewSectionKey, boolean>>({ general: false, health: false, sources: false });
+  const [collapsedOverviewSections, setCollapsedOverviewSections] = useState<Record<OverviewSectionKey, boolean>>({ general: false, sources: false });
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 	const importStatusRef = useRef<HTMLDivElement | null>(null);
 
@@ -241,7 +241,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         sources: repo.sources.join(', '),
         jira: repo.jira ? { ...repo.jira } : null,
         knowledge: { enabled: repo.knowledge?.enabled ?? true, enrichExecutable: repo.knowledge?.enrichExecutable ?? '', enrichArgs: [...(repo.knowledge?.enrichArgs ?? [])] },
-        runtime: repo.runtime ? { ...repo.runtime, commands: { ...repo.runtime.commands, verify: { ...repo.runtime.commands.verify } }, healthChecks: [...(repo.runtime.healthChecks ?? [])], artifacts: { paths: [...(repo.runtime.artifacts?.paths ?? [])] } } : null
+        runtime: cloneRuntimeConfig(repo.runtime)
       });
     setNotice(null);
   };
@@ -639,37 +639,42 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             </button>
           </div>}
           {notice && <WorkspaceNoticePanel notice={notice} onDismiss={() => setNotice(null)} />}
-          {selectedWorkspaceId && <div className="workspace-detail-tabs" role="tablist" aria-label="Workspace settings">
-            {(['overview', 'integrations'] as WorkspaceDetailTab[]).map((tab) => (
-              <button
-                key={tab}
-                id={`workspace-tab-${tab}`}
-                type="button"
-                role="tab"
-                aria-selected={activeDetailTab === tab}
-                aria-controls="workspace-detail-panel"
-                className={activeDetailTab === tab ? 'active' : undefined}
-                onClick={() => selectDetailTab(tab)}
-                onKeyDown={(event) => {
-                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-                  event.preventDefault();
-                  const tabs: WorkspaceDetailTab[] = ['overview', 'integrations'];
-                  const offset = event.key === 'ArrowRight' ? 1 : -1;
-                  const nextTab = tabs[(tabs.indexOf(tab) + offset + tabs.length) % tabs.length];
-                  selectDetailTab(nextTab);
-                  requestAnimationFrame(() => document.getElementById(`workspace-tab-${nextTab}`)?.focus());
-                }}
-              >
-                {tab[0].toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
+          {selectedWorkspaceId && <div className="workspace-detail-tabs">
+            <div className="workspace-detail-tab-list" role="tablist" aria-label="Workspace settings">
+              {(['overview', 'health', 'integrations'] as WorkspaceDetailTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  id={`workspace-tab-${tab}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeDetailTab === tab}
+                  aria-controls="workspace-detail-panel"
+                  className={activeDetailTab === tab ? 'active' : undefined}
+                  onClick={() => selectDetailTab(tab)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                    event.preventDefault();
+                    const tabs: WorkspaceDetailTab[] = ['overview', 'health', 'integrations'];
+                    const offset = event.key === 'ArrowRight' ? 1 : -1;
+                    const nextTab = tabs[(tabs.indexOf(tab) + offset + tabs.length) % tabs.length];
+                    selectDetailTab(nextTab);
+                    requestAnimationFrame(() => document.getElementById(`workspace-tab-${nextTab}`)?.focus());
+                  }}
+                >
+                  {tab[0].toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
+            </div>
+            {editingId === selectedWorkspaceId && activeDetailTab === 'integrations' && isIntegrationEditSection(editingSection) && (
+              <button className="secondary workspace-detail-back-button" type="button" onClick={discardEdit} disabled={busy}><ArrowLeft size={15} /> Back</button>
+            )}
           </div>}
           <div className="repo-list">
             {workspaces.filter((repo) => repo.id === selectedWorkspaceId).map((repo) => (
               <article id="workspace-detail-panel" className="workspace-detail-panel" key={repo.id} role="tabpanel" aria-labelledby={`workspace-tab-${activeDetailTab}`}>
                 <header className="workspace-detail-heading">
                   <div className="repo-row-icon"><HardDrive size={18} /></div>
-                  <div><h2>{repo.name}</h2><span>{activeDetailTab === 'overview' ? 'General, health, and sources' : 'Connected services'}</span></div>
+                  <div><h2>{repo.name}</h2><span>{workspaceDetailSubtitle(activeDetailTab)}</span></div>
                   <div className="workspace-detail-heading-actions">
                     <button className="secondary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all')}><RotateCw size={16} /> Scan workspace</button>
                     <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])}><Trash2 size={16} /> Remove</button>
@@ -703,10 +708,6 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                     </>}
                   </OverviewSection>
 
-                  <OverviewSection title="Health" collapsed={collapsedOverviewSections.health} onToggle={() => toggleOverviewSection('health')}>
-                    <WorkspaceHealthPanel workspaceId={repo.id} embedded />
-                  </OverviewSection>
-
                   <OverviewSection title="Sources" collapsed={collapsedOverviewSections.sources} onToggle={() => toggleOverviewSection('sources')}>
                     {editingId === repo.id && editingSection === 'sources' ? <>
                       <SourcesField value={editDraft.sources} onChange={(value) => setEditDraft({ ...editDraft, sources: value })} />
@@ -724,16 +725,20 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                   </OverviewSection>
                 </section>}
 
+                {activeDetailTab === 'health' && <section className="workspace-detail-section">
+                  <WorkspaceHealthPanel workspaceId={repo.id} embedded />
+                </section>}
+
                 {activeDetailTab === 'integrations' && <section className="workspace-detail-section">
-                  {editingId === repo.id && editingSection === 'integration' ? <>
-                    <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />
-                    <KnowledgeSettingsFields value={editDraft.knowledge} onChange={(value) => setEditDraft({ ...editDraft, knowledge: value })} />
-                    <RuntimeSettingsFields value={editDraft.runtime} onChange={(value) => setEditDraft({ ...editDraft, runtime: value })} />
-                    <div className="repo-row-actions"><button className="secondary" type="button" onClick={discardEdit}>Cancel</button><button className="primary" type="button" onClick={() => saveEdit(repo)}>Save integration</button></div>
+                  {editingId === repo.id && isIntegrationEditSection(editingSection) ? <>
+                    {editingSection === 'jira' && <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />}
+                    {editingSection === 'knowledge' && <KnowledgeSettingsFields value={editDraft.knowledge} onChange={(value) => setEditDraft({ ...editDraft, knowledge: value })} />}
+                    {editingSection === 'runtime' && <RuntimeSettingsFields value={editDraft.runtime} onChange={(value) => setEditDraft({ ...editDraft, runtime: value })} />}
+                    <div className="repo-row-actions"><button className="secondary" type="button" onClick={discardEdit} disabled={busy}>Cancel</button><button className="primary" type="button" onClick={() => saveEdit(repo)} disabled={busy}>{integrationSaveLabel(editingSection)}</button></div>
                   </> : <><div className="workspace-integration-card">
                     <div><strong>Jira</strong><span>{repo.jira ? `${repo.jira.projectKey} · ${repo.jira.deploymentType === 'cloud' ? 'Cloud' : 'Server / Data Center'}` : 'Not configured'}</span></div>
-                    <button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
-                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>Configure Knowledge</button></div><div className="workspace-integration-card"><div><strong>Runtime and verify</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'integration')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div></>}
+                    <button className="secondary" type="button" onClick={() => startEdit(repo, 'jira')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
+                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'knowledge')}>Configure</button></div><div className="workspace-integration-card"><div><strong>Runtime and verify</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'runtime')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div></>}
                 </section>}
 
               </article>
@@ -1298,6 +1303,43 @@ export function normalizeKnowledgeSettings(value: KnowledgeSettings): KnowledgeS
 	return { enabled: value.enabled !== false, enrichExecutable: value.enrichExecutable?.trim() ?? '', enrichArgs: [...(value.enrichArgs ?? [])] };
 }
 
+function cloneRuntimeConfig(runtime: WorkspaceRuntimeConfig | undefined): WorkspaceRuntimeConfig | null {
+  if (!runtime) return null;
+  return {
+    ...runtime,
+    commands: { ...runtime.commands, verify: { ...runtime.commands.verify } },
+    healthChecks: [...(runtime.healthChecks ?? [])],
+    artifacts: { paths: [...(runtime.artifacts?.paths ?? [])] },
+    automation: runtime.automation ? { ...runtime.automation, artifactPaths: [...(runtime.automation.artifactPaths ?? [])] } : undefined
+  };
+}
+
+function workspaceDetailSubtitle(tab: WorkspaceDetailTab): string {
+  switch (tab) {
+  case 'health':
+    return 'Workspace health and diagnostics';
+  case 'integrations':
+    return 'Connected services';
+  default:
+    return 'General and sources';
+  }
+}
+
+function isIntegrationEditSection(section: WorkspaceEditSection): section is 'jira' | 'knowledge' | 'runtime' {
+  return section === 'jira' || section === 'knowledge' || section === 'runtime';
+}
+
+function integrationSaveLabel(section: 'jira' | 'knowledge' | 'runtime'): string {
+  switch (section) {
+  case 'jira':
+    return 'Save Jira';
+  case 'knowledge':
+    return 'Save Knowledge';
+  default:
+    return 'Save runtime';
+  }
+}
+
 function KnowledgeSettingsFields({ value, onChange }: { value: KnowledgeSettings; onChange: (value: KnowledgeSettings) => void }) {
 	const args = value.enrichArgs ?? [];
 	const updateArg = (index: number, argument: string) => onChange({ ...value, enrichArgs: args.map((current, currentIndex) => currentIndex === index ? argument : current) });
@@ -1307,6 +1349,9 @@ function KnowledgeSettingsFields({ value, onChange }: { value: KnowledgeSettings
 
 function RuntimeSettingsFields({ value, onChange }: { value: WorkspaceRuntimeConfig | null; onChange: (value: WorkspaceRuntimeConfig | null) => void }) {
   const runtime = value ?? defaultRuntimeConfig();
+  const [activeRuntimeTab, setActiveRuntimeTab] = useState<'runtime' | 'automation'>('runtime');
+  const [automationPickerBusy, setAutomationPickerBusy] = useState(false);
+  const [automationPickerError, setAutomationPickerError] = useState('');
   const update = (patch: Partial<WorkspaceRuntimeConfig>) => onChange({ ...runtime, ...patch });
   const updateCommands = (patch: Partial<WorkspaceRuntimeConfig['commands']>) => onChange({ ...runtime, commands: { ...runtime.commands, ...patch } });
   const updateVerify = (patch: Partial<WorkspaceRuntimeConfig['commands']['verify']>) => onChange({ ...runtime, commands: { ...runtime.commands, verify: { ...runtime.commands.verify, ...patch } } });
@@ -1315,45 +1360,71 @@ function RuntimeSettingsFields({ value, onChange }: { value: WorkspaceRuntimeCon
   const automation = runtime.automation ?? defaultRuntimeConfig().automation!;
   const updateAutomation = (patch: Partial<NonNullable<WorkspaceRuntimeConfig['automation']>>) => update({ automation: { ...automation, ...patch } });
   const automationArtifactPaths = automation.artifactPaths ?? [];
+  const browseAutomationRepository = async () => {
+    setAutomationPickerBusy(true);
+    setAutomationPickerError('');
+    try {
+      const selection = await api.selectDirectory();
+      updateAutomation({ repositoryPath: selection.path });
+    } catch (err) {
+      setAutomationPickerError(errorMessage(err));
+    } finally {
+      setAutomationPickerBusy(false);
+    }
+  };
 
   return <section className="knowledge-settings-fields" aria-label="Runtime settings">
-    <label className="repo-field jira-connection-toggle">
-      <span className="jira-connection-title">
-        <input type="checkbox" checked={value !== null} onChange={(event) => onChange(event.target.checked ? runtime : null)} />
-        Runtime verification
-      </span>
-    </label>
-    {value && <>
-      <div className="registration-mode-toggle" role="radiogroup" aria-label="Runtime type">
-        {(['docker-compose', 'procfile', 'makefile', 'custom'] as RuntimeType[]).map((option) => (
-          <button key={option} type="button" role="radio" aria-checked={runtime.type === option} className={runtime.type === option ? 'secondary active' : 'secondary'} onClick={() => update({ type: option })}>{option}</button>
-        ))}
-      </div>
-      <label className="repo-field">Runtime config path<input value={runtime.configPath ?? ''} onChange={(event) => update({ configPath: event.target.value })} placeholder="infra/docker-compose.yaml" /></label>
-      <label className="repo-field">Startup command<input value={runtime.commands.up} onChange={(event) => updateCommands({ up: event.target.value })} placeholder="docker compose up -d --no-build" /></label>
-      <label className="repo-field">Teardown command<input value={runtime.commands.down} onChange={(event) => updateCommands({ down: event.target.value })} placeholder="docker compose down" /></label>
-      <label className="repo-field">Changed-only rebuild command<input value={runtime.commands.rebuildChanged ?? ''} onChange={(event) => updateCommands({ rebuildChanged: event.target.value })} placeholder="docker compose build service-a service-b" /></label>
-      <div className="repo-field-grid">
-        <label className="repo-field">Verify smoke<input value={runtime.commands.verify.smoke} onChange={(event) => updateVerify({ smoke: event.target.value })} placeholder="pnpm test:e2e --grep @smoke" /></label>
-        <label className="repo-field">Verify critical<input value={runtime.commands.verify.critical ?? ''} onChange={(event) => updateVerify({ critical: event.target.value })} placeholder="pnpm test:e2e --grep @critical" /></label>
-      </div>
-      <label className="repo-field">Verify full<input value={runtime.commands.verify.full ?? ''} onChange={(event) => updateVerify({ full: event.target.value })} placeholder="pnpm test:e2e" /></label>
-      <label className="repo-field">Rebuild policy<select value={runtime.rebuildPolicy ?? 'changed-only'} onChange={(event) => update({ rebuildPolicy: event.target.value as WorkspaceRuntimeConfig['rebuildPolicy'] })}><option value="never">Never</option><option value="changed-only">Changed only</option><option value="always">Always</option></select></label>
-      <div className="repo-field"><span>Health checks</span>{healthChecks.map((check, index) => <div className="path-input-row" key={`${check.target}-${index}`}><select value={check.type} onChange={(event) => onChange({ ...runtime, healthChecks: healthChecks.map((current, currentIndex) => currentIndex === index ? { ...current, type: event.target.value as 'http' | 'command' } : current) })}><option value="http">HTTP</option><option value="command">Command</option></select><input value={check.target} onChange={(event) => onChange({ ...runtime, healthChecks: healthChecks.map((current, currentIndex) => currentIndex === index ? { ...current, target: event.target.value } : current) })} placeholder={check.type === 'http' ? 'http://localhost:3000/health' : 'curl -f http://localhost:3000/health'} /><button className="secondary icon-action" type="button" aria-label={`Remove health check ${index + 1}`} onClick={() => onChange({ ...runtime, healthChecks: healthChecks.filter((_, currentIndex) => currentIndex !== index) })}>×</button></div>)}<button className="secondary" type="button" onClick={() => onChange({ ...runtime, healthChecks: [...healthChecks, { type: 'http', target: '', timeoutSeconds: 30 }] })}>Add health check</button></div>
-      <div className="repo-field"><span>Artifact paths</span>{paths.map((artifactPath, index) => <div className="path-input-row" key={`${artifactPath}-${index}`}><input value={artifactPath} onChange={(event) => onChange({ ...runtime, artifacts: { paths: paths.map((current, currentIndex) => currentIndex === index ? event.target.value : current) } })} placeholder="playwright-report" /><button className="secondary icon-action" type="button" aria-label={`Remove artifact path ${index + 1}`} onClick={() => onChange({ ...runtime, artifacts: { paths: paths.filter((_, currentIndex) => currentIndex !== index) } })}>×</button></div>)}<button className="secondary" type="button" onClick={() => onChange({ ...runtime, artifacts: { paths: [...paths, ''] } })}>Add artifact path</button></div>
+    <div className="settings-subtabs" role="tablist" aria-label="Runtime and automation settings">
+      <button type="button" role="tab" aria-selected={activeRuntimeTab === 'runtime'} className={activeRuntimeTab === 'runtime' ? 'active' : undefined} onClick={() => setActiveRuntimeTab('runtime')}>Runtime verification</button>
+      <button type="button" role="tab" aria-selected={activeRuntimeTab === 'automation'} className={activeRuntimeTab === 'automation' ? 'active' : undefined} onClick={() => setActiveRuntimeTab('automation')}>Automation tests</button>
+    </div>
+    {activeRuntimeTab === 'runtime' && <>
+      <label className="repo-field jira-connection-toggle">
+        <span className="jira-connection-title">
+          <input type="checkbox" checked={value !== null} onChange={(event) => onChange(event.target.checked ? runtime : null)} />
+          Runtime verification
+        </span>
+      </label>
+      {value && <>
+        <div className="registration-mode-toggle" role="radiogroup" aria-label="Runtime type">
+          {(['docker-compose', 'procfile', 'makefile', 'custom'] as RuntimeType[]).map((option) => (
+            <button key={option} type="button" role="radio" aria-checked={runtime.type === option} className={runtime.type === option ? 'secondary active' : 'secondary'} onClick={() => update({ type: option })}>{option}</button>
+          ))}
+        </div>
+        <label className="repo-field">Runtime config path<input value={runtime.configPath ?? ''} onChange={(event) => update({ configPath: event.target.value })} placeholder="infra/docker-compose.yaml" /></label>
+        <label className="repo-field">Startup command<input value={runtime.commands.up} onChange={(event) => updateCommands({ up: event.target.value })} placeholder="docker compose up -d --no-build" /></label>
+        <label className="repo-field">Teardown command<input value={runtime.commands.down} onChange={(event) => updateCommands({ down: event.target.value })} placeholder="docker compose down" /></label>
+        <label className="repo-field">Changed-only rebuild command<input value={runtime.commands.rebuildChanged ?? ''} onChange={(event) => updateCommands({ rebuildChanged: event.target.value })} placeholder="docker compose build service-a service-b" /></label>
+        <div className="repo-field-grid">
+          <label className="repo-field">Verify smoke<input value={runtime.commands.verify.smoke} onChange={(event) => updateVerify({ smoke: event.target.value })} placeholder="pnpm test:e2e --grep @smoke" /></label>
+          <label className="repo-field">Verify critical<input value={runtime.commands.verify.critical ?? ''} onChange={(event) => updateVerify({ critical: event.target.value })} placeholder="pnpm test:e2e --grep @critical" /></label>
+        </div>
+        <label className="repo-field">Verify full<input value={runtime.commands.verify.full ?? ''} onChange={(event) => updateVerify({ full: event.target.value })} placeholder="pnpm test:e2e" /></label>
+        <label className="repo-field">Rebuild policy<select value={runtime.rebuildPolicy ?? 'changed-only'} onChange={(event) => update({ rebuildPolicy: event.target.value as WorkspaceRuntimeConfig['rebuildPolicy'] })}><option value="never">Never</option><option value="changed-only">Changed only</option><option value="always">Always</option></select></label>
+        <div className="repo-field"><span>Health checks</span>{healthChecks.map((check, index) => <div className="path-input-row" key={`${check.target}-${index}`}><select value={check.type} onChange={(event) => onChange({ ...runtime, healthChecks: healthChecks.map((current, currentIndex) => currentIndex === index ? { ...current, type: event.target.value as 'http' | 'command' } : current) })}><option value="http">HTTP</option><option value="command">Command</option></select><input value={check.target} onChange={(event) => onChange({ ...runtime, healthChecks: healthChecks.map((current, currentIndex) => currentIndex === index ? { ...current, target: event.target.value } : current) })} placeholder={check.type === 'http' ? 'http://localhost:3000/health' : 'curl -f http://localhost:3000/health'} /><button className="secondary icon-action" type="button" aria-label={`Remove health check ${index + 1}`} onClick={() => onChange({ ...runtime, healthChecks: healthChecks.filter((_, currentIndex) => currentIndex !== index) })}>×</button></div>)}<button className="secondary" type="button" onClick={() => onChange({ ...runtime, healthChecks: [...healthChecks, { type: 'http', target: '', timeoutSeconds: 30 }] })}>Add health check</button></div>
+        <div className="repo-field"><span>Artifact paths</span>{paths.map((artifactPath, index) => <div className="path-input-row" key={`${artifactPath}-${index}`}><input value={artifactPath} onChange={(event) => onChange({ ...runtime, artifacts: { paths: paths.map((current, currentIndex) => currentIndex === index ? event.target.value : current) } })} placeholder="playwright-report" /><button className="secondary icon-action" type="button" aria-label={`Remove artifact path ${index + 1}`} onClick={() => onChange({ ...runtime, artifacts: { paths: paths.filter((_, currentIndex) => currentIndex !== index) } })}>×</button></div>)}<button className="secondary" type="button" onClick={() => onChange({ ...runtime, artifacts: { paths: [...paths, ''] } })}>Add artifact path</button></div>
+      </>}
+    </>}
+    {activeRuntimeTab === 'automation' && <>
       <label className="repo-field jira-connection-toggle">
         <span className="jira-connection-title">
           <input type="checkbox" checked={automation.enabled} onChange={(event) => updateAutomation({ enabled: event.target.checked })} />
           Automation tests
         </span>
       </label>
-      <div className="repo-field-grid">
-        <label className="repo-field">Automation repository<input value={automation.repositoryPath ?? ''} onChange={(event) => updateAutomation({ repositoryPath: event.target.value })} placeholder="/Users/kdvu/Documents/0. CC/1. Discovery/testing" /></label>
+      <div className="repo-field-grid automation-field-grid">
+        <label className="repo-field automation-repository-field">Automation repository
+          <div className="path-input-row automation-repository-row">
+            <input value={automation.repositoryPath ?? ''} onChange={(event) => { setAutomationPickerError(''); updateAutomation({ repositoryPath: event.target.value }); }} placeholder="Repository path" />
+            <button className="secondary" type="button" onClick={() => void browseAutomationRepository()} disabled={automationPickerBusy}><FolderOpen size={15} /> Browse</button>
+          </div>
+          {automationPickerError && <small className="settings-error">{automationPickerError}</small>}
+        </label>
         <label className="repo-field">Automation runner<select value={automation.runner ?? 'cypress'} onChange={(event) => updateAutomation({ runner: event.target.value as NonNullable<WorkspaceRuntimeConfig['automation']>['runner'] })}><option value="cypress">Cypress</option><option value="playwright">Playwright</option></select></label>
       </div>
       <div className="repo-field-grid">
         <label className="repo-field">Default environment<input value={automation.defaultEnvironment ?? 'local'} onChange={(event) => updateAutomation({ defaultEnvironment: event.target.value })} placeholder="local" /></label>
-        <label className="repo-field">Automation command<input value={automation.commandTemplate ?? ''} onChange={(event) => updateAutomation({ commandTemplate: event.target.value })} placeholder={'CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec "{specs}"'} /></label>
+        <label className="repo-field">Automation command template<input value={automation.commandTemplate ?? ''} onChange={(event) => updateAutomation({ commandTemplate: event.target.value })} placeholder={'CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec "{specs}"'} /></label>
       </div>
       <div className="repo-field"><span>Automation artifact paths</span>{automationArtifactPaths.map((artifactPath, index) => <div className="path-input-row" key={`automation-${artifactPath}-${index}`}><input value={artifactPath} onChange={(event) => updateAutomation({ artifactPaths: automationArtifactPaths.map((current, currentIndex) => currentIndex === index ? event.target.value : current) })} placeholder="cypress/videos" /><button className="secondary icon-action" type="button" aria-label={`Remove automation artifact path ${index + 1}`} onClick={() => updateAutomation({ artifactPaths: automationArtifactPaths.filter((_, currentIndex) => currentIndex !== index) })}>×</button></div>)}<button className="secondary" type="button" onClick={() => updateAutomation({ artifactPaths: [...automationArtifactPaths, ''] })}>Add automation artifact path</button></div>
     </>}

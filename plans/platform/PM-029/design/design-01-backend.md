@@ -2,101 +2,93 @@
 
 ## Overview
 
-The backend extends the existing runtime verification model with optional automation runner settings, card-level selected specs, discovery of candidate specs, and a verification job mode that runs selected specs in an external automation repository. No database schema is required because workspace settings live in `workspaces.yaml` and item metadata lives in each item's `plan.yaml`.
+The backend supports automation verification as a separate job mode. It stores workspace automation settings, persists item-selected specs, discovers candidate specs from structured plan metadata, renders runner commands, executes them in the automation repository, and returns unified artifacts.
+
+No database schema is required. Workspace settings live in workspace config, item run selections live in item `plan.yaml`, and planned automation paths live in feature/test `plan.yaml` files.
 
 ## Data Model
 
 ### Workspace Automation Config
 
-| Field                | Type     | Purpose                                                                |
-|----------------------|----------|------------------------------------------------------------------------|
-| `enabled`            | boolean  | Controls whether automation test features are active for the workspace |
-| `repositoryPath`     | string   | Absolute path to the external automation repository                    |
-| `runner`             | string   | Runner type: `cypress`, `playwright`, or `custom`                      |
-| `defaultEnvironment` | string   | Default test environment, initially `local`                            |
-| `commandTemplate`    | string   | Shell command template rendered for selected specs                     |
-| `artifactPaths`      | string[] | Paths inside the automation repo to collect after a run                |
+| Field                | Type     | Purpose                                                |
+|----------------------|----------|--------------------------------------------------------|
+| `enabled`            | boolean  | Enables automation controls and runs                   |
+| `repositoryPath`     | string   | Absolute path to the automation repository             |
+| `runner`             | string   | `cypress` or `playwright`                              |
+| `defaultEnvironment` | string   | Default card environment, usually `local` or `nightly` |
+| `commandTemplate`    | string   | Shell command template rendered at run time            |
+| `artifactPaths`      | string[] | Automation repo paths to collect after a run           |
 
 ### Item Verification Metadata
 
-| Field           | Type     | Purpose                                                      |
-|-----------------|----------|--------------------------------------------------------------|
-| `selectedSpecs` | string[] | Workspace-independent spec paths relative to automation repo |
-| `environment`   | string   | Optional item-level default environment override             |
-| `updatedAt`     | string   | Timestamp used for display and conflict clarity              |
+| Field           | Type     | Purpose                                    |
+|-----------------|----------|--------------------------------------------|
+| `selectedSpecs` | string[] | Spec paths relative to the automation repo |
+| `environment`   | string   | Item-level environment override            |
+| `displayMode`   | string   | `silent` or `visible` browser mode         |
+| `updatedAt`     | string   | Timestamp for display and conflict clarity |
 
-The item metadata writer stores this under the existing item `plan.yaml`. Plan Manager should keep the metadata sparse and only write the verification section when selected specs or an environment override exists.
+### Planned Automation Metadata
 
-### Verification Job Extensions
+| Field                          | Type    | Purpose                                            |
+|--------------------------------|---------|----------------------------------------------------|
+| `automation-test-paths[].path` | string  | Planned Cypress or Playwright spec path suggestion |
+| `plan.wiki_enriched`           | boolean | Wiki enrichment state stored in `plan.yaml`        |
 
-| Field                | Type     | Purpose                                                              |
-|----------------------|----------|----------------------------------------------------------------------|
-| `mode`               | string   | `runtime` for existing profiles, `automation` for selected spec runs |
-| `environment`        | string   | Effective automation environment                                     |
-| `selectedSpecs`      | string[] | Specs used by the job                                                |
-| `automationRepoPath` | string   | Repository path used by the job                                      |
-| `renderedCommand`    | string   | Final command stored for logs and auditability                       |
-
-Existing `profile`, `trigger`, `provider`, `sessionId`, and `terminalMode` remain backward compatible.
+Empty `automation-test-paths[].path` entries are valid placeholders and must be ignored by discovery.
 
 ## API Contract
 
-| Method | Endpoint                                                   | Request                                 | Response                              |
-|--------|------------------------------------------------------------|-----------------------------------------|---------------------------------------|
-| `GET`  | `/api/workspaces/{id}/runtime`                             | none                                    | Runtime config with automation fields |
-| `PUT`  | `/api/workspaces/{id}/runtime`                             | Runtime config with automation fields   | Saved runtime config                  |
-| `GET`  | `/api/items/{itemId}/verification-tests`                   | none                                    | Selected specs and discovered specs   |
-| `PUT`  | `/api/items/{itemId}/verification-tests`                   | Selected specs and optional environment | Saved selected specs                  |
-| `POST` | `/api/workspaces/{id}/verification-jobs`                   | Runtime profile or automation run input | Verification job                      |
-| `GET`  | `/api/workspaces/{id}/verification-jobs/{jobId}`           | none                                    | Verification job                      |
-| `GET`  | `/api/workspaces/{id}/verification-jobs/{jobId}/artifacts` | none                                    | Verification artifacts                |
+| Method | Endpoint                                 | Request                               | Response                              |
+|--------|------------------------------------------|---------------------------------------|---------------------------------------|
+| `GET`  | `/api/workspaces/{id}/runtime`           | none                                  | Runtime config with automation        |
+| `PUT`  | `/api/workspaces/{id}/runtime`           | Runtime config                        | Saved runtime config                  |
+| `GET`  | `/api/items/{itemId}/verification-tests` | none                                  | Selection plus discovered specs       |
+| `PUT`  | `/api/items/{itemId}/verification-tests` | Specs, environment, display mode      | Saved selection plus discovered specs |
+| `POST` | `/api/workspaces/{id}/verification-jobs` | Runtime profile or automation payload | Verification job                      |
+
+Automation job payload includes `mode: automation`, selected specs, environment, and display mode.
+
+## Discovery Strategy
+
+Spec discovery must be fast and metadata-first:
+
+1. Look for likely `plan.yaml` files in the automation repo using item identifier, scope, and item ID.
+2. Return non-empty `automation-test-paths[].path` entries as discovered specs.
+
+This avoids slow full-repo Markdown scans during Quality panel load.
 
 ## Command Rendering
 
-| Template Variable | Source                                                   |
-|-------------------|----------------------------------------------------------|
-| `{env}`           | Request environment, item override, or workspace default |
-| `{specs}`         | Selected spec paths joined for the runner                |
-| `{workspacePath}` | Main app workspace path                                  |
-| `{itemId}`        | Current item identifier                                  |
-| `{itemPath}`      | Current item path inside workspace                       |
+| Placeholder  | Source / Meaning                                   |
+|--------------|----------------------------------------------------|
+| `{env}`      | Item environment or workspace default              |
+| `{specs}`    | Selected spec paths joined for the runner          |
+| `{modeArgs}` | Runner-specific args for visible mode              |
+| `{headed}`   | Headed-only flag when visible mode is selected     |
+| `{browser}`  | Browser/project flag when visible mode is selected |
 
-The default Cypress template runs `npx cypress run --spec` with selected specs and the effective environment. Playwright can later use the same field with a different runner default.
+If visible mode is selected and the template has no mode placeholder, the backend appends runner defaults:
+
+| Runner     | Visible mode args             |
+|------------|-------------------------------|
+| Cypress    | `--headed --browser chrome`   |
+| Playwright | `--headed --project=chromium` |
 
 ## Execution Flow
 
 ```text
-Start verification job
-  -> resolve workspace runtime config
-  -> if mode is runtime, run existing profile command
-  -> if mode is automation, validate automation config and selected specs
-  -> create artifact root under main workspace
-  -> run prepare, up, health in main workspace
-  -> render automation command
-  -> run command in automation repository
+Create automation job
+  -> validate runtime automation config
+  -> validate selected specs are relative and inside automation repo
+  -> create artifact root
+  -> run prepare, up, and health in app workspace
+  -> run rendered command in automation repository
   -> collect runtime and automation artifacts
   -> run teardown
-  -> mark passed or failed
+  -> expose status, steps, logs, and artifacts
 ```
 
-## Validation Rules
+## Knowledge Flag Risk
 
-| Rule                                             | Error Behavior                                |
-|--------------------------------------------------|-----------------------------------------------|
-| Automation repository must exist and be a folder | Reject save or run when automation is enabled |
-| Selected specs must be relative paths            | Reject absolute paths                         |
-| Selected specs must stay inside automation repo  | Reject path traversal                         |
-| Automation command template must be non-empty    | Reject automation run                         |
-| Runtime smoke command remains required           | Preserve existing runtime validation behavior |
-| Unknown runner values are invalid                | Reject save                                   |
-
-## Design Decisions
-
-| Decision                                           | Rationale                                                              |
-|----------------------------------------------------|------------------------------------------------------------------------|
-| Store automation config in workspace runtime       | The automation runner is part of how a workspace verifies itself       |
-| Store selected specs in item metadata              | Test links belong to the card and should move with the planning item   |
-| Keep existing runtime mode as the default          | Existing API callers that post only `profile` must continue to work    |
-| Add a separate automation mode                     | Automation runs need selected specs, environment, and repo context     |
-| Run automation in the external repo working dir    | Test dependencies, Cypress config, and reports live in that repository |
-| Collect artifacts from both runtime and test repos | Users should inspect runtime logs and test runner output in one job    |
+The Knowledge page implementation does not depend on `wiki_enriched`. It scans `docs/**` wiki pages and parses wiki frontmatter. Moving `wiki_enriched` to `plan.yaml` affects wiki enrichment skill behavior and migration scripts, not Knowledge page rendering.

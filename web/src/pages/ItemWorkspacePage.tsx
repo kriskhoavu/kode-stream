@@ -28,7 +28,7 @@ import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels } from '../lib/api';
-import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile, WorkspaceConfig } from '../lib/types';
+import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile, WorkspaceConfig, WorkspaceTreeEntry } from '../lib/types';
 import { labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile } from '../shared/domain/diff';
@@ -47,10 +47,10 @@ import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspa
 import { BranchSnapshotPicker } from '../features/workstream/BranchSnapshotPicker';
 
 type Tab = 'preview' | 'raw' | 'diff';
-type RightPanelTab = 'info' | 'git' | 'jira';
+type RightPanelTab = 'info' | 'jira' | 'quality';
 type DiffMode = 'review' | 'raw';
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
-type DetailViewMode = 'plan' | 'workspace';
+type DetailViewMode = 'plan' | 'workspace' | 'git';
 type BranchViewState = { branch: string; currentCheckoutBranch: string; sourceMode: 'working_tree' | 'snapshot'; missing: true };
 type OpenItemFileTab = { id: string; path: string; name: string; editable: boolean };
 
@@ -104,7 +104,14 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [verificationError, setVerificationError] = useState('');
   const [verificationTests, setVerificationTests] = useState<ItemVerificationTests | null>(null);
   const [verificationTestsBusy, setVerificationTestsBusy] = useState(false);
+  const [automationLaunchBusy, setAutomationLaunchBusy] = useState(false);
   const [manualSpec, setManualSpec] = useState('');
+  const [specPickerOpen, setSpecPickerOpen] = useState(false);
+  const [specPickerPath, setSpecPickerPath] = useState('');
+  const [specPickerEntries, setSpecPickerEntries] = useState<WorkspaceTreeEntry[]>([]);
+  const [specPickerSelected, setSpecPickerSelected] = useState<string[]>([]);
+  const [specPickerLoading, setSpecPickerLoading] = useState(false);
+  const [specPickerError, setSpecPickerError] = useState('');
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
   const [artifactPreview, setArtifactPreview] = useState<{ title: string; path: string; content: string; loading: boolean; error: string } | null>(null);
   const [workspaceExplorerLocation, setWorkspaceExplorerLocation] = useState<ExplorerLocation>();
@@ -661,6 +668,16 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     setDetailViewMode('plan');
   };
 
+  const openGitView = () => {
+    if (!plan) return;
+    setWorkspaceExplorerLocation((current) => ({
+      workspaceId: plan.workspaceId,
+      path: currentWorkspacePath || current?.path,
+      mode: current?.mode ?? 'all'
+    }));
+    setDetailViewMode('git');
+  };
+
   const scheduleFileChangeRefresh = () => {
     clearTimer(autoSaveRefreshTimerRef);
     autoSaveRefreshTimerRef.current = window.setTimeout(() => {
@@ -739,8 +756,17 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
 
   const selectedSpecs = verificationTests?.selection.selectedSpecs ?? [];
   const automationEnvironment = verificationTests?.selection.environment || workspaceConfig?.runtime?.automation?.defaultEnvironment || 'local';
+  const automationDisplayMode = verificationTests?.selection.displayMode === 'visible' ? 'visible' : 'silent';
+  const automationJobActive = verificationJob?.mode === 'automation' && (verificationJob.status === 'queued' || verificationJob.status === 'running');
+  const automationRunBusy = automationLaunchBusy || automationJobActive;
+  const automationRepoPath = workspaceConfig?.runtime?.automation?.repositoryPath ?? '';
+  const automationWorkspace = useMemo(() => {
+    const target = normalizeLocalPath(automationRepoPath);
+    if (!target) return undefined;
+    return workspaces.find((workspace) => normalizeLocalPath(workspace.path) === target);
+  }, [automationRepoPath, workspaces]);
   const setSelectedSpecs = async (specs: string[]) => {
-    await saveVerificationTests({ selectedSpecs: specs, environment: automationEnvironment });
+    await saveVerificationTests({ selectedSpecs: specs, environment: automationEnvironment, displayMode: automationDisplayMode });
   };
   const addSelectedSpec = async (spec: string) => {
     const clean = spec.trim();
@@ -751,7 +777,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     await setSelectedSpecs(selectedSpecs.filter((candidate) => candidate !== spec));
   };
   const saveAutomationEnvironment = async (environment: string) => {
-    await saveVerificationTests({ selectedSpecs, environment });
+    await saveVerificationTests({ selectedSpecs, environment, displayMode: automationDisplayMode });
+  };
+  const saveAutomationDisplayMode = async (displayMode: 'silent' | 'visible') => {
+    await saveVerificationTests({ selectedSpecs, environment: automationEnvironment, displayMode });
   };
   const addManualSpec = async () => {
     const clean = manualSpec.trim();
@@ -759,21 +788,61 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     await addSelectedSpec(clean);
     setManualSpec('');
   };
+  const openSpecPicker = () => {
+    setSpecPickerPath('');
+    setSpecPickerSelected([]);
+    setSpecPickerError('');
+    setSpecPickerOpen(true);
+  };
+  const loadSpecPickerDirectory = async (path: string) => {
+    if (!automationWorkspace) return;
+    setSpecPickerLoading(true);
+    setSpecPickerError('');
+    try {
+      const listing = await api.workspaceTree(automationWorkspace.id, path);
+      setSpecPickerPath(listing.path);
+      setSpecPickerEntries(listing.entries.filter((entry) => entry.type === 'directory' || isAutomationSpecPath(entry.path)));
+    } catch (err) {
+      setSpecPickerError(err instanceof Error ? err.message : 'Failed to browse automation specs');
+    } finally {
+      setSpecPickerLoading(false);
+    }
+  };
+  const togglePickerSpec = (path: string) => {
+    setSpecPickerSelected((current) => current.includes(path) ? current.filter((spec) => spec !== path) : [...current, path]);
+  };
+  const addPickedSpecs = async () => {
+    const nextSpecs = [...selectedSpecs];
+    specPickerSelected.forEach((spec) => {
+      if (!nextSpecs.includes(spec)) nextSpecs.push(spec);
+    });
+    await setSelectedSpecs(nextSpecs);
+    setSpecPickerOpen(false);
+    setSpecPickerSelected([]);
+  };
+
+  useEffect(() => {
+    if (!specPickerOpen || !automationWorkspace) return;
+    void loadSpecPickerDirectory(specPickerPath);
+  }, [specPickerOpen, automationWorkspace?.id, specPickerPath]);
 
   const runAutomationVerification = async () => {
     if (!plan) return;
     setVerificationBusy(true);
+    setAutomationLaunchBusy(true);
     setVerificationError('');
     try {
-      const tests = await saveVerificationTests({ selectedSpecs, environment: automationEnvironment });
+      const tests = await saveVerificationTests({ selectedSpecs, environment: automationEnvironment, displayMode: automationDisplayMode });
       const specs = tests?.selection.selectedSpecs ?? selectedSpecs;
       const environment = tests?.selection.environment || automationEnvironment;
-      const job = await api.createVerificationJob(plan.workspaceId, { mode: 'automation', environment, selectedSpecs: specs, trigger: 'manual_checkpoint', terminalMode: 'embedded' });
+      const displayMode = tests?.selection.displayMode === 'visible' ? 'visible' : automationDisplayMode;
+      const job = await api.createVerificationJob(plan.workspaceId, { mode: 'automation', environment, displayMode, selectedSpecs: specs, trigger: 'manual_checkpoint', terminalMode: 'embedded' });
       setVerificationJob(job);
     } catch (err) {
       setVerificationError(err instanceof Error ? err.message : 'Failed to start automation verification');
     } finally {
       setVerificationBusy(false);
+      setAutomationLaunchBusy(false);
     }
   };
 
@@ -815,17 +884,172 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     }
   };
 
+  const qualityPanel = (
+    <section className="metadata-callout quality-panel" aria-label="Quality">
+      <div className="verification-header">
+        <strong>Quality</strong>
+        {verificationJob && <span className={`verification-trigger-badge ${verificationTriggerTone(verificationJob)}`}>{verificationTriggerLabel(verificationJob)}</span>}
+      </div>
+      <div className="verification-actions">
+        <button className="secondary" type="button" onClick={() => void runVerification('smoke')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run smoke verify</button>
+        <button className="secondary" type="button" onClick={() => void runVerification('critical')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run critical verify</button>
+        <button className="secondary" type="button" onClick={() => void rerunVerification()} disabled={verificationBusy || !verificationJob}>Re-run latest</button>
+      </div>
+      {!plan?.workspaceId && <span className="verification-note">No workspace selected.</span>}
+      {plan?.workspaceId && !workspaceConfig?.runtime && <span className="verification-note">Runtime not configured for this workspace.</span>}
+      {workspaceConfig?.runtime && !workspaceConfig.runtime.automation?.enabled && <span className="verification-note">Automation tests are not configured for this workspace.</span>}
+      {workspaceConfig?.runtime?.automation?.enabled && (
+        <div className="automation-test-panel">
+          <div className="quality-section-heading">
+            <strong>Automation</strong>
+            <span>Environment and card-linked specs</span>
+          </div>
+          <label className="repo-field">Automation environment<input value={automationEnvironment} onChange={(event) => void saveAutomationEnvironment(event.target.value)} placeholder="local" /></label>
+          <div className="automation-mode-field">
+            <span>Run mode</span>
+            <div className="segmented-control automation-mode-toggle" role="tablist" aria-label="Automation run mode">
+              <button type="button" className={automationDisplayMode === 'silent' ? 'active' : ''} aria-selected={automationDisplayMode === 'silent'} onClick={() => void saveAutomationDisplayMode('silent')}>Silent</button>
+              <button type="button" className={automationDisplayMode === 'visible' ? 'active' : ''} aria-selected={automationDisplayMode === 'visible'} onClick={() => void saveAutomationDisplayMode('visible')}>Visible browser</button>
+            </div>
+          </div>
+          <div className="quality-section-heading compact">
+            <strong>Selected specs</strong>
+            {!automationWorkspace && <span>Register the automation repository as a workspace to browse specs.</span>}
+          </div>
+          <div className="automation-spec-list" aria-label="Selected automation specs">
+            {selectedSpecs.length ? selectedSpecs.map((spec) => <span className="automation-spec-chip" key={spec}>{spec}<button type="button" aria-label={`Remove ${spec}`} onClick={() => void removeSelectedSpec(spec)}>×</button></span>) : <span className="verification-note">No selected specs.</span>}
+          </div>
+          <div className="path-input-row manual-spec-row">
+            <input aria-label="Manual automation spec" value={manualSpec} onChange={(event) => setManualSpec(event.target.value)} placeholder="Repo-relative spec path" />
+            <button className="secondary" type="button" onClick={() => void addManualSpec()} disabled={!manualSpec.trim()}>Add spec</button>
+            <button className="secondary browse-specs-action" type="button" onClick={openSpecPicker} disabled={!automationWorkspace}>Browse</button>
+          </div>
+          <div className="automation-action-row">
+            <button className={automationRunBusy ? 'secondary automation-run-action progress-button active' : 'secondary automation-run-action'} type="button" onClick={() => void runAutomationVerification()} disabled={automationRunBusy || verificationTestsBusy || !plan?.workspaceId || !workspaceConfig?.runtime?.automation?.enabled || selectedSpecs.length === 0}>
+              <span>{automationRunBusy ? (automationDisplayMode === 'visible' ? 'Starting browser...' : 'Running automation...') : 'Run automation tests'}</span>
+              {automationRunBusy && <span className="button-progress-bar" aria-hidden="true" />}
+            </button>
+          </div>
+          <div className="automation-suggestions">
+            <div className="quality-subsection-heading">
+              <strong>Suggested specs</strong>
+              <span>From automation-test-paths in plan.yaml</span>
+            </div>
+            {verificationTests?.discoveredSpecs?.length ? (
+              <div className="automation-discovered-specs" aria-label="Suggested automation specs">
+                {verificationTests.discoveredSpecs.map((spec) => {
+                  const selected = selectedSpecs.includes(spec.path);
+                  return (
+                    <article className={selected ? 'automation-suggestion-card selected' : 'automation-suggestion-card'} key={`${spec.path}-${spec.sourcePath ?? ''}`}>
+                      <div>
+                        <strong>{spec.path}</strong>
+                        <span>{spec.runner}{spec.sourcePath ? ` · ${spec.sourcePath}` : ''}</span>
+                      </div>
+                      <button className="secondary" type="button" disabled={selected} onClick={() => void addSelectedSpec(spec.path)}>
+                        {selected ? 'Selected' : 'Select'}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : <span className="verification-note">No suggested specs from plan.yaml.</span>}
+          </div>
+        </div>
+      )}
+      {verificationBusy && <span className="verification-note">Starting verification...</span>}
+      {verificationError && <span className="error" role="alert">{verificationError}</span>}
+      {verificationJob && <span className="verification-status">{verificationJob.mode === 'automation' ? 'automation' : verificationJob.profile} · {verificationJob.status}{verificationJob.failureType ? ` (${verificationJob.failureType})` : ''}</span>}
+      {verificationJob && <span className="verification-note">{verificationTriggerDescription(verificationJob)}</span>}
+      {verificationJob?.steps?.length ? (
+        <div className="verification-steps">
+          {verificationJob.steps.map((step) => (
+            <span className={`verification-step ${step.status === 'ok' ? 'ok' : 'failed'}`} key={`${step.step}-${step.at}`}>{step.step}: {step.status}</span>
+          ))}
+        </div>
+      ) : null}
+      {verificationJob?.artifacts?.length ? (
+        <div className="verification-artifacts">
+          {verificationJob.artifacts.map((artifact) => (
+            <article className="verification-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
+              <div className="verification-artifact-meta">
+                <strong>{formatArtifactKind(artifact.kind, artifact.path)}</strong>
+                <span>{artifact.path}</span>
+                <small>{formatBytes(artifact.sizeBytes)} · {formatAt(artifact.createdAt)}</small>
+              </div>
+              <div className="verification-artifact-actions">
+                <button className="secondary" type="button" onClick={() => void previewArtifact(formatArtifactKind(artifact.kind, artifact.path), artifact.path)}>Preview</button>
+                <button className="secondary" type="button" onClick={() => void openArtifactPath(artifact.path)}>Open</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+
+  const gitPanel = gitStatus ? (
+    <section className="git-panel git-main-panel">
+      <h3>Git</h3>
+      <div className="git-summary">
+        <span>{gitStatus.branch}</span>
+        <span>{gitStatus.ahead} ahead</span>
+        <span>{gitStatus.behind} behind</span>
+      </div>
+      <div className="workspace-actions">
+        <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('fetch')}>{gitBusy === 'fetch' ? 'Fetching...' : 'Fetch'}</button>
+        <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('pull')}>{gitBusy === 'pull' ? 'Pulling...' : 'Pull'}</button>
+        <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('push')}>{gitBusy === 'push' ? 'Pushing...' : 'Push'}</button>
+      </div>
+      <div className="git-changes">
+        {gitStatus.changes.length === 0 && <span>No local changes</span>}
+        {gitStatus.changes.map((change) => (
+          <label key={`${change.status}-${change.path}`}>
+            <input type="checkbox" checked={selectedGitPaths.includes(change.path)} onChange={() => toggleGitPath(change.path)} />
+            <span>{change.status}</span>
+            <strong>{change.path}</strong>
+          </label>
+        ))}
+      </div>
+      <textarea className="commit-message" value={gitMessage} onChange={(event) => setGitMessage(event.target.value)} placeholder="Commit message" />
+      <button className="primary" type="button" disabled={Boolean(gitBusy) || selectedGitPaths.length === 0 || !gitMessage.trim()} onClick={commitSelectedPaths}>
+        {gitBusy === 'commit' ? 'Committing...' : 'Commit Selected'}
+      </button>
+      <div className="branch-create-row">
+        <input value={branchName} onChange={(event) => setBranchName(event.target.value)} placeholder="new-branch-name" />
+        <button className="secondary" type="button" disabled={Boolean(gitBusy) || !branchName.trim()} onClick={createAndSwitchBranch}>
+          {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
+        </button>
+      </div>
+      <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
+        const open = event.currentTarget.open;
+        setGitActivityOpen(open);
+        localStorage.setItem('item.details.gitActivityOpen', open ? '1' : '0');
+      }}>
+        <summary>
+          <span>Recent Activity</span>
+          <small>{gitActivity.length} events</small>
+        </summary>
+        <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
+      </details>
+    </section>
+  ) : (
+    <div className="metadata-callout git-main-panel">
+      <strong>Git status unavailable</strong>
+      <span>Refresh the workspace or scan the source to load Git information.</span>
+    </div>
+  );
+
   const workItemPanelContent = (
     <>
       <div className="side-panel-tabs" role="tablist" aria-label="Item side panel">
         <button type="button" className={rightPanelTab === 'info' ? 'active' : ''} onClick={() => setRightPanelTab('info')}>
           <Info size={14} /> Info
         </button>
-        <button type="button" className={rightPanelTab === 'git' ? 'active' : ''} onClick={() => setRightPanelTab('git')}>
-          <GitBranch size={14} /> Git
-        </button>
         <button type="button" className={rightPanelTab === 'jira' ? 'active' : ''} onClick={() => setRightPanelTab('jira')}>
           <Ticket size={14} /> Jira
+        </button>
+        <button type="button" className={rightPanelTab === 'quality' ? 'active' : ''} onClick={() => setRightPanelTab('quality')}>
+          <GitCompare size={14} /> Quality
         </button>
       </div>
       {rightPanelTab === 'info' && (
@@ -859,70 +1083,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           <div className="workspace-actions">
             <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
           </div>
-          <section className="metadata-callout verification-harness" aria-label="Verification harness">
-            <div className="verification-header">
-              <strong>Verification Harness</strong>
-              {verificationJob && <span className={`verification-trigger-badge ${verificationTriggerTone(verificationJob)}`}>{verificationTriggerLabel(verificationJob)}</span>}
-            </div>
-            <div className="verification-actions">
-              <button className="secondary" type="button" onClick={() => void runVerification('smoke')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run smoke verify</button>
-              <button className="secondary" type="button" onClick={() => void runVerification('critical')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run critical verify</button>
-              <button className="secondary" type="button" onClick={() => void runAutomationVerification()} disabled={verificationBusy || verificationTestsBusy || !plan?.workspaceId || !workspaceConfig?.runtime?.automation?.enabled || selectedSpecs.length === 0}>Run automation tests</button>
-              <button className="secondary" type="button" onClick={() => void rerunVerification()} disabled={verificationBusy || !verificationJob}>Re-run latest</button>
-            </div>
-            {!plan?.workspaceId && <span className="verification-note">No workspace selected.</span>}
-            {plan?.workspaceId && !workspaceConfig?.runtime && <span className="verification-note">Runtime not configured for this workspace.</span>}
-            {workspaceConfig?.runtime && !workspaceConfig.runtime.automation?.enabled && <span className="verification-note">Automation tests are not configured for this workspace.</span>}
-            {workspaceConfig?.runtime?.automation?.enabled && (
-              <div className="automation-test-panel">
-                <label className="repo-field">Automation environment<input value={automationEnvironment} onChange={(event) => void saveAutomationEnvironment(event.target.value)} placeholder="local" /></label>
-                <div className="automation-spec-list" aria-label="Selected automation specs">
-                  {selectedSpecs.length ? selectedSpecs.map((spec) => <span className="automation-spec-chip" key={spec}>{spec}<button type="button" aria-label={`Remove ${spec}`} onClick={() => void removeSelectedSpec(spec)}>×</button></span>) : <span className="verification-note">No selected specs.</span>}
-                </div>
-                <div className="path-input-row">
-                  <input aria-label="Manual automation spec" value={manualSpec} onChange={(event) => setManualSpec(event.target.value)} placeholder="cypress/e2e/example.cy.ts" />
-                  <button className="secondary" type="button" onClick={() => void addManualSpec()} disabled={!manualSpec.trim()}>Add spec</button>
-                </div>
-                {verificationTests?.discoveredSpecs?.length ? (
-                  <div className="automation-discovered-specs" aria-label="Discovered automation specs">
-                    {verificationTests.discoveredSpecs.map((spec) => (
-                      <button className="secondary" type="button" key={`${spec.path}-${spec.sourcePath ?? ''}`} disabled={selectedSpecs.includes(spec.path)} onClick={() => void addSelectedSpec(spec.path)}>
-                        {selectedSpecs.includes(spec.path) ? 'Selected' : 'Accept'} {spec.path}
-                      </button>
-                    ))}
-                  </div>
-                ) : <span className="verification-note">No discovered specs for this card.</span>}
-              </div>
-            )}
-            {verificationBusy && <span className="verification-note">Starting verification...</span>}
-            {verificationError && <span className="error" role="alert">{verificationError}</span>}
-            {verificationJob && <span className="verification-status">{verificationJob.mode === 'automation' ? 'automation' : verificationJob.profile} · {verificationJob.status}{verificationJob.failureType ? ` (${verificationJob.failureType})` : ''}</span>}
-            {verificationJob && <span className="verification-note">{verificationTriggerDescription(verificationJob)}</span>}
-            {verificationJob?.steps?.length ? (
-              <div className="verification-steps">
-                {verificationJob.steps.map((step) => (
-                  <span className={`verification-step ${step.status === 'ok' ? 'ok' : 'failed'}`} key={`${step.step}-${step.at}`}>{step.step}: {step.status}</span>
-                ))}
-              </div>
-            ) : null}
-            {verificationJob?.artifacts?.length ? (
-              <div className="verification-artifacts">
-                {verificationJob.artifacts.map((artifact) => (
-                  <article className="verification-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
-                    <div className="verification-artifact-meta">
-                      <strong>{artifact.kind}</strong>
-                      <span>{artifact.path}</span>
-                      <small>{formatBytes(artifact.sizeBytes)} · {formatAt(artifact.createdAt)}</small>
-                    </div>
-                    <div className="verification-artifact-actions">
-                      <button className="secondary" type="button" onClick={() => void previewArtifact(artifact.kind, artifact.path)}>Preview</button>
-                      <button className="secondary" type="button" onClick={() => void openArtifactPath(artifact.path)}>Open</button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : null}
-          </section>
           <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
           {visibleWarnings.length ? (
             <div className="plan-warnings">
@@ -932,60 +1092,8 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           ) : null}
         </>
       )}
-      {rightPanelTab === 'git' && (
-        gitStatus ? (
-          <section className="git-panel">
-            <h3>Git</h3>
-            <div className="git-summary">
-              <span>{gitStatus.branch}</span>
-              <span>{gitStatus.ahead} ahead</span>
-              <span>{gitStatus.behind} behind</span>
-            </div>
-            <div className="workspace-actions">
-              <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('fetch')}>{gitBusy === 'fetch' ? 'Fetching...' : 'Fetch'}</button>
-              <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('pull')}>{gitBusy === 'pull' ? 'Pulling...' : 'Pull'}</button>
-              <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('push')}>{gitBusy === 'push' ? 'Pushing...' : 'Push'}</button>
-            </div>
-            <div className="git-changes">
-              {gitStatus.changes.length === 0 && <span>No local changes</span>}
-              {gitStatus.changes.map((change) => (
-                <label key={`${change.status}-${change.path}`}>
-                  <input type="checkbox" checked={selectedGitPaths.includes(change.path)} onChange={() => toggleGitPath(change.path)} />
-                  <span>{change.status}</span>
-                  <strong>{change.path}</strong>
-                </label>
-              ))}
-            </div>
-            <textarea className="commit-message" value={gitMessage} onChange={(event) => setGitMessage(event.target.value)} placeholder="Commit message" />
-            <button className="primary" type="button" disabled={Boolean(gitBusy) || selectedGitPaths.length === 0 || !gitMessage.trim()} onClick={commitSelectedPaths}>
-              {gitBusy === 'commit' ? 'Committing...' : 'Commit Selected'}
-            </button>
-            <div className="branch-create-row">
-              <input value={branchName} onChange={(event) => setBranchName(event.target.value)} placeholder="new-branch-name" />
-              <button className="secondary" type="button" disabled={Boolean(gitBusy) || !branchName.trim()} onClick={createAndSwitchBranch}>
-                {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
-              </button>
-            </div>
-            <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setGitActivityOpen(open);
-              localStorage.setItem('item.details.gitActivityOpen', open ? '1' : '0');
-            }}>
-              <summary>
-                <span>Recent Activity</span>
-                <small>{gitActivity.length} events</small>
-              </summary>
-              <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
-            </details>
-          </section>
-        ) : (
-          <div className="metadata-callout">
-            <strong>Git status unavailable</strong>
-            <span>Refresh the workspace or scan the source to load Git information.</span>
-          </div>
-        )
-      )}
       {rightPanelTab === 'jira' && <JiraItemPanel itemId={itemId} />}
+      {rightPanelTab === 'quality' && qualityPanel}
       {error && (
         <div className="operation-error">
           <p className="error">{error}</p>
@@ -1060,6 +1168,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           embedded
           showModeSelector={false}
           treeRootPath={detailViewMode === 'plan' ? itemRootPath : undefined}
+          mainContent={detailViewMode === 'git' ? gitPanel : undefined}
           rightPanel={{
             title: <><Info size={16} /> Work Item</>,
             content: workItemPanelContent,
@@ -1071,8 +1180,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           }}
           embeddedHeaderContent={
             <div className="segmented-control segmented-control-compact" role="tablist" aria-label="Item detail view mode">
-              <button type="button" className={detailViewMode === 'plan' ? 'active' : ''} aria-selected={detailViewMode === 'plan'} onClick={openPlanView}>Plan files</button>
+              <button type="button" className={detailViewMode === 'plan' ? 'active' : ''} aria-selected={detailViewMode === 'plan'} onClick={openPlanView}>Plan</button>
               <button type="button" className={detailViewMode === 'workspace' ? 'active' : ''} aria-selected={detailViewMode === 'workspace'} onClick={openWorkspaceView}>Explorer</button>
+              <button type="button" className={detailViewMode === 'git' ? 'active' : ''} aria-selected={detailViewMode === 'git'} onClick={openGitView}>Git</button>
             </div>
           }
           workspaces={explorerWorkspaces}
@@ -1188,6 +1298,42 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
               <button className="secondary" type="button" onClick={() => void openArtifactPath(artifactPreview.path)}>Open externally</button>
               <button className="primary" type="button" onClick={() => setArtifactPreview(null)}>Close</button>
             </div>
+          </div>
+        </section>
+      )}
+      {specPickerOpen && (
+        <section className="modal-backdrop" role="presentation" onClick={() => setSpecPickerOpen(false)}>
+          <div className="modal-panel spec-picker-modal" role="dialog" aria-modal="true" aria-label="Browse automation specs" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <h2>Browse automation specs</h2>
+                <span>{automationWorkspace?.name ?? 'Automation repository'} / {specPickerPath || 'root'}</span>
+              </div>
+              <button className="icon-button" type="button" aria-label="Close spec browser" onClick={() => setSpecPickerOpen(false)}><X size={16} /></button>
+            </header>
+            {specPickerPath && (
+              <button className="secondary spec-picker-up" type="button" onClick={() => setSpecPickerPath(parentPath(specPickerPath))}>Up one folder</button>
+            )}
+            {specPickerError && <p className="error" role="alert">{specPickerError}</p>}
+            <div className="spec-picker-list" aria-label="Automation spec files">
+              {specPickerLoading && <span className="verification-note">Loading specs...</span>}
+              {!specPickerLoading && specPickerEntries.length === 0 && <span className="verification-note">No spec files in this folder.</span>}
+              {!specPickerLoading && specPickerEntries.map((entry) => entry.type === 'directory' ? (
+                <button className="spec-picker-row directory" type="button" key={entry.path} onClick={() => setSpecPickerPath(entry.path)}>
+                  <FolderOpen size={15} /> <span>{entry.name}</span>
+                </button>
+              ) : (
+                <label className="spec-picker-row" key={entry.path}>
+                  <input type="checkbox" checked={specPickerSelected.includes(entry.path)} disabled={selectedSpecs.includes(entry.path)} onChange={() => togglePickerSpec(entry.path)} />
+                  <span>{entry.path}</span>
+                  {selectedSpecs.includes(entry.path) && <small>Selected</small>}
+                </label>
+              ))}
+            </div>
+            <footer className="modal-actions">
+              <button className="secondary" type="button" onClick={() => setSpecPickerOpen(false)}>Cancel</button>
+              <button className="primary" type="button" disabled={specPickerSelected.length === 0 || verificationTestsBusy} onClick={() => void addPickedSpecs()}>Add {specPickerSelected.length || ''} spec{specPickerSelected.length === 1 ? '' : 's'}</button>
+            </footer>
           </div>
         </section>
       )}
@@ -1437,6 +1583,20 @@ function normalizePath(path: string): string {
   return path.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
+function normalizeLocalPath(path: string): string {
+  return path.trim().replace(/\/+$/, '');
+}
+
+function parentPath(path: string): string {
+  const parts = normalizePath(path).split('/').filter(Boolean);
+  parts.pop();
+  return parts.join('/');
+}
+
+function isAutomationSpecPath(path: string): boolean {
+  return /\.(?:cy|spec|test)\.(?:ts|tsx|js|jsx)$/i.test(normalizePath(path));
+}
+
 function lastPathSegment(path: string): string {
   const normalized = path.replace(/\/+$/, '');
   const separator = normalized.lastIndexOf('/');
@@ -1509,6 +1669,18 @@ function formatAt(value?: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+}
+
+function formatArtifactKind(kind: string, path: string): string {
+  const fileName = path.split('/').at(-1)?.toLowerCase() ?? '';
+  if (kind === 'automation_log' || fileName === 'automation.log') return 'Automation log';
+  if (kind === 'verify_log' || fileName === 'verify.log') return 'Verification log';
+  if (kind === 'runtime_log' || fileName === 'runtime.log') return 'Runtime setup log';
+  if (kind === 'playwright_trace') return 'Playwright trace';
+  if (kind === 'playwright_video') return 'Playwright video';
+  if (kind === 'playwright_screenshot') return 'Screenshot';
+  if (kind === 'playwright_report') return 'Test report';
+  return kind.replaceAll('_', ' ');
 }
 
 function verificationTriggerLabel(job: VerificationJob): string {

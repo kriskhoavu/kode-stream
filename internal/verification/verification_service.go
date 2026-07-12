@@ -63,6 +63,7 @@ type Job struct {
 	Mode               JobMode                        `json:"mode"`
 	Profile            appruntime.VerifyProfile       `json:"profile"`
 	Environment        string                         `json:"environment,omitempty"`
+	DisplayMode        models.AutomationDisplayMode   `json:"displayMode,omitempty"`
 	SelectedSpecs      []string                       `json:"selectedSpecs,omitempty"`
 	AutomationRepoPath string                         `json:"automationRepoPath,omitempty"`
 	RenderedCommand    string                         `json:"renderedCommand,omitempty"`
@@ -81,14 +82,15 @@ type Job struct {
 }
 
 type CreateInput struct {
-	Profile       appruntime.VerifyProfile `json:"profile"`
-	Mode          JobMode                  `json:"mode,omitempty"`
-	Environment   string                   `json:"environment,omitempty"`
-	SelectedSpecs []string                 `json:"selectedSpecs,omitempty"`
-	Trigger       string                   `json:"trigger,omitempty"`
-	Provider      string                   `json:"provider,omitempty"`
-	SessionID     string                   `json:"sessionId,omitempty"`
-	TerminalMode  string                   `json:"terminalMode,omitempty"`
+	Profile       appruntime.VerifyProfile     `json:"profile"`
+	Mode          JobMode                      `json:"mode,omitempty"`
+	Environment   string                       `json:"environment,omitempty"`
+	DisplayMode   models.AutomationDisplayMode `json:"displayMode,omitempty"`
+	SelectedSpecs []string                     `json:"selectedSpecs,omitempty"`
+	Trigger       string                       `json:"trigger,omitempty"`
+	Provider      string                       `json:"provider,omitempty"`
+	SessionID     string                       `json:"sessionId,omitempty"`
+	TerminalMode  string                       `json:"terminalMode,omitempty"`
 }
 
 type CheckpointEvent struct {
@@ -143,6 +145,7 @@ func (s *Service) Start(workspaceID string, input CreateInput) (Job, error) {
 		TerminalMode:       strings.TrimSpace(input.TerminalMode),
 		Runtime:            workspace.Runtime,
 		Environment:        automation.environment,
+		DisplayMode:        automation.displayMode,
 		SelectedSpecs:      automation.selectedSpecs,
 		AutomationRepoPath: automation.repositoryPath,
 		RenderedCommand:    automation.renderedCommand,
@@ -189,6 +192,7 @@ func (s *Service) Rerun(workspaceID, jobID string, profile appruntime.VerifyProf
 		Profile:       profile,
 		Mode:          previous.Mode,
 		Environment:   previous.Environment,
+		DisplayMode:   previous.DisplayMode,
 		SelectedSpecs: previous.SelectedSpecs,
 		Trigger:       "rerun",
 		Provider:      previous.Provider,
@@ -293,6 +297,7 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 
 type automationJobConfig struct {
 	environment     string
+	displayMode     models.AutomationDisplayMode
 	selectedSpecs   []string
 	repositoryPath  string
 	renderedCommand string
@@ -326,12 +331,14 @@ func prepareAutomationJob(runtimeConfig *models.WorkspaceRuntimeConfig, input Cr
 	if environment == "" {
 		environment = runtimeConfig.Automation.DefaultEnvironment
 	}
-	rendered := renderAutomationCommand(runtimeConfig.Automation.CommandTemplate, environment, selectedSpecs)
+	displayMode := normalizeAutomationDisplayMode(input.DisplayMode)
+	rendered := renderAutomationCommand(runtimeConfig.Automation.CommandTemplate, runtimeConfig.Automation.Runner, environment, selectedSpecs, displayMode)
 	if strings.TrimSpace(rendered) == "" {
 		return automationJobConfig{}, errors.New("runtime automation commandTemplate is required")
 	}
 	return automationJobConfig{
 		environment:     environment,
+		displayMode:     displayMode,
 		selectedSpecs:   selectedSpecs,
 		repositoryPath:  runtimeConfig.Automation.RepositoryPath,
 		renderedCommand: rendered,
@@ -370,11 +377,53 @@ func validateSelectedSpecs(repositoryPath string, specs []string) ([]string, err
 	return selected, nil
 }
 
-func renderAutomationCommand(template, environment string, selectedSpecs []string) string {
+func normalizeAutomationDisplayMode(mode models.AutomationDisplayMode) models.AutomationDisplayMode {
+	if mode == models.AutomationDisplayModeVisible {
+		return models.AutomationDisplayModeVisible
+	}
+	return models.AutomationDisplayModeSilent
+}
+
+func renderAutomationCommand(template string, runner models.AutomationRunner, environment string, selectedSpecs []string, displayMode models.AutomationDisplayMode) string {
 	rendered := strings.TrimSpace(template)
+	modeArgs := automationModeArgs(runner, displayMode)
+	hasModePlaceholder := strings.Contains(rendered, "{modeArgs}") || strings.Contains(rendered, "{headed}") || strings.Contains(rendered, "{browser}")
 	rendered = strings.ReplaceAll(rendered, "{env}", environment)
 	rendered = strings.ReplaceAll(rendered, "{specs}", strings.Join(selectedSpecs, ","))
+	rendered = strings.ReplaceAll(rendered, "{modeArgs}", modeArgs)
+	rendered = strings.ReplaceAll(rendered, "{headed}", automationHeadedArg(displayMode))
+	rendered = strings.ReplaceAll(rendered, "{browser}", automationBrowserArg(runner, displayMode))
+	if modeArgs != "" && !hasModePlaceholder {
+		rendered = strings.TrimSpace(rendered + " " + modeArgs)
+	}
 	return rendered
+}
+
+func automationModeArgs(runner models.AutomationRunner, displayMode models.AutomationDisplayMode) string {
+	if displayMode != models.AutomationDisplayModeVisible {
+		return ""
+	}
+	if runner == models.AutomationRunnerPlaywright {
+		return "--headed --project=chromium"
+	}
+	return "--headed --browser chrome"
+}
+
+func automationHeadedArg(displayMode models.AutomationDisplayMode) string {
+	if displayMode == models.AutomationDisplayModeVisible {
+		return "--headed"
+	}
+	return ""
+}
+
+func automationBrowserArg(runner models.AutomationRunner, displayMode models.AutomationDisplayMode) string {
+	if displayMode != models.AutomationDisplayModeVisible {
+		return ""
+	}
+	if runner == models.AutomationRunnerPlaywright {
+		return "--project=chromium"
+	}
+	return "--browser chrome"
 }
 
 func verifyLogName(mode JobMode) string {
@@ -460,7 +509,14 @@ func (s *Service) collectAutomationArtifacts(job *Job) {
 
 func classifyArtifact(path string) string {
 	lower := strings.ToLower(filepath.ToSlash(path))
+	name := filepath.Base(lower)
 	switch {
+	case name == "automation.log":
+		return "automation_log"
+	case name == "verify.log":
+		return "verify_log"
+	case name == "runtime.log":
+		return "runtime_log"
 	case strings.Contains(lower, "trace"):
 		return "playwright_trace"
 	case strings.Contains(lower, "video"):

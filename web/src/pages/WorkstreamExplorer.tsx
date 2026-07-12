@@ -39,7 +39,7 @@ type ExplorerRightPanelProps = {
   expandedLabel?: string;
 };
 
-export function WorkstreamExplorer({ workspaces, location, onLocationChange, embedded = false, treeRootPath, showModeSelector = true, embeddedHeaderContent, rightPanel }: {
+export function WorkstreamExplorer({ workspaces, location, onLocationChange, embedded = false, treeRootPath, showModeSelector = true, embeddedHeaderContent, mainContent, rightPanel }: {
   workspaces: WorkspaceConfig[];
   location?: ExplorerLocation;
   onLocationChange: (location?: ExplorerLocation) => void;
@@ -47,6 +47,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   treeRootPath?: string;
   showModeSelector?: boolean;
   embeddedHeaderContent?: ReactNode;
+  mainContent?: ReactNode;
   rightPanel?: ExplorerRightPanelProps;
 }) {
   const explorer = useWorkstreamExplorer(workspaces, location, onLocationChange);
@@ -389,6 +390,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
           {!leftCollapsed && <button className="explorer-resize-handle left" aria-label="Resize workspace tree" onPointerDown={(event) => startResize('left', event)} />}
         </aside>
         <main className="workspace-file-editor">
+          {mainContent ?? <>
           <div className="explorer-breadcrumbs">
             <span>{workspace?.name ?? 'Select a workspace'}</span>
             {((activeTab?.path ?? location?.path)?.split('/') ?? []).filter(Boolean).map((part, index, parts) => <span key={`${part}-${index}`}>{index < parts.length && ' / '}{part}</span>)}
@@ -423,6 +425,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
           {tab === 'preview' && (editor.file ? <ContentViewer file={editor.file} content={editor.content} /> : <ExplorerEmpty row={selectedRow} />)}
           {tab === 'raw' && <textarea className="raw-editor" value={editor.file ? editor.content : 'Select a file.'} disabled={!editor.file?.editable} onChange={(event) => editor.setContent(event.target.value)} spellCheck={false} />}
           {tab === 'diff' && <ExplorerDiff diff={diff} onRevert={() => setRevertOpen(true)} disabled={!editor.file || reverting} />}
+          </>}
         </main>
         <aside className={rightPanelOpen ? `explorer-inspector${rightPanel?.className ? ` ${rightPanel.className}` : ''}` : `explorer-inspector collapsed${rightPanel?.className ? ` ${rightPanel.className}` : ''}`}>
           <div className="panel-header"><h2>{rightPanelTitle}</h2><button className="icon-button" type="button" aria-label={rightPanelOpen ? rightPanelExpandedLabel : rightPanelCollapsedLabel} onClick={() => rightPanel?.onToggle ? rightPanel.onToggle() : setInspectorOpen((value) => !value)}>{rightPanelOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button></div>

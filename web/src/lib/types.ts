@@ -129,6 +129,7 @@ export interface WorkspaceRuntimeConfig {
 
 export type VerifyProfile = 'smoke' | 'critical' | 'full';
 export type VerificationRunMode = 'runtime' | 'automation';
+export type AutomationDisplayMode = 'silent' | 'visible';
 export type VerificationStatus = 'queued' | 'running' | 'passed' | 'failed';
 export type VerificationFailureType = 'boot_failure' | 'test_failure' | 'infra_failure';
 
@@ -153,6 +154,7 @@ export interface VerificationJob {
   mode?: VerificationRunMode;
   profile: VerifyProfile;
   environment?: string;
+  displayMode?: AutomationDisplayMode | string;
   selectedSpecs?: string[];
   automationRepoPath?: string;
   renderedCommand?: string;
@@ -173,6 +175,7 @@ export interface VerificationJob {
 export interface VerificationTestSelection {
   selectedSpecs: string[];
   environment?: string;
+  displayMode?: AutomationDisplayMode;
   updatedAt?: string;
 }
 
@@ -191,6 +194,7 @@ export interface CreateVerificationJobInput {
   profile?: VerifyProfile;
   mode?: VerificationRunMode;
   environment?: string;
+  displayMode?: AutomationDisplayMode;
   selectedSpecs?: string[];
   trigger?: string;
   provider?: string;

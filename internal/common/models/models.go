@@ -177,6 +177,13 @@ type RuntimeAutomationConfig struct {
 	ArtifactPaths      []string         `json:"artifactPaths,omitempty" yaml:"artifactPaths,omitempty"`
 }
 
+type AutomationDisplayMode string
+
+const (
+	AutomationDisplayModeSilent  AutomationDisplayMode = "silent"
+	AutomationDisplayModeVisible AutomationDisplayMode = "visible"
+)
+
 type WorkspaceRuntimeConfig struct {
 	Type          RuntimeType              `json:"type" yaml:"type"`
 	ConfigPath    string                   `json:"configPath,omitempty" yaml:"configPath,omitempty"`
@@ -586,9 +593,14 @@ type ItemMetadataUpdateInput struct {
 }
 
 type VerificationTestSelection struct {
-	SelectedSpecs []string  `json:"selectedSpecs" yaml:"selectedSpecs"`
-	Environment   string    `json:"environment,omitempty" yaml:"environment,omitempty"`
-	UpdatedAt     time.Time `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
+	SelectedSpecs []string              `json:"selectedSpecs" yaml:"selectedSpecs"`
+	Environment   string                `json:"environment,omitempty" yaml:"environment,omitempty"`
+	DisplayMode   AutomationDisplayMode `json:"displayMode,omitempty" yaml:"displayMode,omitempty"`
+	UpdatedAt     time.Time             `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
+}
+
+type AutomationTestPath struct {
+	Path string `json:"path" yaml:"path"`
 }
 
 type DiscoveredVerificationSpec struct {

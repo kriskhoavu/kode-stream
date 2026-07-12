@@ -389,6 +389,7 @@ function normalizeItemVerificationTests(input: ItemVerificationTests): ItemVerif
     selection: {
       selectedSpecs: Array.isArray(input.selection?.selectedSpecs) ? input.selection.selectedSpecs : [],
       environment: input.selection?.environment ?? '',
+      displayMode: input.selection?.displayMode === 'visible' ? 'visible' : 'silent',
       updatedAt: input.selection?.updatedAt
     },
     discoveredSpecs: Array.isArray(input.discoveredSpecs) ? input.discoveredSpecs : []

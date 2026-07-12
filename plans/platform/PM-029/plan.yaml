@@ -1,2 +1,9 @@
 plan:
   status: draft
+  tags:
+    - automation
+    - verification
+    - knowledge
+  wiki_enriched: false
+automation-test-paths:
+  - path: ""

@@ -81,6 +81,24 @@ func TestAutomationVerificationRunsSelectedSpecsAndCollectsArtifacts(t *testing.
 	if !hasArtifact(job, filepath.Join(automationRepo, "run.txt")) {
 		t.Fatalf("artifacts = %#v", job.Artifacts)
 	}
+	if !hasArtifactKindSuffix(job, "automation_log", "automation.log") || !hasArtifactKindSuffix(job, "runtime_log", "runtime.log") {
+		t.Fatalf("log artifacts = %#v", job.Artifacts)
+	}
+}
+
+func TestAutomationVisibleModeRendersRunnerFlags(t *testing.T) {
+	cypress := renderAutomationCommand("npx cypress run --spec \"{specs}\"", models.AutomationRunnerCypress, "local", []string{"cypress/e2e/create.cy.ts"}, models.AutomationDisplayModeVisible)
+	if cypress != "npx cypress run --spec \"cypress/e2e/create.cy.ts\" --headed --browser chrome" {
+		t.Fatalf("cypress command = %q", cypress)
+	}
+	playwright := renderAutomationCommand("npx playwright test {specs} {modeArgs}", models.AutomationRunnerPlaywright, "local", []string{"tests/create.spec.ts"}, models.AutomationDisplayModeVisible)
+	if playwright != "npx playwright test tests/create.spec.ts --headed --project=chromium" {
+		t.Fatalf("playwright command = %q", playwright)
+	}
+	silent := renderAutomationCommand("npx playwright test {specs}", models.AutomationRunnerPlaywright, "local", []string{"tests/create.spec.ts"}, models.AutomationDisplayModeSilent)
+	if silent != "npx playwright test tests/create.spec.ts" {
+		t.Fatalf("silent command = %q", silent)
+	}
 }
 
 func TestAutomationVerificationFailureRunsTeardown(t *testing.T) {
@@ -230,6 +248,16 @@ func hasArtifact(job Job, path string) bool {
 	path = filepath.ToSlash(path)
 	for _, candidate := range job.Artifacts {
 		if candidate.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func hasArtifactKindSuffix(job Job, kind, suffix string) bool {
+	suffix = filepath.ToSlash(suffix)
+	for _, candidate := range job.Artifacts {
+		if candidate.Kind == kind && strings.HasSuffix(candidate.Path, suffix) {
 			return true
 		}
 	}

@@ -2,130 +2,115 @@
 
 ## Overview
 
-Implement card-linked automation verification in behavior-preserving phases. Existing Smoke, Critical, and Full runtime profiles remain backward compatible. Automation adds optional workspace settings, item-level selected specs, test discovery, and a new verification job mode.
+PM-029 is the active plan for external automation verification. The target state is a Quality workflow where runtime health checks, card-linked automation specs, visible-browser execution, and metadata-first spec discovery work together without relying on README frontmatter.
 
 ## Terminology Lock
 
-All code, fields, API params, and UI labels should use:
+Use these terms consistently:
 
+- `Quality`
+- `Runtime Verification Profile`
 - `Automation Repository`
-- `Automation Runner`
 - `Selected Spec`
+- `Planned Automation Path`
 - `Discovered Spec`
 - `Run automation tests`
-- `Runtime Verification Profile`
-
-Avoid:
-
-- `real automation` as a code term
-- `test repo command` without runner context
-- Reusing `smoke` or `critical` to mean card-linked automation specs
+- `Silent`
+- `Visible browser`
 
 ## Phases Summary
 
-| Phase | Name                              | Status |
-|-------|-----------------------------------|--------|
-| B1    | Automation Config And Metadata    | Done   |
-| B2    | Automation Verification Execution | Done   |
-| F1    | Frontend Types And API            | Done   |
-| F2    | Settings And Item Harness UI      | Done   |
-| V1    | End-To-End Verification           | Done   |
+| Phase | Name                                      | Status |
+|-------|-------------------------------------------|--------|
+| B1    | Runtime Automation Execution              | Done   |
+| B2    | Metadata-First Spec Discovery             | Done   |
+| B3    | Wiki Enrichment Metadata Migration Review | Done   |
+| F1    | Workspace Settings And Quality UI         | Done   |
+| F2    | Visible Browser Run Feedback              | Done   |
+| V1    | Verification And Regression Coverage      | Done   |
 
 ## Backend Phases
 
-### Phase B1: Automation Config And Metadata
+### Phase B1: Runtime Automation Execution
 
 **Deliverables:**
 
-- [x] Add optional automation config to workspace runtime models and TypeScript-compatible JSON fields.
-- [x] Normalize defaults for Cypress runner, local environment, command template, and artifact paths.
-- [x] Validate enabled automation config without weakening existing runtime validation.
-- [x] Add item verification-test read/save service for selected specs and optional environment override.
-- [x] Add discovery service that scans matching automation plan docs for `cypress/e2e` and future `playwright` path references.
-- [x] Add backend tests for normalization, validation, selected spec persistence, and discovery from plan docs.
+- [x] Workspace automation config with repo path, runner, environment, command template, and artifacts.
+- [x] Item `verificationTests` selection with selected specs, environment, display mode, and timestamp.
+- [x] Automation verification job mode that runs after runtime prepare/up/health.
+- [x] Safe spec path validation inside the automation repository.
+- [x] Runtime setup log, automation log, and collected artifact output.
+- [x] Silent and visible browser command rendering.
 
-**Verification:** `rtk go test ./internal/runtime ./internal/workspace/... ./internal/server/api`
-
-**Commit:** `PM-029: Add automation config and selected specs`
+**Verification:** `rtk go test ./internal/verification ./internal/item/... ./internal/server/api`
 
 ---
 
-### Phase B2: Automation Verification Execution
+### Phase B2: Metadata-First Spec Discovery
 
 **Deliverables:**
 
-- [x] Extend verification job input and output with mode, environment, selected specs, automation repo path, and rendered command.
-- [x] Keep existing profile-only job creation as runtime mode.
-- [x] Validate selected specs are relative and stay inside the automation repository before command execution.
-- [x] Add automation execution after `prepare`, `up`, and `health`, running in the automation repository.
-- [x] Always attempt runtime teardown after automation pass or failure.
-- [x] Collect automation reports, videos, screenshots, and logs into the existing artifact response.
-- [x] Add tests for runtime-mode compatibility, automation pass, automation test failure, boot failure skip, and path traversal rejection.
+- [x] Add planned automation path parsing from `automation-test-paths[].path` in automation repo `plan.yaml`.
+- [x] Check likely plan YAML locations without scanning Markdown files.
+- [x] Ignore empty placeholder paths.
+- [x] Remove Markdown fallback for automation suggestions.
+- [x] Add tests proving Markdown-only plan docs are ignored.
 
-**Verification:** `rtk go test ./internal/verification ./internal/runtime ./internal/server/api && rtk go test ./...`
-
-**Commit:** `PM-029: Run selected automation specs from verification jobs`
+**Verification:** `rtk go test ./internal/item/... ./internal/server/api`
 
 ---
+
+### Phase B3: Wiki Enrichment Metadata Migration Review
+
+**Deliverables:**
+
+- [x] Update wiki-enrich instructions to write `plan.wiki_enriched` in `plan.yaml`.
+- [x] Stop writing `wiki_enriched` README frontmatter.
+- [x] Confirm Knowledge page behavior is unaffected because Knowledge indexes docs wiki pages, not feature-plan enrichment flags.
+- [x] No app code reads `wiki_enriched`, so no Knowledge page code change is required.
+
+**Verification:** focused skill/doc review plus existing Knowledge tests if app code changes.
 
 ## Frontend Phases
 
-### Phase F1: Frontend Types And API
+### Phase F1: Workspace Settings And Quality UI
 
 **Deliverables:**
 
-- [x] Extend runtime and verification TypeScript types with automation config and job metadata.
-- [x] Add API client methods for item verification-test read/save.
-- [x] Extend `createVerificationJob` input with automation mode, environment, and selected specs.
-- [x] Add focused tests or type coverage for runtime-mode backward compatibility.
+- [x] Workspace sections for Overview, Health, and Integrations.
+- [x] Focused integration detail views with Back navigation.
+- [x] Runtime verification and Automation tests as sibling settings tabs.
+- [x] Automation repository Browse action.
+- [x] Right-panel Quality tab with runtime actions and automation controls.
+- [x] Main item tabs for Plan, Explorer, and Git.
+- [x] Spec browser rooted at the registered automation workspace with multi-select.
 
-**Verification:** `rtk npm run typecheck && rtk npm test -- --run`
-
-**Commit:** `PM-029: Add automation verification frontend contracts`
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run web/src/pages/ItemWorkspacePage.test.ts web/src/features/workspaces/WorkspaceDetails.test.tsx`
 
 ---
 
-### Phase F2: Settings And Item Harness UI
+### Phase F2: Visible Browser Run Feedback
 
 **Deliverables:**
 
-- [x] Add Automation tests controls to workspace Runtime and verify settings.
-- [x] Show automation setup status in the item verification harness.
-- [x] Show discovered specs and selected specs with accept, remove, and manual-add actions.
-- [x] Persist selected specs before running automation.
-- [x] Add `Run automation tests` beside existing Smoke and Critical actions.
-- [x] Reuse current verification polling, steps, artifact preview, and open-path actions.
-- [x] Add frontend tests for settings editing, disabled states, spec selection, and automation run payload.
+- [x] Silent and Visible browser run mode toggle.
+- [x] Automation run payload includes `displayMode`.
+- [x] `Run automation tests` shows an in-button progress bar while launching/running.
+- [x] Visible mode shows `Starting browser...` while Chrome/Chromium is starting.
+- [x] Friendly artifact labels for `Automation log`, `Runtime setup log`, and reports.
 
-**Verification:** `rtk npm run typecheck && rtk npm test -- --run`
-
-**Commit:** `PM-029: Add automation verification UI`
-
----
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run web/src/pages/ItemWorkspacePage.test.ts`
 
 ## Verification Phase
 
-### Phase V1: End-To-End Verification
+### Phase V1: Verification And Regression Coverage
 
 **Deliverables:**
 
-- [x] Confirm automation repository `/Users/kdvu/Documents/0. CC/1. Discovery/testing` is available for local workspace configuration.
-- [x] Confirm `DI-390` plan docs contain Create Offer Cypress spec references discoverable from `plans/DI-390/test-plan.md`.
-- [x] Verify selected-spec persistence through backend and frontend tests.
-- [x] Verify `Run smoke verify` still uses the existing runtime profile through runtime-mode compatibility tests.
-- [x] Verify `Run critical verify` still uses the existing runtime profile or smoke fallback through unchanged profile handling.
-- [x] Verify `Run automation tests` payload, execution flow, teardown, and artifact listing through backend and frontend tests.
-- [x] Update PM-029 docs with final phase status.
+- [x] Backend tests for `automation-test-paths` YAML parsing and discovery precedence.
+- [x] Backend tests that empty planned paths are ignored.
+- [x] Frontend tests remain green for Quality panel, spec browse, display mode, and run payload.
+- [x] Confirm `wiki_enriched` move does not affect Knowledge page indexing.
+- [x] Confirm generated `internal/server/frontend/index.html` hash churn is not committed.
 
-**Verification:** `rtk go test ./... && rtk npm run typecheck && rtk npm test -- --run && rtk npm run build`
-
-**Commit:** `PM-029: Verify external automation runner`
-
-## Post-Implementation Checklist
-
-- [x] Existing Smoke and Critical profile behavior is unchanged.
-- [x] Automation command execution rejects paths outside the automation repository.
-- [x] Card-selected specs are persisted explicitly.
-- [x] Discovery never runs tests by itself; it only suggests specs.
-- [x] Runtime teardown is attempted after automation failures.
-- [x] Planning docs match final API and UI names.
+**Verification:** `rtk go test ./internal/item/... ./internal/server/api ./internal/verification && rtk npm run typecheck && rtk npm test -- --run web/src/pages/ItemWorkspacePage.test.ts web/src/features/workspaces/WorkspaceDetails.test.tsx`

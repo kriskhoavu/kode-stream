@@ -2,63 +2,52 @@
 
 ## Overview
 
-The frontend extends workspace runtime settings and the item verification harness. Existing Smoke and Critical buttons stay in place. A new automation area lets users review discovered specs, persist selected specs, choose an environment, and run card-specific automation tests.
+The frontend exposes automation verification through workspace settings and the item Quality panel. Runtime verification remains visible and separate from automation. Users can configure the automation repo, browse specs from the registered repo, choose silent or visible browser mode, and run selected specs from the current item.
 
-## Types And API
+## Workspace Settings
 
-| Type                         | Purpose                                                                   |
-|------------------------------|---------------------------------------------------------------------------|
-| `WorkspaceAutomationConfig`  | Optional automation settings inside `WorkspaceRuntimeConfig`              |
-| `VerificationRunMode`        | Distinguishes existing runtime runs from automation runs                  |
-| `VerificationTestSelection`  | Selected specs and effective environment for one item                     |
-| `DiscoveredVerificationSpec` | Candidate spec with path, source document, and confidence label           |
-| `VerificationJob`            | Extended with mode, selected specs, automation repo, and rendered command |
+Workspace details use top-level sections for Overview, Health, and Integrations. Integration details use a back button and focused detail views so each integration does not show unrelated settings.
 
-The shared API client should add item verification-test endpoints and extend `createVerificationJob` input without breaking existing callers that only pass `profile`.
+Runtime settings contain sibling tabs:
 
-## Workspace Settings UI
+| Tab                  | Purpose                                                           |
+|----------------------|-------------------------------------------------------------------|
+| Runtime verification | App startup, teardown, health, runtime verify commands, artifacts |
+| Automation tests     | Automation repo, runner, environment, command template, artifacts |
 
-| Control             | Behavior                                                                  |
-|---------------------|---------------------------------------------------------------------------|
-| Enable automation   | Shows or hides automation settings while preserving entered draft values  |
-| Repository path     | Uses text input plus existing directory picker pattern                    |
-| Runner selector     | Offers Cypress, Playwright, and Custom                                    |
-| Default environment | Free text, defaulting to `local`                                          |
-| Command template    | Editable command template with concise placeholder help outside the field |
-| Artifact paths      | Reuses the existing repeatable artifact path input pattern                |
+The automation repository field supports both text entry and a folder browser. The Browse action selects a directory path; the repo should also be registered as a workspace before card-level spec browsing is available.
 
-The settings UI lives under the current Runtime and verify integration card so users configure startup, health, runtime verify, and automation in one place.
+## Item Quality Panel
 
-## Item Verification Harness
+The item right panel has `Info`, `Jira`, and `Quality` tabs. The main item view has `Plan`, `Explorer`, and `Git` tabs.
 
-| Area                    | Behavior                                                                |
-|-------------------------|-------------------------------------------------------------------------|
-| Runtime profile actions | Keep `Run smoke verify`, `Run critical verify`, and `Re-run latest`     |
-| Automation status       | Shows whether automation is configured and whether specs are selected   |
-| Discovered specs        | Shows suggestions from matching ticket docs and spec path references    |
-| Selected specs          | Allows accepting suggestions, removing specs, and adding paths manually |
-| Environment             | Defaults from workspace config and can be overridden for the card run   |
-| Run automation tests    | Starts an automation verification job with selected specs               |
+Quality contains:
 
-The existing polling, step rendering, artifact cards, preview, and open actions should be reused for automation jobs.
+| Area                   | Behavior                                                         |
+|------------------------|------------------------------------------------------------------|
+| Runtime actions        | `Run smoke verify`, `Run critical verify`, `Re-run latest`       |
+| Automation environment | Free text environment saved with item selection                  |
+| Run mode               | Segmented toggle for `Silent` and `Visible browser`              |
+| Selected specs         | Chips for saved specs, remove action, manual add path input      |
+| Browse                 | Modal browser rooted at registered automation workspace          |
+| Run automation tests   | Starts automation job and shows in-button progress while running |
+| Artifacts              | Friendly cards for automation log, runtime setup log, reports    |
 
-## States
+Manual add and Browse are attached to the spec path input. Run automation tests is a full-width automation action. The manual spec input uses normal panel colors in light and dark themes.
 
-| State                     | UI Behavior                                                 |
-|---------------------------|-------------------------------------------------------------|
-| Runtime not configured    | Existing runtime note remains                               |
-| Automation not configured | Automation action disabled with setup note                  |
-| Suggestions available     | Suggestions are shown separately from selected specs        |
-| No specs selected         | Automation action disabled until at least one selected spec |
-| Job running               | Existing verification busy and polling behavior applies     |
-| Job failed                | Existing failure display shows failure type and failed step |
+## Spec Browser
 
-## Design Decisions
+The spec browser uses the registered automation workspace tree API. It allows directory navigation and multi-select of files matching Cypress or Playwright spec naming patterns:
 
-| Decision                                   | Rationale                                                              |
-|--------------------------------------------|------------------------------------------------------------------------|
-| Keep automation in the existing harness    | Users already look there for verification actions                      |
-| Separate selected specs from suggestions   | Users need stable run intent instead of mutable discovery results      |
-| Reuse existing artifact UI                 | Runtime and automation jobs should feel like one verification system   |
-| Keep command details in workspace settings | Per-card UI should focus on specs and environment, not shell templates |
-| Use existing dense settings styling        | This is an operational tool, not a marketing or onboarding surface     |
+- `*.cy.ts`, `*.cy.js`, `*.cy.tsx`, `*.cy.jsx`
+- `*.spec.ts`, `*.test.ts`, and JS/TSX/JSX variants
+
+Selected paths are saved as item `verificationTests.selectedSpecs`.
+
+## Run Progress
+
+`Run automation tests` shows a compact animated progress bar inside the button while the automation launch request is in flight or the automation job is queued/running. In visible browser mode, the label reads `Starting browser...` to cover the Chrome/Chromium startup wait.
+
+## Knowledge Flag Review
+
+No Knowledge page UI change is required for moving `wiki_enriched` to `plan.yaml`. The frontend Knowledge page reads Knowledge API responses built from docs wiki pages, not feature-plan enrichment flags.

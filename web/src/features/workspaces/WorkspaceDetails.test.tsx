@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api';
 import { WorkspacesPage } from '../../pages/WorkspacesPage';
@@ -24,15 +24,13 @@ describe('workspace detail settings', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('groups general, health, and sources into collapsible Overview sections', () => {
+  it('keeps overview focused on general and sources while health has its own tab', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
     render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
 
-    expect(screen.queryByRole('tab', { name: 'Health' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Health' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Sources' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Workspace health')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'General' })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: 'Health' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: 'Sources' })).toHaveAttribute('aria-expanded', 'true');
     const heading = screen.getByRole('button', { name: 'Remove' }).closest('header');
     expect(heading).toHaveClass('workspace-detail-heading');
@@ -45,9 +43,14 @@ describe('workspace detail settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sources' }));
     expect(screen.queryByText('docs')).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('tab', { name: 'Health' }));
+    expect(screen.getByLabelText('Workspace health')).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
     expect(screen.getByText('DI · Cloud')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Configure' })).toBeInTheDocument();
+    const jiraCard = screen.getByText('Jira').closest('.workspace-integration-card');
+    expect(jiraCard).not.toBeNull();
+    expect(within(jiraCard as HTMLElement).getByRole('button', { name: 'Configure' })).toBeInTheDocument();
   });
 
   it('guards tab navigation while a settings draft is open', () => {
@@ -70,7 +73,50 @@ describe('workspace detail settings', () => {
 
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Overview' }), { key: 'ArrowRight' });
 
+    expect(screen.getByRole('tab', { name: 'Health' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Health' }), { key: 'ArrowRight' });
+
     expect(screen.getByRole('tab', { name: 'Integrations' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens only the selected integration settings and provides a back action', () => {
+    vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
+    const knowledgeCard = screen.getByText('Knowledge').closest('.workspace-integration-card');
+    expect(knowledgeCard).not.toBeNull();
+    fireEvent.click(within(knowledgeCard as HTMLElement).getByRole('button', { name: 'Configure' }));
+
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Knowledge Wiki detection')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Jira integration')).not.toBeInTheDocument();
+    expect(screen.queryByText('Runtime verification')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    const restoredKnowledgeCard = screen.getByText('Knowledge').closest('.workspace-integration-card');
+    expect(restoredKnowledgeCard).not.toBeNull();
+    expect(within(restoredKnowledgeCard as HTMLElement).getByRole('button', { name: 'Configure' })).toBeInTheDocument();
+  });
+
+  it('shows runtime verification and automation as sibling tabs', () => {
+    vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set runtime' }));
+
+    expect(screen.getByRole('tab', { name: 'Runtime verification' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Automation tests' })).toHaveAttribute('aria-selected', 'false');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Runtime verification' }));
+    expect(screen.getByRole('radiogroup', { name: 'Runtime type' })).toBeInTheDocument();
+    expect(screen.queryByText('Automation repository')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Automation tests' }));
+
+    expect(screen.getByRole('tab', { name: 'Automation tests' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Automation repository')).toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Runtime type' })).not.toBeInTheDocument();
   });
 
   it('reveals repository settings after location and keeps Jira in optional step two', () => {

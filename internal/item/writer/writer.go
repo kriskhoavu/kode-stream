@@ -283,9 +283,10 @@ func (w *Writer) refreshWorkspaceData(workspace models.WorkspaceConfig) (models.
 }
 
 type planYAML struct {
-	Plan              planFields                       `yaml:"plan"`
-	Documents         []models.ItemDocument            `yaml:"documents,omitempty"`
-	VerificationTests models.VerificationTestSelection `yaml:"verificationTests,omitempty"`
+	Plan                planFields                       `yaml:"plan"`
+	Documents           []models.ItemDocument            `yaml:"documents,omitempty"`
+	AutomationTestPaths []models.AutomationTestPath      `yaml:"automation-test-paths,omitempty"`
+	VerificationTests   models.VerificationTestSelection `yaml:"verificationTests,omitempty"`
 }
 
 type planFields struct {
@@ -397,7 +398,7 @@ func compactPlanMetadata(root string, meta *planYAML) {
 	meta.Plan.Ticket = ""
 	meta.Plan.Service = ""
 	meta.Documents = compactDocumentOverrides(root, meta.Documents)
-	if len(meta.VerificationTests.SelectedSpecs) == 0 && strings.TrimSpace(meta.VerificationTests.Environment) == "" {
+	if len(meta.VerificationTests.SelectedSpecs) == 0 && strings.TrimSpace(meta.VerificationTests.Environment) == "" && meta.VerificationTests.DisplayMode == "" {
 		meta.VerificationTests = models.VerificationTestSelection{}
 	}
 }
@@ -419,7 +420,17 @@ func normalizeVerificationTests(input models.VerificationTestSelection) models.V
 	}
 	selection.SelectedSpecs = specs
 	selection.Environment = strings.TrimSpace(selection.Environment)
+	selection.DisplayMode = normalizeAutomationDisplayMode(selection.DisplayMode)
 	return selection
+}
+
+func normalizeAutomationDisplayMode(mode models.AutomationDisplayMode) models.AutomationDisplayMode {
+	switch mode {
+	case models.AutomationDisplayModeVisible:
+		return models.AutomationDisplayModeVisible
+	default:
+		return models.AutomationDisplayModeSilent
+	}
 }
 
 func normalizeAndValidateVerificationTests(input models.VerificationTestSelection) (models.VerificationTestSelection, error) {

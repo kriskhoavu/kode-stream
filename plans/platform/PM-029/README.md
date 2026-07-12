@@ -1,6 +1,8 @@
 # PM-029: External Automation Verification Runner
 
-PM-029 adds first-class card-linked automation test execution to Kode Stream. A workspace can point to an external automation repository, discover candidate Cypress or Playwright specs for the current item, persist explicit selected specs, and run those tests from the item workspace without replacing the existing runtime smoke and critical verification profiles.
+PM-029 makes card-level automation testing a first-class Quality workflow. A workspace can register an external Cypress or Playwright repository, link specs to an item, run those specs after the app runtime is healthy, and inspect runtime plus automation logs from the same verification job.
+
+The implementation keeps workspace Smoke and Critical verification separate from feature automation coverage. Smoke and Critical remain runtime health checks. Automation tests are explicit card-linked checks.
 
 ## Related Plans
 
@@ -12,76 +14,70 @@ PM-029 adds first-class card-linked automation test execution to Kode Stream. A 
 
 ## Glossary
 
-| Term                         | Meaning                                                                                 | Code                                |
-|------------------------------|-----------------------------------------------------------------------------------------|-------------------------------------|
-| Runtime Verification Profile | Existing workspace-level `smoke`, `critical`, or `full` command                         | `VerifyProfile`                     |
-| Automation Repository        | Separate local repository that owns Cypress or Playwright tests                         | `WorkspaceRuntimeConfig.automation` |
-| Automation Runner            | Configured runner type and command template for the automation repository               | `AutomationRunnerConfig`            |
-| Selected Spec                | Test file or spec folder explicitly linked to one item                                  | `plan.yaml` verification metadata   |
-| Discovered Spec              | Candidate spec inferred from the automation repo plan docs or matching ticket structure | Test discovery service              |
-| Automation Verification Job  | Verification job that runs selected specs after runtime startup and health checks       | `verification.Job`                  |
-| Rendered Command             | Final shell command after template variables are substituted                            | Verification job metadata           |
+| Term                         | Meaning                                                                         | Code / Surface                         |
+|------------------------------|---------------------------------------------------------------------------------|----------------------------------------|
+| Runtime Verification Profile | Existing workspace-level `smoke`, `critical`, or `full` command                 | `VerifyProfile`                        |
+| Automation Repository        | Separate registered workspace that owns Cypress or Playwright tests             | Workspace automation settings          |
+| Selected Spec                | Spec path explicitly saved for one item                                         | `verificationTests.selectedSpecs`      |
+| Planned Automation Path      | Spec path authored by feature or test planning skills before it is selected     | `automation-test-paths[].path`         |
+| Discovered Spec              | Suggested spec read from automation repo plan metadata                          | Item verification-test API             |
+| Run Mode                     | Silent/headless or visible headed browser execution                             | `displayMode`                          |
+| Runtime Setup Log            | `prepare`, `up`, `health`, and `down` output for the app runtime around the job | `runtime.log` / Runtime setup log card |
+| Automation Log               | Cypress or Playwright command output                                            | `automation.log` / Automation log card |
 
-## Components
+## Current Behavior
 
-| Layer      | Component                    | Purpose                                                                  |
-|------------|------------------------------|--------------------------------------------------------------------------|
-| Backend    | Runtime config normalization | Store and validate optional automation repository settings               |
-| Backend    | Verification service         | Run automation commands inside the external repo and collect artifacts   |
-| Backend    | Item metadata writer         | Persist selected specs for the current item in `plan.yaml`               |
-| Backend    | Test discovery service       | Suggest specs from ticket-matching plan docs and spec path references    |
-| Controller | Verification API             | Accept automation run input and return selected spec/job metadata        |
-| Frontend   | Workspace runtime settings   | Configure automation repo, runner, environment, command, and artifacts   |
-| Frontend   | Item verification harness    | Show runtime buttons, selected specs, suggestions, and automation action |
+| Action               | Scope        | Runs                                                               |
+|----------------------|--------------|--------------------------------------------------------------------|
+| Run smoke verify     | Workspace    | Existing `runtime.commands.verify.smoke` command                   |
+| Run critical verify  | Workspace    | Existing `runtime.commands.verify.critical`, falling back to smoke |
+| Run automation tests | Current item | Saved Cypress or Playwright specs from the automation repository   |
 
-## Smoke, Critical, And Automation Roles
+`Run automation tests` executes after runtime `prepare`, `up`, and `health`. For Docker Compose runtimes, `runtime.log` contains the configured compose setup and teardown command output for that automation job.
 
-Current `Smoke verify` and `Critical verify` remain workspace-level runtime verification profiles. They are useful for fast generic checks:
+## Metadata Model
 
-- App or container boots correctly.
-- Health endpoints pass.
-- Core smoke command runs.
-- Critical non-card-specific checks run.
-- Fallback verification runs when no card tests are linked.
+| Location            | Field                     | Purpose                                                                 |
+|---------------------|---------------------------|-------------------------------------------------------------------------|
+| Item `plan.yaml`    | `verificationTests`       | Runtime state: selected specs, environment, display mode, updated time  |
+| Feature `plan.yaml` | `automation-test-paths`   | Planning metadata: known automation spec paths authored by skills/users |
+| Feature `plan.yaml` | `plan.wiki_enriched`      | Wiki enrichment state for plan ingestion                                |
+| Feature `README.md` | None for machine metadata | Human-readable plan only                                                |
 
-The new automation runner does not replace them in v1. It sits beside them:
+`verificationTests` and `automation-test-paths` are intentionally separate. `verificationTests` is what the card will run. `automation-test-paths` is a source for suggestions and can contain empty placeholders until a tester provides real paths.
 
-| Action               | Scope        | Runs                                                                |
-|----------------------|--------------|---------------------------------------------------------------------|
-| Run smoke verify     | Workspace    | Existing `runtime.commands.verify.smoke` command                    |
-| Run critical verify  | Workspace    | Existing `runtime.commands.verify.critical`, falling back to smoke  |
-| Run automation tests | Current item | Selected Cypress or Playwright specs from the automation repository |
+## Automation Spec Discovery
 
-Longer term, Smoke and Critical can become profiles that optionally include automation specs. PM-029 keeps them separate to avoid confusing runtime health with feature automation coverage and to preserve backward compatibility for every workspace already using those buttons.
+Discovery uses structured metadata only:
 
-## Data Flow
+1. Read likely `plan.yaml` files in the automation repository:
+   - `plans/{ticket}/plan.yaml`
+   - `plans/{scope}/{ticket}/plan.yaml`
+   - `plans/{itemID}/plan.yaml`
+2. Extract non-empty `automation-test-paths[].path` entries.
 
-```text
-User opens item workspace
-  -> frontend loads workspace runtime and item metadata
-  -> frontend requests automation spec suggestions for this item
-  -> user accepts or edits selected specs
-  -> backend saves selected specs into item metadata
-  -> user clicks Run automation tests
-  -> verification service prepares runtime workspace
-  -> runtime starts and health checks pass
-  -> automation command runs in external automation repository
-  -> verification artifacts are collected
-  -> runtime teardown runs
-  -> frontend polls and renders job status, steps, logs, and artifacts
-```
+This keeps `/api/items/{id}/verification-tests` responsive and avoids scanning test-plan Markdown files whenever the Quality panel opens.
 
-## Design Decisions
+## Quality UI
 
-| Decision                                               | Alternatives Considered                                 | Rationale                                                                            |
-|--------------------------------------------------------|---------------------------------------------------------|--------------------------------------------------------------------------------------|
-| Keep Smoke and Critical as runtime profiles            | Replace them with automation profiles                   | Existing workspaces rely on these commands for generic environment checks            |
-| Add automation as a separate item action               | Add automation behind the existing smoke button         | Users need to see whether they are running environment verification or feature tests |
-| Persist selected specs explicitly                      | Rely only on automatic discovery                        | Discovery is helpful but should not silently change what a card runs                 |
-| Discover specs from ticket docs and spec path mentions | Require every spec to contain structured metadata first | Discovery testing repos already mention `cypress/e2e/...` paths in plan documents    |
-| Run automation after `prepare`, `up`, and `health`     | Let the automation repo own full setup                  | Current workspace runtime already knows how to start the app under test              |
-| Use command templates instead of hard-coding Cypress   | Add only Cypress-specific command generation            | Playwright migration should reuse the same integration model                         |
-| Validate selected specs inside the automation repo     | Trust raw user-entered paths                            | Verification commands must not become arbitrary filesystem execution shortcuts       |
+The item side panel has `Info`, `Jira`, and `Quality` tabs. Quality contains:
+
+- Runtime actions: `Run smoke verify`, `Run critical verify`, and `Re-run latest`.
+- Automation controls: environment, run mode, selected specs, manual add, repo-backed browse, and `Run automation tests`.
+- Artifact cards with friendly labels such as `Automation log`, `Runtime setup log`, and `Test report`.
+
+Automation run mode supports:
+
+| Mode            | Behavior                                                                    |
+|-----------------|-----------------------------------------------------------------------------|
+| Silent          | Current headless/background command behavior                                |
+| Visible browser | Cypress appends headed Chrome args; Playwright appends headed Chromium args |
+
+## Knowledge Flag Review
+
+Moving `wiki_enriched` from README frontmatter to `plan.yaml` should not break the Knowledge page UI. The Knowledge page indexes docs pages from `docs/**` using wiki page frontmatter such as `slug`, `title`, `domain`, and relationships. It does not read feature-plan `wiki_enriched`.
+
+The required change is in the wiki enrichment workflow: the skill must update `plan.wiki_enriched` in `plan.yaml` instead of adding or editing README frontmatter.
 
 ## Documents
 

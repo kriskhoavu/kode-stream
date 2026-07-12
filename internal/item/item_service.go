@@ -15,6 +15,8 @@ import (
 	"kode-stream/internal/item/index"
 	"kode-stream/internal/item/writer"
 	"kode-stream/internal/workspace/registry"
+
+	"gopkg.in/yaml.v3"
 )
 
 type ListInput struct {
@@ -203,87 +205,102 @@ func (s *Service) UpdateStatus(id string, input models.ItemStatusUpdateInput) (m
 	return s.writer.UpdateStatus(workspace, item, input)
 }
 
-var automationSpecPathPattern = regexp.MustCompile(`(?:^|[\s"'(])((?:cypress/e2e|playwright|tests)/[A-Za-z0-9._/@+=:,%-]+?\.(?:cy|spec|test)\.(?:ts|tsx|js|jsx))`)
-
 func DiscoverVerificationSpecs(workspace models.WorkspaceConfig, item models.ItemDetail) ([]models.DiscoveredVerificationSpec, error) {
 	if workspace.Runtime == nil || workspace.Runtime.Automation == nil || !workspace.Runtime.Automation.Enabled {
 		return []models.DiscoveredVerificationSpec{}, nil
 	}
+	specs := []models.DiscoveredVerificationSpec{}
+	seen := map[string]struct{}{}
+	if workspace.Path != "" && item.ItemPath != "" {
+		found, err := discoverVerificationSpecsInPlanYAML(workspace.Path, filepath.Join(workspace.Path, item.ItemPath), workspace.Runtime.Automation.Runner, seen)
+		if err != nil {
+			return nil, err
+		}
+		specs = append(specs, found...)
+	}
 	repoPath := strings.TrimSpace(workspace.Runtime.Automation.RepositoryPath)
 	if repoPath == "" {
-		return []models.DiscoveredVerificationSpec{}, nil
+		sort.Slice(specs, func(i, j int) bool { return specs[i].Path < specs[j].Path })
+		return specs, nil
 	}
 	root, err := filepath.Abs(repoPath)
 	if err != nil {
 		return nil, err
 	}
-	specs := []models.DiscoveredVerificationSpec{}
-	seen := map[string]struct{}{}
-	matchTerms := []string{strings.ToLower(item.Identifier)}
-	if item.ID != "" {
-		matchTerms = append(matchTerms, strings.ToLower(item.ID))
-	}
-	if item.Title != "" {
-		matchTerms = append(matchTerms, strings.ToLower(item.Title))
-	}
-	err = filepath.WalkDir(filepath.Join(root, "plans"), func(path string, d os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return nil
-		}
-		if d.IsDir() || !strings.EqualFold(filepath.Ext(path), ".md") {
-			return nil
-		}
-		data, err := os.ReadFile(path)
+	plansRoot := filepath.Join(root, "plans")
+	for _, candidate := range verificationDiscoveryCandidateRoots(plansRoot, item) {
+		found, err := discoverVerificationSpecsInPlanYAML(root, candidate, workspace.Runtime.Automation.Runner, seen)
 		if err != nil {
-			return nil
+			return nil, err
 		}
-		text := string(data)
-		if !matchesDiscoveryTerms(path, text, matchTerms) {
-			return nil
-		}
-		sourcePath, err := filepath.Rel(root, path)
-		if err != nil {
-			sourcePath = path
-		}
-		for _, match := range automationSpecPathPattern.FindAllStringSubmatch(text, -1) {
-			if len(match) < 2 {
-				continue
+		specs = append(specs, found...)
+	}
+	sort.Slice(specs, func(i, j int) bool { return specs[i].Path < specs[j].Path })
+	return specs, nil
+}
+
+func verificationDiscoveryCandidateRoots(plansRoot string, item models.ItemDetail) []string {
+	candidates := []string{}
+	add := func(parts ...string) {
+		cleanParts := []string{plansRoot}
+		for _, part := range parts {
+			part = strings.Trim(strings.TrimSpace(part), "/")
+			if part == "" || part == "." || part == ".." || strings.Contains(part, "/") {
+				return
 			}
-			specPath := filepath.ToSlash(filepath.Clean(strings.TrimSpace(match[1])))
-			if specPath == "." || specPath == "" {
-				continue
-			}
-			if _, ok := seen[specPath]; ok {
-				continue
-			}
-			seen[specPath] = struct{}{}
-			specs = append(specs, models.DiscoveredVerificationSpec{
-				Path:       specPath,
-				Runner:     string(runnerForSpecPath(specPath, workspace.Runtime.Automation.Runner)),
-				SourcePath: filepath.ToSlash(sourcePath),
-			})
+			cleanParts = append(cleanParts, part)
 		}
-		return nil
-	})
+		path := filepath.Join(cleanParts...)
+		for _, existing := range candidates {
+			if existing == path {
+				return
+			}
+		}
+		candidates = append(candidates, path)
+	}
+	add(item.Identifier)
+	add(item.Scope, item.Identifier)
+	add(item.ID)
+	return candidates
+}
+
+type verificationPlanYAML struct {
+	AutomationTestPaths []models.AutomationTestPath `yaml:"automation-test-paths"`
+}
+
+func discoverVerificationSpecsInPlanYAML(repoRoot, planRoot string, fallbackRunner models.AutomationRunner, seen map[string]struct{}) ([]models.DiscoveredVerificationSpec, error) {
+	data, err := os.ReadFile(filepath.Join(planRoot, "plan.yaml"))
 	if os.IsNotExist(err) {
 		return []models.DiscoveredVerificationSpec{}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(specs, func(i, j int) bool { return specs[i].Path < specs[j].Path })
-	return specs, nil
-}
-
-func matchesDiscoveryTerms(path, text string, terms []string) bool {
-	haystack := strings.ToLower(path + "\n" + text)
-	for _, term := range terms {
-		term = strings.TrimSpace(term)
-		if term != "" && strings.Contains(haystack, term) {
-			return true
-		}
+	var meta verificationPlanYAML
+	if err := yaml.Unmarshal(data, &meta); err != nil {
+		return nil, err
 	}
-	return false
+	sourcePath, err := filepath.Rel(repoRoot, filepath.Join(planRoot, "plan.yaml"))
+	if err != nil {
+		sourcePath = filepath.Join(planRoot, "plan.yaml")
+	}
+	specs := []models.DiscoveredVerificationSpec{}
+	for _, entry := range meta.AutomationTestPaths {
+		specPath := filepath.ToSlash(filepath.Clean(strings.TrimSpace(entry.Path)))
+		if specPath == "." || specPath == "" {
+			continue
+		}
+		if _, ok := seen[specPath]; ok {
+			continue
+		}
+		seen[specPath] = struct{}{}
+		specs = append(specs, models.DiscoveredVerificationSpec{
+			Path:       specPath,
+			Runner:     string(runnerForSpecPath(specPath, fallbackRunner)),
+			SourcePath: filepath.ToSlash(sourcePath),
+		})
+	}
+	return specs, nil
 }
 
 func runnerForSpecPath(path string, fallback models.AutomationRunner) models.AutomationRunner {

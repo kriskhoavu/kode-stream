@@ -71,7 +71,7 @@ func TestDetailNormalizesCollectionsAndReadsFullReadmeDescription(t *testing.T) 
 
 func TestVerificationTestsPersistSelectedSpecs(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, root, "plans/platform/PM-029/plan.yaml", "plan:\n  status: draft\n")
+	writeFile(t, root, "plans/platform/PM-029/plan.yaml", "plan:\n  status: draft\nautomation-test-paths:\n  - path: \"\"\n")
 	registryPath := filepath.Join(root, "workspaces.yaml")
 	indexPath := filepath.Join(root, "item-index.yaml")
 	reg := registry.New(registryPath, gitadapter.New())
@@ -127,9 +127,88 @@ func TestVerificationTestsPersistSelectedSpecs(t *testing.T) {
 	if text := string(data); !strings.Contains(text, "verificationTests:") || !strings.Contains(text, "cypress/e2e/create-offer.cy.ts") {
 		t.Fatalf("plan.yaml =\n%s", text)
 	}
+	if !strings.Contains(string(data), "automation-test-paths:") {
+		t.Fatalf("plan.yaml lost automation-test-paths:\n%s", string(data))
+	}
 }
 
-func TestDiscoverVerificationSpecsFromAutomationPlanDocs(t *testing.T) {
+func TestDiscoverVerificationSpecsPrefersAutomationPlanYAML(t *testing.T) {
+	automationRepo := t.TempDir()
+	writeFile(t, automationRepo, "plans/platform/PM-029/plan.yaml", `plan:
+  status: draft
+automation-test-paths:
+  - path: cypress/e2e/create-offer.cy.ts
+  - path: ""
+  - path: playwright/create-offer.spec.ts
+`)
+	writeFile(t, automationRepo, "plans/platform/PM-029/test-plan.md", `# PM-029
+
+Spec: cypress/e2e/old-markdown.cy.ts
+`)
+	workspace := models.WorkspaceConfig{
+		Runtime: &models.WorkspaceRuntimeConfig{
+			Automation: &models.RuntimeAutomationConfig{
+				Enabled:        true,
+				RepositoryPath: automationRepo,
+				Runner:         models.AutomationRunnerCypress,
+			},
+		},
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-1", Scope: "platform", Identifier: "PM-029", Title: "Automation runner"}}
+
+	specs, err := DiscoverVerificationSpecs(workspace, item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) != 2 {
+		t.Fatalf("specs = %#v", specs)
+	}
+	if specs[0].Path != "cypress/e2e/create-offer.cy.ts" || specs[0].Runner != "cypress" || specs[0].SourcePath != "plans/platform/PM-029/plan.yaml" {
+		t.Fatalf("first spec = %#v", specs[0])
+	}
+	if specs[1].Path != "playwright/create-offer.spec.ts" || specs[1].Runner != "playwright" || specs[1].SourcePath != "plans/platform/PM-029/plan.yaml" {
+		t.Fatalf("second spec = %#v", specs[1])
+	}
+}
+
+func TestDiscoverVerificationSpecsReadsCurrentItemPlanYAML(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	automationRepo := t.TempDir()
+	writeFile(t, workspaceRoot, "plans/api/DI-170/plan.yaml", `plan:
+  status: done
+automation-test-paths:
+  - path: cypress/e2e/01-base/01-logging-to-console.cy.ts
+`)
+	writeFile(t, automationRepo, "plans/api/DI-170/plan.yaml", `plan:
+  status: draft
+automation-test-paths:
+  - path: ""
+`)
+	workspace := models.WorkspaceConfig{
+		Path: workspaceRoot,
+		Runtime: &models.WorkspaceRuntimeConfig{
+			Automation: &models.RuntimeAutomationConfig{
+				Enabled:        true,
+				RepositoryPath: automationRepo,
+				Runner:         models.AutomationRunnerCypress,
+			},
+		},
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-1", Scope: "api", Identifier: "DI-170", Title: "Custom Assortment", ItemPath: "plans/api/DI-170"}}
+
+	specs, err := DiscoverVerificationSpecs(workspace, item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) != 1 {
+		t.Fatalf("specs = %#v", specs)
+	}
+	if specs[0].Path != "cypress/e2e/01-base/01-logging-to-console.cy.ts" || specs[0].SourcePath != "plans/api/DI-170/plan.yaml" {
+		t.Fatalf("spec = %#v", specs[0])
+	}
+}
+
+func TestDiscoverVerificationSpecsIgnoresAutomationPlanMarkdown(t *testing.T) {
 	automationRepo := t.TempDir()
 	writeFile(t, automationRepo, "plans/PM-029/test-plan.md", `# PM-029
 
@@ -151,14 +230,8 @@ Future: playwright/create-offer.spec.ts
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(specs) != 2 {
+	if len(specs) != 0 {
 		t.Fatalf("specs = %#v", specs)
-	}
-	if specs[0].Path != "cypress/e2e/create-offer.cy.ts" || specs[0].Runner != "cypress" || specs[0].SourcePath != "plans/PM-029/test-plan.md" {
-		t.Fatalf("first spec = %#v", specs[0])
-	}
-	if specs[1].Path != "playwright/create-offer.spec.ts" || specs[1].Runner != "playwright" {
-		t.Fatalf("second spec = %#v", specs[1])
 	}
 }
 
