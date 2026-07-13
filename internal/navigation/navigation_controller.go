@@ -34,6 +34,26 @@ func (c *NavigationController) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/recent-items", c.recordRecent)
 }
 
+func (c *NavigationController) Filters(w http.ResponseWriter, r *http.Request) {
+	c.filters(w, r)
+}
+
+func (c *NavigationController) SaveFilter(w http.ResponseWriter, r *http.Request) {
+	c.saveFilter(w, r)
+}
+
+func (c *NavigationController) DeleteFilter(w http.ResponseWriter, r *http.Request) {
+	c.deleteFilter(w, r)
+}
+
+func (c *NavigationController) Recents(w http.ResponseWriter, r *http.Request) {
+	c.recents(w, r)
+}
+
+func (c *NavigationController) RecordRecent(w http.ResponseWriter, r *http.Request) {
+	c.recordRecent(w, r)
+}
+
 func (c *NavigationController) filters(w http.ResponseWriter, _ *http.Request) {
 	if c.repository == nil {
 		httpx.WriteJSON(w, http.StatusOK, []models.SavedFilter{})

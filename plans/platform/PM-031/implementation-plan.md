@@ -6,19 +6,19 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 ## Phases Summary
 
-| Phase | Name                                       | Status      | Verification                                                                                 |
-|-------|--------------------------------------------|-------------|----------------------------------------------------------------------------------------------|
-| B1    | Route inventory v2 and parity harness      | Not started | `rtk go test ./internal/server/api/...`                                                      |
-| B2    | Navigation and system route migration      | Not started | `rtk go test ./internal/navigation/... ./internal/system/... ./internal/server/api/...`      |
-| B3    | State, search, AI settings route migration | Not started | `rtk go test ./internal/server/api/... ./internal/search/... ./internal/ai/...`              |
-| B4    | Workspace read route migration             | Not started | `rtk go test ./internal/server/api/... ./internal/workspace/...`                             |
-| B5    | Item read route migration                  | Not started | `rtk go test ./internal/server/api/... ./internal/item/... ./internal/search/...`            |
-| B6    | Workspace and item write route migration   | Not started | `rtk go test ./... && rtk npm run typecheck`                                                 |
-| B7    | Knowledge and verification route migration | Not started | `rtk go test ./internal/server/api/... ./internal/knowledge/... ./internal/verification/...` |
-| B8    | Git route migration                        | Not started | `rtk go test ./internal/server/api/... ./internal/git/...`                                   |
-| B9    | Streaming and WebSocket route migration    | Not started | `rtk go test ./internal/server/api/... ./internal/ai/...`                                    |
-| C1    | Gin-only cutover and fallback removal      | Not started | `rtk go test ./... && rtk npm run typecheck`                                                 |
-| C2    | Documentation, scorecard, and final checks | Not started | `rtk go test ./... && rtk npm run typecheck`                                                 |
+| Phase | Name                                       | Status   | Verification                                                                                 |
+|-------|--------------------------------------------|----------|----------------------------------------------------------------------------------------------|
+| B1    | Route inventory v2 and parity harness      | Complete | `rtk go test ./internal/server/api/...`                                                      |
+| B2    | Navigation and system route migration      | Complete | `rtk go test ./internal/navigation/... ./internal/system/... ./internal/server/api/...`      |
+| B3    | State, search, AI settings route migration | Complete | `rtk go test ./internal/server/api/... ./internal/search/... ./internal/ai/...`              |
+| B4    | Workspace read route migration             | Complete | `rtk go test ./internal/server/api/... ./internal/workspace/...`                             |
+| B5    | Item read route migration                  | Complete | `rtk go test ./internal/server/api/... ./internal/item/... ./internal/search/...`            |
+| B6    | Workspace and item write route migration   | Complete | `rtk go test ./... && rtk npm run typecheck`                                                 |
+| B7    | Knowledge and verification route migration | Complete | `rtk go test ./internal/server/api/... ./internal/knowledge/... ./internal/verification/...` |
+| B8    | Git route migration                        | Complete | `rtk go test ./internal/server/api/... ./internal/git/...`                                   |
+| B9    | Streaming and WebSocket route migration    | Complete | `rtk go test ./internal/server/api/... ./internal/ai/...`                                    |
+| C1    | Gin-only cutover and fallback removal      | Complete | `rtk go test ./... && rtk npm run typecheck`                                                 |
+| C2    | Documentation, scorecard, and final checks | Complete | `rtk go test ./... && rtk npm run typecheck`                                                 |
 
 ## Backend Phases
 
@@ -26,10 +26,10 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Split PM-030 inventory into Gin-owned, fallback-owned, and removed route sections.
-- [ ] Add route-family status table for every current `/api/` route.
-- [ ] Add reusable API test helpers for JSON status, content type, error envelope, and query defaults.
-- [ ] Add missing baseline tests for navigation and system route families.
+- [x] Split PM-030 inventory into Gin-owned, fallback-owned, and removed route sections.
+- [x] Add route-family status table for every current `/api/` route.
+- [x] Add reusable API test helpers for JSON status, content type, error envelope, and query defaults.
+- [x] Add missing baseline tests for navigation and system route families.
 
 **Verification:** `rtk go test ./internal/server/api/...`
 
@@ -41,11 +41,11 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Migrate saved filters and recent items routes to Gin.
-- [ ] Migrate system config path read/write routes to Gin.
-- [ ] Decide whether native picker/open-path routes stay in this phase or move with high-risk writes.
-- [ ] Preserve nil-repository behavior, JSON decode errors, route validation, and not-found responses.
-- [ ] Remove migrated legacy mux registrations.
+- [x] Migrate saved filters and recent items routes to Gin.
+- [x] Migrate system config path read/write routes to Gin.
+- [x] Decide whether native picker/open-path routes stay in this phase or move with high-risk writes.
+- [x] Preserve nil-repository behavior, JSON decode errors, route validation, and not-found responses.
+- [x] Remove migrated legacy mux registrations.
 
 **Verification:** `rtk go test ./internal/navigation/... ./internal/system/... ./internal/server/api/...`
 
@@ -57,11 +57,11 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Migrate app state and indexed search routes.
-- [ ] Migrate AI capabilities, presets, provider capabilities, settings read, and settings write routes.
-- [ ] Preserve unavailable behavior when optional AI services are nil.
-- [ ] Preserve settings validation and persisted YAML behavior.
-- [ ] Remove migrated legacy mux registrations.
+- [x] Migrate app state and indexed search routes.
+- [x] Migrate AI capabilities, presets, provider capabilities, settings read, and settings write routes.
+- [x] Preserve unavailable behavior when optional AI services are nil.
+- [x] Preserve settings validation and persisted YAML behavior.
+- [x] Remove migrated legacy mux registrations.
 
 **Verification:** `rtk go test ./internal/server/api/... ./internal/search/... ./internal/ai/...`
 
@@ -73,10 +73,10 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Migrate workspace list, runtime read, health read, source structure read, tree, file read, diff, path status, path search, and content search reads.
-- [ ] Preserve path traversal guards, source filters, content limits, and file classification behavior.
-- [ ] Add contract tests for representative file, tree, and content-search reads.
-- [ ] Remove migrated legacy mux registrations.
+- [x] Migrate workspace list, runtime read, health read, source structure read, tree, file read, diff, path status, path search, and content search reads.
+- [x] Preserve path traversal guards, source filters, content limits, and file classification behavior.
+- [x] Add contract tests for representative file, tree, and content-search reads.
+- [x] Remove migrated legacy mux registrations.
 
 **Verification:** `rtk go test ./internal/server/api/... ./internal/workspace/...`
 
@@ -88,10 +88,10 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Migrate item list, detail, AI eligibility, Jira read, Jira attachment, verification tests read, files, content search, file content, and diff routes.
-- [ ] Preserve item not-found behavior, file ID mapping, Jira attachment guards, and content response shape.
-- [ ] Add representative tests for Jira attachment and item file reads.
-- [ ] Remove migrated legacy mux registrations.
+- [x] Migrate item list, detail, AI eligibility, Jira read, Jira attachment, verification tests read, files, content search, file content, and diff routes.
+- [x] Preserve item not-found behavior, file ID mapping, Jira attachment guards, and content response shape.
+- [x] Add representative tests for Jira attachment and item file reads.
+- [x] Remove migrated legacy mux registrations.
 
 **Verification:** `rtk go test ./internal/server/api/... ./internal/item/... ./internal/search/...`
 
@@ -103,11 +103,11 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Migrate workspace create, import preview, import, update, delete, scan, runtime save, source structure save/reset, file write/create/revert, directory create, and path rename routes.
-- [ ] Migrate item file save/revert, metadata/status patch, verification tests save, and item create routes.
-- [ ] Preserve stale-hash recovery hints, scan refreshes, index updates, app state version changes, and audit events.
-- [ ] Run frontend typecheck after migrated writes.
-- [ ] Remove migrated legacy mux registrations.
+- [x] Migrate workspace create, import preview, import, update, delete, scan, runtime save, source structure save/reset, file write/create/revert, directory create, and path rename routes.
+- [x] Migrate item file save/revert, metadata/status patch, verification tests save, and item create routes.
+- [x] Preserve stale-hash recovery hints, scan refreshes, index updates, app state version changes, and audit events.
+- [x] Run frontend typecheck after migrated writes.
+- [x] Remove migrated legacy mux registrations.
 
 **Verification:** `rtk go test ./... && rtk npm run typecheck`
 
@@ -119,11 +119,11 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Migrate knowledge wiki read routes and graph route.
-- [ ] Migrate knowledge rescan, sync, and enrich action routes.
-- [ ] Migrate verification job create, checkpoint ingest, job read, artifact read, and rerun routes.
-- [ ] Preserve bounded verification policy, artifacts, job status responses, and knowledge not-found mapping.
-- [ ] Remove migrated legacy mux registrations.
+- [x] Migrate knowledge wiki read routes and graph route.
+- [x] Migrate knowledge rescan, sync, and enrich action routes.
+- [x] Migrate verification job create, checkpoint ingest, job read, artifact read, and rerun routes.
+- [x] Preserve bounded verification policy, artifacts, job status responses, and knowledge not-found mapping.
+- [x] Remove migrated legacy mux registrations.
 
 **Verification:** `rtk go test ./internal/server/api/... ./internal/knowledge/... ./internal/verification/...`
 
@@ -135,10 +135,10 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Migrate Git status, activity, branches, fetch, pull, push, commit, create branch, and switch branch routes.
-- [ ] Preserve dirty-state guards, branch validation, path scope validation, recovery hints, audit events, and scan refresh behavior.
-- [ ] Add tests for conflict and blocked-operation responses.
-- [ ] Remove migrated legacy mux registrations.
+- [x] Migrate Git status, activity, branches, fetch, pull, push, commit, create branch, and switch branch routes.
+- [x] Preserve dirty-state guards, branch validation, path scope validation, recovery hints, audit events, and scan refresh behavior.
+- [x] Add tests for conflict and blocked-operation responses.
+- [x] Remove migrated legacy mux registrations.
 
 **Verification:** `rtk go test ./internal/server/api/... ./internal/git/...`
 
@@ -150,11 +150,11 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Migrate workspace stream-create route after normal workspace writes are stable.
-- [ ] Migrate embedded AI session metadata, cancel, and WebSocket channel routes.
-- [ ] Preserve WebSocket upgrade behavior, origin rules, message shape, reconnect, cancel, and shutdown cleanup.
-- [ ] Add lifecycle tests for disconnect and cancellation where practical.
-- [ ] Remove migrated legacy mux registrations.
+- [x] Migrate workspace stream-create route after normal workspace writes are stable.
+- [x] Migrate embedded AI session metadata, cancel, and WebSocket channel routes.
+- [x] Preserve WebSocket upgrade behavior, origin rules, message shape, reconnect, cancel, and shutdown cleanup.
+- [x] Add lifecycle tests for disconnect and cancellation where practical.
+- [x] Remove migrated legacy mux registrations.
 
 **Verification:** `rtk go test ./internal/server/api/... ./internal/ai/...`
 
@@ -168,11 +168,11 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Remove legacy `ServeMux` fallback from the Gin transport.
-- [ ] Remove API `mux.HandleFunc` registrations from `API.Routes()`.
-- [ ] Update boundary test to fail on new API `ServeMux` route registrations.
-- [ ] Update route inventory check to require all `/api/` routes to be Gin-owned.
-- [ ] Confirm SPA serving still bypasses Gin and works through `internal/server`.
+- [x] Remove legacy `ServeMux` fallback from the Gin transport.
+- [x] Remove API `mux.HandleFunc` registrations from `API.Routes()`.
+- [x] Update boundary test to fail on new API `ServeMux` route registrations.
+- [x] Update route inventory check to require all `/api/` routes to be Gin-owned.
+- [x] Confirm SPA serving still bypasses Gin and works through `internal/server`.
 
 **Verification:** `rtk go test ./... && rtk npm run typecheck`
 
@@ -184,11 +184,11 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 **Deliverables:**
 
-- [ ] Update `README.md` and `ARCHITECTURE.md` from fallback migration language to Gin-only API language.
-- [ ] Add final route-family status table and completion report to PM-031.
-- [ ] Run representative benchmarks for health, audit, state/search, workspace read, and item read routes.
-- [ ] Record performance notes and any accepted regressions.
-- [ ] Confirm no unchecked PM-031 checklist items remain.
+- [x] Update `README.md` and `ARCHITECTURE.md` from fallback migration language to Gin-only API language.
+- [x] Add final route-family status table and completion report to PM-031.
+- [x] Run representative benchmarks for health, audit, state/search, workspace read, and item read routes.
+- [x] Record performance notes and any accepted regressions.
+- [x] Confirm no unchecked PM-031 checklist items remain.
 
 **Verification:** `rtk go test ./... && rtk npm run typecheck`
 
@@ -196,10 +196,10 @@ Migrate the rest of the backend API from legacy `ServeMux` fallback to Gin route
 
 ## Post-Implementation Checklist
 
-- [ ] All `/api/` routes are registered on Gin.
-- [ ] Legacy `ServeMux` fallback is removed from API transport.
-- [ ] SPA serving remains unchanged.
-- [ ] Gin import boundary still passes.
-- [ ] Route inventory has zero fallback-owned routes.
-- [ ] Frontend typecheck passes.
-- [ ] README and architecture docs describe Gin-only final state.
+- [x] All `/api/` routes are registered on Gin.
+- [x] Legacy `ServeMux` fallback is removed from API transport.
+- [x] SPA serving remains unchanged.
+- [x] Gin import boundary still passes.
+- [x] Route inventory has zero fallback-owned routes.
+- [x] Frontend typecheck passes.
+- [x] README and architecture docs describe Gin-only final state.

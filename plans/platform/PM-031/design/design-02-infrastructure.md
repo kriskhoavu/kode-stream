@@ -2,7 +2,7 @@
 
 ## Overview
 
-PM-031 does not add a new production runtime. It hardens the current Gin dependency and test infrastructure until Gin is the only API router.
+PM-031 does not add a new production runtime. It hardens the current Gin dependency and test infrastructure now that Gin is the only API router.
 
 ## Dependency Scope
 
@@ -15,13 +15,13 @@ PM-031 does not add a new production runtime. It hardens the current Gin depende
 
 ## Governance Checks
 
-| Check                    | Purpose                                                  | Timing                          |
-|--------------------------|----------------------------------------------------------|---------------------------------|
-| Gin import boundary      | Prevent framework leakage outside API transport.         | Every `rtk go test ./...` run   |
-| Route inventory coverage | Ensure remaining legacy route registrations are tracked. | Every migration phase           |
-| Unmigrated route count   | Show progress toward removing legacy fallback.           | Updated after each route family |
-| Frontend typecheck       | Catch accidental API contract drift.                     | Write routes and final cutover  |
-| Benchmark scorecard      | Record representative route overhead and cache effects.  | Before final fallback removal   |
+| Check                    | Purpose                                                 | Timing                         |
+|--------------------------|---------------------------------------------------------|--------------------------------|
+| Gin import boundary      | Prevent framework leakage outside API transport.        | Every `rtk go test ./...` run  |
+| Route inventory coverage | Ensure all API route families are Gin-owned.            | Final cutover                  |
+| Unmigrated route count   | Confirm zero fallback-owned API routes.                 | Final cutover                  |
+| Frontend typecheck       | Catch accidental API contract drift.                    | Write routes and final cutover |
+| Benchmark scorecard      | Record representative route overhead and cache effects. | Final cutover                  |
 
 ## Documentation Updates
 

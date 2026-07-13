@@ -2,18 +2,18 @@
 
 ## Overview
 
-PM-031 converts the remaining API route families to Gin and removes the legacy `ServeMux` fallback after coverage reaches zero. The design keeps Gin at the transport boundary and preserves current domain services, repositories, local file storage, frontend contracts, and SPA serving.
+PM-031 converted the remaining API route families to Gin and removed the legacy `ServeMux` fallback after coverage reached zero. The design keeps Gin at the transport boundary and preserves current domain services, repositories, local file storage, frontend contracts, and SPA serving.
 
 ## Current Transport State
 
 | Area                | Current State                                                                          |
 |---------------------|----------------------------------------------------------------------------------------|
-| Gin router          | Owns `/api/health` and `/api/audit-events`.                                            |
-| Legacy fallback     | Handles remaining API routes via Go `ServeMux`.                                        |
+| Gin router          | Owns every `/api/` route.                                                              |
+| Legacy fallback     | Removed from `internal/server/api`.                                                    |
 | Middleware          | Recovery, request ID propagation, timeout context.                                     |
 | Response helpers    | `ginJSON`, `ginAppError`, `httpx` mapper.                                              |
 | Boundary governance | Tests restrict Gin imports to the HTTP transport boundary under `internal/server/api`. |
-| Route inventory     | PM-030 inventory covers current `ServeMux` routes.                                     |
+| Route inventory     | PM-031 inventory has zero fallback-owned API routes.                                   |
 
 ## Route Family Plan
 
@@ -40,7 +40,7 @@ PM-031 converts the remaining API route families to Gin and removes the legacy `
 | Errors       | Prefer typed application errors for new migrated code where behavior matches.    |
 | Responses    | Use existing JSON shapes and preserve `error`, `code`, and `recoveryHint`.       |
 | Side effects | Preserve scans, index refreshes, audit appends, Git operations, and file writes. |
-| Cleanup      | Remove matching `mux.HandleFunc` registration only after parity tests pass.      |
+| Cleanup      | Keep `API.Routes()` free of `mux.HandleFunc` registrations.                      |
 
 ## Parity Matrix
 
@@ -66,10 +66,10 @@ PM-031 converts the remaining API route families to Gin and removes the legacy `
 
 ## Design Decisions
 
-| Decision                     | Rationale                                                                       |
-|------------------------------|---------------------------------------------------------------------------------|
-| Keep route family ownership  | Route families map to current code and reduce review risk.                      |
-| Remove fallback gradually    | Prevents accidental missing routes while migration is still incomplete.         |
-| Migrate streaming last       | Streaming and WebSocket behavior is harder to validate than normal JSON routes. |
-| No frontend contract changes | Goal is transport migration, not product API redesign.                          |
-| Keep SPA outside Gin         | Static asset serving is stable and independent from `/api/` routing.            |
+| Decision                       | Rationale                                                                       |
+|--------------------------------|---------------------------------------------------------------------------------|
+| Keep route family ownership    | Route families map to current code and reduce review risk.                      |
+| Remove fallback after coverage | Prevented accidental missing routes while migration was incomplete.             |
+| Migrate streaming last         | Streaming and WebSocket behavior is harder to validate than normal JSON routes. |
+| No frontend contract changes   | Goal is transport migration, not product API redesign.                          |
+| Keep SPA outside Gin           | Static asset serving is stable and independent from `/api/` routing.            |

@@ -136,7 +136,7 @@ func TestAIRoutesAreUnavailableWithoutService(t *testing.T) {
 	}
 }
 
-func TestGinTransportFallsBackToLegacyRoutes(t *testing.T) {
+func TestGinTransportOwnsPreviouslyLegacyRoutes(t *testing.T) {
 	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/ai/settings", nil)
@@ -219,6 +219,89 @@ func BenchmarkGinAuditEventsRoute(b *testing.B) {
 	}
 	handler := apiHandler.Routes()
 	request := httptest.NewRequest(http.MethodGet, "/api/audit-events?workspaceId="+workspace.ID+"&limit=50", nil)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			b.Fatalf("status = %d", response.Code)
+		}
+	}
+}
+
+func BenchmarkGinStateRoute(b *testing.B) {
+	apiHandler, _, _, _ := reliabilityTestAPI(b)
+	handler := apiHandler.Routes()
+	request := httptest.NewRequest(http.MethodGet, "/api/state", nil)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			b.Fatalf("status = %d", response.Code)
+		}
+	}
+}
+
+func BenchmarkGinSearchRoute(b *testing.B) {
+	apiHandler, _, _, _ := reliabilityTestAPI(b)
+	handler := apiHandler.Routes()
+	request := httptest.NewRequest(http.MethodGet, "/api/search?q=PM&limit=10", nil)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			b.Fatalf("status = %d", response.Code)
+		}
+	}
+}
+
+func BenchmarkGinWorkspaceListRoute(b *testing.B) {
+	apiHandler, _, _, _ := reliabilityTestAPI(b)
+	handler := apiHandler.Routes()
+	request := httptest.NewRequest(http.MethodGet, "/api/workspaces", nil)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			b.Fatalf("status = %d", response.Code)
+		}
+	}
+}
+
+func BenchmarkGinItemListRoute(b *testing.B) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(b)
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-1", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name, Identifier: "PM-031", Title: "Complete Gin API Migration", ItemPath: "plans/platform/PM-031"}}
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
+		b.Fatal(err)
+	}
+	handler := apiHandler.Routes()
+	request := httptest.NewRequest(http.MethodGet, "/api/items?workspaceId="+workspace.ID, nil)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			b.Fatalf("status = %d", response.Code)
+		}
+	}
+}
+
+func BenchmarkGinItemDetailRoute(b *testing.B) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(b)
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-1", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name, Identifier: "PM-031", Title: "Complete Gin API Migration", ItemPath: "plans/platform/PM-031"}}
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
+		b.Fatal(err)
+	}
+	handler := apiHandler.Routes()
+	request := httptest.NewRequest(http.MethodGet, "/api/items/item-1", nil)
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

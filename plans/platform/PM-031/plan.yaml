@@ -1,5 +1,5 @@
 plan:
-  status: draft
+  status: completed
   wiki_enriched: false
 automation-test:
   - path: ""

@@ -2,27 +2,27 @@
 
 ## Goal
 
-Migrate all remaining API routes to Gin without changing the browser-visible API contract or local workspace side effects.
+Migrate all remaining API routes to Gin without changing the browser-visible API contract or local workspace side effects. This scenario set is complete.
 
 ## Scenario List
 
 | #   | Title                        | Description                                                                    |
 |-----|------------------------------|--------------------------------------------------------------------------------|
-| 0   | Current PM-030 state         | Gin owns health and audit routes; all other API routes use legacy fallback.    |
+| 0   | Current PM-031 state         | Gin owns every `/api/` route and the legacy fallback is removed.               |
 | 1   | Read route family migration  | Read-only JSON route families move to Gin with parity tests.                   |
 | 2   | Write route family migration | Mutating routes move after audit, scan, refresh, and error behavior is locked. |
 | 3   | Streaming route migration    | WebSocket and stream routes move after normal HTTP routes are stable.          |
 | 4   | Gin-only cutover             | Legacy fallback is removed and route inventory has zero unmigrated routes.     |
 
-## Starting State
+## Final State
 
 | Area            | State                                                                             |
 |-----------------|-----------------------------------------------------------------------------------|
-| Gin routes      | `/api/health`, `/api/audit-events`                                                |
-| Legacy fallback | All other `/api/` routes                                                          |
+| Gin routes      | Every `/api/` route                                                               |
+| Legacy fallback | Removed                                                                           |
 | Boundary checks | Gin imports restricted to the HTTP transport boundary under `internal/server/api` |
-| Route inventory | PM-030 inventory covers legacy `ServeMux` registrations                           |
-| Error handling  | `WriteError` is preserved; typed mapper is available for migrated code            |
+| Route inventory | PM-031 inventory has zero fallback-owned routes                                   |
+| Error handling  | `WriteError` behavior is preserved; typed mapper remains available                |
 
 ## Flow 1: Read Route Family Migration
 

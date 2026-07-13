@@ -15,7 +15,7 @@ const (
 	requestTimeout  = 30 * time.Second
 )
 
-func newTransport(legacy http.Handler, register func(*gin.RouterGroup)) http.Handler {
+func newTransport(register func(*gin.RouterGroup)) http.Handler {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.RedirectTrailingSlash = false
@@ -26,9 +26,6 @@ func newTransport(legacy http.Handler, register func(*gin.RouterGroup)) http.Han
 	if register != nil {
 		register(api)
 	}
-	engine.NoRoute(func(c *gin.Context) {
-		legacy.ServeHTTP(c.Writer, c.Request)
-	})
 	return engine
 }
 
@@ -64,4 +61,13 @@ func ginAppError(c *gin.Context, err error) {
 	}
 	c.Header("Content-Type", "application/json")
 	c.JSON(status, payload)
+}
+
+func ginHTTPHandler(handler http.HandlerFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		for _, param := range c.Params {
+			c.Request.SetPathValue(param.Key, param.Value)
+		}
+		handler(c.Writer, c.Request)
+	}
 }

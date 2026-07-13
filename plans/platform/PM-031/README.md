@@ -1,6 +1,6 @@
 # PM-031: Complete Gin API Migration
 
-PM-031 finishes the incremental API transport migration started by PM-030. The goal is to move every `/api/` route from the legacy Go `http.ServeMux` fallback to Gin while preserving public method, path, status, header, body, error, WebSocket, and streaming behavior. The final state has Gin as the only API router and keeps the embedded SPA handler outside Gin.
+PM-031 finishes the incremental API transport migration started by PM-030. Every `/api/` route now runs through Gin while preserving public method, path, status, header, body, error, WebSocket, and streaming behavior. Gin is the only API router; the embedded SPA handler remains outside Gin.
 
 ## Related Plans
 
@@ -13,14 +13,14 @@ PM-031 finishes the incremental API transport migration started by PM-030. The g
 
 ## Glossary
 
-| Term            | Meaning                                                                                       | Code                                            |
-|-----------------|-----------------------------------------------------------------------------------------------|-------------------------------------------------|
-| Gin-only API    | Final state where `/api/` routes are registered on Gin without legacy mux fallback.           | `internal/server/api`                           |
-| Legacy Fallback | Current PM-030 state where non-migrated routes fall through Gin `NoRoute` to `http.ServeMux`. | `newTransport`                                  |
-| Route Family    | Group of routes sharing a domain, risk profile, and test strategy.                            | navigation, system, state, workspace, item, Git |
-| Parity Harness  | Tests that lock method, path, status, content type, JSON shape, and important side effects.   | backend tests                                   |
-| Cutover Gate    | Required condition before deleting fallback code for a route family.                          | implementation phases                           |
-| Streaming Route | Route with Server-Sent Events, WebSocket upgrade, or long-lived response behavior.            | stream-create, embedded AI channel              |
+| Term            | Meaning                                                                                     | Code                                            |
+|-----------------|---------------------------------------------------------------------------------------------|-------------------------------------------------|
+| Gin-only API    | Final state where `/api/` routes are registered on Gin without legacy mux fallback.         | `internal/server/api`                           |
+| Legacy Fallback | Removed PM-030 compatibility layer that sent non-migrated routes through `http.ServeMux`.   | historical                                      |
+| Route Family    | Group of routes sharing a domain, risk profile, and test strategy.                          | navigation, system, state, workspace, item, Git |
+| Parity Harness  | Tests that lock method, path, status, content type, JSON shape, and important side effects. | backend tests                                   |
+| Cutover Gate    | Required condition before deleting fallback code for a route family.                        | implementation phases                           |
+| Streaming Route | Route with Server-Sent Events, WebSocket upgrade, or long-lived response behavior.          | stream-create, embedded AI channel              |
 
 ## Migration Order
 
@@ -39,7 +39,7 @@ PM-031 finishes the incremental API transport migration started by PM-030. The g
 
 Request -> Gin middleware -> route family handler -> decoder -> domain service or adapter -> typed error/result -> response mapper -> existing frontend contract.
 
-During migration, non-migrated requests continue to pass through the legacy fallback. At cutover, the fallback is removed and missing API routes fail tests instead of silently routing through `ServeMux`.
+The migration is complete. Missing API routes now fail through Gin routing instead of silently routing through a legacy `ServeMux` fallback.
 
 ## Design Decisions
 
@@ -59,3 +59,5 @@ During migration, non-migrated requests continue to pass through the legacy fall
 - [Infrastructure Design](design/design-02-infrastructure.md)
 - [Pipeline Design](design/design-03-pipeline.md)
 - [Implementation Plan](implementation-plan.md)
+- [Route Inventory](route-inventory.md)
+- [Performance Scorecard](performance-scorecard.md)

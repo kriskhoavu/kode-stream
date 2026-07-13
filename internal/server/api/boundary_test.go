@@ -44,39 +44,19 @@ func TestGinImportsStayInTransportPackage(t *testing.T) {
 	}
 }
 
-func TestRouteInventoryCoversServeMuxRoutes(t *testing.T) {
+func TestAPIRoutesDoNotRegisterServeMuxHandlers(t *testing.T) {
 	root := moduleRoot(t)
-	inventoryData, err := os.ReadFile(filepath.Join(root, "plans/platform/PM-030/route-inventory.md"))
+	data, err := os.ReadFile(filepath.Join(root, "internal/server/api/api.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	inventory := string(inventoryData)
 	routePattern := regexp.MustCompile(`mux\.HandleFunc\("(GET|POST|PUT|PATCH|DELETE) (/api/[^"]+)"`)
-	missing := []string{}
-	err = filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	if matches := routePattern.FindAllStringSubmatch(string(data), -1); len(matches) > 0 {
+		registrations := make([]string, 0, len(matches))
+		for _, match := range matches {
+			registrations = append(registrations, match[1]+" "+match[2])
 		}
-		if entry.IsDir() || filepath.Ext(path) != ".go" {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		for _, match := range routePattern.FindAllStringSubmatch(string(data), -1) {
-			rowPattern := regexp.MustCompile(`(?m)^\|[^|]*\|\s*` + regexp.QuoteMeta(match[1]) + `\s*\|\s*` + regexp.QuoteMeta("`"+match[2]+"`") + `\s*\|`)
-			if !rowPattern.MatchString(inventory) {
-				missing = append(missing, match[1]+" "+match[2])
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(missing) > 0 {
-		t.Fatalf("route inventory missing routes: %s", strings.Join(missing, ", "))
+		t.Fatalf("API routes must be registered on Gin, found ServeMux registrations: %s", strings.Join(registrations, ", "))
 	}
 }
 

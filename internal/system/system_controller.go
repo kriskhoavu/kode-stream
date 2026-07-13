@@ -21,6 +21,26 @@ func (c *SystemController) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/system/config-paths", c.updateConfigPaths)
 }
 
+func (c *SystemController) SelectDirectory(w http.ResponseWriter, r *http.Request) {
+	c.selectDirectory(w, r)
+}
+
+func (c *SystemController) SelectFile(w http.ResponseWriter, r *http.Request) {
+	c.selectFile(w, r)
+}
+
+func (c *SystemController) OpenPath(w http.ResponseWriter, r *http.Request) {
+	c.openPath(w, r)
+}
+
+func (c *SystemController) ConfigPaths(w http.ResponseWriter, r *http.Request) {
+	c.configPaths(w, r)
+}
+
+func (c *SystemController) UpdateConfigPaths(w http.ResponseWriter, r *http.Request) {
+	c.updateConfigPaths(w, r)
+}
+
 func (c *SystemController) selectFile(w http.ResponseWriter, _ *http.Request) {
 	path, err := c.repository.SelectYAMLFile()
 	if err != nil {
