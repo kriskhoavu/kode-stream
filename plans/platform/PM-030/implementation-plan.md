@@ -12,7 +12,7 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 | B2    | Domain error model and response mapper             | Complete    | `rtk go test ./internal/common/... ./internal/server/... ./internal/navigation/...` |
 | B3    | Gin bootstrap and middleware shell                 | Complete    | `rtk go test ./internal/server/... ./internal/common/...`                           |
 | B4    | First read route-group migration                   | Complete    | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...`  |
-| B5    | Repository/service seams for migrated groups       | Not started | `rtk go test ./...`                                                                 |
+| B5    | Repository/service seams for migrated groups       | Complete    | `rtk go test ./...`                                                                 |
 | B6    | Cache decorator pilot                              | Not started | `rtk go test ./...`                                                                 |
 | B7    | Concurrency policy pilot                           | Not started | `rtk go test ./...`                                                                 |
 | C1    | Boundary and CI checks                             | Not started | `rtk go test ./...`                                                                 |
@@ -96,11 +96,13 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 **Deliverables:**
 
-- [ ] Add narrow interfaces only for services or repositories used by migrated route groups.
-- [ ] Add fakes for route and service tests.
-- [ ] Keep concrete implementations unchanged unless tests expose a boundary issue.
-- [ ] Confirm no Gin types enter service or repository signatures.
-- [ ] Update backend design notes with final interface names.
+- [x] Add narrow interfaces only for services or repositories used by migrated route groups.
+- [x] Add fakes for route and service tests.
+- [x] Keep concrete implementations unchanged unless tests expose a boundary issue.
+- [x] Confirm no Gin types enter service or repository signatures.
+- [x] Update backend design notes with final interface names.
+
+**Result:** Added the `auditEventReader` consumer port for migrated Gin audit reads, package-local test fake, and context-aware audit store adapter without introducing Gin outside transport code.
 
 **Verification:** `rtk go test ./...`
 

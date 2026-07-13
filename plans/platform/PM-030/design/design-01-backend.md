@@ -111,3 +111,9 @@ Cache decorators must be opt-in, tested with fake clocks, and removable without 
 | Migrate small controllers first                    | Existing controller boundaries make audit, health, system, and navigation easier to isolate.   |
 | Defer WebSocket migration                          | It has distinct origin checks, subscription lifecycle, goroutines, and binary/base64 behavior. |
 | Avoid full repository interface sweep              | Interfaces should match real route seams and tests, not speculative architecture.              |
+
+## Implemented Seams
+
+| Interface          | Owner                 | Concrete Implementation | Purpose                                  |
+|--------------------|-----------------------|-------------------------|------------------------------------------|
+| `auditEventReader` | `internal/server/api` | `audit.Store`           | Read recent audit events for Gin routes. |

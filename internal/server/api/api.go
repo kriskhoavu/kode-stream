@@ -48,6 +48,7 @@ type API struct {
 	gitOps         *appgit.Service
 	dialog         *system.Dialog
 	audit          *audit.Store
+	auditReader    auditEventReader
 	healthService  *workspacehealth.HealthService
 	search         *appsearch.SearchService
 	navigation     *navigation.Store
@@ -105,6 +106,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 		gitOps:         appgit.NewService(reg, writer, git),
 		dialog:         dialog,
 		audit:          auditStore,
+		auditReader:    auditStore,
 		healthService:  healthService,
 		search:         searchService,
 		navigation:     navigationStore,

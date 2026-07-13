@@ -3,6 +3,7 @@ package api
 // Package api provides the Server HTTP transport.
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -28,6 +29,15 @@ import (
 	"kode-stream/internal/workspace/registry"
 	"kode-stream/internal/workspace/scanner"
 )
+
+type fakeAuditEventReader struct {
+	events []models.AuditEvent
+	err    error
+}
+
+func (f fakeAuditEventReader) RecentContext(context.Context, int) ([]models.AuditEvent, error) {
+	return f.events, f.err
+}
 
 func TestAISettingsRoutesReadValidateAndPersist(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ai-settings.yaml")
@@ -162,6 +172,26 @@ func TestGinHealthRoutePreservesContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !payload["ok"] {
+		t.Fatalf("payload = %#v", payload)
+	}
+}
+
+func TestGinAuditRouteUsesReaderSeam(t *testing.T) {
+	handler := (&API{auditReader: fakeAuditEventReader{events: []models.AuditEvent{
+		{WorkspaceID: "workspace-a", Operation: "scan", Status: models.AuditStatusSuccess, Message: "scan"},
+	}}}).Routes()
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/audit-events?workspaceId=workspace-a&limit=1", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	var payload []models.AuditEvent
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload) != 1 || payload[0].Operation != "scan" {
 		t.Fatalf("payload = %#v", payload)
 	}
 }

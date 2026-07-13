@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -8,6 +9,10 @@ import (
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
 )
+
+type auditEventReader interface {
+	RecentContext(context.Context, int) ([]models.AuditEvent, error)
+}
 
 func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 	api.GET("/health", a.ginHealth)
@@ -19,7 +24,7 @@ func (a *API) ginHealth(c *gin.Context) {
 }
 
 func (a *API) ginAuditEvents(c *gin.Context) {
-	if a.audit == nil {
+	if a.auditReader == nil {
 		ginJSON(c, 200, []models.AuditEvent{})
 		return
 	}
@@ -27,7 +32,7 @@ func (a *API) ginAuditEvents(c *gin.Context) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	events, err := a.audit.Recent(limit * 2)
+	events, err := a.auditReader.RecentContext(c.Request.Context(), limit*2)
 	if err != nil {
 		ginAppError(c, apperrors.Infra(err.Error(), err))
 		return

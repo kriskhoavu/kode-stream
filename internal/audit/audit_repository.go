@@ -4,6 +4,7 @@ package audit
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -20,6 +21,20 @@ type AuditRepository struct {
 	mu   sync.Mutex
 	path string
 	now  func() time.Time
+}
+
+func (s *Store) RecentContext(ctx context.Context, limit int) ([]models.AuditEvent, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	events, err := s.Recent(limit)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return events, nil
 }
 
 type Store = AuditRepository
