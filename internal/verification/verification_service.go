@@ -107,13 +107,44 @@ type Service struct {
 	mu       sync.RWMutex
 	jobs     map[string]*Job
 	seq      atomic.Int64
+	slots    chan struct{}
+	timeout  time.Duration
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 func NewService(reg *registry.Registry, runtimeService *appruntime.Service) *Service {
-	return &Service{registry: reg, runtime: runtimeService, jobs: map[string]*Job{}}
+	return NewServiceWithPolicy(reg, runtimeService, 2, 10*time.Minute)
+}
+
+func NewServiceWithPolicy(reg *registry.Registry, runtimeService *appruntime.Service, maxRunning int, timeout time.Duration) *Service {
+	if maxRunning <= 0 {
+		maxRunning = 1
+	}
+	if timeout <= 0 {
+		timeout = 10 * time.Minute
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Service{registry: reg, runtime: runtimeService, jobs: map[string]*Job{}, slots: make(chan struct{}, maxRunning), timeout: timeout, ctx: ctx, cancel: cancel}
+}
+
+func (s *Service) Close() {
+	if s.cancel != nil {
+		s.cancel()
+	}
+}
+
+func (s *Service) Limits() (int, time.Duration) {
+	if s == nil {
+		return 0, 0
+	}
+	return cap(s.slots), s.timeout
 }
 
 func (s *Service) Start(workspaceID string, input CreateInput) (Job, error) {
+	if err := s.ctx.Err(); err != nil {
+		return Job{}, err
+	}
 	workspace, ok, err := s.registry.Get(workspaceID)
 	if err != nil {
 		return Job{}, err
@@ -151,6 +182,11 @@ func (s *Service) Start(workspaceID string, input CreateInput) (Job, error) {
 		RenderedCommand:    automation.renderedCommand,
 		Steps:              []StepResult{},
 		Artifacts:          []Artifact{},
+	}
+	select {
+	case s.slots <- struct{}{}:
+	default:
+		return Job{}, errors.New("verification queue is full")
 	}
 	s.mu.Lock()
 	s.jobs[job.ID] = job
@@ -220,6 +256,7 @@ func (s *Service) IngestCheckpoint(workspaceID string, event CheckpointEvent) (J
 }
 
 func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
+	defer func() { <-s.slots }()
 	job, ok := s.getInternal(jobID)
 	if !ok {
 		return
@@ -227,6 +264,8 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	job.Status = JobStatusRunning
 	job.StartedAt = time.Now().UTC()
 	config := job.Runtime
+	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
+	defer cancel()
 
 	artifactRoot, err := appruntime.EnsureArtifactRoot(workspace.Path, job.ID)
 	if err != nil {
@@ -248,7 +287,6 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	}
 	defer verifyLog.Close()
 
-	ctx := context.Background()
 	if err := s.runStep(job, "prepare", runtimeLog, func() error {
 		return s.runtime.Prepare(ctx, workspace.Path, config, runtimeLog)
 	}); err != nil {

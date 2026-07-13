@@ -190,6 +190,55 @@ func TestAutomationVerificationRejectsPathTraversal(t *testing.T) {
 	}
 }
 
+func TestVerificationRejectsWhenConcurrencyLimitIsFull(t *testing.T) {
+	workspacePath := t.TempDir()
+	reg := verificationRegistry(t, models.WorkspaceConfig{
+		ID:             "workspace-1",
+		Name:           "Workspace",
+		Path:           workspacePath,
+		BaselineBranch: "main",
+		Sources:        []string{"plans"},
+		Runtime:        verificationRuntime("sleep 0.2", nil),
+	})
+	service := NewServiceWithPolicy(reg, appruntime.NewService(), 1, time.Minute)
+
+	first, err := service.Start("workspace-1", CreateInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.Start("workspace-1", CreateInput{})
+	if err == nil || !strings.Contains(err.Error(), "queue is full") {
+		t.Fatalf("err = %v", err)
+	}
+	_ = waitVerificationJob(t, service, "workspace-1", first.ID)
+}
+
+func TestVerificationShutdownCancelsRunningJob(t *testing.T) {
+	workspacePath := t.TempDir()
+	reg := verificationRegistry(t, models.WorkspaceConfig{
+		ID:             "workspace-1",
+		Name:           "Workspace",
+		Path:           workspacePath,
+		BaselineBranch: "main",
+		Sources:        []string{"plans"},
+		Runtime:        verificationRuntime("sleep 5", nil),
+	})
+	service := NewServiceWithPolicy(reg, appruntime.NewService(), 1, time.Minute)
+
+	job, err := service.Start("workspace-1", CreateInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.Close()
+	job = waitVerificationJob(t, service, "workspace-1", job.ID)
+	if job.Status != JobStatusFailed || !jobHasMessage(job, "context canceled") {
+		t.Fatalf("job = %#v", job)
+	}
+	if _, err := service.Start("workspace-1", CreateInput{}); err == nil {
+		t.Fatal("Start after Close succeeded")
+	}
+}
+
 func verificationRuntime(verify string, automation *models.RuntimeAutomationConfig) *models.WorkspaceRuntimeConfig {
 	return &models.WorkspaceRuntimeConfig{
 		Type: models.RuntimeTypeCustom,
@@ -238,6 +287,15 @@ func waitVerificationJob(t *testing.T, service *Service, workspaceID, jobID stri
 func hasStep(job Job, step string) bool {
 	for _, candidate := range job.Steps {
 		if candidate.Step == step {
+			return true
+		}
+	}
+	return false
+}
+
+func jobHasMessage(job Job, text string) bool {
+	for _, step := range job.Steps {
+		if strings.Contains(step.Message, text) {
 			return true
 		}
 	}

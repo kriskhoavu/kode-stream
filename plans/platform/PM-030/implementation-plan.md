@@ -14,7 +14,7 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 | B4    | First read route-group migration                   | Complete    | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...`  |
 | B5    | Repository/service seams for migrated groups       | Complete    | `rtk go test ./...`                                                                 |
 | B6    | Cache decorator pilot                              | Complete    | `rtk go test ./...`                                                                 |
-| B7    | Concurrency policy pilot                           | Not started | `rtk go test ./...`                                                                 |
+| B7    | Concurrency policy pilot                           | Complete    | `rtk go test ./...`                                                                 |
 | C1    | Boundary and CI checks                             | Not started | `rtk go test ./...`                                                                 |
 | C2    | Performance scorecard and old transport cleanup    | Not started | `rtk go test ./... && rtk npm run typecheck`                                        |
 
@@ -132,11 +132,13 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 **Deliverables:**
 
-- [ ] Select one heavy workflow such as runtime verification, knowledge enrichment, Git command execution, or embedded AI session work.
-- [ ] Add bounded worker or queue policy for that workflow.
-- [ ] Add context deadline and cancellation propagation tests.
-- [ ] Add queue-full and shutdown behavior tests.
-- [ ] Document operational limits and defaults.
+- [x] Select one heavy workflow such as runtime verification, knowledge enrichment, Git command execution, or embedded AI session work.
+- [x] Add bounded worker or queue policy for that workflow.
+- [x] Add context deadline and cancellation propagation tests.
+- [x] Add queue-full and shutdown behavior tests.
+- [x] Document operational limits and defaults.
+
+**Result:** Added a bounded verification execution policy with two default running slots, ten-minute job timeout, queue-full rejection, service shutdown cancellation, and tests for queue-full and shutdown behavior.
 
 **Verification:** `rtk go test ./...`
 

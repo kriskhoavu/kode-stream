@@ -90,6 +90,12 @@ Cache decorators must be opt-in, tested with fake clocks, and removable without 
 | Shutdown      | Server shutdown must close sessions and workers without leaking goroutines.                       |
 | Metrics       | Track queued, running, completed, failed, canceled, and timed-out jobs.                           |
 
+Implemented concurrency pilot:
+
+| Workflow             | Default Limit  | Default Timeout | Queue-Full Behavior           | Shutdown Behavior                 |
+|----------------------|----------------|-----------------|-------------------------------|-----------------------------------|
+| Verification service | 2 running jobs | 10 minutes      | Rejects new job with an error | Cancels service context and jobs. |
+
 ## Testing Strategy
 
 | Test Type            | Purpose                                                                        |
