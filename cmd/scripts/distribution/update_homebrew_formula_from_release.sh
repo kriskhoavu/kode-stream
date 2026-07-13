@@ -6,8 +6,8 @@ cd "$ROOT_DIR"
 
 VERSION="${1:-}"
 if [[ -z "$VERSION" ]]; then
-  echo "Usage: scripts/distribution/update_homebrew_formula_from_release.sh <version> [tap-path]"
-  echo "Example: scripts/distribution/update_homebrew_formula_from_release.sh 1.0.0 ../homebrew-tap"
+  echo "Usage: cmd/scripts/distribution/update_homebrew_formula_from_release.sh <version> [tap-path]"
+  echo "Example: cmd/scripts/distribution/update_homebrew_formula_from_release.sh 1.0.0 ../homebrew-tap"
   exit 2
 fi
 

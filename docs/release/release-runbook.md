@@ -20,7 +20,7 @@ Canonical runbook for packaging Kode Stream, publishing GitHub releases, and upd
 Use the one-shot script from the `kode-stream` repository root:
 
 ```bash
-./scripts/distribution/release_and_update_tap.sh 1.0.0 ../homebrew-tap
+../cmd/scripts/distribution/release_and_update_tap.sh 1.0.0 ../homebrew-tap
 ```
 
 What it does:
@@ -39,7 +39,7 @@ What it does:
 If release assets already exist and you only need to update the tap formula:
 
 ```bash
-./scripts/distribution/update_homebrew_formula_from_release.sh 1.0.0 ../homebrew-tap
+../cmd/scripts/distribution/update_homebrew_formula_from_release.sh 1.0.0 ../homebrew-tap
 ```
 
 This script:
@@ -66,7 +66,7 @@ brew test kode-stream
 
 ## Related Files
 
-- `scripts/distribution/release_and_update_tap.sh`
-- `scripts/distribution/update_homebrew_formula_from_release.sh`
+- `cmd/scripts/distribution/release_and_update_tap.sh`
+- `cmd/scripts/distribution/update_homebrew_formula_from_release.sh`
 - `packaging/homebrew/Formula/kode-stream.rb`
 - `docs/distribution/homebrew-tap-setup.md`

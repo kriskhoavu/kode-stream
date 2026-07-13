@@ -36,7 +36,7 @@
 .viewer-toolbar button.active,
 .viewer-toolbar button[aria-selected='true'] {
   background: var(--panel);
-  color: var(--blue);
+  color: var(--button-accent);
 }
 
 .viewer-mode-toolbar button {
@@ -109,7 +109,7 @@
 .image-preview-toolbar button:hover,
 .image-preview-toolbar button.active {
   background: var(--panel);
-  color: var(--blue);
+  color: var(--button-accent);
 }
 
 .image-preview-canvas {

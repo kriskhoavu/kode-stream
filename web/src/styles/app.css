@@ -14,12 +14,17 @@
   --nav-soft: #0d1b32;
   --nav-text: #e7eefb;
   --blue: #4f46e5;
+  --button-accent: #c65f2a;
+  --accent-contrast: #ffffff;
   --green: #079669;
-  --selection-accent: #34d399;
+  --selection-accent: var(--button-accent);
   --orange: #c2410c;
   --purple: #6d28d9;
+  --danger: #dc2626;
+  --warning: #d97706;
   --shadow: 0 16px 36px rgba(17, 24, 39, 0.08);
   --shadow-soft: 0 8px 22px rgba(17, 24, 39, 0.06);
+  --shadow-lg: 0 24px 60px rgba(17, 24, 39, 0.14);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -208,17 +213,27 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #07111f;
-  --panel: #101b2b;
-  --panel-soft: #162337;
-  --text: #eef4ff;
-  --muted: #a8b6ca;
-  --line: #26364d;
-  --nav: #040a13;
-  --nav-soft: #0a1424;
-  --nav-text: #e5edf7;
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
-  --shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.26);
+  --bg: #0b0b0f;
+  --panel: #111116;
+  --panel-soft: #19191f;
+  --text: #e6e6e6;
+  --muted: #a7a29e;
+  --line: #333039;
+  --nav: #08080c;
+  --nav-soft: #121217;
+  --nav-text: #e6e6e6;
+  --blue: #f9b98c;
+  --button-accent: #b95f2e;
+  --accent-contrast: #ffffff;
+  --green: #40c977;
+  --selection-accent: #f9b98c;
+  --orange: #f9b98c;
+  --purple: #479ffa;
+  --danger: #fa423e;
+  --warning: #f9b98c;
+  --shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+  --shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.58);
 }
 
 * {
@@ -279,8 +294,8 @@ button:disabled {
   height: 30px;
   padding: 6px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #60a5fa, #8b5cf6 58%, #34d399);
-  color: white;
+  background: linear-gradient(135deg, var(--button-accent), color-mix(in srgb, var(--button-accent) 82%, var(--panel)) 58%, color-mix(in srgb, var(--button-accent) 62%, var(--green)));
+  color: var(--accent-contrast);
 }
 
 .workspace-title {
@@ -790,7 +805,7 @@ button:disabled {
 }
 
 .ai-launch-main-saved {
-  box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.65), 0 10px 22px rgba(79, 70, 229, 0.22);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--button-accent) 70%, white), 0 10px 22px color-mix(in srgb, var(--button-accent) 24%, transparent);
 }
 
 .ai-launch-saved-indicator {
@@ -1668,9 +1683,9 @@ select {
 }
 
 .nav-button.active {
-  background: linear-gradient(135deg, #3b35c8, #5146e5);
-  color: white;
-  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.34);
+  background: linear-gradient(135deg, var(--button-accent), color-mix(in srgb, var(--button-accent) 78%, var(--panel)));
+  color: var(--accent-contrast);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--button-accent) 34%, transparent);
 }
 
 .nav-section {
@@ -1780,7 +1795,7 @@ select {
   overflow: auto;
   padding: 22px 28px 28px;
   background:
-    radial-gradient(circle at 80% -10%, rgba(79, 70, 229, 0.08), transparent 34%),
+    radial-gradient(circle at 80% -10%, color-mix(in srgb, var(--blue) 8%, transparent), transparent 34%),
     var(--bg);
 }
 
@@ -1864,6 +1879,13 @@ select {
   align-items: center;
 }
 
+:root[data-theme="dark"] .branch-context-chip,
+:root[data-theme="dark"] .branch-context-chip small,
+:root[data-theme="dark"] .branch-context-chip > svg,
+:root[data-theme="dark"] .branch-picker-trigger svg {
+  color: var(--text);
+}
+
 .branch-selector-wrap {
   position: relative;
   min-width: 0;
@@ -1929,13 +1951,14 @@ select {
 }
 
 :root[data-theme="dark"] .branch-picker-menu {
-  --branch-picker-bg: #0f1b2d;
-  --branch-picker-input-bg: #07111f;
-  --branch-picker-hover-bg: rgba(147, 197, 253, 0.12);
-  --branch-picker-selected-bg: rgba(147, 197, 253, 0.18);
-  --branch-picker-accent: #93c5fd;
-  border-color: #31435f;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.48);
+  --branch-picker-bg: var(--panel);
+  --branch-picker-input-bg: var(--bg);
+  --branch-picker-hover-bg: color-mix(in srgb, var(--blue) 12%, var(--panel));
+  --branch-picker-selected-bg: color-mix(in srgb, var(--blue) 18%, var(--panel));
+  --branch-picker-accent: var(--text);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--blue) 30%, var(--line));
+  box-shadow: var(--shadow);
 }
 
 .branch-picker-search {
@@ -2002,12 +2025,12 @@ select {
 .branch-picker-options button:focus-visible,
 .branch-picker-options button[data-active='true'] {
   background: var(--branch-picker-hover-bg);
-  color: var(--branch-picker-accent);
+  color: var(--text);
 }
 
 .branch-picker-options button[aria-selected='true'] {
   background: var(--branch-picker-selected-bg);
-  color: var(--branch-picker-accent);
+  color: var(--text);
 }
 
 .branch-picker-empty {
@@ -2031,7 +2054,7 @@ select {
 .branch-context-chip.active {
   border-color: color-mix(in srgb, var(--blue) 42%, var(--line));
   background: color-mix(in srgb, var(--blue) 8%, var(--panel));
-  color: var(--blue);
+  color: var(--text);
 }
 
 .branch-context-chip strong {
@@ -2055,12 +2078,24 @@ select {
   flex: 0 0 auto;
 }
 
+:root[data-theme="dark"] .branch-context-chip > svg,
+:root[data-theme="dark"] .branch-context-chip > span:first-of-type,
+:root[data-theme="dark"] .branch-context-chip small,
+:root[data-theme="dark"] .branch-context-chip .branch-picker-trigger,
+:root[data-theme="dark"] .branch-context-chip .branch-picker-trigger span {
+  color: #ffffff;
+}
+
+.branch-picker-trigger:disabled {
+  opacity: 1;
+}
+
 .branch-context-chip.active .branch-selector-wrap {
   width: 100%;
 }
 
 .branch-context-chip.active strong {
-  color: var(--blue);
+  color: var(--text);
 }
 
 h1,
@@ -2075,10 +2110,17 @@ h1 {
 }
 
 .primary {
-  background: linear-gradient(135deg, #4f46e5, #4338ca);
-  color: white;
+  background: linear-gradient(135deg, var(--button-accent), color-mix(in srgb, var(--button-accent) 74%, var(--panel)));
+  color: var(--accent-contrast);
   padding: 0 14px;
-  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.22);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--button-accent) 22%, transparent);
+}
+
+.primary:disabled {
+  opacity: 1;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--button-accent) 82%, black), color-mix(in srgb, var(--button-accent) 58%, var(--panel)));
+  color: color-mix(in srgb, var(--accent-contrast) 78%, transparent);
+  box-shadow: none;
 }
 
 .secondary,
@@ -2828,7 +2870,7 @@ select:disabled {
 
 .plan-card:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--blue) 35%, var(--line));
+  border-color: color-mix(in srgb, var(--button-accent) 35%, var(--line));
   box-shadow: 0 10px 22px rgba(17, 24, 39, 0.09);
 }
 
@@ -2852,7 +2894,7 @@ select:disabled {
   cursor: grabbing;
   pointer-events: none;
   transform: scale(1.02) rotate(0.4deg);
-  border-color: color-mix(in srgb, var(--blue) 58%, var(--line));
+  border-color: color-mix(in srgb, var(--button-accent) 58%, var(--line));
   box-shadow: 0 22px 50px rgba(15, 23, 42, 0.22);
 }
 
@@ -2898,7 +2940,7 @@ select:disabled {
 
 .plan-card-link:hover,
 .plan-card-link:focus-visible {
-  color: var(--blue);
+  color: var(--button-accent);
   text-decoration: underline;
 }
 
@@ -2930,6 +2972,7 @@ select:disabled {
 
 .scope-badge,
 .source-badge {
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 2px 6px;
   font-size: 10.5px;
@@ -2947,11 +2990,14 @@ select:disabled {
 }
 
 .source-badge {
-  color: var(--blue);
+  border-color: color-mix(in srgb, var(--button-accent) 24%, var(--line));
+  background: color-mix(in srgb, var(--button-accent) 10%, var(--panel));
+  color: var(--button-accent);
   max-width: 96px;
 }
 
 .source-badge.docs {
+  border-color: color-mix(in srgb, var(--green) 28%, var(--line));
   background: color-mix(in srgb, var(--green) 14%, var(--panel));
   color: var(--green);
 }
@@ -3237,8 +3283,8 @@ body.is-resizing-drawer {
 }
 
 .drawer-tabs button.active {
-  background: color-mix(in srgb, var(--blue) 10%, var(--panel));
-  color: var(--blue);
+  background: color-mix(in srgb, var(--button-accent) 10%, var(--panel));
+  color: var(--button-accent);
 }
 
 .drawer-markdown,
@@ -3526,10 +3572,11 @@ body.is-resizing-drawer {
 }
 
 .tags span {
+  border: 1px solid color-mix(in srgb, var(--button-accent) 22%, var(--line));
   border-radius: 999px;
-  background: var(--panel-soft);
-  color: var(--blue);
-  padding: 3px 8px;
+  background: color-mix(in srgb, var(--button-accent) 9%, var(--panel));
+  color: var(--button-accent);
+  padding: 2px 8px;
   font-size: 12px;
 }
 
@@ -4125,11 +4172,11 @@ body.is-resizing-drawer {
 
 .workspace-detail-tab-list button:hover,
 .workspace-detail-tab-list button.active {
-  color: var(--blue);
+  color: var(--button-accent);
 }
 
 .workspace-detail-tab-list button.active {
-  border-bottom-color: var(--blue);
+  border-bottom-color: var(--button-accent);
 }
 
 .workspace-detail-back-button {
@@ -5611,10 +5658,10 @@ body.is-resizing-panel {
 }
 
 .file-tab.active {
-  border-color: color-mix(in srgb, var(--blue) 44%, var(--line));
-  background: color-mix(in srgb, var(--blue) 8%, var(--panel));
+  border-color: color-mix(in srgb, var(--button-accent) 44%, var(--line));
+  background: color-mix(in srgb, var(--button-accent) 8%, var(--panel));
   color: var(--text);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--button-accent) 12%, transparent);
 }
 
 .file-tab-button,
@@ -5673,14 +5720,14 @@ body.is-resizing-panel {
   min-height: 38px;
   border: 1px solid color-mix(in srgb, var(--blue) 54%, var(--line));
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--blue), #4338ca);
-  color: #ffffff;
+  background: linear-gradient(135deg, var(--button-accent), color-mix(in srgb, var(--button-accent) 74%, var(--panel)));
+  color: var(--accent-contrast);
   padding: 0 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 500;
-  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.22);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--button-accent) 22%, transparent);
 }
 
 .save-action:disabled {
@@ -5693,7 +5740,7 @@ body.is-resizing-panel {
 
 .save-action:not(:disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 26px rgba(79, 70, 229, 0.28);
+  box-shadow: 0 14px 26px color-mix(in srgb, var(--button-accent) 28%, transparent);
 }
 
 .save-metadata-action {
@@ -5759,8 +5806,8 @@ body.is-resizing-panel {
 }
 
 .editor-view-switch button.active {
-  background: color-mix(in srgb, var(--blue) 10%, var(--panel));
-  color: var(--blue);
+  background: color-mix(in srgb, var(--button-accent) 10%, var(--panel));
+  color: var(--button-accent);
 }
 
 .autosave-state.error {
@@ -5771,7 +5818,7 @@ body.is-resizing-panel {
 
 .tab-list button.active {
   background: var(--panel-soft);
-  color: var(--blue);
+  color: var(--button-accent);
 }
 
 .markdown-preview,
@@ -5869,7 +5916,7 @@ body.is-resizing-panel {
 
 .diff-mode-switch button.active {
   background: var(--panel-soft);
-  color: var(--blue);
+  color: var(--button-accent);
 }
 
 .diff-actions {
@@ -6378,7 +6425,7 @@ body.is-resizing-panel {
 
 .side-panel-tabs button.active {
   background: var(--panel);
-  color: var(--blue);
+  color: var(--button-accent);
   box-shadow: var(--shadow-soft);
 }
 
@@ -6440,9 +6487,9 @@ body.is-resizing-panel {
 }
 
 .segmented-control button.active {
-  background: var(--blue);
+  background: var(--button-accent);
   color: #ffffff;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--blue) 32%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--button-accent) 32%, transparent);
 }
 
 .segmented-control button + button {

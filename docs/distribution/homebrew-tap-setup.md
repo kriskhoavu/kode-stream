@@ -23,5 +23,5 @@ cp packaging/homebrew/Formula/kode-stream.rb homebrew-tap/Formula/kode-stream.rb
 After bootstrap, run release automation from `kode-stream` root:
 
 ```bash
-./scripts/distribution/release_and_update_tap.sh <version> ../homebrew-tap
+../cmd/scripts/distribution/release_and_update_tap.sh <version> ../homebrew-tap
 ```
