@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement Gin incrementally at the Go backend HTTP boundary while preserving existing routes, JSON contracts, local file behavior, and frontend expectations. Each phase must keep core packages free of Gin imports and must run focused verification before any old transport path is removed.
+Implement Gin incrementally at the Go backend HTTP boundary while preserving existing routes, JSON contracts, local file behavior, and frontend expectations. Each phase must keep core packages free of Gin imports; Gin is allowed only inside the HTTP transport boundary under `internal/server/api`, including handlers, middleware, routing, response adapters, and transport-level tests.
 
 ## Phases Summary
 
@@ -102,7 +102,7 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 - [x] Confirm no Gin types enter service or repository signatures.
 - [x] Update backend design notes with final interface names.
 
-**Result:** Added the `auditEventReader` consumer port for migrated Gin audit reads, package-local test fake, and context-aware audit store adapter without introducing Gin outside transport code.
+**Result:** Added the `auditEventReader` consumer port for migrated Gin audit reads, package-local test fake, and context-aware audit store adapter without introducing Gin outside the HTTP transport boundary.
 
 **Verification:** `rtk go test ./...`
 
@@ -152,7 +152,7 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 **Deliverables:**
 
-- [x] Add a test or script that fails when Gin is imported outside transport packages.
+- [x] Add a test or script that fails when Gin is imported outside the HTTP transport boundary.
 - [x] Add route inventory check or golden snapshot where stable enough.
 - [x] Add verification instructions to the plan and repository README if needed.
 - [x] Confirm `go mod tidy` produces an expected dependency diff only.
@@ -183,7 +183,7 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 ## Post-Implementation Checklist
 
-- [x] Confirm no Gin imports exist outside the approved transport package.
+- [x] Confirm no Gin imports exist outside the approved HTTP transport boundary.
 - [x] Confirm route inventory matches intended public API.
 - [x] Confirm all migrated routes preserve current JSON response contracts.
 - [x] Confirm cache invalidation is documented and tested.

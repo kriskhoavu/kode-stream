@@ -6,12 +6,12 @@ PM-031 does not add a new production runtime. It hardens the current Gin depende
 
 ## Dependency Scope
 
-| Dependency                     | Current Role                                     | PM-031 Rule                                                           |
-|--------------------------------|--------------------------------------------------|-----------------------------------------------------------------------|
-| `github.com/gin-gonic/gin`     | API transport in `internal/server/api`           | May stay only in transport package.                                   |
-| `net/http`                     | Server, SPA, fallback, tests, response contracts | Still used for server and tests; no API route fallback after cutover. |
-| `github.com/gorilla/websocket` | Embedded AI session channel                      | Keep until streaming migration decides adapter details.               |
-| `gopkg.in/yaml.v3`             | Local persistence and config parsing             | Unchanged.                                                            |
+| Dependency                     | Current Role                                     | PM-031 Rule                                                                                                                     |
+|--------------------------------|--------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `github.com/gin-gonic/gin`     | API transport in `internal/server/api`           | May stay only inside the HTTP transport boundary, including handlers, middleware, routing, adapters, and transport-level tests. |
+| `net/http`                     | Server, SPA, fallback, tests, response contracts | Still used for server and tests; no API route fallback after cutover.                                                           |
+| `github.com/gorilla/websocket` | Embedded AI session channel                      | Keep until streaming migration decides adapter details.                                                                         |
+| `gopkg.in/yaml.v3`             | Local persistence and config parsing             | Unchanged.                                                                                                                      |
 
 ## Governance Checks
 

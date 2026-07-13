@@ -6,14 +6,14 @@ PM-030 does not need a new deployment pipeline. Pipeline work means adding CI-sa
 
 ## Pipeline Stages
 
-| Stage                 | Command                                                      | Required By                      |
-|-----------------------|--------------------------------------------------------------|----------------------------------|
-| Dependency check      | `rtk go mod tidy` and clean diff review                      | Gin dependency phase             |
-| Backend tests         | `rtk go test ./...`                                          | Every phase                      |
-| Transport focus tests | `rtk go test ./internal/server/... ./internal/common/...`    | Error and route migration phases |
-| Boundary check        | Go test or script that rejects Gin imports outside transport | First Gin route phase            |
-| Frontend typecheck    | `rtk npm run typecheck`                                      | Before route removal             |
-| Benchmark comparison  | `rtk go test -bench . ./internal/server/...`                 | Baseline and hardening phases    |
+| Stage                 | Command                                                                        | Required By                      |
+|-----------------------|--------------------------------------------------------------------------------|----------------------------------|
+| Dependency check      | `rtk go mod tidy` and clean diff review                                        | Gin dependency phase             |
+| Backend tests         | `rtk go test ./...`                                                            | Every phase                      |
+| Transport focus tests | `rtk go test ./internal/server/... ./internal/common/...`                      | Error and route migration phases |
+| Boundary check        | Go test or script that rejects Gin imports outside the HTTP transport boundary | First Gin route phase            |
+| Frontend typecheck    | `rtk npm run typecheck`                                                        | Before route removal             |
+| Benchmark comparison  | `rtk go test -bench . ./internal/server/...`                                   | Baseline and hardening phases    |
 
 ## Required Gates
 

@@ -19,14 +19,14 @@ PM-031 uses a gated migration pipeline. Each route family must pass focused pari
 
 ## Migration Gates
 
-| Gate             | Required Evidence                                             |
-|------------------|---------------------------------------------------------------|
-| Contract gate    | Focused tests for route shape and error behavior.             |
-| Side-effect gate | Writes preserve scan, index, audit, and refresh behavior.     |
-| Boundary gate    | Gin imports remain inside `internal/server/api`.              |
-| Inventory gate   | Route inventory matches migrated and remaining route state.   |
-| Streaming gate   | WebSocket or stream lifecycle tests cover disconnect cleanup. |
-| Cutover gate     | No legacy API route registrations remain.                     |
+| Gate             | Required Evidence                                                                  |
+|------------------|------------------------------------------------------------------------------------|
+| Contract gate    | Focused tests for route shape and error behavior.                                  |
+| Side-effect gate | Writes preserve scan, index, audit, and refresh behavior.                          |
+| Boundary gate    | Gin imports remain inside the HTTP transport boundary under `internal/server/api`. |
+| Inventory gate   | Route inventory matches migrated and remaining route state.                        |
+| Streaming gate   | WebSocket or stream lifecycle tests cover disconnect cleanup.                      |
+| Cutover gate     | No legacy API route registrations remain.                                          |
 
 ## Options Considered
 

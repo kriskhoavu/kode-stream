@@ -16,13 +16,13 @@ Migrate all remaining API routes to Gin without changing the browser-visible API
 
 ## Starting State
 
-| Area            | State                                                                  |
-|-----------------|------------------------------------------------------------------------|
-| Gin routes      | `/api/health`, `/api/audit-events`                                     |
-| Legacy fallback | All other `/api/` routes                                               |
-| Boundary checks | Gin imports restricted to `internal/server/api`                        |
-| Route inventory | PM-030 inventory covers legacy `ServeMux` registrations                |
-| Error handling  | `WriteError` is preserved; typed mapper is available for migrated code |
+| Area            | State                                                                             |
+|-----------------|-----------------------------------------------------------------------------------|
+| Gin routes      | `/api/health`, `/api/audit-events`                                                |
+| Legacy fallback | All other `/api/` routes                                                          |
+| Boundary checks | Gin imports restricted to the HTTP transport boundary under `internal/server/api` |
+| Route inventory | PM-030 inventory covers legacy `ServeMux` registrations                           |
+| Error handling  | `WriteError` is preserved; typed mapper is available for migrated code            |
 
 ## Flow 1: Read Route Family Migration
 

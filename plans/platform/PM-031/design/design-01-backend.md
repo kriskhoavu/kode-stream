@@ -6,14 +6,14 @@ PM-031 converts the remaining API route families to Gin and removes the legacy `
 
 ## Current Transport State
 
-| Area                | Current State                                        |
-|---------------------|------------------------------------------------------|
-| Gin router          | Owns `/api/health` and `/api/audit-events`.          |
-| Legacy fallback     | Handles remaining API routes via Go `ServeMux`.      |
-| Middleware          | Recovery, request ID propagation, timeout context.   |
-| Response helpers    | `ginJSON`, `ginAppError`, `httpx` mapper.            |
-| Boundary governance | Tests restrict Gin imports to `internal/server/api`. |
-| Route inventory     | PM-030 inventory covers current `ServeMux` routes.   |
+| Area                | Current State                                                                          |
+|---------------------|----------------------------------------------------------------------------------------|
+| Gin router          | Owns `/api/health` and `/api/audit-events`.                                            |
+| Legacy fallback     | Handles remaining API routes via Go `ServeMux`.                                        |
+| Middleware          | Recovery, request ID propagation, timeout context.                                     |
+| Response helpers    | `ginJSON`, `ginAppError`, `httpx` mapper.                                              |
+| Boundary governance | Tests restrict Gin imports to the HTTP transport boundary under `internal/server/api`. |
+| Route inventory     | PM-030 inventory covers current `ServeMux` routes.                                     |
 
 ## Route Family Plan
 
@@ -55,14 +55,14 @@ PM-031 converts the remaining API route families to Gin and removes the legacy `
 
 ## Cutover Criteria
 
-| Criterion              | Required State                                                         |
-|------------------------|------------------------------------------------------------------------|
-| Route inventory        | No `/api/` routes remain registered only on legacy `ServeMux`.         |
-| Boundary checks        | Gin imports exist only in `internal/server/api`.                       |
-| Test coverage          | Each route family has focused parity or contract tests.                |
-| Frontend compatibility | `rtk npm run typecheck` passes after final route family migration.     |
-| Performance            | Scorecard records baseline and final results for representative reads. |
-| Fallback removal       | `newTransport` no longer needs `NoRoute` legacy mux delegation.        |
+| Criterion              | Required State                                                                         |
+|------------------------|----------------------------------------------------------------------------------------|
+| Route inventory        | No `/api/` routes remain registered only on legacy `ServeMux`.                         |
+| Boundary checks        | Gin imports exist only inside the HTTP transport boundary under `internal/server/api`. |
+| Test coverage          | Each route family has focused parity or contract tests.                                |
+| Frontend compatibility | `rtk npm run typecheck` passes after final route family migration.                     |
+| Performance            | Scorecard records baseline and final results for representative reads.                 |
+| Fallback removal       | `newTransport` no longer needs `NoRoute` legacy mux delegation.                        |
 
 ## Design Decisions
 

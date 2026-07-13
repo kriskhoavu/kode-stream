@@ -147,7 +147,7 @@ npm test -- --run
 go test ./...
 ```
 
-`go test ./...` also runs backend governance checks that keep Gin imports inside `internal/server/api` and ensure the PM-030 route inventory covers current `ServeMux` registrations.
+`go test ./...` also runs backend governance checks that keep Gin imports inside the HTTP transport boundary under `internal/server/api` and ensure the PM-030 route inventory covers current `ServeMux` registrations.
 
 Useful build commands:
 
@@ -246,7 +246,7 @@ If source settings are missing or invalid, Kode Stream falls back to freestyle d
 - Markdown stale-write detection via expected content hashes
 - Metadata writes limited to structured/configured items
 - Typed domain errors map to stable HTTP statuses while preserving the existing `error` and optional `recoveryHint` envelope
-- Gin is restricted to the API transport package; services and repositories receive standard contexts and model types
+- Gin is restricted to the HTTP transport boundary under `internal/server/api`; services and repositories receive standard contexts and model types
 - Verification jobs use bounded concurrency, explicit timeouts, queue-full rejection, and shutdown cancellation
 - Commit stages only user-selected paths within configured sources
 - Pull and branch switch protect dirty trees unless risk is explicitly confirmed

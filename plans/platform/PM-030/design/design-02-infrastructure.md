@@ -23,12 +23,12 @@ PM-030 is a local Go backend refactor. Infrastructure work focuses on dependency
 
 ## Boundary Checks
 
-| Check                 | Rule                                                   | Failure Example                                    |
-|-----------------------|--------------------------------------------------------|----------------------------------------------------|
-| Gin import boundary   | Only transport packages may import Gin                 | `internal/item` imports `github.com/gin-gonic/gin` |
-| Route inventory       | Registered method/path set must match approved changes | Missing `GET /api/items/{id}`                      |
-| Error envelope        | Error payload must include current `error` field       | New mapper omits `error`                           |
-| Response content type | JSON routes must return `application/json`             | Gin default differs from current helper            |
+| Check                 | Rule                                                                         | Failure Example                                    |
+|-----------------------|------------------------------------------------------------------------------|----------------------------------------------------|
+| Gin import boundary   | Only HTTP transport-boundary code under `internal/server/api` may import Gin | `internal/item` imports `github.com/gin-gonic/gin` |
+| Route inventory       | Registered method/path set must match approved changes                       | Missing `GET /api/items/{id}`                      |
+| Error envelope        | Error payload must include current `error` field                             | New mapper omits `error`                           |
+| Response content type | JSON routes must return `application/json`                                   | Gin default differs from current helper            |
 
 ## Benchmark Artifacts
 

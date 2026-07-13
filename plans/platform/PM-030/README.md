@@ -1,6 +1,6 @@
 # PM-030: Gin Transport And Core Boundary Hardening
 
-PM-030 modernizes the Go backend HTTP boundary by introducing Gin in a behavior-preserving way, while tightening service, domain, repository, error, cache, and concurrency boundaries that already exist in Kode Stream. The migration keeps existing API routes and JSON contracts stable, avoids Gin types outside transport code, and adds parity checks before moving route groups.
+PM-030 modernizes the Go backend HTTP boundary by introducing Gin in a behavior-preserving way, while tightening service, domain, repository, error, cache, and concurrency boundaries that already exist in Kode Stream. The migration keeps existing API routes and JSON contracts stable, avoids Gin types outside the HTTP transport boundary, and adds parity checks before moving route groups.
 
 ## Final Migration Status
 
@@ -68,7 +68,7 @@ In scope:
 - Add domain error codes and centralized mapping for both `net/http` and Gin handlers.
 - Migrate low-risk read route groups first.
 - Add cache and concurrency policies with one measured implementation each.
-- Add CI or test checks that keep Gin imports out of core packages.
+- Add CI or test checks that keep Gin imports inside the HTTP transport boundary and out of core packages.
 
 Out of scope:
 

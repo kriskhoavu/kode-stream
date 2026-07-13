@@ -4,7 +4,7 @@ This document describes the current architecture.
 
 Kode Stream is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
-The current API transport is incremental: `internal/server/api` uses Gin for migrated route groups and falls back to the legacy Go `http.ServeMux` for routes that have not moved yet. Gin is intentionally confined to the transport package; domain services, repositories, and adapters use standard `context.Context`, model types, and typed application errors.
+The current API transport is incremental: `internal/server/api` uses Gin for migrated route groups and falls back to the legacy Go `http.ServeMux` for routes that have not moved yet. Gin is intentionally confined to the HTTP transport boundary under `internal/server/api`, including handlers, middleware, routing, response adapters, and transport-level tests. Domain services, repositories, and infrastructure adapters use standard `context.Context`, model types, and typed application errors.
 
 ## Goals
 
@@ -131,7 +131,7 @@ User browser
 - `internal/server` is the composition root and contains no domain decisions.
 - Domain packages own workflows, policies, repository ports, and domain-specific implementations.
 - `internal/server/api` preserves HTTP contracts and delegates to domain services.
-- Gin imports are allowed only in `internal/server/api`.
+- Gin imports are allowed only within the HTTP transport boundary under `internal/server/api`, including handlers, middleware, routing, response adapters, and transport-level tests.
 - Services and repositories must not accept `gin.Context`; handlers translate request data into `context.Context`, models, and primitive parameters.
 - Shared filesystem checks belong under `internal/filesystem`; workspace-specific file behavior belongs under `internal/workspace`.
 - `internal/common/models` contains compatibility DTOs only until ownership can move without duplicating cross-domain contracts.

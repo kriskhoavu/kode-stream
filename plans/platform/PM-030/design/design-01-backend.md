@@ -21,12 +21,12 @@ PM-030 adds Gin as the backend API transport without changing business behavior.
 
 ## Target Package Boundaries
 
-| Layer              | Responsibility                                                           | Rule                                     |
-|--------------------|--------------------------------------------------------------------------|------------------------------------------|
-| Transport          | Gin router, middleware, route groups, request decoding, response writing | May import Gin.                          |
-| Application        | Use-case orchestration and service methods                               | Must not import Gin.                     |
-| Domain             | Error codes, validation rules, item/workspace concepts                   | Must not import Gin or storage adapters. |
-| Repository/Adapter | YAML persistence, filesystem, Git, Jira, runtime commands                | Must not import Gin.                     |
+| Layer              | Responsibility                                                           | Rule                                                                                                                                                         |
+|--------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Transport          | Gin router, middleware, route groups, request decoding, response writing | May import Gin inside the HTTP transport boundary under `internal/server/api`, including handlers, middleware, routing, adapters, and transport-level tests. |
+| Application        | Use-case orchestration and service methods                               | Must not import Gin.                                                                                                                                         |
+| Domain             | Error codes, validation rules, item/workspace concepts                   | Must not import Gin or storage adapters.                                                                                                                     |
+| Repository/Adapter | YAML persistence, filesystem, Git, Jira, runtime commands                | Must not import Gin.                                                                                                                                         |
 
 Recommended package movement is incremental. Do not rename all packages before route migration proves the shape.
 
@@ -104,7 +104,7 @@ Implemented concurrency pilot:
 | Contract tests       | Lock status and JSON response shape for selected routes.                       |
 | Parity tests         | Run equivalent requests against old and Gin handlers during dual-stack period. |
 | Error mapper tests   | Verify domain error code to status and payload mapping.                        |
-| Import boundary test | Fail if Gin appears outside transport packages.                                |
+| Import boundary test | Fail if Gin appears outside the HTTP transport boundary.                       |
 | Cache tests          | Verify TTL, keying, invalidation, and fake-clock behavior.                     |
 | Concurrency tests    | Verify deadline, cancellation, full queue, and shutdown behavior.              |
 

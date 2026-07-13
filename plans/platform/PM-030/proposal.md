@@ -50,7 +50,7 @@ Dependency rule:
 
 - `transport -> application -> domain`
 - `infrastructure` implements `domain/application` ports
-- no Gin types outside transport
+- no Gin types outside the HTTP transport boundary
 
 ## Review Amendments
 
@@ -64,7 +64,7 @@ The current implementation already has several service and repository packages, 
 - Add repository interfaces only where route migration or tests need seams.
 - Require cache TTL, key, invalidation, and metrics before adding decorators.
 - Pilot concurrency policy on one heavy workflow before standardizing worker pools.
-- Add an automated boundary check that rejects Gin imports outside transport packages.
+- Add an automated boundary check that rejects Gin imports outside the HTTP transport boundary under `internal/server/api`.
 - Define old-transport removal criteria so dual-stack code does not become permanent.
 
 ## Delivery Plan
