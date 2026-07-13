@@ -15,7 +15,7 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 | B5    | Repository/service seams for migrated groups       | Complete    | `rtk go test ./...`                                                                 |
 | B6    | Cache decorator pilot                              | Complete    | `rtk go test ./...`                                                                 |
 | B7    | Concurrency policy pilot                           | Complete    | `rtk go test ./...`                                                                 |
-| C1    | Boundary and CI checks                             | Not started | `rtk go test ./...`                                                                 |
+| C1    | Boundary and CI checks                             | Complete    | `rtk go test ./...`                                                                 |
 | C2    | Performance scorecard and old transport cleanup    | Not started | `rtk go test ./... && rtk npm run typecheck`                                        |
 
 ## Backend Phases
@@ -152,10 +152,12 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 **Deliverables:**
 
-- [ ] Add a test or script that fails when Gin is imported outside transport packages.
-- [ ] Add route inventory check or golden snapshot where stable enough.
-- [ ] Add verification instructions to the plan and repository README if needed.
-- [ ] Confirm `go mod tidy` produces an expected dependency diff only.
+- [x] Add a test or script that fails when Gin is imported outside transport packages.
+- [x] Add route inventory check or golden snapshot where stable enough.
+- [x] Add verification instructions to the plan and repository README if needed.
+- [x] Confirm `go mod tidy` produces an expected dependency diff only.
+
+**Result:** Added transport boundary tests for Gin imports and route inventory coverage. The expected dependency diff is limited to Gin and its transitive module graph plus the Go directive selected by `go mod tidy`.
 
 **Verification:** `rtk go test ./...`
 
