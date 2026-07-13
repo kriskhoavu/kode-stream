@@ -183,9 +183,9 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 ## Post-Implementation Checklist
 
-- [ ] Confirm no Gin imports exist outside the approved transport package.
-- [ ] Confirm route inventory matches intended public API.
-- [ ] Confirm all migrated routes preserve current JSON response contracts.
-- [ ] Confirm cache invalidation is documented and tested.
-- [ ] Confirm concurrency limits have cancellation and shutdown tests.
-- [ ] Confirm `proposal.md` reflects the final phased plan rather than broad rewrite language.
+- [x] Confirm no Gin imports exist outside the approved transport package.
+- [x] Confirm route inventory matches intended public API.
+- [x] Confirm all migrated routes preserve current JSON response contracts.
+- [x] Confirm cache invalidation is documented and tested.
+- [x] Confirm concurrency limits have cancellation and shutdown tests.
+- [x] Confirm `proposal.md` reflects the final phased plan rather than broad rewrite language.
