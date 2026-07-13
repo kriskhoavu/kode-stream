@@ -145,6 +145,27 @@ func TestGinTransportFallsBackToLegacyRoutes(t *testing.T) {
 	}
 }
 
+func TestGinHealthRoutePreservesContract(t *testing.T) {
+	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	if contentType := response.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Fatalf("content type = %q", contentType)
+	}
+	var payload map[string]bool
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if !payload["ok"] {
+		t.Fatalf("payload = %#v", payload)
+	}
+}
+
 func TestAILaunchRouteValidatesBodyAndReportsUnavailableLauncher(t *testing.T) {
 	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(t.TempDir(), "ai-settings.yaml")))
 	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
@@ -558,6 +579,9 @@ func TestReliabilityEndpointsReturnWorkspaceHealthAndRecentAuditEvents(t *testin
 	auditRequest := httptest.NewRequest(http.MethodGet, "/api/audit-events?workspaceId="+workspace.ID+"&limit=1", nil)
 	auditResponse := httptest.NewRecorder()
 	apiHandler.Routes().ServeHTTP(auditResponse, auditRequest)
+	if contentType := auditResponse.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Fatalf("audit content type = %q", contentType)
+	}
 	var events []models.AuditEvent
 	if err := json.Unmarshal(auditResponse.Body.Bytes(), &events); err != nil {
 		t.Fatal(err)

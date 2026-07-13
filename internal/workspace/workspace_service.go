@@ -249,7 +249,7 @@ func (s *Service) SaveSourceStructure(id, directory string, settings models.Sour
 		return SourceStructureSaveResult{}, err
 	}
 	if warnings := scanner.ValidateSourceStructureSettings(settings); len(warnings) > 0 {
-		return SourceStructureSaveResult{}, fmt.Errorf(warnings[0].Message)
+		return SourceStructureSaveResult{}, fmt.Errorf("%s", warnings[0].Message)
 	}
 	if err := scanner.WriteSourceStructureSettings(root, settings); err != nil {
 		return SourceStructureSaveResult{}, err

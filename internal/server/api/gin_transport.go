@@ -15,13 +15,17 @@ const (
 	requestTimeout  = 30 * time.Second
 )
 
-func newTransport(legacy http.Handler) http.Handler {
+func newTransport(legacy http.Handler, register func(*gin.RouterGroup)) http.Handler {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.RedirectTrailingSlash = false
 	engine.RedirectFixedPath = false
 	engine.HandleMethodNotAllowed = false
 	engine.Use(gin.Recovery(), requestIDMiddleware(), timeoutMiddleware(requestTimeout))
+	api := engine.Group("/api")
+	if register != nil {
+		register(api)
+	}
 	engine.NoRoute(func(c *gin.Context) {
 		legacy.ServeHTTP(c.Writer, c.Request)
 	})

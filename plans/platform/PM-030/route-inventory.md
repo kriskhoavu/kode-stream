@@ -12,10 +12,10 @@ Current backend API routing is registered through Go `http.ServeMux` route patte
 
 ## First Migration Group
 
-| Method | Path                | Current Handler | Risk | Baseline Coverage           |
-|--------|---------------------|-----------------|------|-----------------------------|
-| GET    | `/api/health`       | `c.health`      | low  | controller test + benchmark |
-| GET    | `/api/audit-events` | `c.events`      | low  | controller test + benchmark |
+| Method | Path                | Current Handler    | Risk | Baseline Coverage                        |
+|--------|---------------------|--------------------|------|------------------------------------------|
+| GET    | `/api/health`       | `a.ginHealth`      | low  | controller test + benchmark + Gin parity |
+| GET    | `/api/audit-events` | `a.ginAuditEvents` | low  | controller test + benchmark + Gin parity |
 
 ## Full API Inventory
 

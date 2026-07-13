@@ -11,7 +11,7 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 | B1    | Baseline, route inventory, and proposal tightening | Complete    | `rtk go test ./...`                                                                 |
 | B2    | Domain error model and response mapper             | Complete    | `rtk go test ./internal/common/... ./internal/server/... ./internal/navigation/...` |
 | B3    | Gin bootstrap and middleware shell                 | Complete    | `rtk go test ./internal/server/... ./internal/common/...`                           |
-| B4    | First read route-group migration                   | Not started | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...`  |
+| B4    | First read route-group migration                   | Complete    | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...`  |
 | B5    | Repository/service seams for migrated groups       | Not started | `rtk go test ./...`                                                                 |
 | B6    | Cache decorator pilot                              | Not started | `rtk go test ./...`                                                                 |
 | B7    | Concurrency policy pilot                           | Not started | `rtk go test ./...`                                                                 |
@@ -78,11 +78,13 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 **Deliverables:**
 
-- [ ] Migrate `GET /api/health` and `GET /api/audit-events`, or another low-risk read group selected by the inventory.
-- [ ] Add parity tests for status, content type, and JSON shape.
-- [ ] Preserve query defaults such as audit `limit` behavior.
-- [ ] Keep old route path available until parity tests pass.
-- [ ] Document migration result in the route inventory.
+- [x] Migrate `GET /api/health` and `GET /api/audit-events`, or another low-risk read group selected by the inventory.
+- [x] Add parity tests for status, content type, and JSON shape.
+- [x] Preserve query defaults such as audit `limit` behavior.
+- [x] Keep old route path available until parity tests pass.
+- [x] Document migration result in the route inventory.
+
+**Result:** Mounted `/api/health` and `/api/audit-events` on Gin while keeping their legacy mux registrations for fallback and later cleanup.
 
 **Verification:** `rtk go test ./internal/server/... ./internal/audit/... ./internal/workspace/...`
 

@@ -198,7 +198,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /api/workspaces/{id}/git/commit", a.gitCommit)
 	mux.HandleFunc("POST /api/workspaces/{id}/git/branches", a.gitCreateBranch)
 	mux.HandleFunc("POST /api/workspaces/{id}/git/switch", a.gitSwitchBranch)
-	return newTransport(mux)
+	return newTransport(mux, a.registerGinRoutes)
 }
 
 func (a *API) previewWorkspaceImport(w http.ResponseWriter, r *http.Request) {
