@@ -13,7 +13,7 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 | B3    | Gin bootstrap and middleware shell                 | Complete    | `rtk go test ./internal/server/... ./internal/common/...`                           |
 | B4    | First read route-group migration                   | Complete    | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...`  |
 | B5    | Repository/service seams for migrated groups       | Complete    | `rtk go test ./...`                                                                 |
-| B6    | Cache decorator pilot                              | Not started | `rtk go test ./...`                                                                 |
+| B6    | Cache decorator pilot                              | Complete    | `rtk go test ./...`                                                                 |
 | B7    | Concurrency policy pilot                           | Not started | `rtk go test ./...`                                                                 |
 | C1    | Boundary and CI checks                             | Not started | `rtk go test ./...`                                                                 |
 | C2    | Performance scorecard and old transport cleanup    | Not started | `rtk go test ./... && rtk npm run typecheck`                                        |
@@ -114,11 +114,13 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 **Deliverables:**
 
-- [ ] Select one measured read-heavy candidate from the cache policy matrix.
-- [ ] Add cache interface with TTL semantics and fake-clock tests.
-- [ ] Add one decorator around the selected read path.
-- [ ] Add explicit invalidation on related writes.
-- [ ] Add hit, miss, and invalidation metrics or test-visible counters.
+- [x] Select one measured read-heavy candidate from the cache policy matrix.
+- [x] Add cache interface with TTL semantics and fake-clock tests.
+- [x] Add one decorator around the selected read path.
+- [x] Add explicit invalidation on related writes.
+- [x] Add hit, miss, and invalidation metrics or test-visible counters.
+
+**Result:** Added a TTL cache decorator for Gin audit event reads, explicit invalidation after API audit writes, and fake-clock tests with hit, miss, and invalidation counters.
 
 **Verification:** `rtk go test ./...`
 

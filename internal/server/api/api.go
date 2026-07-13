@@ -93,6 +93,10 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 	if writer != nil {
 		refresher = writer
 	}
+	var auditReader auditEventReader
+	if auditStore != nil {
+		auditReader = audit.NewCachedEventReader(auditStore, 2*time.Second, time.Now)
+	}
 	workspaceFileAccess := workspaceaccess.New()
 	workspaceService := appworkspace.New(reg, idx, scan, writer, git)
 	runtimeService := appruntime.NewService()
@@ -106,7 +110,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 		gitOps:         appgit.NewService(reg, writer, git),
 		dialog:         dialog,
 		audit:          auditStore,
-		auditReader:    auditStore,
+		auditReader:    auditReader,
 		healthService:  healthService,
 		search:         searchService,
 		navigation:     navigationStore,
@@ -1283,7 +1287,11 @@ func (a *API) record(workspaceID, itemID, operation, message string, paths []str
 			message = "Operation blocked."
 		}
 	}
-	_, _ = a.audit.Append(models.AuditEvent{WorkspaceID: workspaceID, ItemID: itemID, Operation: operation, Status: status, Message: message, Paths: paths, DurationMS: time.Since(started).Milliseconds(), Error: errorMessage})
+	if _, err := a.audit.Append(models.AuditEvent{WorkspaceID: workspaceID, ItemID: itemID, Operation: operation, Status: status, Message: message, Paths: paths, DurationMS: time.Since(started).Milliseconds(), Error: errorMessage}); err == nil {
+		if invalidator, ok := a.auditReader.(interface{ Invalidate() }); ok {
+			invalidator.Invalidate()
+		}
+	}
 }
 
 func (a *API) selectDirectory(w http.ResponseWriter, r *http.Request) {
