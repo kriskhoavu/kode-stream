@@ -4,6 +4,8 @@ This document describes the current architecture.
 
 Kode Stream is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
+The current API transport is incremental: `internal/server/api` uses Gin for migrated route groups and falls back to the legacy Go `http.ServeMux` for routes that have not moved yet. Gin is intentionally confined to the transport package; domain services, repositories, and adapters use standard `context.Context`, model types, and typed application errors.
+
 ## Goals
 
 - Run locally on the developer machine.
@@ -45,7 +47,7 @@ User browser
 │ internal/server                                              │
 │ - wires domain services and repositories                     │
 │ - serves embedded frontend assets                            │
-│ - mounts the server/api compatibility transport              │
+│ - mounts Gin API transport with legacy ServeMux fallback     │
 │                                                              │
 │ internal/{workspace,workstream,item,knowledge,git,...}        │
 │ - owns controllers, workflows, repositories, and policies    │
@@ -64,24 +66,39 @@ User browser
 
 ## Backend Components
 
-| Component             | Package               | Responsibility                                                                  |
-|-----------------------|-----------------------|---------------------------------------------------------------------------------|
-| CLI entrypoint        | `cmd/kode-stream`    | Parses `serve` and `doctor` commands                                            |
-| Server                | `internal/server`     | Resolves paths, wires dependencies, and serves the API and embedded frontend    |
-| HTTP transport        | `internal/server/api` | Preserves routes and wire contracts while controllers move into domains         |
-| Shared contracts      | `internal/common`     | Owns shared errors, HTTP helpers, and compatibility DTOs                        |
-| Workspace domain      | `internal/workspace`  | Owns registration, import, scanning, files, source settings, safety, and health |
-| Workstream domain     | `internal/workstream` | Owns branch-scoped planning context, board snapshots, and selected branch state |
-| Item domain           | `internal/item`       | Owns item workflows, cached index data, file writing, and refresh behavior      |
-| Search domain         | `internal/search`     | Owns item, content, and workspace-path search workflows                         |
-| Knowledge domain      | `internal/knowledge`  | Detects, indexes, reads, and enriches structured Markdown Wikis                 |
-| Git domain            | `internal/git`        | Owns guarded Git workflows and the concrete Git repository                      |
-| Jira domain           | `internal/jira`       | Owns Jira workflows, caching, HTTP access, and attachment guards                |
-| AI domain             | `internal/ai`         | Owns settings, capability detection, launch, and embedded terminal sessions     |
-| System domain         | `internal/system`     | Owns configuration paths, native dialogs, application health, and diagnostics   |
-| Audit domain          | `internal/audit`      | Appends and queries local operation events                                      |
-| Navigation domain     | `internal/navigation` | Stores saved filters and recent items                                           |
-| Filesystem capability | `internal/filesystem` | Provides bounded content access, path validation, and guarded writes            |
+| Component             | Package                 | Responsibility                                                                  |
+|-----------------------|-------------------------|---------------------------------------------------------------------------------|
+| CLI entrypoint        | `cmd/kode-stream`       | Parses `serve` and `doctor` commands                                            |
+| Server                | `internal/server`       | Resolves paths, wires dependencies, and serves the API and embedded frontend    |
+| HTTP transport        | `internal/server/api`   | Owns Gin route groups, legacy mux fallback, middleware, and API contracts       |
+| Shared contracts      | `internal/common`       | Owns typed application errors, HTTP helpers, and compatibility DTOs             |
+| Workspace domain      | `internal/workspace`    | Owns registration, import, scanning, files, source settings, safety, and health |
+| Workstream domain     | `internal/workstream`   | Owns branch-scoped planning context, board snapshots, and selected branch state |
+| Item domain           | `internal/item`         | Owns item workflows, cached index data, file writing, and refresh behavior      |
+| Search domain         | `internal/search`       | Owns item, content, and workspace-path search workflows                         |
+| Knowledge domain      | `internal/knowledge`    | Detects, indexes, reads, and enriches structured Markdown Wikis                 |
+| Git domain            | `internal/git`          | Owns guarded Git workflows and the concrete Git repository                      |
+| Jira domain           | `internal/jira`         | Owns Jira workflows, caching, HTTP access, and attachment guards                |
+| AI domain             | `internal/ai`           | Owns settings, capability detection, launch, and embedded terminal sessions     |
+| System domain         | `internal/system`       | Owns configuration paths, native dialogs, application health, and diagnostics   |
+| Audit domain          | `internal/audit`        | Appends and queries local operation events                                      |
+| Verification domain   | `internal/verification` | Owns runtime and automation verification jobs with bounded execution policy     |
+| Navigation domain     | `internal/navigation`   | Stores saved filters and recent items                                           |
+| Filesystem capability | `internal/filesystem`   | Provides bounded content access, path validation, and guarded writes            |
+
+## Backend Infrastructure
+
+| Concern              | Current Implementation                                                                     |
+|----------------------|--------------------------------------------------------------------------------------------|
+| API transport        | Gin 1.9 in `internal/server/api`, with `NoRoute` fallback to the legacy `ServeMux`.        |
+| Migrated Gin routes  | `GET /api/health` and `GET /api/audit-events`.                                             |
+| Legacy route support | Non-migrated routes remain on Go `http.ServeMux` until parity tests allow migration.       |
+| Middleware           | Gin recovery, request ID header propagation, and request timeout context.                  |
+| Response contracts   | JSON responses preserve existing frontend expectations and content type compatibility.     |
+| Error mapping        | Typed `internal/common.AppError` codes map to HTTP status through `internal/common/httpx`. |
+| Cache pilot          | Audit event reads use a TTL decorator with hit, miss, and invalidation counters.           |
+| Concurrency pilot    | Verification jobs run behind bounded slots with timeout and service shutdown cancel.       |
+| Governance           | Go tests enforce Gin import boundaries and route inventory coverage.                       |
 
 ## Frontend Components
 
@@ -114,6 +131,8 @@ User browser
 - `internal/server` is the composition root and contains no domain decisions.
 - Domain packages own workflows, policies, repository ports, and domain-specific implementations.
 - `internal/server/api` preserves HTTP contracts and delegates to domain services.
+- Gin imports are allowed only in `internal/server/api`.
+- Services and repositories must not accept `gin.Context`; handlers translate request data into `context.Context`, models, and primitive parameters.
 - Shared filesystem checks belong under `internal/filesystem`; workspace-specific file behavior belongs under `internal/workspace`.
 - `internal/common/models` contains compatibility DTOs only until ownership can move without duplicating cross-domain contracts.
 - Frontend pages may use feature and shared modules.
@@ -123,6 +142,77 @@ User browser
 - `web/src/lib/api.ts` remains a compatibility facade over `web/src/shared/api`.
 - Workspace file content is untrusted. Rich renderers must sanitize output or render escaped React text.
 - Standalone HTML must stay in an iframe sandbox without script or same-origin permissions.
+- New route migrations require route inventory coverage, parity tests, and no framework leakage into core packages.
+
+## API Transport
+
+`internal/server/api.API.Routes()` builds the legacy `ServeMux`, then wraps it in the Gin transport. Migrated Gin route groups are registered before the fallback, so Gin owns selected routes directly and all other API paths continue through the existing mux.
+
+Current migrated route group:
+
+| Method | Route               | Gin Handler        | Notes                               |
+|--------|---------------------|--------------------|-------------------------------------|
+| `GET`  | `/api/health`       | `a.ginHealth`      | Direct health JSON contract         |
+| `GET`  | `/api/audit-events` | `a.ginAuditEvents` | Uses cached audit event reader seam |
+
+Transport middleware:
+
+| Middleware | Behavior                                                                |
+|------------|-------------------------------------------------------------------------|
+| Recovery   | Converts panics into Gin recovery responses instead of process exits    |
+| Request ID | Mirrors incoming `X-Request-ID` onto the response when provided         |
+| Timeout    | Adds a request context timeout before handlers call downstream services |
+
+The SPA handler remains in `internal/server` and is not served by Gin.
+
+## Error Handling
+
+Typed application errors live in `internal/common`:
+
+| Code           | Default HTTP Status         |
+|----------------|-----------------------------|
+| `not_found`    | `404 Not Found`             |
+| `validation`   | `400 Bad Request`           |
+| `conflict`     | `409 Conflict`              |
+| `unauthorized` | `401 Unauthorized`          |
+| `forbidden`    | `403 Forbidden`             |
+| `unavailable`  | `503 Service Unavailable`   |
+| `infra`        | `500 Internal Server Error` |
+
+`internal/common/httpx` maps typed errors to status and payloads. Existing `WriteError` behavior is preserved for older handlers; migrated handlers can opt into the optional `code` field through the typed mapper. The stable frontend envelope remains:
+
+| Field          | Required | Meaning                                      |
+|----------------|----------|----------------------------------------------|
+| `error`        | yes      | Human-readable error message                 |
+| `code`         | no       | Stable typed application error code          |
+| `recoveryHint` | no       | User-facing recovery guidance when available |
+
+## Read Cache Pilot
+
+The first cache decorator is `audit.CachedEventReader`.
+
+| Property     | Value                                                                |
+|--------------|----------------------------------------------------------------------|
+| Cached path  | Recent audit event reads used by the Gin `/api/audit-events` route   |
+| Key          | Requested read limit                                                 |
+| TTL          | Two seconds in the default API wiring                                |
+| Invalidation | API audit writes invalidate the cache after a successful append      |
+| Testability  | Fake clock tests cover TTL expiry, cache hit, miss, and invalidation |
+
+This cache is intentionally narrow. Additional caches should follow the same pattern: explicit TTL, documented key, explicit invalidation, counters, and fake-clock tests.
+
+## Verification Concurrency
+
+`internal/verification.Service` owns the first bounded worker policy.
+
+| Setting          | Default         | Behavior                                      |
+|------------------|-----------------|-----------------------------------------------|
+| Running jobs     | 2               | New jobs acquire a slot before being accepted |
+| Job timeout      | 10 minutes      | Runtime commands receive a deadline context   |
+| Queue-full state | immediate error | Start rejects new work when slots are full    |
+| Shutdown         | cancel context  | Running jobs observe cancellation             |
+
+The policy covers runtime and automation verification jobs. It does not yet govern Git operations, knowledge enrichment, or embedded AI sessions.
 
 ## PM-003 Refactoring Notes
 

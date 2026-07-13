@@ -37,6 +37,8 @@ Kode Stream addresses that gap by providing:
 - Reopen recently viewed items quickly
 - Use guarded Git flows for commit, fetch, pull, push, branch create/switch
 - Inspect workspace health and recent operation history
+- Serve low-risk read routes through the Gin API transport while preserving existing JSON contracts
+- Keep framework dependencies out of core packages through automated boundary checks
 - Detect local Claude, Codex, Copilot, and OpenCode CLIs
 - Launch Terminal, iTerm2, or WezTerm with workspace-only or selected-card context
 - Connect a workspace to Jira Cloud or Jira Server/Data Center through REST APIs
@@ -46,19 +48,20 @@ See implementation details in [plans/platform/PM-002/README.md](plans/platform/P
 
 ## Tech Stack
 
-| Area              | Technology                               | Purpose                                            |
-|-------------------|------------------------------------------|----------------------------------------------------|
-| Backend           | Go 1.22                                  | Local HTTP API, filesystem access, Git integration |
-| Frontend          | React 19 + TypeScript 5                  | UI shell, Workstream, Explorer, item workspace     |
-| Build             | Vite 6                                   | Frontend build and dev tooling                     |
-| Testing           | Vitest, React Testing Library, `go test` | UI and backend validation                          |
-| Content Rendering | Unified, KaTeX, highlight.js, YAML       | Safe rich preview for multiple file types          |
-| Persistence       | YAML files in user config directory      | Workspace registry and index cache                 |
-| Distribution      | Go binary with embedded frontend assets  | Single local runtime                               |
+| Area              | Technology                               | Purpose                                                   |
+|-------------------|------------------------------------------|-----------------------------------------------------------|
+| Backend           | Go 1.25 module, Go 1.22+ source patterns | Local HTTP API, filesystem access, Git integration        |
+| HTTP transport    | Gin 1.9 + Go `net/http` fallback         | Incremental API migration with preserved route contracts  |
+| Frontend          | React 19 + TypeScript 5                  | UI shell, Workstream, Explorer, item workspace            |
+| Build             | Vite 6                                   | Frontend build and dev tooling                            |
+| Testing           | Vitest, React Testing Library, `go test` | UI, backend, transport-boundary, and contract validation  |
+| Content Rendering | Unified, KaTeX, highlight.js, YAML       | Safe rich preview for multiple file types                 |
+| Persistence       | YAML files and JSONL in user config dir  | Workspace registry, index cache, navigation, audit events |
+| Distribution      | Go binary with embedded frontend assets  | Single local runtime                                      |
 
 ## Requirements
 
-- Go `1.22+`
+- Go `1.25+` for module-tidy parity with the current dependency graph
 - Node.js `20+`
 - npm
 - Git
@@ -144,6 +147,8 @@ npm test -- --run
 go test ./...
 ```
 
+`go test ./...` also runs backend governance checks that keep Gin imports inside `internal/server/api` and ensure the PM-030 route inventory covers current `ServeMux` registrations.
+
 Useful build commands:
 
 ```bash
@@ -211,6 +216,8 @@ Jira token lookup checks the running process environment first and then falls ba
   clone-root/
 ```
 
+Audit event reads are cached behind a short-lived in-process TTL decorator for the migrated Gin route. API audit writes invalidate that cache after successful append, so the UI keeps receiving fresh recent activity after mutations.
+
 ### Workspace-Level Files
 
 - `workspace-settings.yaml`: source mapping rules for non-standard docs layouts
@@ -238,6 +245,9 @@ If source settings are missing or invalid, Kode Stream falls back to freestyle d
 - Writes restricted to configured sources
 - Markdown stale-write detection via expected content hashes
 - Metadata writes limited to structured/configured items
+- Typed domain errors map to stable HTTP statuses while preserving the existing `error` and optional `recoveryHint` envelope
+- Gin is restricted to the API transport package; services and repositories receive standard contexts and model types
+- Verification jobs use bounded concurrency, explicit timeouts, queue-full rejection, and shutdown cancellation
 - Commit stages only user-selected paths within configured sources
 - Pull and branch switch protect dirty trees unless risk is explicitly confirmed
 - No credential storage
