@@ -122,8 +122,6 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 
 func (a *API) Routes() http.Handler {
 	mux := http.NewServeMux()
-	workspacehealth.NewHealthController().RegisterRoutes(mux)
-	audit.NewController(a.audit).RegisterRoutes(mux)
 	navigation.NewController(a.navigation, a.items).RegisterRoutes(mux)
 	system.NewController(a.dialog).RegisterRoutes(mux)
 	mux.HandleFunc("GET /api/state", a.state)

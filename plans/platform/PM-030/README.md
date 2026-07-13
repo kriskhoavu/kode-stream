@@ -2,6 +2,17 @@
 
 PM-030 modernizes the Go backend HTTP boundary by introducing Gin in a behavior-preserving way, while tightening service, domain, repository, error, cache, and concurrency boundaries that already exist in Kode Stream. The migration keeps existing API routes and JSON contracts stable, avoids Gin types outside transport code, and adds parity checks before moving route groups.
 
+## Final Migration Status
+
+| Area                 | Status                                                                   |
+|----------------------|--------------------------------------------------------------------------|
+| Gin transport shell  | Implemented for `/api/` with legacy fallback.                            |
+| Migrated route group | `/api/health` and `/api/audit-events`.                                   |
+| Legacy route cleanup | Migrated routes removed from the legacy API mux registration.            |
+| Boundary governance  | Automated tests enforce Gin import and route inventory coverage.         |
+| Cache pilot          | Audit event read cache with TTL, counters, and write invalidation.       |
+| Concurrency pilot    | Verification service bounded running jobs, timeout, and shutdown cancel. |
+
 ## Proposal Review
 
 | Finding                                                                                                          | Improvement For Plan                                                                | Reason                                                                                                           |
@@ -92,4 +103,5 @@ Core packages must not import Gin. Gin context is translated to standard request
 - [Infrastructure Design](design/design-02-infrastructure.md)
 - [Pipeline Design](design/design-03-pipeline.md)
 - [Route Inventory](route-inventory.md)
+- [Performance Scorecard](performance-scorecard.md)
 - [Implementation Plan](implementation-plan.md)

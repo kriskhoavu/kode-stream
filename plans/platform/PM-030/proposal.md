@@ -228,3 +228,16 @@ Mitigations:
 4. Migrate 2-3 low-risk read endpoints with parity tests
 5. Add cache interface and one decorator for a read-heavy endpoint
 6. Add context timeout policy and one bounded worker pool for a heavy job
+
+## Implementation Status
+
+PM-030 implemented the first incremental slice:
+
+| Scope                  | Status                                                            |
+|------------------------|-------------------------------------------------------------------|
+| Gin transport boundary | Added under `internal/server/api` with legacy fallback.           |
+| First migrated routes  | `/api/health` and `/api/audit-events`.                            |
+| Domain error mapping   | Added typed errors and HTTP mapper while preserving `WriteError`. |
+| Cache pilot            | Added audit event read cache with TTL and invalidation.           |
+| Concurrency pilot      | Added bounded verification jobs with timeout and shutdown cancel. |
+| Governance             | Added Gin import boundary and route inventory tests.              |

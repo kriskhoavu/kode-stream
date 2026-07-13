@@ -6,17 +6,17 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 ## Phases Summary
 
-| Phase | Name                                               | Status      | Verification                                                                        |
-|-------|----------------------------------------------------|-------------|-------------------------------------------------------------------------------------|
-| B1    | Baseline, route inventory, and proposal tightening | Complete    | `rtk go test ./...`                                                                 |
-| B2    | Domain error model and response mapper             | Complete    | `rtk go test ./internal/common/... ./internal/server/... ./internal/navigation/...` |
-| B3    | Gin bootstrap and middleware shell                 | Complete    | `rtk go test ./internal/server/... ./internal/common/...`                           |
-| B4    | First read route-group migration                   | Complete    | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...`  |
-| B5    | Repository/service seams for migrated groups       | Complete    | `rtk go test ./...`                                                                 |
-| B6    | Cache decorator pilot                              | Complete    | `rtk go test ./...`                                                                 |
-| B7    | Concurrency policy pilot                           | Complete    | `rtk go test ./...`                                                                 |
-| C1    | Boundary and CI checks                             | Complete    | `rtk go test ./...`                                                                 |
-| C2    | Performance scorecard and old transport cleanup    | Not started | `rtk go test ./... && rtk npm run typecheck`                                        |
+| Phase | Name                                               | Status   | Verification                                                                        |
+|-------|----------------------------------------------------|----------|-------------------------------------------------------------------------------------|
+| B1    | Baseline, route inventory, and proposal tightening | Complete | `rtk go test ./...`                                                                 |
+| B2    | Domain error model and response mapper             | Complete | `rtk go test ./internal/common/... ./internal/server/... ./internal/navigation/...` |
+| B3    | Gin bootstrap and middleware shell                 | Complete | `rtk go test ./internal/server/... ./internal/common/...`                           |
+| B4    | First read route-group migration                   | Complete | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...`  |
+| B5    | Repository/service seams for migrated groups       | Complete | `rtk go test ./...`                                                                 |
+| B6    | Cache decorator pilot                              | Complete | `rtk go test ./...`                                                                 |
+| B7    | Concurrency policy pilot                           | Complete | `rtk go test ./...`                                                                 |
+| C1    | Boundary and CI checks                             | Complete | `rtk go test ./...`                                                                 |
+| C2    | Performance scorecard and old transport cleanup    | Complete | `rtk go test ./... && rtk npm run typecheck`                                        |
 
 ## Backend Phases
 
@@ -169,11 +169,13 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 **Deliverables:**
 
-- [ ] Compare baseline and migrated route performance.
-- [ ] Record p50, p95, allocation, and regression notes.
-- [ ] Remove old `net/http` route code only for route groups with parity coverage.
-- [ ] Run frontend typecheck to catch accidental API contract drift.
-- [ ] Update proposal and README with final migration status.
+- [x] Compare baseline and migrated route performance.
+- [x] Record p50, p95, allocation, and regression notes.
+- [x] Remove old `net/http` route code only for route groups with parity coverage.
+- [x] Run frontend typecheck to catch accidental API contract drift.
+- [x] Update proposal and README with final migration status.
+
+**Result:** Added migrated Gin benchmarks and performance scorecard, removed migrated health/audit registrations from the legacy API mux, and recorded final migration status.
 
 **Verification:** `rtk go test ./... && rtk npm run typecheck`
 

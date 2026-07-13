@@ -196,6 +196,40 @@ func TestGinAuditRouteUsesReaderSeam(t *testing.T) {
 	}
 }
 
+func BenchmarkGinHealthRoute(b *testing.B) {
+	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
+	request := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			b.Fatalf("status = %d", response.Code)
+		}
+	}
+}
+
+func BenchmarkGinAuditEventsRoute(b *testing.B) {
+	apiHandler, workspace, _, auditStore := reliabilityTestAPI(b)
+	for i := 0; i < 100; i++ {
+		if _, err := auditStore.Append(models.AuditEvent{WorkspaceID: workspace.ID, Operation: "scan", Status: models.AuditStatusSuccess, Message: "scan"}); err != nil {
+			b.Fatal(err)
+		}
+	}
+	handler := apiHandler.Routes()
+	request := httptest.NewRequest(http.MethodGet, "/api/audit-events?workspaceId="+workspace.ID+"&limit=50", nil)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			b.Fatalf("status = %d", response.Code)
+		}
+	}
+}
+
 func TestAILaunchRouteValidatesBodyAndReportsUnavailableLauncher(t *testing.T) {
 	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(t.TempDir(), "ai-settings.yaml")))
 	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
@@ -1016,7 +1050,7 @@ func TestRecentItemEndpointOrdersLatestOpenFirst(t *testing.T) {
 	}
 }
 
-func reliabilityTestAPI(t *testing.T) (*API, models.WorkspaceConfig, *itemindex.Index, *audit.Store) {
+func reliabilityTestAPI(t testing.TB) (*API, models.WorkspaceConfig, *itemindex.Index, *audit.Store) {
 	t.Helper()
 	root := t.TempDir()
 	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
