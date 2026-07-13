@@ -4083,6 +4083,22 @@ body.is-resizing-drawer {
   margin: 0;
 }
 
+.knowledge-settings-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.runtime-settings-fields {
+  gap: 18px;
+}
+
+.runtime-settings-fields .repo-field,
+.runtime-settings-fields .repo-field-grid,
+.runtime-settings-fields .registration-mode-toggle,
+.runtime-settings-fields .runtime-settings-section-fields {
+  margin: 0;
+}
+
 .workspace-detail-tabs {
   display: flex;
   align-items: center;
@@ -4144,6 +4160,15 @@ body.is-resizing-drawer {
 .settings-subtabs button:hover {
   background: var(--panel);
   color: var(--text);
+}
+
+.runtime-settings-section-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+  display: grid;
+  gap: 14px;
 }
 
 .automation-field-grid {

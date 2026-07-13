@@ -738,7 +738,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                   </> : <><div className="workspace-integration-card">
                     <div><strong>Jira</strong><span>{repo.jira ? `${repo.jira.projectKey} · ${repo.jira.deploymentType === 'cloud' ? 'Cloud' : 'Server / Data Center'}` : 'Not configured'}</span></div>
                     <button className="secondary" type="button" onClick={() => startEdit(repo, 'jira')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
-                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'knowledge')}>Configure</button></div><div className="workspace-integration-card"><div><strong>Runtime and verify</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'runtime')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div></>}
+                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'knowledge')}>Configure</button></div><div className="workspace-integration-card"><div><strong>Runtime and verification</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'runtime')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div></>}
                 </section>}
 
               </article>
@@ -1349,9 +1349,10 @@ function KnowledgeSettingsFields({ value, onChange }: { value: KnowledgeSettings
 
 function RuntimeSettingsFields({ value, onChange }: { value: WorkspaceRuntimeConfig | null; onChange: (value: WorkspaceRuntimeConfig | null) => void }) {
   const runtime = value ?? defaultRuntimeConfig();
-  const [activeRuntimeTab, setActiveRuntimeTab] = useState<'runtime' | 'automation'>('runtime');
+  const [activeRuntimeTab, setActiveRuntimeTab] = useState<'runtime' | 'verification'>('runtime');
   const [automationPickerBusy, setAutomationPickerBusy] = useState(false);
   const [automationPickerError, setAutomationPickerError] = useState('');
+  const [verificationInputsEnabled, setVerificationInputsEnabled] = useState(true);
   const update = (patch: Partial<WorkspaceRuntimeConfig>) => onChange({ ...runtime, ...patch });
   const updateCommands = (patch: Partial<WorkspaceRuntimeConfig['commands']>) => onChange({ ...runtime, commands: { ...runtime.commands, ...patch } });
   const updateVerify = (patch: Partial<WorkspaceRuntimeConfig['commands']['verify']>) => onChange({ ...runtime, commands: { ...runtime.commands, verify: { ...runtime.commands.verify, ...patch } } });
@@ -1360,6 +1361,17 @@ function RuntimeSettingsFields({ value, onChange }: { value: WorkspaceRuntimeCon
   const automation = runtime.automation ?? defaultRuntimeConfig().automation!;
   const updateAutomation = (patch: Partial<NonNullable<WorkspaceRuntimeConfig['automation']>>) => update({ automation: { ...automation, ...patch } });
   const automationArtifactPaths = automation.artifactPaths ?? [];
+
+  useEffect(() => {
+    if (!value) {
+      setVerificationInputsEnabled(true);
+      return;
+    }
+    const verify = value.commands?.verify;
+    const hasVerificationCommands = Boolean((verify?.smoke ?? '').trim() || (verify?.critical ?? '').trim() || (verify?.full ?? '').trim());
+    setVerificationInputsEnabled(hasVerificationCommands);
+  }, [value]);
+
   const browseAutomationRepository = async () => {
     setAutomationPickerBusy(true);
     setAutomationPickerError('');
@@ -1373,16 +1385,16 @@ function RuntimeSettingsFields({ value, onChange }: { value: WorkspaceRuntimeCon
     }
   };
 
-  return <section className="knowledge-settings-fields" aria-label="Runtime settings">
-    <div className="settings-subtabs" role="tablist" aria-label="Runtime and automation settings">
-      <button type="button" role="tab" aria-selected={activeRuntimeTab === 'runtime'} className={activeRuntimeTab === 'runtime' ? 'active' : undefined} onClick={() => setActiveRuntimeTab('runtime')}>Runtime verification</button>
-      <button type="button" role="tab" aria-selected={activeRuntimeTab === 'automation'} className={activeRuntimeTab === 'automation' ? 'active' : undefined} onClick={() => setActiveRuntimeTab('automation')}>Automation tests</button>
+  return <section className="knowledge-settings-fields runtime-settings-fields" aria-label="Runtime settings">
+    <div className="settings-subtabs" role="tablist" aria-label="Runtime and verification settings">
+      <button type="button" role="tab" aria-selected={activeRuntimeTab === 'runtime'} className={activeRuntimeTab === 'runtime' ? 'active' : undefined} onClick={() => setActiveRuntimeTab('runtime')}>Runtime</button>
+      <button type="button" role="tab" aria-selected={activeRuntimeTab === 'verification'} className={activeRuntimeTab === 'verification' ? 'active' : undefined} onClick={() => setActiveRuntimeTab('verification')}>Verification</button>
     </div>
     {activeRuntimeTab === 'runtime' && <>
       <label className="repo-field jira-connection-toggle">
         <span className="jira-connection-title">
           <input type="checkbox" checked={value !== null} onChange={(event) => onChange(event.target.checked ? runtime : null)} />
-          Runtime verification
+          Runtime
         </span>
       </label>
       {value && <>
@@ -1395,38 +1407,48 @@ function RuntimeSettingsFields({ value, onChange }: { value: WorkspaceRuntimeCon
         <label className="repo-field">Startup command<input value={runtime.commands.up} onChange={(event) => updateCommands({ up: event.target.value })} placeholder="docker compose up -d --no-build" /></label>
         <label className="repo-field">Teardown command<input value={runtime.commands.down} onChange={(event) => updateCommands({ down: event.target.value })} placeholder="docker compose down" /></label>
         <label className="repo-field">Changed-only rebuild command<input value={runtime.commands.rebuildChanged ?? ''} onChange={(event) => updateCommands({ rebuildChanged: event.target.value })} placeholder="docker compose build service-a service-b" /></label>
-        <div className="repo-field-grid">
-          <label className="repo-field">Verify smoke<input value={runtime.commands.verify.smoke} onChange={(event) => updateVerify({ smoke: event.target.value })} placeholder="pnpm test:e2e --grep @smoke" /></label>
-          <label className="repo-field">Verify critical<input value={runtime.commands.verify.critical ?? ''} onChange={(event) => updateVerify({ critical: event.target.value })} placeholder="pnpm test:e2e --grep @critical" /></label>
-        </div>
-        <label className="repo-field">Verify full<input value={runtime.commands.verify.full ?? ''} onChange={(event) => updateVerify({ full: event.target.value })} placeholder="pnpm test:e2e" /></label>
         <label className="repo-field">Rebuild policy<select value={runtime.rebuildPolicy ?? 'changed-only'} onChange={(event) => update({ rebuildPolicy: event.target.value as WorkspaceRuntimeConfig['rebuildPolicy'] })}><option value="never">Never</option><option value="changed-only">Changed only</option><option value="always">Always</option></select></label>
         <div className="repo-field"><span>Health checks</span>{healthChecks.map((check, index) => <div className="path-input-row" key={`${check.target}-${index}`}><select value={check.type} onChange={(event) => onChange({ ...runtime, healthChecks: healthChecks.map((current, currentIndex) => currentIndex === index ? { ...current, type: event.target.value as 'http' | 'command' } : current) })}><option value="http">HTTP</option><option value="command">Command</option></select><input value={check.target} onChange={(event) => onChange({ ...runtime, healthChecks: healthChecks.map((current, currentIndex) => currentIndex === index ? { ...current, target: event.target.value } : current) })} placeholder={check.type === 'http' ? 'http://localhost:3000/health' : 'curl -f http://localhost:3000/health'} /><button className="secondary icon-action" type="button" aria-label={`Remove health check ${index + 1}`} onClick={() => onChange({ ...runtime, healthChecks: healthChecks.filter((_, currentIndex) => currentIndex !== index) })}>×</button></div>)}<button className="secondary" type="button" onClick={() => onChange({ ...runtime, healthChecks: [...healthChecks, { type: 'http', target: '', timeoutSeconds: 30 }] })}>Add health check</button></div>
         <div className="repo-field"><span>Artifact paths</span>{paths.map((artifactPath, index) => <div className="path-input-row" key={`${artifactPath}-${index}`}><input value={artifactPath} onChange={(event) => onChange({ ...runtime, artifacts: { paths: paths.map((current, currentIndex) => currentIndex === index ? event.target.value : current) } })} placeholder="playwright-report" /><button className="secondary icon-action" type="button" aria-label={`Remove artifact path ${index + 1}`} onClick={() => onChange({ ...runtime, artifacts: { paths: paths.filter((_, currentIndex) => currentIndex !== index) } })}>×</button></div>)}<button className="secondary" type="button" onClick={() => onChange({ ...runtime, artifacts: { paths: [...paths, ''] } })}>Add artifact path</button></div>
       </>}
     </>}
-    {activeRuntimeTab === 'automation' && <>
+    {activeRuntimeTab === 'verification' && <>
+      <label className="repo-field jira-connection-toggle">
+        <span className="jira-connection-title">
+          <input type="checkbox" checked={verificationInputsEnabled} onChange={(event) => setVerificationInputsEnabled(event.target.checked)} />
+          Runtime tests
+        </span>
+      </label>
+      <fieldset className="runtime-settings-section-fields" disabled={!verificationInputsEnabled}>
+        <div className="repo-field-grid">
+          <label className="repo-field">Verify smoke<input value={runtime.commands.verify.smoke} onChange={(event) => updateVerify({ smoke: event.target.value })} placeholder="pnpm test:e2e --grep @smoke" /></label>
+          <label className="repo-field">Verify critical<input value={runtime.commands.verify.critical ?? ''} onChange={(event) => updateVerify({ critical: event.target.value })} placeholder="pnpm test:e2e --grep @critical" /></label>
+        </div>
+        <label className="repo-field">Verify full<input value={runtime.commands.verify.full ?? ''} onChange={(event) => updateVerify({ full: event.target.value })} placeholder="pnpm test:e2e" /></label>
+      </fieldset>
       <label className="repo-field jira-connection-toggle">
         <span className="jira-connection-title">
           <input type="checkbox" checked={automation.enabled} onChange={(event) => updateAutomation({ enabled: event.target.checked })} />
           Automation tests
         </span>
       </label>
-      <div className="repo-field-grid automation-field-grid">
-        <label className="repo-field automation-repository-field">Automation repository
-          <div className="path-input-row automation-repository-row">
-            <input value={automation.repositoryPath ?? ''} onChange={(event) => { setAutomationPickerError(''); updateAutomation({ repositoryPath: event.target.value }); }} placeholder="Repository path" />
-            <button className="secondary" type="button" onClick={() => void browseAutomationRepository()} disabled={automationPickerBusy}><FolderOpen size={15} /> Browse</button>
-          </div>
-          {automationPickerError && <small className="settings-error">{automationPickerError}</small>}
-        </label>
-        <label className="repo-field">Automation runner<select value={automation.runner ?? 'cypress'} onChange={(event) => updateAutomation({ runner: event.target.value as NonNullable<WorkspaceRuntimeConfig['automation']>['runner'] })}><option value="cypress">Cypress</option><option value="playwright">Playwright</option></select></label>
-      </div>
-      <div className="repo-field-grid">
-        <label className="repo-field">Default environment<input value={automation.defaultEnvironment ?? 'local'} onChange={(event) => updateAutomation({ defaultEnvironment: event.target.value })} placeholder="local" /></label>
-        <label className="repo-field">Automation command template<input value={automation.commandTemplate ?? ''} onChange={(event) => updateAutomation({ commandTemplate: event.target.value })} placeholder={'CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec "{specs}"'} /></label>
-      </div>
-      <div className="repo-field"><span>Automation artifact paths</span>{automationArtifactPaths.map((artifactPath, index) => <div className="path-input-row" key={`automation-${artifactPath}-${index}`}><input value={artifactPath} onChange={(event) => updateAutomation({ artifactPaths: automationArtifactPaths.map((current, currentIndex) => currentIndex === index ? event.target.value : current) })} placeholder="cypress/videos" /><button className="secondary icon-action" type="button" aria-label={`Remove automation artifact path ${index + 1}`} onClick={() => updateAutomation({ artifactPaths: automationArtifactPaths.filter((_, currentIndex) => currentIndex !== index) })}>×</button></div>)}<button className="secondary" type="button" onClick={() => updateAutomation({ artifactPaths: [...automationArtifactPaths, ''] })}>Add automation artifact path</button></div>
+      <fieldset className="runtime-settings-section-fields" disabled={!automation.enabled}>
+        <div className="repo-field-grid automation-field-grid">
+          <label className="repo-field automation-repository-field">Automation repository
+            <div className="path-input-row automation-repository-row">
+              <input value={automation.repositoryPath ?? ''} onChange={(event) => { setAutomationPickerError(''); updateAutomation({ repositoryPath: event.target.value }); }} placeholder="Repository path" />
+              <button className="secondary" type="button" onClick={() => void browseAutomationRepository()} disabled={automationPickerBusy || !automation.enabled}><FolderOpen size={15} /> Browse</button>
+            </div>
+            {automationPickerError && <small className="settings-error">{automationPickerError}</small>}
+          </label>
+          <label className="repo-field">Automation runner<select value={automation.runner ?? 'cypress'} onChange={(event) => updateAutomation({ runner: event.target.value as NonNullable<WorkspaceRuntimeConfig['automation']>['runner'] })}><option value="cypress">Cypress</option><option value="playwright">Playwright</option></select></label>
+        </div>
+        <div className="repo-field-grid">
+          <label className="repo-field">Default environment<input value={automation.defaultEnvironment ?? 'local'} onChange={(event) => updateAutomation({ defaultEnvironment: event.target.value })} placeholder="local" /></label>
+          <label className="repo-field">Automation command template<input value={automation.commandTemplate ?? ''} onChange={(event) => updateAutomation({ commandTemplate: event.target.value })} placeholder={'CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec "{specs}"'} /></label>
+        </div>
+        <div className="repo-field"><span>Automation artifact paths</span>{automationArtifactPaths.map((artifactPath, index) => <div className="path-input-row" key={`automation-${artifactPath}-${index}`}><input value={artifactPath} onChange={(event) => updateAutomation({ artifactPaths: automationArtifactPaths.map((current, currentIndex) => currentIndex === index ? event.target.value : current) })} placeholder="cypress/videos" /><button className="secondary icon-action" type="button" aria-label={`Remove automation artifact path ${index + 1}`} onClick={() => updateAutomation({ artifactPaths: automationArtifactPaths.filter((_, currentIndex) => currentIndex !== index) })}>×</button></div>)}<button className="secondary" type="button" onClick={() => updateAutomation({ artifactPaths: [...automationArtifactPaths, ''] })}>Add automation artifact path</button></div>
+      </fieldset>
     </>}
   </section>;
 }

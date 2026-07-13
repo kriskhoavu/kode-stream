@@ -91,7 +91,7 @@ describe('workspace detail settings', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
     expect(screen.getByLabelText('Knowledge Wiki detection')).toBeInTheDocument();
     expect(screen.queryByLabelText('Jira integration')).not.toBeInTheDocument();
-    expect(screen.queryByText('Runtime verification')).not.toBeInTheDocument();
+    expect(screen.queryByText('Runtime tests')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     const restoredKnowledgeCard = screen.getByText('Knowledge').closest('.workspace-integration-card');
@@ -99,22 +99,22 @@ describe('workspace detail settings', () => {
     expect(within(restoredKnowledgeCard as HTMLElement).getByRole('button', { name: 'Configure' })).toBeInTheDocument();
   });
 
-  it('shows runtime verification and automation as sibling tabs', () => {
+  it('shows runtime and verification tabs with automation settings grouped under verification', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
     render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
     fireEvent.click(screen.getByRole('button', { name: 'Set runtime' }));
 
-    expect(screen.getByRole('tab', { name: 'Runtime verification' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Automation tests' })).toHaveAttribute('aria-selected', 'false');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Runtime verification' }));
+    expect(screen.getByRole('tab', { name: 'Runtime' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Verification' })).toHaveAttribute('aria-selected', 'false');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Runtime' }));
     expect(screen.getByRole('radiogroup', { name: 'Runtime type' })).toBeInTheDocument();
     expect(screen.queryByText('Automation repository')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Automation tests' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Verification' }));
 
-    expect(screen.getByRole('tab', { name: 'Automation tests' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Verification' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Automation repository')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup', { name: 'Runtime type' })).not.toBeInTheDocument();
   });
