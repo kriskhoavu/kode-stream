@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/httpx"
 	"kode-stream/internal/common/models"
 )
@@ -29,7 +30,7 @@ func (c *AuditController) events(w http.ResponseWriter, r *http.Request) {
 	}
 	events, err := c.repository.Recent(limit * 2)
 	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, err.Error(), nil)
+		httpx.WriteAppError(w, apperrors.Infra(err.Error(), err), nil)
 		return
 	}
 	workspaceID := r.URL.Query().Get("workspaceId")

@@ -6,17 +6,17 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 ## Phases Summary
 
-| Phase | Name                                               | Status      | Verification                                                                       |
-|-------|----------------------------------------------------|-------------|------------------------------------------------------------------------------------|
-| B1    | Baseline, route inventory, and proposal tightening | Complete    | `rtk go test ./...`                                                                |
-| B2    | Domain error model and response mapper             | Not started | `rtk go test ./internal/common/... ./internal/server/...`                          |
-| B3    | Gin bootstrap and middleware shell                 | Not started | `rtk go test ./internal/server/...`                                                |
-| B4    | First read route-group migration                   | Not started | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...` |
-| B5    | Repository/service seams for migrated groups       | Not started | `rtk go test ./...`                                                                |
-| B6    | Cache decorator pilot                              | Not started | `rtk go test ./...`                                                                |
-| B7    | Concurrency policy pilot                           | Not started | `rtk go test ./...`                                                                |
-| C1    | Boundary and CI checks                             | Not started | `rtk go test ./...`                                                                |
-| C2    | Performance scorecard and old transport cleanup    | Not started | `rtk go test ./... && rtk npm run typecheck`                                       |
+| Phase | Name                                               | Status      | Verification                                                                        |
+|-------|----------------------------------------------------|-------------|-------------------------------------------------------------------------------------|
+| B1    | Baseline, route inventory, and proposal tightening | Complete    | `rtk go test ./...`                                                                 |
+| B2    | Domain error model and response mapper             | Complete    | `rtk go test ./internal/common/... ./internal/server/... ./internal/navigation/...` |
+| B3    | Gin bootstrap and middleware shell                 | Not started | `rtk go test ./internal/server/...`                                                 |
+| B4    | First read route-group migration                   | Not started | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...`  |
+| B5    | Repository/service seams for migrated groups       | Not started | `rtk go test ./...`                                                                 |
+| B6    | Cache decorator pilot                              | Not started | `rtk go test ./...`                                                                 |
+| B7    | Concurrency policy pilot                           | Not started | `rtk go test ./...`                                                                 |
+| C1    | Boundary and CI checks                             | Not started | `rtk go test ./...`                                                                 |
+| C2    | Performance scorecard and old transport cleanup    | Not started | `rtk go test ./... && rtk npm run typecheck`                                        |
 
 ## Backend Phases
 
@@ -42,11 +42,13 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 **Deliverables:**
 
-- [ ] Typed domain error codes for `not_found`, `validation`, `conflict`, `unauthorized`, `forbidden`, `unavailable`, and `infra`.
-- [ ] Mapper from typed errors to HTTP status.
-- [ ] Existing `httpx.WriteError` behavior preserved.
-- [ ] Tests for current envelope fields and optional `code` field compatibility.
-- [ ] Replace duplicated inline error mapping in one low-risk controller.
+- [x] Typed domain error codes for `not_found`, `validation`, `conflict`, `unauthorized`, `forbidden`, `unavailable`, and `infra`.
+- [x] Mapper from typed errors to HTTP status.
+- [x] Existing `httpx.WriteError` behavior preserved.
+- [x] Tests for current envelope fields and optional `code` field compatibility.
+- [x] Replace duplicated inline error mapping in one low-risk controller.
+
+**Result:** Added shared `AppError` codes, `httpx.MapError`, `httpx.WriteAppError`, and migrated audit repository failure handling to the mapper.
 
 **Verification:** `rtk go test ./internal/common/... ./internal/server/... ./internal/navigation/...`
 
