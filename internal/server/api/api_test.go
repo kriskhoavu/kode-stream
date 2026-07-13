@@ -126,6 +126,25 @@ func TestAIRoutesAreUnavailableWithoutService(t *testing.T) {
 	}
 }
 
+func TestGinTransportFallsBackToLegacyRoutes(t *testing.T) {
+	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/ai/settings", nil)
+	request.Header.Set(requestIDHeader, "request-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	if response.Header().Get(requestIDHeader) != "request-1" {
+		t.Fatalf("request id header = %q", response.Header().Get(requestIDHeader))
+	}
+	if contentType := response.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Fatalf("content type = %q", contentType)
+	}
+}
+
 func TestAILaunchRouteValidatesBodyAndReportsUnavailableLauncher(t *testing.T) {
 	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(t.TempDir(), "ai-settings.yaml")))
 	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()

@@ -10,7 +10,7 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 |-------|----------------------------------------------------|-------------|-------------------------------------------------------------------------------------|
 | B1    | Baseline, route inventory, and proposal tightening | Complete    | `rtk go test ./...`                                                                 |
 | B2    | Domain error model and response mapper             | Complete    | `rtk go test ./internal/common/... ./internal/server/... ./internal/navigation/...` |
-| B3    | Gin bootstrap and middleware shell                 | Not started | `rtk go test ./internal/server/...`                                                 |
+| B3    | Gin bootstrap and middleware shell                 | Complete    | `rtk go test ./internal/server/... ./internal/common/...`                           |
 | B4    | First read route-group migration                   | Not started | `rtk go test ./internal/server/... ./internal/navigation/... ./internal/audit/...`  |
 | B5    | Repository/service seams for migrated groups       | Not started | `rtk go test ./...`                                                                 |
 | B6    | Cache decorator pilot                              | Not started | `rtk go test ./...`                                                                 |
@@ -60,11 +60,13 @@ Implement Gin incrementally at the Go backend HTTP boundary while preserving exi
 
 **Deliverables:**
 
-- [ ] Add Gin dependency.
-- [ ] Add API transport bootstrap that can mount Gin route groups without changing SPA serving.
-- [ ] Add middleware for recovery, request logging, request ID, and timeout where behavior is compatible.
-- [ ] Add Gin response adapter that uses the same response envelope.
-- [ ] Add tests proving non-migrated routes still resolve through the existing transport.
+- [x] Add Gin dependency.
+- [x] Add API transport bootstrap that can mount Gin route groups without changing SPA serving.
+- [x] Add middleware for recovery, request logging, request ID, and timeout where behavior is compatible.
+- [x] Add Gin response adapter that uses the same response envelope.
+- [x] Add tests proving non-migrated routes still resolve through the existing transport.
+
+**Result:** Added Gin-backed API transport shell with request ID, recovery, timeout, JSON/error adapters, and legacy mux fallback for routes not yet migrated.
 
 **Verification:** `rtk go test ./internal/server/... ./internal/common/...`
 
