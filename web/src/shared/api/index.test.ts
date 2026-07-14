@@ -17,12 +17,14 @@ describe('shared api facade', () => {
         id: 'w1',
         name: 'Workspace',
         path: '/repo',
+        location: 'local_path',
         baselineBranch: 'main',
         createdAt: '2026-06-20T00:00:00Z',
         registrationMode: 'local_path',
         remoteUrl: '',
         clonePathManaged: false,
-        sources: []
+        sources: [],
+        runtime: undefined
       }
     ]);
   });
