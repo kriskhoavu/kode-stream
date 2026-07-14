@@ -20,6 +20,7 @@ func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 	api.GET("/health", a.ginHealth)
 	a.registerCloudAuthRoutes(api)
 	api.GET("/agents/channel", ginHTTPHandler(a.cloudAgentChannel))
+	api.POST("/workspaces/from-agent", ginHTTPHandler(a.registerCloudWorkspaceFromAgent))
 	api.Use(a.cloudAuthMiddleware())
 	api.GET("/audit-events", a.ginAuditEvents)
 	a.registerNavigationRoutes(api)

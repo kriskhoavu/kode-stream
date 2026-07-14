@@ -42,24 +42,25 @@ import (
 )
 
 type API struct {
-	workspaces     *appworkspace.Service
-	workstream     *appworkstream.Service
-	items          *appitem.Service
-	gitOps         *appgit.Service
-	dialog         *system.Dialog
-	audit          *audit.Store
-	auditReader    auditEventReader
-	healthService  *workspacehealth.HealthService
-	search         *appsearch.SearchService
-	navigation     *navigation.Store
-	workspaceFiles *appworkspace.WorkspaceFileService
-	contentSearch  *appsearch.ContentSearchService
-	aiSessions     *appaisession.Service
-	jira           *appjira.Service
-	knowledge      *knowledgeindex.KnowledgeService
-	verification   *appverification.Service
-	runtimeConfig  system.RuntimeConfig
-	agentStore     *cloudAgentStore
+	workspaces      *appworkspace.Service
+	workstream      *appworkstream.Service
+	items           *appitem.Service
+	gitOps          *appgit.Service
+	dialog          *system.Dialog
+	audit           *audit.Store
+	auditReader     auditEventReader
+	healthService   *workspacehealth.HealthService
+	search          *appsearch.SearchService
+	navigation      *navigation.Store
+	workspaceFiles  *appworkspace.WorkspaceFileService
+	contentSearch   *appsearch.ContentSearchService
+	aiSessions      *appaisession.Service
+	jira            *appjira.Service
+	knowledge       *knowledgeindex.KnowledgeService
+	verification    *appverification.Service
+	runtimeConfig   system.RuntimeConfig
+	agentStore      *cloudAgentStore
+	cloudWorkspaces *cloudWorkspaceStore
 }
 
 func (a *API) WithJira(service *appjira.Service) *API {
@@ -112,21 +113,22 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 		workspaceService.ConfigureAudit(auditStore)
 	}
 	return &API{
-		workspaces:     workspaceService,
-		workstream:     appworkstream.New(reg, idx, scan, git),
-		items:          appitem.New(reg, idx, files, writer, git),
-		gitOps:         appgit.NewService(reg, writer, git),
-		dialog:         dialog,
-		audit:          auditStore,
-		auditReader:    auditReader,
-		healthService:  healthService,
-		search:         searchService,
-		navigation:     navigationStore,
-		workspaceFiles: appworkspace.NewWorkspaceFileService(reg, workspaceFileAccess, git, auditStore, refresher),
-		contentSearch:  appsearch.NewContentSearchService(reg, idx, workspaceFileAccess),
-		verification:   appverification.NewService(reg, runtimeService),
-		runtimeConfig:  runtimeConfig,
-		agentStore:     newCloudAgentStore(time.Now),
+		workspaces:      workspaceService,
+		workstream:      appworkstream.New(reg, idx, scan, git),
+		items:           appitem.New(reg, idx, files, writer, git),
+		gitOps:          appgit.NewService(reg, writer, git),
+		dialog:          dialog,
+		audit:           auditStore,
+		auditReader:     auditReader,
+		healthService:   healthService,
+		search:          searchService,
+		navigation:      navigationStore,
+		workspaceFiles:  appworkspace.NewWorkspaceFileService(reg, workspaceFileAccess, git, auditStore, refresher),
+		contentSearch:   appsearch.NewContentSearchService(reg, idx, workspaceFileAccess),
+		verification:    appverification.NewService(reg, runtimeService),
+		runtimeConfig:   runtimeConfig,
+		agentStore:      newCloudAgentStore(time.Now),
+		cloudWorkspaces: newCloudWorkspaceStore(),
 	}
 }
 
@@ -717,6 +719,15 @@ func (a *API) workspaceHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) listWorkspaces(w http.ResponseWriter, r *http.Request) {
+	if a.runtimeConfig.Mode == models.RuntimeModeCloud {
+		session, ok := cloudSessionFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "Cloud session is required")
+			return
+		}
+		writeJSON(w, http.StatusOK, a.cloudWorkspaces.List(session.User.ID))
+		return
+	}
 	workspaces, err := a.workspaces.List()
 	respond(w, workspaces, err)
 }
@@ -725,6 +736,9 @@ func (a *API) createWorkspace(w http.ResponseWriter, r *http.Request) {
 	var input models.WorkspaceInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if a.rejectCloudBrowserWorkspaceRegistration(w, input) {
 		return
 	}
 	result, err := a.workspaces.CreateWithResult(input)
@@ -752,6 +766,9 @@ func (a *API) createWorkspaceStream(w http.ResponseWriter, r *http.Request) {
 	var input models.WorkspaceInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if a.rejectCloudBrowserWorkspaceRegistration(w, input) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")

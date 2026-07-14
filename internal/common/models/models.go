@@ -108,6 +108,11 @@ type WorkspaceConfig struct {
 	Name               string                    `json:"name" yaml:"name"`
 	Path               string                    `json:"path" yaml:"path"`
 	Location           WorkspaceLocation         `json:"location,omitempty" yaml:"location,omitempty"`
+	OwnerUserID        string                    `json:"ownerUserId,omitempty" yaml:"ownerUserId,omitempty"`
+	AgentID            string                    `json:"agentId,omitempty" yaml:"agentId,omitempty"`
+	LocalRootLabel     string                    `json:"localRootLabel,omitempty" yaml:"localRootLabel,omitempty"`
+	PublishedSummary   bool                      `json:"publishedSummary,omitempty" yaml:"publishedSummary,omitempty"`
+	ScanStatus         string                    `json:"scanStatus,omitempty" yaml:"scanStatus,omitempty"`
 	BaselineBranch     string                    `json:"baselineBranch" yaml:"baselineBranch"`
 	RegistrationMode   WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
 	RemoteURL          string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
