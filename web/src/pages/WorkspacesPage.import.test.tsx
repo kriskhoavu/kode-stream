@@ -36,6 +36,18 @@ describe('existing workspace import state', () => {
 		expect(screen.queryByRole('button', { name: /Reveal folder/ })).not.toBeInTheDocument();
 	});
 
+	it('gates Cloud workspace commands when role or agent state disallows them', () => {
+		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
+		render(<WorkspacesPage workspaces={[{ id: 'cloud', name: 'Cloud Repo', path: '', location: 'cloud_agent', localRootLabel: '.../repo', agentId: 'agent-1', scanStatus: 'offline', baselineBranch: 'main', sources: ['plans'], createdAt: '' }]} runtimeContext={{ mode: 'cloud', role: 'viewer', capabilities: { read: true, write: false, workspace_registration: false, git: true, system: false, terminal: false, ai: false, runtime: false, verification: false }, agent: { available: false, status: 'offline' } }} onChanged={vi.fn()} />);
+
+		expect(screen.getByRole('button', { name: 'Add workspace' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Scan all' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Scan workspace' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Configure structure' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Edit sources' })).toBeDisabled();
+	});
+
 	it('keeps manual input on picker cancellation and retries a failed preview', async () => {
 		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
 		vi.spyOn(api, 'selectYAMLFile').mockResolvedValue({ path: '' });

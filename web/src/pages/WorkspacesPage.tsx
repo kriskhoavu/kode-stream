@@ -114,6 +114,10 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
   const cloudMode = runtimeContext.mode === 'cloud';
   const registrationLocationReady = registrationMode === 'local_path' ? Boolean(path.trim()) : registrationMode === 'remote_clone' ? Boolean(remoteUrl.trim()) : Boolean(importSourcePath.trim());
   const operationBusy = (operation: string) => pendingOperations.includes(operation);
+  const canRunWorkspaceCommands = !cloudMode || runtimeContext.agent.available;
+  const canScan = canRunWorkspaceCommands && runtimeContext.capabilities.verification;
+  const canWrite = !cloudMode || runtimeContext.capabilities.write;
+  const canRegisterWorkspace = !cloudMode || runtimeContext.capabilities.workspace_registration;
   const setBusy = (pending: boolean, operation = 'workspace-form') => {
     setPendingOperations((current) => pending
       ? current.includes(operation) ? current : [...current, operation]
@@ -521,7 +525,9 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
       const token = await api.createAgentConnectToken({ name: 'Cloud Agent', platform: navigator.platform });
       setAgentDeepLink(token.deepLink);
       setAgentStatusLabel('connecting');
-      window.location.href = token.deepLink;
+      if (!navigator.userAgent.toLowerCase().includes('jsdom')) {
+        window.location.href = token.deepLink;
+      }
     } catch (err) {
       setAgentStatusLabel('unsupported');
       setNotice({ tone: 'error', title: 'Cloud Agent connection failed', details: [errorMessage(err)] });
@@ -623,10 +629,10 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
           <span>Browse, configure, and scan registered workspaces.</span>
         </div>
         <div className="workspace-manager-page-actions">
-          <button className="secondary" type="button" onClick={() => void scanAll()} disabled={operationBusy('scan-all') || workspaces.length === 0}>
+          <button className="secondary" type="button" onClick={() => void scanAll()} disabled={operationBusy('scan-all') || workspaces.length === 0 || !canScan}>
             <RotateCw size={16} /> Scan all
           </button>
-          <button className="primary" type="button" onClick={() => setRegistrationOpen(true)}>
+          <button className="primary" type="button" onClick={() => setRegistrationOpen(true)} disabled={!canRegisterWorkspace}>
             <Plus size={16} /> Add workspace
           </button>
         </div>
@@ -660,7 +666,7 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
               />
               Select all ({selectedWorkspaces.length} selected)
             </label>
-            <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove(selectedWorkspaces)} disabled={busy || selectedWorkspaces.length === 0}>
+            <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove(selectedWorkspaces)} disabled={busy || selectedWorkspaces.length === 0 || !canWrite}>
               <Trash2 size={16} /> Remove selected
             </button>
           </div>}
@@ -702,8 +708,8 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
                   <div className="repo-row-icon"><HardDrive size={18} /></div>
                   <div><h2>{repo.name}</h2><span>{workspaceDetailSubtitle(activeDetailTab)}</span></div>
                   <div className="workspace-detail-heading-actions">
-                    <button className="secondary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all')}><RotateCw size={16} /> Scan workspace</button>
-                    <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])}><Trash2 size={16} /> Remove</button>
+                    <button className="secondary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all') || !canScan}><RotateCw size={16} /> Scan workspace</button>
+                    <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])} disabled={!canWrite}><Trash2 size={16} /> Remove</button>
                   </div>
                 </header>
 
@@ -744,11 +750,11 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
                       <div className="workspace-source-list">
                         {repo.sources.map((directory) => <div className="workspace-source-row" key={directory}>
                           <div><strong>{directory}</strong><span>Workspace source directory</span></div>
-                          <button className="secondary" type="button" onClick={() => void openSourceSettings(repo, directory)}><SlidersHorizontal size={15} /> Configure structure</button>
+                          <button className="secondary" type="button" onClick={() => void openSourceSettings(repo, directory)} disabled={!canWrite}><SlidersHorizontal size={15} /> Configure structure</button>
                         </div>)}
                         {repo.sources.length === 0 && <div className="empty-inline">No sources configured.</div>}
                       </div>
-                      <div className="workspace-detail-actions"><button className="primary" type="button" onClick={() => startEdit(repo, 'sources')}><Pencil size={16} /> Edit sources</button></div>
+                      <div className="workspace-detail-actions"><button className="primary" type="button" onClick={() => startEdit(repo, 'sources')} disabled={!canWrite}><Pencil size={16} /> Edit sources</button></div>
                     </>}
                   </OverviewSection>
                 </section>}

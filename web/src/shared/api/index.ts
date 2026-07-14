@@ -137,6 +137,7 @@ export const api = {
 	embeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
 	cancelEmbeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
   state: () => request<AppState>('/api/state'),
+  logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   cloudAgents: async () => ((await request<CloudAgent[] | null>('/api/agents')) ?? []),
   createAgentConnectToken: (input: { name?: string; platform?: string } = {}) => request<AgentConnectToken>('/api/agents/connect-token', { method: 'POST', body: JSON.stringify(input) }),
   search: async (params: { q: string; workspaceId?: string; types?: string[]; limit?: number }) => {

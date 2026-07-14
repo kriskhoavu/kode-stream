@@ -8,6 +8,7 @@ import { WorkstreamPage } from './pages/WorkstreamPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { api } from './lib/api';
 import { ActivityPanel } from './components/ReliabilityPanels';
 import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';
@@ -38,6 +39,8 @@ export function App() {
   const quickSwitcher = useQuickSwitcher();
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const cloudUserLabel = runtimeContext.user?.name || runtimeContext.user?.email || runtimeContext.user?.id || 'Cloud user';
+  const modeLabel = runtimeContext.mode === 'cloud' ? `Cloud · ${runtimeContext.role ?? 'viewer'} · ${runtimeContext.agent.status}` : 'Local';
 
   useEffect(() => {
     if (!workspaceMenuOpen && !profileMenuOpen) return;
@@ -132,7 +135,7 @@ export function App() {
                     <FolderGit2 size={16} />
                     <span>
                       <strong>{repo.name}</strong>
-                      <small>{repo.baselineBranch} · {repo.sources.join(', ') || 'plans'}</small>
+                      <small>{repo.location === 'cloud_agent' ? 'Cloud Agent' : 'Local'} · {repo.baselineBranch} · {repo.sources.join(', ') || 'plans'}</small>
                     </span>
                   </button>
                 ))}
@@ -152,6 +155,7 @@ export function App() {
           <button className="search-trigger" type="button" onClick={() => quickSwitcher.setOpen(true)} aria-label="Search">
             <Search size={16} /><span>Search</span>
           </button>
+          <span className="runtime-mode-label">{modeLabel}</span>
           <button className="icon-button topbar-icon" type="button" aria-label="Recent activity" aria-expanded={activityOpen} onClick={() => setActivityOpen((open) => !open)}>
             <Bell size={17} />
           </button>
@@ -175,8 +179,8 @@ export function App() {
             {profileMenuOpen && (
               <div className="profile-menu" role="menu" aria-label="User menu">
                 <div className="profile-menu-header">
-                  <strong>K</strong>
-                  <span>Signed in</span>
+                  <strong>{runtimeContext.mode === 'cloud' ? cloudUserLabel[0]?.toUpperCase() ?? 'C' : 'K'}</strong>
+                  <span>{runtimeContext.mode === 'cloud' ? cloudUserLabel : 'Signed in locally'}</span>
                 </div>
                 <button
                   className={route.name === 'settings' ? 'profile-menu-item active' : 'profile-menu-item'}
@@ -190,6 +194,18 @@ export function App() {
                   <Settings size={15} />
                   <span>Settings</span>
                 </button>
+                {runtimeContext.mode === 'cloud' && <button
+                  className="profile-menu-item"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    void api.logout().then(() => refreshAppData());
+                  }}
+                >
+                  <Settings size={15} />
+                  <span>Logout</span>
+                </button>}
               </div>
             )}
           </div>
