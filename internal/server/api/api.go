@@ -59,6 +59,7 @@ type API struct {
 	knowledge      *knowledgeindex.KnowledgeService
 	verification   *appverification.Service
 	runtimeConfig  system.RuntimeConfig
+	agentStore     *cloudAgentStore
 }
 
 func (a *API) WithJira(service *appjira.Service) *API {
@@ -125,6 +126,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 		contentSearch:  appsearch.NewContentSearchService(reg, idx, workspaceFileAccess),
 		verification:   appverification.NewService(reg, runtimeService),
 		runtimeConfig:  runtimeConfig,
+		agentStore:     newCloudAgentStore(time.Now),
 	}
 }
 

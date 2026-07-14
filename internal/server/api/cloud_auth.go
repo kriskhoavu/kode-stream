@@ -186,6 +186,9 @@ func roleCanAccess(role models.CloudRole, method, path string) bool {
 	if !isMutatingMethod(method) {
 		return true
 	}
+	if strings.HasSuffix(path, "/agents/connect-token") {
+		return true
+	}
 	if role == models.CloudRoleViewer {
 		return false
 	}

@@ -266,6 +266,15 @@ type AgentConnection struct {
 	Status    string `json:"status"`
 }
 
+type CloudAgent struct {
+	ID         string    `json:"id"`
+	UserID     string    `json:"userId"`
+	Name       string    `json:"name"`
+	Platform   string    `json:"platform,omitempty"`
+	Status     string    `json:"status"`
+	LastSeenAt time.Time `json:"lastSeenAt,omitempty"`
+}
+
 type WorkspaceImportIssue struct {
 	Field   string `json:"field" yaml:"field"`
 	Code    string `json:"code" yaml:"code"`

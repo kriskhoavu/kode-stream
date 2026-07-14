@@ -19,17 +19,24 @@ type auditEventReader interface {
 func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 	api.GET("/health", a.ginHealth)
 	a.registerCloudAuthRoutes(api)
+	api.GET("/agents/channel", ginHTTPHandler(a.cloudAgentChannel))
 	api.Use(a.cloudAuthMiddleware())
 	api.GET("/audit-events", a.ginAuditEvents)
 	a.registerNavigationRoutes(api)
 	a.registerSystemRoutes(api)
 	a.registerStateSearchAIRoutes(api)
+	a.registerCloudAgentRoutes(api)
 	a.registerWorkspaceReadRoutes(api)
 	a.registerItemReadRoutes(api)
 	a.registerWorkspaceItemWriteRoutes(api)
 	a.registerKnowledgeVerificationRoutes(api)
 	a.registerGitRoutes(api)
 	a.registerStreamingRoutes(api)
+}
+
+func (a *API) registerCloudAgentRoutes(api *gin.RouterGroup) {
+	api.POST("/agents/connect-token", ginHTTPHandler(a.cloudAgentConnectToken))
+	api.GET("/agents", ginHTTPHandler(a.cloudAgents))
 }
 
 func (a *API) registerNavigationRoutes(api *gin.RouterGroup) {
