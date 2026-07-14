@@ -123,10 +123,12 @@ npm run dev
 ```text
 kode-stream serve [-port 4317]
 kode-stream doctor [--provider github|bitbucket] [--repo <path-or-url>] [--format text|json] [--strict] [--port <n>]
+kode-stream agent start|status|doctor
 ```
 
 - `serve`: starts the local app server.
 - `doctor`: checks the environment and repository setup.
+- `agent`: starts, checks, or diagnoses the Cloud Agent command surface.
 
 ## Data Directory
 

@@ -36,9 +36,47 @@ func main() {
 		if err := runDoctor(os.Args[2:]); err != nil {
 			log.Fatal(err)
 		}
+	case "agent":
+		if err := runAgent(os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
 	default:
 		usage()
 		os.Exit(2)
+	}
+}
+
+func runAgent(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("agent command is required: start, status, or doctor")
+	}
+	switch args[0] {
+	case "start":
+		fs := flag.NewFlagSet("agent start", flag.ContinueOnError)
+		connect := fs.String("connect", "", "kodestream://connect deep link or connect token")
+		cloudURL := fs.String("cloud-url", "", "Cloud public URL")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stdout, "Cloud Agent start requested\ncloudUrl=%s\nconnect=%t\n", strings.TrimSpace(*cloudURL), strings.TrimSpace(*connect) != "")
+		return nil
+	case "status":
+		fmt.Fprintln(os.Stdout, "Cloud Agent status: not running")
+		return nil
+	case "doctor":
+		fs := flag.NewFlagSet("agent doctor", flag.ContinueOnError)
+		cloudURL := fs.String("cloud-url", "", "Cloud public URL")
+		repo := fs.String("repo", "", "local repository path")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		fmt.Fprintln(os.Stdout, "kode-stream agent doctor")
+		fmt.Fprintf(os.Stdout, "cloudUrl: %s\n", strings.TrimSpace(*cloudURL))
+		fmt.Fprintf(os.Stdout, "repo: %s\n", strings.TrimSpace(*repo))
+		fmt.Fprintln(os.Stdout, "deepLink: kodestream://connect")
+		return nil
+	default:
+		return fmt.Errorf("unsupported agent command %q", args[0])
 	}
 }
 
@@ -94,4 +132,5 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Usage:")
 	fmt.Fprintln(os.Stderr, "  kode-stream serve [-port 4317]")
 	fmt.Fprintln(os.Stderr, "  kode-stream doctor [--provider github|bitbucket] [--repo <path-or-url>] [--format text|json] [--strict] [--port <n>]")
+	fmt.Fprintln(os.Stderr, "  kode-stream agent start|status|doctor")
 }
