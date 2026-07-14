@@ -14,6 +14,14 @@ describe('WorkspaceList', () => {
     expect(filterWorkspaces(workspaces, '/repos/discovery')).toEqual([workspaces[0]]);
   });
 
+  it('labels and filters Cloud Agent backed workspaces', () => {
+    const cloudWorkspace: WorkspaceConfig = { id: 'cloud', name: 'Cloud', path: '', location: 'cloud_agent', localRootLabel: '.../repo', baselineBranch: 'main', sources: ['plans'], createdAt: '' };
+    expect(filterWorkspaces([cloudWorkspace], 'repo')).toEqual([cloudWorkspace]);
+    render(<WorkspaceList workspaces={[cloudWorkspace]} selectedWorkspaceId="cloud" selectedWorkspaceIds={[]} query="" bulkMode={false} onQueryChange={vi.fn()} onSelect={vi.fn()} onToggleBulkMode={vi.fn()} onToggleSelection={vi.fn()} />);
+    expect(screen.getByText('Cloud Agent · 1 source')).toBeInTheDocument();
+    expect(screen.getByText('.../repo')).toBeInTheDocument();
+  });
+
   it('selects a workspace without entering edit mode', () => {
     const onSelect = vi.fn();
     render(<WorkspaceList workspaces={workspaces} selectedWorkspaceId="one" selectedWorkspaceIds={[]} query="" bulkMode={false} onQueryChange={vi.fn()} onSelect={onSelect} onToggleBulkMode={vi.fn()} onToggleSelection={vi.fn()} />);

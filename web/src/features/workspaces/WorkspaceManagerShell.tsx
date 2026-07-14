@@ -4,7 +4,7 @@ import type { WorkspaceConfig } from '../../lib/types';
 export function filterWorkspaces(workspaces: WorkspaceConfig[], query: string): WorkspaceConfig[] {
   const normalized = query.trim().toLocaleLowerCase();
   if (!normalized) return workspaces;
-  return workspaces.filter((workspace) => [workspace.name, workspace.path, workspace.remoteUrl ?? '']
+  return workspaces.filter((workspace) => [workspace.name, workspace.path, workspace.localRootLabel ?? '', workspace.remoteUrl ?? '']
     .some((value) => value.toLocaleLowerCase().includes(normalized)));
 }
 
@@ -65,9 +65,9 @@ export function WorkspaceList({
                 {workspace.lastScannedAt ? 'Scanned' : 'Not scanned'}
               </span>
             </span>
-            <span className="workspace-manager-item-path" title={workspace.path}>{workspace.path}</span>
+            <span className="workspace-manager-item-path" title={workspace.location === 'cloud_agent' ? workspace.localRootLabel : workspace.path}>{workspace.location === 'cloud_agent' ? workspace.localRootLabel || 'Cloud Agent workspace' : workspace.path}</span>
             <span className="workspace-manager-item-meta">
-              {workspace.registrationMode === 'remote_clone' ? 'Remote' : workspace.registrationMode === 'existing_workspace' ? 'Imported' : 'Local'} · {workspace.sources.length} source{workspace.sources.length === 1 ? '' : 's'}
+              {workspace.location === 'cloud_agent' ? 'Cloud Agent' : workspace.registrationMode === 'remote_clone' ? 'Remote' : workspace.registrationMode === 'existing_workspace' ? 'Imported' : 'Local'} · {workspace.sources.length} source{workspace.sources.length === 1 ? '' : 's'}
             </span>
           </button>
         </div>;

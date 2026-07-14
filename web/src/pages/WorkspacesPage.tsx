@@ -1,9 +1,9 @@
 import { type DragEvent, type Dispatch, type FormEvent, type ReactNode, type SetStateAction, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, FolderOpen, HardDrive, Link2, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../lib/api';
-import type { JiraConnection, KnowledgeSettings, RuntimeType, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
+import type { JiraConnection, KnowledgeSettings, RuntimeContext, RuntimeType, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -35,6 +35,12 @@ const defaultRuntimeConfig = (): WorkspaceRuntimeConfig => ({
     artifactPaths: ['cypress/reports', 'cypress/screenshots', 'cypress/videos']
   }
 });
+const localRuntimeContext: RuntimeContext = {
+  mode: 'local',
+  role: 'admin',
+  capabilities: { read: true, write: true, workspace_registration: true, git: true, system: true, terminal: true, ai: true, runtime: true, verification: true },
+  agent: { available: true, status: 'local' }
+};
 type WorkspaceNotice = {
   tone: 'success' | 'error' | 'info';
   title: string;
@@ -61,7 +67,7 @@ export function defaultWorkspaceImportSelection(preview: WorkspaceImportPreview)
 	return preview.candidates.filter((candidate) => candidate.status === 'valid' && candidate.selected).map((candidate) => candidate.candidateKey);
 }
 
-export function WorkspacesPage({ workspaces, onChanged }: { workspaces: WorkspaceConfig[]; onChanged: () => void | Promise<void> }) {
+export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContext, onChanged }: { workspaces: WorkspaceConfig[]; runtimeContext?: RuntimeContext; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('');
   const [registrationMode, setRegistrationMode] = useState<WorkspaceRegistrationMode>('local_path');
   const [path, setPath] = useState('');
@@ -86,6 +92,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [workspaceQuery, setWorkspaceQuery] = useState('');
   const [bulkMode, setBulkMode] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [agentDeepLink, setAgentDeepLink] = useState('');
+  const [agentStatusLabel, setAgentStatusLabel] = useState('');
   const [activeDetailTab, setActiveDetailTab] = useState<WorkspaceDetailTab>('overview');
   const [registrationStep, setRegistrationStep] = useState<1 | 2>(1);
   const [registrationNameEdited, setRegistrationNameEdited] = useState(false);
@@ -103,6 +111,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const selectedWorkspaces = workspaces.filter((workspace) => selectedWorkspaceIds.includes(workspace.id));
   const allSelected = workspaces.length > 0 && selectedWorkspaces.length === workspaces.length;
   const busy = pendingOperations.length > 0;
+  const cloudMode = runtimeContext.mode === 'cloud';
   const registrationLocationReady = registrationMode === 'local_path' ? Boolean(path.trim()) : registrationMode === 'remote_clone' ? Boolean(remoteUrl.trim()) : Boolean(importSourcePath.trim());
   const operationBusy = (operation: string) => pendingOperations.includes(operation);
   const setBusy = (pending: boolean, operation = 'workspace-form') => {
@@ -504,6 +513,23 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     }
   };
 
+  const connectCloudAgent = async () => {
+    setBusy(true, 'connect-agent');
+    setNotice(null);
+    setAgentStatusLabel('connecting');
+    try {
+      const token = await api.createAgentConnectToken({ name: 'Cloud Agent', platform: navigator.platform });
+      setAgentDeepLink(token.deepLink);
+      setAgentStatusLabel('connecting');
+      window.location.href = token.deepLink;
+    } catch (err) {
+      setAgentStatusLabel('unsupported');
+      setNotice({ tone: 'error', title: 'Cloud Agent connection failed', details: [errorMessage(err)] });
+    } finally {
+      setBusy(false, 'connect-agent');
+    }
+  };
+
   const openSourceSettings = async (repo: WorkspaceConfig, directory: string) => {
     setBusy(true);
     setNotice(null);
@@ -695,15 +721,17 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                       </div>
                     </> : <>
                       <dl className="workspace-overview-grid">
-                        <div><dt>Location</dt><dd><button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} title={repo.path}>{repo.path}</button></dd></div>
+                        <div><dt>Location</dt><dd>{repo.location === 'cloud_agent' ? (repo.localRootLabel || 'Cloud Agent workspace') : <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} title={repo.path}>{repo.path}</button>}</dd></div>
                         <div><dt>Base branch</dt><dd>{repo.baselineBranch}</dd></div>
-                        <div><dt>Registration</dt><dd>{repo.registrationMode === 'remote_clone' ? 'Remote clone' : repo.registrationMode === 'existing_workspace' ? 'Imported workspace' : 'Local folder'}</dd></div>
+                        <div><dt>Registration</dt><dd>{repo.location === 'cloud_agent' ? 'Cloud Agent' : repo.registrationMode === 'remote_clone' ? 'Remote clone' : repo.registrationMode === 'existing_workspace' ? 'Imported workspace' : 'Local folder'}</dd></div>
+                        {repo.agentId && <div><dt>Agent</dt><dd>{repo.agentId}</dd></div>}
+                        {repo.scanStatus && <div><dt>Scan</dt><dd>{repo.scanStatus}</dd></div>}
                         {repo.remoteUrl && <div><dt>Remote URL</dt><dd>{repo.remoteUrl}</dd></div>}
                         <div><dt>Created</dt><dd>{repo.createdAt ? new Date(repo.createdAt).toLocaleString() : 'Unknown'}</dd></div>
                       </dl>
                       <div className="repo-row-actions workspace-detail-actions">
-                        <button className="secondary" type="button" onClick={() => revealPath(repo.path)}><ExternalLink size={16} /> Reveal folder</button>
-                        <button className="primary" type="button" onClick={() => startEdit(repo, 'general')}><Pencil size={16} /> Edit general</button>
+                        {repo.location !== 'cloud_agent' && <button className="secondary" type="button" onClick={() => revealPath(repo.path)}><ExternalLink size={16} /> Reveal folder</button>}
+                        {repo.location !== 'cloud_agent' && <button className="primary" type="button" onClick={() => startEdit(repo, 'general')}><Pencil size={16} /> Edit general</button>}
                       </div>
                     </>}
                   </OverviewSection>
@@ -754,6 +782,12 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             <div><h2 id="add-workspace-title">Add workspace</h2><span>Register, clone, or import existing workspace definitions.</span></div>
             <button className="icon-button" type="button" onClick={closeRegistration} aria-label="Close add workspace"><X size={16} /></button>
           </header>
+          {cloudMode ? <CloudAgentRegistration
+            status={agentStatusLabel || runtimeContext.agent.status}
+            deepLink={agentDeepLink}
+            busy={operationBusy('connect-agent')}
+            onConnect={() => void connectCloudAgent()}
+          /> : <>
           {registrationMode !== 'existing_workspace' && <ol className="workspace-registration-steps" aria-label="Workspace registration progress">
             <li className={registrationStep === 1 ? 'active' : 'complete'}><span>1</span><div><strong>Repository</strong><small>Location and content</small></div></li>
             <li className={registrationStep === 2 ? 'active' : ''}><span>2</span><div><strong>Jira</strong><small>Optional integration</small></div></li>
@@ -828,6 +862,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               </div>
             </>}
           </form>
+          </>}
         </div>
       </section>}
 		{importConfirmOpen && <ConfirmDialog
@@ -928,6 +963,34 @@ function WorkspaceImportReview({ preview, selectedKeys, onToggle, onToggleAll }:
 			{preview.candidates.map((candidate) => <WorkspaceImportCandidateCard key={candidate.candidateKey} candidate={candidate} selected={selectedKeys.includes(candidate.candidateKey)} onToggle={onToggle} />)}
 		</div>
 	</section>;
+}
+
+function CloudAgentRegistration({ status, deepLink, busy, onConnect }: { status: string; deepLink: string; busy: boolean; onConnect: () => void }) {
+  return <section className="cloud-agent-registration" aria-label="Cloud Agent connection">
+    <div className="metadata-callout">
+      <strong>Connect Cloud Agent</strong>
+      <span>Use the local agent to choose a repository, validate the Git root, scan metadata, and publish the workspace to Cloud.</span>
+    </div>
+    <dl className="workspace-overview-grid">
+      <div><dt>Status</dt><dd>{cloudAgentStatusLabel(status)}</dd></div>
+      <div><dt>Install</dt><dd>macOS Homebrew first; Windows and Linux planned</dd></div>
+      <div><dt>Network</dt><dd>Requires outbound HTTPS WebSocket access to Cloud</dd></div>
+    </dl>
+    <div className="repo-row-actions">
+      <button className="primary" type="button" onClick={onConnect} disabled={busy}><Link2 size={16} /> {busy ? 'Connecting...' : status === 'offline' || status === 'stale' ? 'Reconnect agent' : 'Connect local workspace'}</button>
+      {deepLink && <a className="secondary button-link" href={deepLink}>Open deep link again</a>}
+    </div>
+  </section>;
+}
+
+function cloudAgentStatusLabel(status: string) {
+  switch (status) {
+    case 'connected': return 'Connected';
+    case 'connecting': return 'Connecting';
+    case 'stale': return 'Stale';
+    case 'unsupported': return 'Agent not installed or blocked';
+    default: return 'Offline';
+  }
 }
 
 function WorkspaceImportCandidateCard({ candidate, selected, onToggle }: { candidate: WorkspaceImportCandidate; selected: boolean; onToggle: (candidateKey: string) => void }) {

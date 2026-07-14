@@ -9,6 +9,33 @@ afterEach(() => {
 });
 
 describe('existing workspace import state', () => {
+	it('renders Cloud Agent registration controls in Cloud mode', async () => {
+		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
+		vi.spyOn(api, 'createAgentConnectToken').mockResolvedValue({ token: 'token', expiresAt: '2026-07-15T00:00:00Z', deepLink: 'kodestream://connect?token=token' });
+		render(<WorkspacesPage workspaces={[]} runtimeContext={{ mode: 'cloud', role: 'editor', capabilities: { read: true, write: true, workspace_registration: true, git: true, system: false, terminal: true, ai: true, runtime: true, verification: true }, agent: { available: false, status: 'offline' } }} onChanged={vi.fn()} />);
+
+		fireEvent.click(screen.getByRole('button', { name: 'Add workspace' }));
+
+		expect(screen.getByLabelText('Cloud Agent connection')).toBeInTheDocument();
+		expect(screen.queryByRole('radio', { name: 'Local Path' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('radio', { name: 'Remote Git URL' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('radio', { name: 'Existing Workspaces' })).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Reconnect agent' }));
+		await waitFor(() => expect(api.createAgentConnectToken).toHaveBeenCalledWith(expect.objectContaining({ name: 'Cloud Agent' })));
+		expect(await screen.findByRole('link', { name: 'Open deep link again' })).toHaveAttribute('href', 'kodestream://connect?token=token');
+	});
+
+	it('renders Cloud Agent workspace metadata without direct path reveal', () => {
+		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
+		render(<WorkspacesPage workspaces={[{ id: 'cloud', name: 'Cloud Repo', path: '', location: 'cloud_agent', localRootLabel: '.../repo', remoteUrl: 'git@example.com:repo.git', agentId: 'agent-1', scanStatus: 'published', baselineBranch: 'main', sources: ['plans'], createdAt: '' }]} runtimeContext={{ mode: 'cloud', role: 'editor', capabilities: { read: true, write: true, workspace_registration: true, git: true, system: false, terminal: true, ai: true, runtime: true, verification: true }, agent: { available: true, status: 'connected' } }} onChanged={vi.fn()} />);
+
+		expect(screen.getByText('Cloud Agent')).toBeInTheDocument();
+		expect(screen.getAllByText('.../repo')).toHaveLength(2);
+		expect(screen.getByText('agent-1')).toBeInTheDocument();
+		expect(screen.getByText('published')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Reveal folder/ })).not.toBeInTheDocument();
+	});
+
 	it('keeps manual input on picker cancellation and retries a failed preview', async () => {
 		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
 		vi.spyOn(api, 'selectYAMLFile').mockResolvedValue({ path: '' });

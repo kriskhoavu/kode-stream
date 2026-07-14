@@ -23,6 +23,7 @@ export function App() {
     setTheme,
     workspaces,
     activeRepo,
+    runtimeContext,
     contentRefreshKey,
     navigate,
     selectWorkspace: selectWorkspaceState,
@@ -214,7 +215,7 @@ export function App() {
           />
         )}
         {route.name === 'item' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={() => refreshAppStateOnly()} />}
-        {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData()} />}
+        {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={() => refreshAppData()} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
       </main>

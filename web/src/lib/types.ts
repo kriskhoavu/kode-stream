@@ -66,6 +66,11 @@ export interface WorkspaceConfig {
   name: string;
   path: string;
   location?: WorkspaceLocation;
+  ownerUserId?: string;
+  agentId?: string;
+  localRootLabel?: string;
+  publishedSummary?: boolean;
+  scanStatus?: string;
   baselineBranch: string;
   registrationMode?: WorkspaceRegistrationMode;
   remoteUrl?: string;
@@ -273,6 +278,21 @@ export interface CloudUser {
 export interface AgentConnection {
   available: boolean;
   status: string;
+}
+
+export interface CloudAgent {
+  id: string;
+  userId: string;
+  name: string;
+  platform?: string;
+  status: string;
+  lastSeenAt?: string;
+}
+
+export interface AgentConnectToken {
+  token: string;
+  expiresAt: string;
+  deepLink: string;
 }
 
 export interface RuntimeContext {
