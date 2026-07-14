@@ -1,0 +1,30 @@
+services:
+  kode-stream:
+    image: kode-stream:cloud
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "4317:4317"
+    environment:
+      KODE_STREAM_MODE: cloud
+      KODE_STREAM_PORT: "4317"
+      KODE_STREAM_BIND_ADDR: 0.0.0.0
+      KODE_STREAM_DATA_DIR: /var/lib/kode-stream
+      KODE_STREAM_PUBLIC_URL: https://kode-stream.example.com
+      KODE_STREAM_COOKIE_SECRET: change-me-with-32-random-bytes
+      KODE_STREAM_OIDC_ISSUER: https://issuer.example.com
+      KODE_STREAM_OIDC_CLIENT_ID: kode-stream
+      KODE_STREAM_OIDC_CLIENT_SECRET: change-me
+      KODE_STREAM_ADMIN_USERS: admin@example.com
+    volumes:
+      - kode-stream-data:/var/lib/kode-stream
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4317/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  kode-stream-data:

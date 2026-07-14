@@ -49,6 +49,9 @@ func NewServer(port int) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := system.ValidateCloudRuntimeConfig(runtimeConfig); err != nil {
+		return nil, err
+	}
 	if port == 0 {
 		port = envPort()
 	}

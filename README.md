@@ -21,6 +21,16 @@ clearer local Git operations.
 - Indexes LLM Wiki content and graph relationships for structured knowledge workflows.
 - Stores app registry, cache, audit log, filters, recents, and AI settings outside managed repositories.
 
+## Runtime Modes
+
+Kode Stream supports Local and Cloud runtime modes.
+
+- Local mode is the default. The app binds to `127.0.0.1`, registers local paths or managed clones, and runs workspace
+  Git, terminal, AI, runtime, and verification commands on the user's machine.
+- Cloud mode runs a hosted control plane with authentication, role policy, metadata storage, and Cloud Agent routing.
+  The hosted app does not clone repositories or execute workspace commands. Command-capable actions require the
+  workspace owner's connected Cloud Agent.
+
 ## Tech Stack
 
 | Area        | Technology                               |
@@ -193,3 +203,5 @@ cards:
 ## Architecture
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries, storage design, data flow, and API structure.
+
+For hosted deployment, see [Cloud Deployment](docs/cloud-deployment.md).

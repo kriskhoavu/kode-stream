@@ -28,6 +28,12 @@ func TestResolveRuntimeConfigCloudDefaultsToPublicBindAndAgentOffline(t *testing
 			return "secret"
 		case EnvOIDCIssuer:
 			return "https://issuer.example.com"
+		case EnvOIDCClientID:
+			return "client-id"
+		case EnvOIDCClientSecret:
+			return "client-secret"
+		case EnvPublicURL:
+			return "https://cloud.example.com/"
 		case EnvAdminUsers:
 			return "admin@example.com, subject-1"
 		}
@@ -42,8 +48,18 @@ func TestResolveRuntimeConfigCloudDefaultsToPublicBindAndAgentOffline(t *testing
 	if config.Capabilities[models.CapabilityTerminal] || config.Capabilities[models.CapabilityGit] || config.Agent.Available || config.Agent.Status != "offline" {
 		t.Fatalf("cloud capabilities/agent = %#v %#v", config.Capabilities, config.Agent)
 	}
-	if config.CookieSecret != "secret" || config.OIDCIssuer != "https://issuer.example.com" || len(config.AdminUsers) != 2 {
+	if config.CookieSecret != "secret" || config.OIDCIssuer != "https://issuer.example.com" || config.PublicURL != "https://cloud.example.com" || len(config.AdminUsers) != 2 {
 		t.Fatalf("cloud auth config = %#v", config)
+	}
+	if err := ValidateCloudRuntimeConfig(config); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateCloudRuntimeConfigRequiresDeploymentEnv(t *testing.T) {
+	err := ValidateCloudRuntimeConfig(RuntimeConfig{Mode: models.RuntimeModeCloud})
+	if err == nil {
+		t.Fatal("expected missing cloud env error")
 	}
 }
 

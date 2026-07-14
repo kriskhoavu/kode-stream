@@ -1,0 +1,11 @@
+.git
+.idea
+.serena
+node_modules
+bin
+release
+plans
+docs/specs/design.png
+npm-debug.log
+Dockerfile
+docker-compose*.yml
