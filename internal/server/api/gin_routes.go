@@ -18,6 +18,8 @@ type auditEventReader interface {
 
 func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 	api.GET("/health", a.ginHealth)
+	a.registerCloudAuthRoutes(api)
+	api.Use(a.cloudAuthMiddleware())
 	api.GET("/audit-events", a.ginAuditEvents)
 	a.registerNavigationRoutes(api)
 	a.registerSystemRoutes(api)

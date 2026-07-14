@@ -9,13 +9,19 @@ import (
 )
 
 const (
-	EnvRuntimeMode = "KODE_STREAM_MODE"
-	EnvBindAddress = "KODE_STREAM_BIND_ADDR"
+	EnvRuntimeMode  = "KODE_STREAM_MODE"
+	EnvBindAddress  = "KODE_STREAM_BIND_ADDR"
+	EnvCookieSecret = "KODE_STREAM_COOKIE_SECRET"
+	EnvOIDCIssuer   = "KODE_STREAM_OIDC_ISSUER"
+	EnvAdminUsers   = "KODE_STREAM_ADMIN_USERS"
 )
 
 type RuntimeConfig struct {
 	Mode         models.RuntimeMode         `json:"mode"`
 	BindAddress  string                     `json:"bindAddress"`
+	CookieSecret string                     `json:"-"`
+	OIDCIssuer   string                     `json:"-"`
+	AdminUsers   []string                   `json:"-"`
 	User         *models.CloudUser          `json:"user,omitempty"`
 	Role         models.CloudRole           `json:"role"`
 	Capabilities map[models.Capability]bool `json:"capabilities"`
@@ -47,6 +53,9 @@ func ResolveRuntimeConfigFromEnv(getenv func(string) string) (RuntimeConfig, err
 	config := RuntimeConfig{
 		Mode:         mode,
 		BindAddress:  bindAddress,
+		CookieSecret: strings.TrimSpace(getenv(EnvCookieSecret)),
+		OIDCIssuer:   strings.TrimSpace(getenv(EnvOIDCIssuer)),
+		AdminUsers:   splitList(getenv(EnvAdminUsers)),
 		Role:         models.CloudRoleAdmin,
 		Capabilities: defaultCapabilities(mode),
 		Agent:        models.AgentConnection{Available: mode == models.RuntimeModeLocal, Status: "unsupported"},
@@ -58,6 +67,18 @@ func ResolveRuntimeConfigFromEnv(getenv func(string) string) (RuntimeConfig, err
 	config.Role = ""
 	config.Agent = models.AgentConnection{Available: false, Status: "offline"}
 	return config, nil
+}
+
+func splitList(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		item := strings.TrimSpace(part)
+		if item != "" {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 func defaultCapabilities(mode models.RuntimeMode) map[models.Capability]bool {

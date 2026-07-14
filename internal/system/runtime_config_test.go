@@ -21,8 +21,15 @@ func TestResolveRuntimeConfigDefaultsToLocalLoopback(t *testing.T) {
 
 func TestResolveRuntimeConfigCloudDefaultsToPublicBindAndAgentOffline(t *testing.T) {
 	config, err := ResolveRuntimeConfigFromEnv(func(key string) string {
-		if key == EnvRuntimeMode {
+		switch key {
+		case EnvRuntimeMode:
 			return "cloud"
+		case EnvCookieSecret:
+			return "secret"
+		case EnvOIDCIssuer:
+			return "https://issuer.example.com"
+		case EnvAdminUsers:
+			return "admin@example.com, subject-1"
 		}
 		return ""
 	})
@@ -34,6 +41,9 @@ func TestResolveRuntimeConfigCloudDefaultsToPublicBindAndAgentOffline(t *testing
 	}
 	if config.Capabilities[models.CapabilityTerminal] || config.Capabilities[models.CapabilityGit] || config.Agent.Available || config.Agent.Status != "offline" {
 		t.Fatalf("cloud capabilities/agent = %#v %#v", config.Capabilities, config.Agent)
+	}
+	if config.CookieSecret != "secret" || config.OIDCIssuer != "https://issuer.example.com" || len(config.AdminUsers) != 2 {
+		t.Fatalf("cloud auth config = %#v", config)
 	}
 }
 

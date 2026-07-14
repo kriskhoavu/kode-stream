@@ -542,6 +542,11 @@ func (a *API) state(w http.ResponseWriter, r *http.Request) {
 	state.Role = a.runtimeConfig.Role
 	state.Capabilities = a.runtimeConfig.Capabilities
 	state.Agent = a.runtimeConfig.Agent
+	if session, ok := cloudSessionFromContext(r.Context()); ok {
+		state.User = &session.User
+		state.Role = session.User.Role
+		state.Capabilities = roleCapabilities(session.User.Role)
+	}
 	respond(w, state, err)
 }
 
