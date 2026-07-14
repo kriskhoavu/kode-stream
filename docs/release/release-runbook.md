@@ -55,14 +55,30 @@ brew update
 brew tap kriskhoavu/homebrew-tap
 brew install kode-stream
 kode-stream doctor
+kode-stream agent doctor --cloud-url https://kode-stream.example.com --repo /path/to/repo
 brew test kode-stream
 ```
+
+## Cloud Release Checklist
+
+- Build frontend assets with `npm run build`.
+- Build and tag the Cloud image with `docker build -t kode-stream:<version> .`.
+- Run `/api/health` against the image with required Cloud environment variables.
+- Verify reverse proxy WebSocket upgrade for `/api/agents/channel`.
+- Verify the Homebrew package exposes `kode-stream agent start`, `status`, and `doctor`.
+- Smoke `kodestream://connect` deep-link registration on macOS.
+- Connect Cloud Agent, register a local repository, and confirm Cloud shows redacted path metadata.
+- Confirm hosted Git, terminal, AI, runtime, and verification routes do not execute without the owner agent.
+- Back up and restore `KODE_STREAM_DATA_DIR` during upgrade and rollback rehearsal.
 
 ## Troubleshooting
 
 - `curl .../SHA256SUMS` returns 404: release tag exists but assets are missing.
 - `npm ci` fails due to missing lockfile: script falls back to `npm install`.
 - no tap commit created: formula already matches target version and checksums.
+- Cloud agent disconnected: check WebSocket proxy upgrade and idle timeout settings.
+- Cloud role denied: check `KODE_STREAM_ADMIN_USERS` and OIDC email/subject claims.
+- Cloud image unhealthy: check required Cloud environment variables and `/api/health`.
 
 ## Related Files
 

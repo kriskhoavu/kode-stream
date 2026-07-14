@@ -24,6 +24,20 @@ Browser
   -> Optional integrations
 ```
 
+## Runtime Modes
+
+Kode Stream has two runtime modes:
+
+- Local mode is the default single-user app. The server binds to loopback, workspace files are local paths or managed
+  clones, and Git, terminal, AI, runtime, and verification commands execute on the same machine.
+- Cloud mode is a hosted control plane. It authenticates users, enforces roles, stores file-backed metadata, and routes
+  workspace commands to the owner Cloud Agent. The hosted process does not clone repositories or execute workspace
+  commands.
+
+Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Cloud workspace records use
+`WorkspaceLocation=cloud_agent` and store metadata such as owner user, agent id, redacted local path label, remote URL,
+scan status, and published summaries.
+
 ```text
 ┌──────────────────────────────────────────────────────────────┐
 │ React app                                                    │
@@ -185,6 +199,9 @@ All API routes are local and grouped by capability.
 | Verification | Job creation, checkpoint ingest, status, artifacts, reruns                  |
 | Git          | Status, activity, branches, fetch, pull, push, commit, branch operations    |
 | Streaming    | Workspace creation events and embedded session channels                     |
+
+In Cloud mode, command-capable routes are denied on the hosted server unless they use the Cloud command envelope path
+and a connected owner Cloud Agent is available.
 
 ## Error Handling
 
