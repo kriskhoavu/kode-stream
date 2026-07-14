@@ -58,6 +58,7 @@ type API struct {
 	jira           *appjira.Service
 	knowledge      *knowledgeindex.KnowledgeService
 	verification   *appverification.Service
+	runtimeConfig  system.RuntimeConfig
 }
 
 func (a *API) WithJira(service *appjira.Service) *API {
@@ -72,6 +73,11 @@ func (a *API) WithAISessions(service *appaisession.Service) *API {
 
 func (a *API) WithKnowledge(service *knowledgeindex.KnowledgeService) *API {
 	a.knowledge = service
+	return a
+}
+
+func (a *API) WithRuntimeConfig(config system.RuntimeConfig) *API {
+	a.runtimeConfig = config
 	return a
 }
 
@@ -100,6 +106,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 	workspaceFileAccess := workspaceaccess.New()
 	workspaceService := appworkspace.New(reg, idx, scan, writer, git)
 	runtimeService := appruntime.NewService()
+	runtimeConfig, _ := system.ResolveRuntimeConfigFromEnv(func(string) string { return "" })
 	if auditStore != nil {
 		workspaceService.ConfigureAudit(auditStore)
 	}
@@ -117,6 +124,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 		workspaceFiles: appworkspace.NewWorkspaceFileService(reg, workspaceFileAccess, git, auditStore, refresher),
 		contentSearch:  appsearch.NewContentSearchService(reg, idx, workspaceFileAccess),
 		verification:   appverification.NewService(reg, runtimeService),
+		runtimeConfig:  runtimeConfig,
 	}
 }
 
@@ -529,6 +537,11 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) state(w http.ResponseWriter, r *http.Request) {
 	state, err := a.workspaces.State()
+	state.Mode = a.runtimeConfig.Mode
+	state.User = a.runtimeConfig.User
+	state.Role = a.runtimeConfig.Role
+	state.Capabilities = a.runtimeConfig.Capabilities
+	state.Agent = a.runtimeConfig.Agent
 	respond(w, state, err)
 }
 

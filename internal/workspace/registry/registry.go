@@ -329,6 +329,7 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 		ID:               slug(name) + "-" + shortHash(root),
 		Name:             name,
 		Path:             root,
+		Location:         models.WorkspaceLocationLocalPath,
 		BaselineBranch:   branch,
 		RegistrationMode: mode,
 		RemoteURL:        strings.TrimSpace(input.RemoteURL),
@@ -383,6 +384,9 @@ func ValidateJiraConnection(input *models.JiraConnection) (*models.JiraConnectio
 func normalizeWorkspace(workspace models.WorkspaceConfig) models.WorkspaceConfig {
 	if workspace.Sources == nil {
 		workspace.Sources = []string{}
+	}
+	if workspace.Location != models.WorkspaceLocationCloudAgent {
+		workspace.Location = models.WorkspaceLocationLocalPath
 	}
 	workspace.RegistrationMode = normalizeRegistrationMode(workspace.RegistrationMode)
 	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone {

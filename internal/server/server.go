@@ -34,13 +34,18 @@ import (
 var frontendFS embed.FS
 
 type Server struct {
-	port     int
-	app      http.Handler
-	sessions *ai.Manager
+	port        int
+	bindAddress string
+	app         http.Handler
+	sessions    *ai.Manager
 }
 
 func NewServer(port int) (*Server, error) {
 	paths, err := system.ResolvePaths()
+	if err != nil {
+		return nil, err
+	}
+	runtimeConfig, err := system.ResolveRuntimeConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -61,12 +66,12 @@ func NewServer(port int) (*Server, error) {
 	aiSessionService := ai.New(ai.NewSettingsRepository(paths.AISettingsFile)).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager)
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, knowledge.NewStore(paths.KnowledgeIndexFile)).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore)
-	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
+	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())
 	mux.Handle("/", spaHandler())
-	return &Server{port: port, app: api.Log(mux), sessions: sessionManager}, nil
+	return &Server{port: port, bindAddress: runtimeConfig.BindAddress, app: api.Log(mux), sessions: sessionManager}, nil
 }
 
 func (s *Server) Close() error {
@@ -77,7 +82,7 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) Serve() error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", s.port))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.bindAddress, s.port))
 	if err != nil {
 		return err
 	}

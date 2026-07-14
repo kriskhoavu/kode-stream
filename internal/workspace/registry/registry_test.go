@@ -25,6 +25,9 @@ func TestCreateDefaultsRegistrationModeToLocalPath(t *testing.T) {
 	if workspace.RegistrationMode != models.WorkspaceRegistrationModeLocalPath {
 		t.Fatalf("registration mode = %q", workspace.RegistrationMode)
 	}
+	if workspace.Location != models.WorkspaceLocationLocalPath {
+		t.Fatalf("location = %q", workspace.Location)
+	}
 	if workspace.RemoteURL != "" || workspace.ClonePathManaged {
 		t.Fatalf("expected local workspace metadata, got %+v", workspace)
 	}

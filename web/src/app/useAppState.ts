@@ -1,13 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
-import type { WorkspaceConfig } from '../lib/types';
+import type { AppState, RuntimeContext, WorkspaceConfig } from '../lib/types';
 import { pathForRoute, routeFromLocation } from './router';
 import type { Route } from './router';
+
+const localRuntimeContext: RuntimeContext = {
+  mode: 'local',
+  role: 'admin',
+  capabilities: {
+    read: true,
+    write: true,
+    workspace_registration: true,
+    git: true,
+    system: true,
+    terminal: true,
+    ai: true,
+    runtime: true,
+    verification: true
+  },
+  agent: { available: true, status: 'local' }
+};
+
+function normalizeRuntimeContext(state?: AppState): RuntimeContext {
+  return {
+    mode: state?.mode === 'cloud' ? 'cloud' : 'local',
+    user: state?.user,
+    role: state?.role ?? (state?.mode === 'cloud' ? undefined : 'admin'),
+    capabilities: { ...localRuntimeContext.capabilities, ...(state?.capabilities ?? {}) },
+    agent: state?.agent ?? localRuntimeContext.agent
+  };
+}
 
 export function useAppState() {
   const [route, setRoute] = useState<Route>(routeFromLocation);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
   const [workspaces, setWorkspaces] = useState<WorkspaceConfig[]>([]);
+  const [runtimeContext, setRuntimeContext] = useState<RuntimeContext>(localRuntimeContext);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => localStorage.getItem('activeWorkspaceId') ?? '');
   const [contentRefreshKey, setContentRefreshKey] = useState(0);
 
@@ -27,13 +55,14 @@ export function useAppState() {
     setRoute(next);
   };
 
+  const refreshRuntimeContext = () => api.state().then((state) => setRuntimeContext(normalizeRuntimeContext(state))).catch(() => setRuntimeContext(localRuntimeContext));
   const refreshWorkspaces = () => api.workspaces().then(setWorkspaces).catch(() => setWorkspaces([]));
   const refreshAppData = async () => {
-    await refreshWorkspaces();
+    await Promise.all([refreshRuntimeContext(), refreshWorkspaces()]);
     setContentRefreshKey((key) => key + 1);
   };
   const refreshAppStateOnly = async () => {
-    await refreshWorkspaces();
+    await Promise.all([refreshRuntimeContext(), refreshWorkspaces()]);
   };
 
   useEffect(() => {
@@ -74,6 +103,7 @@ export function useAppState() {
     setTheme,
     workspaces,
     activeRepo,
+    runtimeContext,
     contentRefreshKey,
     navigate,
     selectWorkspace,

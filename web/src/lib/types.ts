@@ -65,6 +65,7 @@ export interface WorkspaceConfig {
   id: string;
   name: string;
   path: string;
+  location?: WorkspaceLocation;
   baselineBranch: string;
   registrationMode?: WorkspaceRegistrationMode;
   remoteUrl?: string;
@@ -256,6 +257,31 @@ export interface WorkspaceInput {
 }
 
 export type WorkspaceRegistrationMode = 'local_path' | 'remote_clone' | 'existing_workspace';
+export type WorkspaceLocation = 'local_path' | 'cloud_agent';
+export type RuntimeMode = 'local' | 'cloud';
+export type CloudRole = 'admin' | 'editor' | 'viewer';
+export type Capability = 'read' | 'write' | 'workspace_registration' | 'git' | 'system' | 'terminal' | 'ai' | 'runtime' | 'verification';
+
+export interface CloudUser {
+  id: string;
+  email?: string;
+  name?: string;
+  role: CloudRole;
+  subject?: string;
+}
+
+export interface AgentConnection {
+  available: boolean;
+  status: string;
+}
+
+export interface RuntimeContext {
+  mode: RuntimeMode;
+  user?: CloudUser;
+  role?: CloudRole;
+  capabilities: Record<Capability, boolean>;
+  agent: AgentConnection;
+}
 
 export interface WorkspaceImportIssue {
   field: string;
@@ -726,6 +752,11 @@ export interface AppState {
   workspaceCount: number;
   itemCount: number;
   updatedAt: string;
+  mode?: RuntimeMode;
+  user?: CloudUser;
+  role?: CloudRole;
+  capabilities?: Record<Capability, boolean>;
+  agent?: AgentConnection;
 }
 
 export type GitChangeStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'copied' | 'untracked' | 'conflicted';

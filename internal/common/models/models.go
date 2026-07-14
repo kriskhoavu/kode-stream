@@ -107,6 +107,7 @@ type WorkspaceConfig struct {
 	ID                 string                    `json:"id" yaml:"id"`
 	Name               string                    `json:"name" yaml:"name"`
 	Path               string                    `json:"path" yaml:"path"`
+	Location           WorkspaceLocation         `json:"location,omitempty" yaml:"location,omitempty"`
 	BaselineBranch     string                    `json:"baselineBranch" yaml:"baselineBranch"`
 	RegistrationMode   WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
 	RemoteURL          string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
@@ -215,6 +216,55 @@ const (
 	WorkspaceRegistrationModeRemoteClone WorkspaceRegistrationMode = "remote_clone"
 	WorkspaceRegistrationModeExisting    WorkspaceRegistrationMode = "existing_workspace"
 )
+
+type WorkspaceLocation string
+
+const (
+	WorkspaceLocationLocalPath  WorkspaceLocation = "local_path"
+	WorkspaceLocationCloudAgent WorkspaceLocation = "cloud_agent"
+)
+
+type RuntimeMode string
+
+const (
+	RuntimeModeLocal RuntimeMode = "local"
+	RuntimeModeCloud RuntimeMode = "cloud"
+)
+
+type CloudRole string
+
+const (
+	CloudRoleAdmin  CloudRole = "admin"
+	CloudRoleEditor CloudRole = "editor"
+	CloudRoleViewer CloudRole = "viewer"
+)
+
+type Capability string
+
+const (
+	CapabilityRead                  Capability = "read"
+	CapabilityWrite                 Capability = "write"
+	CapabilityWorkspaceRegistration Capability = "workspace_registration"
+	CapabilityGit                   Capability = "git"
+	CapabilitySystem                Capability = "system"
+	CapabilityTerminal              Capability = "terminal"
+	CapabilityAI                    Capability = "ai"
+	CapabilityRuntime               Capability = "runtime"
+	CapabilityVerification          Capability = "verification"
+)
+
+type CloudUser struct {
+	ID      string    `json:"id"`
+	Email   string    `json:"email,omitempty"`
+	Name    string    `json:"name,omitempty"`
+	Role    CloudRole `json:"role"`
+	Subject string    `json:"subject,omitempty"`
+}
+
+type AgentConnection struct {
+	Available bool   `json:"available"`
+	Status    string `json:"status"`
+}
 
 type WorkspaceImportIssue struct {
 	Field   string `json:"field" yaml:"field"`

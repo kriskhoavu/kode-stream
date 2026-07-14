@@ -508,6 +508,17 @@ func TestStateRoutePreservesCountsAndVersionContract(t *testing.T) {
 	if emptyState["version"] == "" || emptyState["workspaceCount"].(float64) != 1 || emptyState["itemCount"].(float64) != 0 || emptyState["updatedAt"] == "" {
 		t.Fatalf("unexpected empty state: %#v", emptyState)
 	}
+	if emptyState["mode"] != "local" || emptyState["role"] != "admin" {
+		t.Fatalf("unexpected runtime state: %#v", emptyState)
+	}
+	capabilities := emptyState["capabilities"].(map[string]any)
+	if capabilities["terminal"] != true || capabilities["verification"] != true {
+		t.Fatalf("unexpected capabilities: %#v", capabilities)
+	}
+	agent := emptyState["agent"].(map[string]any)
+	if agent["available"] != true || agent["status"] != "local" {
+		t.Fatalf("unexpected agent state: %#v", agent)
+	}
 
 	updatedAt := time.Date(2026, 6, 21, 2, 3, 4, 0, time.UTC)
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{

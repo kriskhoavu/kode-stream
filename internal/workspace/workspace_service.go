@@ -23,10 +23,15 @@ import (
 )
 
 type StateResult struct {
-	Version        string    `json:"version"`
-	WorkspaceCount int       `json:"workspaceCount"`
-	ItemCount      int       `json:"itemCount"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	Version        string                     `json:"version"`
+	WorkspaceCount int                        `json:"workspaceCount"`
+	ItemCount      int                        `json:"itemCount"`
+	UpdatedAt      time.Time                  `json:"updatedAt"`
+	Mode           models.RuntimeMode         `json:"mode"`
+	User           *models.CloudUser          `json:"user,omitempty"`
+	Role           models.CloudRole           `json:"role,omitempty"`
+	Capabilities   map[models.Capability]bool `json:"capabilities,omitempty"`
+	Agent          models.AgentConnection     `json:"agent"`
 }
 
 type SourceStructureSaveResult struct {
