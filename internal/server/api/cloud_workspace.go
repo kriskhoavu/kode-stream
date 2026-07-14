@@ -33,6 +33,13 @@ func (s *cloudWorkspaceStore) List(userID string) []models.WorkspaceConfig {
 	return result
 }
 
+func (s *cloudWorkspaceStore) Get(userID, workspaceID string) (models.WorkspaceConfig, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	workspace, ok := s.workspaces[userID][workspaceID]
+	return workspace, ok
+}
+
 func (s *cloudWorkspaceStore) Upsert(workspace models.WorkspaceConfig) models.WorkspaceConfig {
 	s.mu.Lock()
 	defer s.mu.Unlock()

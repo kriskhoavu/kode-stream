@@ -64,6 +64,13 @@ func (s *cloudAgentStore) List(userID string) []models.CloudAgent {
 	return result
 }
 
+func (s *cloudAgentStore) HasConnected(userID, agentID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	agent, ok := s.agents[userID][agentID]
+	return ok && agent.Status == "connected" && s.now().Sub(agent.LastSeenAt) <= 2*time.Minute
+}
+
 func (a *API) cloudAgentConnectToken(w http.ResponseWriter, r *http.Request) {
 	session, ok := cloudSessionFromContext(r.Context())
 	if !ok {

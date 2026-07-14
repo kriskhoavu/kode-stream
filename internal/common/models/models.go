@@ -280,6 +280,22 @@ type CloudAgent struct {
 	LastSeenAt time.Time `json:"lastSeenAt,omitempty"`
 }
 
+type CommandEnvelope struct {
+	ID          string            `json:"id"`
+	Type        string            `json:"type"`
+	WorkspaceID string            `json:"workspaceId"`
+	UserID      string            `json:"userId"`
+	AgentID     string            `json:"agentId"`
+	Capability  Capability        `json:"capability"`
+	Payload     map[string]string `json:"payload,omitempty"`
+}
+
+type CommandResult struct {
+	Accepted bool            `json:"accepted"`
+	Command  CommandEnvelope `json:"command"`
+	Log      string          `json:"log,omitempty"`
+}
+
 type WorkspaceImportIssue struct {
 	Field   string `json:"field" yaml:"field"`
 	Code    string `json:"code" yaml:"code"`

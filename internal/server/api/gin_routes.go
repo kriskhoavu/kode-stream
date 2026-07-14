@@ -38,6 +38,7 @@ func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 func (a *API) registerCloudAgentRoutes(api *gin.RouterGroup) {
 	api.POST("/agents/connect-token", ginHTTPHandler(a.cloudAgentConnectToken))
 	api.GET("/agents", ginHTTPHandler(a.cloudAgents))
+	api.POST("/workspaces/:id/commands", ginHTTPHandler(a.cloudWorkspaceCommand))
 }
 
 func (a *API) registerNavigationRoutes(api *gin.RouterGroup) {

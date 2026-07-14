@@ -57,6 +57,11 @@ func (a *API) cloudAuthMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		if cloudHostedExecutionRoute(c.Request.Method, c.FullPath()) {
+			ginJSON(c, http.StatusServiceUnavailable, map[string]string{"error": "Cloud workspace commands require Cloud Agent routing", "code": "unavailable"})
+			c.Abort()
+			return
+		}
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), cloudSessionContextKey{}, session))
 		c.Next()
 	}
