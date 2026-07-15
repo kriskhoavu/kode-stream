@@ -1,0 +1,49 @@
+flowchart LR
+    browser["Browser Cloud UI"]
+    proxy["OAuth2Proxy public endpoint"]
+    keycloak["Keycloak OIDC provider"]
+    api["Kode Stream Cloud API private port"]
+    channel["Agent channel manager"]
+    ws["Outbound HTTPS WebSocket"]
+    agent["Cloud Agent"]
+    repo["Local repository"]
+    git["Local Git credentials"]
+    terminal["Terminal"]
+    ai["AI CLI"]
+    verify["Verification tools"]
+    metadata["Cloud metadata store"]
+
+    subgraph cloud["Cloud/VPS boundary"]
+        proxy
+        keycloak
+        api
+        channel
+        metadata
+    end
+
+    subgraph user["User machine boundary"]
+        agent
+        repo
+        git
+        terminal
+        ai
+        verify
+    end
+
+    browser -->|"HTTPS requests"| proxy
+    proxy -->|"redirect for login"| keycloak
+    keycloak -->|"OIDC callback"| proxy
+    proxy -->|"trusted identity headers"| api
+    proxy -->|"WebSocket upgrade"| channel
+    api -->|"user, role, workspace metadata"| metadata
+    api -->|"command envelope"| channel
+    channel <-->|"stream frames, heartbeats, cancellation"| ws
+    ws <-->|"agent channel"| agent
+    agent -->|"read/write files"| repo
+    agent -->|"git status, commit, pull, push"| git
+    agent -->|"shell session"| terminal
+    agent -->|"AI session"| ai
+    agent -->|"runtime and verification commands"| verify
+    agent -->|"published summaries and command status"| channel
+    channel -->|"streamed results"| api
+    api -->|"rendered state and stream events"| browser
