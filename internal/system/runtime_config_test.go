@@ -26,12 +26,6 @@ func TestResolveRuntimeConfigCloudDefaultsToPublicBindAndAgentOffline(t *testing
 			return "cloud"
 		case EnvCookieSecret:
 			return "secret"
-		case EnvOIDCIssuer:
-			return "https://issuer.example.com"
-		case EnvOIDCClientID:
-			return "client-id"
-		case EnvOIDCClientSecret:
-			return "client-secret"
 		case EnvPublicURL:
 			return "https://cloud.example.com/"
 		case EnvAdminUsers:
@@ -48,7 +42,7 @@ func TestResolveRuntimeConfigCloudDefaultsToPublicBindAndAgentOffline(t *testing
 	if config.Capabilities[models.CapabilityTerminal] || config.Capabilities[models.CapabilityGit] || config.Agent.Available || config.Agent.Status != "offline" {
 		t.Fatalf("cloud capabilities/agent = %#v %#v", config.Capabilities, config.Agent)
 	}
-	if config.CookieSecret != "secret" || config.OIDCIssuer != "https://issuer.example.com" || config.PublicURL != "https://cloud.example.com" || len(config.AdminUsers) != 2 {
+	if config.AuthMode != "oauth2_proxy" || config.CookieSecret != "secret" || config.PublicURL != "https://cloud.example.com" || len(config.AdminUsers) != 2 {
 		t.Fatalf("cloud auth config = %#v", config)
 	}
 	if err := ValidateCloudRuntimeConfig(config); err != nil {
@@ -56,10 +50,61 @@ func TestResolveRuntimeConfigCloudDefaultsToPublicBindAndAgentOffline(t *testing
 	}
 }
 
+func TestResolveRuntimeConfigCloudAppOIDCRequiresOIDCEnv(t *testing.T) {
+	config, err := ResolveRuntimeConfigFromEnv(func(key string) string {
+		switch key {
+		case EnvRuntimeMode:
+			return "cloud"
+		case EnvAuthMode:
+			return "app_oidc"
+		case EnvCookieSecret:
+			return "secret"
+		case EnvOIDCIssuer:
+			return "https://issuer.example.com"
+		case EnvOIDCClientID:
+			return "client-id"
+		case EnvOIDCClientSecret:
+			return "client-secret"
+		case EnvPublicURL:
+			return "https://cloud.example.com"
+		case EnvAdminUsers:
+			return "admin@example.com"
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.AuthMode != "app_oidc" || config.OIDCIssuer != "https://issuer.example.com" {
+		t.Fatalf("app oidc config = %#v", config)
+	}
+	if err := ValidateCloudRuntimeConfig(config); err != nil {
+		t.Fatal(err)
+	}
+
+	config.OIDCIssuer = ""
+	if err := ValidateCloudRuntimeConfig(config); err == nil {
+		t.Fatal("expected missing app oidc env error")
+	}
+}
+
 func TestValidateCloudRuntimeConfigRequiresDeploymentEnv(t *testing.T) {
 	err := ValidateCloudRuntimeConfig(RuntimeConfig{Mode: models.RuntimeModeCloud})
 	if err == nil {
 		t.Fatal("expected missing cloud env error")
+	}
+}
+
+func TestValidateCloudRuntimeConfigRejectsInvalidAuthMode(t *testing.T) {
+	err := ValidateCloudRuntimeConfig(RuntimeConfig{
+		Mode:         models.RuntimeModeCloud,
+		AuthMode:     "basic",
+		PublicURL:    "https://cloud.example.com",
+		CookieSecret: "secret",
+		AdminUsers:   []string{"admin@example.com"},
+	})
+	if err == nil {
+		t.Fatal("expected invalid auth mode error")
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 
 const (
 	EnvRuntimeMode      = "KODE_STREAM_MODE"
+	EnvAuthMode         = "KODE_STREAM_AUTH_MODE"
 	EnvBindAddress      = "KODE_STREAM_BIND_ADDR"
 	EnvCookieSecret     = "KODE_STREAM_COOKIE_SECRET"
 	EnvOIDCIssuer       = "KODE_STREAM_OIDC_ISSUER"
@@ -21,6 +22,7 @@ const (
 
 type RuntimeConfig struct {
 	Mode             models.RuntimeMode         `json:"mode"`
+	AuthMode         string                     `json:"-"`
 	BindAddress      string                     `json:"bindAddress"`
 	CookieSecret     string                     `json:"-"`
 	OIDCIssuer       string                     `json:"-"`
@@ -58,6 +60,7 @@ func ResolveRuntimeConfigFromEnv(getenv func(string) string) (RuntimeConfig, err
 
 	config := RuntimeConfig{
 		Mode:             mode,
+		AuthMode:         strings.TrimSpace(getenv(EnvAuthMode)),
 		BindAddress:      bindAddress,
 		CookieSecret:     strings.TrimSpace(getenv(EnvCookieSecret)),
 		OIDCIssuer:       strings.TrimSpace(getenv(EnvOIDCIssuer)),
@@ -70,8 +73,12 @@ func ResolveRuntimeConfigFromEnv(getenv func(string) string) (RuntimeConfig, err
 		Agent:            models.AgentConnection{Available: mode == models.RuntimeModeLocal, Status: "unsupported"},
 	}
 	if mode == models.RuntimeModeLocal {
+		config.AuthMode = "local"
 		config.Agent.Status = "local"
 		return config, nil
+	}
+	if config.AuthMode == "" {
+		config.AuthMode = "oauth2_proxy"
 	}
 	config.Role = ""
 	config.Agent = models.AgentConnection{Available: false, Status: "offline"}
@@ -89,14 +96,20 @@ func ValidateCloudRuntimeConfig(config RuntimeConfig) error {
 	if config.CookieSecret == "" {
 		missing = append(missing, EnvCookieSecret)
 	}
-	if config.OIDCIssuer == "" {
-		missing = append(missing, EnvOIDCIssuer)
-	}
-	if config.OIDCClientID == "" {
-		missing = append(missing, EnvOIDCClientID)
-	}
-	if config.OIDCClientSecret == "" {
-		missing = append(missing, EnvOIDCClientSecret)
+	switch config.AuthMode {
+	case "oauth2_proxy":
+	case "app_oidc":
+		if config.OIDCIssuer == "" {
+			missing = append(missing, EnvOIDCIssuer)
+		}
+		if config.OIDCClientID == "" {
+			missing = append(missing, EnvOIDCClientID)
+		}
+		if config.OIDCClientSecret == "" {
+			missing = append(missing, EnvOIDCClientSecret)
+		}
+	default:
+		return fmt.Errorf("cloud mode %s must be oauth2_proxy or app_oidc", EnvAuthMode)
 	}
 	if len(config.AdminUsers) == 0 {
 		missing = append(missing, EnvAdminUsers)

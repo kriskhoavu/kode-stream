@@ -14,7 +14,7 @@ import (
 	"kode-stream/internal/common/models"
 )
 
-func TestCloudAgentConnectTokenRequiresAuthenticatedUserAndCSRF(t *testing.T) {
+func TestCloudAgentConnectTokenRequiresAuthenticatedUser(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
 	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
 
@@ -23,6 +23,20 @@ func TestCloudAgentConnectTokenRequiresAuthenticatedUserAndCSRF(t *testing.T) {
 	if unauthorized.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthorized status = %d", unauthorized.Code)
 	}
+
+	authorized := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/agents/connect-token", strings.NewReader(`{}`))
+	request.Header.Set("X-Auth-Request-User", "editor")
+	request.Header.Set("X-Auth-Request-Email", "editor@example.com")
+	handler.ServeHTTP(authorized, request)
+	if authorized.Code != http.StatusOK {
+		t.Fatalf("authorized status = %d body=%s", authorized.Code, authorized.Body.String())
+	}
+}
+
+func TestCloudAgentConnectTokenRequiresCSRFInAppOIDCMode(t *testing.T) {
+	apiHandler, _, _, _ := reliabilityTestAPI(t)
+	handler := apiHandler.WithRuntimeConfig(testAppOIDCRuntimeConfig()).Routes()
 
 	forbidden := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/agents/connect-token", strings.NewReader(`{}`))

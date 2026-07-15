@@ -4,18 +4,16 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile
-    ports:
-      - "4317:4317"
+    expose:
+      - "4317"
     environment:
       KODE_STREAM_MODE: cloud
+      KODE_STREAM_AUTH_MODE: oauth2_proxy
       KODE_STREAM_PORT: "4317"
       KODE_STREAM_BIND_ADDR: 0.0.0.0
       KODE_STREAM_DATA_DIR: /var/lib/kode-stream
       KODE_STREAM_PUBLIC_URL: https://kode-stream.example.com
       KODE_STREAM_COOKIE_SECRET: change-me-with-32-random-bytes
-      KODE_STREAM_OIDC_ISSUER: https://issuer.example.com
-      KODE_STREAM_OIDC_CLIENT_ID: kode-stream
-      KODE_STREAM_OIDC_CLIENT_SECRET: change-me
       KODE_STREAM_ADMIN_USERS: admin@example.com
     volumes:
       - kode-stream-data:/var/lib/kode-stream
@@ -25,6 +23,29 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    depends_on:
+      - kode-stream
+    ports:
+      - "4318:4180"
+    environment:
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://keycloak.example.com/realms/kode-stream
+      OAUTH2_PROXY_CLIENT_ID: kode-stream
+      OAUTH2_PROXY_CLIENT_SECRET: change-me
+      OAUTH2_PROXY_COOKIE_SECRET: change-me-with-32-byte-base64-secret
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_UPSTREAMS: http://kode-stream:4317/
+      OAUTH2_PROXY_REDIRECT_URL: https://kode-stream.example.com/oauth2/callback
 
 volumes:
   kode-stream-data:

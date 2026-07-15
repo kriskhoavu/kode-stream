@@ -30,7 +30,7 @@ func TestCloudModeRequiresSessionOutsideHealthAndAuth(t *testing.T) {
 
 func TestCloudCallbackBootstrapsAdminFromAllowlist(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+	handler := apiHandler.WithRuntimeConfig(testAppOIDCRuntimeConfig()).Routes()
 
 	callback := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/callback", nil)
@@ -66,7 +66,7 @@ func TestCloudCallbackBootstrapsAdminFromAllowlist(t *testing.T) {
 
 func TestCloudViewerCannotMutateRoutes(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+	handler := apiHandler.WithRuntimeConfig(testAppOIDCRuntimeConfig()).Routes()
 
 	request := httptest.NewRequest(http.MethodPost, "/api/workspaces", strings.NewReader(`{}`))
 	request.Header.Set("X-Kode-Stream-Subject", "viewer")
@@ -83,7 +83,7 @@ func TestCloudViewerCannotMutateRoutes(t *testing.T) {
 
 func TestCloudEditorMutationsRequireCSRF(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+	handler := apiHandler.WithRuntimeConfig(testAppOIDCRuntimeConfig()).Routes()
 
 	request := httptest.NewRequest(http.MethodPost, "/api/workspaces", strings.NewReader(`{}`))
 	request.Header.Set("X-Kode-Stream-Subject", "editor")
@@ -107,7 +107,7 @@ func TestCloudEditorMutationsRequireCSRF(t *testing.T) {
 
 func TestCloudLogoutClearsSessionWithCSRF(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+	handler := apiHandler.WithRuntimeConfig(testAppOIDCRuntimeConfig()).Routes()
 
 	login := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/callback", nil)
@@ -130,6 +130,48 @@ func TestCloudLogoutClearsSessionWithCSRF(t *testing.T) {
 	}
 }
 
+func TestCloudOauth2ProxyHeadersAuthenticateWithoutAppSession(t *testing.T) {
+	apiHandler, _, _, _ := reliabilityTestAPI(t)
+	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/state", nil)
+	request.Header.Set("X-Auth-Request-User", "keycloak-subject")
+	request.Header.Set("X-Auth-Request-Email", "admin@example.com")
+	request.Header.Set("X-Auth-Request-Preferred-Username", "Admin")
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Mode models.RuntimeMode `json:"mode"`
+		User models.CloudUser   `json:"user"`
+		Role models.CloudRole   `json:"role"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Mode != models.RuntimeModeCloud || payload.User.Email != "admin@example.com" || payload.User.Name != "Admin" || payload.Role != models.CloudRoleAdmin {
+		t.Fatalf("payload = %#v", payload)
+	}
+}
+
+func TestCloudOauth2ProxyMutationsRelyOnProxyCsrf(t *testing.T) {
+	apiHandler, _, _, _ := reliabilityTestAPI(t)
+	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/agents/connect-token", strings.NewReader(`{}`))
+	request.Header.Set("X-Auth-Request-User", "viewer")
+	request.Header.Set("X-Auth-Request-Email", "viewer@example.com")
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+}
+
 func TestLocalModeBypassesCloudAuthPolicy(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
 	handler := apiHandler.Routes()
@@ -145,12 +187,21 @@ func TestLocalModeBypassesCloudAuthPolicy(t *testing.T) {
 func testCloudRuntimeConfig() system.RuntimeConfig {
 	config := system.RuntimeConfig{
 		Mode:         models.RuntimeModeCloud,
+		AuthMode:     "oauth2_proxy",
 		BindAddress:  "0.0.0.0",
 		CookieSecret: "test-secret",
-		OIDCIssuer:   "https://issuer.example.com",
 		AdminUsers:   []string{"admin@example.com"},
 		Capabilities: map[models.Capability]bool{models.CapabilityRead: true},
 		Agent:        models.AgentConnection{Available: false, Status: "offline"},
 	}
+	return config
+}
+
+func testAppOIDCRuntimeConfig() system.RuntimeConfig {
+	config := testCloudRuntimeConfig()
+	config.AuthMode = "app_oidc"
+	config.OIDCIssuer = "https://issuer.example.com"
+	config.OIDCClientID = "client"
+	config.OIDCClientSecret = "secret"
 	return config
 }

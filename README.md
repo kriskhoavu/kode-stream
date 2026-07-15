@@ -28,8 +28,9 @@ Kode Stream supports Local and Cloud runtime modes.
 - Local mode is the default. The app binds to `127.0.0.1`, registers local paths or managed clones, and runs workspace
   Git, terminal, AI, runtime, and verification commands on the user's machine.
 - Cloud mode runs a hosted control plane with authentication, role policy, metadata storage, and Cloud Agent routing.
-  The hosted app does not clone repositories or execute workspace commands. Command-capable actions require the
-  workspace owner's connected Cloud Agent.
+  In the default deployment, OAuth2Proxy is the public endpoint and redirects to Keycloak; Kode Stream stays on a
+  private port and trusts OAuth2Proxy identity headers. The hosted app does not clone repositories or execute workspace
+  commands. Command-capable actions require the workspace owner's connected Cloud Agent.
 
 ## Tech Stack
 

@@ -47,7 +47,7 @@ func (a *API) cloudAuthMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if isMutatingMethod(c.Request.Method) && c.GetHeader(csrfHeader) != session.CSRFToken {
+		if a.runtimeConfig.AuthMode != "oauth2_proxy" && isMutatingMethod(c.Request.Method) && c.GetHeader(csrfHeader) != session.CSRFToken {
 			ginJSON(c, http.StatusForbidden, map[string]string{"error": "CSRF token is required", "code": "forbidden"})
 			c.Abort()
 			return
@@ -68,6 +68,10 @@ func (a *API) cloudAuthMiddleware() gin.HandlerFunc {
 }
 
 func (a *API) cloudLogin(w http.ResponseWriter, r *http.Request) {
+	if a.runtimeConfig.AuthMode == "oauth2_proxy" {
+		writeError(w, http.StatusUnauthorized, "login is handled by oauth2-proxy")
+		return
+	}
 	session, ok := a.sessionFromTrustedHeaders(r)
 	if !ok {
 		http.Redirect(w, r, strings.TrimRight(a.runtimeConfig.OIDCIssuer, "/"), http.StatusFound)
@@ -78,6 +82,10 @@ func (a *API) cloudLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) cloudCallback(w http.ResponseWriter, r *http.Request) {
+	if a.runtimeConfig.AuthMode == "oauth2_proxy" {
+		writeError(w, http.StatusUnauthorized, "callback is handled by oauth2-proxy")
+		return
+	}
 	session, ok := a.sessionFromTrustedHeaders(r)
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "Cloud identity headers are required")
@@ -88,6 +96,10 @@ func (a *API) cloudCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) cloudLogout(w http.ResponseWriter, r *http.Request) {
+	if a.runtimeConfig.AuthMode == "oauth2_proxy" {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "logoutUrl": "/oauth2/sign_out"})
+		return
+	}
 	session, ok := a.readCloudSession(r)
 	if !ok || r.Header.Get(csrfHeader) != session.CSRFToken {
 		writeError(w, http.StatusForbidden, "CSRF token is required")
@@ -98,8 +110,17 @@ func (a *API) cloudLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) sessionFromTrustedHeaders(r *http.Request) (cloudSession, bool) {
-	subject := strings.TrimSpace(r.Header.Get("X-Kode-Stream-Subject"))
-	email := strings.TrimSpace(r.Header.Get("X-Kode-Stream-Email"))
+	subject := firstHeader(r,
+		"X-Kode-Stream-Subject",
+		"X-Auth-Request-User",
+		"X-Forwarded-User",
+		"X-Forwarded-Preferred-Username",
+	)
+	email := firstHeader(r,
+		"X-Kode-Stream-Email",
+		"X-Auth-Request-Email",
+		"X-Forwarded-Email",
+	)
 	if subject == "" {
 		subject = email
 	}
@@ -116,11 +137,20 @@ func (a *API) sessionFromTrustedHeaders(r *http.Request) (cloudSession, bool) {
 	user := models.CloudUser{
 		ID:      stableCloudUserID(subject),
 		Email:   email,
-		Name:    strings.TrimSpace(r.Header.Get("X-Kode-Stream-Name")),
+		Name:    firstHeader(r, "X-Kode-Stream-Name", "X-Auth-Request-Preferred-Username", "X-Forwarded-Preferred-Username"),
 		Role:    role,
 		Subject: subject,
 	}
 	return cloudSession{User: user, CSRFToken: stableCloudUserID(subject + ":csrf"), ExpiresAt: time.Now().UTC().Add(12 * time.Hour)}, true
+}
+
+func firstHeader(r *http.Request, names ...string) string {
+	for _, name := range names {
+		if value := strings.TrimSpace(r.Header.Get(name)); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (a *API) writeCloudSession(w http.ResponseWriter, session cloudSession) {
