@@ -46,6 +46,19 @@ Kode Stream accepts proxy identity headers such as `X-Auth-Request-User`, `X-Aut
 `X-Forwarded-User`, and `X-Forwarded-Email`. JWT or opaque-token introspection inside Kode Stream is optional for later
 hardening and is not part of the PM-032 release requirement.
 
+## Local Docker Auth Stack
+
+The local Cloud auth stack copies the Helm deployment idea into Docker Compose:
+
+| Service     | Local URL                           | Responsibility                                            |
+|-------------|-------------------------------------|-----------------------------------------------------------|
+| Keycloak    | `http://keycloak.localhost:8081`    | Imports the `kode-stream` realm and local users.          |
+| OAuth2Proxy | `http://kode-stream.localhost:4318` | Browser entry point, Keycloak redirect, identity headers. |
+| Kode Stream | private Docker network port `4317`  | Cloud API and embedded frontend, not directly published.  |
+
+The local stack uses `deploy/cloud/local-compose.yaml` and `deploy/cloud/keycloak/kode-stream-realm.json`. It is a
+developer smoke environment, not the production VM compose file.
+
 ## Cloud Storage
 
 Cloud v1 requires a persistent metadata volume, not a managed database. Operators back up the metadata volume. A database

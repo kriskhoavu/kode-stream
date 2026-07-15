@@ -62,6 +62,19 @@ Open the public OAuth2Proxy URL, for example `https://kode-stream.example.com`, 
 compose file, local port `4318` is OAuth2Proxy and the app port is not published. After login, connect a Cloud Agent and
 register a workspace from the agent. Command-capable actions should be unavailable until the owner agent is connected.
 
+## Local OAuth2Proxy And Keycloak Stack
+
+For a full local login flow, use the Docker Compose stack in [Local Cloud Auth Stack](cloud/local.md). It starts
+Keycloak with an imported `kode-stream` realm, OAuth2Proxy on `http://kode-stream.localhost:4318`, and Kode Stream as a
+private upstream.
+
+```bash
+docker compose -f deploy/cloud/local-compose.yaml up -d --build
+curl -fsS http://kode-stream.localhost:4318/api/health
+```
+
+Open `http://kode-stream.localhost:4318` and sign in with `admin` / `admin`.
+
 ## Troubleshooting
 
 | Symptom                              | Check                                                                                                     |

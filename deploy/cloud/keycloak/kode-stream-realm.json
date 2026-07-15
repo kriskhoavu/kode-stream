@@ -1,0 +1,113 @@
+{
+  "realm": "kode-stream",
+  "enabled": true,
+  "displayName": "Kode Stream Local",
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "verifyEmail": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 172800,
+  "ssoSessionMaxLifespan": 172800,
+  "roles": {
+    "realm": [
+      {
+        "name": "administrator"
+      },
+      {
+        "name": "editor"
+      },
+      {
+        "name": "viewer"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "kode-stream",
+      "name": "Kode Stream",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-dev-client-secret",
+      "redirectUris": [
+        "http://kode-stream.localhost:4318/oauth2/callback",
+        "http://127.0.0.1:4318/oauth2/callback"
+      ],
+      "webOrigins": [
+        "http://kode-stream.localhost:4318",
+        "http://127.0.0.1:4318"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "email",
+        "roles"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "firstName": "Kode",
+      "lastName": "Admin",
+      "email": "admin@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "administrator"
+      ]
+    },
+    {
+      "username": "editor",
+      "enabled": true,
+      "firstName": "Kode",
+      "lastName": "Editor",
+      "email": "editor@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "editor",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "editor"
+      ]
+    },
+    {
+      "username": "viewer",
+      "enabled": true,
+      "firstName": "Kode",
+      "lastName": "Viewer",
+      "email": "viewer@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewer",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "viewer"
+      ]
+    }
+  ]
+}

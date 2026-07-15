@@ -1,0 +1,84 @@
+name: kode-stream-cloud-local
+
+services:
+  kode-stream:
+    image: kode-stream:cloud-local
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    expose:
+      - "4317"
+    environment:
+      KODE_STREAM_MODE: cloud
+      KODE_STREAM_AUTH_MODE: oauth2_proxy
+      KODE_STREAM_PORT: "4317"
+      KODE_STREAM_BIND_ADDR: 0.0.0.0
+      KODE_STREAM_DATA_DIR: /tmp/kode-stream-data
+      KODE_STREAM_PUBLIC_URL: http://kode-stream.localhost:4318
+      KODE_STREAM_COOKIE_SECRET: local-kode-stream-cookie-secret
+      KODE_STREAM_ADMIN_USERS: admin@example.com
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4317/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1.4
+    command:
+      - start-dev
+      - --import-realm
+      - --http-port=8081
+      - --hostname=http://keycloak.localhost:8081
+      - --hostname-strict=false
+    ports:
+      - "8081:8081"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ./keycloak/kode-stream-realm.json:/opt/keycloak/data/import/kode-stream-realm.json:ro
+    networks:
+      default:
+        aliases:
+          - keycloak.localhost
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    restart: unless-stopped
+    depends_on:
+      - kode-stream
+      - keycloak
+    ports:
+      - "4318:4180"
+    environment:
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_PROVIDER_DISPLAY_NAME: Keycloak
+      OAUTH2_PROXY_OIDC_ISSUER_URL: http://keycloak.localhost:8081/realms/kode-stream
+      OAUTH2_PROXY_CLIENT_ID: kode-stream
+      OAUTH2_PROXY_CLIENT_SECRET: local-dev-client-secret
+      OAUTH2_PROXY_COOKIE_SECRET: 0123456789abcdef0123456789abcdef
+      OAUTH2_PROXY_COOKIE_SECURE: "false"
+      OAUTH2_PROXY_COOKIE_NAME: _kode_stream_oauth2_proxy
+      OAUTH2_PROXY_COOKIE_REFRESH: 14m
+      OAUTH2_PROXY_COOKIE_EXPIRE: 24h
+      OAUTH2_PROXY_COOKIE_PERSIST: "true"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: GET=^/api/health$
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_REDEEM_REFRESH: "true"
+      OAUTH2_PROXY_UPSTREAMS: http://kode-stream:4317/
+      OAUTH2_PROXY_REDIRECT_URL: http://kode-stream.localhost:4318/oauth2/callback
+      OAUTH2_PROXY_WHITELIST_DOMAINS: .localhost
+    networks:
+      default:
+        aliases:
+          - kode-stream.localhost

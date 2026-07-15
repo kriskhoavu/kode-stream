@@ -53,6 +53,7 @@ Avoid:
 | C2    | Cloud Agent packaging and install docs  | DevOps   | Done   |
 | C3    | Release documentation and smoke checks  | DevOps   | Done   |
 | C4    | OAuth2Proxy cloud auth boundary         | DevOps   | Done   |
+| C5    | Local OAuth2Proxy and Keycloak stack    | DevOps   | Done   |
 
 ## Backend Phases
 
@@ -277,6 +278,22 @@ Avoid:
 **Verification:** `rtk go test ./...` plus `rtk docker compose -f deploy/cloud/compose.yaml config`
 
 **Commit:** `PM-032: Support oauth2 proxy cloud auth`
+
+---
+
+### Phase C5: Local OAuth2Proxy And Keycloak Stack
+
+**Deliverables:**
+
+- [x] Add Docker Compose stack for local Keycloak, OAuth2Proxy, and private Kode Stream app.
+- [x] Add Keycloak `kode-stream` realm import with local admin, editor, and viewer users.
+- [x] Keep Kode Stream reachable only through OAuth2Proxy in the local stack.
+- [x] Add local run, healthcheck, login, stop, and reset instructions.
+- [x] Verify OAuth2Proxy can reach Keycloak discovery and redirects browser login to Keycloak.
+
+**Verification:** `rtk docker compose -f deploy/cloud/local-compose.yaml up -d --build` plus health and redirect smoke.
+
+**Commit:** `PM-032: Add local cloud auth compose stack`
 
 ## Post-Implementation Checklist
 
