@@ -57,6 +57,9 @@ Reset local containers:
 docker compose -f deploy/cloud/local-compose.yaml down -v
 ```
 
+Use the reset command after changes to `deploy/cloud/keycloak/kode-stream-realm.json`; Keycloak imports the local realm
+only when the development server starts.
+
 ## Notes
 
 Use `kode-stream.localhost`, not `127.0.0.1`, for browser login. The Keycloak realm import uses that hostname in the

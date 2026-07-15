@@ -46,6 +46,19 @@
       "frontchannelLogout": false,
       "protocol": "openid-connect",
       "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "kode-stream-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "kode-stream",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": [
         "web-origins",
         "profile",
