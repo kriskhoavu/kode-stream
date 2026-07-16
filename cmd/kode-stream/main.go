@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
 
+	"kode-stream/internal/agent"
+	appgit "kode-stream/internal/git"
 	"kode-stream/internal/server"
 	"kode-stream/internal/system"
 )
@@ -55,10 +60,30 @@ func runAgent(args []string) error {
 		fs := flag.NewFlagSet("agent start", flag.ContinueOnError)
 		connect := fs.String("connect", "", "kodestream://connect deep link or connect token")
 		cloudURL := fs.String("cloud-url", "", "Cloud public URL")
+		repo := fs.String("repo", "", "local repository path")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
-		fmt.Fprintf(os.Stdout, "Cloud Agent start requested\ncloudUrl=%s\nconnect=%t\n", strings.TrimSpace(*cloudURL), strings.TrimSpace(*connect) != "")
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		fmt.Fprintln(os.Stdout, "Cloud Agent connecting")
+		client := agent.NewClient(agent.Config{
+			CloudURL: strings.TrimSpace(*cloudURL),
+			Connect:  strings.TrimSpace(*connect),
+			Repo:     strings.TrimSpace(*repo),
+			Git:      appgit.New(),
+			OnFrame: func(frame agent.Frame) {
+				switch frame.Type {
+				case agent.FrameConnected:
+					fmt.Fprintf(os.Stdout, "Cloud Agent connected: %s\n", frame.Agent.Name)
+				case agent.FrameHeartbeatAck:
+					fmt.Fprintln(os.Stdout, "Cloud Agent heartbeat acknowledged")
+				}
+			},
+		})
+		if err := client.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			return err
+		}
 		return nil
 	case "status":
 		fmt.Fprintln(os.Stdout, "Cloud Agent status: not running")

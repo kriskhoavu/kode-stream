@@ -77,6 +77,14 @@ func (g *GitAdapter) CurrentBranch(workspacePath string) (string, error) {
 	return branch, nil
 }
 
+func (g *GitAdapter) RemoteURL(workspacePath string) (string, error) {
+	out, err := g.run(workspacePath, "config", "--get", "remote.origin.url")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 func (g *GitAdapter) ListBranches(workspacePath string) ([]string, error) {
 	out, err := g.run(workspacePath, "for-each-ref", "--format=%(refname:short)", "refs/heads")
 	if err != nil {

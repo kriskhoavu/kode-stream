@@ -24,6 +24,62 @@ Health check through OAuth2Proxy:
 curl -fsS http://kode-stream.localhost:4318/api/health
 ```
 
+Agent CLI surface:
+
+Build local binary if needed:
+
+```bash
+go build -o ./bin/kode-stream ./cmd/kode-stream
+```
+
+Run doctor/status checks:
+
+```bash
+./bin/kode-stream agent doctor --cloud-url http://kode-stream.localhost:4318 --repo .
+./bin/kode-stream agent status
+```
+
+Expected: doctor prints cloud URL/repo/deep link info. Status is local-process only and may say not running before the
+foreground agent is started.
+
+Connected-agent smoke after logging in through the UI and creating a connect link:
+
+```bash
+./bin/kode-stream agent start --connect "kodestream://connect?token=<token_from_uri>" --cloud-url http://kode-stream.localhost:4318 --repo .
+```
+
+```bash
+  ./bin/kode-stream agent start \
+    --connect "kodestream://connect?token=<token_from_uri>" \
+    --cloud-url http://127.0.0.1:4318 \
+    --repo .
+
+```
+
+  fetch("/api/agents/connect-token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Local Agent", platform: navigator.platform })
+  }).then(r => r.json()).then(console.log)
+
+  Then use the raw token field, not a manually trimmed URI value:
+
+  ./bin/kode-stream agent start \
+    --connect "<full-token-with-dot-signature>" \
+    --cloud-url http://kode-stream.localhost:4318 \
+    --repo .
+
+  Or use the full deepLink exactly as returned:
+
+  ./bin/kode-stream agent start \
+    --connect "kodestream://connect?token=<full-token-with-dot-signature>" \
+    --cloud-url http://kode-stream.localhost:4318 \
+    --repo .
+
+
+Expected: the agent prints `Cloud Agent connected`, heartbeat acknowledgements follow, and the selected Git repo is
+published as a `cloud_agent` workspace in Cloud.
+
 Keycloak admin console:
 
 ```text

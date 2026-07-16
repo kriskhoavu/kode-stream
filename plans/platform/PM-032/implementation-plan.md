@@ -38,22 +38,27 @@ Avoid:
 
 ## Phases Summary
 
-| Phase | Name                                    | Track    | Status |
-|-------|-----------------------------------------|----------|--------|
-| B1    | Runtime mode and capability model       | Backend  | Done   |
-| B2    | Cloud auth, roles, and route policy     | Backend  | Done   |
-| B3    | Cloud Agent connection foundation       | Backend  | Done   |
-| B4    | Agent-backed workspace registration     | Backend  | Done   |
-| B5    | Agent command routing and safety        | Backend  | Done   |
-| F1    | Runtime state and shared frontend types | Frontend | Done   |
-| F2    | Cloud Agent connection UX               | Frontend | Done   |
-| F3    | Agent-backed workspace UX               | Frontend | Done   |
-| F4    | Role-aware command and offline UX       | Frontend | Done   |
-| C1    | Cloud container and metadata deployment | DevOps   | Done   |
-| C2    | Cloud Agent packaging and install docs  | DevOps   | Done   |
-| C3    | Release documentation and smoke checks  | DevOps   | Done   |
-| C4    | OAuth2Proxy cloud auth boundary         | DevOps   | Done   |
-| C5    | Local OAuth2Proxy and Keycloak stack    | DevOps   | Done   |
+| Phase | Name                                     | Track    | Status  |
+|-------|------------------------------------------|----------|---------|
+| B1    | Runtime mode and capability model        | Backend  | Done    |
+| B2    | Cloud auth, roles, and route policy      | Backend  | Done    |
+| B3    | Cloud Agent connection foundation        | Backend  | Done    |
+| B4    | Agent-backed workspace API foundation    | Backend  | Done    |
+| B5    | Agent command routing API boundary       | Backend  | Done    |
+| F1    | Runtime state and shared frontend types  | Frontend | Done    |
+| F2    | Cloud Agent connection UX                | Frontend | Done    |
+| F3    | Agent-backed workspace UX                | Frontend | Done    |
+| F4    | Role-aware command and offline UX        | Frontend | Done    |
+| C1    | Cloud container and metadata deployment  | DevOps   | Done    |
+| C2    | Cloud Agent packaging and install docs   | DevOps   | Done    |
+| C3    | Release documentation and smoke checks   | DevOps   | Done    |
+| C4    | OAuth2Proxy cloud auth boundary          | DevOps   | Done    |
+| C5    | Local OAuth2Proxy and Keycloak stack     | DevOps   | Done    |
+| A1    | Cloud Agent domain and CLI runtime       | Agent    | Done    |
+| A2    | Agent connection, heartbeat, local smoke | Agent    | Done    |
+| A3    | Agent workspace metadata publish         | Agent    | Done    |
+| A4    | Agent command dispatch bridge            | Agent    | Planned |
+| A5    | Agent packaging, deep link, reconnect    | Agent    | Planned |
 
 ## Backend Phases
 
@@ -110,37 +115,40 @@ Avoid:
 
 ---
 
-### Phase B4: Agent-Backed Workspace Registration
+### Phase B4: Agent-Backed Workspace API Foundation
 
 **Deliverables:**
 
 - [x] Add Cloud workspace registry for metadata, agent ownership, redacted path label, remote URL, and published
   summaries.
-- [x] Add agent command for local repository selection and Git root validation.
-- [x] Add agent scan and metadata publication flow.
+- [x] Add API contract for agent-owned workspace metadata publication.
+- [x] Store agent-published Git root metadata without storing executable local paths.
 - [x] Reject direct browser local paths and Git URL requests that ask Cloud to clone.
 - [x] Add tests for metadata storage, agent ownership, direct path rejection, and offline workspace state.
 
 **Verification:** `rtk go test ./internal/workspace/... ./internal/server/api/... ./internal/system/...`
 
-**Commit:** `PM-032: Add agent-backed cloud workspaces`
+**Commit:** `PM-032: Add agent-backed cloud workspace API foundation`
 
 ---
 
-### Phase B5: Agent Command Routing And Safety
+### Phase B5: Agent Command Routing API Boundary
 
 **Deliverables:**
 
 - [x] Add command envelope model for file, Git, terminal, AI, runtime, and verification requests.
 - [x] Bind command envelopes to user, workspace, agent, role, and capability.
-- [x] Route command-capable requests only to the owner Cloud Agent.
-- [x] Ensure Cloud routes every workspace command through the owner agent.
+- [x] Accept command-capable requests only when the owner Cloud Agent is connected.
+- [x] Return scoped command envelopes at the Cloud API boundary.
 - [x] Redact streamed logs and errors from agent command responses.
 - [x] Add tests for command authorization, agent offline behavior, credential redaction, and hosted execution denial.
 
 **Verification:** `rtk go test ./internal/git/... ./internal/ai/... ./internal/runtime/... ./internal/verification/... ./internal/server/api/...`
 
-**Commit:** `PM-032: Route cloud commands through local agent`
+**Commit:** `PM-032: Add cloud command routing API boundary`
+
+The full command bridge that streams these envelopes through the native local agent and delegates to existing local
+workspace, Git, file, terminal, AI, runtime, and verification services is Phase A4.
 
 ## Frontend Phases
 
@@ -295,16 +303,98 @@ Avoid:
 
 **Commit:** `PM-032: Add local cloud auth compose stack`
 
+## Agent Runtime Phases
+
+### Phase A1: Cloud Agent Domain And CLI Runtime
+
+**Deliverables:**
+
+- [x] Add `internal/agent` for connect-token parsing, deep-link parsing, channel URL construction, frame contracts,
+  connection lifecycle, workspace metadata publishing, and command-dispatch interfaces.
+- [x] Wire `kode-stream agent start --connect <deep-link-or-token> --cloud-url <url> --repo <path>` as a foreground
+  local process.
+- [x] Keep Cloud API code focused on hosted auth, tokens, agent channel endpoints, role policy, workspace metadata, and
+  command routing boundaries.
+- [x] Keep workspace, Git, file, terminal, AI, runtime, and verification behavior owned by existing local services.
+
+**Verification:** `rtk go test ./internal/agent/... ./cmd/kode-stream/... ./internal/server/api/...`
+
+**Commit:** `PM-032: Add cloud agent domain runtime`
+
+---
+
+### Phase A2: Agent Connection, Heartbeat, And Local Smoke
+
+**Deliverables:**
+
+- [x] Connect outbound to `/api/agents/channel` with a raw token or `kodestream://connect?token=...` link.
+- [x] Convert `http`/`https` Cloud URLs to `ws`/`wss` channel URLs.
+- [x] Read the connected frame and send heartbeat frames.
+- [x] Handle heartbeat acknowledgements from Cloud.
+- [x] Add local WebSocket smoke coverage for connection and heartbeat.
+
+**Verification:** `rtk go test ./internal/agent/...`
+
+**Commit:** `PM-032: Add cloud agent heartbeat smoke`
+
+---
+
+### Phase A3: Agent-Backed Workspace Metadata Publish
+
+**Deliverables:**
+
+- [x] Validate a local repo through the existing Git adapter.
+- [x] Publish workspace metadata to `/api/workspaces/from-agent`.
+- [x] Publish redacted-safe fields only: name, baseline branch, detected source roots, remote URL, root label, and scan
+  status.
+- [x] Add temp Git repo coverage for metadata publishing.
+
+**Verification:** `rtk go test ./internal/agent/... ./internal/server/api/...`
+
+**Commit:** `PM-032: Publish cloud agent workspace metadata`
+
+---
+
+### Phase A4: Agent Command Dispatch Bridge
+
+**Deliverables:**
+
+- [ ] Route Cloud command frames through `internal/agent` dispatch interfaces.
+- [ ] Add adapters that call existing local workspace, Git, file, terminal, AI, runtime, and verification services.
+- [ ] Stream command results, terminal output, cancellation, and errors back through the Cloud channel.
+- [ ] Preserve existing path safety, write guards, Git guards, and runtime verification contracts.
+- [ ] Add integration tests for file, Git, terminal, AI, runtime, and verification command envelopes.
+
+**Verification:** `rtk go test ./internal/agent/... ./internal/server/api/... ./internal/git/... ./internal/ai/... ./internal/runtime/... ./internal/verification/...`
+
+**Commit:** `PM-032: Bridge cloud commands to local services`
+
+---
+
+### Phase A5: Agent Packaging, Deep Link, Reconnect, And Docs
+
+**Deliverables:**
+
+- [ ] Add durable agent credentials after first pairing.
+- [ ] Add reconnect backoff and credential refresh policy.
+- [ ] Register `kodestream://connect` for macOS packaging, then Windows and Linux packages.
+- [ ] Add background service packaging where appropriate.
+- [ ] Update smoke docs for connected-agent and command-dispatch verification.
+
+**Verification:** local compose smoke plus package-specific installer checks.
+
+**Commit:** `PM-032: Package cloud agent reconnect flow`
+
 ## Post-Implementation Checklist
 
 - [x] Local mode remains backward-compatible and loopback by default.
-- [x] Cloud mode exposes hosted UI, auth, metadata, and command routing.
+- [x] Cloud mode exposes hosted UI, auth, metadata, and command routing API boundaries.
 - [x] Cloud v1 runs with a persistent metadata volume and no required database service.
-- [x] Cloud workspace registration requires a connected Cloud Agent.
+- [x] Cloud workspace metadata publication is performed by a connected Cloud Agent.
 - [x] Cloud users cannot register direct browser local paths.
 - [x] Cloud does not clone repositories onto the hosted VM.
 - [x] Cloud does not execute terminal, AI CLI, Git, runtime, or verification commands on the hosted VM.
 - [x] User SSH keys and Git credential helper output are not stored by Cloud.
-- [x] Agent command envelopes are scoped to user, workspace, agent, role, and capability.
+- [x] Agent command envelopes are scoped to user, workspace, agent, role, and capability at the Cloud API boundary.
 - [x] Agent offline state disables command-capable controls.
 - [x] Docs explain Local mode and Cloud mode without describing Agent as a runtime mode.

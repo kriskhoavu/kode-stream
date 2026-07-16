@@ -12,10 +12,11 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	appagent "kode-stream/internal/agent"
 	"kode-stream/internal/common/models"
 )
 
-const agentConnectTokenTTL = 5 * time.Minute
+const agentConnectTokenTTL = 30 * time.Minute
 
 type agentConnectToken struct {
 	UserID    string    `json:"userId"`
@@ -123,18 +124,16 @@ func (a *API) cloudAgentChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	defer connection.Close()
 	agent := a.agentStore.Upsert(models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "connected"})
-	_ = connection.WriteJSON(map[string]any{"type": "connected", "agent": agent})
+	_ = connection.WriteJSON(appagent.Frame{Type: appagent.FrameConnected, Agent: agent})
 	for {
-		var frame struct {
-			Type string `json:"type"`
-		}
+		var frame appagent.Frame
 		if err := connection.ReadJSON(&frame); err != nil {
 			a.agentStore.Upsert(models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "offline"})
 			return
 		}
-		if frame.Type == "heartbeat" {
+		if frame.Type == appagent.FrameHeartbeat {
 			agent = a.agentStore.Upsert(models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "connected"})
-			_ = connection.WriteJSON(map[string]any{"type": "heartbeat_ack", "agent": agent})
+			_ = connection.WriteJSON(appagent.Frame{Type: appagent.FrameHeartbeatAck, Agent: agent})
 		}
 	}
 }

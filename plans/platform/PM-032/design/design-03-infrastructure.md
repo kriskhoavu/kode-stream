@@ -4,23 +4,23 @@
 
 Cloud mode needs hosted app infrastructure with persistent metadata storage, OAuth2Proxy in front of the app, Keycloak
 OIDC configuration at the proxy, health checks, and outbound agent channels. Workspace source trees and command
-execution stay on user machines through Cloud Agent.
+execution stay on user machines through Cloud Agent, a native local process backed by the `internal/agent` package.
 
 ## Cloud Runtime
 
-| Concern      | Design                                                                      |
-|--------------|-----------------------------------------------------------------------------|
-| Process      | Same Go binary serves embedded frontend and Gin API.                        |
-| Bind address | Cloud mode supports `KODE_STREAM_BIND_ADDR`, normally `0.0.0.0`.            |
-| App exposure | Kode Stream app port stays private to the VM/container network.             |
-| Public auth  | OAuth2Proxy is the internet-facing service and redirects users to Keycloak. |
-| TLS          | Terminated before or at OAuth2Proxy, depending on operator topology.        |
-| Persistence  | Metadata and audit data are mounted volumes.                                |
-| Identity     | Kode Stream trusts OAuth2Proxy identity headers in Cloud mode.              |
-| Agent link   | Agents connect outbound over authenticated HTTPS WebSocket.                 |
-| Healthcheck  | Container and proxy check `GET /api/health`; proxy may skip auth for it.    |
-| Backups      | Operator backs up mounted metadata volumes.                                 |
-| Shell access | Web users never receive an interactive shell on the Cloud host.             |
+| Concern      | Design                                                                                         |
+|--------------|------------------------------------------------------------------------------------------------|
+| Process      | Same Go binary serves embedded frontend and Gin API; the agent is a separate local subcommand. |
+| Bind address | Cloud mode supports `KODE_STREAM_BIND_ADDR`, normally `0.0.0.0`.                               |
+| App exposure | Kode Stream app port stays private to the VM/container network.                                |
+| Public auth  | OAuth2Proxy is the internet-facing service and redirects users to Keycloak.                    |
+| TLS          | Terminated before or at OAuth2Proxy, depending on operator topology.                           |
+| Persistence  | Metadata and audit data are mounted volumes.                                                   |
+| Identity     | Kode Stream trusts OAuth2Proxy identity headers in Cloud mode.                                 |
+| Agent link   | Agents connect outbound over authenticated HTTPS WebSocket.                                    |
+| Healthcheck  | Container and proxy check `GET /api/health`; proxy may skip auth for it.                       |
+| Backups      | Operator backs up mounted metadata volumes.                                                    |
+| Shell access | Web users never receive an interactive shell on the Cloud host.                                |
 
 ## Container Layout
 
@@ -81,19 +81,19 @@ Use explicit volume mounts in compose and VM docs.
 | Windows | Planned supported target | MSI or executable installer with startup task/service.           |
 | Linux   | Planned supported target | `.deb`, `.rpm`, or tarball with systemd user service.            |
 
-The Kode Stream binary may host the agent subcommand, or the release can publish a separate agent binary. The
-implementation should choose the lower-maintenance packaging option, with macOS Homebrew as the first delivery gate.
+The Kode Stream binary hosts the `kode-stream agent` subcommand first. A separate binary remains optional only if
+packaging or service-management constraints require it later.
 
 ## Cloud Agent Runtime
 
-| Concern      | Design                                                                                            |
-|--------------|---------------------------------------------------------------------------------------------------|
-| Startup      | `kode-stream agent start` and optional background service.                                        |
-| Doctor       | `kode-stream agent doctor` checks Git, SSH agent, Cloud reachability, and deep-link registration. |
-| Deep link    | `kodestream://connect` wakes an installed agent.                                                  |
-| Connection   | Agent opens outbound HTTPS WebSocket to Cloud with short-lived connect token.                     |
-| Local access | Agent validates repo paths and executes Git, file, terminal, and AI CLI operations locally.       |
-| Secrets      | Agent does not send Git credentials, SSH keys, or credential-helper output to Cloud.              |
+| Concern      | Design                                                                                                                            |
+|--------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| Startup      | `kode-stream agent start --connect <deep-link-or-token> --cloud-url <url> --repo <path>` first, then optional background service. |
+| Doctor       | `kode-stream agent doctor` checks Git, SSH agent, Cloud reachability, and deep-link registration.                                 |
+| Deep link    | `kodestream://connect` wakes an installed agent.                                                                                  |
+| Connection   | Agent opens outbound HTTPS WebSocket to Cloud with short-lived connect token.                                                     |
+| Local access | Agent validates repo paths and reuses existing local services for Git, file, terminal, AI CLI, runtime, and verification work.    |
+| Secrets      | Agent does not send Git credentials, SSH keys, or credential-helper output to Cloud.                                              |
 
 ## Agent Network Topology
 
@@ -108,8 +108,9 @@ host.
 | Port forwarding       | Local development and debugging only.           |
 
 Reverse proxies must support WebSocket upgrade on `/api/agents/channel`, preserve authentication headers, and use idle
-timeouts suitable for long-running terminal and AI CLI streams. Agent reconnect should use backoff, heartbeat, and
-stale-state detection.
+timeouts suitable for long-running terminal and AI CLI streams. The current foreground agent proves connect, heartbeat,
+and metadata publish; durable credentials, reconnect backoff, and background service packaging are follow-on agent
+phases.
 
 ## Component Diagram
 

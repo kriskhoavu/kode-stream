@@ -7,6 +7,8 @@ trusted-proxy identity, authorization, user state, agent connection management, 
 public login boundary and redirects to Keycloak. Kode Stream stays behind that proxy, reads trusted identity headers, and
 does not need to understand Keycloak directly for the default deployment. Workspace files, Git commands, terminal
 sessions, AI CLI sessions, scanning, and verification commands execute only through the user's connected Cloud Agent.
+The Cloud Agent is a native local process backed by the `internal/agent` domain package; it is not a hosted runtime mode
+and does not duplicate Kode Stream's existing local services.
 
 ## Runtime Configuration
 
@@ -97,7 +99,8 @@ validation inside Kode Stream is optional for a later hardening ticket and is no
 | GET    | `/api/agents/channel`       | agent bearer token | outbound WebSocket command channel |
 
 Agent connections use `wss://` over the Cloud public URL. The hosted API never requires inbound network reachability to
-the user machine.
+the user machine. Reusable frame contracts live in the agent domain; token signing, role policy, channel upgrade, and
+hosted metadata ownership stay in the Cloud API package.
 
 ### Workspaces
 
@@ -110,9 +113,10 @@ the user machine.
 | POST   | `/api/system/select-directory` | blocked in Cloud mode           | capability error                           |
 | POST   | `/api/system/open-path`        | routed through owner agent only | streamed agent result                      |
 
-Cloud workspace registration starts from a connected agent. The browser asks Cloud for a connect token, the agent
-validates the token, the user chooses a local repository through native UI, and the agent sends workspace metadata to
-Cloud.
+Cloud workspace registration starts from a connected agent. The browser asks Cloud for a connect token, the native local
+agent validates the token, the user chooses a local repository through native UI, and the agent sends workspace metadata
+to Cloud. The first implemented local runtime publishes metadata from `kode-stream agent start --repo`; full native
+folder picking and command streaming are follow-on agent phases.
 
 ## Authorization Policy
 
@@ -154,9 +158,11 @@ Use filesystem-safe derived user IDs. Do not use raw email as a directory name.
 - Cloud rejects raw local paths submitted directly from the browser.
 - Cloud rejects Git URL registration that asks the hosted server to clone a repository.
 - Cloud stores redacted labels and metadata, not executable local paths.
-- Cloud routes file, Git, terminal, AI, runtime, and verification requests to the owner agent.
+- Cloud accepts file, Git, terminal, AI, runtime, and verification requests only for the connected owner agent and
+  emits scoped command envelopes for the local command bridge.
 - Cloud returns `unavailable` when the owner agent is offline.
-- Cloud routes every workspace command through the owner agent.
+- Cloud must route every workspace command through the owner agent once the command bridge is enabled; until then,
+  hosted execution remains blocked.
 
 ## Agent Security Boundary
 
@@ -194,13 +200,13 @@ proxy configuration must support WebSocket upgrade and idle timeouts long enough
 
 ## Design Decisions
 
-| Decision                                  | Rationale                                                                        |
-|-------------------------------------------|----------------------------------------------------------------------------------|
-| Add middleware at Gin boundary            | PM-031 made Gin the API router, so route policy belongs at this boundary.        |
-| Keep Local mode unauthenticated           | Local workflow is trusted and single-user.                                       |
-| Make Cloud Agent required for workspaces  | Cloud must not own repository source trees or user credentials.                  |
-| Route command envelopes through the agent | Workspace command execution belongs on the user machine.                         |
-| Use outbound agent WebSocket              | Avoids inbound ports, port forwarding, and direct Cloud access to user hosts.    |
-| Use file-backed metadata for Cloud v1     | Keeps deployment simple while preserving a repository boundary for later DBs.    |
-| Store metadata in Cloud                   | Cloud can support UI, status, audit, and collaboration without source hosting.   |
-| Default to OAuth2Proxy auth               | Kode Stream stays independent of Keycloak and trusts the private proxy boundary. |
+| Decision                                  | Rationale                                                                                                      |
+|-------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| Add middleware at Gin boundary            | PM-031 made Gin the API router, so route policy belongs at this boundary.                                      |
+| Keep Local mode unauthenticated           | Local workflow is trusted and single-user.                                                                     |
+| Make Cloud Agent required for workspaces  | Cloud must not own repository source trees or user credentials.                                                |
+| Route command envelopes through the agent | Workspace command execution belongs on the user machine and is bridged by the native `internal/agent` adapter. |
+| Use outbound agent WebSocket              | Avoids inbound ports, port forwarding, and direct Cloud access to user hosts.                                  |
+| Use file-backed metadata for Cloud v1     | Keeps deployment simple while preserving a repository boundary for later DBs.                                  |
+| Store metadata in Cloud                   | Cloud can support UI, status, audit, and collaboration without source hosting.                                 |
+| Default to OAuth2Proxy auth               | Kode Stream stays independent of Keycloak and trusts the private proxy boundary.                               |

@@ -7,13 +7,14 @@ machine.
 ## CLI
 
 ```bash
-kode-stream agent start --connect "kodestream://connect?token=..." --cloud-url https://kode-stream.example.com
+kode-stream agent start --connect "kodestream://connect?token=..." --cloud-url https://kode-stream.example.com --repo /path/to/repo
 kode-stream agent status
 kode-stream agent doctor --cloud-url https://kode-stream.example.com --repo /path/to/repo
 ```
 
-`agent start` is the future long-running channel process. The current foundation validates CLI parsing and gives the
-packaging path a stable command surface.
+`agent start` is the foreground channel process. It parses raw tokens or `kodestream://connect` links, connects outbound
+to `/api/agents/channel`, sends heartbeat frames, reads acknowledgements, and can publish local Git workspace metadata
+when `--repo` is provided. Full command dispatch is planned after this connection and metadata slice.
 
 ## macOS Packaging
 
@@ -37,8 +38,8 @@ Cloud UI launches:
 kodestream://connect?token=<short-lived-token>
 ```
 
-The handler starts or wakes Cloud Agent. The agent exchanges the short-lived token for an authenticated outbound
-WebSocket to `/api/agents/channel`.
+The handler starts or wakes Cloud Agent. The agent uses the short-lived token for an authenticated outbound WebSocket to
+`/api/agents/channel`. Durable reconnect credentials are planned after first-pairing smoke is complete.
 
 ## Planned Targets
 
@@ -49,7 +50,9 @@ outbound-only network model.
 
 ```bash
 kode-stream agent doctor --cloud-url https://kode-stream.example.com --repo /path/to/repo
+kode-stream agent start --connect "kodestream://connect?token=..." --cloud-url https://kode-stream.example.com --repo /path/to/repo
 open "kodestream://connect?token=test" # macOS deep-link registration smoke after packaging
 ```
 
-The repo scan smoke should validate a Git root locally and publish only metadata to Cloud.
+The repo smoke validates a Git root locally and publishes only metadata to Cloud. Command-capable file, Git, terminal,
+AI, runtime, and verification operations must route through the agent command bridge once that phase is implemented.
