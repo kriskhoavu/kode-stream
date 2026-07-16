@@ -39,6 +39,11 @@ type Settings struct {
 	Terminals       map[string]LaunchTemplate `json:"terminals" yaml:"terminals"`
 }
 
+type SettingsStore interface {
+	Load() (Settings, error)
+	Save(Settings) (Settings, error)
+}
+
 type AISettingsRepository struct {
 	mu   sync.Mutex
 	path string

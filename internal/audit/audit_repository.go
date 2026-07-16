@@ -23,6 +23,12 @@ type AuditRepository struct {
 	now  func() time.Time
 }
 
+type Repository interface {
+	Append(models.AuditEvent) (models.AuditEvent, error)
+	Recent(int) ([]models.AuditEvent, error)
+	RecentContext(context.Context, int) ([]models.AuditEvent, error)
+}
+
 func (s *Store) RecentContext(ctx context.Context, limit int) ([]models.AuditEvent, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

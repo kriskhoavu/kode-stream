@@ -28,8 +28,8 @@ type cacheEntry struct {
 }
 
 type JiraService struct {
-	registry *registry.Registry
-	index    *itemindex.Index
+	registry registry.Repository
+	index    itemindex.Repository
 	client   *Client
 	mu       sync.Mutex
 	cache    map[string]cacheEntry
@@ -38,7 +38,7 @@ type JiraService struct {
 
 type Service = JiraService
 
-func NewService(reg *registry.Registry, index *itemindex.Index, client *Client) *JiraService {
+func NewService(reg registry.Repository, index itemindex.Repository, client *Client) *JiraService {
 	return &JiraService{registry: reg, index: index, client: client, cache: map[string]cacheEntry{}, now: time.Now}
 }
 

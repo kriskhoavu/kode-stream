@@ -9,7 +9,7 @@ import (
 )
 
 type CachedEventReader struct {
-	source        *Store
+	source        Repository
 	ttl           time.Duration
 	now           func() time.Time
 	mu            sync.Mutex
@@ -30,7 +30,7 @@ type CacheStats struct {
 	Invalidations int
 }
 
-func NewCachedEventReader(source *Store, ttl time.Duration, now func() time.Time) *CachedEventReader {
+func NewCachedEventReader(source Repository, ttl time.Duration, now func() time.Time) *CachedEventReader {
 	if now == nil {
 		now = time.Now
 	}

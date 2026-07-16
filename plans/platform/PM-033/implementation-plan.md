@@ -33,7 +33,7 @@ Avoid:
 
 | Phase | Name                                      | Track   | Status  |
 |-------|-------------------------------------------|---------|---------|
-| B1    | Storage interfaces and composition        | Backend | Pending |
+| B1    | Storage interfaces and composition        | Backend | Done    |
 | B2    | SQL migrations and migration runner       | Backend | Pending |
 | B3    | SQLite local repositories and file import | Backend | Pending |
 | B4    | Branch re-index correctness               | Backend | Pending |
@@ -47,10 +47,10 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Add repository interfaces for workspace registry, item index, branch scan metadata, audit, navigation, settings, and import status.
-- [ ] Update server composition to choose storage driver from runtime configuration.
-- [ ] Keep YAML-backed implementations available only as import sources or temporary compatibility adapters during transition.
-- [ ] Preserve existing API route contracts and response payloads.
+- [x] Add repository interfaces for workspace registry, item index, branch scan metadata, audit, navigation, settings, and import status.
+- [x] Update server composition to choose storage driver from runtime configuration.
+- [x] Keep YAML-backed implementations available only as import sources or temporary compatibility adapters during transition.
+- [x] Preserve existing API route contracts and response payloads.
 
 **Verification:** `rtk go test ./internal/server/... ./internal/workspace/... ./internal/item/... ./internal/workstream/...`
 

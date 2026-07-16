@@ -46,7 +46,7 @@ type auditAppender interface {
 }
 
 type KnowledgeService struct {
-	registry      *registry.Registry
+	registry      registry.Repository
 	store         *Store
 	detector      workspaceDetector
 	git           gitPuller
@@ -54,7 +54,7 @@ type KnowledgeService struct {
 	enrichTimeout time.Duration
 }
 
-func NewService(registry *registry.Registry, store *Store) *KnowledgeService {
+func NewService(registry registry.Repository, store *Store) *KnowledgeService {
 	return &KnowledgeService{registry: registry, store: store, enrichTimeout: defaultEnrichTimeout}
 }
 

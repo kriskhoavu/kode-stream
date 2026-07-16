@@ -17,6 +17,7 @@ type Paths struct {
 	DefaultDir         string
 	RegistryFile       string
 	PlanIndexFile      string
+	SQLiteDatabaseFile string
 	KnowledgeIndexFile string
 	AuditLogFile       string
 	SavedFiltersFile   string
@@ -47,6 +48,7 @@ func ResolvePaths() (Paths, error) {
 		DefaultDir:         defaultDir,
 		RegistryFile:       filepath.Join(dir, "workspaces.yaml"),
 		PlanIndexFile:      filepath.Join(dir, "item-index.yaml"),
+		SQLiteDatabaseFile: filepath.Join(dir, "kode-stream.db"),
 		KnowledgeIndexFile: filepath.Join(dir, "knowledge-index.yaml"),
 		AuditLogFile:       filepath.Join(dir, "audit-log.jsonl"),
 		SavedFiltersFile:   filepath.Join(dir, "saved-filters.yaml"),

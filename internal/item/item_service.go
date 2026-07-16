@@ -27,8 +27,8 @@ type ListInput struct {
 }
 
 type ItemService struct {
-	registry *registry.Registry
-	index    *itemindex.Index
+	registry registry.Repository
+	index    itemindex.Repository
 	files    *fileaccess.Access
 	writer   *itemwriter.Writer
 	git      *gitadapter.GitAdapter
@@ -36,7 +36,7 @@ type ItemService struct {
 
 type Service = ItemService
 
-func New(reg *registry.Registry, idx *itemindex.Index, files *fileaccess.Access, writer *itemwriter.Writer, git *gitadapter.GitAdapter) *ItemService {
+func New(reg registry.Repository, idx itemindex.Repository, files *fileaccess.Access, writer *itemwriter.Writer, git *gitadapter.GitAdapter) *ItemService {
 	return &ItemService{registry: reg, index: idx, files: files, writer: writer, git: git}
 }
 

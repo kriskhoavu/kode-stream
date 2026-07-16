@@ -22,13 +22,13 @@ import (
 )
 
 type Service struct {
-	registry *registry.Registry
-	index    *itemindex.Index
+	registry registry.Repository
+	index    itemindex.Repository
 	scanner  *scanner.Scanner
 	git      *gitadapter.GitAdapter
 }
 
-func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, git *gitadapter.GitAdapter) *Service {
+func New(reg registry.Repository, idx itemindex.Repository, scan *scanner.Scanner, git *gitadapter.GitAdapter) *Service {
 	return &Service{registry: reg, index: idx, scanner: scan, git: git}
 }
 

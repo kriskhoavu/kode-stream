@@ -20,7 +20,7 @@ type Capability struct {
 }
 
 type AIService struct {
-	store    *AISettingsRepository
+	store    SettingsStore
 	lookPath func(string) (string, error)
 	stat     func(string) (os.FileInfo, error)
 	goos     string
@@ -37,7 +37,7 @@ func (s *Service) ConfigureEmbedded(manager *Manager) *Service {
 
 func (s *Service) EmbeddedManager() *Manager { return s.embedded }
 
-func New(store *AISettingsRepository) *AIService {
+func New(store SettingsStore) *AIService {
 	return &AIService{store: store, lookPath: exec.LookPath, stat: os.Stat, goos: runtime.GOOS}
 }
 

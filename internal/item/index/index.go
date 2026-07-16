@@ -29,6 +29,16 @@ type state struct {
 	BranchScans map[string]map[string]models.BranchScanMetadata `json:"branchScans" yaml:"branchScans"`
 }
 
+type Repository interface {
+	ReplaceWorkspace(string, []models.ItemDetail, []models.ScanWarning, time.Time) error
+	ReplaceWorkspaceBranch(string, string, []models.ItemDetail, models.BranchScanMetadata) error
+	DeleteWorkspace(string) error
+	Query(Query) ([]models.ItemSummary, error)
+	BranchItems(string, string) ([]models.ItemSummary, error)
+	BranchScan(string, string) (models.BranchScanMetadata, bool, error)
+	Get(string) (models.ItemDetail, bool, error)
+}
+
 type Query struct {
 	WorkspaceID string
 	Branch      string

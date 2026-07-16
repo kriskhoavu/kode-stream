@@ -18,11 +18,11 @@ type ItemReader interface {
 }
 
 type NavigationController struct {
-	repository *NavigationRepository
+	repository Repository
 	items      ItemReader
 }
 
-func NewController(repository *NavigationRepository, items ItemReader) *NavigationController {
+func NewController(repository Repository, items ItemReader) *NavigationController {
 	return &NavigationController{repository: repository, items: items}
 }
 

@@ -45,8 +45,8 @@ type CreateResult struct {
 }
 
 type WorkspaceService struct {
-	registry *registry.Registry
-	index    *itemindex.Index
+	registry registry.Repository
+	index    itemindex.Repository
 	scanner  *scanner.Scanner
 	writer   *itemwriter.Writer
 	git      *gitadapter.GitAdapter
@@ -65,7 +65,7 @@ func (s *WorkspaceService) ConfigureAudit(store interface {
 
 type Service = WorkspaceService
 
-func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, writer *itemwriter.Writer, git ...*gitadapter.GitAdapter) *WorkspaceService {
+func New(reg registry.Repository, idx itemindex.Repository, scan *scanner.Scanner, writer *itemwriter.Writer, git ...*gitadapter.GitAdapter) *WorkspaceService {
 	var adapter *gitadapter.GitAdapter
 	if len(git) > 0 {
 		adapter = git[0]

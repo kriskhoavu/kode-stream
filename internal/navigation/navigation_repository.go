@@ -23,6 +23,14 @@ type NavigationRepository struct {
 	now         func() time.Time
 }
 
+type Repository interface {
+	Filters() ([]models.SavedFilter, error)
+	SaveFilter(models.SavedFilter) (models.SavedFilter, error)
+	DeleteFilter(string) (bool, error)
+	Recents(int) ([]models.RecentItem, error)
+	RecordRecent(models.RecentItem) error
+}
+
 type Store = NavigationRepository
 
 func New(filtersPath, recentsPath string) *NavigationRepository {

@@ -47,11 +47,11 @@ type API struct {
 	items           *appitem.Service
 	gitOps          *appgit.Service
 	dialog          *system.Dialog
-	audit           *audit.Store
+	audit           audit.Repository
 	auditReader     auditEventReader
 	healthService   *workspacehealth.HealthService
 	search          *appsearch.SearchService
-	navigation      *navigation.Store
+	navigation      navigation.Repository
 	workspaceFiles  *appworkspace.WorkspaceFileService
 	contentSearch   *appsearch.ContentSearchService
 	aiSessions      *appaisession.Service
@@ -88,15 +88,15 @@ func (a *API) WithVerification(service *appverification.Service) *API {
 	return a
 }
 
-func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *appgit.GitAdapter, dialog *system.Dialog) *API {
+func New(reg registry.Repository, idx itemindex.Repository, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *appgit.GitAdapter, dialog *system.Dialog) *API {
 	return NewWithReliability(reg, idx, scan, files, writer, git, dialog, nil, nil)
 }
 
-func NewWithReliability(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *appgit.GitAdapter, dialog *system.Dialog, auditStore *audit.Store, healthService *workspacehealth.HealthService) *API {
+func NewWithReliability(reg registry.Repository, idx itemindex.Repository, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *appgit.GitAdapter, dialog *system.Dialog, auditStore audit.Repository, healthService *workspacehealth.HealthService) *API {
 	return NewWithServices(reg, idx, scan, files, writer, git, dialog, auditStore, healthService, nil, nil)
 }
 
-func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *appgit.GitAdapter, dialog *system.Dialog, auditStore *audit.Store, healthService *workspacehealth.HealthService, searchService *appsearch.SearchService, navigationStore *navigation.Store) *API {
+func NewWithServices(reg registry.Repository, idx itemindex.Repository, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *appgit.GitAdapter, dialog *system.Dialog, auditStore audit.Repository, healthService *workspacehealth.HealthService, searchService *appsearch.SearchService, navigationStore navigation.Repository) *API {
 	var refresher appworkspace.Refresher
 	if writer != nil {
 		refresher = writer

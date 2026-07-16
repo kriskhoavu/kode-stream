@@ -23,11 +23,11 @@ import (
 type Writer struct {
 	files    *fileaccess.Access
 	scanner  *scanner.Scanner
-	index    *itemindex.Index
-	registry *registry.Registry
+	index    itemindex.Repository
+	registry registry.Repository
 }
 
-func New(files *fileaccess.Access, scan *scanner.Scanner, idx *itemindex.Index, reg *registry.Registry) *Writer {
+func New(files *fileaccess.Access, scan *scanner.Scanner, idx itemindex.Repository, reg registry.Repository) *Writer {
 	return &Writer{files: files, scanner: scan, index: idx, registry: reg}
 }
 

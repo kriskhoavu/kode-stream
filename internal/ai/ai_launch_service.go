@@ -105,15 +105,15 @@ func (execRunner) Start(name string, args []string, dir string) error {
 }
 
 type launchDependencies struct {
-	registry   *registry.Registry
-	index      *itemindex.Index
-	audit      *audit.Store
+	registry   registry.Repository
+	index      itemindex.Repository
+	audit      audit.Repository
 	wrapperDir string
 	runner     ProcessRunner
 	now        func() time.Time
 }
 
-func (s *Service) ConfigureLaunch(reg *registry.Registry, index *itemindex.Index, auditStore *audit.Store, wrapperDir string) *Service {
+func (s *Service) ConfigureLaunch(reg registry.Repository, index itemindex.Repository, auditStore audit.Repository, wrapperDir string) *Service {
 	s.launch = &launchDependencies{registry: reg, index: index, audit: auditStore, wrapperDir: wrapperDir, runner: execRunner{}, now: time.Now}
 	return s
 }

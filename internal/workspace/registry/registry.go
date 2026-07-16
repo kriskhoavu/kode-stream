@@ -27,6 +27,20 @@ type Registry struct {
 	loaded  bool
 }
 
+type Repository interface {
+	List() ([]models.WorkspaceConfig, error)
+	Get(string) (models.WorkspaceConfig, bool, error)
+	Create(models.WorkspaceInput) (models.WorkspaceConfig, error)
+	Validate(models.WorkspaceInput) (models.WorkspaceConfig, error)
+	Path() string
+	BatchCreate([]models.WorkspaceInput) ([]BatchCreateResult, error)
+	Update(string, models.WorkspaceInput) (models.WorkspaceConfig, error)
+	Delete(string) error
+	TouchScanned(string, time.Time) error
+	SetLastSelectedBranch(string, string) error
+	SetRuntime(string, *models.WorkspaceRuntimeConfig) (models.WorkspaceConfig, error)
+}
+
 type BatchCreateResult struct {
 	Workspace models.WorkspaceConfig
 	Err       error

@@ -102,7 +102,7 @@ type CheckpointEvent struct {
 }
 
 type Service struct {
-	registry *registry.Registry
+	registry registry.Repository
 	runtime  *appruntime.Service
 	mu       sync.RWMutex
 	jobs     map[string]*Job
@@ -113,11 +113,11 @@ type Service struct {
 	cancel   context.CancelFunc
 }
 
-func NewService(reg *registry.Registry, runtimeService *appruntime.Service) *Service {
+func NewService(reg registry.Repository, runtimeService *appruntime.Service) *Service {
 	return NewServiceWithPolicy(reg, runtimeService, 2, 10*time.Minute)
 }
 
-func NewServiceWithPolicy(reg *registry.Registry, runtimeService *appruntime.Service, maxRunning int, timeout time.Duration) *Service {
+func NewServiceWithPolicy(reg registry.Repository, runtimeService *appruntime.Service, maxRunning int, timeout time.Duration) *Service {
 	if maxRunning <= 0 {
 		maxRunning = 1
 	}

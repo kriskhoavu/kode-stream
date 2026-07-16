@@ -14,19 +14,16 @@ import (
 	"syscall"
 
 	"kode-stream/internal/ai"
-	"kode-stream/internal/audit"
 	"kode-stream/internal/filesystem/content"
 	appgit "kode-stream/internal/git"
-	"kode-stream/internal/item/index"
 	"kode-stream/internal/item/writer"
 	appjira "kode-stream/internal/jira"
 	"kode-stream/internal/knowledge"
-	"kode-stream/internal/navigation"
 	appsearch "kode-stream/internal/search"
 	"kode-stream/internal/server/api"
+	"kode-stream/internal/storage"
 	"kode-stream/internal/system"
 	"kode-stream/internal/workspace"
-	"kode-stream/internal/workspace/registry"
 	"kode-stream/internal/workspace/scanner"
 )
 
@@ -56,19 +53,23 @@ func NewServer(port int) (*Server, error) {
 		port = envPort()
 	}
 	git := appgit.New()
-	reg := registry.New(paths.RegistryFile, git)
-	idx := itemindex.New(paths.PlanIndexFile)
+	state, err := storage.OpenAppOwnedState(paths, runtimeConfig, git, os.Getenv)
+	if err != nil {
+		return nil, err
+	}
+	reg := state.Workspaces
+	idx := state.Items
 	scan := scanner.New(git)
 	files := fileaccess.New()
 	writer := itemwriter.New(files, scan, idx, reg)
-	auditStore := audit.New(paths.AuditLogFile)
+	auditStore := state.Audit
 	healthService := workspace.NewHealthService(reg, idx, git)
 	searchService := appsearch.New(idx)
-	navigationStore := navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile)
+	navigationStore := state.Navigation
 	sessionManager := ai.NewTerminalManager(ai.Config{})
-	aiSessionService := ai.New(ai.NewSettingsRepository(paths.AISettingsFile)).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager)
+	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager)
 	jiraService := appjira.NewService(reg, idx, appjira.New())
-	knowledgeService := knowledge.NewService(reg, knowledge.NewStore(paths.KnowledgeIndexFile)).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore)
+	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore)
 	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
 
 	mux := http.NewServeMux()
