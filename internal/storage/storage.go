@@ -151,6 +151,16 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		}
 		state.SQLStore = sqlStore
 		state.SQLiteStore = &SQLiteStore{SQLStore: state.SQLStore, path: config.SQLitePath}
+		state.Workspaces = newSQLiteWorkspaceRepository(sqlStore, paths, git)
+		state.Items = &SQLiteItemRepository{db: sqlStore.db}
+		state.ImportStatus = &SQLiteImportStatusRepository{db: sqlStore.db}
+		state.Audit = &SQLiteAuditRepository{db: sqlStore.db, now: time.Now}
+		state.Navigation = &SQLiteNavigationRepository{db: sqlStore.db, now: time.Now}
+		state.AISettings = &SQLiteAISettingsRepository{db: sqlStore.db}
+		if err := ImportLegacyFiles(paths, git, state); err != nil {
+			_ = sqlStore.Close()
+			return nil, err
+		}
 	case StorageDriverPostgres:
 		sqlStore, err := openSQLStore(config)
 		if err != nil {
@@ -315,6 +325,7 @@ clone_path_managed INTEGER NOT NULL DEFAULT 0,
 last_selected_branch TEXT,
 sources_json TEXT NOT NULL,
 runtime_json TEXT,
+workspace_json TEXT NOT NULL,
 created_at TEXT NOT NULL,
 last_scanned_at TEXT
 );

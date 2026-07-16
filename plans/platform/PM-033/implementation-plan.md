@@ -35,7 +35,7 @@ Avoid:
 |-------|-------------------------------------------|---------|---------|
 | B1    | Storage interfaces and composition        | Backend | Done    |
 | B2    | SQL migrations and migration runner       | Backend | Done    |
-| B3    | SQLite local repositories and file import | Backend | Pending |
+| B3    | SQLite local repositories and file import | Backend | Done    |
 | B4    | Branch re-index correctness               | Backend | Pending |
 | B5    | Postgres Cloud repositories               | Backend | Pending |
 | C1    | Local and Cloud storage operations        | DevOps  | Pending |
@@ -77,10 +77,10 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Implement SQLite repositories for workspaces, item indexes, branch scans, scan warnings, audit, navigation, and settings.
-- [ ] Add one-time import from existing app-owned YAML and JSONL files under `KODE_STREAM_DATA_DIR`.
-- [ ] Leave source files untouched and record completed imports in SQL.
-- [ ] Make SQLite the default Local storage driver.
+- [x] Implement SQLite repositories for workspaces, item indexes, branch scans, scan warnings, audit, navigation, and settings.
+- [x] Add one-time import from existing app-owned YAML and JSONL files under `KODE_STREAM_DATA_DIR`.
+- [x] Leave source files untouched and record completed imports in SQL.
+- [x] Make SQLite the default Local storage driver.
 
 **Verification:** `rtk go test ./internal/workspace/... ./internal/item/... ./internal/audit/... ./internal/navigation/... ./internal/search/...`
 
