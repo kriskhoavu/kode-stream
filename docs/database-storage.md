@@ -6,13 +6,13 @@ audit events, navigation state, and settings.
 
 ## Local SQLite
 
-| Item             | Value                                                   |
-|------------------|---------------------------------------------------------|
-| Driver           | `KODE_STREAM_STORAGE_DRIVER=sqlite`                     |
-| Default file     | `<KODE_STREAM_DATA_DIR>/kode-stream.db`                 |
-| Override file    | `KODE_STREAM_SQLITE_PATH=/path/to/kode-stream.db`       |
-| Migration mode   | `KODE_STREAM_MIGRATIONS=auto` by default                |
-| Legacy import    | Existing YAML and JSONL files under `KODE_STREAM_DATA_DIR` are imported once. |
+| Item           | Value                                                                         |
+|----------------|-------------------------------------------------------------------------------|
+| Driver         | `KODE_STREAM_STORAGE_DRIVER=sqlite`                                           |
+| Default file   | `<KODE_STREAM_DATA_DIR>/kode-stream.db`                                       |
+| Override file  | `KODE_STREAM_SQLITE_PATH=/path/to/kode-stream.db`                             |
+| Migration mode | `KODE_STREAM_MIGRATIONS=auto` by default                                      |
+| Legacy import  | Existing YAML and JSONL files under `KODE_STREAM_DATA_DIR` are imported once. |
 
 Back up SQLite by stopping Kode Stream and copying `kode-stream.db`. For a portable export, use `sqlite3
 kode-stream.db .dump > kode-stream.sql`. Restore by stopping Kode Stream, replacing the SQLite file or importing the
@@ -25,11 +25,11 @@ Legacy source files such as `workspaces.yaml`, `item-index.yaml`, `audit-log.jso
 
 Cloud mode must set:
 
-| Variable                       | Purpose                                      |
-|--------------------------------|----------------------------------------------|
-| `KODE_STREAM_STORAGE_DRIVER=postgres` | Selects Postgres repositories.         |
-| `KODE_STREAM_DATABASE_URL`     | Secret-managed Postgres connection URL.      |
-| `KODE_STREAM_MIGRATIONS`       | `auto` for startup migrations or `manual` for operator-run migrations. |
+| Variable                              | Purpose                                                                |
+|---------------------------------------|------------------------------------------------------------------------|
+| `KODE_STREAM_STORAGE_DRIVER=postgres` | Selects Postgres repositories.                                         |
+| `KODE_STREAM_DATABASE_URL`            | Secret-managed Postgres connection URL.                                |
+| `KODE_STREAM_MIGRATIONS`              | `auto` for startup migrations or `manual` for operator-run migrations. |
 
 Provision Postgres with encrypted storage, regular backups, and network access limited to the Kode Stream API and
 approved operator tooling. Cloud Agents never connect to Postgres; they connect only to the Cloud API over HTTPS and

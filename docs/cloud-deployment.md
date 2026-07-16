@@ -7,18 +7,18 @@ workspace commands to the user's Cloud Agent.
 
 ## Required Environment
 
-| Variable                                    | Purpose                                                        |
-|---------------------------------------------|----------------------------------------------------------------|
-| `KODE_STREAM_MODE=cloud`                    | Enables hosted policy, metadata, and agent routing.            |
-| `KODE_STREAM_AUTH_MODE=oauth2_proxy`        | Trusts identity headers from the private OAuth2Proxy upstream. |
-| `KODE_STREAM_BIND_ADDR=0.0.0.0`             | Binds inside the VM or container.                              |
-| `KODE_STREAM_DATA_DIR=/var/lib/kode-stream` | Persistent file-backed metadata volume.                        |
-| `KODE_STREAM_STORAGE_DRIVER=postgres`       | Selects Cloud SQL storage.                                     |
-| `KODE_STREAM_DATABASE_URL`                  | Secret-managed Postgres connection URL.                        |
+| Variable                                    | Purpose                                                                        |
+|---------------------------------------------|--------------------------------------------------------------------------------|
+| `KODE_STREAM_MODE=cloud`                    | Enables hosted policy, metadata, and agent routing.                            |
+| `KODE_STREAM_AUTH_MODE=oauth2_proxy`        | Trusts identity headers from the private OAuth2Proxy upstream.                 |
+| `KODE_STREAM_BIND_ADDR=0.0.0.0`             | Binds inside the VM or container.                                              |
+| `KODE_STREAM_DATA_DIR=/var/lib/kode-stream` | Persistent file-backed metadata volume.                                        |
+| `KODE_STREAM_STORAGE_DRIVER=postgres`       | Selects Cloud SQL storage.                                                     |
+| `KODE_STREAM_DATABASE_URL`                  | Secret-managed Postgres connection URL.                                        |
 | `KODE_STREAM_MIGRATIONS=auto`               | Runs embedded migrations at startup. Use `manual` for operator-run migrations. |
-| `KODE_STREAM_PUBLIC_URL`                    | Public HTTPS URL used for browser and agent links.             |
-| `KODE_STREAM_COOKIE_SECRET`                 | Random secret for signed fallback Cloud session cookies.       |
-| `KODE_STREAM_ADMIN_USERS`                   | Comma-separated bootstrap admins by email or subject.          |
+| `KODE_STREAM_PUBLIC_URL`                    | Public HTTPS URL used for browser and agent links.                             |
+| `KODE_STREAM_COOKIE_SECRET`                 | Random secret for signed fallback Cloud session cookies.                       |
+| `KODE_STREAM_ADMIN_USERS`                   | Comma-separated bootstrap admins by email or subject.                          |
 
 `KODE_STREAM_AUTH_MODE` defaults to `oauth2_proxy` in Cloud mode. App-owned OIDC remains available for development or
 alternate deployments by setting `KODE_STREAM_AUTH_MODE=app_oidc` and providing `KODE_STREAM_OIDC_ISSUER`,

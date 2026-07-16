@@ -31,15 +31,15 @@ Avoid:
 
 ## Phases Summary
 
-| Phase | Name                                      | Track   | Status  |
-|-------|-------------------------------------------|---------|---------|
-| B1    | Storage interfaces and composition        | Backend | Done    |
-| B2    | SQL migrations and migration runner       | Backend | Done    |
-| B3    | SQLite local repositories and file import | Backend | Done    |
-| B4    | Branch re-index correctness               | Backend | Done    |
-| B5    | Postgres Cloud repositories               | Backend | Done    |
-| C1    | Local and Cloud storage operations        | DevOps  | Done    |
-| C2    | Pipeline and release gates                | DevOps  | Done    |
+| Phase | Name                                      | Track   | Status |
+|-------|-------------------------------------------|---------|--------|
+| B1    | Storage interfaces and composition        | Backend | Done   |
+| B2    | SQL migrations and migration runner       | Backend | Done   |
+| B3    | SQLite local repositories and file import | Backend | Done   |
+| B4    | Branch re-index correctness               | Backend | Done   |
+| B5    | Postgres Cloud repositories               | Backend | Done   |
+| C1    | Local and Cloud storage operations        | DevOps  | Done   |
+| C2    | Pipeline and release gates                | DevOps  | Done   |
 
 ## Backend Phases
 
