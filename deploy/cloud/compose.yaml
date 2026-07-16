@@ -12,17 +12,37 @@ services:
       KODE_STREAM_PORT: "4317"
       KODE_STREAM_BIND_ADDR: 0.0.0.0
       KODE_STREAM_DATA_DIR: /var/lib/kode-stream
+      KODE_STREAM_STORAGE_DRIVER: postgres
+      KODE_STREAM_DATABASE_URL: postgres://kode_stream:kode_stream@postgres:5432/kode_stream?sslmode=disable
+      KODE_STREAM_MIGRATIONS: auto
       KODE_STREAM_PUBLIC_URL: https://kode-stream.example.com
       KODE_STREAM_COOKIE_SECRET: change-me-with-32-random-bytes
       KODE_STREAM_ADMIN_USERS: admin@example.com
     volumes:
       - kode-stream-data:/var/lib/kode-stream
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4317/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: kode_stream
+      POSTGRES_USER: kode_stream
+      POSTGRES_PASSWORD: kode_stream
+    volumes:
+      - kode-stream-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kode_stream -d kode_stream"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   oauth2-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
@@ -50,3 +70,4 @@ services:
 
 volumes:
   kode-stream-data:
+  kode-stream-postgres:

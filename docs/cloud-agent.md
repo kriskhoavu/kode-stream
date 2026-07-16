@@ -2,7 +2,7 @@
 
 Cloud Agent is the local execution component for Cloud mode. It connects outbound to the Cloud public URL and keeps
 repository files, Git credentials, terminal sessions, AI CLIs, runtime commands, and verification commands on the user's
-machine.
+machine. It connects only to the Cloud API and never connects directly to Postgres.
 
 ## CLI
 

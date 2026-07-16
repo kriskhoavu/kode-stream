@@ -63,7 +63,10 @@ brew test kode-stream
 
 - Build frontend assets with `npm run build`.
 - Build and tag the Cloud image with `docker build -t kode-stream:<version> .`.
-- Run `/api/health` against the image with required Cloud environment variables.
+- Run `/api/health` against the image with required Cloud and Postgres environment variables.
+- Confirm `/api/health` reports the expected database `migrationVersion`.
+- Back up Postgres before upgrade and rehearse restore from snapshot or dump.
+- Smoke branch re-index by loading a non-current branch and switching back to the active branch.
 - Verify reverse proxy WebSocket upgrade for `/api/agents/channel`.
 - Verify the Homebrew package exposes `kode-stream agent start`, `status`, and `doctor`.
 - Smoke `kodestream://connect` deep-link registration on macOS.

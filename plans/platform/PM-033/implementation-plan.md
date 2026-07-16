@@ -38,7 +38,7 @@ Avoid:
 | B3    | SQLite local repositories and file import | Backend | Done    |
 | B4    | Branch re-index correctness               | Backend | Done    |
 | B5    | Postgres Cloud repositories               | Backend | Done    |
-| C1    | Local and Cloud storage operations        | DevOps  | Pending |
+| C1    | Local and Cloud storage operations        | DevOps  | Done    |
 | C2    | Pipeline and release gates                | DevOps  | Pending |
 
 ## Backend Phases
@@ -126,10 +126,10 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Document SQLite file location, backup, restore, and export workflow.
-- [ ] Document Postgres provisioning, secrets, migration mode, backup, restore, and health checks.
-- [ ] Update Cloud deployment examples to include Postgres and database environment variables.
-- [ ] Document that Cloud Agents connect only to Cloud API and never to Postgres.
+- [x] Document SQLite file location, backup, restore, and export workflow.
+- [x] Document Postgres provisioning, secrets, migration mode, backup, restore, and health checks.
+- [x] Update Cloud deployment examples to include Postgres and database environment variables.
+- [x] Document that Cloud Agents connect only to Cloud API and never to Postgres.
 
 **Verification:** `rtk rg -n "KODE_STREAM_DATABASE_URL|KODE_STREAM_STORAGE_DRIVER|Postgres|SQLite" docs plans/platform/PM-033`
 
