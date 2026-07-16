@@ -10,6 +10,8 @@ import (
 	"kode-stream/internal/common/models"
 	gitadapter "kode-stream/internal/git"
 	itemindex "kode-stream/internal/item/index"
+	"kode-stream/internal/storage"
+	"kode-stream/internal/system"
 	"kode-stream/internal/workspace/registry"
 	"kode-stream/internal/workspace/scanner"
 )
@@ -115,6 +117,73 @@ func TestLoadBranchReusesUnchangedWorkingTreeScan(t *testing.T) {
 	}
 	if second.ItemCount != first.ItemCount {
 		t.Fatalf("cached item count = %d, want %d", second.ItemCount, first.ItemCount)
+	}
+}
+
+func TestLoadBranchKeepsSameIdentifierContentSeparateInSQLite(t *testing.T) {
+	root := newWorkstreamGitRepo(t)
+	writeWorkstreamGitFile(t, root, "plans/platform/PM-001/README.md", "# PM-001: Main\n")
+	workstreamGitCommit(t, root, "main plan")
+	workstreamGitRun(t, root, "switch", "-c", "feature")
+	writeWorkstreamGitFile(t, root, "plans/platform/PM-001/README.md", "# PM-001: Feature\n")
+	workstreamGitCommit(t, root, "feature plan")
+	workstreamGitRun(t, root, "switch", "main")
+
+	dir := t.TempDir()
+	git := gitadapter.New()
+	paths := workstreamStoragePaths(dir)
+	state, err := storage.OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, git, func(string) string { return "" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer state.SQLStore.Close()
+	workspace, err := state.Workspaces.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := New(state.Workspaces, state.Items, scanner.New(git), git)
+
+	mainResult, err := service.LoadBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "main", Force: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	featureResult, err := service.LoadBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "feature", Force: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mainResult.Items) != 1 || len(featureResult.Items) != 1 {
+		t.Fatalf("main=%#v feature=%#v", mainResult.Items, featureResult.Items)
+	}
+	if mainResult.Items[0].Identifier != featureResult.Items[0].Identifier {
+		t.Fatalf("identifiers differ: main=%q feature=%q", mainResult.Items[0].Identifier, featureResult.Items[0].Identifier)
+	}
+	if mainResult.Items[0].Title == featureResult.Items[0].Title {
+		t.Fatalf("branch-specific titles were collapsed: main=%q feature=%q", mainResult.Items[0].Title, featureResult.Items[0].Title)
+	}
+	mainItems, err := state.Items.BranchItems(workspace.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	featureItems, err := state.Items.BranchItems(workspace.ID, "feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mainItems[0].Title != mainResult.Items[0].Title || featureItems[0].Title != featureResult.Items[0].Title {
+		t.Fatalf("stored branch items mismatch: main=%#v feature=%#v", mainItems, featureItems)
+	}
+}
+
+func workstreamStoragePaths(dir string) system.Paths {
+	return system.Paths{
+		Dir:                dir,
+		RegistryFile:       filepath.Join(dir, "workspaces.yaml"),
+		PlanIndexFile:      filepath.Join(dir, "item-index.yaml"),
+		SQLiteDatabaseFile: filepath.Join(dir, "kode-stream.db"),
+		KnowledgeIndexFile: filepath.Join(dir, "knowledge-index.yaml"),
+		AuditLogFile:       filepath.Join(dir, "audit-log.jsonl"),
+		SavedFiltersFile:   filepath.Join(dir, "saved-filters.yaml"),
+		RecentItemsFile:    filepath.Join(dir, "recent-items.yaml"),
+		AISettingsFile:     filepath.Join(dir, "ai-settings.yaml"),
 	}
 }
 

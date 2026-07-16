@@ -36,7 +36,7 @@ Avoid:
 | B1    | Storage interfaces and composition        | Backend | Done    |
 | B2    | SQL migrations and migration runner       | Backend | Done    |
 | B3    | SQLite local repositories and file import | Backend | Done    |
-| B4    | Branch re-index correctness               | Backend | Pending |
+| B4    | Branch re-index correctness               | Backend | Done    |
 | B5    | Postgres Cloud repositories               | Backend | Pending |
 | C1    | Local and Cloud storage operations        | DevOps  | Pending |
 | C2    | Pipeline and release gates                | DevOps  | Pending |
@@ -92,11 +92,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Port current branch index behavior to SQL-backed repositories.
-- [ ] Re-index a selected branch when commit, source configuration hash, or working-tree hash does not match SQL metadata.
-- [ ] Replace item rows, warnings, and branch scan metadata for one workspace branch in a single transaction.
-- [ ] Add tests where the same item identifier has different content on different branches.
-- [ ] Ensure Git branch switch refreshes the active branch index, then returns board/search data.
+- [x] Port current branch index behavior to SQL-backed repositories.
+- [x] Re-index a selected branch when commit, source configuration hash, or working-tree hash does not match SQL metadata.
+- [x] Replace item rows, warnings, and branch scan metadata for one workspace branch in a single transaction.
+- [x] Add tests where the same item identifier has different content on different branches.
+- [x] Ensure Git branch switch refreshes the active branch index, then returns board/search data.
 
 **Verification:** `rtk go test ./internal/workstream/... ./internal/git/... ./internal/item/...`
 
