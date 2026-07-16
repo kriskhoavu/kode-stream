@@ -23,45 +23,88 @@ import (
 	"kode-stream/internal/workspace/registry"
 )
 
+type sqlRow interface {
+	Scan(...any) error
+}
+
+func execSQL(db *sql.DB, driverName, query string, args ...any) (sql.Result, error) {
+	return db.Exec(rebindSQL(driverName, query), args...)
+}
+
+func querySQL(db *sql.DB, driverName, query string, args ...any) (*sql.Rows, error) {
+	return db.Query(rebindSQL(driverName, query), args...)
+}
+
+func queryRowSQL(db *sql.DB, driverName, query string, args ...any) sqlRow {
+	return db.QueryRow(rebindSQL(driverName, query), args...)
+}
+
+func execTx(tx *sql.Tx, driverName, query string, args ...any) (sql.Result, error) {
+	return tx.Exec(rebindSQL(driverName, query), args...)
+}
+
+func rebindSQL(driverName, query string) string {
+	if driverName != StorageDriverPostgres {
+		return query
+	}
+	var builder strings.Builder
+	ordinal := 1
+	for _, char := range query {
+		if char == '?' {
+			builder.WriteString(fmt.Sprintf("$%d", ordinal))
+			ordinal++
+			continue
+		}
+		builder.WriteRune(char)
+	}
+	return builder.String()
+}
+
 type SQLiteWorkspaceRepository struct {
 	db        *sql.DB
+	driver    string
 	path      string
 	validator *registry.Registry
 	mu        sync.Mutex
 }
 
 type SQLiteItemRepository struct {
-	db *sql.DB
-	mu sync.Mutex
+	db     *sql.DB
+	driver string
+	mu     sync.Mutex
 }
 
 type SQLiteAuditRepository struct {
-	db  *sql.DB
-	now func() time.Time
-	mu  sync.Mutex
+	db     *sql.DB
+	driver string
+	now    func() time.Time
+	mu     sync.Mutex
 }
 
 type SQLiteNavigationRepository struct {
-	db  *sql.DB
-	now func() time.Time
-	mu  sync.Mutex
+	db     *sql.DB
+	driver string
+	now    func() time.Time
+	mu     sync.Mutex
 }
 
 type SQLiteAISettingsRepository struct {
-	db *sql.DB
-	mu sync.Mutex
+	db     *sql.DB
+	driver string
+	mu     sync.Mutex
 }
 
 type SQLiteImportStatusRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	driver string
 }
 
 func newSQLiteWorkspaceRepository(store *SQLStore, paths system.Paths, git *appgit.GitAdapter) *SQLiteWorkspaceRepository {
-	return &SQLiteWorkspaceRepository{db: store.db, path: paths.RegistryFile, validator: registry.New(paths.RegistryFile, git)}
+	return &SQLiteWorkspaceRepository{db: store.db, driver: store.driver, path: paths.RegistryFile, validator: registry.New(paths.RegistryFile, git)}
 }
 
 func (r *SQLiteWorkspaceRepository) List() ([]models.WorkspaceConfig, error) {
-	rows, err := r.db.Query(`SELECT workspace_json FROM workspaces ORDER BY created_at ASC, id ASC`)
+	rows, err := querySQL(r.db, r.driver, `SELECT workspace_json FROM workspaces ORDER BY created_at ASC, id ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +132,7 @@ func (r *SQLiteWorkspaceRepository) List() ([]models.WorkspaceConfig, error) {
 
 func (r *SQLiteWorkspaceRepository) Get(id string) (models.WorkspaceConfig, bool, error) {
 	var raw string
-	err := r.db.QueryRow(`SELECT workspace_json FROM workspaces WHERE id = ?`, id).Scan(&raw)
+	err := queryRowSQL(r.db, r.driver, `SELECT workspace_json FROM workspaces WHERE id = ?`, id).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return models.WorkspaceConfig{}, false, nil
 	}
@@ -206,7 +249,7 @@ func (r *SQLiteWorkspaceRepository) Update(id string, input models.WorkspaceInpu
 }
 
 func (r *SQLiteWorkspaceRepository) Delete(id string) error {
-	result, err := r.db.Exec(`DELETE FROM workspaces WHERE id = ?`, id)
+	result, err := execSQL(r.db, r.driver, `DELETE FROM workspaces WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}
@@ -259,7 +302,7 @@ func (r *SQLiteWorkspaceRepository) upsert(workspace models.WorkspaceConfig) err
 	if err != nil {
 		return err
 	}
-	_, err = r.db.Exec(`INSERT INTO workspaces (id, name, path_label, baseline_branch, registration_mode, remote_url, clone_path_managed, last_selected_branch, sources_json, runtime_json, workspace_json, created_at, last_scanned_at)
+	_, err = execSQL(r.db, r.driver, `INSERT INTO workspaces (id, name, path_label, baseline_branch, registration_mode, remote_url, clone_path_managed, last_selected_branch, sources_json, runtime_json, workspace_json, created_at, last_scanned_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET name = excluded.name, path_label = excluded.path_label, baseline_branch = excluded.baseline_branch, registration_mode = excluded.registration_mode, remote_url = excluded.remote_url, clone_path_managed = excluded.clone_path_managed, last_selected_branch = excluded.last_selected_branch, sources_json = excluded.sources_json, runtime_json = excluded.runtime_json, workspace_json = excluded.workspace_json, created_at = excluded.created_at, last_scanned_at = excluded.last_scanned_at`,
 		workspace.ID, workspace.Name, workspacePathLabel(workspace), workspace.BaselineBranch, workspace.RegistrationMode, workspace.RemoteURL, boolInt(workspace.ClonePathManaged), workspace.LastSelectedBranch, sourcesJSON, runtimeJSON, workspaceJSON, formatTime(workspace.CreatedAt), formatTime(workspace.LastScannedAt))
@@ -271,19 +314,19 @@ func (r *SQLiteItemRepository) ReplaceWorkspace(workspaceID string, items []mode
 	if err != nil {
 		return err
 	}
-	if _, err = tx.Exec(`DELETE FROM indexed_items WHERE workspace_id = ?`, workspaceID); err != nil {
+	if _, err = execTx(tx, r.driver, `DELETE FROM indexed_items WHERE workspace_id = ?`, workspaceID); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	if _, err = tx.Exec(`DELETE FROM scan_warnings WHERE workspace_id = ?`, workspaceID); err != nil {
+	if _, err = execTx(tx, r.driver, `DELETE FROM scan_warnings WHERE workspace_id = ?`, workspaceID); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	if _, err = tx.Exec(`DELETE FROM branch_scans WHERE workspace_id = ?`, workspaceID); err != nil {
+	if _, err = execTx(tx, r.driver, `DELETE FROM branch_scans WHERE workspace_id = ?`, workspaceID); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	if err = insertItems(tx, items); err != nil {
+	if err = insertItems(tx, r.driver, items); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -295,14 +338,14 @@ func (r *SQLiteItemRepository) ReplaceWorkspace(workspaceID string, items []mode
 		}
 	}
 	for branch, metadata := range branches {
-		if err = insertBranchScan(tx, metadata); err != nil {
+		if err = insertBranchScan(tx, r.driver, metadata); err != nil {
 			_ = tx.Rollback()
 			return err
 		}
 		_ = branch
 	}
 	for _, warning := range warnings {
-		if _, err = tx.Exec(`INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUES (?, ?, ?, ?, ?)`, workspaceID, "", warning.ItemPath, "", warning.Message); err != nil {
+		if _, err = execTx(tx, r.driver, `INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUES (?, ?, ?, ?, ?)`, workspaceID, "", warning.ItemPath, "", warning.Message); err != nil {
 			_ = tx.Rollback()
 			return err
 		}
@@ -317,15 +360,15 @@ func (r *SQLiteItemRepository) ReplaceWorkspaceBranch(workspaceID, branch string
 	if err != nil {
 		return err
 	}
-	if _, err = tx.Exec(`DELETE FROM indexed_items WHERE workspace_id = ? AND branch = ?`, workspaceID, branch); err != nil {
+	if _, err = execTx(tx, r.driver, `DELETE FROM indexed_items WHERE workspace_id = ? AND branch = ?`, workspaceID, branch); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	if _, err = tx.Exec(`DELETE FROM scan_warnings WHERE workspace_id = ? AND branch = ?`, workspaceID, branch); err != nil {
+	if _, err = execTx(tx, r.driver, `DELETE FROM scan_warnings WHERE workspace_id = ? AND branch = ?`, workspaceID, branch); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	if _, err = tx.Exec(`DELETE FROM branch_scans WHERE workspace_id = ? AND branch = ?`, workspaceID, branch); err != nil {
+	if _, err = execTx(tx, r.driver, `DELETE FROM branch_scans WHERE workspace_id = ? AND branch = ?`, workspaceID, branch); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -333,17 +376,17 @@ func (r *SQLiteItemRepository) ReplaceWorkspaceBranch(workspaceID, branch string
 		items[i].WorkspaceID = workspaceID
 		items[i].Branch = branch
 	}
-	if err = insertItems(tx, items); err != nil {
+	if err = insertItems(tx, r.driver, items); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
 	metadata.WorkspaceID, metadata.Branch = workspaceID, branch
-	if err = insertBranchScan(tx, metadata); err != nil {
+	if err = insertBranchScan(tx, r.driver, metadata); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
 	for _, warning := range metadata.Warnings {
-		if _, err = tx.Exec(`INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUES (?, ?, ?, ?, ?)`, workspaceID, branch, warning.ItemPath, "", warning.Message); err != nil {
+		if _, err = execTx(tx, r.driver, `INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUES (?, ?, ?, ?, ?)`, workspaceID, branch, warning.ItemPath, "", warning.Message); err != nil {
 			_ = tx.Rollback()
 			return err
 		}
@@ -352,12 +395,12 @@ func (r *SQLiteItemRepository) ReplaceWorkspaceBranch(workspaceID, branch string
 }
 
 func (r *SQLiteItemRepository) DeleteWorkspace(workspaceID string) error {
-	_, err := r.db.Exec(`DELETE FROM indexed_items WHERE workspace_id = ?`, workspaceID)
+	_, err := execSQL(r.db, r.driver, `DELETE FROM indexed_items WHERE workspace_id = ?`, workspaceID)
 	if err != nil {
 		return err
 	}
-	_, _ = r.db.Exec(`DELETE FROM branch_scans WHERE workspace_id = ?`, workspaceID)
-	_, _ = r.db.Exec(`DELETE FROM scan_warnings WHERE workspace_id = ?`, workspaceID)
+	_, _ = execSQL(r.db, r.driver, `DELETE FROM branch_scans WHERE workspace_id = ?`, workspaceID)
+	_, _ = execSQL(r.db, r.driver, `DELETE FROM scan_warnings WHERE workspace_id = ?`, workspaceID)
 	return nil
 }
 
@@ -388,7 +431,7 @@ func (r *SQLiteItemRepository) BranchItems(workspaceID, branch string) ([]models
 func (r *SQLiteItemRepository) BranchScan(workspaceID, branch string) (models.BranchScanMetadata, bool, error) {
 	var metadata models.BranchScanMetadata
 	var scannedAt string
-	err := r.db.QueryRow(`SELECT workspace_id, branch, branch_ref, commit_sha, source_mode, editable, source_configuration_hash, working_tree_hash, scanned_at FROM branch_scans WHERE workspace_id = ? AND branch = ?`, workspaceID, branch).Scan(&metadata.WorkspaceID, &metadata.Branch, &metadata.BranchRef, &metadata.Commit, &metadata.SourceMode, &metadata.Editable, &metadata.SourceConfigurationHash, &metadata.WorkingTreeHash, &scannedAt)
+	err := queryRowSQL(r.db, r.driver, `SELECT workspace_id, branch, branch_ref, commit_sha, source_mode, editable, source_configuration_hash, working_tree_hash, scanned_at FROM branch_scans WHERE workspace_id = ? AND branch = ?`, workspaceID, branch).Scan(&metadata.WorkspaceID, &metadata.Branch, &metadata.BranchRef, &metadata.Commit, &metadata.SourceMode, &metadata.Editable, &metadata.SourceConfigurationHash, &metadata.WorkingTreeHash, &scannedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return models.BranchScanMetadata{}, false, nil
 	}
@@ -406,7 +449,7 @@ func (r *SQLiteItemRepository) BranchScan(workspaceID, branch string) (models.Br
 
 func (r *SQLiteItemRepository) Get(id string) (models.ItemDetail, bool, error) {
 	var raw string
-	err := r.db.QueryRow(`SELECT metadata_json FROM indexed_items WHERE id = ? ORDER BY updated_at DESC LIMIT 1`, id).Scan(&raw)
+	err := queryRowSQL(r.db, r.driver, `SELECT metadata_json FROM indexed_items WHERE id = ? ORDER BY updated_at DESC LIMIT 1`, id).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return models.ItemDetail{}, false, nil
 	}
@@ -435,7 +478,7 @@ func (r *SQLiteItemRepository) queryDetails(q itemindex.Query) ([]models.ItemDet
 		where = append(where, "status = ?")
 		args = append(args, q.Status)
 	}
-	rows, err := r.db.Query(`SELECT metadata_json FROM indexed_items WHERE `+strings.Join(where, " AND ")+` ORDER BY updated_at DESC`, args...)
+	rows, err := querySQL(r.db, r.driver, `SELECT metadata_json FROM indexed_items WHERE `+strings.Join(where, " AND ")+` ORDER BY updated_at DESC`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +502,7 @@ func (r *SQLiteItemRepository) queryDetails(q itemindex.Query) ([]models.ItemDet
 }
 
 func (r *SQLiteItemRepository) branchWarnings(workspaceID, branch string) ([]models.ScanWarning, error) {
-	rows, err := r.db.Query(`SELECT item_path, code, message FROM scan_warnings WHERE workspace_id = ? AND branch = ?`, workspaceID, branch)
+	rows, err := querySQL(r.db, r.driver, `SELECT item_path, code, message FROM scan_warnings WHERE workspace_id = ? AND branch = ?`, workspaceID, branch)
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +536,7 @@ func (r *SQLiteAuditRepository) Append(event models.AuditEvent) (models.AuditEve
 	if err != nil {
 		return models.AuditEvent{}, err
 	}
-	_, err = r.db.Exec(`INSERT INTO audit_events (id, workspace_id, item_id, operation, status, message, paths_json, duration_ms, error, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, event.ID, event.WorkspaceID, event.ItemID, event.Operation, event.Status, event.Message, pathsJSON, event.DurationMS, event.Error, formatTime(event.Time))
+	_, err = execSQL(r.db, r.driver, `INSERT INTO audit_events (id, workspace_id, item_id, operation, status, message, paths_json, duration_ms, error, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, event.ID, event.WorkspaceID, event.ItemID, event.Operation, event.Status, event.Message, pathsJSON, event.DurationMS, event.Error, formatTime(event.Time))
 	return event, err
 }
 
@@ -504,7 +547,7 @@ func (r *SQLiteAuditRepository) Recent(limit int) ([]models.AuditEvent, error) {
 		query += ` LIMIT ?`
 		args = append(args, limit)
 	}
-	rows, err := r.db.Query(query, args...)
+	rows, err := querySQL(r.db, r.driver, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -538,7 +581,7 @@ func (r *SQLiteAuditRepository) RecentContext(ctx context.Context, limit int) ([
 }
 
 func (r *SQLiteNavigationRepository) Filters() ([]models.SavedFilter, error) {
-	rows, err := r.db.Query(`SELECT id, name, route, workspace_id, filters_json, created_at, updated_at FROM saved_filters ORDER BY updated_at DESC`)
+	rows, err := querySQL(r.db, r.driver, `SELECT id, name, route, workspace_id, filters_json, created_at, updated_at FROM saved_filters ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -582,13 +625,13 @@ func (r *SQLiteNavigationRepository) SaveFilter(filter models.SavedFilter) (mode
 	if err != nil {
 		return models.SavedFilter{}, err
 	}
-	_, err = r.db.Exec(`INSERT INTO saved_filters (id, name, route, workspace_id, filters_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+	_, err = execSQL(r.db, r.driver, `INSERT INTO saved_filters (id, name, route, workspace_id, filters_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET name = excluded.name, route = excluded.route, workspace_id = excluded.workspace_id, filters_json = excluded.filters_json, updated_at = excluded.updated_at`, filter.ID, filter.Name, filter.Route, filter.WorkspaceID, filtersJSON, formatTime(filter.CreatedAt), formatTime(filter.UpdatedAt))
 	return filter, err
 }
 
 func (r *SQLiteNavigationRepository) DeleteFilter(id string) (bool, error) {
-	result, err := r.db.Exec(`DELETE FROM saved_filters WHERE id = ?`, id)
+	result, err := execSQL(r.db, r.driver, `DELETE FROM saved_filters WHERE id = ?`, id)
 	if err != nil {
 		return false, err
 	}
@@ -603,7 +646,7 @@ func (r *SQLiteNavigationRepository) Recents(limit int) ([]models.RecentItem, er
 		query += ` LIMIT ?`
 		args = append(args, limit)
 	}
-	rows, err := r.db.Query(query, args...)
+	rows, err := querySQL(r.db, r.driver, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -626,14 +669,14 @@ func (r *SQLiteNavigationRepository) Recents(limit int) ([]models.RecentItem, er
 
 func (r *SQLiteNavigationRepository) RecordRecent(item models.RecentItem) error {
 	item.OpenedAt = r.now().UTC()
-	_, err := r.db.Exec(`INSERT INTO recent_items (item_id, workspace_id, title, subtitle, route, opened_at) VALUES (?, ?, ?, ?, ?, ?)
+	_, err := execSQL(r.db, r.driver, `INSERT INTO recent_items (item_id, workspace_id, title, subtitle, route, opened_at) VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT(item_id) DO UPDATE SET workspace_id = excluded.workspace_id, title = excluded.title, subtitle = excluded.subtitle, route = excluded.route, opened_at = excluded.opened_at`, item.ItemID, item.WorkspaceID, item.Title, item.Subtitle, item.Route, formatTime(item.OpenedAt))
 	return err
 }
 
 func (r *SQLiteAISettingsRepository) Load() (ai.Settings, error) {
 	var raw string
-	err := r.db.QueryRow(`SELECT settings_json FROM ai_settings WHERE id = 'default'`).Scan(&raw)
+	err := queryRowSQL(r.db, r.driver, `SELECT settings_json FROM ai_settings WHERE id = 'default'`).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ai.Settings{}, nil
 	}
@@ -649,13 +692,13 @@ func (r *SQLiteAISettingsRepository) Save(settings ai.Settings) (ai.Settings, er
 	if err != nil {
 		return ai.Settings{}, err
 	}
-	_, err = r.db.Exec(`INSERT INTO ai_settings (id, settings_json, updated_at) VALUES ('default', ?, ?) ON CONFLICT(id) DO UPDATE SET settings_json = excluded.settings_json, updated_at = excluded.updated_at`, raw, formatTime(time.Now().UTC()))
+	_, err = execSQL(r.db, r.driver, `INSERT INTO ai_settings (id, settings_json, updated_at) VALUES ('default', ?, ?) ON CONFLICT(id) DO UPDATE SET settings_json = excluded.settings_json, updated_at = excluded.updated_at`, raw, formatTime(time.Now().UTC()))
 	return settings, err
 }
 
 func (r *SQLiteImportStatusRepository) ImportCompleted(source string) (bool, error) {
 	var value string
-	err := r.db.QueryRow(`SELECT source_name FROM import_status WHERE source_name = ?`, source).Scan(&value)
+	err := queryRowSQL(r.db, r.driver, `SELECT source_name FROM import_status WHERE source_name = ?`, source).Scan(&value)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -663,11 +706,11 @@ func (r *SQLiteImportStatusRepository) ImportCompleted(source string) (bool, err
 }
 
 func (r *SQLiteImportStatusRepository) MarkImportCompleted(source string, completedAt time.Time) error {
-	_, err := r.db.Exec(`INSERT INTO import_status (source_name, completed_at) VALUES (?, ?) ON CONFLICT(source_name) DO UPDATE SET completed_at = excluded.completed_at`, source, formatTime(completedAt))
+	_, err := execSQL(r.db, r.driver, `INSERT INTO import_status (source_name, completed_at) VALUES (?, ?) ON CONFLICT(source_name) DO UPDATE SET completed_at = excluded.completed_at`, source, formatTime(completedAt))
 	return err
 }
 
-func insertItems(tx *sql.Tx, items []models.ItemDetail) error {
+func insertItems(tx *sql.Tx, driverName string, items []models.ItemDetail) error {
 	for _, item := range items {
 		if item.SourceMode == "" {
 			item.SourceMode = "working_tree"
@@ -677,7 +720,7 @@ func insertItems(tx *sql.Tx, items []models.ItemDetail) error {
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(`INSERT INTO indexed_items (id, workspace_id, branch, scope, identifier, title, status, item_path, source_mode, editable, metadata_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.WorkspaceID, item.Branch, item.Scope, item.Identifier, item.Title, item.Status, item.ItemPath, item.SourceMode, boolInt(item.Editable), raw, formatTime(item.UpdatedAt))
+		_, err = execTx(tx, driverName, `INSERT INTO indexed_items (id, workspace_id, branch, scope, identifier, title, status, item_path, source_mode, editable, metadata_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.WorkspaceID, item.Branch, item.Scope, item.Identifier, item.Title, item.Status, item.ItemPath, item.SourceMode, boolInt(item.Editable), raw, formatTime(item.UpdatedAt))
 		if err != nil {
 			return err
 		}
@@ -685,8 +728,8 @@ func insertItems(tx *sql.Tx, items []models.ItemDetail) error {
 	return nil
 }
 
-func insertBranchScan(tx *sql.Tx, metadata models.BranchScanMetadata) error {
-	_, err := tx.Exec(`INSERT INTO branch_scans (workspace_id, branch, branch_ref, commit_sha, source_mode, editable, source_configuration_hash, working_tree_hash, scanned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, metadata.WorkspaceID, metadata.Branch, metadata.BranchRef, metadata.Commit, metadata.SourceMode, boolInt(metadata.Editable), metadata.SourceConfigurationHash, metadata.WorkingTreeHash, formatTime(metadata.ScannedAt))
+func insertBranchScan(tx *sql.Tx, driverName string, metadata models.BranchScanMetadata) error {
+	_, err := execTx(tx, driverName, `INSERT INTO branch_scans (workspace_id, branch, branch_ref, commit_sha, source_mode, editable, source_configuration_hash, working_tree_hash, scanned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, metadata.WorkspaceID, metadata.Branch, metadata.BranchRef, metadata.Commit, metadata.SourceMode, boolInt(metadata.Editable), metadata.SourceConfigurationHash, metadata.WorkingTreeHash, formatTime(metadata.ScannedAt))
 	return err
 }
 

@@ -37,7 +37,7 @@ Avoid:
 | B2    | SQL migrations and migration runner       | Backend | Done    |
 | B3    | SQLite local repositories and file import | Backend | Done    |
 | B4    | Branch re-index correctness               | Backend | Done    |
-| B5    | Postgres Cloud repositories               | Backend | Pending |
+| B5    | Postgres Cloud repositories               | Backend | Done    |
 | C1    | Local and Cloud storage operations        | DevOps  | Pending |
 | C2    | Pipeline and release gates                | DevOps  | Pending |
 
@@ -108,11 +108,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Implement Postgres repositories using the same storage interfaces.
-- [ ] Fail Cloud startup when Postgres config is missing, unreachable, or not migrated.
-- [ ] Persist Cloud user, agent, workspace, branch index, audit, and settings metadata in Postgres.
-- [ ] Accept Cloud Agent scan metadata and derived item rows without storing repository source content.
-- [ ] Add Postgres integration tests gated by `KODE_STREAM_DATABASE_URL`.
+- [x] Implement Postgres repositories using the same storage interfaces.
+- [x] Fail Cloud startup when Postgres config is missing, unreachable, or not migrated.
+- [x] Persist Cloud user, agent, workspace, branch index, audit, and settings metadata in Postgres.
+- [x] Accept Cloud Agent scan metadata and derived item rows without storing repository source content.
+- [x] Add Postgres integration tests gated by `KODE_STREAM_DATABASE_URL`.
 
 **Verification:** `KODE_STREAM_DATABASE_URL=... rtk go test ./internal/storage/... ./internal/server/...`
 

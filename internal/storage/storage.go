@@ -152,11 +152,11 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		state.SQLStore = sqlStore
 		state.SQLiteStore = &SQLiteStore{SQLStore: state.SQLStore, path: config.SQLitePath}
 		state.Workspaces = newSQLiteWorkspaceRepository(sqlStore, paths, git)
-		state.Items = &SQLiteItemRepository{db: sqlStore.db}
-		state.ImportStatus = &SQLiteImportStatusRepository{db: sqlStore.db}
-		state.Audit = &SQLiteAuditRepository{db: sqlStore.db, now: time.Now}
-		state.Navigation = &SQLiteNavigationRepository{db: sqlStore.db, now: time.Now}
-		state.AISettings = &SQLiteAISettingsRepository{db: sqlStore.db}
+		state.Items = &SQLiteItemRepository{db: sqlStore.db, driver: sqlStore.driver}
+		state.ImportStatus = &SQLiteImportStatusRepository{db: sqlStore.db, driver: sqlStore.driver}
+		state.Audit = &SQLiteAuditRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
+		state.Navigation = &SQLiteNavigationRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
+		state.AISettings = &SQLiteAISettingsRepository{db: sqlStore.db, driver: sqlStore.driver}
 		if err := ImportLegacyFiles(paths, git, state); err != nil {
 			_ = sqlStore.Close()
 			return nil, err
@@ -168,6 +168,12 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		}
 		state.SQLStore = sqlStore
 		state.PostgresStore = &PostgresStore{SQLStore: state.SQLStore, url: config.DatabaseURL}
+		state.Workspaces = newSQLiteWorkspaceRepository(sqlStore, paths, git)
+		state.Items = &SQLiteItemRepository{db: sqlStore.db, driver: sqlStore.driver}
+		state.ImportStatus = &SQLiteImportStatusRepository{db: sqlStore.db, driver: sqlStore.driver}
+		state.Audit = &SQLiteAuditRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
+		state.Navigation = &SQLiteNavigationRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
+		state.AISettings = &SQLiteAISettingsRepository{db: sqlStore.db, driver: sqlStore.driver}
 	}
 	return state, nil
 }

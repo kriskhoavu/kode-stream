@@ -182,6 +182,27 @@ func TestOpenAppOwnedStateImportsLegacyAppOwnedFiles(t *testing.T) {
 	}
 }
 
+func TestOpenAppOwnedStatePostgresIntegration(t *testing.T) {
+	databaseURL := os.Getenv(EnvDatabaseURL)
+	if databaseURL == "" {
+		t.Skip("set KODE_STREAM_DATABASE_URL to run Postgres integration test")
+	}
+	dataDir := t.TempDir()
+	paths := testPaths(dataDir)
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeCloud}, gitadapter.New(), mapEnv(map[string]string{
+		EnvStorageDriver: StorageDriverPostgres,
+		EnvDatabaseURL:   databaseURL,
+	}))
+	if err != nil {
+		t.Fatalf("OpenAppOwnedState returned error: %v", err)
+	}
+	defer state.SQLStore.Close()
+	health := state.SQLStore.Health(context.Background())
+	if !health.OK || health.Driver != StorageDriverPostgres {
+		t.Fatalf("health = %#v", health)
+	}
+}
+
 func testPaths(dataDir string) system.Paths {
 	return system.Paths{
 		Dir:                dataDir,
