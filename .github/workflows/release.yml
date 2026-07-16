@@ -39,6 +39,20 @@ jobs:
 
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: kode_stream
+          POSTGRES_USER: kode_stream
+          POSTGRES_PASSWORD: kode_stream
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kode_stream -d kode_stream"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,6 +76,40 @@ jobs:
 
       - name: Build frontend assets
         run: npm run build
+
+      - name: SQLite storage and import tests
+        run: go test ./internal/storage/... ./internal/workstream/... ./internal/item/...
+
+      - name: Postgres storage integration tests
+        env:
+          KODE_STREAM_DATABASE_URL: postgres://kode_stream:kode_stream@127.0.0.1:5432/kode_stream?sslmode=disable
+        run: go test ./internal/storage/... ./internal/server/...
+
+      - name: Cloud database health smoke
+        env:
+          KODE_STREAM_MODE: cloud
+          KODE_STREAM_AUTH_MODE: oauth2_proxy
+          KODE_STREAM_BIND_ADDR: 127.0.0.1
+          KODE_STREAM_PORT: "4317"
+          KODE_STREAM_PUBLIC_URL: https://kode-stream.example.com
+          KODE_STREAM_COOKIE_SECRET: 0123456789abcdef0123456789abcdef
+          KODE_STREAM_ADMIN_USERS: admin@example.com
+          KODE_STREAM_STORAGE_DRIVER: postgres
+          KODE_STREAM_DATABASE_URL: postgres://kode_stream:kode_stream@127.0.0.1:5432/kode_stream?sslmode=disable
+          KODE_STREAM_MIGRATIONS: auto
+        run: |
+          go build -o ./bin/kode-stream ./cmd/kode-stream
+          ./bin/kode-stream &
+          pid=$!
+          trap 'kill "$pid" || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:4317/api/health | tee health.json | grep -q '"migrationVersion"'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat health.json 2>/dev/null || true
+          exit 1
 
       - name: Backend test
         run: go test ./...

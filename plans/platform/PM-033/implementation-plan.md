@@ -39,7 +39,7 @@ Avoid:
 | B4    | Branch re-index correctness               | Backend | Done    |
 | B5    | Postgres Cloud repositories               | Backend | Done    |
 | C1    | Local and Cloud storage operations        | DevOps  | Done    |
-| C2    | Pipeline and release gates                | DevOps  | Pending |
+| C2    | Pipeline and release gates                | DevOps  | Done    |
 
 ## Backend Phases
 
@@ -141,11 +141,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Add SQLite migration and repository tests to normal CI.
-- [ ] Add optional local Postgres integration checks and required Cloud release Postgres checks.
-- [ ] Add fixture-based import tests for YAML and JSONL app-owned state.
-- [ ] Add Cloud release smoke for `/api/health` database readiness.
-- [ ] Update release checklist with migration version, backup, and branch re-index smoke checks.
+- [x] Add SQLite migration and repository tests to normal CI.
+- [x] Add optional local Postgres integration checks and required Cloud release Postgres checks.
+- [x] Add fixture-based import tests for YAML and JSONL app-owned state.
+- [x] Add Cloud release smoke for `/api/health` database readiness.
+- [x] Update release checklist with migration version, backup, and branch re-index smoke checks.
 
 **Verification:** `rtk go test ./internal/... && rtk npm run typecheck && rtk npm test -- --run`
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api';
 import { WorkspacesPage } from '../../pages/WorkspacesPage';
@@ -17,7 +17,7 @@ describe('workspace Jira settings', () => {
     const { container } = render(<WorkspacesPage workspaces={[{ id: 'w1', name: 'Repo', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '', jira: { deploymentType: 'server', baseUrl: 'https://jira.example.com', projectKey: 'DI', tokenEnvVar: 'JIRA_PAT' } }]} onChanged={vi.fn()} />);
     expect(screen.queryByText('Token Environment Variable')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    fireEvent.click(within(screen.getByText('Jira').closest('.workspace-integration-card') as HTMLElement).getByRole('button', { name: 'Configure' }));
     fireEvent.click(screen.getByRole('button', { name: 'Test Jira connection' }));
     await waitFor(() => expect(api.testJiraConnection).toHaveBeenCalledWith('w1', expect.objectContaining({ tokenEnvVar: 'JIRA_PAT' })));
     expect(await screen.findByText('Jira connection succeeded')).toBeInTheDocument();
@@ -30,7 +30,7 @@ describe('workspace Jira settings', () => {
     vi.mocked(api.testJiraConnection).mockRejectedValue(new Error('Jira unavailable'));
     const { container } = render(<WorkspacesPage workspaces={[{ id: 'w1', name: 'Repo', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '', jira: { deploymentType: 'server', baseUrl: 'https://jira.example.com', projectKey: 'DI', tokenEnvVar: 'JIRA_PAT' } }]} onChanged={vi.fn()} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    fireEvent.click(within(screen.getByText('Jira').closest('.workspace-integration-card') as HTMLElement).getByRole('button', { name: 'Configure' }));
     fireEvent.click(screen.getByRole('button', { name: 'Test Jira connection' }));
     expect(await screen.findByText('Jira unavailable')).toBeInTheDocument();
     expect(container.querySelector('.jira-connection-status.error .jira-connection-status-dot')).toBeTruthy();
