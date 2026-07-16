@@ -35,7 +35,8 @@ Required OAuth2Proxy behavior:
   opaque/JWT tokens inside Kode Stream.
 - Preserve `Host` and `X-Forwarded-Proto`.
 - Support WebSocket upgrade for `/api/agents/channel`.
-- Allow unauthenticated `GET /api/health` for deployment health checks.
+- Allow unauthenticated `GET /api/health` for deployment health checks and `GET /api/agents/channel` for agent
+  token-authenticated WebSocket connections.
 - Use long idle timeouts for terminal, AI, runtime, and verification streams.
 - Forward `/api/health` for health checks.
 
