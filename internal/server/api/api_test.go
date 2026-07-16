@@ -25,6 +25,7 @@ import (
 	"kode-stream/internal/item/writer"
 	"kode-stream/internal/navigation"
 	appsearch "kode-stream/internal/search"
+	"kode-stream/internal/storage"
 	workspacehealth "kode-stream/internal/workspace"
 	"kode-stream/internal/workspace/registry"
 	"kode-stream/internal/workspace/scanner"
@@ -33,6 +34,14 @@ import (
 type fakeAuditEventReader struct {
 	events []models.AuditEvent
 	err    error
+}
+
+type fakeDatabaseHealth struct {
+	health storage.DatabaseHealth
+}
+
+func (f fakeDatabaseHealth) Health(context.Context) storage.DatabaseHealth {
+	return f.health
 }
 
 func (f fakeAuditEventReader) RecentContext(context.Context, int) ([]models.AuditEvent, error) {
@@ -167,11 +176,36 @@ func TestGinHealthRoutePreservesContract(t *testing.T) {
 	if contentType := response.Header().Get("Content-Type"); contentType != "application/json" {
 		t.Fatalf("content type = %q", contentType)
 	}
-	var payload map[string]bool
+	var payload map[string]any
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if !payload["ok"] {
+	if payload["ok"] != true {
+		t.Fatalf("payload = %#v", payload)
+	}
+}
+
+func TestGinHealthRouteIncludesDatabaseReadiness(t *testing.T) {
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithDatabaseHealth(fakeDatabaseHealth{health: storage.DatabaseHealth{
+		Driver:           storage.StorageDriverSQLite,
+		OK:               true,
+		MigrationVersion: 1,
+	}}).Routes()
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		OK       bool                   `json:"ok"`
+		Database storage.DatabaseHealth `json:"database"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if !payload.OK || payload.Database.Driver != storage.StorageDriverSQLite || payload.Database.MigrationVersion != 1 {
 		t.Fatalf("payload = %#v", payload)
 	}
 }

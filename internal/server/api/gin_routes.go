@@ -159,7 +159,8 @@ func (a *API) registerStreamingRoutes(api *gin.RouterGroup) {
 }
 
 func (a *API) ginHealth(c *gin.Context) {
-	ginJSON(c, 200, map[string]any{"ok": true})
+	payload, status := a.healthPayload(c.Request.Context())
+	ginJSON(c, status, payload)
 }
 
 func (a *API) ginAuditEvents(c *gin.Context) {

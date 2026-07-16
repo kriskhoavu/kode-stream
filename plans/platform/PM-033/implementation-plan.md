@@ -34,7 +34,7 @@ Avoid:
 | Phase | Name                                      | Track   | Status  |
 |-------|-------------------------------------------|---------|---------|
 | B1    | Storage interfaces and composition        | Backend | Done    |
-| B2    | SQL migrations and migration runner       | Backend | Pending |
+| B2    | SQL migrations and migration runner       | Backend | Done    |
 | B3    | SQLite local repositories and file import | Backend | Pending |
 | B4    | Branch re-index correctness               | Backend | Pending |
 | B5    | Postgres Cloud repositories               | Backend | Pending |
@@ -62,10 +62,10 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Add embedded SQL migrations for SQLite and Postgres.
-- [ ] Add migration runner with schema version tracking.
-- [ ] Add startup validation for storage driver, SQLite path, Postgres URL, and migration mode.
-- [ ] Add health integration for database connectivity and migration version.
+- [x] Add embedded SQL migrations for SQLite and Postgres.
+- [x] Add migration runner with schema version tracking.
+- [x] Add startup validation for storage driver, SQLite path, Postgres URL, and migration mode.
+- [x] Add health integration for database connectivity and migration version.
 
 **Verification:** `rtk go test ./internal/storage/... ./internal/server/...`
 

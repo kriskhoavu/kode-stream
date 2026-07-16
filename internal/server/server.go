@@ -35,6 +35,7 @@ type Server struct {
 	bindAddress string
 	app         http.Handler
 	sessions    *ai.Manager
+	storage     *storage.SQLStore
 }
 
 func NewServer(port int) (*Server, error) {
@@ -70,15 +71,20 @@ func NewServer(port int) (*Server, error) {
 	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager)
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore)
-	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
+	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithDatabaseHealth(state.SQLStore).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())
 	mux.Handle("/", spaHandler())
-	return &Server{port: port, bindAddress: runtimeConfig.BindAddress, app: api.Log(mux), sessions: sessionManager}, nil
+	return &Server{port: port, bindAddress: runtimeConfig.BindAddress, app: api.Log(mux), sessions: sessionManager, storage: state.SQLStore}, nil
 }
 
 func (s *Server) Close() error {
+	if s.storage != nil {
+		if err := s.storage.Close(); err != nil {
+			return err
+		}
+	}
 	if s.sessions != nil {
 		return s.sessions.Close()
 	}

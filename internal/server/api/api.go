@@ -31,6 +31,7 @@ import (
 	"kode-stream/internal/navigation"
 	appruntime "kode-stream/internal/runtime"
 	appsearch "kode-stream/internal/search"
+	"kode-stream/internal/storage"
 	"kode-stream/internal/system"
 	appverification "kode-stream/internal/verification"
 	appworkspace "kode-stream/internal/workspace"
@@ -59,8 +60,13 @@ type API struct {
 	knowledge       *knowledgeindex.KnowledgeService
 	verification    *appverification.Service
 	runtimeConfig   system.RuntimeConfig
+	databaseHealth  databaseHealthChecker
 	agentStore      *cloudAgentStore
 	cloudWorkspaces *cloudWorkspaceStore
+}
+
+type databaseHealthChecker interface {
+	Health(context.Context) storage.DatabaseHealth
 }
 
 func (a *API) WithJira(service *appjira.Service) *API {
@@ -80,6 +86,11 @@ func (a *API) WithKnowledge(service *knowledgeindex.KnowledgeService) *API {
 
 func (a *API) WithRuntimeConfig(config system.RuntimeConfig) *API {
 	a.runtimeConfig = config
+	return a
+}
+
+func (a *API) WithDatabaseHealth(checker databaseHealthChecker) *API {
+	a.databaseHealth = checker
 	return a
 }
 
@@ -536,7 +547,8 @@ func (a *API) testJiraConnection(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	payload, status := a.healthPayload(r.Context())
+	writeJSON(w, status, payload)
 }
 
 func (a *API) state(w http.ResponseWriter, r *http.Request) {
