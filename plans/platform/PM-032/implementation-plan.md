@@ -283,7 +283,7 @@ workspace, Git, file, terminal, AI, runtime, and verification services is Phase 
 - [x] Document that token introspection or JWT validation inside Kode Stream is optional for a later hardening ticket.
 - [x] Document local smoke versus full OAuth2Proxy/Keycloak login setup.
 
-**Verification:** `rtk go test ./...` plus `rtk docker compose -f deploy/cloud/compose.yaml config`
+**Verification:** `rtk go test ./...` plus `rtk docker compose -f docker/cloud/compose.yaml config`
 
 **Commit:** `PM-032: Support oauth2 proxy cloud auth`
 
@@ -299,7 +299,7 @@ workspace, Git, file, terminal, AI, runtime, and verification services is Phase 
 - [x] Add local run, healthcheck, login, stop, and reset instructions.
 - [x] Verify OAuth2Proxy can reach Keycloak discovery and redirects browser login to Keycloak.
 
-**Verification:** `rtk docker compose -f deploy/cloud/local-compose.yaml up -d --build` plus health and redirect smoke.
+**Verification:** `rtk docker compose -f docker/cloud/local-compose.yaml up -d --build` plus health and redirect smoke.
 
 **Commit:** `PM-032: Add local cloud auth compose stack`
 

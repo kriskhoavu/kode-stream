@@ -56,7 +56,7 @@ The local Cloud auth stack copies the Helm deployment idea into Docker Compose:
 | OAuth2Proxy | `http://kode-stream.localhost:4318` | Browser entry point, Keycloak redirect, identity headers. |
 | Kode Stream | private Docker network port `4317`  | Cloud API and embedded frontend, not directly published.  |
 
-The local stack uses `deploy/cloud/local-compose.yaml` and `deploy/cloud/keycloak/kode-stream-realm.json`. It is a
+The local stack uses `docker/cloud/local-compose.yaml` and `docker/cloud/keycloak/kode-stream-realm.json`. It is a
 developer smoke environment, not the production VM compose file.
 
 ## Cloud Storage

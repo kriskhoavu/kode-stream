@@ -14,15 +14,35 @@ services:
       KODE_STREAM_PORT: "4317"
       KODE_STREAM_BIND_ADDR: 0.0.0.0
       KODE_STREAM_DATA_DIR: /tmp/kode-stream-data
-      KODE_STREAM_PUBLIC_URL: http://kode-stream.localhost:4318
-      KODE_STREAM_COOKIE_SECRET: local-kode-stream-cookie-secret
-      KODE_STREAM_ADMIN_USERS: admin@example.com
+      KODE_STREAM_STORAGE_DRIVER: ${KODE_STREAM_STORAGE_DRIVER:-postgres}
+      KODE_STREAM_DATABASE_URL: ${KODE_STREAM_DATABASE_URL:-postgres://kode_stream:kode_stream@postgres:5432/kode_stream?sslmode=disable}
+      KODE_STREAM_MIGRATIONS: ${KODE_STREAM_MIGRATIONS:-auto}
+      KODE_STREAM_PUBLIC_URL: ${KODE_STREAM_PUBLIC_URL:-http://kode-stream.localhost:4318}
+      KODE_STREAM_COOKIE_SECRET: ${KODE_STREAM_COOKIE_SECRET:-local-kode-stream-cookie-secret}
+      KODE_STREAM_ADMIN_USERS: ${KODE_STREAM_ADMIN_USERS:-admin@example.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4317/api/health"]
       interval: 15s
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: kode_stream
+      POSTGRES_USER: kode_stream
+      POSTGRES_PASSWORD: kode_stream
+    volumes:
+      - kode-stream-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kode_stream -d kode_stream"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.1.4
@@ -82,3 +102,6 @@ services:
       default:
         aliases:
           - kode-stream.localhost
+
+volumes:
+  kode-stream-postgres:

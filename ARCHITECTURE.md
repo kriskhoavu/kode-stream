@@ -30,9 +30,9 @@ Kode Stream has two runtime modes:
 
 - Local mode is the default single-user app. The server binds to loopback, workspace files are local paths or managed
   clones, and Git, terminal, AI, runtime, and verification commands execute on the same machine.
-- Cloud mode is a hosted control plane. It authenticates users, enforces roles, stores file-backed metadata, and routes
-  workspace commands to the owner Cloud Agent. The hosted process does not clone repositories or execute workspace
-  commands.
+- Cloud mode is a hosted control plane. It authenticates users, enforces roles, stores app-owned state in Postgres, and
+  routes workspace commands to the owner Cloud Agent. The hosted process does not clone repositories or execute
+  workspace commands.
 
 Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Cloud workspace records use
 `WorkspaceLocation=cloud_agent` and store metadata such as owner user, agent id, redacted local path label, remote URL,
@@ -53,21 +53,25 @@ scan status, and published summaries.
                 │                               │
 ┌───────────────▼────────────────┐  ┌───────────▼───────────────┐
 │ App-owned state                │  │ Registered Git workspaces │
-│ Registry, indexes, audit, UI   │  │ User source files         │
-│ state, integration settings    │  │ Git history               │
+│ SQL repositories and imports   │  │ User source files         │
+│ SQLite local / Postgres cloud  │  │ Git history               │
 └────────────────────────────────┘  └───────────────────────────┘
 ```
 
+Rendered architecture diagram: [Storage architecture](docs/storage/storage-architecture-diagram.svg). Source:
+[storage-architecture-diagram.mmd](docs/storage/storage-architecture-diagram.mmd).
+
 ## Backend Layers
 
-| Layer             | Package               | Role                                                         |
-|-------------------|-----------------------|--------------------------------------------------------------|
-| CLI               | `cmd/kode-stream`     | Starts the server and runs diagnostics                       |
-| Composition       | `internal/server`     | Wires services, resolves paths, serves embedded frontend     |
-| API transport     | `internal/server/api` | Owns routes, middleware, request parsing, and JSON responses |
-| Shared contracts  | `internal/common`     | Defines errors, HTTP helpers, and compatibility DTOs         |
-| Domain services   | `internal/*`          | Own workflows, policies, repositories, and integration logic |
-| File capabilities | `internal/filesystem` | Provides guarded path validation, bounded reads, and writes  |
+| Layer             | Package               | Role                                                                                   |
+|-------------------|-----------------------|----------------------------------------------------------------------------------------|
+| CLI               | `cmd/kode-stream`     | Starts the server and runs diagnostics                                                 |
+| Composition       | `internal/server`     | Wires services, resolves paths, serves embedded frontend                               |
+| API transport     | `internal/server/api` | Owns routes, middleware, request parsing, and JSON responses                           |
+| Shared contracts  | `internal/common`     | Defines errors, HTTP helpers, and compatibility DTOs                                   |
+| Domain services   | `internal/*`          | Own workflows, policies, repositories, and integration logic                           |
+| File capabilities | `internal/filesystem` | Provides guarded path validation, bounded reads, and writes                            |
+| Storage           | `internal/storage`    | Resolves storage driver, runs migrations, wires SQL repositories, imports legacy files |
 
 Gin is limited to `internal/server/api`. Domain packages receive standard contexts, model types, and primitive
 parameters instead of framework-specific request objects.
@@ -109,12 +113,44 @@ Frontend shared modules do not import page modules. Pages compose feature and sh
 
 Kode Stream separates app-owned state from repository-owned content.
 
-| Owner      | Examples                                        | Write policy                                           |
-|------------|-------------------------------------------------|--------------------------------------------------------|
-| App state  | Workspace registry, indexes, audit, UI settings | Written by Kode Stream outside registered repositories |
-| Repository | Markdown, metadata, wiki pages, Git history     | Written only through explicit user actions             |
+| Owner      | Examples                                        | Write policy                                                             |
+|------------|-------------------------------------------------|--------------------------------------------------------------------------|
+| App state  | Workspace registry, indexes, audit, UI settings | Written by Kode Stream to SQLite in Local mode or Postgres in Cloud mode |
+| Repository | Markdown, metadata, wiki pages, Git history     | Written only through explicit user actions                               |
 
 Indexes are derived data. A scan can rebuild them from registered workspace content.
+
+## Storage Architecture
+
+Storage is selected at server startup:
+
+| Runtime mode | Driver   | Required configuration                                            | Stored state                                                          |
+|--------------|----------|-------------------------------------------------------------------|-----------------------------------------------------------------------|
+| Local        | SQLite   | Optional `KODE_STREAM_SQLITE_PATH`                                | Workspace metadata, derived item indexes, audit, navigation, settings |
+| Cloud        | Postgres | `KODE_STREAM_STORAGE_DRIVER=postgres`, `KODE_STREAM_DATABASE_URL` | Shared control-plane metadata, branch indexes, audit, settings        |
+
+Deprecated data-dir files remain as migration inputs, not primary storage. See
+[Storage](docs/storage/storage-architecture.md) for the comparison between the deprecated YAML/JSONL store and the
+current SQL-backed implementation.
+
+`internal/storage` opens the configured database, runs embedded migrations when `KODE_STREAM_MIGRATIONS=auto`, exposes
+database readiness through `/api/health`, and composes repository implementations behind domain interfaces.
+
+Local SQLite startup imports legacy app-owned files from `KODE_STREAM_DATA_DIR` once:
+
+- `workspaces.yaml`
+- `item-index.yaml`
+- `audit-log.jsonl`
+- `saved-filters.yaml`
+- `recent-items.yaml`
+- `ai-settings.yaml`
+
+Import completion is recorded in SQL. The legacy source files are left untouched so rollback and manual inspection stay
+possible.
+
+Cloud Agents never connect to Postgres. They connect only to the Cloud API over HTTPS/WebSocket and publish safe
+workspace metadata or scan results. Repository source files, Git credentials, terminal transcripts, prompts, and SSH
+keys are not stored in SQL.
 
 ## Item Discovery
 
@@ -144,8 +180,20 @@ Register or scan workspace
   -> read configured sources
   -> apply source mappings
   -> parse metadata, README headings, Markdown documents, and Git metadata
-  -> update derived indexes
+  -> update derived indexes in SQLite or Postgres
   -> report warnings without blocking valid items
+```
+
+### Branch Load And Re-index
+
+```text
+Load selected branch
+  -> resolve branch ref and commit
+  -> choose working-tree reader or Git tree snapshot reader
+  -> compare commit, source configuration hash, and working-tree hash with SQL branch scan metadata
+  -> reuse SQL branch index when fresh
+  -> otherwise scan branch and replace branch rows, warnings, and metadata in one transaction
+  -> return current branch board/search data
 ```
 
 ### Write

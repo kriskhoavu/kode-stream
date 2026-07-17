@@ -8,8 +8,30 @@ This local stack mirrors the VM deployment shape:
 
 ## Run
 
+One-command local Cloud mode with Docker, Postgres, generated agent token, and foreground Cloud Agent:
+
 ```bash
-docker compose -f deploy/cloud/local-compose.yaml up -d --build
+./run-docker-cloud.sh
+```
+
+By default this starts the Docker stack, waits for `http://kode-stream.localhost:4318/api/health`, builds
+`./bin/kode-stream`, generates a 30-minute local agent token with the development cookie secret, and starts the agent
+against the current repository.
+
+Optional overrides:
+
+```bash
+KODE_STREAM_AGENT_REPO=/path/to/repo \
+KODE_STREAM_AGENT_NAME="MacBook Agent" \
+./run-docker-cloud.sh
+```
+
+The agent runs in the foreground. Press `Ctrl-C` to stop the agent; Docker services stay running.
+
+Manual stack startup:
+
+```bash
+docker compose -f docker/cloud/local-compose.yaml up -d --build
 ```
 
 Open:
@@ -24,7 +46,7 @@ Health check through OAuth2Proxy:
 curl -fsS http://kode-stream.localhost:4318/api/health
 ```
 
-Agent CLI surface:
+## Agent CLI
 
 Build local binary if needed:
 
@@ -42,40 +64,39 @@ Run doctor/status checks:
 Expected: doctor prints cloud URL/repo/deep link info. Status is local-process only and may say not running before the
 foreground agent is started.
 
-Connected-agent smoke after logging in through the UI and creating a connect link:
+### Connected-Agent Smoke
 
-```bash
-./bin/kode-stream agent start --connect "kodestream://connect?token=<token_from_uri>" --cloud-url http://kode-stream.localhost:4318 --repo .
+After logging in through the UI, create a connect token from the browser console:
+
+```js
+fetch("/api/agents/connect-token", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "Local Agent", platform: navigator.platform }),
+})
+  .then((response) => response.json())
+  .then(console.log);
 ```
 
-```bash
-  ./bin/kode-stream agent start \
-    --connect "kodestream://connect?token=<token_from_uri>" \
-    --cloud-url http://127.0.0.1:4318 \
-    --repo .
+Use the raw `token` field exactly as returned:
 
+```bash
+./bin/kode-stream agent start \
+  --connect "<full-token-with-dot-signature>" \
+  --cloud-url http://kode-stream.localhost:4318 \
+  --repo .
 ```
 
-  fetch("/api/agents/connect-token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "Local Agent", platform: navigator.platform })
-  }).then(r => r.json()).then(console.log)
+Or use the full `deepLink` value exactly as returned:
 
-  Then use the raw token field, not a manually trimmed URI value:
+```bash
+./bin/kode-stream agent start \
+  --connect "kodestream://connect?token=<full-token-with-dot-signature>" \
+  --cloud-url http://kode-stream.localhost:4318 \
+  --repo .
+```
 
-  ./bin/kode-stream agent start \
-    --connect "<full-token-with-dot-signature>" \
-    --cloud-url http://kode-stream.localhost:4318 \
-    --repo .
-
-  Or use the full deepLink exactly as returned:
-
-  ./bin/kode-stream agent start \
-    --connect "kodestream://connect?token=<full-token-with-dot-signature>" \
-    --cloud-url http://kode-stream.localhost:4318 \
-    --repo .
-
+Do not manually trim or rewrite the signed token value.
 
 Expected: the agent prints `Cloud Agent connected`, heartbeat acknowledgements follow, and the selected Git repo is
 published as a `cloud_agent` workspace in Cloud.
@@ -104,16 +125,16 @@ role mapping beyond the admin allowlist.
 Stop containers:
 
 ```bash
-docker compose -f deploy/cloud/local-compose.yaml down
+docker compose -f docker/cloud/local-compose.yaml down
 ```
 
 Reset local containers:
 
 ```bash
-docker compose -f deploy/cloud/local-compose.yaml down -v
+docker compose -f docker/cloud/local-compose.yaml down -v
 ```
 
-Use the reset command after changes to `deploy/cloud/keycloak/kode-stream-realm.json`; Keycloak imports the local realm
+Use the reset command after changes to `docker/cloud/keycloak/kode-stream-realm.json`; Keycloak imports the local realm
 only when the development server starts.
 
 ## Notes

@@ -1,0 +1,42 @@
+flowchart TB
+  browser[Browser / React UI]
+  api[Kode Stream Go API]
+  storage[Storage composition]
+  sqlite[(SQLite\nLocal mode current)]
+  postgres[(Postgres\nCloud mode current)]
+  legacyStore[(Deprecated data-dir files\nYAML / JSONL primary store)]
+  legacyImport[Legacy import\nread once, leave files untouched]
+  repo[Registered Git workspace\nsource files and history]
+  agent[Cloud Agent\nowner machine]
+
+  browser -->|JSON API| api
+  api --> storage
+
+  subgraph current[Current SQL storage]
+    direction LR
+    sqlite
+    postgres
+  end
+
+  subgraph deprecatedStorage[Deprecated data-dir storage]
+    direction LR
+    legacyStore -->|migration source| legacyImport
+  end
+
+  storage -->|cloud required| postgres
+  storage -->|local default| sqlite
+  storage -. deprecated primary store .-> legacyStore
+  legacyImport -->|import status recorded in SQL| sqlite
+  api -->|guarded local file and Git operations| repo
+  api <-->|WebSocket command channel| agent
+  agent -->|local file, Git, runtime, AI, verification work| repo
+  agent -->|safe metadata and scan results only| api
+
+  repo ~~~ agent
+
+  classDef db fill:#eef7ff,stroke:#2563eb,color:#0f172a
+  classDef deprecated fill:#fff7ed,stroke:#c2410c,color:#7c2d12,stroke-dasharray:6 4
+  classDef runtime fill:#f8fafc,stroke:#64748b,color:#0f172a
+  class sqlite,postgres db
+  class legacyStore,legacyImport deprecated
+  class browser,api,storage,repo,agent runtime

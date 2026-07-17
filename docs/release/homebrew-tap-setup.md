@@ -15,7 +15,7 @@ gh repo create kriskhoavu/homebrew-tap --public --description "Homebrew tap for 
 ```bash
 git clone https://github.com/kriskhoavu/homebrew-tap.git
 mkdir -p homebrew-tap/Formula
-cp packaging/homebrew/Formula/kode-stream.rb homebrew-tap/Formula/kode-stream.rb
+cp cmd/scripts/distribution/kode-stream.rb homebrew-tap/Formula/kode-stream.rb
 ```
 
 ## 3) First publish guidance

@@ -87,5 +87,5 @@ brew test kode-stream
 
 - `cmd/scripts/distribution/release_and_update_tap.sh`
 - `cmd/scripts/distribution/update_homebrew_formula_from_release.sh`
-- `packaging/homebrew/Formula/kode-stream.rb`
-- `docs/distribution/homebrew-tap-setup.md`
+- `cmd/scripts/distribution/kode-stream.rb`
+- `docs/release/homebrew-tap-setup.md`

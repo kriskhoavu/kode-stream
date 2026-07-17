@@ -88,16 +88,16 @@ Branch load uses stored rows only when the stored scan metadata matches the sele
 
 ## Design Decisions
 
-| Decision                                     | Rationale                                                                         |
-|----------------------------------------------|-----------------------------------------------------------------------------------|
-| Use SQLite for Local mode                    | Keeps local setup dependency-free while improving query, concurrency, and backup. |
-| Use Postgres for Cloud mode                  | Supports multi-user control-plane state, concurrent writes, and managed backups.  |
-| Keep one repository interface                | Domain services should not branch on file, SQLite, or Postgres storage details.   |
-| Keep repository content outside SQL          | Git remains the source of truth for planning files and branch content.            |
-| Store branch indexes by workspace and branch | Branch-specific content can differ and must be queried independently.             |
-| Re-index stale branch rows                   | Board and search views must reflect the selected branch content.                  |
-| Import app-owned file state into SQL         | Existing local users keep workspaces, indexes, audit, settings, and navigation.   |
-| Leave PM-032 Cloud Agent boundary unchanged  | Database storage must not move execution or repository access into Cloud hosts.   |
+| Decision                                     | Rationale                                                                                     |
+|----------------------------------------------|-----------------------------------------------------------------------------------------------|
+| Use SQLite for Local mode                    | Keeps local setup dependency-free while adding transactions, migrations, and one-file backup. |
+| Use Postgres for Cloud mode                  | Supports multi-user control-plane state, concurrent writes, and managed backups.              |
+| Keep one repository interface                | Domain services should not branch on file, SQLite, or Postgres storage details.               |
+| Keep repository content outside SQL          | Git remains the source of truth for planning files and branch content.                        |
+| Store branch indexes by workspace and branch | Branch-specific content can differ and must be queried independently.                         |
+| Re-index stale branch rows                   | Board and search views must reflect the selected branch content.                              |
+| Import app-owned file state into SQL         | Existing local users keep workspaces, indexes, audit, settings, and navigation.               |
+| Leave PM-032 Cloud Agent boundary unchanged  | Database storage must not move execution or repository access into Cloud hosts.               |
 
 ## Documents
 

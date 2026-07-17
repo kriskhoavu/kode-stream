@@ -61,7 +61,7 @@ database.
 npm run build
 go build -o ./bin/kode-stream ./cmd/kode-stream
 docker build -t kode-stream:cloud .
-docker compose -f deploy/cloud/compose.yaml up -d
+docker compose -f docker/cloud/compose.yaml up -d
 curl -fsS http://127.0.0.1:4318/api/health
 ```
 
@@ -76,7 +76,7 @@ Keycloak with an imported `kode-stream` realm, OAuth2Proxy on `http://kode-strea
 private upstream.
 
 ```bash
-docker compose -f deploy/cloud/local-compose.yaml up -d --build
+docker compose -f docker/cloud/local-compose.yaml up -d --build
 curl -fsS http://kode-stream.localhost:4318/api/health
 ```
 

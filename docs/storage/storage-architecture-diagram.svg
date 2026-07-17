@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
+  <title id="title">Kode Stream storage architecture</title>
+  <desc id="desc">Browser calls the Kode Stream API. Storage composition selects SQLite for Local mode or Postgres for Cloud mode. Deprecated YAML and JSONL data-dir files are no longer primary storage; they are imported once into SQLite and left untouched. Cloud Agent connects to the API and performs repository work on the owner machine.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="deprecatedArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c2410c"/>
+    </marker>
+    <style>
+      .box { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; rx: 10; }
+      .db { fill: #eef7ff; stroke: #2563eb; stroke-width: 1.8; }
+      .deprecated { fill: #fff7ed; stroke: #c2410c; stroke-width: 1.8; stroke-dasharray: 7 5; }
+      .label { font: 600 17px system-ui, -apple-system, Segoe UI, sans-serif; fill: #0f172a; }
+      .small { font: 13px system-ui, -apple-system, Segoe UI, sans-serif; fill: #475569; }
+      .deprecatedText { font: 13px system-ui, -apple-system, Segoe UI, sans-serif; fill: #7c2d12; }
+      .line { stroke: #334155; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .dash { stroke-dasharray: 7 5; }
+      .deprecatedLine { stroke: #c2410c; stroke-width: 1.6; fill: none; stroke-dasharray: 7 5; marker-end: url(#deprecatedArrow); }
+    </style>
+  </defs>
+
+  <rect x="35" y="80" width="180" height="80" class="box"/>
+  <text x="125" y="114" text-anchor="middle" class="label">Browser</text>
+  <text x="125" y="138" text-anchor="middle" class="small">React UI</text>
+
+  <rect x="285" y="80" width="220" height="80" class="box"/>
+  <text x="395" y="114" text-anchor="middle" class="label">Kode Stream API</text>
+  <text x="395" y="138" text-anchor="middle" class="small">Go server and domain services</text>
+
+  <rect x="575" y="80" width="230" height="80" class="box"/>
+  <text x="690" y="114" text-anchor="middle" class="label">Storage Composition</text>
+  <text x="690" y="138" text-anchor="middle" class="small">driver, migrations, repositories</text>
+
+  <path d="M215 120 H285" class="line"/>
+  <text x="250" y="104" text-anchor="middle" class="small">JSON API</text>
+  <path d="M505 120 H575" class="line"/>
+
+  <ellipse cx="700" cy="295" rx="112" ry="50" class="db"/>
+  <text x="700" y="287" text-anchor="middle" class="label">SQLite</text>
+  <text x="700" y="312" text-anchor="middle" class="small">Local mode current</text>
+
+  <ellipse cx="990" cy="295" rx="112" ry="50" class="db"/>
+  <text x="990" y="287" text-anchor="middle" class="label">Postgres</text>
+  <text x="990" y="312" text-anchor="middle" class="small">Cloud mode current</text>
+
+  <path d="M700 160 V245" class="line"/>
+  <text x="635" y="208" text-anchor="middle" class="small">local default</text>
+  <path d="M805 125 C890 150 955 195 980 245" class="line"/>
+  <text x="940" y="178" text-anchor="middle" class="small">cloud required</text>
+
+  <rect x="80" y="290" width="235" height="90" class="deprecated"/>
+  <text x="198" y="320" text-anchor="middle" class="label">Data-dir Files</text>
+  <text x="198" y="345" text-anchor="middle" class="deprecatedText">Deprecated primary store</text>
+  <text x="198" y="365" text-anchor="middle" class="deprecatedText">YAML / JSONL</text>
+
+  <rect x="80" y="460" width="235" height="90" class="deprecated"/>
+  <text x="198" y="494" text-anchor="middle" class="label">Legacy Import</text>
+  <text x="198" y="519" text-anchor="middle" class="deprecatedText">read once, leave files untouched</text>
+
+  <path d="M575 145 C450 175 285 225 205 290" class="deprecatedLine"/>
+  <text x="365" y="225" text-anchor="middle" class="deprecatedText">deprecated path</text>
+  <path d="M198 380 V460" class="deprecatedLine"/>
+  <text x="275" y="430" text-anchor="middle" class="deprecatedText">migration source</text>
+  <path d="M315 505 H540 C620 505 660 395 690 345" class="deprecatedLine"/>
+  <text x="545" y="485" text-anchor="middle" class="deprecatedText">import status recorded in SQL</text>
+
+  <rect x="285" y="625" width="260" height="80" class="box"/>
+  <text x="415" y="659" text-anchor="middle" class="label">Registered Git Workspace</text>
+  <text x="415" y="683" text-anchor="middle" class="small">source files and Git history</text>
+
+  <rect x="885" y="625" width="230" height="80" class="box"/>
+  <text x="1000" y="659" text-anchor="middle" class="label">Cloud Agent</text>
+  <text x="1000" y="683" text-anchor="middle" class="small">owner machine execution</text>
+
+  <path d="M395 160 V625" class="line"/>
+  <text x="425" y="592" class="small">local guarded file/Git operations</text>
+
+  <path d="M395 80 V40 H1210 V665 H1115" class="line dash"/>
+  <text x="1010" y="58" text-anchor="middle" class="small">WebSocket channel, metadata, and scan results</text>
+
+  <path d="M885 665 H545" class="line"/>
+  <text x="715" y="649" text-anchor="middle" class="small">local repo work</text>
+</svg>
