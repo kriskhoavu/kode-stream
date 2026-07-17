@@ -12,7 +12,8 @@ workspace commands to the user's Cloud Agent.
 | `KODE_STREAM_MODE=cloud`                    | Enables hosted policy, metadata, and agent routing.                            |
 | `KODE_STREAM_AUTH_MODE=oauth2_proxy`        | Trusts identity headers from the private OAuth2Proxy upstream.                 |
 | `KODE_STREAM_BIND_ADDR=0.0.0.0`             | Binds inside the VM or container.                                              |
-| `KODE_STREAM_DATA_DIR=/var/lib/kode-stream` | Persistent file-backed metadata volume.                                        |
+| `KODE_STREAM_DATA_DIR=/var/lib/kode-stream` | Persistent diagnostics and rollback volume.                                    |
+| `KODE_STREAM_STORAGE_OPTION=database`       | Selects the only supported Cloud storage option.                               |
 | `KODE_STREAM_STORAGE_DRIVER=postgres`       | Selects Cloud SQL storage.                                                     |
 | `KODE_STREAM_DATABASE_URL`                  | Secret-managed Postgres connection URL.                                        |
 | `KODE_STREAM_MIGRATIONS=auto`               | Runs embedded migrations at startup. Use `manual` for operator-run migrations. |
@@ -48,9 +49,10 @@ straight to Kode Stream bypasses OAuth2Proxy and is not the Cloud login entry po
 
 ## Database And Metadata
 
-Cloud requires Postgres. Back up Postgres before upgrades and verify `/api/health` reports database readiness and the
-expected migration version. Mount `KODE_STREAM_DATA_DIR` for optional imports, exports, diagnostics, and rollback
-artifacts. Cloud does not clone repositories, store SSH keys, or run hosted workspace terminals.
+Cloud requires `KODE_STREAM_STORAGE_OPTION=database` with Postgres. `datadir` is rejected at Cloud startup. Back up
+Postgres before upgrades and verify `/api/health` reports database readiness and the expected migration version. Mount
+`KODE_STREAM_DATA_DIR` for diagnostics and rollback artifacts. Cloud does not clone repositories, store SSH keys, or run
+hosted workspace terminals.
 
 Cloud Agents connect only to the Cloud API. They never receive Postgres credentials and never connect directly to the
 database.
@@ -87,7 +89,7 @@ Open `http://kode-stream.localhost:4318` and sign in with `admin` / `admin`.
 | Symptom                              | Check                                                                                                     |
 |--------------------------------------|-----------------------------------------------------------------------------------------------------------|
 | Browser still shows Local mode       | Confirm requests go through OAuth2Proxy and the app container has `KODE_STREAM_MODE=cloud`.               |
-| Cloud API exits at startup           | Confirm `KODE_STREAM_DATABASE_URL`, `KODE_STREAM_STORAGE_DRIVER=postgres`, and Postgres network access.   |
+| Cloud API exits at startup           | Confirm `KODE_STREAM_STORAGE_OPTION=database`, `KODE_STREAM_DATABASE_URL`, driver, and Postgres access.   |
 | `/api/health` shows database failure | Check Postgres readiness, credentials, and migration version.                                             |
 | Login page is not shown              | Confirm the browser is using the OAuth2Proxy URL, not the private Kode Stream app port.                   |
 | OIDC login fails                     | Confirm Keycloak issuer, OAuth2Proxy client id, client secret, redirect URL, and `X-Forwarded-Proto`.     |

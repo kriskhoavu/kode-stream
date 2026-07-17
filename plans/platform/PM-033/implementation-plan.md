@@ -43,7 +43,7 @@ Avoid:
 | B5    | Postgres Cloud repositories               | Backend  | Done    |
 | B6    | Storage option and manual sync API        | Backend  | Done    |
 | F1    | Storage Settings option and sync controls | Frontend | Done    |
-| C1    | Local and Cloud storage operations        | DevOps   | Planned |
+| C1    | Local and Cloud storage operations        | DevOps   | Done    |
 | C2    | Pipeline and release gates                | DevOps   | Planned |
 
 ## Backend Phases
@@ -165,17 +165,17 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Document Local `database` and `datadir` startup configuration.
-- [ ] Document manual sync, target backups, and restore workflow.
-- [ ] Document Postgres provisioning, secrets, migration mode, backup, restore, and health checks.
-- [ ] Update `run.sh` to accept or pass through `KODE_STREAM_STORAGE_OPTION=database|datadir`, print the effective test mode, and support quick local smoke runs for both options.
-- [ ] Update `run-docker-cloud.sh` to set `KODE_STREAM_STORAGE_OPTION=database` for Cloud smoke runs and fail early if a datadir option is supplied.
-- [ ] Add script help text and examples for local database, local datadir, and Cloud database test runs.
-- [ ] Update `docs/storage/storage-architecture.md` so data-dir is documented as a supported Local storage option, not deprecated.
-- [ ] Update `docs/storage/storage-architecture-diagram.mmd` and regenerated diagram assets to show Local `database`, Local `datadir`, Cloud Postgres, and manual sync.
-- [ ] Update root `README.md` and `ARCHITECTURE.md` to describe `KODE_STREAM_STORAGE_OPTION`, Local backend choices, and Cloud database-only behavior.
-- [ ] Update Cloud deployment examples to include storage option, Postgres, and database environment variables.
-- [ ] Document that Cloud Agents connect only to Cloud API and never to Postgres.
+- [x] Document Local `database` and `datadir` startup configuration.
+- [x] Document manual sync, target backups, and restore workflow.
+- [x] Document Postgres provisioning, secrets, migration mode, backup, restore, and health checks.
+- [x] Update `run.sh` to accept or pass through `KODE_STREAM_STORAGE_OPTION=database|datadir`, print the effective test mode, and support quick local smoke runs for both options.
+- [x] Update `run-docker-cloud.sh` to set `KODE_STREAM_STORAGE_OPTION=database` for Cloud smoke runs and fail early if a datadir option is supplied.
+- [x] Add script help text and examples for local database, local datadir, and Cloud database test runs.
+- [x] Update `docs/storage/storage-architecture.md` so data-dir is documented as a supported Local storage option, not deprecated.
+- [x] Update `docs/storage/storage-architecture-diagram.mmd` and regenerated diagram assets to show Local `database`, Local `datadir`, Cloud Postgres, and manual sync.
+- [x] Update root `README.md` and `ARCHITECTURE.md` to describe `KODE_STREAM_STORAGE_OPTION`, Local backend choices, and Cloud database-only behavior.
+- [x] Update Cloud deployment examples to include storage option, Postgres, and database environment variables.
+- [x] Document that Cloud Agents connect only to Cloud API and never to Postgres.
 
 **Verification:** `KODE_STREAM_STORAGE_OPTION=database rtk ./run.sh restart && KODE_STREAM_STORAGE_OPTION=datadir rtk ./run.sh restart && KODE_STREAM_STORAGE_OPTION=database rtk ./run-docker-cloud.sh`
 

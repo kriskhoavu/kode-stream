@@ -21,10 +21,14 @@ against the current repository.
 Optional overrides:
 
 ```bash
+KODE_STREAM_STORAGE_OPTION=database \
 KODE_STREAM_AGENT_REPO=/path/to/repo \
 KODE_STREAM_AGENT_NAME="MacBook Agent" \
 ./run-docker-cloud.sh
 ```
+
+Cloud smoke runs always use `database` storage with Postgres. `run-docker-cloud.sh` fails early if
+`KODE_STREAM_STORAGE_OPTION=datadir` is supplied.
 
 The agent runs in the foreground. Press `Ctrl-C` to stop the agent; Docker services stay running.
 

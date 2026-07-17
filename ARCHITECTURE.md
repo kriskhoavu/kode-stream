@@ -53,8 +53,8 @@ scan status, and published summaries.
                 │                               │
 ┌───────────────▼────────────────┐  ┌───────────▼───────────────┐
 │ App-owned state                │  │ Registered Git workspaces │
-│ SQL repositories and imports   │  │ User source files         │
-│ SQLite local / Postgres cloud  │  │ Git history               │
+│ Storage provider repositories  │  │ User source files         │
+│ SQLite / data-dir / Postgres   │  │ Git history               │
 └────────────────────────────────┘  └───────────────────────────┘
 ```
 
@@ -71,7 +71,7 @@ Rendered architecture diagram: [Storage architecture](docs/storage/storage-archi
 | Shared contracts  | `internal/common`     | Defines errors, HTTP helpers, and compatibility DTOs                                   |
 | Domain services   | `internal/*`          | Own workflows, policies, repositories, and integration logic                           |
 | File capabilities | `internal/filesystem` | Provides guarded path validation, bounded reads, and writes                            |
-| Storage           | `internal/storage`    | Resolves storage driver, runs migrations, wires SQL repositories, imports legacy files |
+| Storage           | `internal/storage`    | Resolves storage option, wires providers, runs SQL migrations, exposes status and sync |
 
 Gin is limited to `internal/server/api`. Domain packages receive standard contexts, model types, and primitive
 parameters instead of framework-specific request objects.
@@ -113,10 +113,10 @@ Frontend shared modules do not import page modules. Pages compose feature and sh
 
 Kode Stream separates app-owned state from repository-owned content.
 
-| Owner      | Examples                                        | Write policy                                                             |
-|------------|-------------------------------------------------|--------------------------------------------------------------------------|
-| App state  | Workspace registry, indexes, audit, UI settings | Written by Kode Stream to SQLite in Local mode or Postgres in Cloud mode |
-| Repository | Markdown, metadata, wiki pages, Git history     | Written only through explicit user actions                               |
+| Owner      | Examples                                        | Write policy                                            |
+|------------|-------------------------------------------------|---------------------------------------------------------|
+| App state  | Workspace registry, indexes, audit, UI settings | Written by Kode Stream to the configured storage option |
+| Repository | Markdown, metadata, wiki pages, Git history     | Written only through explicit user actions              |
 
 Indexes are derived data. A scan can rebuild them from registered workspace content.
 
@@ -124,29 +124,26 @@ Indexes are derived data. A scan can rebuild them from registered workspace cont
 
 Storage is selected at server startup:
 
-| Runtime mode | Driver   | Required configuration                                            | Stored state                                                          |
-|--------------|----------|-------------------------------------------------------------------|-----------------------------------------------------------------------|
-| Local        | SQLite   | Optional `KODE_STREAM_SQLITE_PATH`                                | Workspace metadata, derived item indexes, audit, navigation, settings |
-| Cloud        | Postgres | `KODE_STREAM_STORAGE_DRIVER=postgres`, `KODE_STREAM_DATABASE_URL` | Shared control-plane metadata, branch indexes, audit, settings        |
+| Runtime mode | Storage option | Driver   | Required configuration                                            | Stored state                                                          |
+|--------------|----------------|----------|-------------------------------------------------------------------|-----------------------------------------------------------------------|
+| Local        | `database`     | SQLite   | Optional `KODE_STREAM_SQLITE_PATH`                                | Workspace metadata, derived item indexes, audit, navigation, settings |
+| Local        | `datadir`      | file     | `KODE_STREAM_STORAGE_OPTION=datadir`                              | YAML/JSONL app-owned state under `KODE_STREAM_DATA_DIR`               |
+| Cloud        | `database`     | Postgres | `KODE_STREAM_STORAGE_DRIVER=postgres`, `KODE_STREAM_DATABASE_URL` | Shared control-plane metadata, branch indexes, audit, settings        |
 
-Deprecated data-dir files remain as migration inputs, not primary storage. See
-[Storage](docs/storage/storage-architecture.md) for the comparison between the deprecated YAML/JSONL store and the
-current SQL-backed implementation.
+Local data-dir storage is a supported option, not a deprecated path. See [Storage](docs/storage/storage-architecture.md)
+for the option matrix, manual sync, backup, restore, and performance comparison.
 
-`internal/storage` opens the configured database, runs embedded migrations when `KODE_STREAM_MIGRATIONS=auto`, exposes
-database readiness through `/api/health`, and composes repository implementations behind domain interfaces.
+`internal/storage` resolves `KODE_STREAM_STORAGE_OPTION`, composes a provider-backed `RepositoryBundle`, opens SQL
+stores when needed, runs embedded migrations when `KODE_STREAM_MIGRATIONS=auto`, exposes database readiness through
+`/api/health`, and exposes storage status/sync through `/api/storage/*`.
 
-Local SQLite startup imports legacy app-owned files from `KODE_STREAM_DATA_DIR` once:
+Settings can run local-only manual sync in either direction:
 
-- `workspaces.yaml`
-- `item-index.yaml`
-- `audit-log.jsonl`
-- `saved-filters.yaml`
-- `recent-items.yaml`
-- `ai-settings.yaml`
+- `datadir_to_database`
+- `database_to_datadir`
 
-Import completion is recorded in SQL. The legacy source files are left untouched so rollback and manual inspection stay
-possible.
+Sync writes a target backup under `backups/storage-sync/` before replacement. Runtime writes are not dual-written; the
+selected storage option is the only active backend.
 
 Cloud Agents never connect to Postgres. They connect only to the Cloud API over HTTPS/WebSocket and publish safe
 workspace metadata or scan results. Repository source files, Git credentials, terminal transcripts, prompts, and SSH
@@ -180,7 +177,7 @@ Register or scan workspace
   -> read configured sources
   -> apply source mappings
   -> parse metadata, README headings, Markdown documents, and Git metadata
-  -> update derived indexes in SQLite or Postgres
+  -> update derived indexes in the configured storage backend
   -> report warnings without blocking valid items
 ```
 
@@ -190,8 +187,8 @@ Register or scan workspace
 Load selected branch
   -> resolve branch ref and commit
   -> choose working-tree reader or Git tree snapshot reader
-  -> compare commit, source configuration hash, and working-tree hash with SQL branch scan metadata
-  -> reuse SQL branch index when fresh
+  -> compare commit, source configuration hash, and working-tree hash with stored branch scan metadata
+  -> reuse stored branch index when fresh
   -> otherwise scan branch and replace branch rows, warnings, and metadata in one transaction
   -> return current branch board/search data
 ```

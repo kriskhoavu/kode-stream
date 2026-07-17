@@ -35,15 +35,15 @@ Kode Stream supports Local and Cloud runtime modes.
 
 ## Tech Stack
 
-| Area        | Technology                                                                     |
-|-------------|--------------------------------------------------------------------------------|
-| Backend     | Go 1.25 module, Go 1.22+ source patterns                                       |
-| API         | Gin 1.9 + Go `net/http`                                                        |
-| Frontend    | React 19, TypeScript 5, Vite 6                                                 |
-| Testing     | Vitest, React Testing Library, `go test`                                       |
-| Rendering   | Unified, KaTeX, highlight.js, YAML                                             |
-| Packaging   | Go binary with embedded frontend assets                                        |
-| Persistence | SQLite for Local mode, Postgres for Cloud mode, YAML/JSONL legacy import files |
+| Area        | Technology                                          |
+|-------------|-----------------------------------------------------|
+| Backend     | Go 1.25 module, Go 1.22+ source patterns            |
+| API         | Gin 1.9 + Go `net/http`                             |
+| Frontend    | React 19, TypeScript 5, Vite 6                      |
+| Testing     | Vitest, React Testing Library, `go test`            |
+| Rendering   | Unified, KaTeX, highlight.js, YAML                  |
+| Packaging   | Go binary with embedded frontend assets             |
+| Persistence | Local SQLite or YAML/JSONL data-dir, Cloud Postgres |
 
 ## Requirements
 
@@ -138,10 +138,11 @@ For a local Cloud-mode smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy,
 ./run-docker-cloud.sh
 ```
 
-## Data Directory
+## Storage And Data Directory
 
-Kode Stream stores app-owned state in SQL. Local mode defaults to SQLite in the OS user config directory. Cloud mode
-requires Postgres through `KODE_STREAM_DATABASE_URL`.
+Kode Stream stores app-owned state outside managed repositories. Local mode supports `database` and `datadir` storage
+options. Local `database` uses SQLite in the OS user config directory. Local `datadir` uses YAML/JSONL files under the
+same directory. Cloud mode requires `database` with Postgres through `KODE_STREAM_DATABASE_URL`.
 
 Typical defaults:
 
@@ -159,22 +160,24 @@ Example `bootstrap.yaml`:
 
 ```yaml
 dataDir: /Users/me/.kode-stream-data
+storageOption: database
 ```
 
-Changing `dataDir` requires a restart.
+Changing `dataDir` or `storageOption` requires a restart.
 
 Main files:
 
 ```text
 <effective-data-dir>/
   bootstrap.yaml
-  kode-stream.db
-  workspaces.yaml       # legacy import source, left untouched
-  item-index.yaml       # legacy import source, left untouched
-  audit-log.jsonl       # legacy import source, left untouched
-  saved-filters.yaml    # legacy import source, left untouched
-  recent-items.yaml     # legacy import source, left untouched
-  ai-settings.yaml      # legacy import source, left untouched
+  kode-stream.db        # local database option
+  workspaces.yaml       # local datadir option
+  item-index.yaml       # local datadir option
+  audit-log.jsonl       # local datadir option
+  saved-filters.yaml    # local datadir option
+  recent-items.yaml     # local datadir option
+  ai-settings.yaml      # local datadir option
+  backups/storage-sync/
   clone-root/
 ```
 
@@ -182,16 +185,25 @@ Storage configuration:
 
 | Variable                     | Local default                         | Cloud requirement                   |
 |------------------------------|---------------------------------------|-------------------------------------|
-| `KODE_STREAM_STORAGE_DRIVER` | `sqlite`                              | `postgres`                          |
+| `KODE_STREAM_STORAGE_OPTION` | `database`                            | `database`                          |
+| `KODE_STREAM_STORAGE_DRIVER` | derived from option                   | `postgres`                          |
 | `KODE_STREAM_SQLITE_PATH`    | `<effective-data-dir>/kode-stream.db` | unused                              |
 | `KODE_STREAM_DATABASE_URL`   | unused                                | secret-managed Postgres URL         |
 | `KODE_STREAM_MIGRATIONS`     | `auto`                                | `auto` or operator-managed `manual` |
 
-On first SQLite startup, Kode Stream imports existing YAML and JSONL app-owned files from `KODE_STREAM_DATA_DIR` and
-records completed imports in SQL. Source files are not removed or modified.
+Local examples:
 
-See [Storage](docs/storage/storage-architecture.md) for the current SQL storage model, deprecated data-dir files,
-backup, restore, migration, and Cloud Postgres operations.
+```bash
+KODE_STREAM_STORAGE_OPTION=database ./run.sh restart
+KODE_STREAM_STORAGE_OPTION=datadir ./run.sh restart
+./run.sh smoke-storage
+```
+
+Settings can manually sync `datadir -> database` or `database -> datadir`. Each sync creates a target backup under
+`backups/storage-sync/`. Runtime writes go only to the selected storage option.
+
+See [Storage](docs/storage/storage-architecture.md) for supported storage options, performance comparison, backup,
+restore, manual sync, and Cloud Postgres operations.
 
 ## Workspace Files
 

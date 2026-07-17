@@ -12,6 +12,7 @@ ADMIN_EMAIL="${KODE_STREAM_CLOUD_ADMIN_EMAIL:-admin@example.com}"
 COOKIE_SECRET="${KODE_STREAM_COOKIE_SECRET:-local-kode-stream-cookie-secret}"
 ADMIN_USERS="${KODE_STREAM_ADMIN_USERS:-$ADMIN_EMAIL}"
 BIN_PATH="${KODE_STREAM_BIN:-$ROOT_DIR/bin/kode-stream}"
+STORAGE_OPTION="${KODE_STREAM_STORAGE_OPTION:-database}"
 
 log() {
   printf '[kode-stream-cloud] %s\n' "$*"
@@ -82,12 +83,20 @@ require_command curl
 require_command go
 require_command python3
 
+if [[ "$STORAGE_OPTION" != "database" ]]; then
+  printf 'Cloud mode requires KODE_STREAM_STORAGE_OPTION=database; got %s.\n' "$STORAGE_OPTION" >&2
+  exit 2
+fi
+
 cd "$ROOT_DIR"
+export KODE_STREAM_STORAGE_OPTION="database"
+export KODE_STREAM_STORAGE_DRIVER="${KODE_STREAM_STORAGE_DRIVER:-postgres}"
 export KODE_STREAM_PUBLIC_URL="$CLOUD_URL"
 export KODE_STREAM_COOKIE_SECRET="$COOKIE_SECRET"
 export KODE_STREAM_ADMIN_USERS="$ADMIN_USERS"
 
 log "Starting local Cloud stack with Docker Compose"
+log "Storage option: $KODE_STREAM_STORAGE_OPTION ($KODE_STREAM_STORAGE_DRIVER)"
 docker compose -f "$COMPOSE_FILE" up -d --build
 
 wait_for_health "$CLOUD_URL"
