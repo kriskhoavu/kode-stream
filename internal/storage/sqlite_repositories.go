@@ -310,6 +310,9 @@ ON CONFLICT(id) DO UPDATE SET name = excluded.name, path_label = excluded.path_l
 }
 
 func (r *SQLiteItemRepository) ReplaceWorkspace(workspaceID string, items []models.ItemDetail, warnings []models.ScanWarning, scannedAt time.Time) error {
+	if scannedAt.IsZero() {
+		scannedAt = time.Now().UTC()
+	}
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -326,7 +329,7 @@ func (r *SQLiteItemRepository) ReplaceWorkspace(workspaceID string, items []mode
 		_ = tx.Rollback()
 		return err
 	}
-	if err = insertItems(tx, r.driver, items); err != nil {
+	if err = insertItems(tx, r.driver, items, scannedAt); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -376,11 +379,14 @@ func (r *SQLiteItemRepository) ReplaceWorkspaceBranch(workspaceID, branch string
 		items[i].WorkspaceID = workspaceID
 		items[i].Branch = branch
 	}
-	if err = insertItems(tx, r.driver, items); err != nil {
+	metadata.WorkspaceID, metadata.Branch = workspaceID, branch
+	if metadata.ScannedAt.IsZero() {
+		metadata.ScannedAt = time.Now().UTC()
+	}
+	if err = insertItems(tx, r.driver, items, metadata.ScannedAt); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	metadata.WorkspaceID, metadata.Branch = workspaceID, branch
 	if err = insertBranchScan(tx, r.driver, metadata); err != nil {
 		_ = tx.Rollback()
 		return err
@@ -710,11 +716,17 @@ func (r *SQLiteImportStatusRepository) MarkImportCompleted(source string, comple
 	return err
 }
 
-func insertItems(tx *sql.Tx, driverName string, items []models.ItemDetail) error {
+func insertItems(tx *sql.Tx, driverName string, items []models.ItemDetail, fallbackUpdatedAt time.Time) error {
+	if fallbackUpdatedAt.IsZero() {
+		fallbackUpdatedAt = time.Now().UTC()
+	}
 	for _, item := range items {
 		if item.SourceMode == "" {
 			item.SourceMode = "working_tree"
 			item.Editable = true
+		}
+		if item.UpdatedAt.IsZero() {
+			item.UpdatedAt = fallbackUpdatedAt
 		}
 		raw, err := encodeJSON(item)
 		if err != nil {

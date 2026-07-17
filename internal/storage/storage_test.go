@@ -182,6 +182,49 @@ func TestOpenAppOwnedStateImportsLegacyAppOwnedFiles(t *testing.T) {
 	}
 }
 
+func TestSQLiteItemRepositoryDefaultsMissingUpdatedAt(t *testing.T) {
+	dataDir := t.TempDir()
+	paths := testPaths(dataDir)
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, emptyEnv)
+	if err != nil {
+		t.Fatalf("OpenAppOwnedState returned error: %v", err)
+	}
+	defer state.SQLStore.Close()
+
+	scannedAt := time.Date(2026, 7, 17, 14, 6, 0, 0, time.UTC)
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{
+		ID:          "item-1",
+		WorkspaceID: "workspace-1",
+		Branch:      "main",
+		Scope:       "plans",
+		Identifier:  "PM-001",
+		Title:       "Plan",
+		Status:      models.StatusDraft,
+		ItemPath:    "plans/PM-001",
+		SourceMode:  "snapshot",
+	}}
+	err = state.Items.ReplaceWorkspaceBranch("workspace-1", "main", []models.ItemDetail{item}, models.BranchScanMetadata{
+		WorkspaceID: "workspace-1",
+		Branch:      "main",
+		SourceMode:  "snapshot",
+		ScannedAt:   scannedAt,
+	})
+	if err != nil {
+		t.Fatalf("ReplaceWorkspaceBranch returned error: %v", err)
+	}
+
+	stored, ok, err := state.Items.Get("item-1")
+	if err != nil {
+		t.Fatalf("Get returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("stored item was not found")
+	}
+	if !stored.UpdatedAt.Equal(scannedAt) {
+		t.Fatalf("updatedAt = %v, want %v", stored.UpdatedAt, scannedAt)
+	}
+}
+
 func TestOpenAppOwnedStatePostgresIntegration(t *testing.T) {
 	databaseURL := os.Getenv(EnvDatabaseURL)
 	if databaseURL == "" {
