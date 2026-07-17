@@ -29,7 +29,7 @@ for planning content and uses app-state storage only for metadata and derived in
 | `KODE_STREAM_DATABASE_URL`   | Postgres URL                 | Cloud       | Connects hosted API to Postgres.                             |
 | `KODE_STREAM_MIGRATIONS`     | `auto`, `manual`             | database    | Runs embedded migrations or requires operator action.        |
 
-Local mode defaults to `database`. Local `database` uses SQLite, and Local `datadir` uses YAML/JSONL repositories.
+Local mode defaults to `datadir`. Local `database` uses SQLite, and Local `datadir` uses YAML/JSONL repositories.
 Cloud mode requires `database` with Postgres and fails startup when the database URL is missing or unreachable.
 
 ## Data Model

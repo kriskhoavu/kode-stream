@@ -33,4 +33,18 @@ describe('SettingsPage AI settings', () => {
       providers: { codex: expect.objectContaining({ executable: '/custom/codex' }) }
     })));
   });
+
+  it('renders AI templates when persisted args are null', async () => {
+    vi.mocked(api.aiSettings).mockResolvedValue({
+      defaultProvider: 'codex', defaultTerminal: 'terminal',
+      providers: { codex: { enabled: true, executable: 'codex', args: null as unknown as string[] } },
+      terminals: { terminal: { enabled: true, executable: '/Terminal.app', args: null as unknown as string[] } }
+    });
+    vi.mocked(api.aiCapabilities).mockResolvedValue([]);
+
+    render(<SettingsPage settings={defaultAppSettings} onChange={vi.fn()} />);
+
+    expect(await screen.findByText('Codex')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Arguments, one per line')[0]).toHaveValue('');
+  });
 });

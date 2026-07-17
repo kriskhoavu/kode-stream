@@ -14,12 +14,12 @@ Storage is selected at startup with `KODE_STREAM_STORAGE_OPTION`.
 | Local        | `datadir`      | `file`          | YAML and JSONL files under data dir     | Inspectable file-backed app state.       |
 | Cloud        | `database`     | `postgres`      | `KODE_STREAM_DATABASE_URL`              | Shared hosted control-plane state.       |
 
-Local mode defaults to `database`. Cloud mode only supports `database` and fails startup when `datadir` is selected or
+Local mode defaults to `datadir`. Cloud mode only supports `database` and fails startup when `datadir` is selected or
 Postgres is missing, unreachable, or not migrated.
 
 | Variable                     | Local behavior                             | Cloud behavior                                |
 |------------------------------|--------------------------------------------|-----------------------------------------------|
-| `KODE_STREAM_STORAGE_OPTION` | `database` or `datadir`, default database  | Must be `database`                            |
+| `KODE_STREAM_STORAGE_OPTION` | `database` or `datadir`, default `datadir` | Must be `database`                            |
 | `KODE_STREAM_STORAGE_DRIVER` | Optional low-level override                | `postgres`                                    |
 | `KODE_STREAM_SQLITE_PATH`    | Optional SQLite file override              | Unused                                        |
 | `KODE_STREAM_DATABASE_URL`   | Unused                                     | Required secret-managed Postgres URL          |
@@ -122,6 +122,11 @@ Restore by stopping Kode Stream, replacing the target files or database, startin
 
 Cloud uses `KODE_STREAM_STORAGE_OPTION=database`, `KODE_STREAM_STORAGE_DRIVER=postgres`, and
 `KODE_STREAM_DATABASE_URL`.
+
+Cloud `datadir` is intentionally unsupported. It can work only as a single-process file store on one mounted volume,
+but it does not provide the shared-state, concurrent-write, backup, migration, and health-check guarantees required for
+a hosted control plane. Use Postgres for Cloud and use manual sync/export workflows when a file copy is needed for local
+inspection or rollback.
 
 Provision Postgres with encrypted storage, regular backups, and network access limited to the Kode Stream API and
 approved operator tooling. Cloud Agents never connect to Postgres; they connect only to the Cloud API over HTTPS and

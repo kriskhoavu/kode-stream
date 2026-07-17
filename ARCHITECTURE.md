@@ -126,8 +126,8 @@ Storage is selected at server startup:
 
 | Runtime mode | Storage option | Driver   | Required configuration                                            | Stored state                                                          |
 |--------------|----------------|----------|-------------------------------------------------------------------|-----------------------------------------------------------------------|
-| Local        | `database`     | SQLite   | Optional `KODE_STREAM_SQLITE_PATH`                                | Workspace metadata, derived item indexes, audit, navigation, settings |
-| Local        | `datadir`      | file     | `KODE_STREAM_STORAGE_OPTION=datadir`                              | YAML/JSONL app-owned state under `KODE_STREAM_DATA_DIR`               |
+| Local        | `datadir`      | file     | Default                                                           | YAML/JSONL app-owned state under `KODE_STREAM_DATA_DIR`               |
+| Local        | `database`     | SQLite   | `KODE_STREAM_STORAGE_OPTION=database` or optional SQLite override | Workspace metadata, derived item indexes, audit, navigation, settings |
 | Cloud        | `database`     | Postgres | `KODE_STREAM_STORAGE_DRIVER=postgres`, `KODE_STREAM_DATABASE_URL` | Shared control-plane metadata, branch indexes, audit, settings        |
 
 Local data-dir storage is a supported option, not a deprecated path. See [Storage](docs/storage/storage-architecture.md)

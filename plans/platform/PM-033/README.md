@@ -18,8 +18,8 @@ and verification commands remain outside app-state storage and follow the PM-032
 
 Provide one storage boundary with an operator-selected backend:
 
+- Local `datadir` mode is the default and persists app-owned state in YAML and JSONL files under `KODE_STREAM_DATA_DIR`.
 - Local `database` mode persists app-owned state in SQLite under `KODE_STREAM_DATA_DIR`.
-- Local `datadir` mode persists app-owned state in YAML and JSONL files under `KODE_STREAM_DATA_DIR`.
 - Cloud mode persists shared control-plane state in Postgres.
 - Domain services use repository interfaces and do not branch on the selected backend.
 - Branch-scoped item indexes can be re-indexed when Git branch content changes.
@@ -55,7 +55,7 @@ Provide one storage boundary with an operator-selected backend:
 
 | Setting                      | Local Default                | Cloud Requirement       | Purpose                                            |
 |------------------------------|------------------------------|-------------------------|----------------------------------------------------|
-| `KODE_STREAM_STORAGE_OPTION` | `database`                   | `database`              | Selects `database` or `datadir` app-state storage. |
+| `KODE_STREAM_STORAGE_OPTION` | `datadir`                    | `database`              | Selects `database` or `datadir` app-state storage. |
 | `KODE_STREAM_STORAGE_DRIVER` | derived from storage option  | `postgres`              | Optional low-level compatibility override.         |
 | `KODE_STREAM_SQLITE_PATH`    | `<data-root>/kode-stream.db` | unused                  | Overrides Local SQLite file path.                  |
 | `KODE_STREAM_DATABASE_URL`   | unused                       | required                | Connects Cloud API to Postgres.                    |

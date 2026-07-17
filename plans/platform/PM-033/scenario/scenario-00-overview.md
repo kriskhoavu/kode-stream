@@ -23,7 +23,7 @@ Run Kode Stream locally with database storage and no external database service.
 | #   | Title          | Summary                                            |
 |-----|----------------|----------------------------------------------------|
 | 1   | Runtime mode   | Local mode is selected or defaulted.               |
-| 2   | Storage option | `database` is selected or defaulted.               |
+| 2   | Storage option | `database` is explicitly selected.                 |
 | 3   | Data dir       | `KODE_STREAM_DATA_DIR` resolves to a writable dir. |
 | 4   | Database       | SQLite file may exist or may need to be created.   |
 

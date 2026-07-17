@@ -129,7 +129,11 @@ func ResolveConfig(runtime system.RuntimeConfig, paths system.Paths, getenv func
 		}
 	}
 	if option == "" {
-		option = StorageOptionDatabase
+		if runtime.Mode == models.RuntimeModeCloud {
+			option = StorageOptionDatabase
+		} else {
+			option = StorageOptionDataDir
+		}
 	}
 	switch option {
 	case StorageOptionDatabase, StorageOptionDataDir:

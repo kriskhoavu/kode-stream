@@ -17,7 +17,7 @@ Usage: ./run.sh {start|stop|restart|status}
 
 Environment:
   KODE_STREAM_PORT             Port to bind, default: 4317
-  KODE_STREAM_STORAGE_OPTION   database or datadir, default: database
+  KODE_STREAM_STORAGE_OPTION   database or datadir, default: datadir
   KODE_STREAM_DATA_DIR         Optional app-state directory
 
 Examples:
@@ -31,7 +31,7 @@ EOF
 }
 
 effective_storage_option() {
-  local option="${KODE_STREAM_STORAGE_OPTION:-database}"
+  local option="${KODE_STREAM_STORAGE_OPTION:-datadir}"
   case "$option" in
     database|datadir)
       printf '%s\n' "$option"

@@ -2,6 +2,7 @@ import type {
   AICapability,
   AIProviderCapabilityCatalog,
   AISettings,
+  AILaunchTemplate,
   AIPlanPreset,
   AISessionEligibility,
   AISessionLaunchInput,
@@ -133,8 +134,8 @@ export const api = {
   aiCapabilities: () => request<AICapability[]>('/api/ai/capabilities'),
   aiProviderCapabilities: (providerId: string, itemId?: string) => request<AIProviderCapabilityCatalog>(`/api/ai/providers/${encodeURIComponent(providerId)}/capabilities${itemId ? `?itemId=${encodeURIComponent(itemId)}` : ''}`),
   aiPresets: () => request<AIPlanPreset[]>('/api/ai/presets'),
-  aiSettings: () => request<AISettings>('/api/ai/settings'),
-  saveAISettings: (settings: AISettings) => request<AISettings>('/api/ai/settings', { method: 'PUT', body: JSON.stringify(settings) }),
+  aiSettings: () => request<AISettings>('/api/ai/settings').then(normalizeAISettings),
+  saveAISettings: (settings: AISettings) => request<AISettings>('/api/ai/settings', { method: 'PUT', body: JSON.stringify(normalizeAISettings(settings)) }).then(normalizeAISettings),
   aiSessionEligibility: (itemId: string) => request<AISessionEligibility>(`/api/items/${encodeURIComponent(itemId)}/ai-session-eligibility`),
   launchAISession: (itemId: string, input: AISessionLaunchInput) => request<AISessionLaunchResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions`, { method: 'POST', body: JSON.stringify(input) }),
 	startEmbeddedAISession: (itemId: string, input: Pick<AISessionLaunchInput, 'provider' | 'contextMode' | 'presetId' | 'promptDraft' | 'customPrompt' | 'selectedSkills' | 'selectedAgents'> & { columns?: number; rows?: number }) => request<EmbeddedAISessionResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }),
@@ -419,6 +420,23 @@ function normalizeSystemConfigPaths(input: SystemConfigPaths): SystemConfigPaths
 		registryFile: input.registryFile ?? '',
     restartRequired: Boolean(input.restartRequired)
   };
+}
+
+function normalizeAISettings(input: AISettings): AISettings {
+  return {
+    defaultProvider: input.defaultProvider ?? '',
+    defaultTerminal: input.defaultTerminal ?? '',
+    providers: normalizeAILaunchTemplates(input.providers),
+    terminals: normalizeAILaunchTemplates(input.terminals)
+  };
+}
+
+function normalizeAILaunchTemplates(input: Record<string, AILaunchTemplate> | null | undefined): Record<string, AILaunchTemplate> {
+  return Object.fromEntries(Object.entries(input ?? {}).map(([id, template]) => [id, {
+    enabled: Boolean(template?.enabled),
+    executable: template?.executable ?? '',
+    args: Array.isArray(template?.args) ? template.args : []
+  }]));
 }
 
 function normalizeStorageStatus(input: StorageStatus): StorageStatus {

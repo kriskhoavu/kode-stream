@@ -2,10 +2,10 @@
 
 ## Overview
 
-Implement configurable app-owned storage for Kode Stream. Local mode supports `database` and `datadir`. Local
-`database` uses SQLite. Local `datadir` uses YAML/JSONL files. Cloud mode uses Postgres. Existing domain workflows keep
-their API contracts while repository services run behind storage-capable interfaces. Branch indexes remain derived data
-and are re-indexed when branch freshness metadata no longer matches Git state.
+Implement configurable app-owned storage for Kode Stream. Local mode supports `database` and `datadir`. Local `datadir`
+is the default and uses YAML/JSONL files. Local `database` uses SQLite. Cloud mode uses Postgres. Existing domain
+workflows keep their API contracts while repository services run behind storage-capable interfaces. Branch indexes
+remain derived data and are re-indexed when branch freshness metadata no longer matches Git state.
 
 ## Terminology Lock
 

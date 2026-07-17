@@ -18,20 +18,33 @@ import (
 	"kode-stream/internal/workspace/registry"
 )
 
-func TestResolveConfigDefaultsLocalModeToSQLite(t *testing.T) {
+func TestResolveConfigDefaultsLocalModeToDataDir(t *testing.T) {
 	paths := system.Paths{SQLiteDatabaseFile: filepath.Join(t.TempDir(), "kode-stream.db")}
 	config, err := ResolveConfig(system.RuntimeConfig{Mode: models.RuntimeModeLocal}, paths, emptyEnv)
 	if err != nil {
 		t.Fatalf("ResolveConfig returned error: %v", err)
 	}
-	if config.Driver != StorageDriverSQLite {
-		t.Fatalf("driver = %q, want %q", config.Driver, StorageDriverSQLite)
+	if config.StorageOption != StorageOptionDataDir || config.Driver != StorageDriverFile {
+		t.Fatalf("config = %#v, want datadir/file", config)
 	}
 	if config.SQLitePath != paths.SQLiteDatabaseFile {
 		t.Fatalf("sqlite path = %q, want %q", config.SQLitePath, paths.SQLiteDatabaseFile)
 	}
 	if config.Migrations != "auto" {
 		t.Fatalf("migrations = %q, want auto", config.Migrations)
+	}
+}
+
+func TestResolveConfigUsesExplicitDatabaseOptionForLocalSQLite(t *testing.T) {
+	paths := system.Paths{SQLiteDatabaseFile: filepath.Join(t.TempDir(), "kode-stream.db")}
+	config, err := ResolveConfig(system.RuntimeConfig{Mode: models.RuntimeModeLocal}, paths, mapEnv(map[string]string{
+		EnvStorageOption: StorageOptionDatabase,
+	}))
+	if err != nil {
+		t.Fatalf("ResolveConfig returned error: %v", err)
+	}
+	if config.StorageOption != StorageOptionDatabase || config.Driver != StorageDriverSQLite {
+		t.Fatalf("config = %#v, want database/sqlite", config)
 	}
 }
 
@@ -89,7 +102,7 @@ func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 		RecentItemsFile:    filepath.Join(dataDir, "recent-items.yaml"),
 		AISettingsFile:     filepath.Join(dataDir, "ai-settings.yaml"),
 	}
-	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, emptyEnv)
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, databaseEnv)
 	if err != nil {
 		t.Fatalf("OpenAppOwnedState returned error: %v", err)
 	}
@@ -123,7 +136,8 @@ func TestOpenAppOwnedStateRequiresManualMigrationsToExist(t *testing.T) {
 		KnowledgeIndexFile: filepath.Join(dataDir, "knowledge-index.yaml"),
 	}
 	_, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, mapEnv(map[string]string{
-		EnvMigrations: "manual",
+		EnvStorageOption: StorageOptionDatabase,
+		EnvMigrations:    "manual",
 	}))
 	if err == nil {
 		t.Fatal("expected manual migration error")
@@ -170,7 +184,7 @@ func TestOpenAppOwnedStateImportsLegacyAppOwnedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, git, emptyEnv)
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, git, databaseEnv)
 	if err != nil {
 		t.Fatalf("OpenAppOwnedState returned error: %v", err)
 	}
@@ -244,7 +258,7 @@ func TestStorageSyncDataDirToDatabaseCreatesBackupAndCopiesState(t *testing.T) {
 	if !result.OK || result.BackupPath == "" || result.Summary["workspaces"] != 1 || result.Summary["items"] != 1 {
 		t.Fatalf("result = %#v", result)
 	}
-	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, emptyEnv)
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, databaseEnv)
 	if err != nil {
 		t.Fatalf("OpenAppOwnedState returned error: %v", err)
 	}
@@ -265,7 +279,7 @@ func TestStorageSyncDataDirToDatabaseCreatesBackupAndCopiesState(t *testing.T) {
 func TestStorageSyncDatabaseToDataDirCreatesBackupAndCopiesState(t *testing.T) {
 	dataDir := t.TempDir()
 	paths := testPaths(dataDir)
-	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, emptyEnv)
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, databaseEnv)
 	if err != nil {
 		t.Fatalf("OpenAppOwnedState returned error: %v", err)
 	}
@@ -308,7 +322,7 @@ func TestStorageSyncDatabaseToDataDirCreatesBackupAndCopiesState(t *testing.T) {
 func TestSQLiteItemRepositoryDefaultsMissingUpdatedAt(t *testing.T) {
 	dataDir := t.TempDir()
 	paths := testPaths(dataDir)
-	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, emptyEnv)
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, databaseEnv)
 	if err != nil {
 		t.Fatalf("OpenAppOwnedState returned error: %v", err)
 	}
@@ -393,6 +407,13 @@ func runGit(t *testing.T, dir string, args ...string) {
 }
 
 func emptyEnv(string) string { return "" }
+
+func databaseEnv(key string) string {
+	if key == EnvStorageOption {
+		return StorageOptionDatabase
+	}
+	return ""
+}
 
 func mapEnv(values map[string]string) func(string) string {
 	return func(key string) string { return values[key] }

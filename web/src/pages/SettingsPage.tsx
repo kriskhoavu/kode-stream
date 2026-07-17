@@ -105,6 +105,7 @@ function ToolSettingsGroup({ kind, templates, settings, capabilities, onChange }
       <legend>{kind === 'provider' ? 'AI providers' : 'Terminal applications'}</legend>
       {Object.entries(templates).sort(([left], [right]) => left.localeCompare(right)).map(([id, template]) => {
         const capability = capabilities.find((item) => item.kind === kind && item.id === id);
+        const args = Array.isArray(template.args) ? template.args : [];
         return (
           <div className="ai-tool-row" key={id}>
             <div className="ai-tool-heading">
@@ -114,7 +115,7 @@ function ToolSettingsGroup({ kind, templates, settings, capabilities, onChange }
               <label><input type="checkbox" checked={template.enabled} onChange={(event) => toggleEnabled(id, event.target.checked)} /> Enabled</label>
             </div>
             <label>Executable<input value={template.executable} onChange={(event) => update(id, { ...template, executable: event.target.value })} /></label>
-            <label>Arguments, one per line<textarea rows={2} value={template.args.join('\n')} onChange={(event) => update(id, { ...template, args: event.target.value.split('\n') })} /></label>
+            <label>Arguments, one per line<textarea rows={2} value={args.join('\n')} onChange={(event) => update(id, { ...template, args: event.target.value.split('\n') })} /></label>
           </div>
         );
       })}

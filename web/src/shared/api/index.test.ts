@@ -29,6 +29,24 @@ describe('shared api facade', () => {
     ]);
   });
 
+  it('normalizes AI settings template args', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        defaultProvider: 'codex',
+        providers: { codex: { enabled: true, executable: 'codex', args: null } },
+        terminals: null
+      })
+    }));
+
+    await expect(api.aiSettings()).resolves.toEqual({
+      defaultProvider: 'codex',
+      defaultTerminal: '',
+      providers: { codex: { enabled: true, executable: 'codex', args: [] } },
+      terminals: {}
+    });
+  });
+
 	it('normalizes import previews and sends import selections', async () => {
 		const fetchMock = vi.fn()
 			.mockResolvedValueOnce({ ok: true, json: async () => ({

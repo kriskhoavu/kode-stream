@@ -36,7 +36,7 @@ summaries in Postgres. It does not store repository source trees, Git credential
 
 | Setting                      | Local Example              | Cloud Example                  |
 |------------------------------|----------------------------|--------------------------------|
-| `KODE_STREAM_STORAGE_OPTION` | `database` or `datadir`    | `database`                     |
+| `KODE_STREAM_STORAGE_OPTION` | unset or `datadir` default | `database`                     |
 | `KODE_STREAM_STORAGE_DRIVER` | unset or compatibility use | `postgres`                     |
 | `KODE_STREAM_SQLITE_PATH`    | `/data/kode-stream.db`     | unset                          |
 | `KODE_STREAM_DATABASE_URL`   | unset                      | secret-managed Postgres URL    |

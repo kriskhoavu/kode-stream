@@ -140,9 +140,9 @@ For a local Cloud-mode smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy,
 
 ## Storage And Data Directory
 
-Kode Stream stores app-owned state outside managed repositories. Local mode supports `database` and `datadir` storage
-options. Local `database` uses SQLite in the OS user config directory. Local `datadir` uses YAML/JSONL files under the
-same directory. Cloud mode requires `database` with Postgres through `KODE_STREAM_DATABASE_URL`.
+Kode Stream stores app-owned state outside managed repositories. Local mode supports `datadir` and `database` storage
+options. Local `datadir` is the default and uses YAML/JSONL files under the OS user config directory. Local `database`
+uses SQLite in the same directory. Cloud mode requires `database` with Postgres through `KODE_STREAM_DATABASE_URL`.
 
 Typical defaults:
 
@@ -185,7 +185,7 @@ Storage configuration:
 
 | Variable                     | Local default                         | Cloud requirement                   |
 |------------------------------|---------------------------------------|-------------------------------------|
-| `KODE_STREAM_STORAGE_OPTION` | `database`                            | `database`                          |
+| `KODE_STREAM_STORAGE_OPTION` | `datadir`                             | `database`                          |
 | `KODE_STREAM_STORAGE_DRIVER` | derived from option                   | `postgres`                          |
 | `KODE_STREAM_SQLITE_PATH`    | `<effective-data-dir>/kode-stream.db` | unused                              |
 | `KODE_STREAM_DATABASE_URL`   | unused                                | secret-managed Postgres URL         |
