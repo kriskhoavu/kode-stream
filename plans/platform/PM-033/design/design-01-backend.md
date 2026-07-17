@@ -1,34 +1,36 @@
-# Backend Design: Database Storage For Kode Stream
+# Backend Design: Configurable App-State Storage For Kode Stream
 
 ## Overview
 
-The backend adds SQL storage adapters behind repository interfaces. Local mode uses SQLite. Cloud mode uses Postgres.
-The domain model keeps Git repositories as the source of truth for planning content and uses SQL only for app-owned
-state and derived indexes.
+The backend composes app-owned state repositories from the configured storage option. Local mode supports `database`
+and `datadir`. Cloud mode uses `database` with Postgres. The domain model keeps Git repositories as the source of truth
+for planning content and uses app-state storage only for metadata and derived indexes.
 
 ## Storage Boundary
 
-| Domain Area | Current Owner                 | SQL Responsibility                                                    |
-|-------------|-------------------------------|-----------------------------------------------------------------------|
-| Workspace   | `internal/workspace/registry` | Persist workspace metadata, registration mode, sources, runtime.      |
-| Item index  | `internal/item/index`         | Persist branch-scoped item summaries, details, warnings, scan state.  |
-| Workstream  | `internal/workstream`         | Query and refresh branch indexes through repository interfaces.       |
-| Audit       | `internal/audit`              | Append and query operation events.                                    |
-| Navigation  | `internal/navigation`         | Persist saved filters and recent items.                               |
-| AI settings | `internal/ai`                 | Persist provider settings and launch preferences.                     |
-| Knowledge   | `internal/knowledge`          | Persist derived knowledge index metadata without source file content. |
+| Domain Area | Repository Responsibility                                              |
+|-------------|------------------------------------------------------------------------|
+| Workspace   | Persist workspace metadata, registration mode, sources, and runtime.   |
+| Item index  | Persist branch-scoped item summaries, details, warnings, and state.    |
+| Workstream  | Query and refresh branch indexes through repository interfaces.        |
+| Audit       | Append and query operation events.                                     |
+| Navigation  | Persist saved filters and recent items.                                |
+| AI settings | Persist provider settings and launch preferences.                      |
+| Knowledge   | Persist derived knowledge index metadata without source file content.  |
+| Storage     | Report active backend and run explicit local sync between store types. |
 
 ## Runtime Configuration
 
-| Setting                      | Accepted Values      | Required In | Behavior                                              |
-|------------------------------|----------------------|-------------|-------------------------------------------------------|
-| `KODE_STREAM_STORAGE_DRIVER` | `sqlite`, `postgres` | both modes  | Selects SQL adapter.                                  |
-| `KODE_STREAM_SQLITE_PATH`    | filesystem path      | optional    | Overrides Local SQLite path.                          |
-| `KODE_STREAM_DATABASE_URL`   | Postgres URL         | Cloud       | Connects hosted API to Postgres.                      |
-| `KODE_STREAM_MIGRATIONS`     | `auto`, `manual`     | both modes  | Runs embedded migrations or requires operator action. |
+| Setting                      | Accepted Values              | Required In | Behavior                                                     |
+|------------------------------|------------------------------|-------------|--------------------------------------------------------------|
+| `KODE_STREAM_STORAGE_OPTION` | `database`, `datadir`        | optional    | Admin-facing backend choice.                                 |
+| `KODE_STREAM_STORAGE_DRIVER` | `file`, `sqlite`, `postgres` | optional    | Low-level compatibility override for repository composition. |
+| `KODE_STREAM_SQLITE_PATH`    | filesystem path              | optional    | Overrides Local SQLite path.                                 |
+| `KODE_STREAM_DATABASE_URL`   | Postgres URL                 | Cloud       | Connects hosted API to Postgres.                             |
+| `KODE_STREAM_MIGRATIONS`     | `auto`, `manual`             | database    | Runs embedded migrations or requires operator action.        |
 
-Local mode defaults to SQLite when no storage driver is set. Cloud mode requires Postgres and fails startup when the
-database URL is missing or unreachable.
+Local mode defaults to `database`. Local `database` uses SQLite, and Local `datadir` uses YAML/JSONL repositories.
+Cloud mode requires `database` with Postgres and fails startup when the database URL is missing or unreachable.
 
 ## Data Model
 
@@ -129,7 +131,7 @@ CREATE INDEX indexed_items_workspace_branch_status
   ON indexed_items (workspace_id, branch, status);
 ```
 
-The implementation may add tables for scan warnings, audit events, saved filters, recent items, settings, Cloud users,
+The database backend may add tables for scan warnings, audit events, saved filters, recent items, settings, Cloud users,
 Cloud agents, and Cloud workspaces using the same migration mechanism.
 
 ## Repository Interfaces
@@ -141,9 +143,40 @@ Cloud agents, and Cloud workspaces using the same migration mechanism.
 | Branch scan repository | Read freshness metadata and atomically update metadata with indexed rows.            |
 | Audit repository       | Append events and filter by workspace.                                               |
 | Navigation repository  | Save filters and recent items without browser-only persistence.                      |
-| Migration repository   | Track schema version and one-time file import status.                                |
+| Migration repository   | Track schema version and storage maintenance status.                                 |
+| Storage sync service   | Copy app-owned state between local database and data-dir stores on explicit request. |
 
-Domain services depend on these interfaces. SQL adapters own database details, transactions, and dialect differences.
+Domain services depend on these interfaces. Storage adapters own file layout, database details, transactions, and
+dialect differences.
+
+## Storage Provider Design
+
+Storage composition uses provider-style boundaries so each backend can evolve without changing domain services.
+
+| Type Or Interface      | Responsibility                                                                 |
+|------------------------|--------------------------------------------------------------------------------|
+| `StorageOption`        | Admin-facing selection: `database` or `datadir`.                               |
+| `StorageDriver`        | Low-level implementation: `file`, `sqlite`, or `postgres`.                     |
+| `StorageProvider`      | Opens and validates one backend, then returns a repository bundle.             |
+| `RepositoryBundle`     | Groups workspace, item, audit, navigation, AI settings, knowledge, and health. |
+| `StorageStatusService` | Reports effective option, driver, paths, environment lock state, and health.   |
+| `StorageSyncService`   | Copies app-owned state between Local providers after explicit confirmation.    |
+
+Provider implementations:
+
+| Provider           | Runtime Use      | Owns                                                                |
+|--------------------|------------------|---------------------------------------------------------------------|
+| `DataDirProvider`  | Local `datadir`  | YAML/JSONL paths, file-backed repositories, file schema validation. |
+| `SQLiteProvider`   | Local `database` | SQLite connection, migrations, SQL repositories, database health.   |
+| `PostgresProvider` | Cloud `database` | Postgres connection, migrations, SQL repositories, database health. |
+
+Rules:
+
+- Server composition depends on `StorageProvider` and `RepositoryBundle`, not concrete file or SQL repositories.
+- Domain services receive repository interfaces only.
+- Manual sync is a separate service and must not introduce runtime dual-write.
+- Adding a future backend requires a new provider plus tests, not changes to workspace, item, audit, navigation, or AI
+  services.
 
 ## Branch Re-index Algorithm
 
@@ -153,13 +186,13 @@ loadBranch(workspace, selectedBranch, force)
   choose working_tree reader when selected branch equals checkout branch
   calculate source configuration hash
   calculate working tree hash for working_tree mode
-  read branch scan metadata from SQL
+  read branch scan metadata from configured storage
   if force is false and metadata matches current Git state:
-    return SQL indexed items for workspace and branch
+    return indexed items for workspace and branch
   scan branch through filesystem or Git tree reader
-  replace SQL rows for workspace and branch in one transaction
+  replace stored rows for workspace and branch
   update workspace last scanned and last selected branch
-  return SQL indexed items for workspace and branch
+  return indexed items for workspace and branch
 ```
 
 Cloud mode runs the scan in the Cloud Agent. The Cloud API receives scan results and freshness metadata from the owner
@@ -167,31 +200,31 @@ agent, then writes only safe metadata and derived rows to Postgres.
 
 ## API Contract
 
-Public route shapes remain stable. Database-specific status is exposed through existing health/state surfaces.
+Public route shapes remain stable except for storage settings and sync operations.
 
-| Method | Endpoint                             | Change                                                                |
-|--------|--------------------------------------|-----------------------------------------------------------------------|
-| GET    | `/api/health`                        | Include database connectivity and migration version in health checks. |
-| GET    | `/api/state`                         | Version hash uses SQL workspace and item index state.                 |
-| GET    | `/api/workspaces`                    | Reads from configured SQL workspace repository.                       |
-| POST   | `/api/workspaces/:id/scan`           | Writes branch index rows through SQL item index repository.           |
-| POST   | `/api/workstreams/:id/branches/load` | Re-indexes stale branch rows, then returns items.                     |
+| Method | Endpoint                             | Change                                                               |
+|--------|--------------------------------------|----------------------------------------------------------------------|
+| GET    | `/api/health`                        | Includes database readiness when the active backend is `database`.   |
+| GET    | `/api/state`                         | Version hash uses the configured workspace and item repositories.    |
+| GET    | `/api/workspaces`                    | Reads from the configured workspace repository.                      |
+| POST   | `/api/workspaces/:id/scan`           | Writes branch index rows through the configured item repository.     |
+| POST   | `/api/workstreams/:id/branches/load` | Re-indexes stale branch rows, then returns items.                    |
+| GET    | `/api/system/storage`                | Returns effective storage option, lock state, paths, and sync state. |
+| PUT    | `/api/system/storage`                | Saves Local bootstrap storage option and data directory settings.    |
+| POST   | `/api/system/storage/sync`           | Runs confirmed local sync between `database` and `datadir`.          |
 
-## File Import
+## Manual Storage Sync
 
-On first SQL startup, the app imports existing app-owned files from `KODE_STREAM_DATA_DIR`:
+Local mode supports explicit sync between database and data-dir stores:
 
-| Source File            | SQL Target                          |
-|------------------------|-------------------------------------|
-| `workspaces.yaml`      | workspace tables                    |
-| `item-index.yaml`      | indexed item and branch scan tables |
-| `audit-log.jsonl`      | audit events                        |
-| `saved-filters.yaml`   | saved filters                       |
-| `recent-items.yaml`    | recent items                        |
-| `ai-settings.yaml`     | AI settings                         |
-| `knowledge-index.yaml` | knowledge index metadata            |
+| Direction             | Source           | Target           |
+|-----------------------|------------------|------------------|
+| `datadir_to_database` | YAML/JSONL files | SQLite tables    |
+| `database_to_datadir` | SQLite tables    | YAML/JSONL files |
 
-Imports are idempotent and recorded in SQL. Source files are left untouched.
+Sync is replace-style and requires confirmation. Before replacing target data, the service writes a timestamped backup
+under `KODE_STREAM_DATA_DIR/backups/storage-sync/`. Sync covers workspaces, branch indexes, scan warnings, audit events,
+navigation state, AI settings, and knowledge index metadata when those stores are present.
 
 ## Error Handling
 
@@ -199,18 +232,10 @@ Imports are idempotent and recorded in SQL. Source files are left untouched.
 |------------------------------|---------------|--------|
 | Database unavailable         | `unavailable` | 503    |
 | Migration required           | `unavailable` | 503    |
-| SQL constraint violation     | `validation`  | 400    |
+| Storage option invalid       | `validation`  | 400    |
+| Cloud datadir requested      | `validation`  | 400    |
+| Sync confirmation missing    | `validation`  | 400    |
+| Sync source unreadable       | `validation`  | 400    |
 | Workspace missing            | `not_found`   | 404    |
 | Stale branch re-index failed | `scan_failed` | 500    |
 | Cloud Agent scan unavailable | `unavailable` | 503    |
-
-## Design Decisions
-
-| Decision                              | Rationale                                                                            |
-|---------------------------------------|--------------------------------------------------------------------------------------|
-| Use embedded migrations               | The binary can create and upgrade SQLite and Postgres schemas consistently.          |
-| Keep SQL behind interfaces            | Existing services can move incrementally without storage-specific branches.          |
-| Make branch index replacement atomic  | Board/search views should not observe mixed rows from two scans.                     |
-| Store JSON for flexible item metadata | Planning metadata evolves faster than board query fields.                            |
-| Keep source files out of SQL          | Git remains the source of truth and PM-032 keeps repository access on user machines. |
-| Fail Cloud startup without Postgres   | Cloud needs durable shared state and concurrent write safety.                        |
