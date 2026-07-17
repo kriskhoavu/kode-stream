@@ -34,17 +34,17 @@ Avoid:
 
 ## Phases Summary
 
-| Phase | Name                                      | Track    | Status  |
-|-------|-------------------------------------------|----------|---------|
-| B1    | Storage interfaces and composition        | Backend  | Done    |
-| B2    | SQL migrations and migration runner       | Backend  | Done    |
-| B3    | SQLite and datadir local repositories     | Backend  | Done    |
-| B4    | Branch re-index correctness               | Backend  | Done    |
-| B5    | Postgres Cloud repositories               | Backend  | Done    |
-| B6    | Storage option and manual sync API        | Backend  | Done    |
-| F1    | Storage Settings option and sync controls | Frontend | Done    |
-| C1    | Local and Cloud storage operations        | DevOps   | Done    |
-| C2    | Pipeline and release gates                | DevOps   | Planned |
+| Phase | Name                                      | Track    | Status |
+|-------|-------------------------------------------|----------|--------|
+| B1    | Storage interfaces and composition        | Backend  | Done   |
+| B2    | SQL migrations and migration runner       | Backend  | Done   |
+| B3    | SQLite and datadir local repositories     | Backend  | Done   |
+| B4    | Branch re-index correctness               | Backend  | Done   |
+| B5    | Postgres Cloud repositories               | Backend  | Done   |
+| B6    | Storage option and manual sync API        | Backend  | Done   |
+| F1    | Storage Settings option and sync controls | Frontend | Done   |
+| C1    | Local and Cloud storage operations        | DevOps   | Done   |
+| C2    | Pipeline and release gates                | DevOps   | Done   |
 
 ## Backend Phases
 
@@ -188,12 +188,12 @@ Avoid:
 **Deliverables:**
 
 - [x] Add SQLite migration and repository tests to normal CI.
-- [ ] Add Local datadir repository and storage-option resolution tests to normal CI.
-- [ ] Add script smoke coverage or documented manual smoke steps for `run.sh` with both Local storage options.
+- [x] Add Local datadir repository and storage-option resolution tests to normal CI.
+- [x] Add script smoke coverage or documented manual smoke steps for `run.sh` with both Local storage options.
 - [x] Add optional local Postgres integration checks and required Cloud release Postgres checks.
-- [ ] Add fixture-based manual sync tests for YAML, JSONL, and SQLite app-owned state.
+- [x] Add fixture-based manual sync tests for YAML, JSONL, and SQLite app-owned state.
 - [x] Add Cloud release smoke for `/api/health` database readiness.
-- [ ] Update release checklist with storage option, sync backup, migration version, and branch re-index smoke checks.
+- [x] Update release checklist with storage option, sync backup, migration version, and branch re-index smoke checks.
 
 **Verification:** `rtk go test ./internal/... && rtk npm run typecheck && rtk npm test -- --run`
 

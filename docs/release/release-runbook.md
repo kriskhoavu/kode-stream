@@ -63,9 +63,14 @@ brew test kode-stream
 
 - Build frontend assets with `npm run build`.
 - Build and tag the Cloud image with `docker build -t kode-stream:<version> .`.
-- Run `/api/health` against the image with required Cloud and Postgres environment variables.
+- Run `/api/health` against the image with `KODE_STREAM_STORAGE_OPTION=database`, Postgres, and required Cloud
+  environment variables.
 - Confirm `/api/health` reports the expected database `migrationVersion`.
+- Confirm Cloud startup rejects `KODE_STREAM_STORAGE_OPTION=datadir`.
 - Back up Postgres before upgrade and rehearse restore from snapshot or dump.
+- Smoke local storage options with `KODE_STREAM_STORAGE_OPTION=database ./run.sh restart` and
+  `KODE_STREAM_STORAGE_OPTION=datadir ./run.sh restart`, or use `./run.sh smoke-storage`.
+- Smoke Settings manual sync in both directions and confirm a target backup appears under `backups/storage-sync/`.
 - Smoke branch re-index by loading a non-current branch and switching back to the active branch.
 - Verify reverse proxy WebSocket upgrade for `/api/agents/channel`.
 - Verify the Homebrew package exposes `kode-stream agent start`, `status`, and `doctor`.

@@ -262,6 +262,49 @@ func TestStorageSyncDataDirToDatabaseCreatesBackupAndCopiesState(t *testing.T) {
 	}
 }
 
+func TestStorageSyncDatabaseToDataDirCreatesBackupAndCopiesState(t *testing.T) {
+	dataDir := t.TempDir()
+	paths := testPaths(dataDir)
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, emptyEnv)
+	if err != nil {
+		t.Fatalf("OpenAppOwnedState returned error: %v", err)
+	}
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: t.TempDir(), BaselineBranch: "main", Sources: []string{"plans"}, CreatedAt: time.Now().UTC()}
+	if err := state.Workspaces.(*SQLiteWorkspaceRepository).upsert(workspace); err != nil {
+		t.Fatal(err)
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-1", WorkspaceID: workspace.ID, Branch: "main", Scope: "plans", Identifier: "PM-001", Title: "Plan", Status: models.StatusDraft, ItemPath: "plans/PM-001", SourceMode: "working_tree", Editable: true, UpdatedAt: time.Now().UTC()}}
+	if err := state.Items.ReplaceWorkspaceBranch(workspace.ID, "main", []models.ItemDetail{item}, models.BranchScanMetadata{WorkspaceID: workspace.ID, Branch: "main", SourceMode: "working_tree", Editable: true, ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.SQLStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := writeYAMLFile(paths.RegistryFile, []models.WorkspaceConfig{{ID: "old-workspace", Name: "Old", Path: t.TempDir(), BaselineBranch: "main", Sources: []string{"plans"}, CreatedAt: time.Now().UTC()}}); err != nil {
+		t.Fatal(err)
+	}
+	service := NewStorageSyncService(Config{StorageOption: StorageOptionDatabase, Driver: StorageDriverSQLite, SQLitePath: paths.SQLiteDatabaseFile, Migrations: "auto"}, paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil)
+	result, err := service.Sync(context.Background(), StorageSyncRequest{Direction: SyncDatabaseToDataDir, Confirm: true})
+	if err != nil {
+		t.Fatalf("Sync returned error: %v", err)
+	}
+	if !result.OK || result.BackupPath == "" || result.Summary["workspaces"] != 1 || result.Summary["items"] != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	workspaces, err := registry.New(paths.RegistryFile, nil).List()
+	if err != nil || len(workspaces) != 1 || workspaces[0].ID != workspace.ID {
+		t.Fatalf("workspaces = %#v err=%v", workspaces, err)
+	}
+	items, err := itemindex.New(paths.PlanIndexFile).BranchItems(workspace.ID, "main")
+	if err != nil || len(items) != 1 || items[0].ID != item.ID {
+		t.Fatalf("items = %#v err=%v", items, err)
+	}
+	if _, err := os.Stat(filepath.Join(result.BackupPath, filepath.Base(paths.RegistryFile))); err != nil {
+		t.Fatalf("target backup missing registry file: %v", err)
+	}
+}
+
 func TestSQLiteItemRepositoryDefaultsMissingUpdatedAt(t *testing.T) {
 	dataDir := t.TempDir()
 	paths := testPaths(dataDir)
