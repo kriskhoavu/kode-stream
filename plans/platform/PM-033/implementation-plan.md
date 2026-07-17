@@ -42,7 +42,7 @@ Avoid:
 | B4    | Branch re-index correctness               | Backend  | Done    |
 | B5    | Postgres Cloud repositories               | Backend  | Done    |
 | B6    | Storage option and manual sync API        | Backend  | Done    |
-| F1    | Storage Settings option and sync controls | Frontend | Planned |
+| F1    | Storage Settings option and sync controls | Frontend | Done    |
 | C1    | Local and Cloud storage operations        | DevOps   | Planned |
 | C2    | Pipeline and release gates                | DevOps   | Planned |
 
@@ -149,11 +149,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Show effective storage option, data directory, database path, and restart-required messaging in Settings.
-- [ ] Let local admins save `database` or `datadir` when storage config is not environment-locked.
-- [ ] Show local-only manual sync actions in both directions with explicit confirmation.
-- [ ] Display sync summary, warnings, skipped stores, and backup path.
-- [ ] Hide or disable unsupported sync actions in Cloud mode.
+- [x] Show effective storage option, data directory, database path, and restart-required messaging in Settings.
+- [x] Let local admins save `database` or `datadir` when storage config is not environment-locked.
+- [x] Show local-only manual sync actions in both directions with explicit confirmation.
+- [x] Display sync summary, warnings, skipped stores, and backup path.
+- [x] Hide or disable unsupported sync actions in Cloud mode.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run StorageSettings`
 

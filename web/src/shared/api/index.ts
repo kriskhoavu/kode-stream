@@ -65,6 +65,10 @@ import type {
   WorkspaceContentSearchResponse,
   WorkspaceTreeEntry,
   SystemConfigPaths,
+  StorageOption,
+  StorageStatus,
+  StorageSyncDirection,
+  StorageSyncResult,
   SourceStructureSettings,
   ScanResult,
   VerifyProfile,
@@ -302,6 +306,11 @@ export const api = {
   systemConfigPaths: () => request<SystemConfigPaths>('/api/system/config-paths').then(normalizeSystemConfigPaths),
   updateSystemConfigPaths: (input: { dataDir: string }) =>
     request<SystemConfigPaths>('/api/system/config-paths', { method: 'PUT', body: JSON.stringify(input) }).then(normalizeSystemConfigPaths),
+  storageStatus: () => request<StorageStatus>('/api/storage/status').then(normalizeStorageStatus),
+  saveStorageOption: (storageOption: StorageOption) =>
+    request<{ storageOption: StorageOption; restartRequired: boolean }>('/api/storage/option', { method: 'PUT', body: JSON.stringify({ storageOption }) }),
+  syncStorage: (direction: StorageSyncDirection) =>
+    request<StorageSyncResult>('/api/storage/sync', { method: 'POST', body: JSON.stringify({ direction, confirm: true }) }).then(normalizeStorageSyncResult),
   items: async (params: URLSearchParams) => ((await request<ItemSummary[] | null>(`/api/items?${params.toString()}`)) ?? []).map(normalizeItem),
   item: async (id: string) => normalizeItemDetail(await request<ItemDetail>(`/api/items/${id}`)),
   files: async (id: string) => (await request<FileNode[] | null>(`/api/items/${id}/files`)) ?? [],
@@ -409,6 +418,39 @@ function normalizeSystemConfigPaths(input: SystemConfigPaths): SystemConfigPaths
     cloneRootDir: input.cloneRootDir ?? '',
 		registryFile: input.registryFile ?? '',
     restartRequired: Boolean(input.restartRequired)
+  };
+}
+
+function normalizeStorageStatus(input: StorageStatus): StorageStatus {
+  return {
+    ...input,
+    mode: input.mode === 'cloud' ? 'cloud' : 'local',
+    storageOption: input.storageOption === 'datadir' ? 'datadir' : 'database',
+    storageDriver: input.storageDriver === 'file' || input.storageDriver === 'postgres' ? input.storageDriver : 'sqlite',
+    environmentLocked: Boolean(input.environmentLocked),
+    storageOptionEnv: input.storageOptionEnv ?? 'KODE_STREAM_STORAGE_OPTION',
+    storageDriverEnv: input.storageDriverEnv ?? 'KODE_STREAM_STORAGE_DRIVER',
+    dataDir: input.dataDir ?? '',
+    databasePath: input.databasePath ?? '',
+    databaseUrlConfigured: Boolean(input.databaseUrlConfigured),
+    database: input.database ? {
+      ...input.database,
+      driver: input.database.driver === 'postgres' || input.database.driver === 'file' ? input.database.driver : 'sqlite',
+      ok: Boolean(input.database.ok),
+      migrationVersion: Number(input.database.migrationVersion) || 0
+    } : undefined
+  };
+}
+
+function normalizeStorageSyncResult(input: StorageSyncResult): StorageSyncResult {
+  return {
+    ...input,
+    ok: Boolean(input.ok),
+    direction: input.direction === 'database_to_datadir' ? 'database_to_datadir' : 'datadir_to_database',
+    backupPath: input.backupPath ?? '',
+    summary: input.summary ?? {},
+    warnings: Array.isArray(input.warnings) ? input.warnings : [],
+    skippedStores: Array.isArray(input.skippedStores) ? input.skippedStores : []
   };
 }
 
