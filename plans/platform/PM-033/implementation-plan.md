@@ -203,11 +203,11 @@ Avoid:
 
 ## Post-Implementation Checklist
 
-- [ ] PM-033 docs match implemented package names and environment variables.
-- [ ] PM-032 docs still describe Cloud Agent execution without Cloud-hosted clones or commands.
-- [ ] Local mode starts with `database` and `datadir` options.
-- [ ] Manual sync works in both directions and creates target backups.
-- [ ] Cloud mode starts only with reachable Postgres.
-- [ ] Branch switch and branch load return current branch items once re-index completes.
-- [ ] App-state storage does not include repository source files, Git credentials, SSH keys, terminal transcripts, or prompts.
-- [ ] Full verification passes: `rtk go test ./internal/... && rtk npm run typecheck && rtk npm test -- --run`.
+- [x] PM-033 docs match implemented package names and environment variables.
+- [x] PM-032 docs still describe Cloud Agent execution without Cloud-hosted clones or commands.
+- [x] Local mode starts with `database` and `datadir` options.
+- [x] Manual sync works in both directions and creates target backups.
+- [x] Cloud mode starts only with reachable Postgres.
+- [x] Branch switch and branch load return current branch items once re-index completes.
+- [x] App-state storage does not include repository source files, Git credentials, SSH keys, terminal transcripts, or prompts.
+- [x] Full verification passes: `rtk go test ./internal/... && rtk npm run typecheck && rtk npm test -- --run`.
