@@ -100,7 +100,19 @@ func SetDataDir(path string) (Paths, error) {
 	}
 	value := strings.TrimSpace(path)
 	if value == "" {
-		if err := os.Remove(settingsPath); err != nil && !os.IsNotExist(err) {
+		settings, _ := readBootstrapSettings(settingsPath)
+		settings.DataDir = ""
+		if strings.TrimSpace(settings.StorageOption) == "" {
+			if err := os.Remove(settingsPath); err != nil && !os.IsNotExist(err) {
+				return Paths{}, err
+			}
+			return ResolvePaths()
+		}
+		data, err := yaml.Marshal(settings)
+		if err != nil {
+			return Paths{}, err
+		}
+		if err := os.WriteFile(settingsPath, data, 0o600); err != nil {
 			return Paths{}, err
 		}
 		return ResolvePaths()
@@ -112,7 +124,9 @@ func SetDataDir(path string) (Paths, error) {
 	if err := os.MkdirAll(resolved, 0o755); err != nil {
 		return Paths{}, err
 	}
-	data, err := yaml.Marshal(bootstrapSettings{DataDir: resolved})
+	settings, _ := readBootstrapSettings(settingsPath)
+	settings.DataDir = resolved
+	data, err := yaml.Marshal(settings)
 	if err != nil {
 		return Paths{}, err
 	}
@@ -123,7 +137,8 @@ func SetDataDir(path string) (Paths, error) {
 }
 
 type bootstrapSettings struct {
-	DataDir string `yaml:"dataDir,omitempty"`
+	DataDir       string `yaml:"dataDir,omitempty"`
+	StorageOption string `yaml:"storageOption,omitempty"`
 }
 
 func resolveDataDirOverride(defaultDir string) (string, error) {
@@ -135,15 +150,8 @@ func resolveDataDirOverride(defaultDir string) (string, error) {
 		return resolved, nil
 	}
 	settingsPath := filepath.Join(defaultDir, "bootstrap.yaml")
-	data, err := os.ReadFile(settingsPath)
+	settings, err := readBootstrapSettings(settingsPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
-		return "", err
-	}
-	var settings bootstrapSettings
-	if err := yaml.Unmarshal(data, &settings); err != nil {
 		return "", err
 	}
 	if strings.TrimSpace(settings.DataDir) == "" {
@@ -154,6 +162,53 @@ func resolveDataDirOverride(defaultDir string) (string, error) {
 		return "", err
 	}
 	return resolved, nil
+}
+
+func ResolveStorageOptionOverride(defaultDir string) (string, error) {
+	if env := strings.TrimSpace(os.Getenv("KODE_STREAM_STORAGE_OPTION")); env != "" {
+		return env, nil
+	}
+	settings, err := readBootstrapSettings(filepath.Join(defaultDir, "bootstrap.yaml"))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(settings.StorageOption), nil
+}
+
+func SetStorageOption(option string) error {
+	defaultDir, err := DefaultDataDir()
+	if err != nil {
+		return err
+	}
+	settingsPath := filepath.Join(defaultDir, "bootstrap.yaml")
+	if err := os.MkdirAll(defaultDir, 0o755); err != nil {
+		return err
+	}
+	settings, _ := readBootstrapSettings(settingsPath)
+	settings.StorageOption = strings.TrimSpace(option)
+	if settings.DataDir == "" && settings.StorageOption == "" {
+		return os.Remove(settingsPath)
+	}
+	data, err := yaml.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(settingsPath, data, 0o600)
+}
+
+func readBootstrapSettings(settingsPath string) (bootstrapSettings, error) {
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return bootstrapSettings{}, nil
+		}
+		return bootstrapSettings{}, err
+	}
+	var settings bootstrapSettings
+	if err := yaml.Unmarshal(data, &settings); err != nil {
+		return bootstrapSettings{}, err
+	}
+	return settings, nil
 }
 
 func expandHome(path string) string {

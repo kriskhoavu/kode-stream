@@ -24,10 +24,14 @@ import (
 )
 
 const (
+	EnvStorageOption = "KODE_STREAM_STORAGE_OPTION"
 	EnvStorageDriver = "KODE_STREAM_STORAGE_DRIVER"
 	EnvSQLitePath    = "KODE_STREAM_SQLITE_PATH"
 	EnvDatabaseURL   = "KODE_STREAM_DATABASE_URL"
 	EnvMigrations    = "KODE_STREAM_MIGRATIONS"
+
+	StorageOptionDatabase = "database"
+	StorageOptionDataDir  = "datadir"
 
 	StorageDriverFile     = "file"
 	StorageDriverSQLite   = "sqlite"
@@ -35,10 +39,14 @@ const (
 )
 
 type Config struct {
-	Driver      string
-	SQLitePath  string
-	DatabaseURL string
-	Migrations  string
+	StorageOption    string
+	Driver           string
+	SQLitePath       string
+	DatabaseURL      string
+	Migrations       string
+	EnvironmentLock  bool
+	StorageOptionSet bool
+	StorageDriverSet bool
 }
 
 type AppOwnedState struct {
@@ -54,6 +62,26 @@ type AppOwnedState struct {
 	SQLStore      *SQLStore
 	SQLiteStore   *SQLiteStore
 	PostgresStore *PostgresStore
+	Provider      StorageProvider
+	Repositories  RepositoryBundle
+	StatusService *StorageStatusService
+	SyncService   *StorageSyncService
+}
+
+type RepositoryBundle struct {
+	Workspaces registry.Repository
+	Items      itemindex.Repository
+	Audit      audit.Repository
+	Navigation navigation.Repository
+	AISettings ai.SettingsStore
+	Knowledge  *knowledge.Store
+}
+
+type StorageProvider interface {
+	Name() string
+	Repositories() RepositoryBundle
+	SQLStore() *SQLStore
+	Close() error
 }
 
 type ImportStatusRepository interface {
@@ -91,19 +119,45 @@ type DatabaseHealth struct {
 }
 
 func ResolveConfig(runtime system.RuntimeConfig, paths system.Paths, getenv func(string) string) (Config, error) {
+	option := strings.ToLower(strings.TrimSpace(getenv(EnvStorageOption)))
 	driver := strings.ToLower(strings.TrimSpace(getenv(EnvStorageDriver)))
+	optionSet := option != ""
+	driverSet := driver != ""
+	if option == "" && paths.DefaultDir != "" {
+		if persisted, err := system.ResolveStorageOptionOverride(paths.DefaultDir); err == nil {
+			option = strings.ToLower(strings.TrimSpace(persisted))
+		}
+	}
+	if option == "" {
+		option = StorageOptionDatabase
+	}
+	switch option {
+	case StorageOptionDatabase, StorageOptionDataDir:
+	default:
+		return Config{}, fmt.Errorf("%s must be database or datadir", EnvStorageOption)
+	}
 	if driver == "" {
-		if runtime.Mode == models.RuntimeModeCloud {
+		switch {
+		case runtime.Mode == models.RuntimeModeCloud:
 			driver = StorageDriverPostgres
-		} else {
+		case option == StorageOptionDataDir:
+			driver = StorageDriverFile
+		default:
 			driver = StorageDriverSQLite
 		}
 	}
+	if driverSet {
+		option = storageOptionForDriver(driver)
+	}
 	config := Config{
-		Driver:      driver,
-		SQLitePath:  strings.TrimSpace(getenv(EnvSQLitePath)),
-		DatabaseURL: strings.TrimSpace(getenv(EnvDatabaseURL)),
-		Migrations:  strings.ToLower(strings.TrimSpace(getenv(EnvMigrations))),
+		StorageOption:    option,
+		Driver:           driver,
+		SQLitePath:       strings.TrimSpace(getenv(EnvSQLitePath)),
+		DatabaseURL:      strings.TrimSpace(getenv(EnvDatabaseURL)),
+		Migrations:       strings.ToLower(strings.TrimSpace(getenv(EnvMigrations))),
+		EnvironmentLock:  optionSet || driverSet,
+		StorageOptionSet: optionSet,
+		StorageDriverSet: driverSet,
 	}
 	if config.Migrations == "" {
 		config.Migrations = "auto"
@@ -119,13 +173,26 @@ func ResolveConfig(runtime system.RuntimeConfig, paths system.Paths, getenv func
 	default:
 		return Config{}, fmt.Errorf("%s must be file, sqlite, or postgres", EnvStorageDriver)
 	}
+	if config.StorageOption == StorageOptionDatabase && config.Driver == StorageDriverFile {
+		return Config{}, fmt.Errorf("%s=database cannot use %s=file", EnvStorageOption, EnvStorageDriver)
+	}
+	if config.StorageOption == StorageOptionDataDir && config.Driver != StorageDriverFile {
+		return Config{}, fmt.Errorf("%s=datadir requires %s=file", EnvStorageOption, EnvStorageDriver)
+	}
 	if runtime.Mode == models.RuntimeModeCloud && config.Driver != StorageDriverPostgres {
-		return Config{}, fmt.Errorf("cloud mode requires %s=postgres", EnvStorageDriver)
+		return Config{}, fmt.Errorf("cloud mode requires %s=database with %s=postgres", EnvStorageOption, EnvStorageDriver)
 	}
 	if config.Driver == StorageDriverPostgres && config.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("%s=postgres requires %s", EnvStorageDriver, EnvDatabaseURL)
 	}
 	return config, nil
+}
+
+func storageOptionForDriver(driver string) string {
+	if driver == StorageDriverFile {
+		return StorageOptionDataDir
+	}
+	return StorageOptionDatabase
 }
 
 func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *appgit.GitAdapter, getenv func(string) string) (*AppOwnedState, error) {
@@ -143,7 +210,17 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		Knowledge:   knowledge.NewStore(paths.KnowledgeIndexFile),
 		LegacyFiles: paths,
 	}
+	state.Repositories = RepositoryBundle{
+		Workspaces: state.Workspaces,
+		Items:      state.Items,
+		Audit:      state.Audit,
+		Navigation: state.Navigation,
+		AISettings: state.AISettings,
+		Knowledge:  state.Knowledge,
+	}
 	switch config.Driver {
+	case StorageDriverFile:
+		state.Provider = &DataDirProvider{repositories: state.Repositories}
 	case StorageDriverSQLite:
 		sqlStore, err := openSQLStore(config)
 		if err != nil {
@@ -157,6 +234,8 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		state.Audit = &SQLiteAuditRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
 		state.Navigation = &SQLiteNavigationRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
 		state.AISettings = &SQLiteAISettingsRepository{db: sqlStore.db, driver: sqlStore.driver}
+		state.Repositories = RepositoryBundle{Workspaces: state.Workspaces, Items: state.Items, Audit: state.Audit, Navigation: state.Navigation, AISettings: state.AISettings, Knowledge: state.Knowledge}
+		state.Provider = &SQLiteProvider{store: state.SQLiteStore, repositories: state.Repositories}
 		if err := ImportLegacyFiles(paths, git, state); err != nil {
 			_ = sqlStore.Close()
 			return nil, err
@@ -174,7 +253,11 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		state.Audit = &SQLiteAuditRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
 		state.Navigation = &SQLiteNavigationRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
 		state.AISettings = &SQLiteAISettingsRepository{db: sqlStore.db, driver: sqlStore.driver}
+		state.Repositories = RepositoryBundle{Workspaces: state.Workspaces, Items: state.Items, Audit: state.Audit, Navigation: state.Navigation, AISettings: state.AISettings, Knowledge: state.Knowledge}
+		state.Provider = &PostgresProvider{store: state.PostgresStore, repositories: state.Repositories}
 	}
+	state.StatusService = NewStorageStatusService(config, paths, runtime, state.SQLStore)
+	state.SyncService = NewStorageSyncService(config, paths, runtime, git)
 	return state, nil
 }
 

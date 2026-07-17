@@ -71,7 +71,7 @@ func NewServer(port int) (*Server, error) {
 	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager)
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore)
-	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithDatabaseHealth(state.SQLStore).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
+	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithDatabaseHealth(state.SQLStore).WithStorageServices(state.StatusService, state.SyncService).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())

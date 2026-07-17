@@ -41,7 +41,7 @@ Avoid:
 | B3    | SQLite and datadir local repositories     | Backend  | Done    |
 | B4    | Branch re-index correctness               | Backend  | Done    |
 | B5    | Postgres Cloud repositories               | Backend  | Done    |
-| B6    | Storage option and manual sync API        | Backend  | Planned |
+| B6    | Storage option and manual sync API        | Backend  | Done    |
 | F1    | Storage Settings option and sync controls | Frontend | Planned |
 | C1    | Local and Cloud storage operations        | DevOps   | Planned |
 | C2    | Pipeline and release gates                | DevOps   | Planned |
@@ -131,13 +131,13 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Introduce provider-style storage composition with `StorageProvider`, `RepositoryBundle`, `StorageStatusService`, and `StorageSyncService` boundaries.
-- [ ] Add `KODE_STREAM_STORAGE_OPTION=database|datadir` and bootstrap `storageOption` support.
-- [ ] Resolve Local `database` to SQLite, Local `datadir` to file repositories, and Cloud `database` to Postgres.
-- [ ] Reject Cloud `datadir` startup with a clear validation error.
-- [ ] Add storage status API with effective option, environment lock state, paths, and database health when applicable.
-- [ ] Add confirmed manual sync API for `datadir_to_database` and `database_to_datadir`.
-- [ ] Write timestamped target backups before sync replacement.
+- [x] Introduce provider-style storage composition with `StorageProvider`, `RepositoryBundle`, `StorageStatusService`, and `StorageSyncService` boundaries.
+- [x] Add `KODE_STREAM_STORAGE_OPTION=database|datadir` and bootstrap `storageOption` support.
+- [x] Resolve Local `database` to SQLite, Local `datadir` to file repositories, and Cloud `database` to Postgres.
+- [x] Reject Cloud `datadir` startup with a clear validation error.
+- [x] Add storage status API with effective option, environment lock state, paths, and database health when applicable.
+- [x] Add confirmed manual sync API for `datadir_to_database` and `database_to_datadir`.
+- [x] Write timestamped target backups before sync replacement.
 
 **Verification:** `rtk go test ./internal/storage/... ./internal/system/... ./internal/server/...`
 

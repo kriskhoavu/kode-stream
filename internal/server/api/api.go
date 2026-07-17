@@ -61,12 +61,22 @@ type API struct {
 	verification    *appverification.Service
 	runtimeConfig   system.RuntimeConfig
 	databaseHealth  databaseHealthChecker
+	storageStatus   storageStatusService
+	storageSync     storageSyncService
 	agentStore      *cloudAgentStore
 	cloudWorkspaces *cloudWorkspaceStore
 }
 
 type databaseHealthChecker interface {
 	Health(context.Context) storage.DatabaseHealth
+}
+
+type storageStatusService interface {
+	Status(context.Context) storage.StorageStatus
+}
+
+type storageSyncService interface {
+	Sync(context.Context, storage.StorageSyncRequest) (storage.StorageSyncResult, error)
 }
 
 func (a *API) WithJira(service *appjira.Service) *API {
@@ -91,6 +101,12 @@ func (a *API) WithRuntimeConfig(config system.RuntimeConfig) *API {
 
 func (a *API) WithDatabaseHealth(checker databaseHealthChecker) *API {
 	a.databaseHealth = checker
+	return a
+}
+
+func (a *API) WithStorageServices(status storageStatusService, sync storageSyncService) *API {
+	a.storageStatus = status
+	a.storageSync = sync
 	return a
 }
 

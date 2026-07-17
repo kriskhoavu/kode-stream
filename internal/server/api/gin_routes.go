@@ -25,6 +25,7 @@ func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 	api.GET("/audit-events", a.ginAuditEvents)
 	a.registerNavigationRoutes(api)
 	a.registerSystemRoutes(api)
+	a.registerStorageRoutes(api)
 	a.registerStateSearchAIRoutes(api)
 	a.registerCloudAgentRoutes(api)
 	a.registerWorkspaceReadRoutes(api)
@@ -33,6 +34,12 @@ func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 	a.registerKnowledgeVerificationRoutes(api)
 	a.registerGitRoutes(api)
 	a.registerStreamingRoutes(api)
+}
+
+func (a *API) registerStorageRoutes(api *gin.RouterGroup) {
+	api.GET("/storage/status", ginHTTPHandler(a.storageStatusRoute))
+	api.PUT("/storage/option", ginHTTPHandler(a.storageOptionRoute))
+	api.POST("/storage/sync", ginHTTPHandler(a.storageSyncRoute))
 }
 
 func (a *API) registerCloudAgentRoutes(api *gin.RouterGroup) {

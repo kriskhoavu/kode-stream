@@ -54,6 +54,28 @@ func TestResolveConfigAcceptsCloudPostgresURL(t *testing.T) {
 	}
 }
 
+func TestResolveConfigUsesStorageOption(t *testing.T) {
+	paths := system.Paths{SQLiteDatabaseFile: filepath.Join(t.TempDir(), "kode-stream.db")}
+	config, err := ResolveConfig(system.RuntimeConfig{Mode: models.RuntimeModeLocal}, paths, mapEnv(map[string]string{
+		EnvStorageOption: StorageOptionDataDir,
+	}))
+	if err != nil {
+		t.Fatalf("ResolveConfig returned error: %v", err)
+	}
+	if config.StorageOption != StorageOptionDataDir || config.Driver != StorageDriverFile {
+		t.Fatalf("config = %#v, want datadir/file", config)
+	}
+}
+
+func TestResolveConfigRejectsCloudDataDir(t *testing.T) {
+	_, err := ResolveConfig(system.RuntimeConfig{Mode: models.RuntimeModeCloud}, system.Paths{}, mapEnv(map[string]string{
+		EnvStorageOption: StorageOptionDataDir,
+	}))
+	if err == nil {
+		t.Fatal("expected cloud datadir validation error")
+	}
+}
+
 func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 	dataDir := t.TempDir()
 	paths := system.Paths{
@@ -179,6 +201,64 @@ func TestOpenAppOwnedStateImportsLegacyAppOwnedFiles(t *testing.T) {
 	}
 	if _, err := os.Stat(paths.RegistryFile); err != nil {
 		t.Fatalf("legacy source file was changed or removed: %v", err)
+	}
+}
+
+func TestOpenAppOwnedStateUsesDataDirProvider(t *testing.T) {
+	dataDir := t.TempDir()
+	paths := testPaths(dataDir)
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, mapEnv(map[string]string{
+		EnvStorageOption: StorageOptionDataDir,
+	}))
+	if err != nil {
+		t.Fatalf("OpenAppOwnedState returned error: %v", err)
+	}
+	if state.SQLStore != nil {
+		t.Fatalf("SQLStore = %#v, want nil for datadir", state.SQLStore)
+	}
+	if state.Provider == nil || state.Provider.Name() != StorageOptionDataDir {
+		t.Fatalf("provider = %#v, want datadir", state.Provider)
+	}
+}
+
+func TestStorageSyncDataDirToDatabaseCreatesBackupAndCopiesState(t *testing.T) {
+	dataDir := t.TempDir()
+	paths := testPaths(dataDir)
+	source := registry.New(paths.RegistryFile, nil)
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: t.TempDir(), BaselineBranch: "main", Sources: []string{"plans"}, CreatedAt: time.Now().UTC()}
+	if err := writeYAMLFile(paths.RegistryFile, []models.WorkspaceConfig{workspace}); err != nil {
+		t.Fatal(err)
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-1", WorkspaceID: workspace.ID, Branch: "main", Scope: "plans", Identifier: "PM-001", Title: "Plan", Status: models.StatusDraft, ItemPath: "plans/PM-001", SourceMode: "working_tree", Editable: true, UpdatedAt: time.Now().UTC()}}
+	if err := itemindex.New(paths.PlanIndexFile).ReplaceWorkspaceBranch(workspace.ID, "main", []models.ItemDetail{item}, models.BranchScanMetadata{WorkspaceID: workspace.ID, Branch: "main", SourceMode: "working_tree", Editable: true, ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := source.List(); err != nil {
+		t.Fatal(err)
+	}
+	service := NewStorageSyncService(Config{StorageOption: StorageOptionDataDir, Driver: StorageDriverFile, SQLitePath: paths.SQLiteDatabaseFile, Migrations: "auto"}, paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil)
+	result, err := service.Sync(context.Background(), StorageSyncRequest{Direction: SyncDataDirToDatabase, Confirm: true})
+	if err != nil {
+		t.Fatalf("Sync returned error: %v", err)
+	}
+	if !result.OK || result.BackupPath == "" || result.Summary["workspaces"] != 1 || result.Summary["items"] != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, emptyEnv)
+	if err != nil {
+		t.Fatalf("OpenAppOwnedState returned error: %v", err)
+	}
+	defer state.SQLStore.Close()
+	workspaces, err := state.Workspaces.List()
+	if err != nil || len(workspaces) != 1 || workspaces[0].ID != workspace.ID {
+		t.Fatalf("workspaces = %#v err=%v", workspaces, err)
+	}
+	items, err := state.Items.BranchItems(workspace.ID, "main")
+	if err != nil || len(items) != 1 || items[0].ID != item.ID {
+		t.Fatalf("items = %#v err=%v", items, err)
+	}
+	if _, err := os.Stat(result.BackupPath); err != nil {
+		t.Fatalf("backup path missing: %v", err)
 	}
 }
 
