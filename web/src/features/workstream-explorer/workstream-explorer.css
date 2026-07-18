@@ -67,6 +67,13 @@
   container-type: inline-size;
 }
 
+.explorer-left-panel-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+
 .explorer-toolbar {
   min-height: 50px;
   gap: 8px;

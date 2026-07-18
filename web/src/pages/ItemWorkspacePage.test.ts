@@ -5,10 +5,11 @@ import { ItemWorkspacePage } from './ItemWorkspacePage';
 import { parseGitDiff } from '../shared/domain/diff';
 
 vi.mock('./WorkstreamExplorer', () => ({
-  WorkstreamExplorer: ({ location, embeddedHeaderContent, rightPanel }: { location?: { workspaceId?: string; path?: string; mode?: string }; embeddedHeaderContent?: ReturnType<typeof createElement>; rightPanel?: { title?: ReturnType<typeof createElement>; content?: ReturnType<typeof createElement> } }) => createElement(
+  WorkstreamExplorer: ({ location, embeddedHeaderContent, leftPanelContent, rightPanel }: { location?: { workspaceId?: string; path?: string; mode?: string }; embeddedHeaderContent?: ReturnType<typeof createElement>; leftPanelContent?: ReturnType<typeof createElement>; rightPanel?: { title?: ReturnType<typeof createElement>; content?: ReturnType<typeof createElement> } }) => createElement(
     'div',
     undefined,
     embeddedHeaderContent,
+    leftPanelContent,
     createElement(
       'div',
       { 'data-testid': 'embedded-explorer' },
@@ -129,6 +130,55 @@ describe('ItemWorkspacePage', () => {
     expect(screen.getByRole('button', { name: 'Git' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Quality/i }));
     expect(screen.getByLabelText('Quality')).toBeInTheDocument();
+  });
+
+  it('opens a Git changed path in the main explorer without leaving the Git panel', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/items/item-1') {
+        return Promise.resolve(response({
+          id: 'item-1',
+          workspaceId: 'ws-1',
+          workspaceName: 'Workspace',
+          scope: 'api',
+          branch: 'main',
+          identifier: 'DI-170',
+          title: 'Custom assortment',
+          status: 'draft',
+          tags: [],
+          metadataSource: 'plan.yaml',
+          itemPath: 'plans/api/DI-170',
+          counts: { files: 1 },
+          warnings: []
+        }));
+      }
+      if (url === '/api/items/item-1/files') return Promise.resolve(response([{ id: 'readme', name: 'README.md', path: 'README.md', type: 'file', editable: true, kind: 'markdown' }]));
+      if (url === '/api/items/item-1/files/readme') return Promise.resolve(response({ id: 'readme', path: 'README.md', content: '# DI-170', hash: 'hash', kind: 'markdown', sizeBytes: 8, editable: true, truncated: false }));
+      if (url === '/api/items/item-1/diff') return Promise.resolve(response({ diff: '' }));
+      if (url === '/api/workspaces/ws-1/git/status') return Promise.resolve(response({
+        workspaceId: 'ws-1',
+        branch: 'main',
+        ahead: 0,
+        behind: 0,
+        dirty: true,
+        conflicted: false,
+        changes: [{ path: 'plans/api/DI-170/README.md', status: 'modified', staged: false }]
+      }));
+      if (url === '/api/workspaces/ws-1/git/branches') return Promise.resolve(response({ workspaceId: 'ws-1', current: 'main', branches: ['main'] }));
+      if (url === '/api/workspaces/ws-1/git/activity?path=plans%2Fapi%2FDI-170&limit=8') return Promise.resolve(response([]));
+      if (url === '/api/items/item-1/jira') return Promise.resolve(response({ state: 'not_configured' }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(createElement(ItemWorkspacePage, { itemId: 'item-1', refreshKey: 0, workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }], onBack: vi.fn(), onOpenItem: vi.fn(), onContentChanged: vi.fn() }));
+
+    const gitTab = await screen.findByRole('button', { name: 'Git' });
+    fireEvent.click(gitTab);
+    fireEvent.click(await screen.findByRole('button', { name: 'plans/api/DI-170/README.md' }));
+
+    await waitFor(() => expect(screen.getByTestId('embedded-explorer')).toHaveTextContent('ws-1|plans/api/DI-170/README.md|all'));
+    expect(gitTab).toHaveClass('active');
+    expect(screen.getByText('0 ahead')).toBeInTheDocument();
   });
 
   it('loads a branch snapshot and opens the matching branch-scoped item', async () => {

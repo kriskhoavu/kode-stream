@@ -583,6 +583,17 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     }
   };
 
+  const refreshGitDetails = async () => {
+    if (!plan) return;
+    setError('');
+    setRecoveryHint('');
+    await Promise.all([
+      loadGitStatus(plan.workspaceId),
+      loadGitActivity(plan.workspaceId, activityPath),
+      loadDiff()
+    ]);
+  };
+
   const commitSelectedPaths = async () => {
     if (!plan) return;
     setGitBusy('commit');
@@ -624,6 +635,17 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
 
   const toggleGitPath = (path: string) => {
     setSelectedGitPaths((current) => current.includes(path) ? current.filter((item) => item !== path) : [...current, path]);
+  };
+
+  const openGitChangePath = (change: GitChange) => {
+    if (!plan) return;
+    const path = normalizePath(change.path);
+    if (!path) return;
+    setWorkspaceExplorerLocation((current) => ({
+      workspaceId: plan.workspaceId,
+      path,
+      mode: current?.mode ?? 'all'
+    }));
   };
 
   const goBack = () => {
@@ -988,8 +1010,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   );
 
   const gitPanel = gitStatus ? (
-    <section className="git-panel git-main-panel">
-      <h3>Git</h3>
+    <section className="git-panel git-side-panel">
       <div className="git-summary">
         <span>{gitStatus.branch}</span>
         <span>{gitStatus.ahead} ahead</span>
@@ -1003,11 +1024,11 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       <div className="git-changes">
         {gitStatus.changes.length === 0 && <span>No local changes</span>}
         {gitStatus.changes.map((change) => (
-          <label key={`${change.status}-${change.path}`}>
-            <input type="checkbox" checked={selectedGitPaths.includes(change.path)} onChange={() => toggleGitPath(change.path)} />
+          <div className="git-change-row" key={`${change.status}-${change.path}`}>
+            <input type="checkbox" aria-label={`Select ${change.path} for commit`} checked={selectedGitPaths.includes(change.path)} onChange={() => toggleGitPath(change.path)} />
             <span>{change.status}</span>
-            <strong>{change.path}</strong>
-          </label>
+            <button className="git-change-path" type="button" title={change.path} onClick={() => openGitChangePath(change)}>{change.path}</button>
+          </div>
         ))}
       </div>
       <textarea className="commit-message" value={gitMessage} onChange={(event) => setGitMessage(event.target.value)} placeholder="Commit message" />
@@ -1015,7 +1036,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
         {gitBusy === 'commit' ? 'Committing...' : 'Commit Selected'}
       </button>
       <div className="branch-create-row">
-        <input value={branchName} onChange={(event) => setBranchName(event.target.value)} placeholder="new-branch-name" />
+        <input value={branchName} onChange={(event) => setBranchName(event.target.value)} placeholder="New Branch" />
         <button className="secondary" type="button" disabled={Boolean(gitBusy) || !branchName.trim()} onClick={createAndSwitchBranch}>
           {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
         </button>
@@ -1033,7 +1054,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       </details>
     </section>
   ) : (
-    <div className="metadata-callout git-main-panel">
+    <div className="metadata-callout git-side-panel">
       <strong>Git status unavailable</strong>
       <span>Refresh the workspace or scan the source to load Git information.</span>
     </div>
@@ -1147,10 +1168,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           <button
             className={`icon-button workspace-git-status-button${gitStatus?.dirty ? ' is-dirty' : ''}`}
             type="button"
-            aria-label={gitStatus?.dirty ? 'Refresh Git status, local changes present' : 'Refresh Git status'}
-            title={gitStatus?.dirty ? 'Local changes present. Refresh Git status.' : 'Refresh Git status'}
+            aria-label={gitStatus?.dirty ? 'Refresh Git status, activity, and diff; local changes present' : 'Refresh Git status, activity, and diff'}
+            title={gitStatus?.dirty ? 'Local changes present. Refresh Git status, activity, and diff.' : 'Refresh Git status, activity, and diff'}
             disabled={gitLoading || !plan}
-            onClick={() => { if (plan) void loadGitStatus(plan.workspaceId); }}
+            onClick={() => void refreshGitDetails()}
           >
             <RefreshCw size={18} />
           </button>
@@ -1168,7 +1189,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           embedded
           showModeSelector={false}
           treeRootPath={detailViewMode === 'plan' ? itemRootPath : undefined}
-          mainContent={detailViewMode === 'git' ? gitPanel : undefined}
+          leftPanelContent={detailViewMode === 'git' ? gitPanel : undefined}
           rightPanel={{
             title: <><Info size={16} /> Work Item</>,
             content: workItemPanelContent,

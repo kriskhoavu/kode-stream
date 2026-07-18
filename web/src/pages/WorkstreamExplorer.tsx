@@ -39,7 +39,7 @@ type ExplorerRightPanelProps = {
   expandedLabel?: string;
 };
 
-export function WorkstreamExplorer({ workspaces, location, onLocationChange, embedded = false, treeRootPath, showModeSelector = true, embeddedHeaderContent, mainContent, rightPanel }: {
+export function WorkstreamExplorer({ workspaces, location, onLocationChange, embedded = false, treeRootPath, showModeSelector = true, embeddedHeaderContent, leftPanelContent, mainContent, rightPanel }: {
   workspaces: WorkspaceConfig[];
   location?: ExplorerLocation;
   onLocationChange: (location?: ExplorerLocation) => void;
@@ -47,6 +47,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   treeRootPath?: string;
   showModeSelector?: boolean;
   embeddedHeaderContent?: ReactNode;
+  leftPanelContent?: ReactNode;
   mainContent?: ReactNode;
   rightPanel?: ExplorerRightPanelProps;
 }) {
@@ -363,15 +364,16 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
 				<option value="all">Entire workspace</option>
 			</select>
               )}
-              {!leftCollapsed && <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label="New file" title="New file" disabled={!workspace} onClick={() => setPathDialog({ kind: 'file', parentPath: selectedParentPath() })}>{embedded ? <FilePlus2 size={15} /> : <><FilePlus2 size={15} /> New file</>}</button>}
-              {!leftCollapsed && <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label="New folder" title="New folder" disabled={!workspace} onClick={() => setPathDialog({ kind: 'directory', parentPath: selectedParentPath() })}>{embedded ? <FolderPlus size={15} /> : <><FolderPlus size={15} /> New folder</>}</button>}
-              {!leftCollapsed && <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label="Rename selected path" title="Rename" disabled={!selectedRow || selectedRow.node.type === 'workspace'} onClick={() => void openRename()}>{embedded ? <Pencil size={15} /> : <><Pencil size={15} /> Rename</>}</button>}
+              {!leftCollapsed && !leftPanelContent && <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label="New file" title="New file" disabled={!workspace} onClick={() => setPathDialog({ kind: 'file', parentPath: selectedParentPath() })}>{embedded ? <FilePlus2 size={15} /> : <><FilePlus2 size={15} /> New file</>}</button>}
+              {!leftCollapsed && !leftPanelContent && <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label="New folder" title="New folder" disabled={!workspace} onClick={() => setPathDialog({ kind: 'directory', parentPath: selectedParentPath() })}>{embedded ? <FolderPlus size={15} /> : <><FolderPlus size={15} /> New folder</>}</button>}
+              {!leftCollapsed && !leftPanelContent && <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label="Rename selected path" title="Rename" disabled={!selectedRow || selectedRow.node.type === 'workspace'} onClick={() => void openRename()}>{embedded ? <Pencil size={15} /> : <><Pencil size={15} /> Rename</>}</button>}
               <button className={embedded ? 'icon-button explorer-action-button' : 'secondary'} type="button" aria-label={leftCollapsed ? 'Expand files panel' : 'Collapse files panel'} title={leftCollapsed ? 'Expand files panel' : 'Collapse files panel'} onClick={() => setLeftCollapsed((value) => !value)}>{embedded ? (leftCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />) : <>{leftCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />} {leftCollapsed ? 'Expand files' : 'Collapse files'}</>}</button>
               {(!embedded && !leftCollapsed) && <button className="secondary" type="button" aria-label="Refresh" title="Refresh" onClick={explorer.refresh}><RefreshCw size={15} /> Refresh</button>}
             </div>
 		  </div>
-		  {!leftCollapsed && !embedded && <div className="explorer-search-context">Search in {workspace?.name ?? 'all workspaces'}</div>}
-		  {!leftCollapsed && <div className="explorer-toolbar">
+		  {!leftCollapsed && leftPanelContent && <div className="explorer-left-panel-content">{leftPanelContent}</div>}
+		  {!leftCollapsed && !leftPanelContent && !embedded && <div className="explorer-search-context">Search in {workspace?.name ?? 'all workspaces'}</div>}
+		  {!leftCollapsed && !leftPanelContent && <div className="explorer-toolbar">
 			<label><Search size={15} /><input aria-label="Search files" value={pathSearch.query} onChange={(event) => setExplorerSearchQuery(event.target.value)} onKeyDown={(event) => {
 			  if (event.key === 'ArrowDown' && searchResults.length) { event.preventDefault(); setSearchIndex((index) => Math.min(index + 1, searchResults.length - 1)); }
 			  if (event.key === 'ArrowUp' && searchResults.length) { event.preventDefault(); setSearchIndex((index) => Math.max(index - 1, 0)); }
@@ -379,8 +381,8 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
 			  if (event.key === 'Escape') setExplorerSearchQuery('');
 			}} placeholder="Search files and text" /></label>
 		  </div>}
-		  {!leftCollapsed && pathSearch.query.trim() && <ExplorerUnifiedSearchResults query={pathSearch.query} results={searchResults} loading={pathSearch.loading || contentSearch.loading} error={pathSearch.error || contentSearch.error} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={openUnifiedSearchResult} />}
-		  {!leftCollapsed && <div className="explorer-tree" ref={treeRef} role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>
+		  {!leftCollapsed && !leftPanelContent && pathSearch.query.trim() && <ExplorerUnifiedSearchResults query={pathSearch.query} results={searchResults} loading={pathSearch.loading || contentSearch.loading} error={pathSearch.error || contentSearch.error} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={openUnifiedSearchResult} />}
+		  {!leftCollapsed && !leftPanelContent && <div className="explorer-tree" ref={treeRef} role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>
             {visibleRows.map((row, index) => (
               <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={row.node.type === 'file' ? explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path)) : undefined} branchState={workspaceBranches.states[row.workspaceId]} showBranchSelector={!embedded} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} onBranchChange={(workspace, branch) => void switchWorkspaceBranch(workspace, branch)} />
             ))}

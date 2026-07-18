@@ -2329,8 +2329,8 @@ select:disabled {
   color: var(--text);
 }
 
-.git-main-panel {
-  margin: 16px;
+.git-side-panel {
+  margin-top: 2px;
 }
 
 .verification-header {
@@ -6835,7 +6835,8 @@ body.is-resizing-panel {
   font-size: 13px;
 }
 
-.git-changes label {
+.git-changes label,
+.git-change-row {
   display: grid;
   grid-template-columns: 18px 72px minmax(0, 1fr);
   align-items: center;
@@ -6844,15 +6845,33 @@ body.is-resizing-panel {
   font-size: 12px;
 }
 
-.git-changes label span {
+.git-changes label span,
+.git-change-row span {
   color: var(--muted);
 }
 
-.git-changes label strong {
+.git-changes label strong,
+.git-change-path {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.git-change-path {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  font-weight: 700;
+}
+
+.git-change-path:hover,
+.git-change-path:focus-visible {
+  color: var(--button-accent);
+  text-decoration: underline;
 }
 
 .commit-message {
