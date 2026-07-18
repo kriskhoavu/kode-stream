@@ -31,7 +31,7 @@ Avoid:
 | F1    | API origin adapter                      | Frontend | Done   |
 | F2    | Extension surface behavior              | Frontend | Done   |
 | C1    | Extension build artifact                | DevOps   | Done   |
-| C2    | Showcase verification and documentation | DevOps   | Draft  |
+| C2    | Showcase verification and documentation | DevOps   | Done   |
 
 ## Frontend Phases
 
@@ -89,11 +89,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Document manual load steps for `dist/chrome-extension`.
-- [ ] Document local server startup and configurable API origin.
-- [ ] Document Files + Git acceptance scenarios.
-- [ ] Document v1 limits: no direct file URL permission, no downloads permission, no native messaging, no embedded terminal streaming.
-- [ ] Add troubleshooting for stopped server, wrong port, and localhost permission issues.
+- [x] Document manual load steps for `dist/chrome-extension`.
+- [x] Document local server startup and configurable API origin.
+- [x] Document Files + Git acceptance scenarios.
+- [x] Document v1 limits: no direct file URL permission, no downloads permission, no native messaging, no embedded terminal streaming.
+- [x] Add troubleshooting for stopped server, wrong port, and localhost permission issues.
 
 **Verification:** `rtk npm run build:extension && rtk go test ./...`
 
@@ -101,9 +101,9 @@ Avoid:
 
 ## Post-Implementation Checklist
 
-- [ ] Update `plans/platform/PM-034/` docs to reflect final file names and commands.
-- [ ] Run Markdown formatting on all PM-034 Markdown files.
-- [ ] Run `rtk npm run typecheck`.
-- [ ] Run `rtk npm test -- --run`.
-- [ ] Run `rtk go test ./...`.
+- [x] Update `plans/platform/PM-034/` docs to reflect final file names and commands.
+- [x] Run Markdown formatting on all PM-034 Markdown files.
+- [x] Run `rtk npm run typecheck`.
+- [x] Run `rtk npm test -- --run`.
+- [x] Run `rtk go test ./...`.
 - [ ] PR description references PM-034 planning docs.

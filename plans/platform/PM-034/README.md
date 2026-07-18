@@ -75,3 +75,4 @@ Git history.
 - [Infrastructure Design](design/design-02-infrastructure.md)
 - [Pipeline Design](design/design-03-pipeline.md)
 - [Implementation Plan](implementation-plan.md)
+- [Showcase Runbook](../../../docs/release/chrome-extension-showcase.md)
