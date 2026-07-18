@@ -28,7 +28,7 @@ Avoid:
 
 | Phase | Name                                    | Track    | Status |
 |-------|-----------------------------------------|----------|--------|
-| F1    | API origin adapter                      | Frontend | Draft  |
+| F1    | API origin adapter                      | Frontend | Done   |
 | F2    | Extension surface behavior              | Frontend | Draft  |
 | C1    | Extension build artifact                | DevOps   | Draft  |
 | C2    | Showcase verification and documentation | DevOps   | Draft  |
@@ -39,11 +39,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Add a shared API URL resolver used by all frontend API requests.
-- [ ] Keep relative `/api/*` behavior for localhost and Vite dev surfaces.
-- [ ] Resolve extension-surface API calls to `localStorage.kodeStreamApiOrigin` or `http://127.0.0.1:4317`.
-- [ ] Update direct fetch helpers and attachment URLs to use the resolver.
-- [ ] Add focused tests for URL resolution and representative Files + Git endpoints.
+- [x] Add a shared API URL resolver used by all frontend API requests.
+- [x] Keep relative `/api/*` behavior for localhost and Vite dev surfaces.
+- [x] Resolve extension-surface API calls to `localStorage.kodeStreamApiOrigin` or `http://127.0.0.1:4317`.
+- [x] Update direct fetch helpers and attachment URLs to use the resolver.
+- [x] Add focused tests for URL resolution and representative Files + Git endpoints.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run web/src/shared/api/index.test.ts`
 

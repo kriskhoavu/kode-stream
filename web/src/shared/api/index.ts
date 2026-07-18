@@ -94,6 +94,23 @@ export class ApiError extends Error {
 }
 
 const inFlightRequests = new Map<string, Promise<unknown>>();
+const defaultLocalAPIOrigin = 'http://127.0.0.1:4317';
+const localAPIOriginStorageKey = 'kodeStreamApiOrigin';
+
+export function isExtensionSurface(protocol = globalThis.location?.protocol): boolean {
+  return protocol === 'chrome-extension:';
+}
+
+export function localAPIOrigin(storage: Pick<Storage, 'getItem'> = localStorage): string {
+  const configured = storage.getItem(localAPIOriginStorageKey)?.trim().replace(/\/+$/, '');
+  return configured || defaultLocalAPIOrigin;
+}
+
+export function apiURL(path: string, extensionSurface = isExtensionSurface()): string {
+  if (!path.startsWith('/')) return path;
+  if (!extensionSurface) return path;
+  return `${localAPIOrigin()}${path}`;
+}
 
 async function request<T>(path: string, options?: RequestInit, dedupe = options?.method === undefined || options.method === 'GET'): Promise<T> {
   const key = dedupe ? `${options?.method ?? 'GET'} ${path} ${options?.body ?? ''}` : '';
@@ -101,7 +118,7 @@ async function request<T>(path: string, options?: RequestInit, dedupe = options?
   if (existing) return existing as Promise<T>;
 
   const pending = (async () => {
-    const res = await fetch(path, {
+    const res = await fetch(apiURL(path), {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -182,7 +199,7 @@ export const api = {
     };
   },
   createWorkspaceStream: async (input: WorkspaceInput, onLog: (chunk: string) => void) => {
-    const res = await fetch('/api/workspaces/stream-create', {
+    const res = await fetch(apiURL('/api/workspaces/stream-create'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input)
@@ -247,7 +264,7 @@ export const api = {
     request<ItemVerificationTests>(`/api/items/${encodeURIComponent(itemId)}/verification-tests`, { method: 'PUT', body: JSON.stringify(input) }).then(normalizeItemVerificationTests),
   jiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira`),
   refreshJiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira/refresh`, { method: 'POST' }),
-  jiraAttachmentURL: (itemId: string, attachmentId: string) => `/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`,
+  jiraAttachmentURL: (itemId: string, attachmentId: string) => apiURL(`/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`),
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
   scan: (workspaceId: string) => request<ScanResult>(`/api/workspaces/${workspaceId}/scan`, { method: 'POST' }),
   loadWorkstreamBranch: (workspaceId: string, input: { branch?: string; force?: boolean } = {}) =>
