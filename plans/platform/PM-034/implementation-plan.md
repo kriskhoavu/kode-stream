@@ -30,7 +30,7 @@ Avoid:
 |-------|-----------------------------------------|----------|--------|
 | F1    | API origin adapter                      | Frontend | Done   |
 | F2    | Extension surface behavior              | Frontend | Done   |
-| C1    | Extension build artifact                | DevOps   | Draft  |
+| C1    | Extension build artifact                | DevOps   | Done   |
 | C2    | Showcase verification and documentation | DevOps   | Draft  |
 
 ## Frontend Phases
@@ -73,11 +73,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Add an extension Vite build mode with relative asset paths and separate output directory.
-- [ ] Add an MV3 manifest for local unpacked loading.
-- [ ] Add `npm run build:extension`.
-- [ ] Ensure the normal `npm run build` output for Go embed remains unchanged.
-- [ ] Confirm the extension artifact can be loaded with Chrome Developer Mode.
+- [x] Add an extension Vite build mode with relative asset paths and separate output directory.
+- [x] Add an MV3 manifest for local unpacked loading.
+- [x] Add `npm run build:extension`.
+- [x] Ensure the normal `npm run build` output for Go embed remains unchanged.
+- [x] Confirm the extension artifact can be loaded with Chrome Developer Mode.
 
 **Verification:** `rtk npm run build && rtk npm run build:extension`
 

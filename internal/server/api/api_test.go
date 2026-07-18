@@ -26,6 +26,7 @@ import (
 	"kode-stream/internal/navigation"
 	appsearch "kode-stream/internal/search"
 	"kode-stream/internal/storage"
+	"kode-stream/internal/system"
 	workspacehealth "kode-stream/internal/workspace"
 	"kode-stream/internal/workspace/registry"
 	"kode-stream/internal/workspace/scanner"
@@ -182,6 +183,35 @@ func TestGinHealthRoutePreservesContract(t *testing.T) {
 	}
 	if payload["ok"] != true {
 		t.Fatalf("payload = %#v", payload)
+	}
+}
+
+func TestLocalModeAllowsChromeExtensionPreflight(t *testing.T) {
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithRuntimeConfig(system.RuntimeConfig{Mode: models.RuntimeModeLocal}).Routes()
+	request := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
+	request.Header.Set("Origin", "chrome-extension://extension-id")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	if got := response.Header().Get("Access-Control-Allow-Origin"); got != "chrome-extension://extension-id" {
+		t.Fatalf("allow origin = %q", got)
+	}
+}
+
+func TestCloudModeDoesNotAllowChromeExtensionCORS(t *testing.T) {
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithRuntimeConfig(system.RuntimeConfig{Mode: models.RuntimeModeCloud}).Routes()
+	request := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
+	request.Header.Set("Origin", "chrome-extension://extension-id")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if got := response.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("allow origin = %q", got)
 	}
 }
 
