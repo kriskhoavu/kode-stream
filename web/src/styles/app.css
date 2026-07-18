@@ -1190,6 +1190,7 @@ button:disabled {
 }
 
 .ai-launch-fields > label,
+.ai-launch-prompt-field,
 .ai-launch-fields fieldset {
   display: grid;
   gap: 7px;
@@ -1226,16 +1227,37 @@ button:disabled {
 	resize: vertical;
 }
 
-.ai-launch-inline-actions {
+.ai-launch-prompt-heading {
 	display: flex;
-	justify-content: flex-start;
-	margin-top: -6px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
 }
 
-.ai-launch-inline-actions .ghost {
+.ai-launch-check {
+	display: flex !important;
+	align-items: center;
+	gap: 8px;
+	color: var(--text) !important;
+	font-size: 13px !important;
+	font-weight: 600 !important;
+}
+
+.ai-launch-check input {
+	margin: 0;
+}
+
+.ai-launch-check span {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
+}
+
+@media (max-width: 640px) {
+	.ai-launch-prompt-heading {
+		align-items: flex-start;
+		flex-direction: column;
+	}
 }
 
 .ai-launch-capabilities {

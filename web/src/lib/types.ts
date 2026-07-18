@@ -461,6 +461,7 @@ export interface AISessionLaunchInput {
 	selectedSkills?: string[];
 	selectedAgents?: string[];
 	surface?: 'external' | 'embedded';
+	includeJiraDescription?: boolean;
 }
 
 export interface AISessionLaunchResult extends AISessionLaunchInput {

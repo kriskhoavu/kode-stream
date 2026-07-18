@@ -15,7 +15,8 @@ export function readAISessionPreference(): AISessionLaunchInput | null {
 			surface: value.surface ?? 'external',
 			presetId: typeof value.presetId === 'string' ? value.presetId : undefined,
 			promptDraft: typeof value.promptDraft === 'string' ? value.promptDraft : undefined,
-			customPrompt: typeof value.customPrompt === 'string' ? value.customPrompt : undefined
+			customPrompt: typeof value.customPrompt === 'string' ? value.customPrompt : undefined,
+			includeJiraDescription: value.includeJiraDescription === true
 		};
   } catch {
     return null;

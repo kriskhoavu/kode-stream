@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 import { AISessionLaunchDialog } from './AISessionLaunchDialog';
 
 vi.mock('../../lib/api', () => ({ api: {
-  aiSettings: vi.fn(), aiCapabilities: vi.fn(), aiProviderCapabilities: vi.fn(), aiPresets: vi.fn(), aiSessionEligibility: vi.fn(), launchAISession: vi.fn(), startEmbeddedAISession: vi.fn()
+  aiSettings: vi.fn(), aiCapabilities: vi.fn(), aiProviderCapabilities: vi.fn(), aiPresets: vi.fn(), aiSessionEligibility: vi.fn(), launchAISession: vi.fn(), startEmbeddedAISession: vi.fn(), jiraIssue: vi.fn()
 } }));
 
 function mockOptions(cardContextAvailable = true) {
@@ -29,6 +29,7 @@ function mockOptions(cardContextAvailable = true) {
     supportsPromptFallback: true
   });
   vi.mocked(api.aiSessionEligibility).mockResolvedValue({ editable: cardContextAvailable, cardContextAvailable, missing: cardContextAvailable ? [] : ['editable working-tree item'] });
+  vi.mocked(api.jiraIssue).mockResolvedValue({ state: 'not_configured', message: 'Jira is not configured for this workspace.' });
 }
 
 function capability(id: string, name: string, scope: 'workspace' | 'global' = 'workspace') {
@@ -92,6 +93,35 @@ describe('AISessionLaunchDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
     await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', terminal: 'terminal', contextMode: 'card_context', surface: 'external', presetId: undefined, promptDraft: 'Use the Jira context first.', selectedSkills: undefined, selectedAgents: undefined }));
   });
+
+	it('fetches the Jira ticket description into the prompt when selected', async () => {
+		mockOptions();
+		vi.mocked(api.jiraIssue).mockResolvedValue({ state: 'available', issue: { key: 'DI-170', summary: 'Search', status: 'Open', description: 'Remote Jira description', issueType: 'Story', labels: [], browserUrl: 'https://jira/browse/DI-170', attachments: [] } });
+		vi.mocked(api.launchAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', contextMode: 'card_context', startedAt: '2026-07-02T00:00:00Z' });
+		render(<AISessionLaunchDialog itemId="item-1" onClose={vi.fn()} onLaunched={vi.fn()} />);
+		await screen.findByText(/selected card path/i);
+		fireEvent.click(screen.getByLabelText(/fetch jira ticket description/i));
+		await waitFor(() => expect((screen.getByLabelText('Prompt') as HTMLTextAreaElement).value).toContain('Remote Jira description'));
+		fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
+		await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', expect.objectContaining({
+			promptDraft: expect.stringContaining('Remote Jira description'),
+			includeJiraDescription: true
+		})));
+	});
+
+	it('removes the fetched Jira description when the Jira option is unchecked', async () => {
+		mockOptions();
+		vi.mocked(api.jiraIssue).mockResolvedValue({ state: 'available', issue: { key: 'DI-170', summary: 'Search', status: 'Open', description: 'Remote Jira description', issueType: 'Story', labels: [], browserUrl: 'https://jira/browse/DI-170', attachments: [] } });
+		render(<AISessionLaunchDialog itemId="item-1" onClose={vi.fn()} onLaunched={vi.fn()} />);
+		await screen.findByText(/selected card path/i);
+		const jiraOption = screen.getByLabelText(/fetch jira ticket description/i);
+		fireEvent.click(jiraOption);
+		await waitFor(() => expect((screen.getByLabelText('Prompt') as HTMLTextAreaElement).value).toContain('Remote Jira description'));
+		expect(screen.queryByRole('button', { name: /use preset text again/i })).not.toBeInTheDocument();
+		fireEvent.click(jiraOption);
+		await waitFor(() => expect((screen.getByLabelText('Prompt') as HTMLTextAreaElement).value).not.toContain('Remote Jira description'));
+		expect(screen.getByLabelText('Prompt')).toHaveValue('Create a plan');
+	});
 
 	it('starts an embedded session without requiring an external terminal', async () => {
 		mockOptions();

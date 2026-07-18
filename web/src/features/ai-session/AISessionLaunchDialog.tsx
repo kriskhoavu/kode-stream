@@ -1,6 +1,6 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, ChevronDown, ChevronRight, FolderTree, Globe2, RotateCcw, Search, X } from 'lucide-react';
+import { Bot, ChevronDown, ChevronRight, FolderTree, Globe2, Search, Ticket, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import type {
 	AICapability,
@@ -13,6 +13,7 @@ import type {
 	AISessionLaunchResult,
 	EmbeddedAISessionResult
 } from '../../lib/types';
+import { appendJiraDescriptionPrompt, removeJiraDescriptionPrompt } from './jiraPrompt';
 
 export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched }: { itemId: string; preference?: AISessionLaunchInput | null; onClose: () => void; onLaunched: (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => void }) {
 	const [settings, setSettings] = useState<AISettings | null>(null);
@@ -27,6 +28,9 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 	const [presetId, setPresetId] = useState('');
 	const [promptDraft, setPromptDraft] = useState('');
 	const [promptDirty, setPromptDirty] = useState(false);
+	const [includeJiraDescription, setIncludeJiraDescription] = useState(false);
+	const [jiraPromptLoading, setJiraPromptLoading] = useState(false);
+	const [jiraPromptError, setJiraPromptError] = useState('');
 	const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
 	const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
 	const [surface, setSurface] = useState<'external' | 'embedded'>('external');
@@ -36,7 +40,6 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 	const closeRef = useRef<HTMLButtonElement | null>(null);
 	const dialogRef = useRef<HTMLElement | null>(null);
 
-	const selectedPreset = useMemo(() => presets.find((preset) => preset.id === presetId) ?? null, [presetId, presets]);
 	const providers = toolOptions(settings?.providers, capabilities, 'provider');
 	const terminals = toolOptions(settings?.terminals, capabilities, 'terminal');
 	const canLaunch = !loading && !launching && (contextMode === 'workspace_only' || eligibility?.cardContextAvailable) && providers.some((item) => item.id === provider) && (surface === 'embedded' || terminals.some((item) => item.id === terminal));
@@ -59,6 +62,8 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 			setPresetId(nextPresetId);
 			setPromptDraft(nextPromptDraft);
 			setPromptDirty(Boolean(preference?.promptDraft ?? preference?.customPrompt) && nextPromptDraft.trim() !== presetPrompt.trim());
+			setIncludeJiraDescription(preference?.includeJiraDescription === true);
+			setJiraPromptError('');
 			setSelectedSkills([]);
 			setSelectedAgents([]);
 			setSurface(preference?.surface ?? 'external');
@@ -87,6 +92,36 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 	}, [provider, itemId]);
 
 	useEffect(() => {
+		if (!includeJiraDescription) {
+			setPromptDraft((current) => removeJiraDescriptionPrompt(current));
+			setJiraPromptError('');
+			setJiraPromptLoading(false);
+			return;
+		}
+		let active = true;
+		setJiraPromptLoading(true);
+		setJiraPromptError('');
+		api.jiraIssue(itemId).then((state) => {
+			if (!active) return;
+			const issue = state.issue;
+			if (state.state !== 'available' || !issue) {
+				setJiraPromptError(state.message || 'Jira ticket description is unavailable for this item.');
+				return;
+			}
+			if (!issue.description.trim()) {
+				setJiraPromptError('The Jira ticket does not have a description.');
+				return;
+			}
+			setPromptDraft((current) => appendJiraDescriptionPrompt(current, issue));
+			setPromptDirty(true);
+		}).catch((caught) => {
+			if (!active) return;
+			setJiraPromptError(caught instanceof Error ? caught.message : 'Jira ticket description is unavailable.');
+		}).finally(() => active && setJiraPromptLoading(false));
+		return () => { active = false; };
+	}, [includeJiraDescription, itemId, presetId]);
+
+	useEffect(() => {
 		closeRef.current?.focus();
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (event.key === 'Escape' && !launching) onClose();
@@ -101,12 +136,6 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
 	}, [launching, onClose]);
-
-	const resetPromptToPreset = () => {
-		if (!selectedPreset) return;
-		setPromptDraft(selectedPreset.prompt);
-		setPromptDirty(false);
-	};
 
 	const handlePresetChange = (nextPresetId: string) => {
 		const nextPreset = presets.find((preset) => preset.id === nextPresetId);
@@ -142,7 +171,8 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 				presetId: presetId || undefined,
 				promptDraft: promptDraft.trim() || undefined,
 				selectedSkills: selectedSkills.length > 0 ? selectedSkills : undefined,
-				selectedAgents: selectedAgents.length > 0 ? selectedAgents : undefined
+				selectedAgents: selectedAgents.length > 0 ? selectedAgents : undefined,
+				includeJiraDescription: includeJiraDescription || undefined
 			};
 			const result = surface === 'embedded'
 				? await api.startEmbeddedAISession(itemId, { provider, contextMode, presetId: input.presetId, promptDraft: input.promptDraft, selectedSkills: input.selectedSkills, selectedAgents: input.selectedAgents, columns: 80, rows: 24 })
@@ -173,8 +203,12 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 						{presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
 						<option value="">Free prompt</option>
 					</select></label>
-					<label>Prompt<textarea aria-label="Prompt" rows={4} value={promptDraft} onChange={(event) => { setPromptDraft(event.target.value); setPromptDirty(true); }} placeholder="Tell the AI what to do with this item." /></label>
-					{selectedPreset && promptDraft.trim() !== selectedPreset.prompt.trim() && <div className="ai-launch-inline-actions"><button className="ghost" type="button" onClick={resetPromptToPreset}><RotateCcw size={14} /> Use preset text again</button></div>}
+					<div className="ai-launch-prompt-field">
+						<div className="ai-launch-prompt-heading"><span>Prompt</span><label className="ai-launch-check"><input type="checkbox" checked={includeJiraDescription} onChange={(event) => setIncludeJiraDescription(event.target.checked)} /> <span><Ticket size={14} /> Fetch Jira ticket description into prompt</span></label></div>
+						<textarea aria-label="Prompt" rows={4} value={promptDraft} onChange={(event) => { setPromptDraft(event.target.value); setPromptDirty(true); }} placeholder="Tell the AI what to do with this item." />
+					</div>
+					{jiraPromptLoading && <p className="eligibility-ready" role="status">Fetching Jira ticket description...</p>}
+					{jiraPromptError && <p className="eligibility-blocked">{jiraPromptError}</p>}
 					{providerCatalogError && <p className="eligibility-blocked">{providerCatalogError}</p>}
 					<CapabilitySection title="Skills" items={providerCatalog?.skills ?? []} selected={selectedSkills} onToggle={(id) => toggleSelection(setSelectedSkills, id)} onSelect={(ids) => selectCapabilities(setSelectedSkills, ids)} onClear={(ids) => clearCapabilities(setSelectedSkills, ids)} />
 					<CapabilitySection title="Agents" items={providerCatalog?.agents ?? []} selected={selectedAgents} onToggle={(id) => toggleSelection(setSelectedAgents, id)} onSelect={(ids) => selectCapabilities(setSelectedAgents, ids)} onClear={(ids) => clearCapabilities(setSelectedAgents, ids)} />

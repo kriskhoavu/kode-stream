@@ -3,6 +3,7 @@ import { Bot, Settings2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { AISessionLaunchInput, AISessionLaunchResult, EmbeddedAISessionResult } from '../../lib/types';
 import { AISessionLaunchDialog } from './AISessionLaunchDialog';
+import { appendJiraDescriptionPrompt } from './jiraPrompt';
 import { readAISessionPreference, saveAISessionPreference } from './preferences';
 import { openEmbeddedSession } from './terminalSessions';
 
@@ -19,11 +20,12 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, 
     }
     setLaunching(true);
 	try {
+		const launchPreference = preference.includeJiraDescription ? await withCurrentJiraDescription(itemId, preference) : preference;
 		if (preference.surface === 'embedded') {
-			const result = await api.startEmbeddedAISession(itemId, { provider: preference.provider, contextMode: preference.contextMode, presetId: preference.presetId, promptDraft: preference.promptDraft, customPrompt: preference.customPrompt, selectedSkills: undefined, selectedAgents: undefined, columns: 80, rows: 24 });
+			const result = await api.startEmbeddedAISession(itemId, { provider: launchPreference.provider, contextMode: launchPreference.contextMode, presetId: launchPreference.presetId, promptDraft: launchPreference.promptDraft, customPrompt: launchPreference.customPrompt, selectedSkills: undefined, selectedAgents: undefined, columns: 80, rows: 24 });
 			openEmbeddedSession(result); onLaunched(`${label(preference.provider)} opened in the embedded terminal.`);
 		} else {
-			const result = await api.launchAISession(itemId, { provider: preference.provider, terminal: preference.terminal, contextMode: preference.contextMode, presetId: preference.presetId, promptDraft: preference.promptDraft, customPrompt: preference.customPrompt, selectedSkills: undefined, selectedAgents: undefined });
+			const result = await api.launchAISession(itemId, { provider: launchPreference.provider, terminal: launchPreference.terminal, contextMode: launchPreference.contextMode, presetId: launchPreference.presetId, promptDraft: launchPreference.promptDraft, customPrompt: launchPreference.customPrompt, selectedSkills: undefined, selectedAgents: undefined });
 			onLaunched(launchMessage(result));
 		}
     } catch (caught) {
@@ -35,7 +37,7 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, 
   };
 
   const rememberLaunch = (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => {
-		const next = { provider: input.provider, terminal: input.terminal, contextMode: input.contextMode, surface: input.surface ?? 'external', presetId: input.presetId, promptDraft: input.promptDraft, customPrompt: input.customPrompt };
+		const next = { provider: input.provider, terminal: input.terminal, contextMode: input.contextMode, surface: input.surface ?? 'external', presetId: input.presetId, promptDraft: input.promptDraft, customPrompt: input.customPrompt, includeJiraDescription: input.includeJiraDescription };
     saveAISessionPreference(next);
     setPreference(next);
 		if ('session' in result) { openEmbeddedSession(result); onLaunched(`${label(input.provider)} opened in the embedded terminal.`); }
@@ -59,9 +61,16 @@ function preferenceLabel(preference: AISessionLaunchInput) {
 	const context = preference.contextMode === 'card_context' ? 'selected card' : 'workspace only';
 	const surface = preference.surface === 'embedded' ? 'Embedded' : label(preference.terminal);
 	const prompt = preference.presetId ? ` · ${preference.presetId}` : preference.promptDraft || preference.customPrompt ? ' · free prompt' : '';
-	return `${label(preference.provider)} · ${surface} · ${context}${prompt}`;
+	const jira = preference.includeJiraDescription ? ' · Jira description' : '';
+	return `${label(preference.provider)} · ${surface} · ${context}${prompt}${jira}`;
 }
 
 function label(id: string) {
   return ({ claude: 'Claude', codex: 'Codex', copilot: 'Copilot', opencode: 'OpenCode', terminal: 'Terminal', iterm2: 'iTerm2', wezterm: 'WezTerm' } as Record<string, string>)[id] ?? id;
+}
+
+async function withCurrentJiraDescription(itemId: string, preference: AISessionLaunchInput): Promise<AISessionLaunchInput> {
+	const state = await api.jiraIssue(itemId);
+	if (state.state !== 'available' || !state.issue?.description.trim()) return preference;
+	return { ...preference, promptDraft: appendJiraDescriptionPrompt(preference.promptDraft ?? preference.customPrompt ?? '', state.issue), customPrompt: undefined };
 }
