@@ -159,6 +159,61 @@ func TestCreateItemWritesOnlyEmptyReadme(t *testing.T) {
 	}
 }
 
+func TestCreateItemUsesSourceStructurePathPattern(t *testing.T) {
+	root := t.TempDir()
+	plansRoot := filepath.Join(root, "plans")
+	if err := os.MkdirAll(plansRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	settings := []byte("version: 1\ncards:\n    - pathPattern: \"{item}\"\n      fields:\n        source: plans\n        item: \"{item}\"\n        title: readme_heading\n        status: draft\n")
+	if err := os.WriteFile(filepath.Join(plansRoot, "workspace-settings.yaml"), settings, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	writer := New(fileaccess.New(), nil, nil, nil)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"plans"}}
+	if _, err := writer.CreateItem(workspace, models.NewItemInput{
+		Source:     "plans",
+		Scope:      "plans",
+		Identifier: "TEST_X",
+		Status:     models.StatusDraft,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Join(root, "plans", "TEST_X", "README.md")); err != nil {
+		t.Fatalf("expected item under source root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "plans", "plans")); !os.IsNotExist(err) {
+		t.Fatalf("did not expect nested plans directory, err=%v", err)
+	}
+}
+
+func TestCreateItemDoesNotDuplicateSourceWhenScopeDefaultsToSource(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	writer := New(fileaccess.New(), nil, nil, nil)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"plans", "docs"}}
+	if _, err := writer.CreateItem(workspace, models.NewItemInput{
+		Source:     "plans",
+		Scope:      "plans",
+		Identifier: "TEST_X",
+		Status:     models.StatusDraft,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Join(root, "plans", "TEST_X", "README.md")); err != nil {
+		t.Fatalf("expected item under plans root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "plans", "plans")); !os.IsNotExist(err) {
+		t.Fatalf("did not expect nested plans directory, err=%v", err)
+	}
+}
+
 func TestCreateJiraBackedItemWritesReadmeAndMetadata(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "items"), 0o755); err != nil {

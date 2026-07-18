@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -198,7 +199,10 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 	if err := writeguard.ValidateStatus(status); err != nil {
 		return models.WriteResult{}, err
 	}
-	itemRoot := filepath.ToSlash(filepath.Join(source, input.Scope, input.Identifier))
+	itemRoot, err := w.createItemRoot(workspace, source, input)
+	if err != nil {
+		return models.WriteResult{}, err
+	}
 	fullRoot, err := safeJoin(workspace.Path, itemRoot)
 	if err != nil {
 		return models.WriteResult{}, err
@@ -228,6 +232,52 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 		}
 	}
 	return w.refresh(workspace, itemRoot)
+}
+
+var createItemPatternVariable = regexp.MustCompile(`\{([A-Za-z][A-Za-z0-9_]*)\}`)
+
+func (w *Writer) createItemRoot(workspace models.WorkspaceConfig, source string, input models.NewItemInput) (string, error) {
+	sourceRoot := filepath.Join(workspace.Path, filepath.FromSlash(source))
+	settings, hasSettings, warnings := scanner.ReadSourceStructureSettings(sourceRoot)
+	if hasSettings && len(warnings) == 0 && len(settings.Cards) > 0 {
+		rel, err := renderCreateItemPathPattern(settings.Cards[0].PathPattern, source, input)
+		if err != nil {
+			return "", err
+		}
+		return filepath.ToSlash(filepath.Join(source, rel)), nil
+	}
+	if isSourceRootScope(source, input.Scope) {
+		return filepath.ToSlash(filepath.Join(source, input.Identifier)), nil
+	}
+	return filepath.ToSlash(filepath.Join(source, input.Scope, input.Identifier)), nil
+}
+
+func isSourceRootScope(source, scope string) bool {
+	cleanSource := filepath.ToSlash(filepath.Clean(strings.TrimSpace(source)))
+	cleanScope := filepath.ToSlash(filepath.Clean(strings.TrimSpace(scope)))
+	return cleanScope == cleanSource || cleanScope == filepath.Base(cleanSource)
+}
+
+func renderCreateItemPathPattern(pattern, source string, input models.NewItemInput) (string, error) {
+	values := map[string]string{
+		"folder":     input.Scope,
+		"scope":      input.Scope,
+		"item":       input.Identifier,
+		"identifier": input.Identifier,
+		"source":     filepath.Base(source),
+	}
+	rendered := createItemPatternVariable.ReplaceAllStringFunc(pattern, func(match string) string {
+		parts := createItemPatternVariable.FindStringSubmatch(match)
+		if len(parts) != 2 {
+			return ""
+		}
+		return values[parts[1]]
+	})
+	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(rendered)))
+	if clean == "." || clean == "" || strings.HasPrefix(clean, "../") || clean == ".." || strings.HasPrefix(clean, "/") || filepath.IsAbs(clean) {
+		return "", fmt.Errorf("source item path pattern produced an invalid path")
+	}
+	return clean, nil
 }
 
 func (w *Writer) RefreshWorkspace(workspace models.WorkspaceConfig) (models.ScanResult, error) {
