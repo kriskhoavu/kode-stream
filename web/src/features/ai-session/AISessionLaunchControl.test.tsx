@@ -49,4 +49,14 @@ describe('AISessionLaunchControl', () => {
     expect(await screen.findByRole('button', { name: 'Save test choice' })).toBeInTheDocument();
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Provider unavailable' }));
   });
+
+  it('opens configuration instead of using a remembered embedded launch when embedded sessions are disabled', async () => {
+    localStorage.setItem('aiSession.lastLaunch', JSON.stringify({ provider: 'codex', terminal: 'terminal', contextMode: 'card_context', surface: 'embedded' }));
+    render(<AISessionLaunchControl itemId="item-1" allowEmbedded={false} onLaunched={vi.fn()} onError={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /using saved choice/i }));
+
+    expect(screen.getByRole('button', { name: 'Save test choice' })).toBeInTheDocument();
+    expect(api.startEmbeddedAISession).not.toHaveBeenCalled();
+  });
 });

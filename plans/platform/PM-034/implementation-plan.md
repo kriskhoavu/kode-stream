@@ -29,7 +29,7 @@ Avoid:
 | Phase | Name                                    | Track    | Status |
 |-------|-----------------------------------------|----------|--------|
 | F1    | API origin adapter                      | Frontend | Done   |
-| F2    | Extension surface behavior              | Frontend | Draft  |
+| F2    | Extension surface behavior              | Frontend | Done   |
 | C1    | Extension build artifact                | DevOps   | Draft  |
 | C2    | Showcase verification and documentation | DevOps   | Draft  |
 
@@ -55,11 +55,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Detect the extension surface without affecting normal local web mode.
-- [ ] Add a local-server health check state for extension startup.
-- [ ] Show a clear unavailable state when the configured local API origin is not reachable.
-- [ ] Hide or disable embedded terminal/AI streaming controls in extension mode.
-- [ ] Add component tests for unavailable state and unsupported streaming controls.
+- [x] Detect the extension surface without affecting normal local web mode.
+- [x] Add a local-server health check state for extension startup.
+- [x] Show a clear unavailable state when the configured local API origin is not reachable.
+- [x] Hide or disable embedded terminal/AI streaming controls in extension mode.
+- [x] Add component tests for unavailable state and unsupported streaming controls.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
