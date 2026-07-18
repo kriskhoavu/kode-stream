@@ -1,1 +1,1 @@
-export { ApiError, api, editableStatusOrder, statusLabels, statusOrder } from '../shared/api';
+export { ApiError, api, apiURL, editableStatusOrder, isExtensionSurface, localAPIOrigin, statusLabels, statusOrder } from '../shared/api';

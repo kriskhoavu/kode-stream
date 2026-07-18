@@ -7,7 +7,7 @@ import { appendJiraDescriptionPrompt } from './jiraPrompt';
 import { readAISessionPreference, saveAISessionPreference } from './preferences';
 import { openEmbeddedSession } from './terminalSessions';
 
-export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, buttonLabel = 'Open AI session' }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void; buttonLabel?: string }) {
+export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, buttonLabel = 'Open AI session', allowEmbedded = true }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void; buttonLabel?: string; allowEmbedded?: boolean }) {
   const [preference, setPreference] = useState<AISessionLaunchInput | null>(readAISessionPreference);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
@@ -21,6 +21,10 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, 
     setLaunching(true);
 	try {
 		const launchPreference = preference.includeJiraDescription ? await withCurrentJiraDescription(itemId, preference) : preference;
+		if (preference.surface === 'embedded' && !allowEmbedded) {
+			setDialogOpen(true);
+			return;
+		}
 		if (preference.surface === 'embedded') {
 			const result = await api.startEmbeddedAISession(itemId, { provider: launchPreference.provider, contextMode: launchPreference.contextMode, presetId: launchPreference.presetId, promptDraft: launchPreference.promptDraft, customPrompt: launchPreference.customPrompt, selectedSkills: undefined, selectedAgents: undefined, columns: 80, rows: 24 });
 			openEmbeddedSession(result); onLaunched(`${label(preference.provider)} opened in the embedded terminal.`);
@@ -40,7 +44,7 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, 
 		const next = { provider: input.provider, terminal: input.terminal, contextMode: input.contextMode, surface: input.surface ?? 'external', presetId: input.presetId, promptDraft: input.promptDraft, customPrompt: input.customPrompt, includeJiraDescription: input.includeJiraDescription };
     saveAISessionPreference(next);
     setPreference(next);
-		if ('session' in result) { openEmbeddedSession(result); onLaunched(`${label(input.provider)} opened in the embedded terminal.`); }
+		if ('session' in result) { if (allowEmbedded) openEmbeddedSession(result); onLaunched(`${label(input.provider)} opened in the embedded terminal.`); }
 		else onLaunched(launchMessage(result));
   };
 
@@ -49,7 +53,7 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, 
       <button className={`primary ai-launch-main${preference ? ' ai-launch-main-saved' : ''}`} type="button" disabled={disabled || launching} aria-label={preference ? `Open AI session using saved choice: ${savedChoice}` : 'Open AI session'} title={preference ? `Saved choice: ${savedChoice}` : 'Configure your first AI session'} onClick={() => void quickLaunch()}><Bot size={16} /> {launching ? 'Opening...' : buttonLabel} {preference && <span className="ai-launch-saved-indicator" aria-hidden="true" />}</button>
       <button className="primary ai-launch-settings" type="button" disabled={disabled || launching} aria-label="Configure AI session" title="Configure AI session" onClick={() => setDialogOpen(true)}><Settings2 size={16} /></button>
     </div>
-    {dialogOpen && <AISessionLaunchDialog itemId={itemId} preference={preference} onClose={() => setDialogOpen(false)} onLaunched={rememberLaunch} />}
+    {dialogOpen && <AISessionLaunchDialog itemId={itemId} preference={preference} allowEmbedded={allowEmbedded} onClose={() => setDialogOpen(false)} onLaunched={rememberLaunch} />}
   </>;
 }
 

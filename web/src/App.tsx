@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Plus, Search, Sun, Boxes, FolderGit2, Settings } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
@@ -8,7 +8,7 @@ import { WorkstreamPage } from './pages/WorkstreamPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { api } from './lib/api';
+import { api, isExtensionSurface, localAPIOrigin } from './lib/api';
 import { ActivityPanel } from './components/ReliabilityPanels';
 import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';
@@ -18,6 +18,7 @@ import { EmbeddedTerminalDock } from './features/ai-session/EmbeddedTerminalDock
 const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((module) => ({ default: module.KnowledgePage })));
 
 export function App() {
+  const extensionSurface = isExtensionSurface();
   const {
     route,
     theme,
@@ -35,6 +36,7 @@ export function App() {
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [localAPIStatus, setLocalAPIStatus] = useState<'ready' | 'checking' | 'unavailable'>(extensionSurface ? 'checking' : 'ready');
   const [appSettings, setAppSettings] = useAppSettings();
   const quickSwitcher = useQuickSwitcher();
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
@@ -71,6 +73,25 @@ export function App() {
     selectWorkspaceState(repo);
     setWorkspaceMenuOpen(false);
   };
+
+  const checkLocalAPI = useCallback(async () => {
+    if (!extensionSurface) return;
+    setLocalAPIStatus('checking');
+    try {
+      await api.health();
+      setLocalAPIStatus('ready');
+    } catch {
+      setLocalAPIStatus('unavailable');
+    }
+  }, [extensionSurface]);
+
+  useEffect(() => {
+    if (extensionSurface) void checkLocalAPI();
+  }, [extensionSurface, checkLocalAPI]);
+
+  if (extensionSurface && localAPIStatus !== 'ready') {
+    return <LocalServerUnavailable status={localAPIStatus} apiOrigin={localAPIOrigin()} onRetry={() => void checkLocalAPI()} />;
+  }
 
   return (
     <div className="app-shell">
@@ -230,7 +251,7 @@ export function App() {
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
           />
         )}
-        {route.name === 'item' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={() => refreshAppStateOnly()} />}
+        {route.name === 'item' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} allowEmbeddedAISessions={!extensionSurface} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={() => refreshAppStateOnly()} />}
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={() => refreshAppData()} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
@@ -242,8 +263,20 @@ export function App() {
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}><Settings size={18} />Settings</button>
       </nav>
-		<EmbeddedTerminalDock workspaces={workspaces} />
+		{!extensionSurface && <EmbeddedTerminalDock workspaces={workspaces} />}
     </div>
+  );
+}
+
+export function LocalServerUnavailable({ status, apiOrigin, onRetry }: { status: 'checking' | 'unavailable'; apiOrigin: string; onRetry: () => void }) {
+  return (
+    <main className="main-content">
+      <section className="empty-state" role={status === 'checking' ? 'status' : 'alert'} aria-live="polite">
+        <h1>Kode Stream local server unavailable</h1>
+        <p>{status === 'checking' ? `Checking ${apiOrigin}...` : `Start kode-stream serve -port 4317, then retry ${apiOrigin}.`}</p>
+        <button className="primary" type="button" onClick={onRetry}>Retry</button>
+      </section>
+    </main>
   );
 }
 

@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { routeFromLocation } from './app/router';
+import { LocalServerUnavailable } from './App';
 
 describe('routeFromLocation', () => {
   it('parses item workspace routes', () => {
@@ -29,5 +31,17 @@ describe('routeFromLocation', () => {
     window.history.pushState(null, '', '/unknown');
 
     expect(routeFromLocation()).toEqual({ name: 'workstream' });
+  });
+});
+
+describe('LocalServerUnavailable', () => {
+  it('shows the configured local API origin and retries on demand', () => {
+    const retry = vi.fn();
+    render(<LocalServerUnavailable status="unavailable" apiOrigin="http://127.0.0.1:9999" onRetry={retry} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('http://127.0.0.1:9999');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 });

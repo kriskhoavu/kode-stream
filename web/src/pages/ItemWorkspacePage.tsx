@@ -54,7 +54,7 @@ type DetailViewMode = 'plan' | 'workspace' | 'git';
 type BranchViewState = { branch: string; currentCheckoutBranch: string; sourceMode: 'working_tree' | 'snapshot'; missing: true };
 type OpenItemFileTab = { id: string; path: string; name: string; editable: boolean };
 
-export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOpenItem, onContentChanged }: { itemId: string; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onOpenItem: (itemId: string) => void; onContentChanged?: () => void | Promise<void> }) {
+export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOpenItem, onContentChanged, allowEmbeddedAISessions = true }: { itemId: string; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onOpenItem: (itemId: string) => void; onContentChanged?: () => void | Promise<void>; allowEmbeddedAISessions?: boolean }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
@@ -1164,7 +1164,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           </div>
         </div>
         <div className="workspace-header-actions">
-          <AISessionLaunchControl itemId={itemId} buttonLabel="AI session" disabled={!plan} onLaunched={setAILaunchMessage} onError={(caught) => showOperationError(caught, 'AI session launch failed')} />
+          <AISessionLaunchControl itemId={itemId} buttonLabel="AI session" disabled={!plan} allowEmbedded={allowEmbeddedAISessions} onLaunched={setAILaunchMessage} onError={(caught) => showOperationError(caught, 'AI session launch failed')} />
           <button
             className={`icon-button workspace-git-status-button${gitStatus?.dirty ? ' is-dirty' : ''}`}
             type="button"
