@@ -77,12 +77,11 @@ export function App() {
   const checkLocalAPI = useCallback(async () => {
     if (!extensionSurface) return;
     setLocalAPIStatus('checking');
-    try {
-      await api.health();
+    if (await api.localServerReachable()) {
       setLocalAPIStatus('ready');
-    } catch {
-      setLocalAPIStatus('unavailable');
+      return;
     }
+    setLocalAPIStatus('unavailable');
   }, [extensionSurface]);
 
   useEffect(() => {

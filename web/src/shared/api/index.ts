@@ -156,9 +156,17 @@ export const api = {
   aiSessionEligibility: (itemId: string) => request<AISessionEligibility>(`/api/items/${encodeURIComponent(itemId)}/ai-session-eligibility`),
   launchAISession: (itemId: string, input: AISessionLaunchInput) => request<AISessionLaunchResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions`, { method: 'POST', body: JSON.stringify(input) }),
 	startEmbeddedAISession: (itemId: string, input: Pick<AISessionLaunchInput, 'provider' | 'contextMode' | 'presetId' | 'promptDraft' | 'customPrompt' | 'selectedSkills' | 'selectedAgents'> & { columns?: number; rows?: number }) => request<EmbeddedAISessionResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }),
-	embeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
+  embeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
   cancelEmbeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
   health: () => request<{ status?: string }>('/api/health', undefined, false),
+  localServerReachable: async () => {
+    try {
+      await fetch(apiURL('/api/health'), { headers: { 'Content-Type': 'application/json' } });
+      return true;
+    } catch {
+      return false;
+    }
+  },
   state: () => request<AppState>('/api/state'),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   cloudAgents: async () => ((await request<CloudAgent[] | null>('/api/agents')) ?? []),
