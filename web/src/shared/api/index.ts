@@ -163,6 +163,14 @@ export const api = {
 	embeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
   cancelEmbeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
   health: () => request<{ status?: string }>('/api/health', undefined, false),
+  localServerReachable: async () => {
+    try {
+      await fetch(apiURL('/api/health'), { headers: { 'Content-Type': 'application/json' } });
+      return true;
+    } catch {
+      return false;
+    }
+  },
   state: () => request<AppState>('/api/state'),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   cloudAgents: async () => ((await request<CloudAgent[] | null>('/api/agents')) ?? []),

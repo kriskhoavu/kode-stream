@@ -21,6 +21,18 @@ describe('shared api facade', () => {
     expect(localAPIOrigin()).toBe('http://127.0.0.1:9999');
   });
 
+  it('treats any health HTTP response as a reachable local server', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+
+    await expect(api.localServerReachable()).resolves.toBe(true);
+  });
+
+  it('treats failed health fetch as an unreachable local server', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+    await expect(api.localServerReachable()).resolves.toBe(false);
+  });
+
   it('normalizes workspace sources', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
