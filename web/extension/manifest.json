@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Kode Stream Local Showcase",
+  "version": "0.0.1",
+  "description": "Runs the Kode Stream UI as an unpacked Chrome extension backed by the local Kode Stream server.",
+  "action": {
+    "default_title": "Open Kode Stream"
+  },
+  "background": {
+    "service_worker": "extension-service-worker.js"
+  },
+  "host_permissions": [
+    "http://127.0.0.1:4317/*",
+    "http://localhost:4317/*"
+  ]
+}

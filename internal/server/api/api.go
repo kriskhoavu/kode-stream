@@ -160,7 +160,7 @@ func NewWithServices(reg registry.Repository, idx itemindex.Repository, scan *sc
 }
 
 func (a *API) Routes() http.Handler {
-	return newTransport(a.registerGinRoutes)
+	return newTransport(a.runtimeConfig, a.registerGinRoutes)
 }
 
 func (a *API) previewWorkspaceImport(w http.ResponseWriter, r *http.Request) {
