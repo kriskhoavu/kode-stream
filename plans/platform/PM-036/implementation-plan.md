@@ -19,13 +19,13 @@ All code, fields, API params, and TS types must use:
 
 ## Phase Summary
 
-| Phase | Name                                    | Status  |
-|-------|-----------------------------------------|---------|
-| B1    | E2E runbook read model and APIs         | Pending |
-| B2    | Workspace-context AI session launch     | Pending |
-| F1    | Types, API client, and shared E2E panel | Pending |
-| F2    | Plan and Knowledge integration          | Pending |
-| F3    | Tests and visual polish                 | Pending |
+| Phase | Name                                    | Status   |
+|-------|-----------------------------------------|----------|
+| B1    | E2E runbook read model and APIs         | Complete |
+| B2    | Workspace-context AI session launch     | Complete |
+| F1    | Types, API client, and shared E2E panel | Complete |
+| F2    | Plan and Knowledge integration          | Complete |
+| F3    | Tests and visual polish                 | Complete |
 
 ## Backend Phases
 
