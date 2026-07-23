@@ -2363,6 +2363,50 @@ select:disabled {
   padding-top: 10px;
 }
 
+.e2e-runbook-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.e2e-runbook-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.e2e-runbook-group {
+  display: grid;
+  gap: 8px;
+}
+
+.e2e-runbook-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  text-align: left;
+}
+
+.e2e-runbook-group-toggle small {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .automation-action-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

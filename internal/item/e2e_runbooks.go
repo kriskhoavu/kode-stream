@@ -46,7 +46,7 @@ func (s *Service) E2ERunbooks(id string) (models.E2ERunbookList, []string, error
 	runbooks := make([]models.E2ERunbook, 0)
 	sources := make([]string, 0)
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".md") || entry.Name() == "latest.md" {
+		if entry.IsDir() || !isE2EScenarioRunbook(entry.Name()) {
 			continue
 		}
 		path := filepath.Join(automationRoot, entry.Name())
@@ -63,6 +63,11 @@ func (s *Service) E2ERunbooks(id string) (models.E2ERunbookList, []string, error
 		return models.E2ERunbookList{Runbooks: runbooks, Diagnostic: "No ticket-local E2E runbooks were found."}, sources, nil
 	}
 	return models.E2ERunbookList{Runbooks: runbooks}, sources, nil
+}
+
+func isE2EScenarioRunbook(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	return strings.HasPrefix(name, "scenario-") && strings.HasSuffix(name, ".md")
 }
 
 func readE2EPlanMetadata(path string) (e2ePlanMetadata, error) {

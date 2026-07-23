@@ -17,3 +17,12 @@ func TestParseE2ELatestResultDefaultsToNotRun(t *testing.T) {
 		t.Fatalf("status = %q, want not run", result.Status)
 	}
 }
+
+func TestIsE2EScenarioRunbook(t *testing.T) {
+	if !isE2EScenarioRunbook("scenario-01-review-offer.md") {
+		t.Fatal("expected scenario runbook to be included")
+	}
+	if isE2EScenarioRunbook("README.md") || isE2EScenarioRunbook("results/latest.md") {
+		t.Fatal("expected hub and result files to be excluded")
+	}
+}

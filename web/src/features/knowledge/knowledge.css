@@ -149,6 +149,10 @@
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) minmax(280px, 340px);
 }
 
+.knowledge-browser.with-side-panel.side-panel-collapsed {
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) 44px;
+}
+
 .knowledge-side-panel {
   min-width: 0;
   overflow: auto;
@@ -157,9 +161,6 @@
   padding: 14px;
 }
 
-.knowledge-side-panel-tabs {
-  grid-template-columns: minmax(0, 1fr);
-}
 
 .knowledge-browser-list {
   min-height: 0;

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { BookMarked, BookOpen, ChevronRight, Search } from 'lucide-react';
+import { BookMarked, BookOpen, ChevronRight, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
 
 export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children, sidePanel }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode; sidePanel?: ReactNode }) {
 	const [query, setQuery] = useState('');
+	const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
 	const [expandedDomains, setExpandedDomains] = useState<Set<string>>(() => new Set(['root']));
 	const navigationRef = useRef<HTMLElement | null>(null);
 	const filtered = useMemo(() => {
@@ -57,7 +58,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		</section>;
 	};
 
-	return <div className={sidePanel ? 'knowledge-browser with-side-panel' : 'knowledge-browser'}>
+	return <div className={sidePanel ? `knowledge-browser with-side-panel${sidePanelCollapsed ? ' side-panel-collapsed' : ''}` : 'knowledge-browser'}>
 		<div className="knowledge-browser-list">
 			<label className="knowledge-search"><Search size={15} /><span className="knowledge-visually-hidden">Filter Knowledge pages</span><input aria-label="Filter Knowledge pages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter pages" /></label>
 			{pages.length === 0 && <div className="knowledge-empty"><h2>No valid pages indexed</h2><p>Add Markdown pages with <code>slug</code> and <code>title</code> front matter, then rescan.</p></div>}
@@ -66,7 +67,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			<KnowledgeWarnings warnings={warnings} compact indexDiagnostics />
 		</div>
 		<section className="knowledge-content-pane" aria-label="Knowledge page content">{children ?? <div className="knowledge-welcome"><BookOpen size={28} /><h2>Select a page</h2><p>Choose an entry from the index to read its full content.</p></div>}</section>
-		{sidePanel && <aside className="side-panel knowledge-side-panel" aria-label="Knowledge side panel">{sidePanel}</aside>}
+		{sidePanel && <aside className={sidePanelCollapsed ? 'side-panel knowledge-side-panel collapsed' : 'side-panel knowledge-side-panel'} aria-label="Knowledge side panel"><div className="panel-header"><h2>Quality</h2><button className="icon-button" type="button" title={sidePanelCollapsed ? 'Expand Knowledge Quality' : 'Collapse Knowledge Quality'} onClick={() => setSidePanelCollapsed((current) => !current)}>{sidePanelCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button></div>{!sidePanelCollapsed && sidePanel}</aside>}
 	</div>;
 }
 
