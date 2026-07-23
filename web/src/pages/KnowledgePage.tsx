@@ -10,14 +10,13 @@ import '../features/knowledge/knowledge.css';
 
 const KnowledgeGraph = lazy(() => import('../features/knowledge/KnowledgeGraph').then((module) => ({ default: module.KnowledgeGraph })));
 
-export function KnowledgePage({ workspaces, location, onLocationChange }: { workspaces: WorkspaceConfig[]; location?: KnowledgeLocation; onLocationChange: (location: KnowledgeLocation) => void }) {
-	const controller = useKnowledgeController(workspaces, location, onLocationChange);
+export function KnowledgePage({ workspaces, activeWorkspace, location, onLocationChange }: { workspaces: WorkspaceConfig[]; activeWorkspace?: WorkspaceConfig; location?: KnowledgeLocation; onLocationChange: (location: KnowledgeLocation) => void }) {
+	const controller = useKnowledgeController(activeWorkspace ? [activeWorkspace] : workspaces, location, onLocationChange);
 	if (!workspaces.length) return <section className="empty-state"><h1>Knowledge</h1><p>Add a workspace to discover structured Markdown Wikis.</p></section>;
 	return <section className="knowledge-page">
 		<header className="knowledge-header">
 			<div className="knowledge-title"><h1>Knowledge</h1><p>Browse structured documentation, follow relationships, and inspect the Wiki graph.</p></div>
 			<div className="knowledge-toolbar">
-			<label className="knowledge-field"><span>Workspace</span><select aria-label="Knowledge workspace" value={controller.workspace?.id ?? ''} onChange={(event) => controller.updateLocation({ workspaceId: event.target.value, root: undefined, slug: undefined, view: 'browse' })}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select></label>
 			<label className="knowledge-field"><span>Wiki</span><select aria-label="Knowledge Wiki" value={controller.wiki?.root ?? ''} disabled={!controller.wikis.length} onChange={(event) => controller.updateLocation({ root: event.target.value, slug: undefined, view: 'browse' })}>{controller.wikis.map((wiki) => <option key={wiki.root} value={wiki.root}>{wiki.displayName}</option>)}</select></label>
 			<div className="knowledge-views" aria-label="Knowledge view"><button type="button" className={location?.view !== 'graph' ? 'active' : ''} onClick={() => controller.updateLocation({ view: controller.page ? 'read' : 'browse' })}>Pages</button><button type="button" className={location?.view === 'graph' ? 'active' : ''} disabled={!controller.pages.length} onClick={() => controller.updateLocation({ view: 'graph' })}>Graph</button></div>
 			{controller.workspace && <KnowledgeActions workspaceId={controller.workspace.id} settings={controller.workspace.knowledge} root={controller.wiki?.root} busy={controller.actionBusy} result={controller.actionResult} onRun={controller.runAction} />}
