@@ -11,7 +11,7 @@ import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
 
 export { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parseSources, previewPathSegments };
 
-const DEFAULT_SOURCES = ['docs', 'plans'];
+const DEFAULT_SOURCES = ['wiki', 'plans'];
 const UNSORTED_SELECTION_ID = 'unsorted';
 const emptyJiraConnection = (): JiraConnection => ({ deploymentType: 'cloud', baseUrl: '', projectKey: '', accountEmail: '', tokenEnvVar: 'JIRA_API_TOKEN' });
 const defaultRuntimeConfig = (): WorkspaceRuntimeConfig => ({
@@ -1653,7 +1653,7 @@ function normalizeSettingsCard(card?: SourceStructureCard, directory = 'source')
       title: card?.fields?.title || 'readme_heading',
       status: card?.fields?.status || 'draft',
       owner: card?.fields?.owner || '',
-      tags: Array.isArray(card?.fields?.tags) ? card.fields.tags : ['docs']
+      tags: Array.isArray(card?.fields?.tags) ? card.fields.tags : [lastPathSegment(directory) || 'source']
     }
   }, directory);
 }

@@ -54,12 +54,16 @@ func TestSaveMetadataCreatesPlanYAML(t *testing.T) {
 	}
 }
 
-func TestSaveMetadataRejectsDocsRoot(t *testing.T) {
+func TestSaveMetadataRejectsDocumentationRoots(t *testing.T) {
 	writer := New(fileaccess.New(), nil, nil, nil)
-	workspace := models.WorkspaceConfig{Path: t.TempDir(), Sources: []string{"docs"}}
-	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "docs", MetadataSource: "docs"}}
-	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); err == nil {
-		t.Fatal("expected docs root metadata edit to be rejected")
+	for _, source := range []string{"docs", "wiki"} {
+		t.Run(source, func(t *testing.T) {
+			workspace := models.WorkspaceConfig{Path: t.TempDir(), Sources: []string{source}}
+			item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: source, MetadataSource: source}}
+			if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); err == nil {
+				t.Fatalf("expected %s root metadata edit to be rejected", source)
+			}
+		})
 	}
 }
 

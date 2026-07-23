@@ -27,7 +27,7 @@ import type {
   SourceStructureSettings,
   WorkspaceConfig
 } from '../lib/types';
-import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
+import { isDocumentationMetadataSource, labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/workstream/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
@@ -1395,8 +1395,8 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
 
 function confirmSnapshotMaterialization(item: ItemSummary | ItemDetail | null, operation: 'file' | 'metadata' | 'status'): boolean | null {
   if (!item || item.sourceMode !== 'snapshot') return false;
-  const copyTarget = item.metadataSource === 'docs'
-    ? 'only this docs file'
+  const copyTarget = isDocumentationMetadataSource(item.metadataSource)
+    ? `only this ${genericMetadataSourceLabel(item.metadataSource).toLowerCase()} file`
     : `the whole plan at ${item.itemPath || item.identifier}`;
   const action = operation === 'status' ? 'move it' : operation === 'metadata' ? 'edit its metadata' : 'edit it';
   const message = `This item is loaded from branch ${item.branch}. To ${action}, Kode Stream will copy ${copyTarget} into the current checkout branch, then apply your change there.`;
@@ -1455,7 +1455,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   onMove: (status: ItemStatus) => void;
 }) {
   const source = sourceLabel(plan, workspace);
-  const docs = plan.metadataSource === 'docs';
+  const docs = isDocumentationMetadataSource(plan.metadataSource);
   const showItem = plan.identifier.toLowerCase() !== plan.title.toLowerCase();
   const description = plan.description;
   const tags = docs ? plan.tags.filter((tag) => tag !== source && tag !== plan.scope && tag !== plan.identifier) : plan.tags;
@@ -1500,7 +1500,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
         <time>{plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : 'No date'}</time>
       </footer>
       {tags.length > 0 && <div className="tags">{tags.slice(0, 3).map((tag: string) => <span key={tag}>{tag}</span>)}</div>}
-      {plan.status !== 'unsorted' && plan.metadataSource !== 'docs' && (
+      {plan.status !== 'unsorted' && !isDocumentationMetadataSource(plan.metadataSource) && (
         <StatusMenu value={plan.status} onChange={onMove} ariaLabel="Move item status" />
       )}
     </article>
@@ -1953,7 +1953,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                     <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
                     <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
                   </dl>
-                  {plan?.metadataSource !== 'docs' && (
+                  {!isDocumentationMetadataSource(plan?.metadataSource) && (
                     <div className="metadata-form drawer-metadata-form">
                       <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
                       <label>{labels.identifier}<input value={metadataDraft.identifier ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, identifier: event.target.value }))} /></label>
@@ -1963,7 +1963,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                     </div>
                   )}
                   <div className="workspace-actions">
-                    <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
+                    <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || isDocumentationMetadataSource(plan?.metadataSource)} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
                   </div>
                   {(plan?.tags?.length ?? 0) > 0 && <div className="tags">{plan?.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}
                 </>

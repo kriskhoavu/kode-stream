@@ -87,7 +87,7 @@ func PublishWorkspaceMetadata(ctx context.Context, httpClient *http.Client, clou
 }
 
 func detectSources(root string) []string {
-	candidates := []string{"plans", "docs", "items"}
+	candidates := []string{"plans", "wiki", "docs", "items"}
 	var sources []string
 	for _, candidate := range candidates {
 		info, err := os.Stat(filepath.Join(root, candidate))

@@ -12,5 +12,11 @@ export const labels = {
 } as const;
 
 export function metadataSourceLabel(source?: string): string {
-  return source === 'docs' ? 'Docs' : 'Item';
+  if (source === 'wiki') return 'Wiki';
+  if (source === 'docs') return 'Docs';
+  return 'Item';
+}
+
+export function isDocumentationMetadataSource(source?: string): boolean {
+  return source === 'docs' || source === 'wiki';
 }

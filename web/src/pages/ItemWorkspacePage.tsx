@@ -29,7 +29,7 @@ import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels } from '../lib/api';
 import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile, WorkspaceConfig, WorkspaceTreeEntry } from '../lib/types';
-import { labels, metadataSourceLabel } from '../lib/vocabulary';
+import { isDocumentationMetadataSource, labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile } from '../shared/domain/diff';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -1087,9 +1087,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       </div>
       {rightPanelTab === 'info' && (
         <>
-          {plan?.metadataSource === 'docs' && (
+          {isDocumentationMetadataSource(plan?.metadataSource) && (
             <div className="metadata-callout">
-              <strong>Docs</strong>
+              <strong>{metadataSourceLabel(plan?.metadataSource)}</strong>
               <span>This item is a documentation folder. It is browsable even though it does not use a structured source item layout.</span>
             </div>
           )}
@@ -1103,7 +1103,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
             <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
             <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
           </dl>
-          {plan?.metadataSource !== 'docs' && (
+          {!isDocumentationMetadataSource(plan?.metadataSource) && (
             <div className="metadata-form">
               <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
               <label>{labels.scope}<input value={metadataDraft.scope ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, scope: event.target.value }))} /></label>
@@ -1114,7 +1114,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
             </div>
           )}
           <div className="workspace-actions">
-            <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
+            <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || isDocumentationMetadataSource(plan?.metadataSource)} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
           </div>
           <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
           {visibleWarnings.length ? (
@@ -1650,8 +1650,8 @@ function matchingBranchItem(items: { id: string; itemPath?: string; scope?: stri
 
 function confirmSnapshotMaterialization(item: ItemDetail | null, operation: 'file' | 'metadata'): boolean | null {
   if (!item || item.sourceMode !== 'snapshot') return false;
-  const copyTarget = item.metadataSource === 'docs'
-    ? 'only this docs file'
+  const copyTarget = isDocumentationMetadataSource(item.metadataSource)
+    ? `only this ${metadataSourceLabel(item.metadataSource).toLowerCase()} file`
     : `the whole plan at ${item.itemPath || item.identifier}`;
   const action = operation === 'metadata' ? 'edit its metadata' : 'edit it';
   const message = `This item is loaded from branch ${item.branch}. To ${action}, Kode Stream will copy ${copyTarget} into the current checkout branch, then apply your change there.`;

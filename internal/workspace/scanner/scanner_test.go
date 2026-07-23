@@ -296,34 +296,45 @@ func TestRemoveSourceStructureSettingsDeletesCurrentFile(t *testing.T) {
 	}
 }
 
-func TestInvalidSourceStructureSettingsFallsBackToDocsCollection(t *testing.T) {
-	root := t.TempDir()
-	writeTestFile(t, root, "docs/workspace-settings.yaml", `version: 1
+func TestDefaultSourceStructureSettingsUsesWikiWhenNoSourceRootIsGiven(t *testing.T) {
+	settings := DefaultSourceStructureSettings()
+	if settings.Cards[0].Fields.Source != "wiki" || len(settings.Cards[0].Fields.Tags) != 1 || settings.Cards[0].Fields.Tags[0] != "wiki" {
+		t.Fatalf("expected Wiki defaults, got %#v", settings.Cards[0].Fields)
+	}
+}
+
+func TestInvalidSourceStructureSettingsFallsBackToDocumentationCollection(t *testing.T) {
+	for _, source := range []string{"docs", "wiki"} {
+		t.Run(source, func(t *testing.T) {
+			root := t.TempDir()
+			writeTestFile(t, root, source+"/workspace-settings.yaml", `version: 1
 cards:
   - pathPattern: "{scope}/{identifier}"
     fields:
       scope: "{missing}"
       identifier: "{identifier}"
 `)
-	writeTestFile(t, root, "docs/a12/guide.md", "# Guide\n\nDocs.\n")
+			writeTestFile(t, root, source+"/a12/guide.md", "# Guide\n\nDocumentation.\n")
 
-	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
-		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(data.Items) != 1 {
-		t.Fatalf("expected fallback docs card, got %d", len(data.Items))
-	}
-	if data.Items[0].MetadataSource != "docs" {
-		t.Fatalf("expected docs fallback, got %q", data.Items[0].MetadataSource)
-	}
-	if data.Items[0].Status != models.StatusUnsorted {
-		t.Fatalf("expected unsorted docs fallback, got %q", data.Items[0].Status)
-	}
-	if len(data.Warnings) == 0 {
-		t.Fatal("expected invalid settings warning")
+			data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+				ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{source},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(data.Items) != 1 {
+				t.Fatalf("expected fallback %s card, got %d", source, len(data.Items))
+			}
+			if data.Items[0].MetadataSource != source {
+				t.Fatalf("expected %s fallback, got %q", source, data.Items[0].MetadataSource)
+			}
+			if data.Items[0].Status != models.StatusUnsorted {
+				t.Fatalf("expected unsorted %s fallback, got %q", source, data.Items[0].Status)
+			}
+			if len(data.Warnings) == 0 {
+				t.Fatal("expected invalid settings warning")
+			}
+		})
 	}
 }
 

@@ -43,8 +43,8 @@ func (w *Writer) SaveMarkdown(workspace models.WorkspaceConfig, item models.Item
 }
 
 func (w *Writer) SaveMetadata(workspace models.WorkspaceConfig, item models.ItemDetail, input models.ItemMetadataUpdateInput) (models.WriteResult, error) {
-	if isDocsRoot(item) {
-		return models.WriteResult{}, fmt.Errorf("freestyle docs roots do not support item metadata")
+	if isDocumentationRoot(item) {
+		return models.WriteResult{}, fmt.Errorf("freestyle documentation roots do not support item metadata")
 	}
 	if input.Status != "" {
 		if err := writeguard.ValidateStatus(input.Status); err != nil {
@@ -81,8 +81,8 @@ func (w *Writer) VerificationTests(workspace models.WorkspaceConfig, item models
 }
 
 func (w *Writer) SaveVerificationTests(workspace models.WorkspaceConfig, item models.ItemDetail, input models.VerificationTestSelection) (models.WriteResult, error) {
-	if isDocsRoot(item) {
-		return models.WriteResult{}, fmt.Errorf("freestyle docs roots do not support item verification tests")
+	if isDocumentationRoot(item) {
+		return models.WriteResult{}, fmt.Errorf("freestyle documentation roots do not support item verification tests")
 	}
 	meta, err := readPlanMetadata(workspace, item)
 	if err != nil {
@@ -112,7 +112,7 @@ func (w *Writer) MaterializeSnapshotItem(workspace models.WorkspaceConfig, item 
 	}
 	reader := scanner.NewGitTreeSourceReader(workspace.Path, item.BranchRef, gitadapter.New())
 	scopeRoot := item.ItemPath
-	copyOneFile := item.MetadataSource == "docs"
+	copyOneFile := isDocumentationRoot(item)
 	if copyOneFile {
 		relPath := materializeRelativeFile(item, fileID)
 		if relPath == "" {
@@ -556,8 +556,8 @@ func safeJoin(root, rel string) (string, error) {
 	return pathguard.SafeJoin(root, rel)
 }
 
-func isDocsRoot(item models.ItemDetail) bool {
-	return item.MetadataSource == "docs"
+func isDocumentationRoot(item models.ItemDetail) bool {
+	return item.MetadataSource == "docs" || item.MetadataSource == "wiki"
 }
 
 func materializeRelativeFile(item models.ItemDetail, fileID string) string {
