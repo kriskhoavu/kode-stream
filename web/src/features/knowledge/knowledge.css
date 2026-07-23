@@ -83,7 +83,7 @@
 
 .knowledge-views button.active {
   background: var(--panel);
-  color: var(--blue);
+  color: var(--button-accent);
   box-shadow: 0 2px 7px rgba(17, 24, 39, 0.1);
 }
 
@@ -352,7 +352,7 @@ body.is-resizing-panel .knowledge-browser {
 }
 
 .knowledge-page-row:focus-visible {
-  box-shadow: inset 3px 0 0 var(--selection-accent), inset 0 0 0 2px color-mix(in srgb, var(--blue) 52%, transparent);
+  box-shadow: inset 3px 0 0 var(--selection-accent);
 }
 
 .knowledge-page-row.active .knowledge-page-title {
@@ -924,6 +924,18 @@ body.is-resizing-panel .knowledge-browser {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+.knowledge-graph-panel-header-actions .knowledge-graph-open-details {
+  border-color: var(--button-accent);
+  background: var(--button-accent);
+  color: var(--accent-contrast);
+}
+
+.knowledge-graph-panel-header-actions .knowledge-graph-open-details:hover {
+  border-color: color-mix(in srgb, var(--button-accent) 82%, black);
+  background: color-mix(in srgb, var(--button-accent) 88%, black);
+  color: var(--accent-contrast);
 }
 
 .knowledge-graph-panel-close {

@@ -134,7 +134,7 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 					<div className="knowledge-graph-panel-header">
 						<p className="knowledge-graph-panel-eyebrow"><Network size={14} /> {selectedGraphNode.domain || 'root'} · {selectedGraphNode.pageType || 'PAGE'}</p>
 						<div className="knowledge-graph-panel-header-actions">
-							<button type="button" className="secondary" onClick={() => onOpenDetails(selectedGraphNode.id)}><BookOpen size={15} /> Open details page</button>
+							<button type="button" className="secondary knowledge-graph-open-details" onClick={() => onOpenDetails(selectedGraphNode.id)}><BookOpen size={15} /> Open details page</button>
 							<button type="button" className="knowledge-graph-panel-close" aria-label="Close review panel" onClick={() => setIsPanelOpen(false)}><X size={16} /></button>
 						</div>
 					</div>
