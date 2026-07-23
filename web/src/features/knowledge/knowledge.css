@@ -28,7 +28,7 @@
 
 .knowledge-toolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(160px, 220px) auto minmax(0, 1fr);
+  grid-template-columns: minmax(160px, 220px) auto minmax(0, 1fr);
   align-items: end;
   gap: 12px;
   padding: 14px;
@@ -974,12 +974,7 @@ body.is-resizing-panel .knowledge-browser {
 
 @media (max-width: 1100px) {
   .knowledge-toolbar {
-    grid-template-columns: minmax(180px, 1fr) minmax(160px, 1fr) auto;
-  }
-
-  .knowledge-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
+    grid-template-columns: minmax(160px, 1fr) auto minmax(0, 1fr);
   }
 
   .knowledge-graph-filters {
