@@ -99,6 +99,13 @@ func TestQueriesReturnStableMissingAndUnsafeErrors(t *testing.T) {
 	}
 }
 
+func TestConfiguredWikisExcludesStaleRootsAfterASourceRename(t *testing.T) {
+	wikis := configuredWikis([]KnowledgeWiki{{Root: "docs"}, {Root: "wiki"}}, []string{"plans", "wiki"})
+	if len(wikis) != 1 || wikis[0].Root != "wiki" {
+		t.Fatalf("configured wikis = %#v", wikis)
+	}
+}
+
 func TestRescanAndSyncReplaceOnlyAfterSuccessfulDetection(t *testing.T) {
 	service, store := newActionService(t, "", nil)
 	detector := &stubDetector{wikis: []KnowledgeWiki{{Root: "docs", Pages: []KnowledgePage{}, Warnings: []KnowledgeWarning{}}}}

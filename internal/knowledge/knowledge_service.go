@@ -252,6 +252,7 @@ func (s *KnowledgeService) Wikis(workspaceID string) ([]KnowledgeWiki, error) {
 	if err != nil {
 		return nil, err
 	}
+	wikis = configuredWikis(wikis, workspace.Sources)
 	if wikis == nil {
 		wikis = []KnowledgeWiki{}
 	}
@@ -472,6 +473,9 @@ func (s *KnowledgeService) wiki(workspaceID, root string) (KnowledgeWiki, error)
 	if clean := filepath.ToSlash(filepath.Clean(root)); clean != root || clean == "." || filepath.IsAbs(root) || strings.HasPrefix(clean, "../") {
 		return KnowledgeWiki{}, ErrUnsafePath
 	}
+	if !containsSource(workspace.Sources, root) {
+		return KnowledgeWiki{}, ErrWikiNotFound
+	}
 	wikis, err := s.store.List(workspaceID)
 	if err != nil {
 		return KnowledgeWiki{}, err
@@ -498,6 +502,16 @@ func containsSource(sources []string, root string) bool {
 		}
 	}
 	return false
+}
+
+func configuredWikis(wikis []KnowledgeWiki, sources []string) []KnowledgeWiki {
+	configured := make([]KnowledgeWiki, 0, len(wikis))
+	for _, wiki := range wikis {
+		if containsSource(sources, wiki.Root) {
+			configured = append(configured, wiki)
+		}
+	}
+	return configured
 }
 
 func guardedPagePath(workspaceRoot, wikiRoot, pagePath string) (string, error) {
