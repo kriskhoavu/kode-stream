@@ -331,10 +331,20 @@ body.is-resizing-panel .knowledge-browser {
 }
 
 .knowledge-page-row.active {
-  border-color: color-mix(in srgb, var(--blue) 34%, var(--line));
+  border-color: transparent;
   background: color-mix(in srgb, var(--blue) 7%, var(--panel));
   color: var(--text);
   box-shadow: inset 3px 0 0 var(--selection-accent);
+}
+
+/* Keep keyboard focus contained within the row instead of drawing a second
+   outline around the selected-page treatment. */
+.knowledge-page-row:focus {
+  outline: none;
+}
+
+.knowledge-page-row:focus-visible {
+  box-shadow: inset 3px 0 0 var(--selection-accent), inset 0 0 0 2px color-mix(in srgb, var(--blue) 52%, transparent);
 }
 
 .knowledge-page-row.active .knowledge-page-title {
