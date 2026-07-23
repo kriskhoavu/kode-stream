@@ -109,10 +109,13 @@
   top: 78px;
   right: 20px;
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-sizing: border-box;
+  min-height: 56px;
   max-width: min(440px, calc(100vw - 40px));
-  padding: 12px 14px;
+  padding: 10px 10px 10px 14px;
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--panel);
@@ -124,6 +127,8 @@
 .knowledge-notification strong { display: flex; align-items: center; gap: 7px; font-size: 13px; }
 .knowledge-notification.success strong { color: var(--green); }
 .knowledge-notification.error strong { color: #b91c1c; }
+.knowledge-notification > .icon-button { width: 30px; height: 30px; border-color: transparent; background: transparent; }
+.knowledge-notification > .icon-button:hover { border-color: var(--line); background: var(--panel-soft); }
 .knowledge-notification details { margin-top: 8px; color: var(--muted); font-size: 12px; }
 .knowledge-notification pre { max-height: 12rem; max-width: 50rem; overflow: auto; white-space: pre-wrap; }
 
