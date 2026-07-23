@@ -1886,7 +1886,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
             <p>{plan ? `${plan.scope} / ${plan.branch}` : ''}</p>
           </div>
           <div className="drawer-actions">
-            <button type="button" className="secondary" onClick={openFullDetails}>Open details</button>
+            <button type="button" className="secondary drawer-open-details" onClick={openFullDetails}>Open details</button>
             <button type="button" className="icon-button" aria-label="Close preview" onClick={closeDrawer}><X size={16} /></button>
           </div>
         </header>
