@@ -3,6 +3,7 @@ import type { KnowledgeLocation } from '../app/router';
 import { KnowledgeActions } from '../features/knowledge/KnowledgeActions';
 import { KnowledgeBrowser } from '../features/knowledge/KnowledgeBrowser';
 import { KnowledgeReader } from '../features/knowledge/KnowledgeReader';
+import { KnowledgeE2ESidePanel } from '../features/e2e-testing/KnowledgeE2ESidePanel';
 import { useKnowledgeController } from '../features/knowledge/useKnowledgeController';
 import type { WorkspaceConfig } from '../lib/types';
 import '../features/knowledge/knowledge.css';
@@ -24,8 +25,8 @@ export function KnowledgePage({ workspaces, location, onLocationChange }: { work
 		</header>
 		{(controller.loading || controller.error || controller.notice) && <div aria-live="polite" className={controller.error ? 'knowledge-status error' : 'knowledge-status'}>{controller.loading ? 'Loading Knowledge…' : controller.error || controller.notice}</div>}
 		{!controller.loading && !controller.error && !controller.wikis.length && <div className="empty-state"><h2>No structured Wikis detected</h2><p>A source qualifies when it contains <code>index.md</code> and valid pages with <code>slug</code> and <code>title</code> front matter.</p></div>}
-		{controller.wiki && location?.view !== 'graph' && <KnowledgeBrowser pages={controller.pages} selectedSlug={controller.page?.slug} warnings={controller.warnings} onSelect={(slug) => controller.updateLocation({ slug, view: 'read' })}>
-			{controller.detailLoading ? <div className="knowledge-welcome">Loading page…</div> : controller.detail && location?.view === 'read' && controller.workspace && controller.wiki ? <KnowledgeReader detail={controller.detail} workspaceId={controller.workspace.id} root={controller.wiki.root} onNavigate={(slug) => controller.updateLocation({ slug, view: 'read' })} /> : undefined}
+		{controller.wiki && location?.view !== 'graph' && <KnowledgeBrowser pages={controller.pages} selectedSlug={controller.page?.slug} warnings={controller.warnings} onSelect={(slug) => controller.updateLocation({ slug, view: 'read' })} sidePanel={controller.detail && location?.view === 'read' && controller.workspace && controller.detail.path.startsWith('e2e-testing/') ? <KnowledgeE2ESidePanel workspaceId={controller.workspace.id} root={controller.wiki.root} detail={controller.detail} /> : undefined}>
+			{controller.detailLoading ? <div className="knowledge-welcome">Loading page…</div> : controller.detail && location?.view === 'read' ? <KnowledgeReader detail={controller.detail} onNavigate={(slug) => controller.updateLocation({ slug, view: 'read' })} /> : undefined}
 		</KnowledgeBrowser>}
 		{controller.graphLoading && <div className="empty-state">Loading graph…</div>}
 		{controller.graph && location?.view === 'graph' && <Suspense fallback={<div className="empty-state">Loading graph renderer…</div>}><KnowledgeGraph graph={controller.graph} pages={controller.pages} selectedSlug={controller.page?.slug} selectedDetail={controller.detail} onSelect={(slug) => controller.updateLocation({ slug, view: 'graph' })} onOpenDetails={(slug) => controller.updateLocation({ slug, view: 'read' })} /></Suspense>}

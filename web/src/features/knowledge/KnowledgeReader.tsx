@@ -1,17 +1,10 @@
 import type { MouseEvent } from 'react';
-import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { ContentViewer } from '../content-viewer/ContentViewer';
-import type { E2ERunbookList, KnowledgePageDetail } from '../../lib/types';
-import { api } from '../../lib/api';
-import { E2EQualityPanel } from '../e2e-testing/E2EQualityPanel';
+import type { KnowledgePageDetail } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
 
-export function KnowledgeReader({ detail, workspaceId, root, onNavigate }: { detail: KnowledgePageDetail; workspaceId?: string; root?: string; onNavigate: (slug: string) => void }) {
-	const [e2e, setE2E] = useState<E2ERunbookList>({ runbooks: [] });
-	const isE2E = Boolean(workspaceId && root && detail.path.startsWith('e2e-testing/'));
-	const refreshE2E = () => { if (isE2E && workspaceId && root) void api.knowledgeE2ERunbook(workspaceId, root, detail.slug).then((result) => setE2E(result ?? { runbooks: [] })).catch(() => setE2E({ runbooks: [], diagnostic: 'E2E coverage could not be loaded.' })); };
-	useEffect(() => { refreshE2E(); }, [detail.slug, workspaceId, root]);
+export function KnowledgeReader({ detail, onNavigate }: { detail: KnowledgePageDetail; onNavigate: (slug: string) => void }) {
 	const resolvedTargets = new Map(detail.links.filter((link) => link.resolution === 'resolved' && link.targetSlug).map((link) => [normalizeTarget(link.rawTarget), link.targetSlug!]));
 	const interceptLink = (event: MouseEvent<HTMLDivElement>) => {
 		const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a');
@@ -28,7 +21,6 @@ export function KnowledgeReader({ detail, workspaceId, root, onNavigate }: { det
 			<KnowledgeWarnings warnings={detail.warnings} />
 			{detail.links.some((link) => /^https?:/i.test(link.rawTarget)) && <p className="knowledge-reader-note"><ExternalLink size={14} /> External links open in a new tab.</p>}
 		</section>
-		{isE2E && workspaceId && <E2EQualityPanel workspaceId={workspaceId} runbooks={e2e.runbooks} diagnostic={e2e.diagnostic} onRefresh={refreshE2E} />}
 		<article className="knowledge-reader-content" onClick={interceptLink}><ContentViewer file={detail.content} content={prepareKnowledgeMarkdown(detail.content.content)} /></article>
 	</div>;
 }

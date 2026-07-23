@@ -145,6 +145,22 @@
   box-shadow: var(--shadow-soft);
 }
 
+.knowledge-browser.with-side-panel {
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) minmax(280px, 340px);
+}
+
+.knowledge-side-panel {
+  min-width: 0;
+  overflow: auto;
+  border-left: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-soft) 48%, var(--panel));
+  padding: 14px;
+}
+
+.knowledge-side-panel-tabs {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .knowledge-browser-list {
   min-height: 0;
   overflow: auto;

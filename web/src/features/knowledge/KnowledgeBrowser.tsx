@@ -3,7 +3,7 @@ import { BookMarked, BookOpen, ChevronRight, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
 
-export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode }) {
+export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children, sidePanel }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode; sidePanel?: ReactNode }) {
 	const [query, setQuery] = useState('');
 	const [expandedDomains, setExpandedDomains] = useState<Set<string>>(() => new Set(['root']));
 	const navigationRef = useRef<HTMLElement | null>(null);
@@ -57,7 +57,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		</section>;
 	};
 
-	return <div className="knowledge-browser">
+	return <div className={sidePanel ? 'knowledge-browser with-side-panel' : 'knowledge-browser'}>
 		<div className="knowledge-browser-list">
 			<label className="knowledge-search"><Search size={15} /><span className="knowledge-visually-hidden">Filter Knowledge pages</span><input aria-label="Filter Knowledge pages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter pages" /></label>
 			{pages.length === 0 && <div className="knowledge-empty"><h2>No valid pages indexed</h2><p>Add Markdown pages with <code>slug</code> and <code>title</code> front matter, then rescan.</p></div>}
@@ -66,6 +66,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			<KnowledgeWarnings warnings={warnings} compact indexDiagnostics />
 		</div>
 		<section className="knowledge-content-pane" aria-label="Knowledge page content">{children ?? <div className="knowledge-welcome"><BookOpen size={28} /><h2>Select a page</h2><p>Choose an entry from the index to read its full content.</p></div>}</section>
+		{sidePanel && <aside className="side-panel knowledge-side-panel" aria-label="Knowledge side panel">{sidePanel}</aside>}
 	</div>;
 }
 
