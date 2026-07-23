@@ -289,6 +289,39 @@ button:disabled {
   margin-bottom: 18px;
 }
 
+.left-nav-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.left-nav-brand-row .brand {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.left-nav-toggle {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #aebed3;
+}
+
+.left-nav-toggle:hover,
+.left-nav-toggle:focus-visible {
+  border-color: #31425c;
+  background: var(--nav-soft);
+  color: var(--nav-text);
+}
+
 .brand svg {
   width: 30px;
   height: 30px;
@@ -1897,6 +1930,46 @@ select {
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
+}
+
+.left-nav-collapsed .left-nav {
+  align-items: center;
+  padding: 18px 10px;
+}
+
+.left-nav-collapsed .left-nav-brand-row,
+.left-nav-collapsed .nav-section,
+.left-nav-collapsed .workspace-list,
+.left-nav-collapsed .add-repository-button {
+  width: 100%;
+}
+
+.left-nav-collapsed .left-nav-brand-row {
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.left-nav-collapsed .brand,
+.left-nav-collapsed .nav-button,
+.left-nav-collapsed .workspace-button,
+.left-nav-collapsed .add-repository-button {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.left-nav-collapsed .brand span,
+.left-nav-collapsed .nav-section-label,
+.left-nav-collapsed .workspace-list-label,
+.left-nav-collapsed .nav-button span,
+.left-nav-collapsed .workspace-button span,
+.left-nav-collapsed .add-repository-button span,
+.left-nav-collapsed .workspace-empty,
+.left-nav-collapsed .repo-status {
+  display: none;
+}
+
+.left-nav-collapsed .workspace-list {
+  margin-top: 14px;
 }
 
 .main-content {

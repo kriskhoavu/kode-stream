@@ -5,6 +5,10 @@
   grid-template-rows: 68px 1fr;
 }
 
+.app-shell.left-nav-collapsed {
+  grid-template-columns: 72px 1fr;
+}
+
 .topbar {
   grid-column: 2;
   grid-row: 1;

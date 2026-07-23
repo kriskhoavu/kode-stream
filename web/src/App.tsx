@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Plus, Search, Sun, Boxes, FolderGit2, Settings } from 'lucide-react';
+import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Plus, Search, Sun, Boxes, FolderGit2, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
@@ -33,6 +33,7 @@ export function App() {
     lastSync
   } = useAppState();
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const [leftNavCollapsed, setLeftNavCollapsed] = useState(() => localStorage.getItem('leftNavCollapsed') === 'true');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [appSettings, setAppSettings] = useAppSettings();
@@ -72,13 +73,22 @@ export function App() {
     setWorkspaceMenuOpen(false);
   };
 
+  const toggleLeftNav = () => setLeftNavCollapsed((collapsed) => {
+    const next = !collapsed;
+    localStorage.setItem('leftNavCollapsed', String(next));
+    return next;
+  });
+
   return (
-    <div className="app-shell">
+    <div className={leftNavCollapsed ? 'app-shell left-nav-collapsed' : 'app-shell'}>
       <aside className="left-nav">
-        <button className="brand" onClick={() => navigate({ name: 'workstream' })} aria-label="Kode Stream home">
-          <Boxes size={20} />
-          <span>Kode Stream</span>
-        </button>
+        <div className="left-nav-brand-row">
+          <button className="brand" onClick={() => navigate({ name: 'workstream' })} aria-label="Kode Stream home">
+            <Boxes size={20} />
+            <span>Kode Stream</span>
+          </button>
+          <button className="left-nav-toggle" type="button" onClick={toggleLeftNav} aria-label={leftNavCollapsed ? 'Expand navigation' : 'Collapse navigation'} title={leftNavCollapsed ? 'Expand navigation' : 'Collapse navigation'}>{leftNavCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
+        </div>
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>
           <NavButton active={route.name === 'workstream'} onClick={() => navigate({ name: 'workstream' })} icon={<WorkstreamIcon size={18} />} label="Workstream" />
@@ -101,7 +111,7 @@ export function App() {
         </div>
         <button className="add-repository-button" type="button" onClick={() => navigate({ name: 'workspaces' })}>
           <Plus size={16} />
-          Add Workspace
+          <span>Add Workspace</span>
         </button>
         <div className="repo-status">
           <span className="repo-status-label">Last scan</span>
