@@ -45,6 +45,7 @@ import { WorkstreamExplorer } from './WorkstreamExplorer';
 import type { ExplorerLocation } from '../features/workstream-explorer/types';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import { BranchSnapshotPicker } from '../features/workstream/BranchSnapshotPicker';
+import { E2EQualityPanel } from '../features/e2e-testing/E2EQualityPanel';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'jira' | 'quality';
@@ -103,6 +104,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationError, setVerificationError] = useState('');
   const [verificationTests, setVerificationTests] = useState<ItemVerificationTests | null>(null);
+  const [e2eRunbooks, setE2ERunbooks] = useState<{ runbooks: import('../lib/types').E2ERunbook[]; diagnostic?: string }>({ runbooks: [] });
   const [verificationTestsBusy, setVerificationTestsBusy] = useState(false);
   const [automationLaunchBusy, setAutomationLaunchBusy] = useState(false);
   const [manualSpec, setManualSpec] = useState('');
@@ -281,6 +283,13 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       .finally(() => { if (active) setVerificationTestsBusy(false); });
     return () => { active = false; };
   }, [plan?.id]);
+
+  const loadE2ERunbooks = () => {
+    if (!plan) return;
+    void api.itemE2ERunbooks(plan.id).then((result) => setE2ERunbooks(result ?? { runbooks: [] })).catch(() => setE2ERunbooks({ runbooks: [], diagnostic: 'E2E coverage could not be loaded.' }));
+  };
+
+  useEffect(() => { loadE2ERunbooks(); }, [plan?.id]);
 
   useEffect(() => {
     if (!plan) {
@@ -978,6 +987,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           </div>
         </div>
       )}
+		{plan?.workspaceId && <E2EQualityPanel workspaceId={plan.workspaceId} runbooks={e2eRunbooks.runbooks} diagnostic={e2eRunbooks.diagnostic} onRefresh={loadE2ERunbooks} />}
       {verificationBusy && <span className="verification-note">Starting verification...</span>}
       {verificationError && <span className="error" role="alert">{verificationError}</span>}
       {verificationJob && <span className="verification-status">{verificationJob.mode === 'automation' ? 'automation' : verificationJob.profile} · {verificationJob.status}{verificationJob.failureType ? ` (${verificationJob.failureType})` : ''}</span>}
