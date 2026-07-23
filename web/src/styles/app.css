@@ -1952,6 +1952,10 @@ select {
   color: var(--blue);
 }
 
+:root:not([data-theme="dark"]) .workstream-heading h1 svg {
+  color: var(--button-accent);
+}
+
 .workstream-heading > div > span svg {
   color: var(--muted);
 }
