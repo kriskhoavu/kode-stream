@@ -2363,6 +2363,11 @@ select:disabled {
   padding-top: 10px;
 }
 
+.e2e-quality-panel.nested {
+  border-top: 0;
+  padding-top: 0;
+}
+
 .e2e-runbook-search {
   display: flex;
   align-items: center;

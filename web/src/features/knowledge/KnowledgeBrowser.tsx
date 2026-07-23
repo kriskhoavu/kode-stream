@@ -67,7 +67,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			<KnowledgeWarnings warnings={warnings} compact indexDiagnostics />
 		</div>
 		<section className="knowledge-content-pane" aria-label="Knowledge page content">{children ?? <div className="knowledge-welcome"><BookOpen size={28} /><h2>Select a page</h2><p>Choose an entry from the index to read its full content.</p></div>}</section>
-		{sidePanel && <aside className={sidePanelCollapsed ? 'side-panel knowledge-side-panel collapsed' : 'side-panel knowledge-side-panel'} aria-label="Knowledge side panel"><div className="panel-header"><h2>Quality</h2><button className="icon-button" type="button" title={sidePanelCollapsed ? 'Expand Knowledge Quality' : 'Collapse Knowledge Quality'} onClick={() => setSidePanelCollapsed((current) => !current)}>{sidePanelCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button></div>{!sidePanelCollapsed && sidePanel}</aside>}
+		{sidePanel && <aside className={sidePanelCollapsed ? 'metadata-panel side-panel knowledge-side-panel collapsed' : 'metadata-panel side-panel knowledge-side-panel'} aria-label="Knowledge side panel"><div className="panel-header"><h2><BookOpen size={16} /> Knowledge</h2><button className="icon-button" type="button" title={sidePanelCollapsed ? 'Expand Knowledge Quality' : 'Collapse Knowledge Quality'} onClick={() => setSidePanelCollapsed((current) => !current)}>{sidePanelCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button></div>{!sidePanelCollapsed && sidePanel}</aside>}
 	</div>;
 }
 
