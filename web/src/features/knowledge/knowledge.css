@@ -488,6 +488,21 @@ body.is-resizing-panel .knowledge-browser {
   background: linear-gradient(180deg, color-mix(in srgb, var(--panel-soft) 62%, var(--panel)), var(--panel));
 }
 
+.knowledge-reader-eyebrow {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .knowledge-reader-summary h2 {
   margin: 0;
   font-size: 26px;
