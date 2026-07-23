@@ -655,6 +655,15 @@ func (a *API) knowledgePage(w http.ResponseWriter, r *http.Request) {
 	a.respondKnowledge(w, page, err)
 }
 
+func (a *API) knowledgeE2ERunbook(w http.ResponseWriter, r *http.Request) {
+	if a.knowledge == nil {
+		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
+		return
+	}
+	result, err := a.knowledge.E2ERunbook(r.PathValue("workspaceID"), r.PathValue("root"), r.PathValue("slug"))
+	respond(w, result, err)
+}
+
 func (a *API) knowledgeGraph(w http.ResponseWriter, r *http.Request) {
 	if a.knowledge == nil {
 		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
@@ -1107,6 +1116,26 @@ func (a *API) itemVerificationTests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, tests, err)
+}
+
+func (a *API) itemE2ERunbooks(w http.ResponseWriter, r *http.Request) {
+	result, sources, err := a.items.E2ERunbooks(r.PathValue("id"))
+	if errors.Is(err, apperrors.ErrItemNotFound) {
+		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	if err != nil {
+		respond(w, result, err)
+		return
+	}
+	item, itemErr := a.items.Detail(r.PathValue("id"))
+	if itemErr == nil && a.knowledge != nil && len(sources) > 0 {
+		canonical, canonicalErr := a.knowledge.E2ERunbooksForSources(item.WorkspaceID, sources)
+		if canonicalErr == nil {
+			result.Runbooks = append(result.Runbooks, canonical.Runbooks...)
+		}
+	}
+	respond(w, result, nil)
 }
 
 func (a *API) saveItemVerificationTests(w http.ResponseWriter, r *http.Request) {

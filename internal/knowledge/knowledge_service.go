@@ -322,6 +322,101 @@ func (s *KnowledgeService) Page(workspaceID, root, slug string) (KnowledgePageDe
 	return KnowledgePageDetail{KnowledgePage: *selected, Content: content, Warnings: warnings}, nil
 }
 
+func (s *KnowledgeService) E2ERunbooksForSources(workspaceID string, sourceRefs []string) (models.E2ERunbookList, error) {
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return models.E2ERunbookList{}, err
+	}
+	if err := requireKnowledgeEnabled(workspace); err != nil {
+		return models.E2ERunbookList{}, err
+	}
+	wikis, err := s.store.List(workspaceID)
+	if err != nil {
+		return models.E2ERunbookList{}, err
+	}
+	matched := make([]models.E2ERunbook, 0)
+	for _, wiki := range wikis {
+		for _, page := range wiki.Pages {
+			if !strings.HasPrefix(page.Domain, "e2e-testing") || !matchesE2ESource(page.SourceRefs, sourceRefs) {
+				continue
+			}
+			matched = append(matched, s.e2ERunbook(workspace, wiki.Root, page))
+		}
+	}
+	sort.Slice(matched, func(i, j int) bool { return matched[i].Title < matched[j].Title })
+	if len(matched) == 0 {
+		return models.E2ERunbookList{Runbooks: matched, Diagnostic: "No canonical E2E journey is linked to this plan."}, nil
+	}
+	return models.E2ERunbookList{Runbooks: matched}, nil
+}
+
+func (s *KnowledgeService) E2ERunbook(workspaceID, root, slug string) (models.E2ERunbookList, error) {
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return models.E2ERunbookList{}, err
+	}
+	wiki, err := s.wiki(workspaceID, root)
+	if err != nil {
+		return models.E2ERunbookList{}, err
+	}
+	for _, page := range wiki.Pages {
+		if page.Slug == slug && strings.HasPrefix(page.Domain, "e2e-testing") {
+			return models.E2ERunbookList{Runbooks: []models.E2ERunbook{s.e2ERunbook(workspace, wiki.Root, page)}}, nil
+		}
+	}
+	return models.E2ERunbookList{Runbooks: []models.E2ERunbook{}, Diagnostic: "The selected Knowledge page is not an E2E journey."}, nil
+}
+
+func matchesE2ESource(pageSources, requested []string) bool {
+	for _, source := range pageSources {
+		for _, candidate := range requested {
+			if strings.TrimSpace(source) == candidate {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (s *KnowledgeService) e2ERunbook(workspace models.WorkspaceConfig, wikiRoot string, page KnowledgePage) models.E2ERunbook {
+	runbook := models.E2ERunbook{Title: page.Title, Path: filepath.ToSlash(filepath.Join(wikiRoot, page.Path)), Source: "wiki"}
+	result := filepath.Join(workspace.Path, wikiRoot, filepath.Dir(page.Path), "automation", "results", "latest.md")
+	if data, err := os.ReadFile(result); err == nil {
+		runbook.ResultPath = filepath.ToSlash(filepath.Join(wikiRoot, filepath.Dir(page.Path), "automation", "results", "latest.md"))
+		runbook.LatestResult = parseE2EResult(string(data))
+	} else if os.IsNotExist(err) {
+		runbook.Diagnostic = "Not run"
+	} else {
+		runbook.Diagnostic = "Latest E2E result could not be read."
+	}
+	return runbook
+}
+
+func parseE2EResult(content string) *models.E2ELatestResult {
+	result := &models.E2ELatestResult{Status: "not run", Evidence: []string{}}
+	for _, line := range strings.Split(content, "\n") {
+		key, value, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "status":
+			result.Status = strings.ToLower(strings.TrimSpace(value))
+		case "provider":
+			result.Provider = strings.TrimSpace(value)
+		case "environment":
+			result.Environment = strings.TrimSpace(value)
+		case "failed step":
+			result.FailedStep = strings.TrimSpace(value)
+		case "evidence":
+			if evidence := strings.TrimSpace(value); evidence != "" {
+				result.Evidence = append(result.Evidence, evidence)
+			}
+		}
+	}
+	return result
+}
+
 func (s *KnowledgeService) Graph(workspaceID, root string) (KnowledgeGraph, error) {
 	wiki, err := s.wiki(workspaceID, root)
 	if err != nil {
