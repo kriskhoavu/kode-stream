@@ -49,7 +49,6 @@ describe('KnowledgeBrowser', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Open A12 index' }));
 		expect(onSelect).toHaveBeenCalledWith('a12-index');
 		expect(screen.queryByRole('button', { name: /A12 Documentation/ })).not.toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: 'Expand A12' }));
 		const childPage = screen.getByRole('button', { name: /A12 Architecture Analysis/ });
 		expect(childPage).toBeInTheDocument();
 		const landingControl = screen.getByRole('button', { name: 'Open A12 index' });
@@ -105,6 +104,24 @@ describe('KnowledgeBrowser', () => {
 
 		fireEvent.click(screen.getByRole('button', { name: 'Expand A12' }));
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
+	});
+
+	it('toggles an already selected landing page folder from its title', () => {
+		const domainPages: KnowledgePage[] = [
+			{ ...pages[0], slug: 'a12-index', path: 'a12/README.md', domain: 'A12' },
+			{ ...pages[1], slug: 'a12-analysis', title: 'A12 Architecture Analysis', path: 'a12/architecture.md', domain: 'A12' }
+		];
+		render(<KnowledgeBrowser pages={domainPages} selectedSlug="a12-index" warnings={[]} onSelect={vi.fn()} />);
+
+		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Open A12 index' }));
+		expect(screen.queryByRole('button', { name: /A12 Architecture Analysis/ })).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Expand A12' })).toHaveAttribute('aria-expanded', 'false');
+	});
+
+	it('provides a left-border resize handle for the Knowledge Quality side panel', () => {
+		render(<KnowledgeBrowser pages={pages} warnings={[]} onSelect={vi.fn()} sidePanel={<div>Quality content</div>} />);
+		expect(screen.getByRole('button', { name: 'Resize Knowledge Quality panel' })).toHaveClass('panel-resize-handle-right');
 	});
 
 	it('opens only the root domain by default', () => {
