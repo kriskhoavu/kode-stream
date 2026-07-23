@@ -286,7 +286,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
 
   const loadE2ERunbooks = () => {
     if (!plan) return;
-    void api.itemE2ERunbooks(plan.id).then((result) => setE2ERunbooks(result ?? { runbooks: [] })).catch(() => setE2ERunbooks({ runbooks: [], diagnostic: 'E2E coverage could not be loaded.' }));
+    const load = api.itemE2ERunbooks;
+    if (typeof load !== 'function') { setE2ERunbooks({ runbooks: [] }); return; }
+    void load(plan.id).then((result) => setE2ERunbooks(result ?? { runbooks: [] })).catch(() => setE2ERunbooks({ runbooks: [], diagnostic: 'E2E coverage could not be loaded.' }));
   };
 
   useEffect(() => { loadE2ERunbooks(); }, [plan?.id]);
