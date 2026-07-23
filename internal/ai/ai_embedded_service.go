@@ -14,8 +14,52 @@ type EmbeddedInput struct {
 	CustomPrompt   string   `json:"customPrompt,omitempty"`
 	SelectedSkills []string `json:"selectedSkills,omitempty"`
 	SelectedAgents []string `json:"selectedAgents,omitempty"`
+	ContextPath    string   `json:"contextPath,omitempty"`
 	Columns        uint16   `json:"columns"`
 	Rows           uint16   `json:"rows"`
+}
+
+func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput) (EmbeddedResult, error) {
+	if s.embedded == nil || s.launch == nil || s.launch.registry == nil {
+		return EmbeddedResult{}, launchError("launch_failed", "embedded AI sessions are unavailable")
+	}
+	workspace, found, err := s.launch.registry.Get(workspaceID)
+	if err != nil {
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	if !found {
+		return EmbeddedResult{}, launchError("workspace_not_found", "workspace not found")
+	}
+	contextPath := strings.TrimSpace(input.ContextPath)
+	if contextPath == "" {
+		return EmbeddedResult{}, launchError("invalid_context_path", "contextPath is required")
+	}
+	if _, err := pathguard.SafeJoin(workspace.Path, contextPath); err != nil {
+		return EmbeddedResult{}, launchError("invalid_context_path", "context path is outside the workspace")
+	}
+	settings, err := s.Settings()
+	if err != nil {
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	providerID := strings.TrimSpace(input.Provider)
+	provider, ok := settings.Providers[providerID]
+	if !ok || !provider.Enabled {
+		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
+	}
+	capability := s.detect(provider.Executable)
+	if !capability.Detected {
+		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
+	}
+	prompt, _, err := s.composePrompt(providerID, "", "workspace_only", input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
+	if err != nil {
+		return EmbeddedResult{}, err
+	}
+	values := map[string]string{"workspace": workspace.Path, "contextFile": contextPath, "itemPath": contextPath, "identifier": contextPath, "contextMode": "workspace_only", "intent": "workspace_only", "prompt": prompt}
+	session, grant, err := s.embedded.Start(StartRequest{WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", Executable: capability.Executable, Args: launchProviderArgs("workspace_only", provider.Args, values), Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+	if err != nil {
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	return EmbeddedResult{Session: session, Grant: grant}, nil
 }
 
 type EmbeddedResult struct {

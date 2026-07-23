@@ -229,6 +229,37 @@ func (a *API) startEmbeddedAISession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
 }
 
+func (a *API) startEmbeddedWorkspaceAISession(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
+		return
+	}
+	var input appaisession.EmbeddedInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.aiSessions.StartEmbeddedWorkspace(r.PathValue("id"), input)
+	if err == nil {
+		writeJSON(w, http.StatusCreated, result)
+		return
+	}
+	var launchErr *appaisession.LaunchError
+	if !errors.As(err, &launchErr) {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	status := http.StatusBadRequest
+	if launchErr.Code == "workspace_not_found" {
+		status = http.StatusNotFound
+	} else if launchErr.Code == "launch_failed" {
+		status = http.StatusInternalServerError
+	}
+	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+}
+
 func (a *API) embeddedAISession(w http.ResponseWriter, r *http.Request) {
 	if a.aiSessions == nil || a.aiSessions.EmbeddedManager() == nil {
 		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
@@ -395,6 +426,37 @@ func (a *API) launchAISession(w http.ResponseWriter, r *http.Request) {
 	}
 	status := http.StatusBadRequest
 	if launchErr.Code == "item_not_found" || launchErr.Code == "workspace_not_found" {
+		status = http.StatusNotFound
+	} else if launchErr.Code == "launch_failed" {
+		status = http.StatusInternalServerError
+	}
+	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+}
+
+func (a *API) launchWorkspaceAISession(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session launch is unavailable")
+		return
+	}
+	var input appaisession.LaunchInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.aiSessions.LaunchWorkspace(r.PathValue("id"), input)
+	if err == nil {
+		writeJSON(w, http.StatusAccepted, result)
+		return
+	}
+	var launchErr *appaisession.LaunchError
+	if !errors.As(err, &launchErr) {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	status := http.StatusBadRequest
+	if launchErr.Code == "workspace_not_found" {
 		status = http.StatusNotFound
 	} else if launchErr.Code == "launch_failed" {
 		status = http.StatusInternalServerError
