@@ -12,10 +12,12 @@ import type {
 	AISessionLaunchInput,
 	AISessionLaunchResult,
 	EmbeddedAISessionResult
+	, E2ERunbook
 } from '../../lib/types';
 import { appendJiraDescriptionPrompt, removeJiraDescriptionPrompt } from './jiraPrompt';
 
-export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched }: { itemId: string; preference?: AISessionLaunchInput | null; onClose: () => void; onLaunched: (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => void }) {
+export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, preference, onClose, onLaunched }: { itemId?: string; workspaceTarget?: { workspaceId: string; contextPath: string }; e2eRunbook?: E2ERunbook; preference?: AISessionLaunchInput | null; onClose: () => void; onLaunched: (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => void }) {
+	const e2eMode = Boolean(workspaceTarget && e2eRunbook);
 	const [settings, setSettings] = useState<AISettings | null>(null);
 	const [capabilities, setCapabilities] = useState<AICapability[]>([]);
 	const [presets, setPresets] = useState<AIPlanPreset[]>([]);
@@ -42,34 +44,34 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 
 	const providers = toolOptions(settings?.providers, capabilities, 'provider');
 	const terminals = toolOptions(settings?.terminals, capabilities, 'terminal');
-	const canLaunch = !loading && !launching && (contextMode === 'workspace_only' || eligibility?.cardContextAvailable) && providers.some((item) => item.id === provider) && (surface === 'embedded' || terminals.some((item) => item.id === terminal));
+	const canLaunch = !loading && !launching && (e2eMode || contextMode === 'workspace_only' || eligibility?.cardContextAvailable) && providers.some((item) => item.id === provider) && (surface === 'embedded' || terminals.some((item) => item.id === terminal));
 
 	useEffect(() => {
 		let active = true;
-		Promise.all([api.aiSettings(), api.aiCapabilities(), api.aiPresets(), api.aiSessionEligibility(itemId)]).then(([nextSettings, nextCapabilities, nextPresets, nextEligibility]) => {
+		Promise.all([api.aiSettings(), api.aiCapabilities(), api.aiPresets(), itemId ? api.aiSessionEligibility(itemId) : Promise.resolve({ editable: true, cardContextAvailable: true, missing: [] })]).then(([nextSettings, nextCapabilities, nextPresets, nextEligibility]) => {
 			if (!active) return;
 			const nextProvider = preference?.provider ?? nextSettings.defaultProvider;
 			const nextPresetId = preference?.presetId ?? nextPresets[0]?.id ?? '';
 			const presetPrompt = nextPresets.find((preset) => preset.id === nextPresetId)?.prompt ?? '';
-			const nextPromptDraft = preference?.promptDraft ?? preference?.customPrompt ?? presetPrompt;
+			const nextPromptDraft = e2eMode ? `Execute the E2E runbook at ${workspaceTarget!.contextPath}. Use the e2e-testing skill, request missing runtime inputs, and record the result in automation/results/latest.md.` : preference?.promptDraft ?? preference?.customPrompt ?? presetPrompt;
 			setSettings(nextSettings);
 			setCapabilities(nextCapabilities);
 			setPresets(nextPresets);
 			setEligibility(nextEligibility);
 			setProvider(nextProvider);
 			setTerminal(preference?.terminal ?? nextSettings.defaultTerminal);
-			setContextMode(preference?.contextMode ?? 'card_context');
+			setContextMode(e2eMode ? 'workspace_only' : preference?.contextMode ?? 'card_context');
 			setPresetId(nextPresetId);
 			setPromptDraft(nextPromptDraft);
 			setPromptDirty(Boolean(preference?.promptDraft ?? preference?.customPrompt) && nextPromptDraft.trim() !== presetPrompt.trim());
 			setIncludeJiraDescription(preference?.includeJiraDescription === true);
 			setJiraPromptError('');
-			setSelectedSkills([]);
+			setSelectedSkills(e2eMode ? ['e2e-testing'] : []);
 			setSelectedAgents([]);
 			setSurface(preference?.surface ?? 'external');
 		}).catch((caught) => active && setError(caught instanceof Error ? caught.message : 'AI session options are unavailable.')).finally(() => active && setLoading(false));
 		return () => { active = false; };
-	}, [itemId, preference]);
+	}, [itemId, preference, e2eMode, workspaceTarget?.contextPath]);
 
 	useEffect(() => {
 		if (!provider) return;
@@ -79,7 +81,7 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 		api.aiProviderCapabilities(provider, itemId).then((catalog) => {
 			if (!active) return;
 			setProviderCatalog(catalog);
-			setSelectedSkills((current) => current.filter((item) => catalog.skills.some((skill) => skill.id === item)));
+			setSelectedSkills((current) => e2eMode ? ['e2e-testing'] : current.filter((item) => catalog.skills.some((skill) => skill.id === item)));
 			setSelectedAgents((current) => current.filter((item) => catalog.agents.some((agent) => agent.id === item)));
 		}).catch((caught) => {
 			if (!active) return;
@@ -89,10 +91,10 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 			setSelectedAgents([]);
 		});
 		return () => { active = false; };
-	}, [provider, itemId]);
+	}, [provider, itemId, e2eMode]);
 
 	useEffect(() => {
-		if (!includeJiraDescription) {
+		if (e2eMode || !includeJiraDescription || !itemId) {
 			setPromptDraft((current) => removeJiraDescriptionPrompt(current));
 			setJiraPromptError('');
 			setJiraPromptLoading(false);
@@ -119,7 +121,7 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 			setJiraPromptError(caught instanceof Error ? caught.message : 'Jira ticket description is unavailable.');
 		}).finally(() => active && setJiraPromptLoading(false));
 		return () => { active = false; };
-	}, [includeJiraDescription, itemId, presetId]);
+	}, [includeJiraDescription, itemId, presetId, e2eMode]);
 
 	useEffect(() => {
 		closeRef.current?.focus();
@@ -170,13 +172,17 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 				surface,
 				presetId: presetId || undefined,
 				promptDraft: promptDraft.trim() || undefined,
-				selectedSkills: selectedSkills.length > 0 ? selectedSkills : undefined,
+				selectedSkills: e2eMode ? ['e2e-testing'] : selectedSkills.length > 0 ? selectedSkills : undefined,
 				selectedAgents: selectedAgents.length > 0 ? selectedAgents : undefined,
 				includeJiraDescription: includeJiraDescription || undefined
 			};
-			const result = surface === 'embedded'
-				? await api.startEmbeddedAISession(itemId, { provider, contextMode, presetId: input.presetId, promptDraft: input.promptDraft, selectedSkills: input.selectedSkills, selectedAgents: input.selectedAgents, columns: 80, rows: 24 })
-				: await api.launchAISession(itemId, input);
+			const result = e2eMode
+				? surface === 'embedded'
+					? await api.startEmbeddedWorkspaceAISession(workspaceTarget!.workspaceId, { provider, contextMode: 'workspace_only', contextPath: workspaceTarget!.contextPath, presetId: input.presetId, promptDraft: input.promptDraft, selectedSkills: input.selectedSkills, selectedAgents: input.selectedAgents, columns: 80, rows: 24 })
+					: await api.launchWorkspaceAISession(workspaceTarget!.workspaceId, { ...input, contextMode: 'workspace_only', contextPath: workspaceTarget!.contextPath })
+				: surface === 'embedded'
+					? await api.startEmbeddedAISession(itemId!, { provider, contextMode, presetId: input.presetId, promptDraft: input.promptDraft, selectedSkills: input.selectedSkills, selectedAgents: input.selectedAgents, columns: 80, rows: 24 })
+					: await api.launchAISession(itemId!, input);
 			onLaunched(result, input);
 			onClose();
 		} catch (caught) {
@@ -189,28 +195,28 @@ export function AISessionLaunchDialog({ itemId, preference, onClose, onLaunched 
 	return (
 		<div className="modal-backdrop ai-launch-backdrop" role="presentation">
 			<section ref={dialogRef} className="modal-panel ai-launch-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-launch-title">
-				<header><div><h2 id="ai-launch-title"><Bot size={19} /> Open AI session</h2><span>Start an interactive CLI with this workspace and item context.</span></div><button ref={closeRef} className="icon-button" type="button" aria-label="Close AI session dialog" disabled={launching} onClick={onClose}><X size={18} /></button></header>
+				<header><div><h2 id="ai-launch-title"><Bot size={19} /> {e2eMode ? 'Run E2E test' : 'Open AI session'}</h2><span>{e2eMode ? `Runbook: ${e2eRunbook!.title}` : 'Start an interactive CLI with this workspace and item context.'}</span></div><button ref={closeRef} className="icon-button" type="button" aria-label="Close AI session dialog" disabled={launching} onClick={onClose}><X size={18} /></button></header>
 				{loading && <p role="status">Loading available tools...</p>}
 				{error && <p className="error" role="alert">{error}</p>}
 				{settings && eligibility && <div className="ai-launch-fields">
 					<label>AI provider<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providers.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>
 					<fieldset><legend>Session surface</legend><label><input type="radio" name="ai-surface" checked={surface === 'external'} onChange={() => setSurface('external')} /> Integrated terminal</label><label><input type="radio" name="ai-surface" checked={surface === 'embedded'} onChange={() => setSurface('embedded')} /> Embedded terminal</label></fieldset>
 					{surface === 'external' && <label>Terminal<select value={terminal} onChange={(event) => setTerminal(event.target.value)}>{terminals.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>}
-					<fieldset><legend>Session context</legend><label><input type="radio" name="ai-context" checked={contextMode === 'workspace_only'} onChange={() => setContextMode('workspace_only')} /> Workspace only — start with a free prompt</label><label><input type="radio" name="ai-context" checked={contextMode === 'card_context'} disabled={!eligibility.cardContextAvailable} aria-describedby="card-context-readiness" onChange={() => setContextMode('card_context')} /> Selected card — provide its path and related documents</label></fieldset>
+					{!e2eMode && <fieldset><legend>Session context</legend><label><input type="radio" name="ai-context" checked={contextMode === 'workspace_only'} onChange={() => setContextMode('workspace_only')} /> Workspace only — start with a free prompt</label><label><input type="radio" name="ai-context" checked={contextMode === 'card_context'} disabled={!eligibility.cardContextAvailable} aria-describedby="card-context-readiness" onChange={() => setContextMode('card_context')} /> Selected card — provide its path and related documents</label></fieldset>}
 					{contextMode === 'workspace_only' && <p className="eligibility-ready">No card context will be injected. The AI opens at the workspace root so you can manually reference any relevant file or directory.</p>}
 					{contextMode === 'card_context' && <p id="card-context-readiness" className={eligibility.cardContextAvailable ? 'eligibility-ready' : 'eligibility-blocked'}>{eligibility.cardContextAvailable ? 'The selected card path will be provided as context. The AI will read relevant documents from that path and wait for your request.' : `Card context unavailable: ${eligibility.missing.join(', ') || 'the card is not available in the working tree'}.`}</p>}
-					<label>Prompt preset<select aria-label="AI prompt" value={presetId} onChange={(event) => handlePresetChange(event.target.value)}>
+					{!e2eMode && <label>Prompt preset<select aria-label="AI prompt" value={presetId} onChange={(event) => handlePresetChange(event.target.value)}>
 						{presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
 						<option value="">Free prompt</option>
-					</select></label>
+					</select></label>}
 					<div className="ai-launch-prompt-field">
-						<div className="ai-launch-prompt-heading"><span>Prompt</span><label className="ai-launch-check"><input type="checkbox" checked={includeJiraDescription} onChange={(event) => setIncludeJiraDescription(event.target.checked)} /> <span><Ticket size={14} /> Fetch Jira ticket description into prompt</span></label></div>
-						<textarea aria-label="Prompt" rows={4} value={promptDraft} onChange={(event) => { setPromptDraft(event.target.value); setPromptDirty(true); }} placeholder="Tell the AI what to do with this item." />
+						<div className="ai-launch-prompt-heading"><span>Prompt</span>{!e2eMode && <label className="ai-launch-check"><input type="checkbox" checked={includeJiraDescription} onChange={(event) => setIncludeJiraDescription(event.target.checked)} /> <span><Ticket size={14} /> Fetch Jira ticket description into prompt</span></label>}</div>
+						<textarea aria-label="Prompt" rows={4} value={promptDraft} disabled={e2eMode} onChange={(event) => { setPromptDraft(event.target.value); setPromptDirty(true); }} placeholder="Tell the AI what to do with this item." />
 					</div>
 					{jiraPromptLoading && <p className="eligibility-ready" role="status">Fetching Jira ticket description...</p>}
 					{jiraPromptError && <p className="eligibility-blocked">{jiraPromptError}</p>}
 					{providerCatalogError && <p className="eligibility-blocked">{providerCatalogError}</p>}
-					<CapabilitySection title="Skills" items={providerCatalog?.skills ?? []} selected={selectedSkills} onToggle={(id) => toggleSelection(setSelectedSkills, id)} onSelect={(ids) => selectCapabilities(setSelectedSkills, ids)} onClear={(ids) => clearCapabilities(setSelectedSkills, ids)} />
+					{e2eMode ? <p className="eligibility-ready">Required skill: <code>e2e-testing</code></p> : <CapabilitySection title="Skills" items={providerCatalog?.skills ?? []} selected={selectedSkills} onToggle={(id) => toggleSelection(setSelectedSkills, id)} onSelect={(ids) => selectCapabilities(setSelectedSkills, ids)} onClear={(ids) => clearCapabilities(setSelectedSkills, ids)} />}
 					<CapabilitySection title="Agents" items={providerCatalog?.agents ?? []} selected={selectedAgents} onToggle={(id) => toggleSelection(setSelectedAgents, id)} onSelect={(ids) => selectCapabilities(setSelectedAgents, ids)} onClear={(ids) => clearCapabilities(setSelectedAgents, ids)} />
 					{providerCatalog && providerCatalog.skills.length === 0 && providerCatalog.agents.length === 0 && <p className="eligibility-ready">No {label(provider)} workspace or global skills/agents were discovered for this item. Launch will continue without capability injection.</p>}
 					{!eligibility.editable && contextMode !== 'workspace_only' && <p className="error">Card context requires an editable working-tree item.</p>}
