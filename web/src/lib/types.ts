@@ -196,6 +196,28 @@ export interface ItemVerificationTests {
   discoveredSpecs: DiscoveredVerificationSpec[];
 }
 
+export interface E2ELatestResult {
+  status: string;
+  provider?: string;
+  environment?: string;
+  failedStep?: string;
+  evidence: string[];
+}
+
+export interface E2ERunbook {
+  title: string;
+  path: string;
+  source: 'plan' | 'wiki' | string;
+  resultPath?: string;
+  latestResult?: E2ELatestResult;
+  diagnostic?: string;
+}
+
+export interface E2ERunbookList {
+  runbooks: E2ERunbook[];
+  diagnostic?: string;
+}
+
 export interface CreateVerificationJobInput {
   profile?: VerifyProfile;
   mode?: VerificationRunMode;

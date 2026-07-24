@@ -229,6 +229,37 @@ func (a *API) startEmbeddedAISession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
 }
 
+func (a *API) startEmbeddedWorkspaceAISession(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
+		return
+	}
+	var input appaisession.EmbeddedInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.aiSessions.StartEmbeddedWorkspace(r.PathValue("id"), input)
+	if err == nil {
+		writeJSON(w, http.StatusCreated, result)
+		return
+	}
+	var launchErr *appaisession.LaunchError
+	if !errors.As(err, &launchErr) {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	status := http.StatusBadRequest
+	if launchErr.Code == "workspace_not_found" {
+		status = http.StatusNotFound
+	} else if launchErr.Code == "launch_failed" {
+		status = http.StatusInternalServerError
+	}
+	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+}
+
 func (a *API) embeddedAISession(w http.ResponseWriter, r *http.Request) {
 	if a.aiSessions == nil || a.aiSessions.EmbeddedManager() == nil {
 		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
@@ -395,6 +426,37 @@ func (a *API) launchAISession(w http.ResponseWriter, r *http.Request) {
 	}
 	status := http.StatusBadRequest
 	if launchErr.Code == "item_not_found" || launchErr.Code == "workspace_not_found" {
+		status = http.StatusNotFound
+	} else if launchErr.Code == "launch_failed" {
+		status = http.StatusInternalServerError
+	}
+	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+}
+
+func (a *API) launchWorkspaceAISession(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session launch is unavailable")
+		return
+	}
+	var input appaisession.LaunchInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.aiSessions.LaunchWorkspace(r.PathValue("id"), input)
+	if err == nil {
+		writeJSON(w, http.StatusAccepted, result)
+		return
+	}
+	var launchErr *appaisession.LaunchError
+	if !errors.As(err, &launchErr) {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	status := http.StatusBadRequest
+	if launchErr.Code == "workspace_not_found" {
 		status = http.StatusNotFound
 	} else if launchErr.Code == "launch_failed" {
 		status = http.StatusInternalServerError
@@ -653,6 +715,15 @@ func (a *API) knowledgePage(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := a.knowledge.Page(r.PathValue("workspaceID"), r.PathValue("root"), r.PathValue("slug"))
 	a.respondKnowledge(w, page, err)
+}
+
+func (a *API) knowledgeE2ERunbook(w http.ResponseWriter, r *http.Request) {
+	if a.knowledge == nil {
+		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
+		return
+	}
+	result, err := a.knowledge.E2ERunbook(r.PathValue("workspaceID"), r.PathValue("root"), r.PathValue("slug"))
+	respond(w, result, err)
 }
 
 func (a *API) knowledgeGraph(w http.ResponseWriter, r *http.Request) {
@@ -1107,6 +1178,26 @@ func (a *API) itemVerificationTests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, tests, err)
+}
+
+func (a *API) itemE2ERunbooks(w http.ResponseWriter, r *http.Request) {
+	result, sources, err := a.items.E2ERunbooks(r.PathValue("id"))
+	if errors.Is(err, apperrors.ErrItemNotFound) {
+		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	if err != nil {
+		respond(w, result, err)
+		return
+	}
+	item, itemErr := a.items.Detail(r.PathValue("id"))
+	if itemErr == nil && a.knowledge != nil && len(sources) > 0 {
+		canonical, canonicalErr := a.knowledge.E2ERunbooksForSources(item.WorkspaceID, sources)
+		if canonicalErr == nil {
+			result.Runbooks = append(result.Runbooks, canonical.Runbooks...)
+		}
+	}
+	respond(w, result, nil)
 }
 
 func (a *API) saveItemVerificationTests(w http.ResponseWriter, r *http.Request) {

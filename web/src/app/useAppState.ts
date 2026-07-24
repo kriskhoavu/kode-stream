@@ -85,6 +85,10 @@ export function useAppState() {
   const selectWorkspace = (repo: WorkspaceConfig) => {
     setActiveWorkspaceId(repo.id);
     localStorage.setItem('activeWorkspaceId', repo.id);
+    if (route.name === 'knowledge') {
+      navigate({ name: 'knowledge', location: { workspaceId: repo.id, view: 'browse' } });
+      return;
+    }
     navigate({ name: 'workstream' });
   };
 

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { BookMarked, BookOpen, ChevronRight, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { BookMarked, BookOpen, ChevronRight, GripVertical, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
 
-export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode }) {
+export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children, sidePanel }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode; sidePanel?: ReactNode }) {
 	const [query, setQuery] = useState('');
+	const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
+	const [sidePanelWidth, setSidePanelWidth] = useState(300);
 	const [expandedDomains, setExpandedDomains] = useState<Set<string>>(() => new Set(['root']));
 	const navigationRef = useRef<HTMLElement | null>(null);
 	const filtered = useMemo(() => {
@@ -40,6 +42,20 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		}
 		if (event.key === 'Enter') { event.preventDefault(); onSelect(slug); }
 	};
+	const startSidePanelResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+		event.preventDefault();
+		const startX = event.clientX;
+		const startingWidth = sidePanelWidth;
+		const resize = (moveEvent: PointerEvent) => setSidePanelWidth(Math.max(260, Math.min(640, startingWidth - (moveEvent.clientX - startX))));
+		const finish = () => {
+			document.body.classList.remove('is-resizing-panel');
+			window.removeEventListener('pointermove', resize);
+			window.removeEventListener('pointerup', finish);
+		};
+		document.body.classList.add('is-resizing-panel');
+		window.addEventListener('pointermove', resize);
+		window.addEventListener('pointerup', finish);
+	};
 	const renderDomain = (node: DomainNode): ReactNode => {
 		const childPages = node.landingPage ? node.pages.filter((page) => page !== node.landingPage) : node.pages;
 		const collapsible = childPages.length > 0 || node.children.length > 0;
@@ -50,14 +66,31 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			if (next.has(key)) next.delete(key); else next.add(key);
 			return next;
 		});
+		const openOrToggleLanding = () => {
+			if (query.trim() === '' && node.landingPage?.slug === selectedSlug) {
+				toggleDomain();
+				return;
+			}
+			onSelect(node.landingPage!.slug);
+			if (!expanded) setExpandedDomains((current) => new Set(current).add(node.path.toLowerCase()));
+		};
+		const handleLandingKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+			if (event.key === 'Enter') {
+				event.preventDefault();
+				openOrToggleLanding();
+				return;
+			}
+			moveFocus(event, node.landingPage!.slug);
+		};
 		return <section className="knowledge-domain" key={node.path}>
-			<div className="knowledge-domain-header"><h3>{node.landingPage ? <button data-knowledge-entry data-knowledge-slug={node.landingPage.slug} type="button" className={node.landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={() => onSelect(node.landingPage!.slug)} onKeyDown={(event) => moveFocus(event, node.landingPage!.slug)} aria-label={`Open ${node.path} index`}><BookMarked size={13} /><span>{node.name}</span></button> : <span className="knowledge-domain-label"><BookMarked size={13} /><span>{node.name}</span></span>}</h3>{collapsible && <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>}</div>
+			<div className="knowledge-domain-header"><h3>{node.landingPage ? <button data-knowledge-entry data-knowledge-slug={node.landingPage.slug} type="button" className={node.landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={openOrToggleLanding} onKeyDown={handleLandingKeyDown} aria-label={`Open ${node.path} index`}><BookMarked size={13} /><span>{node.name}</span></button> : <span className="knowledge-domain-label"><BookMarked size={13} /><span>{node.name}</span></span>}</h3>{collapsible && <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>}</div>
 			{expanded && childPages.map((page) => { const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length; return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}><span><strong className="knowledge-page-title">{page.title}</strong><small><span className="knowledge-page-type">{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span></button>; })}
 			{expanded && node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map(renderDomain)}</div>}
 		</section>;
 	};
 
-	return <div className="knowledge-browser">
+	const browserStyle = sidePanel ? { '--knowledge-side-panel-width': `${sidePanelWidth}px` } as CSSProperties : undefined;
+	return <div className={sidePanel ? `knowledge-browser with-side-panel${sidePanelCollapsed ? ' side-panel-collapsed' : ''}` : 'knowledge-browser'} style={browserStyle}>
 		<div className="knowledge-browser-list">
 			<label className="knowledge-search"><Search size={15} /><span className="knowledge-visually-hidden">Filter Knowledge pages</span><input aria-label="Filter Knowledge pages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter pages" /></label>
 			{pages.length === 0 && <div className="knowledge-empty"><h2>No valid pages indexed</h2><p>Add Markdown pages with <code>slug</code> and <code>title</code> front matter, then rescan.</p></div>}
@@ -66,6 +99,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			<KnowledgeWarnings warnings={warnings} compact indexDiagnostics />
 		</div>
 		<section className="knowledge-content-pane" aria-label="Knowledge page content">{children ?? <div className="knowledge-welcome"><BookOpen size={28} /><h2>Select a page</h2><p>Choose an entry from the index to read its full content.</p></div>}</section>
+		{sidePanel && <aside className={sidePanelCollapsed ? 'metadata-panel side-panel knowledge-side-panel collapsed' : 'metadata-panel side-panel knowledge-side-panel'} aria-label="Knowledge side panel"><div className="panel-header"><h2><BookOpen size={16} /> Knowledge</h2><button className="icon-button" type="button" title={sidePanelCollapsed ? 'Expand Knowledge Quality' : 'Collapse Knowledge Quality'} onClick={() => setSidePanelCollapsed((current) => !current)}>{sidePanelCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button></div>{!sidePanelCollapsed && sidePanel}{!sidePanelCollapsed && <button className="panel-resize-handle panel-resize-handle-right" type="button" aria-label="Resize Knowledge Quality panel" onPointerDown={startSidePanelResize}><GripVertical size={16} /></button>}</aside>}
 	</div>;
 }
 

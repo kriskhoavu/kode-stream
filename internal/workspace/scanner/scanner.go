@@ -108,12 +108,12 @@ func (s *Scanner) scanItemDirectory(request ScanRequest, reader SourceReader, br
 		if err != nil {
 			return items, []models.ScanWarning{{ItemPath: source, Message: err.Error()}}
 		}
-		detail.MetadataSource = "docs"
+		detail.MetadataSource = documentationMetadataSource(source)
 		detail.Status = models.StatusUnsorted
 		if detail.Title == titleFromIdentifier(filepath.Base(source)) {
 			detail.Title = titleFromDocumentRoot(source)
 		}
-		detail.Tags = append(detail.Tags, "docs")
+		detail.Tags = append(detail.Tags, detail.MetadataSource)
 		return []models.ItemDetail{detail}, append(warnings, itemWarnings...)
 	}
 	for _, scopeEntry := range entries {
@@ -142,6 +142,13 @@ func (s *Scanner) scanItemDirectory(request ScanRequest, reader SourceReader, br
 		}
 	}
 	return items, warnings
+}
+
+func documentationMetadataSource(source string) string {
+	if strings.EqualFold(filepath.Base(filepath.Clean(source)), "wiki") {
+		return "wiki"
+	}
+	return "docs"
 }
 
 func (s *Scanner) scanConfiguredItemDirectory(request ScanRequest, reader SourceReader, branch, source string, settings models.SourceStructureSettings) ([]models.ItemDetail, []models.ScanWarning) {

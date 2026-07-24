@@ -25,6 +25,7 @@ describe('Workstream drag and drop helpers', () => {
   it('protects unsorted and freestyle docs items', () => {
     expect(isItemDraggable({ ...item, status: 'unsorted' })).toBe(false);
     expect(isItemDraggable({ ...item, metadataSource: 'docs' })).toBe(false);
+		expect(isItemDraggable({ ...item, metadataSource: 'wiki' })).toBe(false);
     expect(isDropStatus('unsorted')).toBe(false);
   });
 

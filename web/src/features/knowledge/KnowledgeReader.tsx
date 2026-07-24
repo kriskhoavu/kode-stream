@@ -16,7 +16,7 @@ export function KnowledgeReader({ detail, onNavigate }: { detail: KnowledgePageD
 		event.preventDefault(); onNavigate(target);
 	};
 	return <div className="knowledge-reader">
-		<section className="knowledge-reader-summary"><p className="eyebrow">{detail.domain} · {detail.pageType || 'PAGE'}</p><h2>{detail.title}</h2><p>{detail.summary || 'No summary provided.'}</p>
+		<section className="knowledge-reader-summary"><p className="knowledge-reader-eyebrow"><span>{detail.domain || 'root'}</span><span aria-hidden="true">·</span><span>{detail.pageType || 'PAGE'}</span></p><h2>{detail.title}</h2><p>{detail.summary || 'No summary provided.'}</p>
 			<div className="knowledge-reader-metadata"><Metadata title="Roles" values={detail.roles} compact /><Metadata title="Topics" values={detail.topics} compact /><Metadata title="Source references" values={detail.sourceRefs} compact /><Metadata title="Outgoing links" values={detail.links.map((link) => link.resolution === 'resolved' && link.targetSlug ? (link.label || link.targetSlug) : `${link.label || link.rawTarget} (unresolved)`)} compact interactiveValues={detail.links.map((link) => link.resolution === 'resolved' && link.targetSlug ? { label: link.label || link.targetSlug, onClick: () => onNavigate(link.targetSlug!) } : undefined)} /><Metadata title="Backlinks" values={detail.backlinks} compact interactiveValues={detail.backlinks.map((slug) => ({ label: slug, onClick: () => onNavigate(slug) }))} /></div>
 			<KnowledgeWarnings warnings={detail.warnings} />
 			{detail.links.some((link) => /^https?:/i.test(link.rawTarget)) && <p className="knowledge-reader-note"><ExternalLink size={14} /> External links open in a new tab.</p>}

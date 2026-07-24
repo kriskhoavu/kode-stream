@@ -18,17 +18,21 @@ const SourceStructureSettingsFile = "workspace-settings.yaml"
 
 var settingVariablePattern = regexp.MustCompile(`^\{([A-Za-z][A-Za-z0-9_]*)\}$`)
 
-func DefaultSourceStructureSettings() models.SourceStructureSettings {
+func DefaultSourceStructureSettings(sourceRoot ...string) models.SourceStructureSettings {
+	source := "wiki"
+	if len(sourceRoot) > 0 && strings.TrimSpace(filepath.Base(sourceRoot[0])) != "" {
+		source = strings.TrimSpace(filepath.Base(sourceRoot[0]))
+	}
 	return models.SourceStructureSettings{
 		Version: 1,
 		Cards: []models.SourceStructureCard{{
 			PathPattern: "{folder}/feature/{item}",
 			Fields: models.SourceStructureFields{
-				Source: "docs",
+				Source: source,
 				Item:   "{item}",
 				Title:  "readme_heading",
 				Status: "draft",
-				Tags:   []string{"docs"},
+				Tags:   []string{source},
 			},
 		}},
 	}
@@ -58,14 +62,14 @@ func ReadSourceStructureSettingsFromReader(reader SourceReader, root string) (mo
 	path := filepath.ToSlash(filepath.Join(root, SourceStructureSettingsFile))
 	data, err := reader.ReadFile(path)
 	if os.IsNotExist(err) {
-		return DefaultSourceStructureSettings(), false, nil
+		return DefaultSourceStructureSettings(root), false, nil
 	}
 	if err != nil {
-		return DefaultSourceStructureSettings(), false, []models.ScanWarning{{ItemPath: filepath.ToSlash(path), Message: err.Error()}}
+		return DefaultSourceStructureSettings(root), false, []models.ScanWarning{{ItemPath: filepath.ToSlash(path), Message: err.Error()}}
 	}
 	var settings models.SourceStructureSettings
 	if err := yaml.Unmarshal(data, &settings); err != nil {
-		return DefaultSourceStructureSettings(), true, []models.ScanWarning{{ItemPath: SourceStructureSettingsFile, Message: "invalid workspace settings: " + err.Error()}}
+		return DefaultSourceStructureSettings(root), true, []models.ScanWarning{{ItemPath: SourceStructureSettingsFile, Message: "invalid workspace settings: " + err.Error()}}
 	}
 	warnings := ValidateSourceStructureSettings(settings)
 	return settings, true, warnings

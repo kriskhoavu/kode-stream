@@ -207,7 +207,7 @@ restore, manual sync, and Cloud Postgres operations.
 
 ## Workspace Files
 
-Kode Stream reads configured source directories such as `plans`, `docs`, or `specs`.
+Kode Stream reads configured source directories such as `plans`, `wiki`, or `specs`.
 
 Common workspace files:
 
@@ -222,11 +222,11 @@ version: 1
 cards:
   - pathPattern: "{folder}/feature/{item}"
     fields:
-      source: docs
+      source: wiki
       item: "{item}"
       title: readme_heading
       status: draft
-      tags: [docs]
+      tags: [wiki]
 ```
 
 ## Safety Model

@@ -39,6 +39,17 @@ describe('KnowledgePage layout', () => {
 		expect(warningDetails).not.toHaveAttribute('open');
 		expect(screen.getByText(/not errors in the selected page/i)).toBeInTheDocument();
 		expect(screen.getByText('Filter Knowledge pages')).toHaveClass('knowledge-visually-hidden');
+		expect(screen.queryByLabelText('Knowledge workspace')).not.toBeInTheDocument();
+	});
+
+	it('uses the active application workspace instead of the workspace in a Knowledge URL', async () => {
+		const activeWorkspace = { ...workspace, id: 'discovery-sap', name: 'Discovery SAP' };
+		vi.mocked(api.knowledgeWikis).mockResolvedValue([{ workspaceId: activeWorkspace.id, root: 'wiki', displayName: 'Wiki', pages: [], warnings: [], indexedAt: '' }]);
+		const onLocationChange = vi.fn();
+		render(<KnowledgePage workspaces={[workspace, activeWorkspace]} activeWorkspace={activeWorkspace} location={{ workspaceId: workspace.id, root: 'docs', view: 'browse' }} onLocationChange={onLocationChange} />);
+
+		await waitFor(() => expect(api.knowledgeWikis).toHaveBeenCalledWith(activeWorkspace.id));
+		expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: activeWorkspace.id, root: 'wiki', view: 'browse' });
 	});
 
 	it('opens full page content with one click and keeps the index visible', async () => {

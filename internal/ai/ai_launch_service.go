@@ -31,6 +31,56 @@ type LaunchInput struct {
 	CustomPrompt   string   `json:"customPrompt,omitempty"`
 	SelectedSkills []string `json:"selectedSkills,omitempty"`
 	SelectedAgents []string `json:"selectedAgents,omitempty"`
+	ContextPath    string   `json:"contextPath,omitempty"`
+}
+
+func (s *Service) LaunchWorkspace(workspaceID string, input LaunchInput) (result LaunchResult, err error) {
+	if s.launch == nil || s.launch.registry == nil {
+		return LaunchResult{}, launchError("launch_failed", "AI session launch is unavailable")
+	}
+	workspace, found, getErr := s.launch.registry.Get(workspaceID)
+	if getErr != nil {
+		return LaunchResult{}, launchErrorWith("launch_failed", getErr)
+	}
+	if !found {
+		return LaunchResult{}, launchError("workspace_not_found", "workspace not found")
+	}
+	contextPath := strings.TrimSpace(input.ContextPath)
+	if contextPath == "" {
+		return LaunchResult{}, launchError("invalid_context_path", "contextPath is required")
+	}
+	if _, joinErr := pathguard.SafeJoin(workspace.Path, contextPath); joinErr != nil {
+		return LaunchResult{}, launchError("invalid_context_path", "context path is outside the workspace")
+	}
+	settings, settingsErr := s.Settings()
+	if settingsErr != nil {
+		return LaunchResult{}, launchErrorWith("launch_failed", settingsErr)
+	}
+	providerID, terminalID := strings.TrimSpace(input.Provider), strings.TrimSpace(input.Terminal)
+	provider, ok := settings.Providers[providerID]
+	if !ok || !provider.Enabled {
+		return LaunchResult{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
+	}
+	terminal, ok := settings.Terminals[terminalID]
+	if !ok || !terminal.Enabled {
+		return LaunchResult{}, launchError("terminal_missing", "selected terminal is unavailable")
+	}
+	if !s.detect(provider.Executable).Detected {
+		return LaunchResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
+	}
+	if !s.detect(terminal.Executable).Detected {
+		return LaunchResult{}, launchError("terminal_missing", "selected terminal executable was not found")
+	}
+	prompt, presetID, promptErr := s.composePrompt(providerID, "", "workspace_only", input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
+	if promptErr != nil {
+		return LaunchResult{}, promptErr
+	}
+	values := map[string]string{"workspace": workspace.Path, "contextFile": contextPath, "itemPath": contextPath, "identifier": contextPath, "contextMode": "workspace_only", "intent": "workspace_only", "prompt": prompt}
+	sessionID := "external-" + randomID()
+	if startErr := s.startTerminal(terminalID, terminal, expandAll(terminal.Args, values), workspace.Path, expand(provider.Executable, values), launchProviderArgs("workspace_only", provider.Args, values), verificationCheckpoint{WorkspaceID: workspace.ID, Provider: providerID, SessionID: sessionID, TerminalMode: "external", Profile: "smoke"}); startErr != nil {
+		return LaunchResult{}, launchErrorWith("launch_failed", startErr)
+	}
+	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: "workspace_only", Surface: "external", PresetID: presetID, SessionID: sessionID, StartedAt: s.launch.now().UTC()}, nil
 }
 
 type LaunchResult struct {

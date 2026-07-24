@@ -694,6 +694,28 @@ type ItemVerificationTests struct {
 	DiscoveredSpecs []DiscoveredVerificationSpec `json:"discoveredSpecs" yaml:"discoveredSpecs"`
 }
 
+type E2ELatestResult struct {
+	Status      string   `json:"status" yaml:"status"`
+	Provider    string   `json:"provider,omitempty" yaml:"provider,omitempty"`
+	Environment string   `json:"environment,omitempty" yaml:"environment,omitempty"`
+	FailedStep  string   `json:"failedStep,omitempty" yaml:"failedStep,omitempty"`
+	Evidence    []string `json:"evidence" yaml:"evidence"`
+}
+
+type E2ERunbook struct {
+	Title        string           `json:"title" yaml:"title"`
+	Path         string           `json:"path" yaml:"path"`
+	Source       string           `json:"source" yaml:"source"`
+	ResultPath   string           `json:"resultPath,omitempty" yaml:"resultPath,omitempty"`
+	LatestResult *E2ELatestResult `json:"latestResult,omitempty" yaml:"latestResult,omitempty"`
+	Diagnostic   string           `json:"diagnostic,omitempty" yaml:"diagnostic,omitempty"`
+}
+
+type E2ERunbookList struct {
+	Runbooks   []E2ERunbook `json:"runbooks" yaml:"runbooks"`
+	Diagnostic string       `json:"diagnostic,omitempty" yaml:"diagnostic,omitempty"`
+}
+
 type ItemStatusUpdateInput struct {
 	Status               ItemStatus `json:"status" yaml:"status"`
 	MaterializeConfirmed bool       `json:"materializeConfirmed,omitempty" yaml:"materializeConfirmed,omitempty"`
