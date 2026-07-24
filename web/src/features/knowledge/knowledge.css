@@ -587,9 +587,17 @@ body.is-resizing-panel .knowledge-browser {
   box-shadow: var(--shadow-soft);
 }
 
+.knowledge-graph-view:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  background: var(--panel);
+}
+
 .knowledge-graph-filters {
   display: grid;
-  grid-template-columns: minmax(220px, 1.15fr) minmax(190px, 0.95fr) minmax(190px, 0.95fr) auto;
+  grid-template-columns: minmax(220px, 1.15fr) minmax(170px, 0.9fr) minmax(170px, 0.9fr) auto auto;
   align-items: center;
   gap: 10px;
   padding: 14px;
@@ -644,6 +652,33 @@ body.is-resizing-panel .knowledge-browser {
   min-height: 0;
 }
 
+.knowledge-graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-soft) 45%, var(--panel));
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.knowledge-graph-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.knowledge-legend-root { color: var(--button-accent); }
+.knowledge-legend-domain { color: var(--blue); }
+.knowledge-legend-parent { color: var(--blue); }
+.knowledge-legend-leaf { color: var(--muted); }
+.knowledge-graph-legend i { width: 24px; border-top: 2px solid var(--muted); }
+.knowledge-graph-legend .knowledge-legend-selected { color: var(--button-accent); }
+.knowledge-graph-legend .knowledge-legend-selected i { border-color: var(--button-accent); }
+
 .knowledge-graph-stage {
   position: relative;
   flex: 1;
@@ -683,6 +718,24 @@ body.is-resizing-panel .knowledge-browser {
   cursor: pointer;
 }
 
+.knowledge-flow-node-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.knowledge-flow-node-role {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
 .knowledge-flow-node-card:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--blue) 62%, white);
   outline-offset: -2px;
@@ -708,7 +761,7 @@ body.is-resizing-panel .knowledge-browser {
   z-index: 20;
   left: 50%;
   bottom: calc(100% + 10px);
-  display: none;
+  display: block;
   width: 260px;
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--blue) 42%, var(--line));
@@ -718,6 +771,27 @@ body.is-resizing-panel .knowledge-browser {
   box-shadow: var(--shadow);
   transform: translateX(-50%);
   pointer-events: auto;
+}
+
+.knowledge-node-tooltip-close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.knowledge-node-tooltip-close:hover {
+  background: color-mix(in srgb, var(--blue) 18%, transparent);
+  color: var(--text);
 }
 
 .knowledge-node-tooltip::after {
@@ -731,12 +805,6 @@ body.is-resizing-panel .knowledge-browser {
   border-bottom: 1px solid color-mix(in srgb, var(--blue) 42%, var(--line));
   background: color-mix(in srgb, var(--panel) 88%, var(--blue));
   transform: translate(-50%, -5px) rotate(45deg);
-}
-
-.knowledge-flow-node:hover .knowledge-node-tooltip,
-.knowledge-flow-node:focus-visible .knowledge-node-tooltip,
-.knowledge-flow-node:focus-within .knowledge-node-tooltip {
-  display: block;
 }
 
 .knowledge-node-tooltip dl {
@@ -782,6 +850,28 @@ body.is-resizing-panel .knowledge-browser {
 .react-flow__connection-path {
   stroke: color-mix(in srgb, var(--muted) 72%, var(--line));
   stroke-width: 1.5;
+}
+
+.react-flow__edge.hierarchy path {
+  stroke: var(--blue);
+  stroke-width: 2;
+}
+
+.react-flow__edge.domain-link path {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  opacity: 0.6;
+}
+
+.react-flow__edge.selected-link path {
+  stroke: var(--button-accent);
+  stroke-width: 2.5;
+  opacity: 1;
+}
+
+.react-flow__edge.secondary path {
+  stroke-dasharray: 5 4;
+  opacity: 0.5;
 }
 
 .react-flow__arrowhead polyline {
@@ -846,12 +936,59 @@ body.is-resizing-panel .knowledge-browser {
 }
 
 .react-flow__node.selected {
-  border: 2px solid var(--blue);
+  border: 2px solid var(--button-accent) !important;
   z-index: 40 !important;
 }
 
 .react-flow__node.neighbor {
   border-color: var(--blue);
+}
+
+.react-flow__node.knowledge-root {
+  border: 2px solid var(--button-accent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--button-accent) 9%, var(--panel));
+}
+
+.react-flow__node.knowledge-domain {
+  border: 2px solid var(--blue);
+  border-radius: 12px 12px 3px 3px;
+  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
+}
+
+.react-flow__node.knowledge-domain .knowledge-flow-node-role {
+  background: var(--blue);
+  color: white;
+}
+
+.react-flow__node.knowledge-root .knowledge-flow-node-role {
+  background: var(--button-accent);
+  color: var(--accent-contrast);
+}
+
+.react-flow__node.knowledge-parent {
+  border: 2px solid color-mix(in srgb, var(--blue) 72%, var(--line));
+  border-radius: 12px 12px 5px 5px;
+}
+
+.react-flow__node.knowledge-parent .knowledge-flow-node-role {
+  background: color-mix(in srgb, var(--blue) 15%, var(--panel));
+  color: var(--blue);
+}
+
+.react-flow__node.knowledge-leaf {
+  border-color: color-mix(in srgb, var(--muted) 68%, var(--line));
+  border-radius: 5px;
+  box-shadow: none;
+}
+
+.react-flow__node.knowledge-leaf .knowledge-flow-node-role {
+  background: var(--muted);
+  color: var(--panel);
+}
+
+.react-flow__node.knowledge-related {
+  border-style: dashed;
 }
 
 .react-flow__edge.neighbor path {
