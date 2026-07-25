@@ -108,8 +108,13 @@ type WorkspaceConfig struct {
 	Name               string                    `json:"name" yaml:"name"`
 	Path               string                    `json:"path" yaml:"path"`
 	Location           WorkspaceLocation         `json:"location,omitempty" yaml:"location,omitempty"`
+	AccessMode         WorkspaceAccessMode       `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
 	OwnerUserID        string                    `json:"ownerUserId,omitempty" yaml:"ownerUserId,omitempty"`
 	AgentID            string                    `json:"agentId,omitempty" yaml:"agentId,omitempty"`
+	Provider           string                    `json:"provider,omitempty" yaml:"provider,omitempty"`
+	ProviderRepository string                    `json:"providerRepository,omitempty" yaml:"providerRepository,omitempty"`
+	SelectedRef        string                    `json:"selectedRef,omitempty" yaml:"selectedRef,omitempty"`
+	ResolvedCommitSHA  string                    `json:"resolvedCommitSha,omitempty" yaml:"resolvedCommitSha,omitempty"`
 	LocalRootLabel     string                    `json:"localRootLabel,omitempty" yaml:"localRootLabel,omitempty"`
 	PublishedSummary   bool                      `json:"publishedSummary,omitempty" yaml:"publishedSummary,omitempty"`
 	ScanStatus         string                    `json:"scanStatus,omitempty" yaml:"scanStatus,omitempty"`
@@ -227,6 +232,13 @@ type WorkspaceLocation string
 const (
 	WorkspaceLocationLocalPath  WorkspaceLocation = "local_path"
 	WorkspaceLocationCloudAgent WorkspaceLocation = "cloud_agent"
+)
+
+type WorkspaceAccessMode string
+
+const (
+	WorkspaceAccessModeAgentBacked    WorkspaceAccessMode = "agent_backed"
+	WorkspaceAccessModeRemoteSnapshot WorkspaceAccessMode = "remote_snapshot"
 )
 
 type RuntimeMode string

@@ -2,9 +2,10 @@
 
 ## Overview
 
-Implement a local unpacked Chrome extension showcase for Kode Stream. The extension bundles the existing React app,
-routes API calls to the local server, and verifies Files + Git workflows against registered local workspaces. The Go
-server stays responsible for filesystem and Git operations.
+Implement a local unpacked Chrome extension showcase for Kode Stream and an agentless Cloud remote-snapshot workspace.
+The extension bundles the existing React app and routes API calls to the local server. The Cloud path reads an approved
+Git-provider snapshot without a Cloud Agent. A common workspace access interface keeps the existing PM-032 agent-backed
+command path separate from the new provider-read path.
 
 ## Terminology Lock
 
@@ -15,6 +16,14 @@ All code, fields, API params, and docs must use:
 - `API Origin Adapter`
 - `Unpacked Extension`
 - `Chrome Extension Showcase`
+- `WorkspaceAccessMode`
+- `agent_backed`
+- `remote_snapshot`
+- `WorkspaceAccessAdapter`
+- `RemoteSnapshotAdapter`
+- `AgentAccessAdapter`
+- `GitProviderIntegration`
+- `TerminalHandoff`
 
 Avoid:
 
@@ -23,15 +32,24 @@ Avoid:
 - `file URL mode`
 - `native messaging`
 - `Chrome app`
+- `agentless Git`
+- `Cloud Git command`
+- `remote clone`
 
 ## Phases Summary
 
-| Phase | Name                                    | Track    | Status |
-|-------|-----------------------------------------|----------|--------|
-| F1    | API origin adapter                      | Frontend | Done   |
-| F2    | Extension surface behavior              | Frontend | Done   |
-| C1    | Extension build artifact                | DevOps   | Done   |
-| C2    | Showcase verification and documentation | DevOps   | Done   |
+| Phase | Name                                    | Track    | Status  |
+|-------|-----------------------------------------|----------|---------|
+| F1    | API origin adapter                      | Frontend | Done    |
+| F2    | Extension surface behavior              | Frontend | Done    |
+| C1    | Extension build artifact                | DevOps   | Done    |
+| C2    | Showcase verification and documentation | DevOps   | Done    |
+| B1    | Cloud workspace access adapters         | Backend  | Done    |
+| B2    | Provider remote snapshot adapter        | Backend  | Planned |
+| B3    | Snapshot read and capability API        | Backend  | Planned |
+| F3    | Agentless workspace registration        | Frontend | Planned |
+| F4    | Snapshot workspace capability UI        | Frontend | Planned |
+| C3    | Provider authorization and Cloud smoke  | DevOps   | Planned |
 
 ## Frontend Phases
 
@@ -98,6 +116,106 @@ Avoid:
 **Verification:** `rtk npm run build:extension && rtk go test ./...`
 
 **Commit:** `PM-034: Document Chrome extension showcase`
+
+---
+
+## Agentless Cloud Phases
+
+### Phase B1: Cloud Workspace Access Adapters
+
+**Deliverables:**
+
+- [x] Add `WorkspaceAccessMode` to Cloud workspace persistence and API types; migrate current `cloud_agent` workspaces to `agent_backed`.
+- [x] Define `WorkspaceAccessAdapter` responsibilities for workspace state, snapshots, read models, capabilities, and command execution.
+- [x] Implement `AgentAccessAdapter` by delegating to the existing PM-032 registry and command-envelope path.
+- [x] Add one resolver at the Cloud API/service boundary; remove route-level assumptions that every Cloud workspace has an agent ID.
+- [x] Add tests for migration, adapter selection, owner isolation, and unchanged agent-backed command behavior.
+
+**Verification:** `rtk go test ./internal/common/... ./internal/workspace/... ./internal/server/api/...`
+
+**Commit:** `PM-034: Add Cloud workspace access adapters`
+
+---
+
+### Phase B2: Provider Remote Snapshot Adapter
+
+**Deliverables:**
+
+- [ ] Define `GitProviderIntegration` for authorization state, repository discovery, ref resolution, tree reads, file reads, and commit metadata.
+- [ ] Implement one approved provider adapter with read-only authorization and strict repository ownership checks.
+- [ ] Implement `RemoteSnapshotAdapter`; it must not invoke Git or access local paths.
+- [ ] Persist provider repository identity, selected ref, resolved commit SHA, and authorization state without exposing tokens.
+- [ ] Resolve selected branches and tags to immutable commit SHAs before returning content.
+- [ ] Add fake-provider contract tests for revoked access, missing refs, forbidden repositories, and snapshot resolution.
+
+**Verification:** `rtk go test ./internal/provider/... ./internal/workspace/... ./internal/server/api/...`
+
+**Commit:** `PM-034: Add remote snapshot workspace adapter`
+
+---
+
+### Phase B3: Snapshot Read And Capability API
+
+**Deliverables:**
+
+- [ ] Route tree, file, plan, board, and search reads through `WorkspaceAccessAdapter`; key remote results by resolved commit SHA.
+- [ ] Add bounded, sanitized remote snapshot caching with provider outage and rate-limit behavior.
+- [ ] Return a capability map that enables only reads, snapshot selection, and terminal handoff for `remote_snapshot`.
+- [ ] Return stable unsupported results for agentless Git mutations, file writes, and process execution; never forward them to provider writes.
+- [ ] Prove remote workspaces never expose local path, dirty state, agent ID, token, or command envelope.
+
+**Verification:** `rtk go test ./internal/server/api/... ./internal/workspace/... ./internal/search/...`
+
+**Commit:** `PM-034: Add agentless snapshot read API`
+
+---
+
+### Phase F3: Agentless Workspace Registration
+
+**Deliverables:**
+
+- [ ] Extend workspace and runtime types with access mode, provider repository identity, selected ref, resolved commit SHA, and capabilities.
+- [ ] Add an explicit Cloud workspace choice: Agent-Backed or Remote Snapshot.
+- [ ] Reuse agent pairing only for Agent-Backed selection.
+- [ ] Add provider connection, repository selection, and ref selection only for Remote Snapshot selection.
+- [ ] Add tests for mode switching, validation, provider reconnect, and no-agent registration.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run web/src/pages/WorkspacesPage web/src/shared`
+
+**Commit:** `PM-034: Add Cloud workspace access-mode registration`
+
+---
+
+### Phase F4: Snapshot Workspace Capability UI
+
+**Deliverables:**
+
+- [ ] Render a Remote Snapshot badge, provider repository, selected ref, and resolved commit SHA in Cloud workspace views.
+- [ ] Key workspace read queries by commit SHA and invalidate them after ref changes.
+- [ ] Render read-only explorer, plan, board, and search views from normalized snapshot responses.
+- [ ] Hide local dirty state, file mutations, Git mutations, embedded terminal, AI, runtime, and verification controls when unsupported.
+- [ ] Provide terminal-handoff guidance that does not imply Cloud can launch or observe a local terminal.
+- [ ] Add agent-backed workspace regression tests.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run web/src/pages web/src/features web/src/shared`
+
+**Commit:** `PM-034: Add agentless Cloud snapshot workspace UI`
+
+---
+
+### Phase C3: Provider Authorization And Cloud Smoke
+
+**Deliverables:**
+
+- [ ] Configure first-provider OAuth/App credentials through deployment secrets; use read-only repository scopes and encrypt stored authorization material.
+- [ ] Document provider reconnect, rotation, revocation, cache, and outage behavior without exposing secrets.
+- [ ] Verify an operator-owned provider test repository for registration, ref selection, commit-pinned reads, and recovery states.
+- [ ] Verify agentless workspaces reject Git mutation and process commands before any provider write call.
+- [ ] Run the PM-032 agent-backed smoke to prove adapter isolation.
+
+**Verification:** `rtk go test ./... && rtk npm run typecheck && rtk npm test -- --run`, plus the documented Cloud/provider smoke.
+
+**Commit:** `PM-034: Verify agentless Cloud remote workspaces`
 
 ## Post-Implementation Checklist
 

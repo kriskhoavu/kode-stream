@@ -31,6 +31,20 @@ func TestCloudWorkspaceRegistrationFromAgentStoresMetadata(t *testing.T) {
 	if workspace.Location != models.WorkspaceLocationCloudAgent || workspace.OwnerUserID != "user-1" || workspace.AgentID != "agent-1" || workspace.Path != "" || workspace.LocalRootLabel != ".../repo" {
 		t.Fatalf("workspace = %#v", workspace)
 	}
+	if workspace.AccessMode != models.WorkspaceAccessModeAgentBacked {
+		t.Fatalf("access mode = %q", workspace.AccessMode)
+	}
+}
+
+func TestCloudWorkspaceStoreMigratesLegacyAgentWorkspaceAccessMode(t *testing.T) {
+	store := newCloudWorkspaceStore()
+	workspace := store.Upsert(models.WorkspaceConfig{ID: "legacy", OwnerUserID: "user", AgentID: "agent", Location: models.WorkspaceLocationCloudAgent})
+	if workspace.AccessMode != models.WorkspaceAccessModeAgentBacked {
+		t.Fatalf("access mode = %q", workspace.AccessMode)
+	}
+	if workspace.Location != models.WorkspaceLocationCloudAgent {
+		t.Fatalf("location = %q", workspace.Location)
+	}
 }
 
 func TestCloudWorkspacesAreScopedToSessionUser(t *testing.T) {

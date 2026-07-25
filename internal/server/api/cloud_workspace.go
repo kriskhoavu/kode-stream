@@ -41,12 +41,23 @@ func (s *cloudWorkspaceStore) Get(userID, workspaceID string) (models.WorkspaceC
 }
 
 func (s *cloudWorkspaceStore) Upsert(workspace models.WorkspaceConfig) models.WorkspaceConfig {
+	workspace = normalizeCloudWorkspaceAccess(workspace)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.workspaces[workspace.OwnerUserID] == nil {
 		s.workspaces[workspace.OwnerUserID] = map[string]models.WorkspaceConfig{}
 	}
 	s.workspaces[workspace.OwnerUserID][workspace.ID] = workspace
+	return workspace
+}
+
+func normalizeCloudWorkspaceAccess(workspace models.WorkspaceConfig) models.WorkspaceConfig {
+	if workspace.AccessMode == "" {
+		workspace.AccessMode = models.WorkspaceAccessModeAgentBacked
+	}
+	if workspace.AccessMode == models.WorkspaceAccessModeAgentBacked {
+		workspace.Location = models.WorkspaceLocationCloudAgent
+	}
 	return workspace
 }
 
@@ -89,6 +100,7 @@ func (a *API) registerCloudWorkspaceFromAgent(w http.ResponseWriter, r *http.Req
 		Name:             name,
 		Path:             "",
 		Location:         models.WorkspaceLocationCloudAgent,
+		AccessMode:       models.WorkspaceAccessModeAgentBacked,
 		OwnerUserID:      token.UserID,
 		AgentID:          token.AgentID,
 		LocalRootLabel:   redactRootLabel(input.LocalRootLabel),

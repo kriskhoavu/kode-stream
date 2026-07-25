@@ -2,12 +2,14 @@
 
 ## Scenario List
 
-| #   | Title                      | Description                                                         |
-|-----|----------------------------|---------------------------------------------------------------------|
-| 0   | Current localhost-only app | User runs Kode Stream and opens the UI from `http://localhost`.     |
-| 1   | Extension opens local app  | User loads the unpacked extension and reaches the bundled React UI. |
-| 2   | Files and Git showcase     | User edits workspace files and runs branch-oriented Git actions.    |
-| 3   | Local server unavailable   | Extension explains that `kode-stream serve` must be running.        |
+| #   | Title                      | Description                                                          |
+|-----|----------------------------|----------------------------------------------------------------------|
+| 0   | Current localhost-only app | User runs Kode Stream and opens the UI from `http://localhost`.      |
+| 1   | Extension opens local app  | User loads the unpacked extension and reaches the bundled React UI.  |
+| 2   | Files and Git showcase     | User edits workspace files and runs branch-oriented Git actions.     |
+| 3   | Local server unavailable   | Extension explains that `kode-stream serve` must be running.         |
+| 4   | Agentless Cloud snapshot   | User browses a provider-hosted repository without a Cloud Agent.     |
+| 5   | Agentless Cloud limits     | User sees clear limits for local Git, files, and terminal execution. |
 
 ---
 
@@ -123,3 +125,39 @@ User opens extension while kode-stream is stopped
 | Wrong port       | User can set `localStorage.kodeStreamApiOrigin` and reload the extension page. |
 | API unhealthy    | UI reports the local server problem instead of hiding workspace actions.       |
 | Unsupported flow | Embedded terminal/AI streaming controls are unavailable in extension mode.     |
+
+---
+
+# Scenario 4: Agentless Cloud Snapshot
+
+## Goal
+
+Let a Cloud user browse an approved Git-provider repository without a Cloud Agent.
+
+## Execution Flow
+
+```text
+User selects Remote Snapshot workspace
+    -> user authorizes the approved provider with read-only access
+    -> user selects repository and branch, tag, or commit
+    -> Cloud resolves the selection to a commit SHA
+    -> remote snapshot adapter reads commit-pinned workspace data
+    -> UI renders read-only tree, plans, board, and search
+```
+
+## Expected Result
+
+Cloud never accesses a local path, runs Git, or requires a user-machine process for this workspace type.
+
+---
+
+# Scenario 5: Agentless Cloud Limits
+
+## Goal
+
+Make the remote-snapshot boundary clear without hiding useful local-terminal guidance.
+
+## Expected Result
+
+The UI labels the selected commit and omits dirty state, file writes, Git mutations, embedded terminal, AI, runtime, and
+verification controls. A terminal handoff explains that the user performs local Git and process work outside Cloud.
