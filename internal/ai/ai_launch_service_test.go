@@ -133,6 +133,77 @@ func TestWorkspaceOnlyLaunchesWithoutCardContext(t *testing.T) {
 	}
 }
 
+func TestLaunchWorkspaceUsesWorkspaceSkillAndValidatedMarkdownContext(t *testing.T) {
+	service, _, workspace, runner, _, _ := launchTestService(t, true)
+	runbook := filepath.Join("plans", "platform", "PM-018", "automation", "scenario-01-run.md")
+	fullRunbook := filepath.Join(workspace.Path, filepath.FromSlash(runbook))
+	if err := os.MkdirAll(filepath.Dir(fullRunbook), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fullRunbook, []byte("# Run E2E\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := service.ProviderCapabilitiesForWorkspace("test-ai", workspace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Skills) == 0 || catalog.Skills[0].Scope != "workspace" {
+		t.Fatalf("catalog = %#v", catalog)
+	}
+	result, err := service.LaunchWorkspace(workspace.ID, LaunchInput{
+		Provider:       "test-ai",
+		Terminal:       "wezterm",
+		ContextMode:    "workspace_only",
+		ContextPath:    runbook,
+		PromptDraft:    "Execute the selected runbook.",
+		SelectedSkills: []string{catalog.Skills[0].ID},
+	})
+	if err != nil || !result.Accepted || len(runner.processes) != 1 {
+		t.Fatalf("result=%#v processes=%#v err=%v", result, runner.processes, err)
+	}
+	wrapper, readErr := os.ReadFile(runner.processes[0].args[len(runner.processes[0].args)-1])
+	if readErr != nil || !strings.Contains(string(wrapper), "Implementation Planning") {
+		t.Fatalf("wrapper=%q err=%v", wrapper, readErr)
+	}
+}
+
+func TestLaunchWorkspaceRejectsInvalidContextAndMissingCapability(t *testing.T) {
+	service, _, workspace, runner, _, _ := launchTestService(t, true)
+	textPath := filepath.Join(workspace.Path, "runbook.txt")
+	if err := os.WriteFile(textPath, []byte("not markdown"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := service.LaunchWorkspace(workspace.ID, LaunchInput{
+		Provider: "test-ai", Terminal: "wezterm", ContextMode: "workspace_only", ContextPath: "runbook.txt",
+	})
+	var launchErr *LaunchError
+	if !errors.As(err, &launchErr) || launchErr.Code != "invalid_context_path" {
+		t.Fatalf("invalid context err = %#v", err)
+	}
+	runbook := filepath.Join(workspace.Path, "runbook.md")
+	if err := os.WriteFile(runbook, []byte("# Runbook\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.LaunchWorkspace(workspace.ID, LaunchInput{
+		Provider: "test-ai", Terminal: "wezterm", ContextMode: "workspace_only", ContextPath: "runbook.md",
+		SelectedSkills: []string{"missing-skill"},
+	})
+	if !errors.As(err, &launchErr) || launchErr.Code != "capability_missing" || len(runner.processes) != 0 {
+		t.Fatalf("missing capability err=%#v processes=%#v", err, runner.processes)
+	}
+}
+
+func TestNormalizeCapabilitySelectionResolvesStableAliasAndReportsMissing(t *testing.T) {
+	allowed := []CapabilityDescriptor{{
+		ID: "codex:workspace:.codex/skills/e2e-testing/SKILL.md", Name: "E2E Testing",
+		SourcePath: ".codex/skills/e2e-testing/SKILL.md",
+	}}
+	selected, missing := normalizeCapabilitySelection([]string{"e2e-testing", "missing"}, allowed)
+	if len(selected) != 1 || selected[0].ID != allowed[0].ID || len(missing) != 1 || missing[0] != "missing" {
+		t.Fatalf("selected=%#v missing=%#v", selected, missing)
+	}
+}
+
 func TestLaunchExpandsPresetPrompt(t *testing.T) {
 	service, item, _, runner, _, _ := launchTestService(t, true)
 	result, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context", PresetID: "implementation-plan"})
@@ -238,7 +309,7 @@ func launchTestService(t *testing.T, structured bool) (*Service, models.ItemDeta
 	if err := os.MkdirAll(filepath.Join(root, ".skills"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".skills", "implementation-planning.md"), []byte("# skill"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".skills", "implementation-planning.md"), []byte("# Implementation Planning"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if structured {

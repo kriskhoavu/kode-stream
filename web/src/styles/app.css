@@ -2489,6 +2489,84 @@ select:disabled {
   font-weight: 600;
 }
 
+.automation-suggestion-card.e2e-runbook-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.automation-suggestion-card.e2e-runbook-card > button,
+.e2e-quality-panel > button.secondary {
+  justify-self: stretch;
+  min-width: 0;
+  width: 100%;
+  white-space: normal;
+}
+
+.e2e-coverage-diagnostic {
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--amber) 30%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--amber) 8%, var(--panel));
+}
+
+.automation-suggestion-card .e2e-evidence-links {
+  display: grid !important;
+  gap: 5px !important;
+  min-width: 0;
+  margin-top: 3px;
+}
+
+.automation-suggestion-card .e2e-evidence-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--blue);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.e2e-evidence-preview {
+  position: fixed;
+  z-index: 61;
+  inset: max(24px, 8vh) max(24px, 8vw);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 35%);
+}
+
+.e2e-evidence-preview > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.e2e-evidence-preview > header > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.e2e-evidence-preview > header span {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .automation-action-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

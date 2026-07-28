@@ -49,8 +49,8 @@ func (s *Service) LaunchWorkspace(workspaceID string, input LaunchInput) (result
 	if contextPath == "" {
 		return LaunchResult{}, launchError("invalid_context_path", "contextPath is required")
 	}
-	if _, joinErr := pathguard.SafeJoin(workspace.Path, contextPath); joinErr != nil {
-		return LaunchResult{}, launchError("invalid_context_path", "context path is outside the workspace")
+	if _, pathErr := pathguard.ValidateMarkdownFile(workspace.Path, contextPath); pathErr != nil {
+		return LaunchResult{}, launchError("invalid_context_path", "context path must be an existing Markdown file inside the workspace")
 	}
 	settings, settingsErr := s.Settings()
 	if settingsErr != nil {
@@ -71,7 +71,7 @@ func (s *Service) LaunchWorkspace(workspaceID string, input LaunchInput) (result
 	if !s.detect(terminal.Executable).Detected {
 		return LaunchResult{}, launchError("terminal_missing", "selected terminal executable was not found")
 	}
-	prompt, presetID, promptErr := s.composePrompt(providerID, "", "workspace_only", input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
+	prompt, presetID, promptErr := s.composeWorkspacePrompt(providerID, workspaceID, "workspace_only", input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
 	if promptErr != nil {
 		return LaunchResult{}, promptErr
 	}
@@ -341,16 +341,31 @@ func (s *Service) resolvePrompt(presetID, promptDraft, customPrompt string) (str
 }
 
 func (s *Service) composePrompt(providerID, itemID, contextMode, presetID, promptDraft, customPrompt string, selectedSkills, selectedAgents []string) (string, string, error) {
-	basePrompt, resolvedPresetID, err := s.resolvePrompt(presetID, promptDraft, customPrompt)
-	if err != nil {
-		return "", "", err
-	}
 	catalog, catalogErr := s.ProviderCapabilities(providerID, itemID)
 	if catalogErr != nil {
 		return "", "", catalogErr
 	}
-	skills := normalizeCapabilitySelection(selectedSkills, catalog.Skills)
-	agents := normalizeCapabilitySelection(selectedAgents, catalog.Agents)
+	return s.composePromptWithCatalog(catalog, contextMode, presetID, promptDraft, customPrompt, selectedSkills, selectedAgents)
+}
+
+func (s *Service) composeWorkspacePrompt(providerID, workspaceID, contextMode, presetID, promptDraft, customPrompt string, selectedSkills, selectedAgents []string) (string, string, error) {
+	catalog, catalogErr := s.ProviderCapabilitiesForWorkspace(providerID, workspaceID)
+	if catalogErr != nil {
+		return "", "", catalogErr
+	}
+	return s.composePromptWithCatalog(catalog, contextMode, presetID, promptDraft, customPrompt, selectedSkills, selectedAgents)
+}
+
+func (s *Service) composePromptWithCatalog(catalog ProviderCapabilityCatalog, contextMode, presetID, promptDraft, customPrompt string, selectedSkills, selectedAgents []string) (string, string, error) {
+	basePrompt, resolvedPresetID, err := s.resolvePrompt(presetID, promptDraft, customPrompt)
+	if err != nil {
+		return "", "", err
+	}
+	skills, missingSkills := normalizeCapabilitySelection(selectedSkills, catalog.Skills)
+	agents, missingAgents := normalizeCapabilitySelection(selectedAgents, catalog.Agents)
+	if len(missingSkills) > 0 || len(missingAgents) > 0 {
+		return "", "", launchError("capability_missing", "one or more selected AI capabilities are unavailable")
+	}
 	if len(skills) == 0 && len(agents) == 0 {
 		return basePrompt, resolvedPresetID, nil
 	}
@@ -398,6 +413,38 @@ func (s *Service) ProviderCapabilities(providerID, itemID string) (ProviderCapab
 		workspacePath = workspace.Path
 	}
 	skills, agents := discoverProviderCapabilities(id, workspacePath)
+	return ProviderCapabilityCatalog{
+		Provider:                id,
+		Skills:                  skills,
+		Agents:                  agents,
+		SupportsNativeSelection: false,
+		SupportsPromptFallback:  true,
+	}, nil
+}
+
+func (s *Service) ProviderCapabilitiesForWorkspace(providerID, workspaceID string) (ProviderCapabilityCatalog, error) {
+	if s.launch == nil || s.launch.registry == nil {
+		return ProviderCapabilityCatalog{}, launchError("launch_failed", "AI session launch is unavailable")
+	}
+	workspace, found, err := s.launch.registry.Get(strings.TrimSpace(workspaceID))
+	if err != nil {
+		return ProviderCapabilityCatalog{}, launchErrorWith("launch_failed", err)
+	}
+	if !found {
+		return ProviderCapabilityCatalog{}, launchError("workspace_not_found", "workspace not found")
+	}
+	settings, err := s.Settings()
+	if err != nil {
+		return ProviderCapabilityCatalog{}, err
+	}
+	id := strings.TrimSpace(providerID)
+	if id == "" {
+		id = settings.DefaultProvider
+	}
+	if _, ok := settings.Providers[id]; !ok {
+		return ProviderCapabilityCatalog{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
+	}
+	skills, agents := discoverProviderCapabilities(id, workspace.Path)
 	return ProviderCapabilityCatalog{
 		Provider:                id,
 		Skills:                  skills,
@@ -558,26 +605,60 @@ func containsPlaceholder(values []string, placeholder string) bool {
 	return false
 }
 
-func normalizeCapabilitySelection(selected []string, allowed []CapabilityDescriptor) []CapabilityDescriptor {
-	if len(selected) == 0 || len(allowed) == 0 {
-		return nil
+func normalizeCapabilitySelection(selected []string, allowed []CapabilityDescriptor) ([]CapabilityDescriptor, []string) {
+	if len(selected) == 0 {
+		return nil, nil
 	}
 	allowedByID := map[string]CapabilityDescriptor{}
+	allowedByAlias := map[string][]CapabilityDescriptor{}
 	for _, item := range allowed {
 		allowedByID[item.ID] = item
+		for _, alias := range capabilityAliases(item) {
+			allowedByAlias[alias] = append(allowedByAlias[alias], item)
+		}
 	}
 	result := make([]CapabilityDescriptor, 0, len(selected))
+	missing := make([]string, 0)
 	seen := map[string]bool{}
 	for _, id := range selected {
 		id = strings.TrimSpace(id)
 		item, ok := allowedByID[id]
-		if !ok || seen[id] {
+		if !ok {
+			candidates := allowedByAlias[normalizeCapabilityAlias(id)]
+			if len(candidates) == 1 {
+				item, ok = candidates[0], true
+			}
+		}
+		if !ok {
+			missing = append(missing, id)
 			continue
 		}
-		seen[id] = true
+		if seen[item.ID] {
+			continue
+		}
+		seen[item.ID] = true
 		result = append(result, item)
 	}
-	return result
+	return result, missing
+}
+
+func capabilityAliases(item CapabilityDescriptor) []string {
+	nameAlias := normalizeCapabilityAlias(item.Name)
+	base := strings.TrimSuffix(filepath.Base(item.SourcePath), filepath.Ext(item.SourcePath))
+	if isGenericCapabilityBasename(base) {
+		base = filepath.Base(filepath.Dir(item.SourcePath))
+	}
+	pathAlias := normalizeCapabilityAlias(base)
+	if pathAlias == nameAlias {
+		return []string{nameAlias}
+	}
+	return []string{nameAlias, pathAlias}
+}
+
+func normalizeCapabilityAlias(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.ReplaceAll(value, "_", "-")
+	return strings.Join(strings.Fields(value), "-")
 }
 
 func buildCapabilityPromptBlock(contextMode string, skills, agents []CapabilityDescriptor) string {

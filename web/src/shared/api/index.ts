@@ -134,7 +134,13 @@ export const api = {
 	syncKnowledge: (workspaceId: string, confirm = false) => request<KnowledgeActionResult>(`/api/knowledge/workspaces/${encodeURIComponent(workspaceId)}/sync`, { method: 'POST', body: JSON.stringify({ confirm }) }),
 	enrichKnowledge: (workspaceId: string, confirm: boolean) => request<KnowledgeActionResult>(`/api/knowledge/workspaces/${encodeURIComponent(workspaceId)}/enrich`, { method: 'POST', body: JSON.stringify({ confirm }) }),
   aiCapabilities: () => request<AICapability[]>('/api/ai/capabilities'),
-  aiProviderCapabilities: (providerId: string, itemId?: string) => request<AIProviderCapabilityCatalog>(`/api/ai/providers/${encodeURIComponent(providerId)}/capabilities${itemId ? `?itemId=${encodeURIComponent(itemId)}` : ''}`),
+  aiProviderCapabilities: (providerId: string, context?: { itemId?: string; workspaceId?: string }) => {
+    const query = new URLSearchParams();
+    if (context?.itemId) query.set('itemId', context.itemId);
+    if (context?.workspaceId) query.set('workspaceId', context.workspaceId);
+    const suffix = query.size > 0 ? `?${query.toString()}` : '';
+    return request<AIProviderCapabilityCatalog>(`/api/ai/providers/${encodeURIComponent(providerId)}/capabilities${suffix}`);
+  },
   aiPresets: () => request<AIPlanPreset[]>('/api/ai/presets'),
   aiSettings: () => request<AISettings>('/api/ai/settings').then(normalizeAISettings),
   saveAISettings: (settings: AISettings) => request<AISettings>('/api/ai/settings', { method: 'PUT', body: JSON.stringify(normalizeAISettings(settings)) }).then(normalizeAISettings),

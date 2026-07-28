@@ -20,11 +20,16 @@ No database schema or persisted run history is added.
 ## Discovery and Result Rules
 
 1. Read a plan’s `plan.yaml`; only discover ticket-local runbooks when `plan.e2e-runbook` is true.
-2. Include the automation hub and scenario Markdown files, excluding `results/` and `artifacts/`.
+2. Expose scenario Markdown files as runnable cards. Include the automation hub and scenarios as canonical `sourceRef`
+   matching candidates, excluding `results/` and `artifacts/`.
 3. Read indexed Knowledge pages under `e2e-testing/`; include canonical pages only when a `sourceRef` references the selected plan’s automation path.
 4. Preserve the order: selected plan local runbooks, then canonical journeys sorted by title.
-5. Resolve `automation/results/latest.md` inside the owning runbook directory only. A missing or malformed file produces `not run`, never an API failure.
-6. Reject absolute paths, traversal, unsupported extensions, and files outside the workspace.
+5. Always return a safe `resultPath`, including before the first run. Local scenarios use their plan’s
+   `automation/results/latest.md`. A canonical journey uses the newest plan automation path in its `sourceRef`, with a
+   wiki-owned result path only when no plan source exists.
+6. Treat missing or malformed results as `not run`. Accept only `passed`, `failed`, `blocked`, or `not run`.
+7. Reject absolute paths, traversal, unsupported extensions, missing context files, symlink escapes, and files outside
+   the workspace.
 
 ## API Contract
 
@@ -45,9 +50,11 @@ Existing item AI session routes remain unchanged.
 | Source-reference matching                   | Canonical pages already express durable ticket-to-journey provenance.    |
 | Workspace AI launch route                   | Knowledge execution needs a workspace path but does not have an item ID. |
 | Result parser is tolerant                   | A result may not exist until the first successful or failed execution.   |
+| Explicit result destination                 | The agent and result reader must use the same path on the first run.     |
 
 ## Verification
 
 - Unit-test plan discovery, source-reference matching, result parsing, ordering, and path rejection.
 - Add API route tests for plan and Knowledge reads plus workspace-context launch validation.
+- Verify workspace-context capability discovery and rejection of unavailable requested skills.
 - Preserve existing item launch and verification route tests.

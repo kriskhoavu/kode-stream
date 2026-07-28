@@ -208,7 +208,7 @@ export interface E2ERunbook {
   title: string;
   path: string;
   source: 'plan' | 'wiki' | string;
-  resultPath?: string;
+  resultPath: string;
   latestResult?: E2ELatestResult;
   diagnostic?: string;
 }

@@ -47,6 +47,18 @@ describe('shared api facade', () => {
     });
   });
 
+  it('scopes provider capability discovery to the selected workspace', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ provider: 'codex', skills: [], agents: [], supportsNativeSelection: false, supportsPromptFallback: true })
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await api.aiProviderCapabilities('codex/local', { workspaceId: 'workspace/one' });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/providers/codex%2Flocal/capabilities?workspaceId=workspace%2Fone', expect.any(Object));
+  });
+
 	it('normalizes import previews and sends import selections', async () => {
 		const fetchMock = vi.fn()
 			.mockResolvedValueOnce({ ok: true, json: async () => ({

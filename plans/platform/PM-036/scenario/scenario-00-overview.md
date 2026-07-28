@@ -16,7 +16,7 @@
 
 - The selected item is a plan under `plans/{service}/{ticket}`.
 - A plan may have `plan.e2e-runbook: true` and Markdown playbooks under `automation/`.
-- The configured Knowledge wiki may contain canonical pages under `docs/e2e-testing/`.
+- The configured Knowledge wiki may contain canonical pages under `wiki/e2e-testing/`.
 - No browser provider, base URL, account reference, or test data is stored in the app.
 
 ## Visual State (Before)
@@ -35,7 +35,7 @@ The existing Quality panel contains runtime verification and repository automati
 
 ## Flow 2: Inspect canonical wiki coverage
 
-1. The user opens a page under `docs/e2e-testing/` in Knowledge.
+1. The user opens a page under `wiki/e2e-testing/` in Knowledge.
 2. The Knowledge Reader renders the same E2E section for that page only.
 3. The user reviews the latest result or launches the constrained E2E session with the wiki page as workspace context.
 
