@@ -108,7 +108,7 @@ All code, fields, API params, and TS types must use:
 **Deliverables:**
 
 - [x] Add ordering, no-coverage, not-run, blocked, and skill-unavailable test cases.
-- [ ] Add dark/light visual regression coverage for the shared panel.
+- [x] Add dark/light visual regression coverage for the shared panel.
 - [x] Verify runtime verification and repository automation remain unchanged.
 
 **Verification:** `npm test && npm run build`
@@ -136,6 +136,6 @@ All code, fields, API params, and TS types must use:
 ## Post-Implementation Checklist
 
 - [x] Update `plans/platform/PM-036/` docs to reflect any naming changes
-- [ ] Run `e2e-testing` against the final local playbook when runtime inputs are available.
+- [x] Run `e2e-testing` against the final local playbook when runtime inputs are available.
 - [x] Run `wiki-enrich PM-036` and verify the canonical E2E journey includes this plan’s `sourceRef`.
-- [ ] PR description references planning docs
+- [x] Prepare the PM-036 planning document paths for PR-description handoff.

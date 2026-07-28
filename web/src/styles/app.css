@@ -2489,6 +2489,18 @@ select:disabled {
   font-weight: 600;
 }
 
+.automation-suggestion-card.e2e-runbook-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.automation-suggestion-card.e2e-runbook-card > button,
+.e2e-quality-panel > button.secondary {
+  justify-self: stretch;
+  min-width: 0;
+  width: 100%;
+  white-space: normal;
+}
+
 .e2e-coverage-diagnostic {
   padding: 7px 9px;
   border: 1px solid color-mix(in srgb, var(--amber) 30%, var(--line));
@@ -2496,18 +2508,20 @@ select:disabled {
   background: color-mix(in srgb, var(--amber) 8%, var(--panel));
 }
 
-.e2e-evidence-links {
-  display: flex !important;
-  flex-wrap: wrap;
+.automation-suggestion-card .e2e-evidence-links {
+  display: grid !important;
   gap: 5px !important;
+  min-width: 0;
   margin-top: 3px;
 }
 
-.e2e-evidence-link {
+.automation-suggestion-card .e2e-evidence-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
   border: 0;
   padding: 0;
   background: transparent;
@@ -2516,6 +2530,7 @@ select:disabled {
   text-align: left;
   text-decoration: underline;
   overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .e2e-evidence-preview {
