@@ -21,17 +21,24 @@ clearer local Git operations.
 - Indexes LLM Wiki content and graph relationships for structured knowledge workflows.
 - Stores app registry, cache, audit log, filters, recents, and AI settings outside managed repositories.
 
-## Runtime Modes
+## Deployment Modes
 
-Kode Stream supports Local and Cloud runtime modes.
+Kode Stream has three supported deployment models. Storage is a separate choice only for Local.
 
-- Local mode is the default. The app binds to `127.0.0.1`, registers local paths or managed clones, and runs workspace
-  Git, terminal, AI, runtime, and verification commands on the user's machine.
-- Cloud mode runs a hosted control plane with authentication, role policy, metadata storage, and Cloud Agent routing.
-  In the default deployment, OAuth2Proxy is the public endpoint and redirects to Keycloak; Kode Stream stays on a
-  private port and trusts OAuth2Proxy identity headers. Cloud mode requires Postgres for app-owned state. The hosted app
-  does not clone repositories or execute workspace commands. Command-capable actions require the workspace owner's
-  connected Cloud Agent.
+| Model                           | Install/run location                          | Workspace capability                                                                            | Storage                                  |
+|---------------------------------|-----------------------------------------------|-------------------------------------------------------------------------------------------------|------------------------------------------|
+| Local application               | User machine; Homebrew or local binary        | Full local reads, writes, Git, terminal, AI, runtime, and verification                          | `datadir` (default) or SQLite `database` |
+| Cloud Agent-Backed              | Cloud VM/container plus Agent on user machine | Cloud coordinates; Agent executes privileged actions locally                                    | Postgres `database`                      |
+| Cloud Agentless Remote Snapshot | Cloud VM/container                            | Read-only provider snapshot pinned to a commit; no Agent, checkout, or hosted command execution | Postgres `database`                      |
+
+```text
+Local: Browser -> loopback Kode Stream -> local repository
+Cloud + Agent: Browser -> Cloud API -> outbound Agent -> local repository
+Cloud snapshot: Browser -> Cloud API -> provider API -> immutable repository commit
+```
+
+See [Architecture](ARCHITECTURE.md) for the capability boundary, [Cloud modes](docs/cloud/cloud-modes.md) for operating
+guidance, and [Storage](docs/storage/storage-architecture.md) for the storage decision matrix.
 
 ## Tech Stack
 

@@ -1,5 +1,8 @@
 # Cloud Deployment
 
+Cloud deployments support Agent-Backed and Agentless Remote Snapshot workspaces. Both run the same authenticated
+control plane and Postgres metadata store; only the workspace access boundary differs. See [Cloud deployment modes](cloud-modes.md).
+
 Cloud mode runs Kode Stream as a hosted control plane behind OAuth2Proxy. The public endpoint is OAuth2Proxy, which
 redirects users to Keycloak and forwards authenticated identity headers to Kode Stream. Kode Stream itself stays on a
 private VM/container port, stores metadata in Postgres, keeps optional exports under `KODE_STREAM_DATA_DIR`, and routes
@@ -55,7 +58,8 @@ Postgres before upgrades and verify `/api/health` reports database readiness and
 hosted workspace terminals.
 
 Cloud Agents connect only to the Cloud API. They never receive Postgres credentials and never connect directly to the
-database.
+database. Remote Snapshot workspaces do not require an Agent; Cloud reads their selected provider repository with
+read-only authorization and resolves every selected ref to a commit SHA before returning content.
 
 ## Smoke Check
 

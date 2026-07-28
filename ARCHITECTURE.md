@@ -24,15 +24,50 @@ Browser
   -> Optional integrations
 ```
 
-## Runtime Modes
+## Deployment And Workspace Model
 
-Kode Stream has two runtime modes:
+Kode Stream has three deployment models and two independent local storage choices. Do not use “Cloud mode” to imply
+that every Cloud workspace has an Agent: the Cloud control plane supports both Agent-Backed and Agentless Remote
+Snapshot workspaces.
 
-- Local mode is the default single-user app. The server binds to loopback, workspace files are local paths or managed
-  clones, and Git, terminal, AI, runtime, and verification commands execute on the same machine.
-- Cloud mode is a hosted control plane. It authenticates users, enforces roles, stores app-owned state in Postgres, and
-  routes workspace commands to the owner Cloud Agent. The hosted process does not clone repositories or execute
-  workspace commands.
+```mermaid
+flowchart TD
+  D[Choose deployment model] --> L[Local application]
+  D --> CA[Cloud control plane + Cloud Agent]
+  D --> CS[Cloud control plane + Remote Snapshot]
+  L --> LD[datadir storage]
+  L --> LDB[SQLite database storage]
+  CA --> PG[Postgres database storage]
+  CS --> PG
+  CA --> Machine[User machine: Git, files, terminal, AI, verification]
+  CS --> Provider[Read-only Git provider API at pinned commit]
+```
+
+| Deployment model                | Where Kode Stream runs                                                      | Workspace execution/data boundary                                                                                     | Supported storage              | Intended use                                                    |
+|---------------------------------|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|--------------------------------|-----------------------------------------------------------------|
+| Local application               | User machine; typically installed with Homebrew or built locally            | Local paths and managed clones; Git, file writes, terminal, AI, runtime, and verification run locally                 | `datadir` or SQLite `database` | One user working directly with local repositories               |
+| Cloud Agent-Backed              | Cloud API on VM/container plus Cloud Agent on the workspace owner’s machine | Agent keeps repository files, Git credentials, processes, and terminals local; Cloud sends approved command envelopes | Postgres `database` only       | Hosted collaboration with privileged work kept on user machines |
+| Cloud Agentless Remote Snapshot | Cloud API on VM/container                                                   | Cloud reads an authorized provider repository at a resolved immutable commit; no checkout or process runs in Cloud    | Postgres `database` only       | Read-only plans, files, board, and search without a local Agent |
+
+### Capability Boundary
+
+```text
+Local application
+  Browser -> loopback Go server -> local repository + local app state
+  Read, write, Git, terminal, AI, runtime, verification
+
+Cloud Agent-Backed
+  Browser -> Cloud API -> outbound Cloud Agent -> user's repository + local tools
+  Hosted metadata; privileged actions execute only on the user's machine
+
+Cloud Agentless Remote Snapshot
+  Browser -> Cloud API -> provider read API -> commit-pinned tree and files
+  Read, snapshot selection, terminal handoff guidance only
+```
+
+Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Agent-Backed workspace records use
+`WorkspaceLocation=cloud_agent`; Remote Snapshot records use `WorkspaceLocation=cloud_remote_snapshot` and never
+contain a local path, agent ID, command envelope, or provider credential.
 
 Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Cloud workspace records use
 `WorkspaceLocation=cloud_agent` and store metadata such as owner user, agent id, redacted local path label, remote URL,
