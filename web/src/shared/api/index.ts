@@ -411,7 +411,7 @@ function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
   return {
     ...workspace,
 		location: workspace.location === 'cloud_agent' || workspace.location === 'cloud_remote_snapshot' ? workspace.location : 'local_path',
-		accessMode: workspace.accessMode === 'remote_snapshot' ? 'remote_snapshot' : 'agent_backed',
+		accessMode: workspace.accessMode === 'remote_snapshot' ? 'remote_snapshot' : workspace.accessMode === 'agent_backed' ? 'agent_backed' : undefined,
 		registrationMode: workspace.registrationMode === 'remote_clone' || workspace.registrationMode === 'existing_workspace' ? workspace.registrationMode : 'local_path',
     remoteUrl: workspace.remoteUrl ?? '',
     clonePathManaged: Boolean(workspace.clonePathManaged),

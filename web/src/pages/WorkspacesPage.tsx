@@ -737,8 +737,8 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
                         <div><dt>Created</dt><dd>{repo.createdAt ? new Date(repo.createdAt).toLocaleString() : 'Unknown'}</dd></div>
                       </dl>
                       <div className="repo-row-actions workspace-detail-actions">
-                        {repo.location === 'local_path' && <button className="secondary" type="button" onClick={() => revealPath(repo.path)}><ExternalLink size={16} /> Reveal folder</button>}
-                        {repo.location === 'local_path' && <button className="primary" type="button" onClick={() => startEdit(repo, 'general')}><Pencil size={16} /> Edit general</button>}
+						{repo.location !== 'cloud_agent' && repo.location !== 'cloud_remote_snapshot' && <button className="secondary" type="button" onClick={() => revealPath(repo.path)}><ExternalLink size={16} /> Reveal folder</button>}
+						{repo.location !== 'cloud_agent' && repo.location !== 'cloud_remote_snapshot' && <button className="primary" type="button" onClick={() => startEdit(repo, 'general')}><Pencil size={16} /> Edit general</button>}
                       </div>
 						{repo.location === 'cloud_remote_snapshot' && <p className="workspace-inline-notice">This is a read-only provider snapshot. Run local Git or terminal work on your machine; Cloud cannot launch or observe that terminal.</p>}
                     </>}
