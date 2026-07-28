@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 import { AISessionLaunchDialog } from './AISessionLaunchDialog';
 
 vi.mock('../../lib/api', () => ({ api: {
-  aiSettings: vi.fn(), aiCapabilities: vi.fn(), aiProviderCapabilities: vi.fn(), aiPresets: vi.fn(), aiSessionEligibility: vi.fn(), launchAISession: vi.fn(), startEmbeddedAISession: vi.fn(), jiraIssue: vi.fn()
+  aiSettings: vi.fn(), aiCapabilities: vi.fn(), aiProviderCapabilities: vi.fn(), aiPresets: vi.fn(), aiSessionEligibility: vi.fn(), launchAISession: vi.fn(), launchWorkspaceAISession: vi.fn(), startEmbeddedAISession: vi.fn(), startEmbeddedWorkspaceAISession: vi.fn(), jiraIssue: vi.fn()
 } }));
 
 function mockOptions(cardContextAvailable = true) {
@@ -263,5 +263,46 @@ describe('AISessionLaunchDialog', () => {
 		expect(screen.getByLabelText(/filter skills/i)).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: /skills/i }));
 		expect(screen.queryByLabelText(/filter skills/i)).not.toBeInTheDocument();
+	});
+
+	it('locks an E2E launch to the returned result path and discovered workspace skill ID', async () => {
+		mockOptions();
+		vi.mocked(api.aiProviderCapabilities).mockResolvedValue({
+			provider: 'codex',
+			skills: [{ ...capability('workspace-skill-17', 'E2E testing'), sourcePath: '.codex/skills/e2e-testing/SKILL.md' }],
+			agents: [],
+			supportsNativeSelection: false,
+			supportsPromptFallback: true
+		});
+		vi.mocked(api.launchWorkspaceAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', contextMode: 'workspace_only', startedAt: '2026-07-02T00:00:00Z' });
+		render(<AISessionLaunchDialog
+			workspaceTarget={{ workspaceId: 'workspace-1', contextPath: 'plans/platform/PM-036/automation/scenario-01.md' }}
+			e2eRunbook={{ title: 'Quality journey', path: 'plans/platform/PM-036/automation/scenario-01.md', resultPath: 'plans/platform/PM-036/automation/results/latest.md', source: 'plan' }}
+			onClose={vi.fn()}
+			onLaunched={vi.fn()}
+		/>);
+		expect(await screen.findByText(/required skill ready/i)).toHaveTextContent('E2E testing');
+		expect(api.aiProviderCapabilities).toHaveBeenCalledWith('codex', { workspaceId: 'workspace-1' });
+		expect(screen.getByLabelText('Prompt')).toHaveValue('Execute the E2E runbook at plans/platform/PM-036/automation/scenario-01.md. Use the e2e-testing skill, request missing runtime inputs, and record the result at plans/platform/PM-036/automation/results/latest.md.');
+		expect(screen.getByLabelText('Prompt')).toBeDisabled();
+		fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
+		await waitFor(() => expect(api.launchWorkspaceAISession).toHaveBeenCalledWith('workspace-1', expect.objectContaining({
+			contextMode: 'workspace_only',
+			contextPath: 'plans/platform/PM-036/automation/scenario-01.md',
+			selectedSkills: ['workspace-skill-17'],
+			promptDraft: expect.stringContaining('plans/platform/PM-036/automation/results/latest.md')
+		})));
+	});
+
+	it('blocks E2E launch when the provider lacks the required workspace skill', async () => {
+		mockOptions();
+		render(<AISessionLaunchDialog
+			workspaceTarget={{ workspaceId: 'workspace-1', contextPath: 'plans/platform/PM-036/automation/scenario-01.md' }}
+			e2eRunbook={{ title: 'Quality journey', path: 'plans/platform/PM-036/automation/scenario-01.md', resultPath: 'plans/platform/PM-036/automation/results/latest.md', source: 'plan' }}
+			onClose={vi.fn()}
+			onLaunched={vi.fn()}
+		/>);
+		expect(await screen.findByText(/does not expose the required/i)).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Open session' })).toBeDisabled();
 	});
 });

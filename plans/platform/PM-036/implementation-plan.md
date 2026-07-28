@@ -27,6 +27,7 @@ All code, fields, API params, and TS types must use:
 | F1    | Types, API client, and shared E2E panel  | Complete |
 | F2    | Plan and Knowledge integration           | Complete |
 | F3    | Tests and visual polish                  | Complete |
+| F4    | Frontend launch and evidence hardening   | Complete |
 
 ## Backend Phases
 
@@ -115,6 +116,22 @@ All code, fields, API params, and TS types must use:
 **Verification:** `npm --prefix web run test && npm --prefix web run build`
 
 **Commit:** `PM-036: Verify E2E quality experience`
+
+---
+
+### Phase F4: Frontend Launch and Evidence Hardening
+
+**Deliverables:**
+
+- [x] Preserve local runbooks when canonical coverage reports a load diagnostic.
+- [x] Open evidence through the safe workspace file reader.
+- [x] Scope provider capability discovery to the selected workspace.
+- [x] Lock the launch prompt to the backend-provided result destination and disable launch when `e2e-testing` is unavailable.
+- [x] Add ordering, diagnostic, evidence-preview, immutable-prompt, and unavailable-skill tests.
+
+**Verification:** `npm test -- E2EQualityPanel AISessionLaunchDialog index.test.ts && npm test -- ItemWorkspacePage KnowledgePage KnowledgeReader && npm run build`
+
+**Commit:** `PM-036: Harden E2E quality launch experience`
 
 ---
 

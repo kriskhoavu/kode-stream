@@ -44,7 +44,9 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 
 	const providers = toolOptions(settings?.providers, capabilities, 'provider');
 	const terminals = toolOptions(settings?.terminals, capabilities, 'terminal');
-	const canLaunch = !loading && !launching && (e2eMode || contextMode === 'workspace_only' || eligibility?.cardContextAvailable) && providers.some((item) => item.id === provider) && (surface === 'embedded' || terminals.some((item) => item.id === terminal));
+	const requiredE2ESkill = e2eMode ? findE2ETestingSkill(providerCatalog?.skills ?? []) : undefined;
+	const e2eReady = !e2eMode || Boolean(e2eRunbook?.resultPath.trim() && requiredE2ESkill);
+	const canLaunch = !loading && !launching && (!e2eMode || providerCatalog !== null) && e2eReady && (e2eMode || contextMode === 'workspace_only' || eligibility?.cardContextAvailable) && providers.some((item) => item.id === provider) && (surface === 'embedded' || terminals.some((item) => item.id === terminal));
 
 	useEffect(() => {
 		let active = true;
@@ -53,7 +55,7 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 			const nextProvider = preference?.provider ?? nextSettings.defaultProvider;
 			const nextPresetId = preference?.presetId ?? nextPresets[0]?.id ?? '';
 			const presetPrompt = nextPresets.find((preset) => preset.id === nextPresetId)?.prompt ?? '';
-			const nextPromptDraft = e2eMode ? `Execute the E2E runbook at ${workspaceTarget!.contextPath}. Use the e2e-testing skill, request missing runtime inputs, and record the result in automation/results/latest.md.` : preference?.promptDraft ?? preference?.customPrompt ?? presetPrompt;
+			const nextPromptDraft = e2eMode ? `Execute the E2E runbook at ${workspaceTarget!.contextPath}. Use the e2e-testing skill, request missing runtime inputs, and record the result at ${e2eRunbook!.resultPath}.` : preference?.promptDraft ?? preference?.customPrompt ?? presetPrompt;
 			setSettings(nextSettings);
 			setCapabilities(nextCapabilities);
 			setPresets(nextPresets);
@@ -66,22 +68,23 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 			setPromptDirty(Boolean(preference?.promptDraft ?? preference?.customPrompt) && nextPromptDraft.trim() !== presetPrompt.trim());
 			setIncludeJiraDescription(preference?.includeJiraDescription === true);
 			setJiraPromptError('');
-			setSelectedSkills(e2eMode ? ['e2e-testing'] : []);
+			setSelectedSkills([]);
 			setSelectedAgents([]);
 			setSurface(preference?.surface ?? 'external');
 		}).catch((caught) => active && setError(caught instanceof Error ? caught.message : 'AI session options are unavailable.')).finally(() => active && setLoading(false));
 		return () => { active = false; };
-	}, [itemId, preference, e2eMode, workspaceTarget?.contextPath]);
+	}, [itemId, preference, e2eMode, e2eRunbook?.resultPath, workspaceTarget?.contextPath]);
 
 	useEffect(() => {
 		if (!provider) return;
 		let active = true;
 		setProviderCatalog(null);
 		setProviderCatalogError('');
-		api.aiProviderCapabilities(provider, itemId).then((catalog) => {
+		api.aiProviderCapabilities(provider, e2eMode ? { workspaceId: workspaceTarget!.workspaceId } : { itemId }).then((catalog) => {
 			if (!active) return;
+			const e2eSkill = findE2ETestingSkill(catalog.skills);
 			setProviderCatalog(catalog);
-			setSelectedSkills((current) => e2eMode ? ['e2e-testing'] : current.filter((item) => catalog.skills.some((skill) => skill.id === item)));
+			setSelectedSkills((current) => e2eMode ? (e2eSkill ? [e2eSkill.id] : []) : current.filter((item) => catalog.skills.some((skill) => skill.id === item)));
 			setSelectedAgents((current) => current.filter((item) => catalog.agents.some((agent) => agent.id === item)));
 		}).catch((caught) => {
 			if (!active) return;
@@ -91,7 +94,7 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 			setSelectedAgents([]);
 		});
 		return () => { active = false; };
-	}, [provider, itemId, e2eMode]);
+	}, [provider, itemId, e2eMode, workspaceTarget?.workspaceId]);
 
 	useEffect(() => {
 		if (e2eMode || !includeJiraDescription || !itemId) {
@@ -172,7 +175,7 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 				surface,
 				presetId: presetId || undefined,
 				promptDraft: promptDraft.trim() || undefined,
-				selectedSkills: e2eMode ? ['e2e-testing'] : selectedSkills.length > 0 ? selectedSkills : undefined,
+				selectedSkills: e2eMode ? [requiredE2ESkill!.id] : selectedSkills.length > 0 ? selectedSkills : undefined,
 				selectedAgents: selectedAgents.length > 0 ? selectedAgents : undefined,
 				includeJiraDescription: includeJiraDescription || undefined
 			};
@@ -216,9 +219,13 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 					{jiraPromptLoading && <p className="eligibility-ready" role="status">Fetching Jira ticket description...</p>}
 					{jiraPromptError && <p className="eligibility-blocked">{jiraPromptError}</p>}
 					{providerCatalogError && <p className="eligibility-blocked">{providerCatalogError}</p>}
-					{e2eMode ? <p className="eligibility-ready">Required skill: <code>e2e-testing</code></p> : <CapabilitySection title="Skills" items={providerCatalog?.skills ?? []} selected={selectedSkills} onToggle={(id) => toggleSelection(setSelectedSkills, id)} onSelect={(ids) => selectCapabilities(setSelectedSkills, ids)} onClear={(ids) => clearCapabilities(setSelectedSkills, ids)} />}
+					{e2eMode ? requiredE2ESkill
+						? <p className="eligibility-ready">Required skill ready: <code>{requiredE2ESkill.name}</code></p>
+						: providerCatalog && <p className="eligibility-blocked">This provider does not expose the required <code>e2e-testing</code> skill for this workspace. Add or enable it in the provider configuration before launching.</p>
+						: <CapabilitySection title="Skills" items={providerCatalog?.skills ?? []} selected={selectedSkills} onToggle={(id) => toggleSelection(setSelectedSkills, id)} onSelect={(ids) => selectCapabilities(setSelectedSkills, ids)} onClear={(ids) => clearCapabilities(setSelectedSkills, ids)} />}
 					<CapabilitySection title="Agents" items={providerCatalog?.agents ?? []} selected={selectedAgents} onToggle={(id) => toggleSelection(setSelectedAgents, id)} onSelect={(ids) => selectCapabilities(setSelectedAgents, ids)} onClear={(ids) => clearCapabilities(setSelectedAgents, ids)} />
-					{providerCatalog && providerCatalog.skills.length === 0 && providerCatalog.agents.length === 0 && <p className="eligibility-ready">No {label(provider)} workspace or global skills/agents were discovered for this item. Launch will continue without capability injection.</p>}
+					{!e2eMode && providerCatalog && providerCatalog.skills.length === 0 && providerCatalog.agents.length === 0 && <p className="eligibility-ready">No {label(provider)} workspace or global skills/agents were discovered for this item. Launch will continue without capability injection.</p>}
+					{e2eMode && !e2eRunbook?.resultPath.trim() && <p className="eligibility-blocked">The runbook response does not include a safe result destination. Refresh coverage after the workspace is rescanned.</p>}
 					{!eligibility.editable && contextMode !== 'workspace_only' && <p className="error">Card context requires an editable working-tree item.</p>}
 					{(providers.length === 0 || (surface === 'external' && terminals.length === 0)) && <p className="error">Enable and detect the tools required for this session in Settings.</p>}
 				</div>}
@@ -226,6 +233,15 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 			</section>
 		</div>
 	);
+}
+
+function findE2ETestingSkill(skills: AICapabilityDescriptor[]): AICapabilityDescriptor | undefined {
+	return skills.find((skill) => {
+		const normalizedName = skill.name.trim().toLowerCase().replace(/[\s_]+/g, '-');
+		const normalizedID = skill.id.trim().toLowerCase().replace(/[\s_]+/g, '-');
+		const sourcePath = skill.sourcePath.trim().toLowerCase().replaceAll('\\', '/');
+		return normalizedName === 'e2e-testing' || normalizedID === 'e2e-testing' || /(^|\/)e2e-testing(?:\/|\.|$)/.test(sourcePath);
+	});
 }
 
 function CapabilitySection({ title, items, selected, onToggle, onSelect, onClear }: { title: string; items: AICapabilityDescriptor[]; selected: string[]; onToggle: (id: string) => void; onSelect: (ids: string[]) => void; onClear: (ids: string[]) => void }) {
