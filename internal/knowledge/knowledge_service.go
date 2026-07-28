@@ -14,6 +14,7 @@ import (
 
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
+	"kode-stream/internal/filesystem/pathguard"
 	"kode-stream/internal/workspace/registry"
 )
 
@@ -371,7 +372,7 @@ func (s *KnowledgeService) E2ERunbook(workspaceID, root, slug string) (models.E2
 func matchesE2ESource(pageSources, requested []string) bool {
 	for _, source := range pageSources {
 		for _, candidate := range requested {
-			if strings.TrimSpace(source) == candidate {
+			if sourceReferencePath(source) == sourceReferencePath(candidate) {
 				return true
 			}
 		}
@@ -380,17 +381,55 @@ func matchesE2ESource(pageSources, requested []string) bool {
 }
 
 func (s *KnowledgeService) e2ERunbook(workspace models.WorkspaceConfig, wikiRoot string, page KnowledgePage) models.E2ERunbook {
-	runbook := models.E2ERunbook{Title: page.Title, Path: filepath.ToSlash(filepath.Join(wikiRoot, page.Path)), Source: "wiki"}
-	result := filepath.Join(workspace.Path, wikiRoot, filepath.Dir(page.Path), "automation", "results", "latest.md")
-	if data, err := os.ReadFile(result); err == nil {
-		runbook.ResultPath = filepath.ToSlash(filepath.Join(wikiRoot, filepath.Dir(page.Path), "automation", "results", "latest.md"))
+	resultRelative := e2EResultPath(workspace.Path, wikiRoot, page)
+	runbook := models.E2ERunbook{
+		Title:      page.Title,
+		Path:       filepath.ToSlash(filepath.Join(wikiRoot, page.Path)),
+		Source:     "wiki",
+		ResultPath: resultRelative,
+	}
+	result, err := pathguard.ValidateMarkdownFile(workspace.Path, resultRelative)
+	if err == nil {
+		data, readErr := os.ReadFile(result)
+		if readErr != nil {
+			runbook.Diagnostic = "Latest E2E result could not be read."
+			return runbook
+		}
 		runbook.LatestResult = parseE2EResult(string(data))
 	} else if os.IsNotExist(err) {
 		runbook.Diagnostic = "Not run"
 	} else {
-		runbook.Diagnostic = "Latest E2E result could not be read."
+		runbook.Diagnostic = "Latest E2E result path is unsafe or unsupported."
 	}
 	return runbook
+}
+
+func e2EResultPath(workspaceRoot, wikiRoot string, page KnowledgePage) string {
+	for index := len(page.SourceRefs) - 1; index >= 0; index-- {
+		source := sourceReferencePath(page.SourceRefs[index])
+		automationIndex := strings.Index(source, "/automation/")
+		if automationIndex < 0 {
+			continue
+		}
+		automationRoot := source[:automationIndex+len("/automation")]
+		candidate := filepath.ToSlash(filepath.Join(automationRoot, "results", "latest.md"))
+		if _, err := pathguard.ValidateMarkdownTarget(workspaceRoot, candidate); err == nil {
+			return candidate
+		}
+	}
+	fallback := filepath.ToSlash(filepath.Join(wikiRoot, filepath.Dir(page.Path), "automation", "results", "latest.md"))
+	if _, err := pathguard.ValidateMarkdownTarget(workspaceRoot, fallback); err == nil {
+		return fallback
+	}
+	return ""
+}
+
+func sourceReferencePath(value string) string {
+	value = strings.TrimSpace(value)
+	if path, _, found := strings.Cut(value, " | "); found {
+		value = strings.TrimSpace(path)
+	}
+	return filepath.ToSlash(filepath.Clean(value))
 }
 
 func parseE2EResult(content string) *models.E2ELatestResult {
@@ -414,6 +453,11 @@ func parseE2EResult(content string) *models.E2ELatestResult {
 				result.Evidence = append(result.Evidence, evidence)
 			}
 		}
+	}
+	switch result.Status {
+	case "passed", "failed", "blocked", "not run":
+	default:
+		result.Status = "not run"
 	}
 	return result
 }

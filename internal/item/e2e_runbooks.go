@@ -24,7 +24,7 @@ func (s *Service) E2ERunbooks(id string) (models.E2ERunbookList, []string, error
 	if err != nil {
 		return models.E2ERunbookList{}, nil, err
 	}
-	root, err := pathguard.SafeJoin(workspace.Path, item.ItemPath)
+	root, err := pathguard.ResolveExisting(workspace.Path, item.ItemPath)
 	if err != nil {
 		return models.E2ERunbookList{}, nil, err
 	}
@@ -45,17 +45,21 @@ func (s *Service) E2ERunbooks(id string) (models.E2ERunbookList, []string, error
 	}
 	runbooks := make([]models.E2ERunbook, 0)
 	sources := make([]string, 0)
+	hubRelative := filepath.ToSlash(filepath.Join(item.ItemPath, "automation", "README.md"))
+	if _, hubErr := pathguard.ValidateMarkdownFile(workspace.Path, hubRelative); hubErr == nil {
+		sources = append(sources, hubRelative)
+	}
 	for _, entry := range entries {
 		if entry.IsDir() || !isE2EScenarioRunbook(entry.Name()) {
 			continue
 		}
-		path := filepath.Join(automationRoot, entry.Name())
-		rel, err := filepath.Rel(workspace.Path, path)
-		if err != nil {
+		rel := filepath.ToSlash(filepath.Join(item.ItemPath, "automation", entry.Name()))
+		fullPath, pathErr := pathguard.ValidateMarkdownFile(workspace.Path, rel)
+		if pathErr != nil {
 			continue
 		}
-		rel = filepath.ToSlash(rel)
-		runbooks = append(runbooks, readE2ERunbook(path, rel, "plan"))
+		resultRelative := filepath.ToSlash(filepath.Join(filepath.Dir(rel), "results", "latest.md"))
+		runbooks = append(runbooks, readE2ERunbook(workspace.Path, fullPath, rel, resultRelative, "plan"))
 		sources = append(sources, rel)
 	}
 	sort.Slice(runbooks, func(i, j int) bool { return runbooks[i].Path < runbooks[j].Path })
@@ -79,8 +83,13 @@ func readE2EPlanMetadata(path string) (e2ePlanMetadata, error) {
 	return metadata, yaml.Unmarshal(data, &metadata)
 }
 
-func readE2ERunbook(fullPath, relativePath, source string) models.E2ERunbook {
-	runbook := models.E2ERunbook{Title: strings.TrimSuffix(filepath.Base(relativePath), filepath.Ext(relativePath)), Path: relativePath, Source: source}
+func readE2ERunbook(workspaceRoot, fullPath, relativePath, resultRelativePath, source string) models.E2ERunbook {
+	runbook := models.E2ERunbook{
+		Title:      strings.TrimSuffix(filepath.Base(relativePath), filepath.Ext(relativePath)),
+		Path:       relativePath,
+		Source:     source,
+		ResultPath: resultRelativePath,
+	}
 	if file, err := os.Open(fullPath); err == nil {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
@@ -92,14 +101,18 @@ func readE2ERunbook(fullPath, relativePath, source string) models.E2ERunbook {
 		}
 		_ = file.Close()
 	}
-	resultPath := filepath.Join(filepath.Dir(fullPath), "results", "latest.md")
-	if data, err := os.ReadFile(resultPath); err == nil {
-		runbook.ResultPath = filepath.ToSlash(filepath.Join(filepath.Dir(relativePath), "results", "latest.md"))
+	resultPath, err := pathguard.ValidateMarkdownFile(workspaceRoot, resultRelativePath)
+	if err == nil {
+		data, readErr := os.ReadFile(resultPath)
+		if readErr != nil {
+			runbook.Diagnostic = "Latest E2E result could not be read."
+			return runbook
+		}
 		runbook.LatestResult = parseE2ELatestResult(string(data))
 	} else if os.IsNotExist(err) {
 		runbook.Diagnostic = "Not run"
 	} else {
-		runbook.Diagnostic = "Latest E2E result could not be read."
+		runbook.Diagnostic = "Latest E2E result path is unsafe or unsupported."
 	}
 	return runbook
 }
@@ -126,5 +139,17 @@ func parseE2ELatestResult(content string) *models.E2ELatestResult {
 			}
 		}
 	}
+	if !validE2EStatus(result.Status) {
+		result.Status = "not run"
+	}
 	return result
+}
+
+func validE2EStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "passed", "failed", "blocked", "not run":
+		return true
+	default:
+		return false
+	}
 }

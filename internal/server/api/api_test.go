@@ -23,6 +23,7 @@ import (
 	gitadapter "kode-stream/internal/git"
 	"kode-stream/internal/item/index"
 	"kode-stream/internal/item/writer"
+	knowledgeindex "kode-stream/internal/knowledge"
 	"kode-stream/internal/navigation"
 	appsearch "kode-stream/internal/search"
 	"kode-stream/internal/storage"
@@ -131,6 +132,167 @@ func TestAIProviderCapabilitiesRouteReturnsCatalog(t *testing.T) {
 	}
 	if catalog.Provider != "codex" || len(catalog.Skills) == 0 || !catalog.SupportsPromptFallback || catalog.Skills[0].SourcePath == "" {
 		t.Fatalf("catalog = %#v", catalog)
+	}
+}
+
+func TestWorkspaceAISessionRoutesUseWorkspaceCapabilitiesAndValidateContext(t *testing.T) {
+	root := t.TempDir()
+	if output, err := exec.Command("git", "-C", root, "init", "-b", "main").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	commit := exec.Command("git", "-C", root, "commit", "--allow-empty", "-m", "seed")
+	commit.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if output, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v: %s", err, output)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".skills", "e2e-testing.md"), []byte("# E2E Testing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "runbook.md"), []byte("# Runbook"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "runbook.txt"), []byte("not markdown"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	settingsStore := appaisession.NewSettingsRepository(filepath.Join(dataDir, "ai-settings.yaml"))
+	if _, err := settingsStore.Save(appaisession.Settings{
+		DefaultProvider: "test-ai", DefaultTerminal: "wezterm",
+		Providers: map[string]appaisession.LaunchTemplate{"test-ai": {Enabled: true, Executable: "/usr/bin/true", Args: []string{"{prompt}"}}},
+		Terminals: map[string]appaisession.LaunchTemplate{"wezterm": {Enabled: true, Executable: "/usr/bin/true"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service := appaisession.New(settingsStore).ConfigureLaunch(
+		reg,
+		itemindex.New(filepath.Join(dataDir, "items.yaml")),
+		audit.New(filepath.Join(dataDir, "audit.jsonl")),
+		filepath.Join(dataDir, "wrappers"),
+	)
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+
+	capabilities := httptest.NewRecorder()
+	handler.ServeHTTP(capabilities, httptest.NewRequest(http.MethodGet, "/api/ai/providers/test-ai/capabilities?workspaceId="+workspace.ID, nil))
+	if capabilities.Code != http.StatusOK || !strings.Contains(capabilities.Body.String(), `"scope":"workspace"`) {
+		t.Fatalf("capabilities status=%d body=%s", capabilities.Code, capabilities.Body.String())
+	}
+	var catalog appaisession.ProviderCapabilityCatalog
+	if err := json.Unmarshal(capabilities.Body.Bytes(), &catalog); err != nil || len(catalog.Skills) == 0 {
+		t.Fatalf("catalog=%#v err=%v", catalog, err)
+	}
+
+	valid := httptest.NewRecorder()
+	validBody, err := json.Marshal(map[string]any{
+		"provider": "test-ai", "terminal": "wezterm", "contextMode": "workspace_only",
+		"contextPath": "runbook.md", "promptDraft": "Run it", "selectedSkills": []string{catalog.Skills[0].ID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.ServeHTTP(valid, httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/ai-sessions", strings.NewReader(string(validBody))))
+	if valid.Code != http.StatusAccepted {
+		t.Fatalf("valid status=%d body=%s", valid.Code, valid.Body.String())
+	}
+
+	invalid := httptest.NewRecorder()
+	invalidBody := `{"provider":"test-ai","terminal":"wezterm","contextMode":"workspace_only","contextPath":"runbook.txt"}`
+	handler.ServeHTTP(invalid, httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/ai-sessions", strings.NewReader(invalidBody)))
+	if invalid.Code != http.StatusBadRequest || !strings.Contains(invalid.Body.String(), `"code":"invalid_context_path"`) {
+		t.Fatalf("invalid status=%d body=%s", invalid.Code, invalid.Body.String())
+	}
+}
+
+func TestE2ERunbookReadRoutesReturnLocalAndCanonicalCoverage(t *testing.T) {
+	root := t.TempDir()
+	if output, err := exec.Command("git", "-C", root, "init", "-b", "main").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	commit := exec.Command("git", "-C", root, "commit", "--allow-empty", "-m", "seed")
+	commit.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if output, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v: %s", err, output)
+	}
+	planPath := filepath.Join("plans", "platform", "PM-036")
+	automationPath := filepath.Join(planPath, "automation")
+	for path, content := range map[string]string{
+		filepath.Join(planPath, "plan.yaml"):                         "plan:\n  e2e-runbook: true\n",
+		filepath.Join(automationPath, "README.md"):                   "# Automation\n",
+		filepath.Join(automationPath, "scenario-01-quality.md"):      "# Run E2E coverage\n",
+		filepath.Join(automationPath, "results", "latest.md"):        "Status: passed\nProvider: playwright\n",
+		filepath.Join("wiki", "e2e-testing", "quality-panels.md"):    "# Canonical\n",
+		filepath.Join("wiki", "e2e-testing", "index-placeholder.md"): "# Index\n",
+	} {
+		if err := os.MkdirAll(filepath.Join(root, filepath.Dir(path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, path), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dataDir := t.TempDir()
+	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: []string{"plans", "wiki"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{
+		ID: "item-pm-036", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name,
+		Branch: "main", SourceMode: "working_tree", Editable: true, Scope: "platform",
+		Identifier: "PM-036", Title: "E2E Quality Panels", ItemPath: filepath.ToSlash(planPath),
+	}}
+	idx := itemindex.New(filepath.Join(dataDir, "items.yaml"))
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	store := knowledgeindex.NewStore(filepath.Join(dataDir, "knowledge.yaml"))
+	page := knowledgeindex.KnowledgePage{
+		Slug: "e2e-quality-panels", Title: "Run E2E Coverage from Quality",
+		Path: "e2e-testing/quality-panels.md", Domain: "e2e-testing",
+		SourceRefs: []string{filepath.ToSlash(filepath.Join(automationPath, "scenario-01-quality.md"))},
+	}
+	if err := store.ReplaceWorkspace(workspace.ID, []knowledgeindex.KnowledgeWiki{{Root: "wiki", Pages: []knowledgeindex.KnowledgePage{page}}}); err != nil {
+		t.Fatal(err)
+	}
+	handler := New(reg, idx, nil, nil, nil, gitadapter.New(), nil).
+		WithKnowledge(knowledgeindex.NewService(reg, store)).
+		Routes()
+
+	itemResponse := httptest.NewRecorder()
+	handler.ServeHTTP(itemResponse, httptest.NewRequest(http.MethodGet, "/api/items/"+item.ID+"/e2e-runbooks", nil))
+	if itemResponse.Code != http.StatusOK {
+		t.Fatalf("item status=%d body=%s", itemResponse.Code, itemResponse.Body.String())
+	}
+	var itemRunbooks models.E2ERunbookList
+	if err := json.Unmarshal(itemResponse.Body.Bytes(), &itemRunbooks); err != nil {
+		t.Fatal(err)
+	}
+	if len(itemRunbooks.Runbooks) != 2 || itemRunbooks.Runbooks[0].Source != "plan" || itemRunbooks.Runbooks[1].Source != "wiki" {
+		t.Fatalf("item runbooks=%#v", itemRunbooks)
+	}
+
+	knowledgeResponse := httptest.NewRecorder()
+	path := "/api/knowledge/wikis/" + workspace.ID + "/wiki/pages/" + page.Slug + "/e2e-runbook"
+	handler.ServeHTTP(knowledgeResponse, httptest.NewRequest(http.MethodGet, path, nil))
+	if knowledgeResponse.Code != http.StatusOK {
+		t.Fatalf("knowledge status=%d body=%s", knowledgeResponse.Code, knowledgeResponse.Body.String())
+	}
+	var knowledgeRunbooks models.E2ERunbookList
+	if err := json.Unmarshal(knowledgeResponse.Body.Bytes(), &knowledgeRunbooks); err != nil {
+		t.Fatal(err)
+	}
+	if len(knowledgeRunbooks.Runbooks) != 1 || knowledgeRunbooks.Runbooks[0].ResultPath != filepath.ToSlash(filepath.Join(automationPath, "results", "latest.md")) {
+		t.Fatalf("knowledge runbooks=%#v", knowledgeRunbooks)
 	}
 }
 

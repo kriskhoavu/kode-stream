@@ -19,13 +19,14 @@ All code, fields, API params, and TS types must use:
 
 ## Phase Summary
 
-| Phase | Name                                    | Status   |
-|-------|-----------------------------------------|----------|
-| B1    | E2E runbook read model and APIs         | Complete |
-| B2    | Workspace-context AI session launch     | Complete |
-| F1    | Types, API client, and shared E2E panel | Complete |
-| F2    | Plan and Knowledge integration          | Complete |
-| F3    | Tests and visual polish                 | Complete |
+| Phase | Name                                     | Status   |
+|-------|------------------------------------------|----------|
+| B1    | E2E runbook read model and APIs          | Complete |
+| B2    | Workspace-context AI session launch      | Complete |
+| B3    | Result and capability contract hardening | Complete |
+| F1    | Types, API client, and shared E2E panel  | Complete |
+| F2    | Plan and Knowledge integration           | Complete |
+| F3    | Tests and visual polish                  | Complete |
 
 ## Backend Phases
 
@@ -55,6 +56,21 @@ All code, fields, API params, and TS types must use:
 **Verification:** `go test ./internal/ai ./internal/server/api`
 
 **Commit:** `PM-036: Support workspace E2E sessions`
+
+---
+
+### Phase B3: Result and Capability Contract Hardening
+
+**Deliverables:**
+
+- [x] Return the result destination before the first run and reuse plan results for linked canonical journeys.
+- [x] Validate result statuses, Markdown contexts, and symlink boundaries.
+- [x] Discover provider capabilities with workspace scope and reject unavailable requested skills.
+- [x] Add service and API tests for discovery, ordering, result ownership, route contracts, and unsafe paths.
+
+**Verification:** `go test ./internal/filesystem/pathguard ./internal/item ./internal/knowledge ./internal/ai ./internal/server/api`
+
+**Commit:** `PM-036: Harden E2E result and launch contracts`
 
 ---
 

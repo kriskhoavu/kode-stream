@@ -34,8 +34,8 @@ func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput
 	if contextPath == "" {
 		return EmbeddedResult{}, launchError("invalid_context_path", "contextPath is required")
 	}
-	if _, err := pathguard.SafeJoin(workspace.Path, contextPath); err != nil {
-		return EmbeddedResult{}, launchError("invalid_context_path", "context path is outside the workspace")
+	if _, err := pathguard.ValidateMarkdownFile(workspace.Path, contextPath); err != nil {
+		return EmbeddedResult{}, launchError("invalid_context_path", "context path must be an existing Markdown file inside the workspace")
 	}
 	settings, err := s.Settings()
 	if err != nil {
@@ -50,7 +50,7 @@ func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput
 	if !capability.Detected {
 		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
 	}
-	prompt, _, err := s.composePrompt(providerID, "", "workspace_only", input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
+	prompt, _, err := s.composeWorkspacePrompt(providerID, workspaceID, "workspace_only", input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
 	if err != nil {
 		return EmbeddedResult{}, err
 	}

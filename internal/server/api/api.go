@@ -486,7 +486,13 @@ func (a *API) aiProviderCapabilities(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
 		return
 	}
-	result, err := a.aiSessions.ProviderCapabilities(r.PathValue("id"), r.URL.Query().Get("itemId"))
+	var result appaisession.ProviderCapabilityCatalog
+	var err error
+	if workspaceID := strings.TrimSpace(r.URL.Query().Get("workspaceId")); workspaceID != "" {
+		result, err = a.aiSessions.ProviderCapabilitiesForWorkspace(r.PathValue("id"), workspaceID)
+	} else {
+		result, err = a.aiSessions.ProviderCapabilities(r.PathValue("id"), r.URL.Query().Get("itemId"))
+	}
 	if err == nil {
 		writeJSON(w, http.StatusOK, result)
 		return
@@ -1195,6 +1201,11 @@ func (a *API) itemE2ERunbooks(w http.ResponseWriter, r *http.Request) {
 		canonical, canonicalErr := a.knowledge.E2ERunbooksForSources(item.WorkspaceID, sources)
 		if canonicalErr == nil {
 			result.Runbooks = append(result.Runbooks, canonical.Runbooks...)
+			if canonical.Diagnostic != "" {
+				result.Diagnostic = canonical.Diagnostic
+			}
+		} else {
+			result.Diagnostic = "Canonical E2E coverage could not be loaded."
 		}
 	}
 	respond(w, result, nil)
