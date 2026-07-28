@@ -112,6 +112,7 @@ type WorkspaceConfig struct {
 	OwnerUserID        string                    `json:"ownerUserId,omitempty" yaml:"ownerUserId,omitempty"`
 	AgentID            string                    `json:"agentId,omitempty" yaml:"agentId,omitempty"`
 	Provider           string                    `json:"provider,omitempty" yaml:"provider,omitempty"`
+	ProviderInstanceID string                    `json:"providerInstanceId,omitempty" yaml:"providerInstanceId,omitempty"`
 	ProviderRepository string                    `json:"providerRepository,omitempty" yaml:"providerRepository,omitempty"`
 	SelectedRef        string                    `json:"selectedRef,omitempty" yaml:"selectedRef,omitempty"`
 	ResolvedCommitSHA  string                    `json:"resolvedCommitSha,omitempty" yaml:"resolvedCommitSha,omitempty"`

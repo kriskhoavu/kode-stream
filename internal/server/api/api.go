@@ -65,6 +65,7 @@ type API struct {
 	storageSync     storageSyncService
 	agentStore      *cloudAgentStore
 	cloudWorkspaces *cloudWorkspaceStore
+	cloudProviders  *cloudProviderStore
 }
 
 type databaseHealthChecker interface {
@@ -156,6 +157,7 @@ func NewWithServices(reg registry.Repository, idx itemindex.Repository, scan *sc
 		runtimeConfig:   runtimeConfig,
 		agentStore:      newCloudAgentStore(time.Now),
 		cloudWorkspaces: newCloudWorkspaceStore(),
+		cloudProviders:  newCloudProviderStore(),
 	}
 }
 

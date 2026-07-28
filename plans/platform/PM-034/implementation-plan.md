@@ -45,7 +45,7 @@ Avoid:
 | C1    | Extension build artifact                | DevOps   | Done    |
 | C2    | Showcase verification and documentation | DevOps   | Done    |
 | B1    | Cloud workspace access adapters         | Backend  | Done    |
-| B2    | Provider remote snapshot adapter        | Backend  | Planned |
+| B2    | Provider remote snapshot adapter        | Backend  | Done    |
 | B3    | Snapshot read and capability API        | Backend  | Planned |
 | F3    | Agentless workspace registration        | Frontend | Planned |
 | F4    | Snapshot workspace capability UI        | Frontend | Planned |
@@ -141,12 +141,12 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Define `GitProviderIntegration` for authorization state, repository discovery, ref resolution, tree reads, file reads, and commit metadata.
-- [ ] Implement one approved provider adapter with read-only authorization and strict repository ownership checks.
-- [ ] Implement `RemoteSnapshotAdapter`; it must not invoke Git or access local paths.
-- [ ] Persist provider repository identity, selected ref, resolved commit SHA, and authorization state without exposing tokens.
-- [ ] Resolve selected branches and tags to immutable commit SHAs before returning content.
-- [ ] Add fake-provider contract tests for revoked access, missing refs, forbidden repositories, and snapshot resolution.
+- [x] Define `GitProviderIntegration` for authorization state, repository discovery, ref resolution, tree reads, file reads, and commit metadata.
+- [x] Implement approved GitHub and Bitbucket Server/Data Center adapters with read-only authorization and strict repository ownership checks.
+- [x] Implement `RemoteSnapshotAdapter`; it does not invoke Git or access local paths.
+- [x] Persist provider repository identity, selected ref, resolved commit SHA, and opaque, user-scoped authorization state without exposing tokens.
+- [x] Resolve selected branches and tags to immutable commit SHAs before returning content.
+- [x] Add provider contract tests for revoked access, missing refs, forbidden repositories, and snapshot resolution.
 
 **Verification:** `rtk go test ./internal/provider/... ./internal/workspace/... ./internal/server/api/...`
 
@@ -175,6 +175,8 @@ Avoid:
 **Deliverables:**
 
 - [ ] Extend workspace and runtime types with access mode, provider repository identity, selected ref, resolved commit SHA, and capabilities.
+- [ ] Add Cloud integration settings with an admin-only provider-instance section and a user-owned connected-account section.
+- [ ] Support multiple named Bitbucket Server/Data Center instances; selecting one scopes repository discovery only for that Remote Snapshot workspace.
 - [ ] Add an explicit Cloud workspace choice: Agent-Backed or Remote Snapshot.
 - [ ] Reuse agent pairing only for Agent-Backed selection.
 - [ ] Add provider connection, repository selection, and ref selection only for Remote Snapshot selection.

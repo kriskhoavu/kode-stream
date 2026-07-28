@@ -36,6 +36,9 @@ func (a *API) cloudWorkspaceCommand(w http.ResponseWriter, r *http.Request) {
 	}
 	result, status, message := adapter.Command(session, workspace, input)
 	if message != "" {
+		if status == 0 {
+			status = http.StatusConflict
+		}
 		writeError(w, status, message)
 		return
 	}

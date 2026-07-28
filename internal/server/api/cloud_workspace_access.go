@@ -50,7 +50,7 @@ func (a *API) workspaceAccessAdapter(workspace models.WorkspaceConfig) (workspac
 	case "", models.WorkspaceAccessModeAgentBacked:
 		return agentAccessAdapter{agents: a.agentStore}, http.StatusOK, ""
 	case models.WorkspaceAccessModeRemoteSnapshot:
-		return nil, http.StatusNotImplemented, "remote snapshot workspaces are not configured"
+		return remoteSnapshotAdapter{providers: a.cloudProviders}, http.StatusOK, ""
 	default:
 		return nil, http.StatusBadRequest, "unsupported workspace access mode"
 	}

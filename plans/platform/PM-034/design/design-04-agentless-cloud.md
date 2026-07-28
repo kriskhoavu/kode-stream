@@ -9,14 +9,15 @@ commit and returns no local-process capability.
 
 ## Workspace Model
 
-| Field                | Purpose                                                        |
-|----------------------|----------------------------------------------------------------|
-| `accessMode`         | `agent_backed` or `remote_snapshot`.                           |
-| `provider`           | Initial approved Git provider for a remote snapshot workspace. |
-| `providerRepository` | Provider repository identity; never an executable local path.  |
-| `selectedRef`        | User-selected branch, tag, or commit.                          |
-| `resolvedCommitSHA`  | Commit resolved before every snapshot read.                    |
-| `agentId`            | Required only by `agent_backed`.                               |
+| Field                | Purpose                                                                                      |
+|----------------------|----------------------------------------------------------------------------------------------|
+| `accessMode`         | `agent_backed` or `remote_snapshot`.                                                         |
+| `provider`           | Initial approved Git provider for a remote snapshot workspace.                               |
+| `providerInstanceId` | Administrator-configured GitHub or Bitbucket Server/DC endpoint selected for this workspace. |
+| `providerRepository` | Provider repository identity; never an executable local path.                                |
+| `selectedRef`        | User-selected branch, tag, or commit.                                                        |
+| `resolvedCommitSHA`  | Commit resolved before every snapshot read.                                                  |
+| `agentId`            | Required only by `agent_backed`.                                                             |
 
 ## Adapter Responsibilities
 
@@ -41,23 +42,25 @@ commit and returns no local-process capability.
 
 ## Provider Boundary
 
-| Area                 | Requirement                                                                       |
-|----------------------|-----------------------------------------------------------------------------------|
-| Authorization        | One provider adapter with read-only OAuth/App repository access.                  |
-| Token handling       | Encrypt stored authorization material; never return or log token values.          |
-| Snapshot consistency | Resolve a selected ref to a commit SHA before tree, file, board, or search reads. |
-| Caching              | Bound and sanitize commit-keyed read models; never create a hosted checkout.      |
-| Failure behavior     | Reconnect, forbidden, missing-ref, rate-limit, and outage states are explicit.    |
+| Area                 | Requirement                                                                                              |
+|----------------------|----------------------------------------------------------------------------------------------------------|
+| Authorization        | One provider adapter with read-only OAuth/App repository access.                                         |
+| Provider instances   | Admin settings manages named GitHub and Bitbucket Server/DC endpoints; a workspace selects one instance. |
+| Token handling       | Encrypt stored authorization material; never return or log token values.                                 |
+| Snapshot consistency | Resolve a selected ref to a commit SHA before tree, file, board, or search reads.                        |
+| Caching              | Bound and sanitize commit-keyed read models; never create a hosted checkout.                             |
+| Failure behavior     | Reconnect, forbidden, missing-ref, rate-limit, and outage states are explicit.                           |
 
 ## UI Contract
 
-| Area                   | Agentless Cloud Behavior                                               |
-|------------------------|------------------------------------------------------------------------|
-| Workspace registration | Select Remote Snapshot, authorize provider, choose repository and ref. |
-| Workspace label        | Show provider repository, selected ref, and resolved commit SHA.       |
-| Explorer and board     | Read-only and keyed by the resolved commit SHA.                        |
-| Unsupported controls   | Hide local writes, dirty state, Git mutations, and process controls.   |
-| Terminal handoff       | Explain that the user runs local Git or terminal work outside Cloud.   |
+| Area                       | Agentless Cloud Behavior                                                                                     |
+|----------------------------|--------------------------------------------------------------------------------------------------------------|
+| Workspace registration     | Select Remote Snapshot, authorize provider, choose repository and ref.                                       |
+| Cloud integration settings | Admin manages named provider instances; each user connects their own GitHub or Bitbucket Server/DC identity. |
+| Workspace label            | Show provider repository, selected ref, and resolved commit SHA.                                             |
+| Explorer and board         | Read-only and keyed by the resolved commit SHA.                                                              |
+| Unsupported controls       | Hide local writes, dirty state, Git mutations, and process controls.                                         |
+| Terminal handoff           | Explain that the user runs local Git or terminal work outside Cloud.                                         |
 
 ## Design Decisions
 
