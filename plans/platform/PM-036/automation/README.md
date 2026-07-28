@@ -16,7 +16,7 @@ Browser validation is required because this feature changes how users locate and
 
 | Playbook                                                                       | Covers                                                                           | Status |
 |--------------------------------------------------------------------------------|----------------------------------------------------------------------------------|--------|
-| [Scenario 01 — Run E2E coverage from Quality](scenario-01-run-e2e-coverage.md) | Plan-local priority, Knowledge execution, result states, and AI session handoff. | Draft  |
+| [Scenario 01 — Run E2E coverage from Quality](scenario-01-run-e2e-coverage.md) | Plan-local priority, Knowledge execution, result states, and AI session handoff. | Ready  |
 
 ## Latest Result
 
@@ -24,4 +24,6 @@ Browser validation is required because this feature changes how users locate and
 
 ## Reusable E2E Coverage
 
-Ticket-local playbooks are working sources. This plan changes reusable browser-journey coverage, so `plan.e2e-runbook` is true. After implementation, use `wiki-enrich` to synthesize the durable journey under `docs/e2e-testing/`.
+Ticket-local playbooks are working sources. This plan changes reusable browser-journey coverage, so
+`plan.e2e-runbook` is true. The durable journey is synthesized under
+`wiki/e2e-testing/cross-domain/e2e-quality-coverage.md`.

@@ -16,9 +16,9 @@ Make agent-driven browser runbooks visible and executable from the existing Qual
 
 | Term              | Meaning                                                                         | Maps To                                |
 |-------------------|---------------------------------------------------------------------------------|----------------------------------------|
-| E2E runbook       | Provider-neutral Markdown browser journey.                                      | `automation/` and `docs/e2e-testing/`  |
+| E2E runbook       | Provider-neutral Markdown browser journey.                                      | `automation/` and `wiki/e2e-testing/`  |
 | Local runbook     | Ticket-local working runbook owned by the selected plan.                        | `plans/{service}/{ticket}/automation/` |
-| Canonical journey | Reusable E2E wiki page linked through `sourceRef`.                              | `docs/e2e-testing/**`                  |
+| Canonical journey | Reusable E2E wiki page linked through `sourceRef`.                              | `wiki/e2e-testing/**`                  |
 | Latest result     | The most recent skill-written outcome for a runbook owner.                      | `automation/results/latest.md`         |
 | E2E session mode  | AI launch configuration that locks the runbook context and `e2e-testing` skill. | AI session dialog                      |
 
