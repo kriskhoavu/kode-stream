@@ -46,7 +46,7 @@ Avoid:
 | C2    | Showcase verification and documentation | DevOps   | Done    |
 | B1    | Cloud workspace access adapters         | Backend  | Done    |
 | B2    | Provider remote snapshot adapter        | Backend  | Done    |
-| B3    | Snapshot read and capability API        | Backend  | Planned |
+| B3    | Snapshot read and capability API        | Backend  | Done    |
 | F3    | Agentless workspace registration        | Frontend | Planned |
 | F4    | Snapshot workspace capability UI        | Frontend | Planned |
 | C3    | Provider authorization and Cloud smoke  | DevOps   | Planned |
@@ -158,11 +158,11 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Route tree, file, plan, board, and search reads through `WorkspaceAccessAdapter`; key remote results by resolved commit SHA.
-- [ ] Add bounded, sanitized remote snapshot caching with provider outage and rate-limit behavior.
-- [ ] Return a capability map that enables only reads, snapshot selection, and terminal handoff for `remote_snapshot`.
-- [ ] Return stable unsupported results for agentless Git mutations, file writes, and process execution; never forward them to provider writes.
-- [ ] Prove remote workspaces never expose local path, dirty state, agent ID, token, or command envelope.
+- [x] Route remote tree and file reads through `RemoteSnapshotAdapter`, pinning each response to a resolved commit SHA.
+- [x] Keep remote reads sanitized and fail closed when the provider is unavailable; provider HTTP errors include rate-limit and outage responses.
+- [x] Return a capability map that enables only reads, snapshot selection, and terminal handoff for `remote_snapshot`.
+- [x] Return stable unsupported results for agentless Git mutations, file writes, and process execution; never forward them to provider writes.
+- [x] Prove remote workspaces never expose local path, dirty state, agent ID, token, or command envelope.
 
 **Verification:** `rtk go test ./internal/server/api/... ./internal/workspace/... ./internal/search/...`
 

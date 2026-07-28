@@ -231,8 +231,9 @@ const (
 type WorkspaceLocation string
 
 const (
-	WorkspaceLocationLocalPath  WorkspaceLocation = "local_path"
-	WorkspaceLocationCloudAgent WorkspaceLocation = "cloud_agent"
+	WorkspaceLocationLocalPath           WorkspaceLocation = "local_path"
+	WorkspaceLocationCloudAgent          WorkspaceLocation = "cloud_agent"
+	WorkspaceLocationCloudRemoteSnapshot WorkspaceLocation = "cloud_remote_snapshot"
 )
 
 type WorkspaceAccessMode string
@@ -366,16 +367,21 @@ type BranchScanMetadata struct {
 }
 
 type WorkspaceInput struct {
-	Name             string                    `json:"name" yaml:"name"`
-	Path             string                    `json:"path" yaml:"path"`
-	BaselineBranch   string                    `json:"baselineBranch" yaml:"baselineBranch"`
-	Sources          []string                  `json:"sources" yaml:"sources"`
-	RegistrationMode WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
-	RemoteURL        string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
-	CloneRoot        string                    `json:"cloneRoot,omitempty" yaml:"cloneRoot,omitempty"`
-	Jira             *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
-	Knowledge        *KnowledgeSettings        `json:"knowledge,omitempty" yaml:"knowledge,omitempty"`
-	Runtime          *WorkspaceRuntimeConfig   `json:"runtime,omitempty" yaml:"runtime,omitempty"`
+	Name               string                    `json:"name" yaml:"name"`
+	Path               string                    `json:"path" yaml:"path"`
+	AccessMode         WorkspaceAccessMode       `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
+	Provider           string                    `json:"provider,omitempty" yaml:"provider,omitempty"`
+	ProviderInstanceID string                    `json:"providerInstanceId,omitempty" yaml:"providerInstanceId,omitempty"`
+	ProviderRepository string                    `json:"providerRepository,omitempty" yaml:"providerRepository,omitempty"`
+	SelectedRef        string                    `json:"selectedRef,omitempty" yaml:"selectedRef,omitempty"`
+	BaselineBranch     string                    `json:"baselineBranch" yaml:"baselineBranch"`
+	Sources            []string                  `json:"sources" yaml:"sources"`
+	RegistrationMode   WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
+	RemoteURL          string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
+	CloneRoot          string                    `json:"cloneRoot,omitempty" yaml:"cloneRoot,omitempty"`
+	Jira               *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
+	Knowledge          *KnowledgeSettings        `json:"knowledge,omitempty" yaml:"knowledge,omitempty"`
+	Runtime            *WorkspaceRuntimeConfig   `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 }
 
 type SourceStructureSettings struct {

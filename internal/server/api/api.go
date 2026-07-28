@@ -839,7 +839,8 @@ func (a *API) createWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	if a.rejectCloudBrowserWorkspaceRegistration(w, input) {
+	if a.runtimeConfig.Mode == models.RuntimeModeCloud {
+		a.createCloudRemoteSnapshotWorkspace(w, r, input)
 		return
 	}
 	result, err := a.workspaces.CreateWithResult(input)
