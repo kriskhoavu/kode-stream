@@ -94,3 +94,4 @@ tree, file, board, search, and capability response.
 - [Agentless Cloud Design](design/design-04-agentless-cloud.md)
 - [Implementation Plan](implementation-plan.md)
 - [Showcase Runbook](../../../docs/release/chrome-extension-showcase.md)
+- [Remote Snapshot Operations](../../../docs/release/cloud-remote-snapshot.md)
