@@ -45,7 +45,7 @@ flowchart TD
 
 | Deployment model                | Where Kode Stream runs                                                      | Workspace execution/data boundary                                                                                     | Supported storage              | Intended use                                                    |
 |---------------------------------|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|--------------------------------|-----------------------------------------------------------------|
-| Local application               | User machine; typically installed with Homebrew or built locally            | Local paths and managed clones; Git, file writes, terminal, AI, runtime, and verification run locally                 | `datadir` or SQLite `database` | One user working directly with local repositories               |
+| Local application               | User machine; installed with Homebrew, built locally, or run in Docker      | Local paths and managed clones; Git, file writes, terminal, AI, runtime, and verification run locally                 | `datadir` or SQLite `database` | One user working directly with local repositories               |
 | Cloud Agent-Backed              | Cloud API on VM/container plus Cloud Agent on the workspace owner’s machine | Agent keeps repository files, Git credentials, processes, and terminals local; Cloud sends approved command envelopes | Postgres `database` only       | Hosted collaboration with privileged work kept on user machines |
 | Cloud Agentless Remote Snapshot | Cloud API on VM/container                                                   | Cloud reads an authorized provider repository at a resolved immutable commit; no checkout or process runs in Cloud    | Postgres `database` only       | Read-only plans, files, board, and search without a local Agent |
 
@@ -55,6 +55,7 @@ flowchart TD
 Local application
   Browser -> loopback Go server -> local repository + local app state
   Read, write, Git, terminal, AI, runtime, verification
+  Docker variant: server and tools run in the container; a host repository is mounted at /workspace
 
 Cloud Agent-Backed
   Browser -> Cloud API -> outbound Cloud Agent -> user's repository + local tools
@@ -68,10 +69,6 @@ Cloud Agentless Remote Snapshot
 Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Agent-Backed workspace records use
 `WorkspaceLocation=cloud_agent`; Remote Snapshot records use `WorkspaceLocation=cloud_remote_snapshot` and never
 contain a local path, agent ID, command envelope, or provider credential.
-
-Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Cloud workspace records use
-`WorkspaceLocation=cloud_agent` and store metadata such as owner user, agent id, redacted local path label, remote URL,
-scan status, and published summaries.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐

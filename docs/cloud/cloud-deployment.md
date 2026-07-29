@@ -67,22 +67,21 @@ read-only authorization and resolves every selected ref to a commit SHA before r
 npm run build
 go build -o ./bin/kode-stream ./cmd/kode-stream
 docker build -t kode-stream:cloud .
-docker compose -f docker/cloud/compose.yaml up -d
+docker compose -f docker/cloud-mode/compose.yaml up -d
 curl -fsS http://127.0.0.1:4318/api/health
 ```
 
-Open the public OAuth2Proxy URL, for example `https://kode-stream.example.com`, to see the login page. In the sample
-compose file, local port `4318` is OAuth2Proxy and the app port is not published. After login, connect a Cloud Agent and
-register a workspace from the agent. Command-capable actions should be unavailable until the owner agent is connected.
+The repository Compose file is the self-contained local stack: local port `4318` is OAuth2Proxy and the app port is not
+published. After login, use the Agent-Backed or Agentless Remote Snapshot workflow described in [Local Cloud Stack](../../docker/cloud-mode/local.md).
 
 ## Local OAuth2Proxy And Keycloak Stack
 
-For a full local login flow, use the Docker Compose stack in [Local Cloud Auth Stack](cloud/local.md). It starts
+For a full local login flow, use the Docker Compose stack in [Local Cloud Stack](../../docker/cloud-mode/local.md). It starts
 Keycloak with an imported `kode-stream` realm, OAuth2Proxy on `http://kode-stream.localhost:4318`, and Kode Stream as a
 private upstream.
 
 ```bash
-docker compose -f docker/cloud/local-compose.yaml up -d --build
+docker compose -f docker/cloud-mode/compose.yaml up -d --build
 curl -fsS http://kode-stream.localhost:4318/api/health
 ```
 

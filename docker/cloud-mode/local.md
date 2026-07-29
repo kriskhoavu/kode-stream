@@ -1,4 +1,4 @@
-# Local Cloud Auth Stack
+# Local Cloud Stack
 
 This local stack mirrors the VM deployment shape:
 
@@ -8,13 +8,21 @@ This local stack mirrors the VM deployment shape:
 
 ## Run
 
-One-command local Cloud mode with Docker, Postgres, generated agent token, and foreground Cloud Agent:
+The stack supports both Cloud workspace access modes. Both start OAuth2Proxy, Keycloak, Kode Stream, and Postgres with
+Cloud `database` storage. The mode determines whether the helper also starts a local Cloud Agent.
+
+| Helper mode               | Command                                                                 | What it validates                                                                           |
+|---------------------------|-------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| Agent-Backed              | `./docker/cloud-mode/run.sh`                                            | Cloud control plane plus a foreground Agent for a local repository                          |
+| Agentless Remote Snapshot | `KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./docker/cloud-mode/run.sh` | Cloud control plane without an Agent; then validate a read-only provider snapshot in the UI |
+
+## Agent-Backed Run
 
 ```bash
-./run-docker-cloud.sh
+./docker/cloud-mode/run.sh
 ```
 
-By default this starts the Docker stack, waits for `http://kode-stream.localhost:4318/api/health`, builds
+By default, this starts the Docker stack, waits for `http://kode-stream.localhost:4318/api/health`, builds
 `./bin/kode-stream`, generates a 30-minute local agent token with the development cookie secret, and starts the agent
 against the current repository.
 
@@ -24,18 +32,32 @@ Optional overrides:
 KODE_STREAM_STORAGE_OPTION=database \
 KODE_STREAM_AGENT_REPO=/path/to/repo \
 KODE_STREAM_AGENT_NAME="MacBook Agent" \
-./run-docker-cloud.sh
+./docker/cloud-mode/run.sh
 ```
 
-Cloud smoke runs always use `database` storage with Postgres. `run-docker-cloud.sh` fails early if
-`KODE_STREAM_STORAGE_OPTION=datadir` is supplied.
+Cloud smoke runs always use `database` storage with Postgres. `docker/cloud-mode/run.sh` fails early if
+`KODE_STREAM_STORAGE_OPTION=datadir` is supplied. Postgres persists shared metadata in `kode-stream-postgres`; the
+separate `kode-stream-cloud-data` volume persists Cloud diagnostics and rollback exports under `KODE_STREAM_DATA_DIR`.
 
 The agent runs in the foreground. Press `Ctrl-C` to stop the agent; Docker services stay running.
+
+## Agentless Remote Snapshot Run
+
+Start only the Cloud control plane:
+
+```bash
+KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./docker/cloud-mode/run.sh
+```
+
+The helper waits for health and exits without building or starting an Agent. Open the Cloud URL, configure an approved
+read-only provider connection, then register a Remote Snapshot workspace and select a repository/ref. Verify that the
+returned content is pinned to a resolved commit SHA and that write, Git, terminal, AI, runtime, and verification
+actions are unavailable. See [Remote Snapshot operations](../../docs/cloud/remote-snapshot-operations.md).
 
 Manual stack startup:
 
 ```bash
-docker compose -f docker/cloud/local-compose.yaml up -d --build
+docker compose -f docker/cloud-mode/compose.yaml up -d --build
 ```
 
 Open:
@@ -129,16 +151,16 @@ role mapping beyond the admin allowlist.
 Stop containers:
 
 ```bash
-docker compose -f docker/cloud/local-compose.yaml down
+docker compose -f docker/cloud-mode/compose.yaml down
 ```
 
 Reset local containers:
 
 ```bash
-docker compose -f docker/cloud/local-compose.yaml down -v
+docker compose -f docker/cloud-mode/compose.yaml down -v
 ```
 
-Use the reset command after changes to `docker/cloud/keycloak/kode-stream-realm.json`; Keycloak imports the local realm
+Use the reset command after changes to `docker/cloud-mode/keycloak/kode-stream-realm.json`; Keycloak imports the local realm
 only when the development server starts.
 
 ## Notes

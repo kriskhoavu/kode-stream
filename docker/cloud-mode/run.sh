@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_FILE="${KODE_STREAM_CLOUD_COMPOSE_FILE:-$ROOT_DIR/docker/cloud/local-compose.yaml}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+COMPOSE_FILE="${KODE_STREAM_CLOUD_COMPOSE_FILE:-$ROOT_DIR/docker/cloud-mode/compose.yaml}"
 CLOUD_URL="${KODE_STREAM_CLOUD_URL:-http://kode-stream.localhost:4318}"
+WORKSPACE_MODE="${KODE_STREAM_CLOUD_WORKSPACE_MODE:-agent_backed}"
 REPO_PATH="${KODE_STREAM_AGENT_REPO:-$ROOT_DIR}"
 AGENT_NAME="${KODE_STREAM_AGENT_NAME:-Local Agent}"
 AGENT_PLATFORM="${KODE_STREAM_AGENT_PLATFORM:-$(uname -s | tr '[:upper:]' '[:lower:]')}"
@@ -88,6 +89,11 @@ if [[ "$STORAGE_OPTION" != "database" ]]; then
   exit 2
 fi
 
+if [[ "$WORKSPACE_MODE" != "agent_backed" && "$WORKSPACE_MODE" != "agentless" ]]; then
+  printf 'KODE_STREAM_CLOUD_WORKSPACE_MODE must be agent_backed or agentless; got %s.\n' "$WORKSPACE_MODE" >&2
+  exit 2
+fi
+
 cd "$ROOT_DIR"
 export KODE_STREAM_STORAGE_OPTION="database"
 export KODE_STREAM_STORAGE_DRIVER="${KODE_STREAM_STORAGE_DRIVER:-postgres}"
@@ -97,9 +103,17 @@ export KODE_STREAM_ADMIN_USERS="$ADMIN_USERS"
 
 log "Starting local Cloud stack with Docker Compose"
 log "Storage option: $KODE_STREAM_STORAGE_OPTION ($KODE_STREAM_STORAGE_DRIVER)"
+log "Workspace mode: $WORKSPACE_MODE"
 docker compose -f "$COMPOSE_FILE" up -d --build
 
 wait_for_health "$CLOUD_URL"
+
+if [[ "$WORKSPACE_MODE" == "agentless" ]]; then
+  log "Cloud control plane is ready for Agentless Remote Snapshot validation"
+  log "Open $CLOUD_URL, configure a read-only provider connection, then register a Remote Snapshot workspace"
+  log "No Cloud Agent is started in agentless mode"
+  exit 0
+fi
 
 log "Building agent binary at $BIN_PATH"
 mkdir -p "$(dirname "$BIN_PATH")"

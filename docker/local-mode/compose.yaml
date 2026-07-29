@@ -1,0 +1,30 @@
+name: kode-stream-local
+
+services:
+  kode-stream:
+    image: kode-stream:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "${KODE_STREAM_LOCAL_PORT:-4317}:4317"
+    environment:
+      KODE_STREAM_MODE: local
+      KODE_STREAM_PORT: "4317"
+      KODE_STREAM_BIND_ADDR: 0.0.0.0
+      KODE_STREAM_DATA_DIR: /var/lib/kode-stream
+      KODE_STREAM_STORAGE_OPTION: ${KODE_STREAM_STORAGE_OPTION:-datadir}
+      KODE_STREAM_SQLITE_PATH: /var/lib/kode-stream/kode-stream.db
+      KODE_STREAM_MIGRATIONS: ${KODE_STREAM_MIGRATIONS:-auto}
+    volumes:
+      - kode-stream-local-data:/var/lib/kode-stream
+      - ${KODE_STREAM_LOCAL_WORKSPACE:-../..}:/workspace
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4317/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  kode-stream-local-data:

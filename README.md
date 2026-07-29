@@ -140,11 +140,31 @@ kode-stream agent start|status|doctor
 - `doctor`: checks the environment and repository setup.
 - `agent`: starts, checks, or diagnoses the Cloud Agent command surface.
 
-For a local Cloud-mode smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy, and a foreground Cloud Agent:
+For a local Agent-Backed Cloud smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy, and a foreground Cloud Agent:
 
 ```bash
-./run-docker-cloud.sh
+./docker/cloud-mode/run.sh
 ```
+
+For the Agentless Remote Snapshot control-plane stack, use:
+
+```bash
+KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./docker/cloud-mode/run.sh
+```
+
+See [Local Cloud Stack](docker/cloud-mode/local.md) for both flows.
+
+## Local Docker Mode
+
+Local mode can also run in Docker with either supported Local storage option:
+
+```bash
+./docker/local-mode/run.sh
+KODE_STREAM_STORAGE_OPTION=database ./docker/local-mode/run.sh
+```
+
+The selected host workspace is mounted at `/workspace`. See [Local Docker Stack](docker/local-mode/README.md) for the
+storage boundary and container limitations for Git credentials, terminal, AI, dialogs, and path reveal.
 
 ## Storage And Data Directory
 
