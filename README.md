@@ -37,7 +37,7 @@ Cloud + Agent: Browser -> Cloud API -> outbound Agent -> local repository
 Cloud snapshot: Browser -> Cloud API -> provider API -> immutable repository commit
 ```
 
-See [Architecture](ARCHITECTURE.md) for the capability boundary, [Cloud modes](docs/cloud/cloud-modes.md) for operating
+See [Architecture](docs/architecture/ARCHITECTURE.md) for the capability boundary, [Cloud modes](docs/cloud/cloud-modes.md) for operating
 guidance, [Storage](docs/storage/storage-architecture.md) for the storage decision matrix, and the
 [Documentation map](docs/README.md) for the full documentation taxonomy.
 
@@ -269,6 +269,6 @@ cards:
 
 ## Architecture
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries, storage design, data flow, and API structure.
+See [Architecture](docs/architecture/ARCHITECTURE.md) for system boundaries, storage design, data flow, and API structure.
 
 For hosted deployment, see [Cloud Deployment](docs/cloud/cloud-deployment.md).

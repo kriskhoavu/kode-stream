@@ -1,0 +1,14 @@
+flowchart LR
+  server[Local Kode Stream server] --> sqlite[(SQLite\nkode-stream.db)]
+  sqlite --> registry[Workspace registry]
+  sqlite --> index[Derived indexes and branch metadata]
+  sqlite --> audit[Audit, navigation, and settings]
+  sync[Explicit manual sync] --> backup[Backup target\nbackups/storage-sync]
+  sync --> sqlite
+
+  classDef runtime fill:#f8fafc,stroke:#64748b,color:#0f172a
+  classDef db fill:#eef7ff,stroke:#2563eb,color:#0f172a
+  classDef backup fill:#fff7ed,stroke:#c2410c,color:#7c2d12
+  class server,registry,index,audit,sync runtime
+  class sqlite db
+  class backup backup

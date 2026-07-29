@@ -1,0 +1,14 @@
+flowchart LR
+  browser[Browser / React UI] -->|JSON API| api[Kode Stream Go server\nloopback by default]
+  api --> services[Domain services\nworkspace, Git, AI, verification]
+  services --> repo[Registered Git workspace\nfiles and history]
+  api --> storage{App-state storage option}
+  storage -->|default| datadir[(datadir\nYAML / JSONL)]
+  storage -->|database| sqlite[(SQLite\nkode-stream.db)]
+
+  classDef runtime fill:#f8fafc,stroke:#64748b,color:#0f172a
+  classDef file fill:#f0fdf4,stroke:#16a34a,color:#052e16
+  classDef db fill:#eef7ff,stroke:#2563eb,color:#0f172a
+  class browser,api,services runtime
+  class repo,datadir file
+  class sqlite db

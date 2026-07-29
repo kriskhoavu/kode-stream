@@ -1,0 +1,13 @@
+flowchart LR
+  server[Local Kode Stream server] --> registry[Workspace registry]
+  server --> index[Derived item index]
+  server --> audit[Audit and UI state]
+  registry --> workspaces[workspaces.yaml]
+  index --> itemIndex[item-index.yaml]
+  audit --> state[YAML settings and JSONL audit log]
+  backup[Manual sync / backup] --> backupFiles[backups/storage-sync]
+
+  classDef runtime fill:#f8fafc,stroke:#64748b,color:#0f172a
+  classDef file fill:#f0fdf4,stroke:#16a34a,color:#052e16
+  class server,registry,index,audit,backup runtime
+  class workspaces,itemIndex,state,backupFiles file

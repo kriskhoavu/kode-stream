@@ -30,6 +30,11 @@ Storage does not choose how repository work executes. Local storage choices appl
 Cloud workspace access modes use the same Postgres control-plane state; Agent repositories remain on user machines,
 while Remote Snapshot content remains in the Git provider. See [Cloud deployment modes](../cloud/cloud-modes.md).
 
+The storage boundary diagram now lives with the Local runtime
+architecture as [Mermaid source](../architecture/local-mode/storage-options.mmd).
+See [Local mode](../architecture/local-mode/README.md)
+for the full Local runtime boundary.
+
 | Variable                     | Local behavior                             | Cloud behavior                                |
 |------------------------------|--------------------------------------------|-----------------------------------------------|
 | `KODE_STREAM_STORAGE_OPTION` | `database` or `datadir`, default `datadir` | Must be `database`                            |

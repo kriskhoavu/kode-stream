@@ -24,7 +24,7 @@ Browser
   -> Optional integrations
 ```
 
-## Deployment And Workspace Model
+## Deployment Model
 
 Kode Stream has three deployment models and two independent local storage choices. Do not use “Cloud mode” to imply
 that every Cloud workspace has an Agent: the Cloud control plane supports both Agent-Backed and Agentless Remote
@@ -90,8 +90,9 @@ contain a local path, agent ID, command envelope, or provider credential.
 └────────────────────────────────┘  └───────────────────────────┘
 ```
 
-Rendered architecture diagram: [Storage architecture](docs/storage/storage-architecture-diagram.svg). Source:
-[storage-architecture-diagram.mmd](docs/storage/storage-architecture-diagram.mmd).
+For the mode-specific diagrams and use cases, see [Local mode](local-mode/README.md),
+[Cloud mode](cloud-mode/README.md), and [Chrome extension](chrome-extension/README.md). The Local storage-options
+diagram source is [Mermaid](local-mode/storage-options.mmd).
 
 ## Backend Layers
 
@@ -162,7 +163,7 @@ Storage is selected at server startup:
 | Local        | `database`     | SQLite   | `KODE_STREAM_STORAGE_OPTION=database` or optional SQLite override | Workspace metadata, derived item indexes, audit, navigation, settings |
 | Cloud        | `database`     | Postgres | `KODE_STREAM_STORAGE_DRIVER=postgres`, `KODE_STREAM_DATABASE_URL` | Shared control-plane metadata, branch indexes, audit, settings        |
 
-Local data-dir storage is a supported option, not a deprecated path. See [Storage](docs/storage/storage-architecture.md)
+Local data-dir storage is a supported option, not a deprecated path. See [Storage](../storage/storage-architecture.md)
 for the option matrix, manual sync, backup, restore, and performance comparison.
 
 `internal/storage` resolves `KODE_STREAM_STORAGE_OPTION`, composes a provider-backed `RepositoryBundle`, opens SQL

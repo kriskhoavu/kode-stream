@@ -1,0 +1,18 @@
+flowchart TB
+  browser[Authenticated browser] --> gateway[OAuth2Proxy / identity provider]
+  gateway --> api[Kode Stream Cloud API]
+  api --> postgres[(Postgres\napp-owned control-plane state)]
+  api --> agentWorkspace[Agent-Backed workspace]
+  agentWorkspace --> agent[Outbound Cloud Agent\non user machine]
+  agent --> localRepo[Local repository, Git credentials,\nterminal, AI, runtime, verification]
+  api --> snapshot[Agentless Remote Snapshot workspace]
+  snapshot --> provider[Read-only Git provider API]
+  provider --> commit[Resolved immutable commit]
+  agent -. never connects .-> postgres
+
+  classDef runtime fill:#f8fafc,stroke:#64748b,color:#0f172a
+  classDef db fill:#eef7ff,stroke:#2563eb,color:#0f172a
+  classDef boundary fill:#fefce8,stroke:#ca8a04,color:#422006
+  class browser,gateway,api,agent,localRepo,provider,commit runtime
+  class postgres db
+  class agentWorkspace,snapshot boundary

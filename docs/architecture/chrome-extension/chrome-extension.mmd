@@ -1,0 +1,15 @@
+flowchart LR
+  chrome[Chrome extension page\nReact UI, Manifest V3] -->|HTTP JSON API| server[Local Kode Stream server\n127.0.0.1:4317]
+  server --> guarded[Guarded workspace, Git,\nand system APIs]
+  guarded --> repo[Registered local Git workspace]
+  server --> storage{Local app-state storage}
+  storage --> datadir[(datadir\nYAML / JSONL)]
+  storage --> sqlite[(SQLite database)]
+  chrome -. no direct file access .-> repo
+
+  classDef runtime fill:#f8fafc,stroke:#64748b,color:#0f172a
+  classDef file fill:#f0fdf4,stroke:#16a34a,color:#052e16
+  classDef db fill:#eef7ff,stroke:#2563eb,color:#0f172a
+  class chrome,server,guarded runtime
+  class repo,datadir file
+  class sqlite db

@@ -1,7 +1,8 @@
 # Cloud Deployment Modes
 
 Cloud is a hosted control plane, not a hosted Git checkout or terminal. Every Cloud deployment uses Postgres for
-app-owned state. A workspace then chooses one of two access modes.
+app-owned state. A workspace then chooses one of two access modes. See [Cloud mode architecture](../architecture/cloud-mode/README.md)
+for the rendered system diagram and a concise use-case guide.
 
 ```mermaid
 flowchart LR
