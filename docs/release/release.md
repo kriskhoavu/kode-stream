@@ -1,4 +1,4 @@
-# Release Runbook
+# Release Procedure
 
 Canonical runbook for packaging Kode Stream, publishing GitHub releases, and updating Homebrew tap metadata.
 
@@ -93,4 +93,4 @@ brew test kode-stream
 - `cmd/scripts/distribution/release_and_update_tap.sh`
 - `cmd/scripts/distribution/update_homebrew_formula_from_release.sh`
 - `cmd/scripts/distribution/kode-stream.rb`
-- `docs/release/homebrew-tap-setup.md`
+- `docs/release/homebrew-tap-bootstrap.md`

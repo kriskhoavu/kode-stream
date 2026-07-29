@@ -31,4 +31,4 @@ Cloud stores workspace metadata, derived indexes, audit events, and settings in 
 an Agent-Backed repository checkout, SSH key, terminal transcript, or provider token. Remote Snapshot provider
 credentials are user-scoped opaque connection material and are never returned by APIs or written to workspace records.
 
-See [Cloud deployment](cloud-deployment.md), [Cloud Agent](cloud-agent.md), and [Remote Snapshot operations](../release/cloud-remote-snapshot.md).
+See [Cloud deployment](cloud-deployment.md), [Cloud Agent](cloud-agent.md), and [Remote Snapshot operations](remote-snapshot-operations.md).

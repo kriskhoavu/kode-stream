@@ -38,7 +38,8 @@ Cloud snapshot: Browser -> Cloud API -> provider API -> immutable repository com
 ```
 
 See [Architecture](ARCHITECTURE.md) for the capability boundary, [Cloud modes](docs/cloud/cloud-modes.md) for operating
-guidance, and [Storage](docs/storage/storage-architecture.md) for the storage decision matrix.
+guidance, [Storage](docs/storage/storage-architecture.md) for the storage decision matrix, and the
+[Documentation map](docs/README.md) for the full documentation taxonomy.
 
 ## Tech Stack
 

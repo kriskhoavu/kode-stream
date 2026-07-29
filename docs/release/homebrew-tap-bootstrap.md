@@ -1,8 +1,8 @@
-# Homebrew Tap Setup
+# Homebrew Tap Bootstrap
 
 Use this page for first-time tap bootstrap. Day-to-day releases now live in the release runbook:
 
-- `docs/release/release-runbook.md`
+- `docs/release/release.md`
 
 ## 1) Create the tap repository
 

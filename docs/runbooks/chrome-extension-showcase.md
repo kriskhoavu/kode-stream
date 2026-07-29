@@ -1,4 +1,4 @@
-# Chrome Extension Local Showcase
+# Chrome Extension Showcase Runbook
 
 Kode Stream can be built as an unpacked Chrome extension for Local mode showcases. The extension bundles the React UI
 and calls the local Kode Stream server for workspace files, Git operations, system dialogs, and guarded writes.
@@ -16,17 +16,17 @@ locally when needed.
 
 ## Load In Chrome
 
-1. Start the local server:
+Start the local server:
 
 ```bash
 kode-stream serve -port 4317
 ```
 
-2. Open `chrome://extensions`.
-3. Enable Developer Mode.
-4. Select Load unpacked.
-5. Choose `dist/chrome-extension`.
-6. Click the Kode Stream extension action to open the bundled UI in a Chrome tab.
+1. Open `chrome://extensions`.
+2. Enable Developer Mode.
+3. Select Load unpacked.
+4. Choose `dist/chrome-extension`.
+5. Click the Kode Stream extension action to open the bundled UI in a Chrome tab.
 
 The extension defaults to `http://127.0.0.1:4317` for API calls. To test another port, open the extension page console,
 set `localStorage.kodeStreamApiOrigin` to the desired origin, and reload the extension page.

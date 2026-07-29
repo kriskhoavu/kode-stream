@@ -1,4 +1,4 @@
-# Cloud Remote Snapshot Operations
+# Remote Snapshot Operations
 
 ## Purpose
 
@@ -14,13 +14,13 @@ Cloud Agent, local path, checkout, Git command, file mutation, terminal, AI, run
 
 ## Recovery
 
-| Condition | User action | Operator action |
-|-----------|-------------|-----------------|
-| Authorization revoked | Reconnect the provider account. | Confirm the provider grant still has read-only repository scope. |
-| Repository forbidden | Select an authorized repository. | Verify repository membership; do not broaden workspace ownership. |
-| Ref missing | Select an existing branch, tag, or commit. | Check retention and renamed branches. |
-| Provider outage or rate limit | Retry later; no local fallback is attempted. | Review provider health and rate-limit policy. |
-| Credential rotation | Reconnect after rotation. | Rotate the deployment secret and revoke the old credential. |
+| Condition                     | User action                                  | Operator action                                                   |
+|-------------------------------|----------------------------------------------|-------------------------------------------------------------------|
+| Authorization revoked         | Reconnect the provider account.              | Confirm the provider grant still has read-only repository scope.  |
+| Repository forbidden          | Select an authorized repository.             | Verify repository membership; do not broaden workspace ownership. |
+| Ref missing                   | Select an existing branch, tag, or commit.   | Check retention and renamed branches.                             |
+| Provider outage or rate limit | Retry later; no local fallback is attempted. | Review provider health and rate-limit policy.                     |
+| Credential rotation           | Reconnect after rotation.                    | Rotate the deployment secret and revoke the old credential.       |
 
 ## Smoke Checklist
 
