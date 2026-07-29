@@ -94,6 +94,13 @@ For the mode-specific diagrams and use cases, see [Local mode](local-mode/README
 [Cloud mode](cloud-mode/README.md), and [Chrome extension](chrome-extension/README.md). The Local storage-options
 diagram source is [Mermaid](local-mode/storage-options.mmd).
 
+## Deployment Adapter Boundaries
+
+Kode Stream does not use one abstract `DeploymentMode` interface. Instead, the runtime mode is configuration and
+policy, while the variable concerns use smaller abstractions: `StorageProvider` for app-owned state and
+`workspaceAccessAdapter` for Cloud workspace commands. The Chrome extension is a frontend API-origin adapter, not a
+server-side runtime mode. See the [deployment adapter class diagrams](deployment-adapters.md).
+
 ## Backend Layers
 
 | Layer             | Package               | Role                                                                                   |
