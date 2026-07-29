@@ -93,5 +93,5 @@ tree, file, board, search, and capability response.
 - [Pipeline Design](design/design-03-pipeline.md)
 - [Agentless Cloud Design](design/design-04-agentless-cloud.md)
 - [Implementation Plan](implementation-plan.md)
-- [Showcase Runbook](../../../docs/runbooks/chrome-extension-showcase.md)
+- [Showcase Runbook](../../../runbooks/chrome-extension-showcase.md)
 - [Remote Snapshot Operations](../../../docs/cloud/remote-snapshot-operations.md)

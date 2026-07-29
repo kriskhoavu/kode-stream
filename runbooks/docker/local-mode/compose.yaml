@@ -4,7 +4,7 @@ services:
   kode-stream:
     image: kode-stream:local
     build:
-      context: ../..
+      context: ../../..
       dockerfile: Dockerfile
     ports:
       - "${KODE_STREAM_LOCAL_PORT:-4317}:4317"
@@ -18,7 +18,7 @@ services:
       KODE_STREAM_MIGRATIONS: ${KODE_STREAM_MIGRATIONS:-auto}
     volumes:
       - kode-stream-local-data:/var/lib/kode-stream
-      - ${KODE_STREAM_LOCAL_WORKSPACE:-../..}:/workspace
+      - ${KODE_STREAM_LOCAL_WORKSPACE:-../../..}:/workspace
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4317/api/health"]
       interval: 15s

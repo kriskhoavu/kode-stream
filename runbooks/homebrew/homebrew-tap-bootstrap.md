@@ -2,7 +2,7 @@
 
 Use this page for first-time tap bootstrap. Day-to-day releases now live in the release runbook:
 
-- `docs/release/release.md`
+- `runbooks/homebrew/release.md`
 
 ## 1) Create the tap repository
 
