@@ -20,7 +20,7 @@ branch-safe terminal launch, placement restoration, and visible verification fre
 
 | Playbook                                                                                      | Covers                                                                                                                      | Status |
 |-----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|--------|
-| [Scenario 01 — Operate the focused Terminal Canvas](scenario-01-orchestrate-plan-terminal.md) | Arrange and restore nodes, branch-safe launch, session lifecycle, Git state, verification staleness, and keyboard recovery. | Draft  |
+| [Scenario 01 — Operate the focused Terminal Canvas](scenario-01-orchestrate-plan-terminal.md) | Arrange and restore nodes, branch-safe launch, session lifecycle, Git state, verification staleness, and keyboard recovery. | Ready  |
 
 ## Latest Result
 
@@ -29,8 +29,8 @@ branch-safe terminal launch, placement restoration, and visible verification fre
 ## Reusable E2E Coverage
 
 Ticket-local playbooks are working sources. This plan introduces a reusable browser journey, so
-`plan.e2e-runbook` is true. No matching canonical journey exists in the configured `discovery-wiki` collection during
-planning. After implementation, run `wiki-enrich` to synthesize the canonical journey and verify it before handoff.
+`plan.e2e-runbook` is true. No matching canonical journey existed in the configured `discovery-wiki` collection. PM-037
+therefore introduces the canonical [[platform-terminal-canvas-journey]] journey during implementation enrichment.
 
 Agent-Backed Cloud and Agentless Remote Snapshot sections were removed from this MVP playbook. They require separate
 provider-capability delivery and future journey deltas.

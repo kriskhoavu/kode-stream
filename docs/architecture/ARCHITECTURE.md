@@ -134,6 +134,7 @@ parameters instead of framework-specific request objects.
 | System       | `internal/system`       | Config paths, native dialogs, path reveal, health, diagnostics    |
 | Audit        | `internal/audit`        | Local operation event append and query                            |
 | Navigation   | `internal/navigation`   | Saved filters and recent items                                    |
+| Canvas       | `internal/canvas`       | Branch-scoped layouts, placements, references, and projections    |
 
 ## Frontend Areas
 
@@ -146,6 +147,7 @@ parameters instead of framework-specific request objects.
 | Workspaces      | `web/src/pages/WorkspacesPage.tsx`     | Workspace setup, import, edit, delete, scan, reveal      |
 | Item workspace  | `web/src/pages/ItemWorkspacePage.tsx`  | Files, preview, editor, diff, metadata, Jira, Git tools  |
 | Explorer        | `web/src/pages/WorkstreamExplorer.tsx` | Workspace tree, file editor, content search, inspector   |
+| Canvas          | `web/src/pages/CanvasPage.tsx`         | Draggable workspace, plan, and durable session workbench |
 | Feature modules | `web/src/features/*`                   | Search, reliability, content rendering, editor, explorer |
 | Shared modules  | `web/src/shared/*`                     | Reusable API, domain, and UI support code                |
 
@@ -155,12 +157,17 @@ Frontend shared modules do not import page modules. Pages compose feature and sh
 
 Kode Stream separates app-owned state from repository-owned content.
 
-| Owner      | Examples                                        | Write policy                                            |
-|------------|-------------------------------------------------|---------------------------------------------------------|
-| App state  | Workspace registry, indexes, audit, UI settings | Written by Kode Stream to the configured storage option |
-| Repository | Markdown, metadata, wiki pages, Git history     | Written only through explicit user actions              |
+| Owner      | Examples                                                                                 | Write policy                                            |
+|------------|------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| App state  | Workspace registry, indexes, audit, UI settings, Canvas placements, safe session records | Written by Kode Stream to the configured storage option |
+| Repository | Markdown, metadata, wiki pages, Git history                                              | Written only through explicit user actions              |
 
 Indexes are derived data. A scan can rebuild them from registered workspace content.
+
+Canvas is also a projection. It persists layout identity, viewport, node coordinates, and collapsed presentation only.
+Current labels, repository relationships, Git state, verification state, capabilities, and process availability are
+resolved from their owning domains on read. Derived repository and application connections are never stored as authored
+Canvas edges.
 
 ## Storage Architecture
 
@@ -259,6 +266,12 @@ Terminal and AI sessions
   -> launch external terminal or embedded session
   -> record audit outcome without prompt content
 
+Terminal Canvas
+  -> resolve one layout for workspace and branch
+  -> combine saved placements with current workspace, plan, Git, verification, and session projections
+  -> revalidate capabilities and branch context before actions
+  -> keep safe durable session metadata separate from the in-memory PTY/process binding
+
 Verification
   -> start bounded job
   -> collect checkpoints, status, logs, and artifacts
@@ -286,6 +299,7 @@ All API routes are local and grouped by capability.
 | Verification | Job creation, checkpoint ingest, status, artifacts, reruns                  |
 | Git          | Status, activity, branches, fetch, pull, push, commit, branch operations    |
 | Streaming    | Workspace creation events and embedded session channels                     |
+| Canvas       | Default resolution, branch-scoped projections, placements, and viewport     |
 
 In Cloud mode, command-capable routes are denied on the hosted server unless they use the Cloud command envelope path
 and a connected owner Cloud Agent is available.

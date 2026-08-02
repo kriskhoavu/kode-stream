@@ -18,6 +18,7 @@ clearer local Git operations.
 - Connects workspace items with Jira issue context and guarded attachment access.
 - Launches external or embedded terminal sessions with supported local AI CLIs.
 - Runs verification harness jobs and tracks their status and artifacts.
+- Provides a branch-scoped Canvas for arranging workspace, plan, and durable terminal-session nodes.
 - Indexes LLM Wiki content and graph relationships for structured knowledge workflows.
 - Stores app registry, cache, audit log, filters, recents, and AI settings outside managed repositories.
 
@@ -71,6 +72,25 @@ Platform integrations:
 
 AI session launch requires an installed and authenticated supported CLI. Kode Stream does not bypass provider
 authentication, approval prompts, or sandbox behavior.
+
+## Terminal Canvas
+
+Choose **Canvas** from Workspace navigation to open the selected workspace and branch as a spatial workbench. Workspace,
+plan, and durable session nodes can be dragged independently; arrow keys move a focused node by 12 pixels and Shift plus
+an arrow moves it by one pixel. Saved positions are restored on reload without copying plan, Git, verification, or
+terminal content into Canvas storage.
+
+Select a plan to launch a terminal, run smoke verification, or open the full item view. Launch is revalidated against
+the current checkout branch immediately before process start. Select the workspace to inspect branch, HEAD, working-tree,
+and verification freshness. A passed result becomes historical and stale when the relevant repository fingerprint
+changes.
+
+Removing a node or resetting layout changes presentation only. Cancelling a live process is a separate confirmed action.
+PM-037 supports this workflow for Local checkouts and local execution; groups, notes, custom links, multiple canvases,
+Cloud Agent execution, and Remote Snapshot Canvas UX remain future capabilities.
+
+See [Terminal Canvas sessions](docs/terminal/canvas-sessions.md) and
+[verification freshness](docs/verification/canvas-freshness.md) for the safety and lifecycle details.
 
 ## Quick Start
 

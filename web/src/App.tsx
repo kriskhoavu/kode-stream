@@ -266,7 +266,7 @@ export function App() {
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={() => refreshAppData()} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} activeWorkspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
-		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Canvas...</section>}><CanvasPage workspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} /></Suspense>}
+		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Canvas...</section>}><CanvasPage workspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
       </main>
 
       <nav className="bottom-nav">

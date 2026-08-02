@@ -1,0 +1,53 @@
+---
+slug: platform-terminal-canvas-workflows
+title: Use Terminal Canvas
+pageType: HOW_TO
+roles: USER, BA, TESTER
+topics: canvas, drag, terminal, git, verification
+summary: How to arrange work, launch a branch-safe terminal, and interpret Git and verification state in Canvas.
+sourceRef: plans/platform/PM-037/scenario/scenario-00-overview.md
+sourceCount: 1
+lastTicket: PM-037
+---
+
+## Arrange And Restore Work
+<!-- chunkId: platform-terminal-canvas-workflows-arrange -->
+<!-- keywords: canvas, nodes, drag, keyboard, restore -->
+
+Open **Canvas** for the active workspace and selected branch. Drag a workspace, plan, or session node independently, or
+focus it and use an arrow key to move 12 pixels; Shift plus an arrow moves one pixel. Wait for **Saved** before reloading.
+**Place new items** accepts deterministic positions without moving saved nodes. **Reset layout** previews and confirms a
+presentation-only reset. **Remove from Canvas** removes only the placement.
+
+Use **Search Canvas nodes** to find a title, identifier, branch, or session state. **Fit view** recovers off-screen nodes.
+Closing the Workbench returns focus to the selected node.
+
+## Launch A Session
+<!-- chunkId: platform-terminal-canvas-workflows-launch -->
+<!-- keywords: plan, launch terminal, branch, session, idempotency -->
+
+Select a plan and choose **Launch terminal**. The configured default provider is used. The server checks the workspace,
+plan, expected branch, observed commit, provider, authorization, and limits again before launch. If the checkout changed,
+Canvas shows **Checkout changed** with expected/current context and offers **Refresh Canvas and Git status**; it never
+switches branches automatically.
+
+A successful launch creates one safe durable record and one live process. Selecting another node does not cancel or
+relaunch it. **Cancel process** is separate from placement removal. After an application restart, an orphaned running
+record becomes interrupted and cannot falsely reconnect. See [[platform-terminal-canvas-reference]].
+
+## Inspect Git And Verification
+<!-- chunkId: platform-terminal-canvas-workflows-verify -->
+<!-- keywords: git, verification, freshness, stale, historical -->
+
+Select the workspace for branch, HEAD, working-tree status, changed-file count, and current verification detail. A plan
+also exposes **Run smoke verification** when its resolved capability allows it. Result and freshness are separate: a pass
+may be current, stale, or inconclusive. After a relevant repository or verification-configuration change, the previous
+pass appears as **Passed (historical)** until rerun.
+
+## MVP Limits
+<!-- chunkId: platform-terminal-canvas-workflows-limits -->
+<!-- keywords: local, groups, snapshots, cloud agent, deferred -->
+
+The delivered journey is a Local desktop workbench with workspace, plan, and session nodes. It is not a general graph
+editor and does not provide groups, notes, artifacts, custom links, multiple canvases, Cloud Agent execution, Remote
+Snapshot Canvas UX, worktrees, or collaborative layouts. See [[platform-terminal-canvas-concept]].

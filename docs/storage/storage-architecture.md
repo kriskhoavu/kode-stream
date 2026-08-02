@@ -2,7 +2,8 @@
 
 Kode Stream stores app-owned state separately from repository-owned source files. Repository files and Git history remain
 the source of truth for planning content. App-owned state covers workspace registration, derived item indexes, branch
-scan metadata, scan warnings, audit events, navigation state, and AI settings.
+scan metadata, scan warnings, audit events, navigation state, AI settings, Canvas placements, and safe terminal-session
+metadata.
 
 ## Supported Options
 
@@ -51,16 +52,24 @@ the effective option but does not let the user change it until the override is r
 
 Runtime writes go only to the selected backend. Kode Stream does not dual-write between SQLite and YAML/JSONL files.
 
-| Area                 | Local `database` | Local `datadir`      | Cloud `database` |
-|----------------------|------------------|----------------------|------------------|
-| Workspace registry   | SQLite           | `workspaces.yaml`    | Postgres         |
-| Item index           | SQLite           | `item-index.yaml`    | Postgres         |
-| Audit events         | SQLite           | `audit-log.jsonl`    | Postgres         |
-| Saved filters        | SQLite           | `saved-filters.yaml` | Postgres         |
-| Recent items         | SQLite           | `recent-items.yaml`  | Postgres         |
-| AI settings          | SQLite           | `ai-settings.yaml`   | Postgres         |
-| Branch scan metadata | SQLite           | `item-index.yaml`    | Postgres         |
-| Repository source    | Git workspace    | Git workspace        | User Cloud Agent |
+| Area                 | Local `database` | Local `datadir`           | Cloud `database` |
+|----------------------|------------------|---------------------------|------------------|
+| Workspace registry   | SQLite           | `workspaces.yaml`         | Postgres         |
+| Item index           | SQLite           | `item-index.yaml`         | Postgres         |
+| Audit events         | SQLite           | `audit-log.jsonl`         | Postgres         |
+| Saved filters        | SQLite           | `saved-filters.yaml`      | Postgres         |
+| Recent items         | SQLite           | `recent-items.yaml`       | Postgres         |
+| AI settings          | SQLite           | `ai-settings.yaml`        | Postgres         |
+| Branch scan metadata | SQLite           | `item-index.yaml`         | Postgres         |
+| Canvas layouts       | SQLite           | `canvases.yaml`           | Deferred         |
+| Canvas placements    | SQLite           | `canvases.yaml`           | Deferred         |
+| AI session records   | SQLite           | `ai-session-records.yaml` | Deferred         |
+| Repository source    | Git workspace    | Git workspace             | User Cloud Agent |
+
+Canvas storage contains branch-scoped layout identity, viewport, coordinates, collapsed state, entity references, and
+optimistic revisions. It does not contain resolved titles, plan content, Git state, verification output, terminal bytes,
+prompts, arguments, environment variables, grants, credentials, or process buffers. Safe session records retain only
+bounded lifecycle metadata; live PTYs and process bindings remain in memory.
 
 `/api/health` reports database connectivity and `migrationVersion` when SQL storage is configured. Settings calls
 `/api/storage/status` to show the effective option, environment lock state, data directory, database path, and database
@@ -75,7 +84,8 @@ Settings provides local-only manual sync in both directions:
 | `datadir_to_database` | YAML/JSONL | SQLite     |
 | `database_to_datadir` | SQLite     | YAML/JSONL |
 
-Each sync is explicit and confirmed by the user. Before replacing the target, Kode Stream writes a timestamped backup
+Each sync is explicit and confirmed by the user. Canvas layouts, placements, and safe session records participate in
+both sync directions. Before replacing the target, Kode Stream writes a timestamped backup
 under:
 
 ```text

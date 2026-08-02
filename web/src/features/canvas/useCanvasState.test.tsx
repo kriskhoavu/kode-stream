@@ -34,10 +34,12 @@ describe('useCanvasState', () => {
 		act(() => result.current.moveNode('plan:item-1', { x: 90, y: 80 }));
 		expect(result.current.projection?.nodes[0].position).toEqual({ x: 90, y: 80 });
 		expect(result.current.dirtyCount).toBe(1);
+		expect(result.current.saveStatus).toBe('saving');
 		await act(async () => { await vi.advanceTimersByTimeAsync(351); });
 		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', position: { x: 90, y: 80 }, expectedRevision: 1 })]);
 		await act(async () => { await Promise.resolve(); });
 		expect(result.current.dirtyCount).toBe(0);
+		expect(result.current.saveStatus).toBe('saved');
 	});
 
 	it('keeps a conflicting position dirty and supports reload recovery', async () => {

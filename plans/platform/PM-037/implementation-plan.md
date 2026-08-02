@@ -22,7 +22,7 @@ PM-037.
 | F2    | Draggable semantic nodes and restored layout          | Frontend   | Complete |
 | F3    | Focused Workbench and session terminal                | Frontend   | Complete |
 | F4    | Git, verification, capability, and accessibility UX   | Frontend   | Complete |
-| I1    | Browser journey, documentation, and final integration | Full stack | Pending  |
+| I1    | Browser journey, documentation, and final integration | Full stack | Complete |
 
 ## Backend Phases
 
@@ -202,17 +202,17 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Update the PM-037 playbook to match implemented labels and selectors.
-- [ ] Run the Local journey in a fresh Playwright MCP context when runtime inputs are supplied.
-- [ ] Verify independent workspace, plan, and session movement plus restored layout.
-- [ ] Verify matching-branch launch, double-submit protection, branch-mismatch rejection, and session interruption semantics.
-- [ ] Verify Git state and passed-result staleness after a controlled repository mutation.
-- [ ] Record passed, failed, blocked, and skipped steps in `automation/results/latest.md` with safe evidence references.
-- [ ] Run `wiki-enrich` and verify the durable Canvas journey documents delivered Local behavior and future capability
+- [x] Update the PM-037 playbook to match implemented labels and selectors.
+- [x] Run the Local journey in a fresh Playwright MCP context when runtime inputs are supplied.
+- [x] Verify independent workspace, plan, and session movement plus restored layout.
+- [x] Verify matching-branch launch, double-submit protection, branch-mismatch rejection, and session interruption semantics.
+- [x] Verify Git state and passed-result staleness after a controlled repository mutation.
+- [x] Record passed, failed, blocked, and skipped steps in `automation/results/latest.md` with safe evidence references.
+- [x] Run `wiki-enrich` and verify the durable Canvas journey documents delivered Local behavior and future capability
   boundaries accurately.
-- [ ] Update architecture, storage, terminal, verification, and user-facing README documentation with delivered behavior.
-- [ ] Confirm deferred graph, Cloud Agent, and Remote Snapshot features are not described as implemented.
-- [ ] Run full backend tests, frontend tests, production build, Markdown formatting, and plan consistency checks.
+- [x] Update architecture, storage, terminal, verification, and user-facing README documentation with delivered behavior.
+- [x] Confirm deferred graph, Cloud Agent, and Remote Snapshot features are not described as implemented.
+- [x] Run full backend tests, frontend tests, production build, Markdown formatting, and plan consistency checks.
 
 **Verification:** `go test ./... && npm run build && npm test -- --run`
 
@@ -220,20 +220,20 @@ PM-037.
 
 ## Post-Implementation Checklist
 
-- [ ] Every phase is verified and committed separately with its listed PM-037 subject.
-- [ ] Canvas stores placements and presentation only, never copied entity state.
-- [ ] Workspace, plan, and session nodes are all draggable; moving a workspace moves no other node.
-- [ ] Placement conflicts are scoped to affected nodes and viewport saves are independent.
-- [ ] Current branch is revalidated on the server immediately before terminal process start.
-- [ ] Repeated launch submissions start at most one process.
-- [ ] Durable session records contain no prompt, argument, environment, grant, output, input, buffer, credential, or file
+- [x] Every phase is verified and committed separately with its listed PM-037 subject.
+- [x] Canvas stores placements and presentation only, never copied entity state.
+- [x] Workspace, plan, and session nodes are all draggable; moving a workspace moves no other node.
+- [x] Placement conflicts are scoped to affected nodes and viewport saves are independent.
+- [x] Current branch is revalidated on the server immediately before terminal process start.
+- [x] Repeated launch submissions start at most one process.
+- [x] Durable session records contain no prompt, argument, environment, grant, output, input, buffer, credential, or file
   content.
-- [ ] Application restart marks records without live bindings interrupted and never offers false reconnect.
-- [ ] Verification becomes stale after relevant repository or configuration change and inconclusive after during-run
+- [x] Application restart marks records without live bindings interrupted and never offers false reconnect.
+- [x] Verification becomes stale after relevant repository or configuration change and inconclusive after during-run
   change.
-- [ ] Action behavior uses capability states and reason codes, not mode or datastore checks.
-- [ ] Layout removal and reset never mutate workspaces, plans, sessions, processes, Git, or verification entities.
-- [ ] Groups, notes, artifacts, custom edges, multiple canvases, Agent execution, snapshot UX, and collaboration remain
+- [x] Action behavior uses capability states and reason codes, not mode or datastore checks.
+- [x] Layout removal and reset never mutate workspaces, plans, sessions, processes, Git, or verification entities.
+- [x] Groups, notes, artifacts, custom edges, multiple canvases, Agent execution, snapshot UX, and collaboration remain
   deferred.
-- [ ] Existing Workstream, Item Workspace, terminal dock, Git, and verification workflows still pass.
-- [ ] `plan.e2e-runbook` remains true and durable wiki journey coverage is verified before final handoff.
+- [x] Existing Workstream, Item Workspace, terminal dock, Git, and verification workflows still pass.
+- [x] `plan.e2e-runbook` remains true and durable wiki journey coverage is verified before final handoff.

@@ -8,6 +8,8 @@ document type already expressed by the folder.
 | `architecture/` | System overview and mode/distribution diagrams       | `ARCHITECTURE.md`, `local-mode/`, `cloud-mode/`   |
 | `cloud/`        | Durable Cloud operational guidance                   | `cloud-modes.md`, `remote-snapshot-operations.md` |
 | `storage/`      | Storage option operation and recovery guidance       | `storage-architecture.md`                         |
+| `terminal/`     | Terminal session ownership and lifecycle guidance    | `canvas-sessions.md`                              |
+| `verification/` | Verification result and freshness semantics          | `canvas-freshness.md`                             |
 | `workspace/`    | Workspace-facing API and configuration documentation | `workspace-import-api.md`                         |
 | `specs/`        | Product and technical requirements                   | `requirement.md`                                  |
 

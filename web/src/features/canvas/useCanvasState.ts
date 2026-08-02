@@ -12,6 +12,7 @@ export function useCanvasState(workspaceId?: string, branch?: string) {
 	const [projection, setProjectionState] = useState<CanvasProjection>();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
+	const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 	const [conflicts, setConflicts] = useState<string[]>([]);
 	const [dirtyVersion, setDirtyVersion] = useState(0);
 	const projectionRef = useRef<CanvasProjection | undefined>(undefined);
@@ -84,9 +85,11 @@ export function useCanvasState(workspaceId?: string, branch?: string) {
 			}
 			setConflicts((previous) => previous.filter((id) => dirtyRef.current.has(id)));
 			setError('');
+			setSaveStatus(dirtyRef.current.size > 0 ? 'saving' : 'saved');
 			setProjection(saved);
 			if (dirtyRef.current.size > 0) setDirtyVersion((version) => version + 1);
 		} catch (caught) {
+			setSaveStatus('saving');
 			if (caught instanceof ApiError && caught.code === 'placement_conflict') {
 				const affected = caught.nodeIds?.length ? caught.nodeIds : batch.map((entry) => entry.patch.nodeId);
 				setConflicts((previous) => Array.from(new Set([...previous, ...affected])));
@@ -126,6 +129,7 @@ export function useCanvasState(workspaceId?: string, branch?: string) {
 		const existing = dirtyRef.current.get(nodeId);
 		const mutation = ++mutationRef.current;
 		dirtyRef.current.set(nodeId, { patch: { nodeId, entityRef: node.entityRef, position, collapsed: node.collapsed, expectedRevision: existing?.patch.expectedRevision ?? node.revision }, mutation, retries: 0 });
+		setSaveStatus('saving');
 		setProjection({ ...current, nodes: current.nodes.map((candidate) => candidate.id === nodeId ? { ...candidate, position } : candidate) });
 		setDirtyVersion((version) => version + 1);
 	}, [setProjection]);
@@ -216,7 +220,7 @@ export function useCanvasState(workspaceId?: string, branch?: string) {
 		for (const [index, node] of ordered.entries()) moveNode(node.id, deterministicPosition(index, node.kind));
 	}, [moveNode]);
 
-	return { projection, loading, error, conflicts, dirtyCount, hasUnsavedChanges: dirtyCount > 0, moveNode, saveViewport, reloadPosition, reapplyPosition, placeUnplaced, removeNode, resetPositions, reload: load, refresh };
+	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, saveViewport, reloadPosition, reapplyPosition, placeUnplaced, removeNode, resetPositions, reload: load, refresh };
 }
 
 function overlayDirty(projection: CanvasProjection, dirty: Map<string, DirtyPlacement>): CanvasProjection {

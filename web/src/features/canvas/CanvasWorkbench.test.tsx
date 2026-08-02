@@ -74,17 +74,31 @@ describe('CanvasWorkbench', () => {
 		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
 	});
 
-	it('separates verification result from freshness and removes stale success emphasis', () => {
+	it('separates verification result from freshness and removes stale success emphasis', async () => {
 		const workspace = workspaceNode();
 		renderWorkbench(workspace);
 		expect(screen.getByText('Passed (historical)')).toBeInTheDocument();
 		expect(screen.getByText('stale')).toBeInTheDocument();
 		expect(screen.getByText('11111111')).toBeInTheDocument();
-  expect(screen.getAllByText('22222222')).toHaveLength(2);
+		expect(screen.getAllByText('22222222')).toHaveLength(2);
 		expect(screen.getByRole('button', { name: /Run smoke verification/ })).toBeDisabled();
+		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalled());
 	});
 
-	it('hides cached details for forbidden references and offers safe refresh', () => {
+	it('runs verification and opens the full view from a plan', async () => {
+		const plan = planNode();
+		plan.plan!.actions['verification.run'] = { action: 'verification.run', state: 'available', recoveryActions: [] };
+		const projection = baseProjection([workspaceNode(), plan]);
+		const openFullView = vi.fn();
+		vi.mocked(api.createVerificationJob).mockResolvedValue({ id: 'verify-2', workspaceId: 'workspace-1', profile: 'smoke', status: 'passed', exitCode: 0, steps: [], artifacts: [] });
+		render(<CanvasWorkbench {...defaultProps(projection, plan)} onOpenFullView={openFullView} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Run smoke verification' }));
+		await waitFor(() => expect(api.createVerificationJob).toHaveBeenCalledWith('workspace-1', { profile: 'smoke', trigger: 'canvas' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Open full view' }));
+		expect(openFullView).toHaveBeenCalledWith(plan);
+	});
+
+	it('hides cached details for forbidden references and offers safe refresh', async () => {
 		const forbidden: CanvasNode = { id: 'plan:gone', kind: 'plan', state: 'forbidden', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'gone', itemPath: 'private/Secret', identifier: 'SECRET-TITLE', branchKey: 'main' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1 };
 		const reload = vi.fn();
 		renderWorkbench(forbidden, { onReload: reload });
@@ -92,6 +106,7 @@ describe('CanvasWorkbench', () => {
 		expect(screen.queryByText('SECRET-TITLE')).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: /Refresh reference/ }));
 		expect(reload).toHaveBeenCalled();
+		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalled());
 	});
 });
 
