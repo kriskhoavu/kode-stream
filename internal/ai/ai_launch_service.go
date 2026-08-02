@@ -135,8 +135,9 @@ type Eligibility struct {
 }
 
 type LaunchError struct {
-	Code string
-	Err  error
+	Code    string
+	Err     error
+	Details map[string]string
 }
 
 func (e *LaunchError) Error() string { return e.Err.Error() }
@@ -698,3 +699,7 @@ func launchError(code, message string) error {
 	return &LaunchError{Code: code, Err: errors.New(message)}
 }
 func launchErrorWith(code string, err error) error { return &LaunchError{Code: code, Err: err} }
+
+func launchErrorWithDetails(code, message string, details map[string]string) error {
+	return &LaunchError{Code: code, Err: errors.New(message), Details: details}
+}

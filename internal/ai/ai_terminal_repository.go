@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -54,9 +56,9 @@ type Grant struct {
 }
 
 type StartRequest struct {
-	ItemID, ItemIdentifier, ItemTitle, WorkspaceID, Provider, Intent, Executable, Dir string
-	Args                                                                              []string
-	Columns, Rows                                                                     uint16
+	ID, ItemID, ItemIdentifier, ItemTitle, WorkspaceID, Provider, Intent, Executable, Dir string
+	Args                                                                                  []string
+	Columns, Rows                                                                         uint16
 }
 
 type managed struct {
@@ -76,6 +78,7 @@ type Manager struct {
 	sessions map[string]*managed
 	config   Config
 	closed   bool
+	observer func(Session)
 }
 
 func NewTerminalManager(config Config) *Manager {
@@ -111,10 +114,17 @@ func (m *Manager) Start(request StartRequest) (Session, Grant, error) {
 		m.mu.Unlock()
 		return Session{}, Grant{}, ErrLimit
 	}
-	id, err := random(24)
-	if err != nil {
+	id := strings.TrimSpace(request.ID)
+	if id == "" {
+		var err error
+		id, err = random(24)
+		if err != nil {
+			m.mu.Unlock()
+			return Session{}, Grant{}, err
+		}
+	} else if _, exists := m.sessions[id]; exists {
 		m.mu.Unlock()
-		return Session{}, Grant{}, err
+		return Session{}, Grant{}, errors.New("session already exists")
 	}
 	token, err := random(32)
 	if err != nil {
@@ -140,14 +150,18 @@ func (m *Manager) Start(request StartRequest) (Session, Grant, error) {
 		s.mu.Lock()
 		s.info.State = StateFailed
 		s.mu.Unlock()
-		return s.snapshot(), Grant{}, err
+		failed := s.snapshot()
+		m.notify(failed)
+		return failed, Grant{}, err
 	}
 	s.mu.Lock()
 	s.file, s.command, s.info.State = file, command, StateRunning
 	s.mu.Unlock()
 	go m.read(s)
 	go m.wait(s)
-	return s.snapshot(), Grant{SessionID: id, Token: token, ExpiresAt: s.grantExpires}, nil
+	running := s.snapshot()
+	m.notify(running)
+	return running, Grant{SessionID: id, Token: token, ExpiresAt: s.grantExpires}, nil
 }
 
 func (m *Manager) Get(id string) (Session, error) {
@@ -156,6 +170,48 @@ func (m *Manager) Get(id string) (Session, error) {
 		return Session{}, ErrNotFound
 	}
 	return s.snapshot(), nil
+}
+
+func (m *Manager) List() []Session {
+	m.mu.RLock()
+	sessions := make([]*managed, 0, len(m.sessions))
+	for _, session := range m.sessions {
+		sessions = append(sessions, session)
+	}
+	m.mu.RUnlock()
+	result := make([]Session, 0, len(sessions))
+	for _, session := range sessions {
+		result = append(result, session.snapshot())
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].StartedAt.After(result[j].StartedAt) })
+	return result
+}
+
+func (m *Manager) IssueGrant(id string) (Grant, error) {
+	s := m.lookup(id)
+	if s == nil {
+		return Grant{}, ErrNotFound
+	}
+	token, err := random(32)
+	if err != nil {
+		return Grant{}, err
+	}
+	s.mu.Lock()
+	if s.info.State != StateStarting && s.info.State != StateRunning {
+		s.mu.Unlock()
+		return Grant{}, errors.New("session is not running")
+	}
+	s.grantHash = hash(token)
+	s.grantExpires = time.Now().UTC().Add(m.config.GrantTTL)
+	expires := s.grantExpires
+	s.mu.Unlock()
+	return Grant{SessionID: id, Token: token, ExpiresAt: expires}, nil
+}
+
+func (m *Manager) SetObserver(observer func(Session)) {
+	m.mu.Lock()
+	m.observer = observer
+	m.mu.Unlock()
 }
 
 func (m *Manager) Authenticate(id, token string) error {
@@ -254,7 +310,9 @@ func (m *Manager) stop(id, state string) (Session, error) {
 		}
 	}
 	s.mu.Unlock()
-	return s.snapshot(), nil
+	result := s.snapshot()
+	m.notify(result)
+	return result, nil
 }
 
 func (m *Manager) read(s *managed) {
@@ -275,7 +333,6 @@ func (m *Manager) read(s *managed) {
 func (m *Manager) wait(s *managed) {
 	err := s.command.Wait()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.info.State == StateRunning {
 		s.info.State = StateExited
 		code := 0
@@ -284,6 +341,9 @@ func (m *Manager) wait(s *managed) {
 		}
 		s.info.ExitCode = &code
 	}
+	result := s.info
+	s.mu.Unlock()
+	m.notify(result)
 }
 
 func (m *Manager) publish(s *managed, data []byte) {
@@ -318,6 +378,14 @@ func (m *Manager) lookup(id string) *managed {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.sessions[id]
+}
+func (m *Manager) notify(session Session) {
+	m.mu.RLock()
+	observer := m.observer
+	m.mu.RUnlock()
+	if observer != nil {
+		observer(session)
+	}
 }
 func (s *managed) snapshot() Session { s.mu.Lock(); defer s.mu.Unlock(); return s.info }
 func random(size int) (string, error) {

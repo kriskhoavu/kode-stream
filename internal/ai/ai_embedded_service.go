@@ -7,16 +7,20 @@ import (
 )
 
 type EmbeddedInput struct {
-	Provider       string   `json:"provider"`
-	ContextMode    string   `json:"contextMode"`
-	PresetID       string   `json:"presetId,omitempty"`
-	PromptDraft    string   `json:"promptDraft,omitempty"`
-	CustomPrompt   string   `json:"customPrompt,omitempty"`
-	SelectedSkills []string `json:"selectedSkills,omitempty"`
-	SelectedAgents []string `json:"selectedAgents,omitempty"`
-	ContextPath    string   `json:"contextPath,omitempty"`
-	Columns        uint16   `json:"columns"`
-	Rows           uint16   `json:"rows"`
+	Provider            string   `json:"provider"`
+	ContextMode         string   `json:"contextMode"`
+	PresetID            string   `json:"presetId,omitempty"`
+	PromptDraft         string   `json:"promptDraft,omitempty"`
+	CustomPrompt        string   `json:"customPrompt,omitempty"`
+	SelectedSkills      []string `json:"selectedSkills,omitempty"`
+	SelectedAgents      []string `json:"selectedAgents,omitempty"`
+	ContextPath         string   `json:"contextPath,omitempty"`
+	ExpectedWorkspaceID string   `json:"expectedWorkspaceId,omitempty"`
+	ExpectedBranch      string   `json:"expectedBranch,omitempty"`
+	ObservedCommit      string   `json:"observedCommit,omitempty"`
+	IdempotencyKey      string   `json:"idempotencyKey,omitempty"`
+	Columns             uint16   `json:"columns"`
+	Rows                uint16   `json:"rows"`
 }
 
 func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput) (EmbeddedResult, error) {
@@ -29,6 +33,16 @@ func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput
 	}
 	if !found {
 		return EmbeddedResult{}, launchError("workspace_not_found", "workspace not found")
+	}
+	if expected := strings.TrimSpace(input.ExpectedWorkspaceID); expected != "" && expected != workspace.ID {
+		return EmbeddedResult{}, launchErrorWithDetails("terminal_workspace_mismatch", "the requested workspace no longer matches the selected workspace", map[string]string{"expectedWorkspaceId": expected, "currentWorkspaceId": workspace.ID})
+	}
+	if result, found, err := s.existingSession(workspace.ID, input.IdempotencyKey); err != nil || found {
+		return result, err
+	}
+	branch, commit, err := s.validateSessionBranch(workspace, input.ExpectedBranch, input.ObservedCommit)
+	if err != nil {
+		return EmbeddedResult{}, err
 	}
 	contextPath := strings.TrimSpace(input.ContextPath)
 	if contextPath == "" {
@@ -55,16 +69,25 @@ func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput
 		return EmbeddedResult{}, err
 	}
 	values := map[string]string{"workspace": workspace.Path, "contextFile": contextPath, "itemPath": contextPath, "identifier": contextPath, "contextMode": "workspace_only", "intent": "workspace_only", "prompt": prompt}
-	session, grant, err := s.embedded.Start(StartRequest{WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", Executable: capability.Executable, Args: launchProviderArgs("workspace_only", provider.Args, values), Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+	now := s.sessionNow()
+	record, err := s.persistStartingSession(SessionRecord{ID: "embedded-" + randomID(), WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", RequestedBranch: branch, ObservedCommit: commit, IdempotencyKey: input.IdempotencyKey, State: StateStarting, StartedAt: now, LastKnownAt: now})
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
-	return EmbeddedResult{Session: session, Grant: grant}, nil
+	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", Executable: capability.Executable, Args: launchProviderArgs("workspace_only", provider.Args, values), Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+	if err != nil {
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	if saved, ok, getErr := s.recordsGet(record.ID); getErr == nil && ok {
+		record = saved
+	}
+	return EmbeddedResult{Session: session, Grant: grant, Record: &record}, nil
 }
 
 type EmbeddedResult struct {
-	Session Session `json:"session"`
-	Grant   Grant   `json:"grant"`
+	Session Session        `json:"session"`
+	Grant   Grant          `json:"grant"`
+	Record  *SessionRecord `json:"record,omitempty"`
 }
 
 func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedResult, error) {
@@ -84,6 +107,27 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	}
 	if !found {
 		return EmbeddedResult{}, launchError("workspace_not_found", "workspace not found")
+	}
+	if expected := strings.TrimSpace(input.ExpectedWorkspaceID); expected != "" && expected != item.WorkspaceID {
+		return EmbeddedResult{}, launchErrorWithDetails("terminal_workspace_mismatch", "the plan reference moved to a different workspace", map[string]string{"expectedWorkspaceId": expected, "currentWorkspaceId": item.WorkspaceID})
+	}
+	if result, found, err := s.existingSession(workspace.ID, input.IdempotencyKey); err != nil || found {
+		return result, err
+	}
+	if expected := strings.TrimSpace(input.ExpectedBranch); expected != "" && strings.TrimSpace(item.Branch) != "" && expected != item.Branch {
+		return EmbeddedResult{}, launchErrorWithDetails("terminal_branch_mismatch", "the plan reference moved to a different branch", map[string]string{"expectedBranch": expected, "currentBranch": item.Branch})
+	}
+	requestedBranch := strings.TrimSpace(item.Branch)
+	if requestedBranch == "" {
+		requestedBranch = strings.TrimSpace(input.ExpectedBranch)
+	}
+	observedCommit := strings.TrimSpace(input.ObservedCommit)
+	if observedCommit == "" {
+		observedCommit = strings.TrimSpace(item.Commit)
+	}
+	branch, commit, err := s.validateSessionBranch(workspace, requestedBranch, observedCommit)
+	if err != nil {
+		return EmbeddedResult{}, err
 	}
 	mode := strings.TrimSpace(input.ContextMode)
 	if mode != "workspace_only" && mode != "card_context" {
@@ -116,9 +160,24 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	}
 	values := map[string]string{"workspace": workspace.Path, "contextFile": item.ItemPath, "itemPath": item.ItemPath, "identifier": item.Identifier, "contextMode": mode, "intent": mode, "prompt": prompt}
 	args := launchProviderArgs(mode, provider.Args, values)
-	session, grant, err := s.embedded.Start(StartRequest{ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+	now := s.sessionNow()
+	record, err := s.persistStartingSession(SessionRecord{ID: "embedded-" + randomID(), WorkspaceID: workspace.ID, PlanRef: &SessionPlanRef{ItemID: itemID, ItemPath: item.ItemPath, Identifier: item.Identifier, BranchKey: branch, ObservedCommit: commit}, Provider: providerID, Intent: mode, RequestedBranch: branch, ObservedCommit: commit, IdempotencyKey: input.IdempotencyKey, State: StateStarting, StartedAt: now, LastKnownAt: now})
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
-	return EmbeddedResult{Session: session, Grant: grant}, nil
+	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+	if err != nil {
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	if saved, ok, getErr := s.recordsGet(record.ID); getErr == nil && ok {
+		record = saved
+	}
+	return EmbeddedResult{Session: session, Grant: grant, Record: &record}, nil
+}
+
+func (s *Service) recordsGet(id string) (SessionRecord, bool, error) {
+	if s.records == nil {
+		return SessionRecord{}, false, nil
+	}
+	return s.records.Get(id)
 }

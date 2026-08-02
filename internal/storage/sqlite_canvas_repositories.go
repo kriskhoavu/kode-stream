@@ -314,6 +314,17 @@ func (r *SQLiteSessionRecordRepository) Get(id string) (ai.SessionRecord, bool, 
 	return record, err == nil, err
 }
 
+func (r *SQLiteSessionRecordRepository) FindByIdempotency(workspaceID, key string) (ai.SessionRecord, bool, error) {
+	if strings.TrimSpace(workspaceID) == "" || strings.TrimSpace(key) == "" {
+		return ai.SessionRecord{}, false, nil
+	}
+	record, err := scanSessionRecord(queryRowSQL(r.db, r.driver, sessionRecordSelect+` WHERE workspace_id = ? AND idempotency_key = ?`, workspaceID, key))
+	if errors.Is(err, sql.ErrNoRows) {
+		return ai.SessionRecord{}, false, nil
+	}
+	return record, err == nil, err
+}
+
 func (r *SQLiteSessionRecordRepository) List(workspaceID, branch string) ([]ai.SessionRecord, error) {
 	query := sessionRecordSelect + ` WHERE (? = '' OR workspace_id = ?) AND (? = '' OR requested_branch = ?) ORDER BY started_at DESC, id`
 	rows, err := querySQL(r.db, r.driver, query, workspaceID, workspaceID, branch, branch)

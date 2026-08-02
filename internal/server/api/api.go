@@ -216,19 +216,7 @@ func (a *API) startEmbeddedAISession(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusCreated, result)
 		return
 	}
-	var launchErr *appaisession.LaunchError
-	if !errors.As(err, &launchErr) {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	status := http.StatusBadRequest
-	if launchErr.Code == "item_not_found" || launchErr.Code == "workspace_not_found" {
-		status = http.StatusNotFound
-	}
-	if launchErr.Code == "launch_failed" {
-		status = http.StatusInternalServerError
-	}
-	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+	writeEmbeddedLaunchError(w, err)
 }
 
 func (a *API) startEmbeddedWorkspaceAISession(w http.ResponseWriter, r *http.Request) {
@@ -248,18 +236,50 @@ func (a *API) startEmbeddedWorkspaceAISession(w http.ResponseWriter, r *http.Req
 		writeJSON(w, http.StatusCreated, result)
 		return
 	}
+	writeEmbeddedLaunchError(w, err)
+}
+
+func writeEmbeddedLaunchError(w http.ResponseWriter, err error) {
 	var launchErr *appaisession.LaunchError
 	if !errors.As(err, &launchErr) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	status := http.StatusBadRequest
-	if launchErr.Code == "workspace_not_found" {
+	switch launchErr.Code {
+	case "item_not_found", "workspace_not_found":
 		status = http.StatusNotFound
-	} else if launchErr.Code == "launch_failed" {
+	case "terminal_workspace_mismatch", "terminal_branch_mismatch", "terminal_revision_mismatch":
+		status = http.StatusConflict
+	case "launch_failed":
 		status = http.StatusInternalServerError
 	}
-	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+	writeJSON(w, status, map[string]any{"error": launchErr.Error(), "code": launchErr.Code, "details": launchErr.Details})
+}
+
+func (a *API) aiSessionRecords(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session records are unavailable")
+		return
+	}
+	workspaceID := strings.TrimSpace(r.URL.Query().Get("workspaceId"))
+	if a.runtimeConfig.Mode == models.RuntimeModeCloud {
+		session, ok := cloudSessionFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "Cloud session is required")
+			return
+		}
+		if workspaceID == "" {
+			writeError(w, http.StatusBadRequest, "workspaceId is required")
+			return
+		}
+		if _, ok := a.cloudWorkspaces.Get(session.User.ID, workspaceID); !ok {
+			writeError(w, http.StatusNotFound, "workspace not found")
+			return
+		}
+	}
+	records, err := a.aiSessions.SessionRecords(workspaceID, r.URL.Query().Get("branch"))
+	respond(w, records, err)
 }
 
 func (a *API) embeddedAISession(w http.ResponseWriter, r *http.Request) {

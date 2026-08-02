@@ -26,12 +26,15 @@ type AIService struct {
 	goos     string
 	launch   *launchDependencies
 	embedded *Manager
+	records  SessionRecordRepository
+	branches sessionBranchResolver
 }
 
 type Service = AIService
 
 func (s *Service) ConfigureEmbedded(manager *Manager) *Service {
 	s.embedded = manager
+	s.configureSessionObserver()
 	return s
 }
 

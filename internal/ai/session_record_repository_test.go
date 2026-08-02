@@ -40,3 +40,16 @@ func TestFileSessionRecordRepositoryRejectsUnsafeOrIncompleteShape(t *testing.T)
 		t.Fatal("expected timestamp validation error")
 	}
 }
+
+func TestFileSessionRecordRepositoryRejectsDuplicateIdempotencyKey(t *testing.T) {
+	repository := NewFileSessionRecordRepository(filepath.Join(t.TempDir(), "ai-session-records.yaml"))
+	now := time.Now().UTC()
+	base := SessionRecord{ID: "session-1", WorkspaceID: "workspace-1", Provider: "codex", Intent: "implement", RequestedBranch: "main", IdempotencyKey: "request-1", State: StateStarting, StartedAt: now, LastKnownAt: now}
+	if _, err := repository.Upsert(base); err != nil {
+		t.Fatal(err)
+	}
+	base.ID = "session-2"
+	if _, err := repository.Upsert(base); err == nil {
+		t.Fatal("expected duplicate idempotency key to be rejected")
+	}
+}

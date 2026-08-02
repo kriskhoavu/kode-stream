@@ -41,6 +41,7 @@ type SessionRecord struct {
 
 type SessionRecordRepository interface {
 	Get(id string) (SessionRecord, bool, error)
+	FindByIdempotency(workspaceID, key string) (SessionRecord, bool, error)
 	List(workspaceID, branch string) ([]SessionRecord, error)
 	Upsert(SessionRecord) (SessionRecord, error)
 	Snapshot() ([]SessionRecord, error)
@@ -65,6 +66,25 @@ func (r *FileSessionRecordRepository) Get(id string) (SessionRecord, bool, error
 	}
 	for _, record := range records {
 		if record.ID == id {
+			return record, true, nil
+		}
+	}
+	return SessionRecord{}, false, nil
+}
+
+func (r *FileSessionRecordRepository) FindByIdempotency(workspaceID, key string) (SessionRecord, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	records, err := r.load()
+	if err != nil {
+		return SessionRecord{}, false, err
+	}
+	workspaceID, key = strings.TrimSpace(workspaceID), strings.TrimSpace(key)
+	if workspaceID == "" || key == "" {
+		return SessionRecord{}, false, nil
+	}
+	for _, record := range records {
+		if record.WorkspaceID == workspaceID && record.IdempotencyKey == key {
 			return record, true, nil
 		}
 	}
@@ -114,6 +134,9 @@ func (r *FileSessionRecordRepository) Upsert(record SessionRecord) (SessionRecor
 			records[i] = record
 			return record, r.save(records)
 		}
+		if record.IdempotencyKey != "" && records[i].WorkspaceID == record.WorkspaceID && records[i].IdempotencyKey == record.IdempotencyKey {
+			return SessionRecord{}, fmt.Errorf("idempotency key already belongs to session %q", records[i].ID)
+		}
 	}
 	records = append(records, record)
 	return record, r.save(records)
@@ -131,6 +154,7 @@ func (r *FileSessionRecordRepository) ReplaceAll(records []SessionRecord) error 
 		records = []SessionRecord{}
 	}
 	seen := map[string]bool{}
+	idempotency := map[string]string{}
 	for i := range records {
 		records[i] = normalizeSessionRecord(records[i])
 		if err := ValidateSessionRecord(records[i]); err != nil {
@@ -140,6 +164,13 @@ func (r *FileSessionRecordRepository) ReplaceAll(records []SessionRecord) error 
 			return fmt.Errorf("duplicate session record ID %q", records[i].ID)
 		}
 		seen[records[i].ID] = true
+		if records[i].IdempotencyKey != "" {
+			key := records[i].WorkspaceID + "\x00" + records[i].IdempotencyKey
+			if prior := idempotency[key]; prior != "" {
+				return fmt.Errorf("idempotency key is shared by sessions %q and %q", prior, records[i].ID)
+			}
+			idempotency[key] = records[i].ID
+		}
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()

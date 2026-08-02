@@ -16,7 +16,7 @@ PM-037.
 |-------|-------------------------------------------------------|------------|----------|
 | B1    | Provider axes and action capabilities                 | Backend    | Complete |
 | B2    | Layout, placement, and session repositories           | Backend    | Complete |
-| B3    | Durable session lifecycle and branch-safe launch      | Backend    | Pending  |
+| B3    | Durable session lifecycle and branch-safe launch      | Backend    | Complete |
 | B4    | Verification freshness and Canvas API                 | Backend    | Pending  |
 | F1    | Canvas route and placement state                      | Frontend   | Pending  |
 | F2    | Draggable semantic nodes and restored layout          | Frontend   | Pending  |
@@ -72,17 +72,17 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Split safe durable session lifecycle metadata from ephemeral PTY/process binding state.
-- [ ] Associate the current terminal manager binding with a session-record ID without persisting grants, bytes, prompts,
+- [x] Split safe durable session lifecycle metadata from ephemeral PTY/process binding state.
+- [x] Associate the current terminal manager binding with a session-record ID without persisting grants, bytes, prompts,
   arguments, buffers, environment variables, or credentials.
-- [ ] Add safe session-record listing by accessible workspace and branch.
-- [ ] Reconcile `starting` and `running` records without live bindings to `interrupted` during application startup.
-- [ ] Extend launch requests with expected workspace, plan branch, observed commit, and idempotency key.
-- [ ] Re-resolve the plan and current checkout immediately before process start.
-- [ ] Return `terminal_branch_mismatch` with expected/current branch and safe Git recovery context.
-- [ ] Ensure repeated submissions with one idempotency key return one record and start at most one process.
-- [ ] Preserve current PM-020 grant, lease, cancellation, session-limit, origin, and shutdown behavior.
-- [ ] Add matched branch, changed branch, dirty tree, stale plan, forbidden plan, launch failure, page reload, application
+- [x] Add safe session-record listing by accessible workspace and branch.
+- [x] Reconcile `starting` and `running` records without live bindings to `interrupted` during application startup.
+- [x] Extend launch requests with expected workspace, plan branch, observed commit, and idempotency key.
+- [x] Re-resolve the plan and current checkout immediately before process start.
+- [x] Return `terminal_branch_mismatch` with expected/current branch and safe Git recovery context.
+- [x] Ensure repeated submissions with one idempotency key return one record and start at most one process.
+- [x] Preserve current PM-020 grant, lease, cancellation, session-limit, origin, and shutdown behavior.
+- [x] Add matched branch, changed branch, dirty tree, stale plan, forbidden plan, launch failure, page reload, application
   restart, cancellation, placement removal, and sensitive-field tests.
 
 **Verification:** `go test ./internal/ai ./internal/git ./internal/item ./internal/server/api`

@@ -3,6 +3,7 @@ package ai
 import (
 	"bytes"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
@@ -107,5 +108,51 @@ func TestResizeRejectsUnsafeDimensions(t *testing.T) {
 	}
 	if err := manager.Resize(session.ID, 120, 40); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSessionUsesRequestedIDListsAndReissuesGrant(t *testing.T) {
+	manager := NewTerminalManager(Config{})
+	defer manager.Close()
+	session, firstGrant, err := manager.Start(StartRequest{ID: "durable-session", Executable: "/bin/sh", Args: []string{"-c", "sleep 10"}, Dir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.ID != "durable-session" || len(manager.List()) != 1 {
+		t.Fatalf("session=%#v list=%#v", session, manager.List())
+	}
+	secondGrant, err := manager.IssueGrant(session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondGrant.Token == "" || secondGrant.Token == firstGrant.Token {
+		t.Fatalf("first=%#v second=%#v", firstGrant, secondGrant)
+	}
+	if _, _, err := manager.Start(StartRequest{ID: session.ID, Executable: "/bin/true", Dir: t.TempDir()}); err == nil {
+		t.Fatal("expected duplicate session ID to be rejected")
+	}
+}
+
+func TestSessionObserverReceivesRunningAndCancelledLifecycle(t *testing.T) {
+	manager := NewTerminalManager(Config{})
+	defer manager.Close()
+	var mu sync.Mutex
+	states := []string{}
+	manager.SetObserver(func(session Session) {
+		mu.Lock()
+		states = append(states, session.State)
+		mu.Unlock()
+	})
+	session, _, err := manager.Start(StartRequest{Executable: "/bin/sh", Args: []string{"-c", "sleep 10"}, Dir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Cancel(session.ID); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(states) < 2 || states[0] != StateRunning || states[len(states)-1] != StateCancelled {
+		t.Fatalf("states=%#v", states)
 	}
 }

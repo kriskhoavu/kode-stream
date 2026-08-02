@@ -68,7 +68,7 @@ func NewServer(port int) (*Server, error) {
 	searchService := appsearch.New(idx)
 	navigationStore := state.Navigation
 	sessionManager := ai.NewTerminalManager(ai.Config{})
-	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager)
+	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager).ConfigureSessionRecords(state.SessionRecords, git)
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore)
 	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithDatabaseHealth(state.SQLStore).WithStorageServices(state.StatusService, state.SyncService).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
@@ -80,15 +80,16 @@ func NewServer(port int) (*Server, error) {
 }
 
 func (s *Server) Close() error {
+	var sessionErr error
+	if s.sessions != nil {
+		sessionErr = s.sessions.Close()
+	}
 	if s.storage != nil {
 		if err := s.storage.Close(); err != nil {
-			return err
+			return errors.Join(sessionErr, err)
 		}
 	}
-	if s.sessions != nil {
-		return s.sessions.Close()
-	}
-	return nil
+	return sessionErr
 }
 
 func (s *Server) Serve() error {

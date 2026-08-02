@@ -38,6 +38,29 @@ type fakeAuditEventReader struct {
 	err    error
 }
 
+func TestAISessionRecordsRouteReturnsDurableSafeMetadata(t *testing.T) {
+	dataDir := t.TempDir()
+	repository := appaisession.NewFileSessionRecordRepository(filepath.Join(dataDir, "session-records.yaml"))
+	now := time.Now().UTC()
+	_, err := repository.Upsert(appaisession.SessionRecord{ID: "session-1", WorkspaceID: "workspace-1", Provider: "codex", Intent: "workspace_only", RequestedBranch: "main", ObservedCommit: "abc123", IdempotencyKey: "private-request-key", State: appaisession.StateExited, StartedAt: now, EndedAt: now, LastKnownAt: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := appaisession.NewTerminalManager(appaisession.Config{})
+	t.Cleanup(func() { _ = manager.Close() })
+	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(dataDir, "ai-settings.yaml"))).ConfigureEmbedded(manager).ConfigureSessionRecords(repository, nil)
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/ai/session-records?workspaceId=workspace-1&branch=main", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"id":"session-1"`) || !strings.Contains(response.Body.String(), `"live":false`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "private-request-key") {
+		t.Fatalf("response leaked idempotency key: %s", response.Body.String())
+	}
+}
+
 type fakeDatabaseHealth struct {
 	health storage.DatabaseHealth
 }
