@@ -1,229 +1,351 @@
-# Backend Design: Terminal Canvas Workspace Orchestrator
+# Backend Design: Focused Terminal Canvas
 
 ## Overview
 
-Add an `internal/canvas` domain that persists Canvas documents through the same provider-selected app-state boundary as
-workspaces, navigation, AI settings, and indexes. A document stores layout and stable entity references. Read responses
-resolve those references against current workspace, item, verification, Git, and active-session state. Existing guarded
-services remain responsible for repository and process actions.
+PM-037 adds backend contracts for a branch-scoped Canvas without making Canvas authoritative for workspace entities.
+The Canvas repository stores layout identity, viewport preference, and independently versioned placements. Read
+responses resolve each placement against current workspace, plan, session, Git, and verification services.
 
-The Canvas API is available in Local and Cloud runtimes. Effective capabilities determine whether a referenced
-workspace supports repository mutations, terminal launch, AI, Git, runtime, and verification. Agentless Remote Snapshot
-documents can be edited as app-owned state, but their repository entities are read-only and cannot start processes.
+The same design separates deployment topology, workspace content provider, execution provider, app-state datastore,
+and authorization. Canvas consumes resolved action capabilities and never branches on Local, Cloud, Agentless,
+data-dir, SQLite, or Postgres names.
+
+PM-037 implements Local execution with data-dir and SQLite persistence. Future Agent and snapshot phases add provider
+adapters and Postgres repositories without changing Canvas domain contracts.
 
 ## Domain Model
 
-### Entity: Canvas Document
+### Entity: Canvas Layout
 
-| Field         | Type             | Purpose                                                                             |
-|---------------|------------------|-------------------------------------------------------------------------------------|
-| `id`          | string           | Opaque stable document identifier.                                                  |
-| `ownerUserId` | string, optional | Authenticated Cloud owner; empty in single-user Local mode.                         |
-| `name`        | string           | User-visible Canvas name.                                                           |
-| `scope`       | enum             | V1 value is `workspace`.                                                            |
-| `workspaceId` | string           | Registered workspace used to resolve the default Canvas and its entities.           |
-| `documentKey` | string           | `default` for the primary Canvas or an opaque key for a user-created copy.          |
-| `version`     | integer          | Optimistic concurrency version incremented after every successful update.           |
-| `viewport`    | viewport         | Saved x, y, and zoom values.                                                        |
-| `preferences` | preferences      | Focus, grid, minimap, semantic zoom, and reduced-motion-compatible display choices. |
-| `nodes`       | Canvas Node list | Ordered positioned entity references and app-owned note/group nodes.                |
-| `edges`       | Canvas Edge list | Typed relationships between existing node IDs.                                      |
-| `createdAt`   | timestamp        | Creation time.                                                                      |
-| `updatedAt`   | timestamp        | Last successful document update.                                                    |
+| Field         | Type             | Purpose                                                       |
+|---------------|------------------|---------------------------------------------------------------|
+| `id`          | string           | Opaque stable layout identifier.                              |
+| `ownerUserId` | string, optional | Reserved ownership scope; empty in Local mode.                |
+| `workspaceId` | string           | Registered workspace shown by the layout.                     |
+| `branchKey`   | string           | Normalized selected branch/ref context.                       |
+| `viewport`    | viewport         | Last saved x, y, and zoom when server persistence is enabled. |
+| `version`     | integer          | Metadata version, independent from placement revisions.       |
+| `createdAt`   | timestamp        | Creation time.                                                |
+| `updatedAt`   | timestamp        | Latest layout or placement update.                            |
 
-### Value: Canvas Node
+There is one default layout for an owner, workspace, and branch key. PM-037 has no copies, names, list endpoint, or
+metadata-only deletion UI.
 
-| Field       | Type                | Purpose                                                              |
-|-------------|---------------------|----------------------------------------------------------------------|
-| `id`        | string              | Document-local stable node identifier.                               |
-| `kind`      | enum                | `workspace`, `plan`, `session`, `artifact`, `note`, or `group`.      |
-| `entityRef` | reference, optional | Existing entity type, ID, workspace ID, and optional commit context. |
-| `position`  | point               | Finite Canvas x and y coordinates.                                   |
-| `size`      | size, optional      | Bounded user size for supported node kinds.                          |
-| `parentId`  | string, optional    | Group membership; must identify a group node in the same document.   |
-| `note`      | string, optional    | Bounded app-owned text allowed only for note nodes.                  |
-| `collapsed` | boolean             | Saved presentation state.                                            |
+### Entity: Placement
 
-### Value: Canvas Edge
+| Field       | Type      | Purpose                                                     |
+|-------------|-----------|-------------------------------------------------------------|
+| `nodeId`    | string    | Stable Canvas-local node identity.                          |
+| `layoutId`  | string    | Owning branch-scoped layout.                                |
+| `entityRef` | reference | Workspace, branch-aware plan, or durable session reference. |
+| `position`  | point     | Finite absolute x and y coordinates.                        |
+| `collapsed` | boolean   | Bounded presentation state.                                 |
+| `revision`  | integer   | Optimistic revision for this placement.                     |
+| `updatedAt` | timestamp | Latest successful placement update.                         |
 
-| Field    | Type             | Purpose                                                                          |
-|----------|------------------|----------------------------------------------------------------------------------|
-| `id`     | string           | Document-local stable edge identifier.                                           |
-| `source` | string           | Existing source node ID.                                                         |
-| `target` | string           | Existing target node ID.                                                         |
-| `kind`   | enum             | `contains`, `implements`, `produced`, `verifies`, `depends_on`, or `blocked_by`. |
-| `label`  | string, optional | Bounded user label for relationships that need clarification.                    |
+Placement ordering is not authoritative. Node render order is derived in the frontend from kind, selection, and current
+status. PM-037 does not persist node size, notes, parent IDs, groups, or arbitrary node payloads.
 
-### Projection: Resolved Canvas Node
+### Value: Entity Reference
 
-Read responses pair persisted node layout with a non-persisted current-state projection.
+| Kind        | Required Identity                                             | Resolution Notes                                                                                      |
+|-------------|---------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| `workspace` | Workspace ID                                                  | Resolves current configuration, branch, Git state, and capabilities.                                  |
+| `plan`      | Workspace ID, item ID, item path, branch key, observed commit | Item ID is the current lookup key; path and identifier may support explicit stale-reference recovery. |
+| `session`   | Durable session-record ID                                     | Resolves metadata first and an optional live process binding separately.                              |
 
-| Field          | Type              | Purpose                                                                                  |
-|----------------|-------------------|------------------------------------------------------------------------------------------|
-| `resolution`   | enum              | `resolved`, `stale`, `unavailable`, or `forbidden`.                                      |
-| `title`        | string            | Current entity title, not copied into persistent layout.                                 |
-| `subtitle`     | string, optional  | Workspace, branch, commit, provider, or contextual label.                                |
-| `status`       | string, optional  | Current plan, health, verification, or session lifecycle state.                          |
-| `capabilities` | capability object | Current readable/editable/executable actions after role, mode, access, and Agent checks. |
-| `recoveryHint` | string, optional  | Safe user guidance for stale references or unavailable execution.                        |
+The plan item ID remains branch- and path-derived in current code. A rename or move can therefore create a stale
+reference. PM-037 may offer a replacement candidate by branch and identifier, but must not silently rebind it. A future
+repository-stable plan identifier can replace this recovery rule without changing placement storage.
+
+### Projection: Resolved Node
+
+| Field          | Type             | Purpose                                             |
+|----------------|------------------|-----------------------------------------------------|
+| `nodeId`       | string           | Placement identity.                                 |
+| `resolution`   | enum             | `resolved`, `stale`, `unavailable`, or `forbidden`. |
+| `title`        | string           | Current authoritative title.                        |
+| `subtitle`     | string, optional | Branch, commit, provider, or execution context.     |
+| `status`       | string, optional | Current plan, Git, session, or verification state.  |
+| `capabilities` | action map       | Current action states and recovery reasons.         |
+| `recoveryHint` | string, optional | Safe guidance for stale or unavailable references.  |
+
+Resolved fields are response-only and never accepted in placement writes.
+
+## Independent Runtime Axes
+
+### Deployment Topology
+
+Controls identity, ownership, and routing only. It does not decide whether a terminal or repository read is possible.
+
+### Workspace Content Provider
+
+Owns repository reads, Git projections, and ref resolution. PM-037 uses the local checkout provider. Future providers
+include an Agent checkout and a commit-pinned provider snapshot.
+
+### Execution Provider
+
+Owns terminal, AI, runtime, and verification execution. PM-037 uses the local process provider. Future values include a
+connected Agent and no provider. Absence of an execution provider does not remove content-provider capabilities.
+
+### App-State Datastore
+
+Owns Canvas layouts, placements, and durable session records. Domain services depend on repository interfaces and never
+inspect driver or storage-option names.
+
+### Authorization
+
+Filters supported provider actions for the current identity. Authorization cannot turn an unsupported action into a
+supported one.
+
+## Action Capability Contract
+
+| Field             | Purpose                                                                                    |
+|-------------------|--------------------------------------------------------------------------------------------|
+| `action`          | Stable name such as `layout.move`, `git.status`, `terminal.launch`, or `verification.run`. |
+| `state`           | `available`, `unavailable`, `unsupported`, `forbidden`, or `conflicted`.                   |
+| `reasonCode`      | Stable machine-readable explanation.                                                       |
+| `message`         | Safe user-facing summary.                                                                  |
+| `recoveryActions` | Supported next actions, such as refresh or open branch controls.                           |
+
+Capability composition follows this order:
+
+1. Determine whether the content or execution provider supports the action.
+2. Apply current provider availability, including tool and connection health.
+3. Apply authorization.
+4. Apply entity context such as source editability and branch match.
+5. Return the most specific non-available state and recovery guidance.
+
+The frontend uses this projection for presentation. Every service revalidates its own guard immediately before action
+execution to prevent time-of-check/time-of-use errors.
+
+## Branch-Safe Launch
+
+The launch request includes workspace ID, plan ID, expected branch key, observed commit, and an idempotency key.
+
+Before starting a process, the backend:
+
+1. Resolves the current plan and workspace.
+2. Confirms the plan belongs to the requested workspace and branch context.
+3. Reads the current checkout branch from Git.
+4. Rejects a mismatch with `terminal_branch_mismatch` and returns expected branch, current branch, and dirty-state
+   guidance.
+5. Revalidates execution-provider support, tool availability, authorization, and bounded-session limits.
+6. Creates one durable session record for the idempotency key.
+7. Starts the ephemeral process binding and updates the record to running only after PTY start succeeds.
+
+PM-037 never switches branches automatically. A future worktree provider may satisfy launch for another branch without
+changing this contract.
+
+## Durable Session Metadata
+
+### Entity: Session Record
+
+| Field             | Type                             | Purpose                                                                   |
+|-------------------|----------------------------------|---------------------------------------------------------------------------|
+| `id`              | string                           | Stable session identity referenced by Canvas.                             |
+| `workspaceId`     | string                           | Owning workspace.                                                         |
+| `planRef`         | branch-aware reference, optional | Plan that initiated the work.                                             |
+| `provider`        | string                           | Safe provider label.                                                      |
+| `intent`          | string                           | Bounded non-sensitive intent category, not the prompt.                    |
+| `requestedBranch` | string                           | Branch validated at launch.                                               |
+| `observedCommit`  | string, optional                 | HEAD observed before launch.                                              |
+| `state`           | enum                             | `starting`, `running`, `exited`, `cancelled`, `failed`, or `interrupted`. |
+| `startedAt`       | timestamp                        | Launch time.                                                              |
+| `endedAt`         | timestamp, optional              | Terminal lifecycle completion.                                            |
+| `exitCode`        | integer, optional                | Safe process outcome.                                                     |
+| `lastKnownAt`     | timestamp                        | Latest durable lifecycle observation.                                     |
+
+The record excludes executable arguments, prompts, environment variables, grants, output, input, buffers, credentials,
+and file content.
+
+### Ephemeral: Process Binding
+
+The existing terminal manager continues to own the process, PTY, output buffer, channel subscribers, grants, reconnect
+timer, and cancellation. It exposes a safe lookup by session-record ID. Canvas never persists or reconstructs a process
+binding.
+
+At application startup, records left in `starting` or `running` with no corresponding live binding become
+`interrupted`. Page reload within the same process can reconnect under existing grant and lease rules. Application
+restart restores honest metadata but does not promise terminal reconnection.
+
+Removing a placement does not cancel its process. Cancelling a process does not remove its placement.
+
+## Verification Freshness
+
+### Value: Repository Fingerprint
+
+| Field               | Purpose                                                                                      |
+|---------------------|----------------------------------------------------------------------------------------------|
+| `branch`            | Current checkout branch.                                                                     |
+| `headCommit`        | Current HEAD commit SHA.                                                                     |
+| `indexHash`         | Digest representing staged content.                                                          |
+| `worktreeHash`      | Digest representing relevant tracked and untracked working-tree content.                     |
+| `configurationHash` | Digest of the selected verification profile, commands, environment name, and selected specs. |
+
+The fingerprint algorithm must be deterministic and conservative. It may reuse Git plumbing and bounded file hashing,
+but must not rely only on timestamps or `git status` text. Ignored files are excluded unless the verification
+configuration explicitly includes them.
+
+Each verification job captures a start fingerprint and a completion fingerprint. The result projection is:
+
+| Freshness      | Condition                                                                                      |
+|----------------|------------------------------------------------------------------------------------------------|
+| `fresh`        | Start and completion fingerprints match, and the current fingerprint still matches completion. |
+| `stale`        | The current repository or configuration fingerprint differs from the completed result.         |
+| `inconclusive` | Repository state changed during execution or a complete fingerprint could not be produced.     |
+
+PM-037 extends the current in-memory verification job with fingerprints and freshness projection. Durable verification
+history and lineage are follow-up scope. Browser reload can recover a result while the service remains running;
+application restart does not restore verification jobs in PM-037.
 
 ## Persistence
 
-### Data-dir Store
+### Data-Dir Store
 
-- Add `canvases.yaml` under the effective Kode Stream data directory.
-- Use a Canvas repository with the same mutex, validation, atomic replacement, and empty-list behavior as other
-  file-backed repositories.
-- Include Canvas documents in `datadir -> database` and `database -> datadir` snapshots and pre-replacement backups.
-- Never place this file inside a registered workspace.
+- Add Canvas layouts and placements to app-owned Canvas storage under the effective data directory.
+- Add safe session records to app-owned session metadata storage.
+- Use guarded atomic replacement and repository-level validation.
+- Include both repositories in Local data-dir to SQLite sync and pre-replacement backups.
+- Never place Canvas or session metadata inside a registered workspace.
 
-### SQLite And Postgres
+### SQLite
 
-Add migration version 2 for both SQL drivers. The existing migration conversion continues to normalize timestamp and
-boolean types for Postgres.
+Add the next Local database migration with normalized layout, placement, and session-record tables.
 
 ```sql
-CREATE TABLE IF NOT EXISTS canvas_documents (
+CREATE TABLE IF NOT EXISTS canvas_layouts (
   id TEXT PRIMARY KEY,
   owner_user_id TEXT NOT NULL DEFAULT '',
-  name TEXT NOT NULL,
-  scope TEXT NOT NULL,
   workspace_id TEXT NOT NULL,
-  document_key TEXT NOT NULL,
+  branch_key TEXT NOT NULL,
+  viewport_json TEXT NOT NULL,
   version INTEGER NOT NULL,
-  document_json TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS canvas_documents_owner_workspace_scope
-  ON canvas_documents (owner_user_id, workspace_id, scope, document_key);
+CREATE UNIQUE INDEX IF NOT EXISTS canvas_layouts_owner_workspace_branch
+  ON canvas_layouts (owner_user_id, workspace_id, branch_key);
 
-CREATE INDEX IF NOT EXISTS canvas_documents_owner_updated
-  ON canvas_documents (owner_user_id, updated_at);
+CREATE TABLE IF NOT EXISTS canvas_placements (
+  layout_id TEXT NOT NULL,
+  node_id TEXT NOT NULL,
+  entity_kind TEXT NOT NULL,
+  entity_ref_json TEXT NOT NULL,
+  x REAL NOT NULL,
+  y REAL NOT NULL,
+  collapsed INTEGER NOT NULL DEFAULT 0,
+  revision INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (layout_id, node_id)
+);
+
+CREATE TABLE IF NOT EXISTS ai_session_records (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  plan_ref_json TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  intent TEXT NOT NULL,
+  requested_branch TEXT NOT NULL,
+  observed_commit TEXT NOT NULL,
+  state TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  ended_at TEXT NOT NULL,
+  exit_code INTEGER,
+  last_known_at TEXT NOT NULL
+);
 ```
 
-The JSON payload contains viewport, preferences, nodes, and edges. Indexed columns support ownership, workspace default
-resolution, and recent ordering without normalizing every spatial update into multiple writes.
-
-### Repository Boundary
-
-Extend `storage.RepositoryBundle` with a Canvas repository. Both provider composition and manual sync must treat Canvas
-documents as app-owned state. Domain services depend on this repository interface and do not inspect storage option or
-driver names.
+Postgres compatibility is a repository-contract requirement but its migration and Cloud ownership rollout are deferred
+to the Agent-Backed Canvas phase.
 
 ## API Contract
 
-| Method | Endpoint                                     | Request                                               | Response                                                 |
-|--------|----------------------------------------------|-------------------------------------------------------|----------------------------------------------------------|
-| GET    | `/api/canvases?workspaceId={id}`             | Query scope                                           | Owned Canvas summaries                                   |
-| POST   | `/api/canvases/resolve`                      | Workspace ID and optional name                        | Existing or newly created `default` resolved document    |
-| GET    | `/api/canvases/{canvasId}`                   | None                                                  | Resolved document with current entity projections        |
-| PUT    | `/api/canvases/{canvasId}`                   | Expected version, viewport, preferences, nodes, edges | Updated persisted document and next version              |
-| POST   | `/api/canvases/{canvasId}/copies`            | Name and expected source version                      | New owned Canvas with an opaque document key             |
-| DELETE | `/api/canvases/{canvasId}`                   | None                                                  | `204`; deletes only Canvas metadata                      |
-| GET    | `/api/ai/sessions?workspaceId={id}&active=1` | Workspace filter                                      | Safe active embedded-session summaries; no grants/output |
+| Method  | Endpoint                                                   | Request                                   | Response                                                   |
+|---------|------------------------------------------------------------|-------------------------------------------|------------------------------------------------------------|
+| `POST`  | `/api/canvas/resolve`                                      | Workspace ID and branch                   | Existing or created default layout with resolved nodes     |
+| `GET`   | `/api/canvas/{layoutId}`                                   | None                                      | Layout, placements, resolved projections, and capabilities |
+| `PATCH` | `/api/canvas/{layoutId}/placements`                        | Placement changes with expected revisions | Updated placement revisions and layout timestamp           |
+| `PATCH` | `/api/canvas/{layoutId}/viewport`                          | Expected layout version and viewport      | Updated layout version                                     |
+| `GET`   | `/api/ai/session-records?workspaceId={id}&branch={branch}` | Workspace and branch filter               | Safe durable session records with live-binding state       |
 
-`POST /api/canvases/resolve` is idempotent for one owner, workspace, `workspace` scope, and `default` document key.
-Concurrent resolve calls return the document selected by that unique key. Copies receive opaque document keys and do
-not replace the default Canvas.
+Existing guarded terminal, Git, and verification endpoints remain the action owners. Canvas does not add proxy action
+endpoints that bypass those services.
 
-### Update Conflict
+### Placement Conflict
 
-- Client sends the version it loaded.
-- Repository updates only when the stored version matches.
-- A mismatch returns `409` with error code `canvas_version_conflict` and the current version.
-- The backend does not merge coordinates, nodes, notes, or edges.
-- Frontend may reload latest or create a copy after explicit user choice.
+- Each placement change includes its loaded revision.
+- Updates succeed independently when stored revisions match.
+- A mismatch returns `409 canvas_placement_conflict` with only the conflicting node IDs and current revisions.
+- Non-conflicting placement updates in the same batch may succeed only if the API clearly returns per-item outcomes;
+  PM-037 may instead reject the complete small batch for simpler atomic drag behavior.
+- Recovery offers reload of affected placements and reset-layout preview. PM-037 does not create Canvas copies.
 
-## Entity Resolution
+## Initial Placement And Discovery
 
-The service resolves node references in bounded batches:
-
-1. Load and authorize the Canvas document.
-2. Group references by workspace, plan, session, and artifact kind.
-3. Read workspace configuration and indexed plan state through existing repositories.
-4. Read safe in-memory session summaries from the embedded session manager.
-5. Attach effective capabilities and current labels/status without changing the stored document.
-6. Mark missing or inaccessible references explicitly; never delete them as a read side effect.
-
-V1 artifact resolution covers verification jobs and Git-change summaries already available through workspace services.
-File contents, diffs, and terminal output load only when the Workbench requests them.
-
-## Capability Policy
-
-| Condition                             | Layout edit | Plan read | Repo write | Terminal / AI | Git / verify |
-|---------------------------------------|-------------|-----------|------------|---------------|--------------|
-| Local admin, writable workspace       | yes         | yes       | yes        | yes           | yes          |
-| Local read-only workspace or role     | policy      | yes       | no         | no            | no           |
-| Agent-Backed, owner Agent connected   | role-based  | yes       | role-based | role-based    | role-based   |
-| Agent-Backed, owner Agent offline     | role-based  | cached    | no         | no            | no           |
-| Remote Snapshot                       | role-based  | yes       | no         | no            | no           |
-| Missing or forbidden entity reference | role-based  | no        | no         | no            | no           |
-
-Layout editing uses app-state authorization. Repository and runtime actions use the target workspace's access adapter
-and effective runtime capabilities. The API returns denial reasons suitable for inline UI guidance.
+- First resolve creates the workspace placement and current branch plan placements with deterministic coordinates.
+- Existing durable sessions for the workspace and branch receive deterministic initial placements near their plan.
+- A newly indexed plan or newly launched session receives an unplaced projection until the client accepts its suggested
+  position; existing placements never move during background resolution.
+- Missing entities remain stale placements and are never deleted as a read side effect.
 
 ## Validation And Limits
 
-Initial server-configured defaults:
+| Limit                              | Initial Default | Purpose                                                      |
+|------------------------------------|-----------------|--------------------------------------------------------------|
+| Placements per layout              | 300             | Bound Local MVP resolution and rendering.                    |
+| Placement update batch             | 50              | Support multi-select movement without full-layout writes.    |
+| Coordinate magnitude               | 1,000,000       | Reject non-finite or abusive geometry.                       |
+| Viewport zoom                      | 0.1 to 2.0      | Keep recovery and rendering usable.                          |
+| Safe session records per workspace | 500             | Bound durable metadata growth before archival policy exists. |
 
-| Limit                    | Default | Purpose                                                 |
-|--------------------------|---------|---------------------------------------------------------|
-| Documents per owner      | 100     | Bound list and storage growth.                          |
-| Nodes per document       | 1,000   | Keep save, resolve, and render operations bounded.      |
-| Edges per document       | 2,000   | Bound relationship validation and payload size.         |
-| Serialized document size | 2 MiB   | Reject unexpected or abusive app-state payloads.        |
-| Document name            | 120     | Keep menus and API logs bounded.                        |
-| Note text per node       | 8 KiB   | Support useful notes without becoming a document store. |
-
-Validation rejects unknown kinds, duplicate IDs, dangling edge endpoints, invalid parents, cycles in group ancestry,
-non-finite coordinates, out-of-range zoom, entity references outside the document workspace, and terminal data or
-grant-like fields in persisted node payloads.
+Validation rejects unknown entity kinds, cross-workspace references, branch-context violations, duplicate IDs,
+non-finite coordinates, invalid revisions, and any terminal or repository content in app-state payloads.
 
 ## Security And Privacy
 
-- Authorize every Canvas by owner before returning whether it exists.
-- Resolve only workspaces accessible to the current Local runtime or Cloud identity.
-- Treat names, labels, notes, and entity titles as untrusted text.
-- Never persist terminal output, input, environment variables, executable arguments, prompts, grant tokens, credentials,
-  repository contents, diffs, or file bodies in Canvas storage.
-- Reuse existing path guards, role checks, access adapters, launch validation, audit policy, PTY limits, and WebSocket
-  origin/token checks for actions initiated from Canvas.
-- Canvas delete affects only app-owned metadata and must not cascade into repository or runtime entities.
+- Authorize layout and session records before revealing whether they exist.
+- Resolve only workspaces and entities accessible to the current identity.
+- Never return a cached stale title for an entity that has become forbidden.
+- Treat resolved titles and labels as untrusted text.
+- Do not log placement payloads, prompts, arguments, environment variables, grants, terminal bytes, repository content,
+  diffs, or verification artifact bodies.
+- Reuse existing path guards, Git safety checks, terminal limits, WebSocket origin checks, and execution-provider guards.
+- Placement removal and layout reset never mutate repository, session, or verification entities.
 
 ## Failure Handling
 
-| Failure                        | API behavior                              | User-visible recovery                                    |
-|--------------------------------|-------------------------------------------|----------------------------------------------------------|
-| Canvas not found               | `404`                                     | Return to workspace Canvas list.                         |
-| Canvas version conflict        | `409 canvas_version_conflict`             | Reload latest or save current layout as a copy.          |
-| Invalid document               | `400` with stable field-level issue codes | Keep unsaved state and identify invalid node/edge.       |
-| Owner Agent offline            | Read succeeds; execution capabilities off | Reconnect Agent; do not discard layout.                  |
-| Remote Snapshot action attempt | `403` or capability-specific unavailable  | Connect Agent or open locally.                           |
-| Missing entity                 | Read succeeds with stale resolution       | Remove reference or locate replacement.                  |
-| Storage unavailable            | Existing storage error mapping            | Retry; keep unsaved frontend state until user navigates. |
-| Embedded session expired       | Summary resolves as ended/stale           | Remove node or launch a new session from the plan.       |
+| Failure                                | API Behavior                                             | User Recovery                                                    |
+|----------------------------------------|----------------------------------------------------------|------------------------------------------------------------------|
+| Placement revision conflict            | `409 canvas_placement_conflict`                          | Reload affected placement or reset with preview.                 |
+| Branch mismatch at launch              | `409 terminal_branch_mismatch`                           | Review expected/current branch and open guarded branch controls. |
+| Unsupported execution provider         | Capability state plus guarded action rejection           | Use a workspace with an execution provider.                      |
+| Missing plan after rename or deletion  | Resolve stale placement                                  | Remove placement or confirm a suggested replacement.             |
+| Lost process after restart             | Reconcile durable record to `interrupted`                | Launch a new session; do not offer reconnect.                    |
+| Repository changes after verification  | Return `stale` freshness                                 | Rerun verification on the current fingerprint.                   |
+| Repository changes during verification | Return `inconclusive` freshness                          | Stabilize the repository and rerun.                              |
+| App-state store unavailable            | Preserve in-memory client edits and return storage error | Retry without mutating entities.                                 |
 
-## Observability And Tests
+## Tests
 
-- Audit Canvas create, update, delete, conflict, and blocked execution intent without node note content.
-- Record duration and counts, not serialized documents or terminal data.
-- Add domain tests for validation, ownership, default resolution, version conflicts, and deletion isolation.
-- Add repository contract tests for data-dir, SQLite, and Postgres-compatible SQL behavior.
-- Add storage sync tests proving Canvas round trips and backup behavior.
-- Add API tests for Local, Agent-Backed online/offline, Remote Snapshot, role denial, stale references, and safe session
-  projection.
-- Retain existing AI terminal lifecycle, grant, loopback, limit, cancellation, and shutdown tests unchanged.
+- Repository contract tests for data-dir and SQLite layout, placement, revision, session-record, sync, and backup behavior.
+- Capability composition tests covering unsupported, unavailable, forbidden, conflicted, and available actions.
+- Branch-safe launch tests, including dirty-tree mismatch, idempotent double launch, and server-side revalidation.
+- Session reconciliation tests proving no prompt, argument, grant, output, or buffer enters durable storage.
+- Verification fingerprint tests for commit, branch, staged, unstaged, untracked, configuration, and during-run changes.
+- Resolver tests for rename/delete staleness, forbidden references, new unplaced work, and session live-binding state.
+- Existing terminal limit, lease, grant, cancellation, and shutdown tests remain authoritative and unchanged.
 
 ## Design Decisions
 
-| Decision                                       | Rationale                                                                                    |
-|------------------------------------------------|----------------------------------------------------------------------------------------------|
-| New `internal/canvas` domain                   | Keeps spatial metadata separate from workspace files, item indexing, and terminal runtime.   |
-| Provider-backed Canvas repository              | Gives data-dir, SQLite, and Postgres equal behavior without mode branching in services.      |
-| Versioned document JSON                        | Spatial updates remain atomic while indexed ownership fields keep lookup efficient.          |
-| Resolve current state on reads                 | Saved layout remains stable while Git-backed and runtime information stays authoritative.    |
-| Safe active-session list endpoint              | Restores live terminal nodes after navigation without exposing channel grants or output.     |
-| Capability composition before action rendering | Prevents unsupported operations from appearing enabled in Agentless or offline-Agent states. |
-| No backend coordinate merge                    | Automatic spatial merges are surprising; explicit reload/copy recovery avoids silent loss.   |
+| Decision                                      | Rationale                                                                 |
+|-----------------------------------------------|---------------------------------------------------------------------------|
+| One default layout per workspace and branch   | Keeps first-release execution context explicit and bounded.               |
+| Placement-level revisions                     | Ordinary drags do not conflict with unrelated nodes or viewport changes.  |
+| Repository interfaces hide datastore drivers  | Local and future Cloud storage do not change Canvas domain behavior.      |
+| Capability resolver composes independent axes | Provider combinations evolve without mode-specific Canvas code.           |
+| Durable session record plus ephemeral binding | Restores honest work history while keeping terminal secrets in memory.    |
+| Server-side branch validation                 | UI state cannot authorize execution in the wrong checkout.                |
+| Conservative verification fingerprints        | False-stale is safer than a false-current green result.                   |
+| No persisted or authored edges in MVP         | Relationship meaning remains owned by repository and application domains. |

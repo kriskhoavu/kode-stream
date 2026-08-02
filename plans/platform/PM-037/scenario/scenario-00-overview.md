@@ -1,210 +1,282 @@
-# Scenarios: PM-037 Overview
+# Scenarios: PM-037 Focused Terminal Canvas
 
 ## Scenario List
 
-| #   | Title                            | Description                                                                             |
-|-----|----------------------------------|-----------------------------------------------------------------------------------------|
-| 0   | First Canvas                     | User opens a workspace that has no saved Canvas document.                               |
-| 1   | Plan-to-terminal orchestration   | User launches and operates an embedded AI session from a plan node.                     |
-| 2   | Restore spatial workspace        | User returns and receives saved positions plus current entity state.                    |
-| 3   | Agent-Backed Cloud execution     | Cloud user works through a connected owner Agent and handles Agent loss.                |
-| 4   | Agentless Remote Snapshot        | Cloud user explores commit-pinned plans without repository writes or process execution. |
-| 5   | Concurrent or stale Canvas state | User recovers from document conflicts, deleted entities, and ended terminal sessions.   |
-| 6   | Accessible Canvas navigation     | Keyboard and reduced-motion users navigate, focus, and operate Canvas nodes.            |
+| #   | Title                                   | Description                                                                        |
+|-----|-----------------------------------------|------------------------------------------------------------------------------------|
+| 0   | First branch-scoped Canvas              | Resolve one default layout and place current workspace and plans.                  |
+| 1   | Arrange and restore work                | Move workspace, plan, and session nodes independently and restore their positions. |
+| 2   | Branch-safe plan launch                 | Launch once on a matching checkout and block launch after branch mismatch.         |
+| 3   | Durable session and live process        | Keep safe session history distinct from reconnectable terminal state.              |
+| 4   | Git and verification freshness          | Show current Git state and invalidate verification after repository change.        |
+| 5   | Capability and stale-reference recovery | Explain unavailable actions and missing entities without mode-specific UI.         |
+| 6   | Keyboard and narrow-window operation    | Operate essential Canvas actions without precise pointer input.                    |
 
-## Scenario 0: First Canvas
+## Scenario 0: First Branch-Scoped Canvas
 
 ### Goal
 
-> Give the user an immediately useful workspace map without requiring manual node creation.
+> Give the user a useful spatial workbench for the selected workspace and branch without copying repository data into
+> Canvas storage.
 
 ### Starting State
 
-| #   | Area        | State                                                                          |
-|-----|-------------|--------------------------------------------------------------------------------|
-| 1   | Workspace   | A registered workspace is selected and its plans are indexed.                  |
-| 2   | App state   | No Canvas document exists for the user and workspace.                          |
-| 3   | Sessions    | Zero or more embedded sessions may already be active.                          |
-| 4   | Permissions | User can read the workspace; layout editing follows the user's app-state role. |
+| #   | Area          | State                                                   |
+|-----|---------------|---------------------------------------------------------|
+| 1   | Workspace     | A registered Local workspace is selected.               |
+| 2   | Branch        | The selected branch is known and its plans are indexed. |
+| 3   | App state     | No Canvas layout exists for this workspace and branch.  |
+| 4   | Authorization | The user can read entities and edit app-owned layout.   |
 
-### Visual State Before
+### Flow 0.1: Resolve Default Layout
 
-> Kode Stream -> Workstream is selected -> no Canvas route or spatial arrangement exists.
+1. User opens **Canvas** from Workspace navigation.
+2. Backend resolves the selected workspace and branch context.
+3. Backend creates one default layout when none exists.
+4. Resolver projects the workspace and current branch plans with capabilities and current state.
+5. Frontend assigns deterministic suggested positions and persists accepted placements.
+6. The viewport fits visible content and announces that Canvas is ready.
 
-### Flow 0.1: Resolve Default Workspace Canvas
+### Expected State
 
-1. User selects **Canvas** in the Workspace navigation.
-2. Frontend resolves the current user's default Canvas for the selected workspace.
-3. Backend creates a minimal document when none exists and returns its version.
-4. Frontend loads current workspace, plan, and safe active-session projections.
-5. Auto-layout places the workspace node first, plans by status, and active sessions next to their plans.
-6. The viewport fits visible content and announces that the Canvas is ready.
-
-### Visual State After
-
-> Workspace node -> plan nodes grouped by status -> active session nodes attached to their plan -> selected node opens
-> in the Workbench.
+> One workspace node and current branch plan nodes are visible. There are no group, note, artifact, or editable edge
+> controls.
 
 ### Edge Cases
 
-- With no indexed plans, show the workspace node, an explanatory empty state, and a link to scan or configure sources.
-- If the workspace is unavailable, retain saved positions and show a recoverable workspace warning.
-- If document creation is forbidden, render an unsaved read-only projection without offering layout changes.
-- Auto-layout never overwrites a previously saved manual layout without confirmation.
+- With no plans, show the workspace node and existing scan/source guidance.
+- A failure to read Git state does not delete or rearrange placements.
+- A user without layout permission receives a read-only projected layout.
+- Changing the selected branch resolves another branch-scoped layout instead of mixing plans into the current layout.
 
-## Scenario 1: Plan-To-Terminal Orchestration
+## Scenario 1: Arrange And Restore Work
 
 ### Goal
 
-> Start an embedded AI session from a plan and keep execution context visibly connected to that plan.
+> Preserve spatial memory while keeping node movement independent from entity and relationship state.
 
 ### Starting State
 
-| #   | Area       | State                                                          |
-|-----|------------|----------------------------------------------------------------|
-| 1   | Canvas     | A workspace Canvas contains at least one editable plan node.   |
-| 2   | Runtime    | Effective capabilities allow terminal and AI actions.          |
-| 3   | AI tooling | A supported provider is installed, enabled, and authenticated. |
+| #   | Area       | State                                                        |
+|-----|------------|--------------------------------------------------------------|
+| 1   | Canvas     | Workspace and at least two plan nodes have saved placements. |
+| 2   | Session    | A durable session record may have a placement.               |
+| 3   | Repository | Repository entities and relationships remain authoritative.  |
 
-### Flow 1.1: Launch From Plan Node
+### Flow 1.1: Move Every Relevant Node Kind
 
-1. User selects a plan node and chooses **Open AI session**.
-2. Existing launch controls collect provider, prompt, context, and terminal surface.
-3. Backend validates workspace containment and starts the existing bounded embedded session.
-4. Canvas adds a terminal node with an `implements` relationship to the plan.
-5. Terminal Workbench opens and attaches to the granted WebSocket channel.
-6. Lifecycle state changes are reflected on the node and in the Workbench.
+1. User moves the workspace node.
+2. Only the workspace placement changes; plan and session coordinates remain unchanged.
+3. User moves a plan node and then a session node.
+4. Frontend patches only the changed placements with expected revisions.
+5. Save state changes from **Saving** to **Saved**.
+6. User reloads the page.
+7. Backend resolves current entity state while frontend restores the saved coordinates.
 
-### Flow 1.2: Inspect Produced Work
+### Flow 1.2: New And Removed Work
 
-1. User switches the selected node from terminal to plan or artifact.
-2. Workbench reuses existing file, Markdown, diff, Git, and verification components.
-3. Canvas keeps the terminal transport alive while another node is selected.
-4. User returns to the terminal node and reconnects within the existing lease rules.
+1. A repository scan discovers a new plan.
+2. The new plan appears under **Unplaced work** without moving saved nodes.
+3. User chooses **Place new items** and accepts its suggested placement.
+4. User removes a plan placement.
+5. The plan remains in the repository and can appear as unplaced work again.
 
-### Flow 1.3: Finish Or Cancel
+### Flow 1.3: Placement Conflict
 
-1. A session exits, fails, or the user confirms cancellation.
-2. Canvas shows the terminal node's final lifecycle state.
-3. User may remove the transient node without deleting any repository content.
-4. The document may retain only the safe session reference and outcome until the user removes it.
-
-### Edge Cases
-
-- Launch errors remain attached to the initiating plan and do not create a running terminal node.
-- Closing an active terminal requires the existing confirmation; hiding a node does not cancel its process.
-- Losing the browser channel follows PM-020 reconnect and lease behavior.
-- Terminal bytes and grant tokens are never included in Canvas save requests.
-
-## Scenario 2: Restore Spatial Workspace
-
-### Goal
-
-> Restore the user's spatial arrangement while refreshing every referenced entity from its authoritative source.
-
-### Flow 2.1: Reload Saved Canvas
-
-1. User revisits the Canvas route.
-2. Frontend loads the saved document, viewport, and display preferences.
-3. Backend resolves references against current workspaces, item index, and active sessions.
-4. Frontend preserves saved positions and updates labels, status, branch, health, and lifecycle badges.
-5. Unresolved references render as stale nodes instead of disappearing silently.
+1. Two views move the same node from the same placement revision.
+2. The first save succeeds.
+3. The second receives `canvas_placement_conflict` for that node only.
+4. Unrelated node positions remain saved and interactive.
+5. User reloads the affected position or explicitly reapplies their position to the latest revision.
 
 ### Edge Cases
 
-- A renamed plan keeps its position because its stable item ID still resolves.
-- A deleted plan becomes a stale reference with **Remove from Canvas** and **Locate replacement** actions.
-- An ended or expired session cannot reconnect and shows its last safe lifecycle summary.
-- A reset operation previews the new auto-layout and requires confirmation before replacing manual positions.
+- Viewport updates do not conflict with node placement updates.
+- Removing a running session placement does not cancel its process.
+- Reset layout shows a preview and requires confirmation.
+- Background refresh never runs auto-layout over saved positions.
 
-## Scenario 3: Agent-Backed Cloud Execution
+## Scenario 2: Branch-Safe Plan Launch
 
 ### Goal
 
-> Use the full Canvas and Terminal Workbench while privileged work remains on the user's machine.
+> Start one embedded terminal in the branch represented by the selected plan and never silently execute elsewhere.
 
 ### Starting State
 
-| #   | Area    | State                                                                      |
-|-----|---------|----------------------------------------------------------------------------|
-| 1   | Cloud   | User is authenticated and owns or can access an Agent-Backed workspace.    |
-| 2   | Storage | Canvas document is stored in Postgres under the authenticated owner scope. |
-| 3   | Agent   | Owner Cloud Agent may be connected or offline.                             |
+| #   | Area       | State                                                               |
+|-----|------------|---------------------------------------------------------------------|
+| 1   | Plan       | A plan node references the current checkout branch.                 |
+| 2   | Capability | `terminal.launch` is available.                                     |
+| 3   | Tooling    | A supported terminal or AI provider is installed and authenticated. |
 
-### Flow 3.1: Connected Agent
+### Flow 2.1: Matching Branch Launch
 
-1. Browser loads Canvas metadata and indexed plan state from the Cloud API.
-2. User launches a terminal or AI action from a plan node.
-3. Cloud API authorizes the action and routes it through the owner Agent channel.
-4. Agent executes in the local workspace and streams safe lifecycle/output frames back to the browser.
-5. Postgres stores layout and safe entity references, never repository files or terminal content.
+1. User selects a plan and chooses **Open session**.
+2. Frontend submits workspace, plan, expected branch, observed commit, provider choice, and one idempotency key.
+3. Backend resolves the plan and rechecks current checkout, repository context, authorization, provider, and session
+   limits.
+4. Backend creates a durable session record.
+5. Backend starts one ephemeral process binding.
+6. Canvas adds the new session as unplaced work or accepts a deterministic position near the plan.
+7. Workbench attaches to the granted terminal channel.
 
-### Flow 3.2: Agent Goes Offline
+### Flow 2.2: Double Submission
 
-1. Agent availability changes while the Canvas is open.
-2. Terminal, Git, file mutation, AI, runtime, and verification actions become unavailable.
-3. Existing nodes and read models remain visible with an **Agent offline** explanation.
-4. After reconnection and capability refresh, supported actions become available without recreating the Canvas.
+1. User double-clicks launch or the client retries after an uncertain response.
+2. The same idempotency key reaches the backend more than once.
+3. Backend returns the original session record and never starts a second process.
 
-## Scenario 4: Agentless Remote Snapshot
+### Flow 2.3: Branch Changes Before Launch
 
-### Goal
-
-> Explore and organize a provider snapshot without implying that Cloud can run commands or mutate the repository.
-
-### Flow 4.1: Inspect Snapshot Canvas
-
-1. User opens a Canvas for a `remote_snapshot` workspace.
-2. Backend resolves workspace and plan data at the stored immutable commit.
-3. Frontend labels the workspace as **Remote Snapshot** and shows the selected ref and abbreviated commit.
-4. User may arrange nodes, add app-owned notes, open read-only plan content, and save Canvas layout.
-5. Terminal and AI actions are replaced by **Connect Agent** or **Open locally** guidance.
+1. Plan node was resolved for `feature/PM-037`.
+2. Current checkout changes to `main` before the launch request is handled.
+3. Backend rejects the request with `terminal_branch_mismatch`.
+4. Canvas shows expected branch, current branch, and available dirty-state guidance.
+5. No session record, placement, or process is created.
+6. User may open existing branch controls or refresh Canvas.
 
 ### Edge Cases
 
-- Canvas layout remains editable when the user's role permits app-state writes, even though repository content is read-only.
-- Missing provider authorization shows stale snapshot metadata and recovery guidance.
-- A new provider commit does not mutate an existing snapshot node; selecting a new snapshot refreshes its entity reference.
-- No terminal placeholder may be represented as running or connected.
+- Canvas never switches branches automatically.
+- A dirty or conflicted tree does not produce an unsafe one-click branch-switch action.
+- A stale or forbidden plan cannot launch.
+- Launch failure after record creation updates the record to `failed` without storing command arguments or prompt.
 
-## Scenario 5: Concurrent Or Stale Canvas State
-
-### Goal
-
-> Avoid silent layout loss when app state changes concurrently or entity references expire.
-
-### Flow 5.1: Optimistic Version Conflict
-
-1. Two browser views load the same document version.
-2. First view saves and receives the next version.
-3. Second view attempts to save the old version and receives a conflict.
-4. Frontend pauses automatic saving and offers **Reload latest** or **Keep my layout as a copy**.
-5. No update silently overwrites the newer document.
-
-### Limits And Validation
-
-- Reject duplicate node IDs, invalid node/edge kinds, non-finite coordinates, dangling edge endpoints, and oversized documents.
-- Bound document name, note text, node count, edge count, viewport, and serialized document size.
-- Deleting a workspace does not cascade-delete a Canvas without an explicit app-state cleanup policy.
-- Deleting a Canvas never deletes a plan, workspace, session, file, or Git object.
-
-## Scenario 6: Accessible Canvas Navigation
+## Scenario 3: Durable Session And Live Process
 
 ### Goal
 
-> Operate the Canvas without precise pointer input and without relying on animation or color alone.
+> Restore honest session history without treating an in-memory terminal process as durable.
 
-### Flow 6.1: Keyboard Focus
+### Flow 3.1: Select Away And Return
 
-1. User tabs to the Canvas toolbar and chooses **Search nodes**.
-2. User filters by workspace, plan, or session name.
-3. Selecting a result focuses the node, updates an accessible status region, and opens its Workbench.
-4. Arrow or documented shortcut actions move between connected nodes.
-5. Escape returns focus from Workbench controls to the selected node.
+1. User launches a session and receives a running durable record plus live binding.
+2. User selects the workspace or plan node.
+3. The process continues under existing terminal lifecycle rules.
+4. User returns to the session node.
+5. Canvas attaches to the same session; it does not relaunch or create another terminal owner.
+
+### Flow 3.2: Page Reload
+
+1. Browser reloads while the backend process remains alive.
+2. Canvas reloads the durable session record and detects its live binding.
+3. Existing grant and reconnect rules determine whether terminal attachment can resume.
+4. The saved session placement remains unchanged.
+
+### Flow 3.3: Application Restart
+
+1. Application stops while a durable record is `running`.
+2. Live process bindings and grants are lost.
+3. On startup, reconciliation marks the record `interrupted`.
+4. Canvas restores the session placement and explains that metadata survived but the terminal cannot reconnect.
+5. User may remove the placement or launch a new session from the linked plan.
+
+### Edge Cases
+
+- Cancelling a process updates the durable record but leaves its placement.
+- Removing a placement leaves the process and record unchanged.
+- Active sessions not yet placed remain visible through **Active sessions**.
+- Terminal bytes, input, prompt, arguments, grants, and credentials never appear in Canvas or session-record writes.
+
+## Scenario 4: Git And Verification Freshness
+
+### Goal
+
+> Show whether a verification result applies to the repository state the user is currently viewing.
+
+### Starting State
+
+| #   | Area       | State                                                           |
+|-----|------------|-----------------------------------------------------------------|
+| 1   | Workspace  | Current branch and Git status are readable.                     |
+| 2   | Plan       | Verification is configured and `verification.run` is available. |
+| 3   | Repository | Repository state is stable at launch.                           |
+
+### Flow 4.1: Fresh Passing Result
+
+1. User selects the plan and starts verification.
+2. Backend captures branch, HEAD, index, worktree, and verification configuration fingerprints.
+3. Verification runs and captures a completion fingerprint.
+4. Start and completion fingerprints match and the run passes.
+5. Canvas shows **Passed · current** with an abbreviated verified revision.
+
+### Flow 4.2: Repository Changes After Pass
+
+1. User modifies, stages, creates, removes, or commits a relevant file, or changes branch.
+2. Current repository fingerprint changes.
+3. Resolver compares it with the completed verification fingerprint.
+4. Canvas shows **Passed · stale** and removes current-success emphasis.
+5. User may rerun verification when the capability is available.
+
+### Flow 4.3: Repository Changes During Verification
+
+1. Verification starts with one fingerprint.
+2. Relevant repository state changes before it completes.
+3. Completion fingerprint differs from the start fingerprint.
+4. Canvas shows **Inconclusive · repository changed during run**, even if the command exited successfully.
+
+### Edge Cases
+
+- Verification configuration or selected-spec changes invalidate the previous result.
+- Relevant untracked files participate in freshness.
+- A fingerprint failure is inconclusive, never fresh.
+- Node position remains unchanged while Git and verification projections refresh.
+- Application restart does not restore verification jobs in PM-037; durable verification lineage is follow-up scope.
+
+## Scenario 5: Capability And Stale-Reference Recovery
+
+### Goal
+
+> Explain why an action cannot run without hard-coding behavior from deployment or access-mode labels.
+
+### Flow 5.1: Capability States
+
+1. Resolver composes provider support, availability, authorization, and branch context.
+2. Canvas receives `available`, `unavailable`, `unsupported`, `forbidden`, or `conflicted` for each relevant action.
+3. UI enables, disables, hides, or explains the action according to its state and disclosure policy.
+4. Backend revalidates the action if the user invokes it.
+
+### Flow 5.2: Stale Plan Reference
+
+1. A referenced plan is renamed, moved, deleted, or no longer accessible.
+2. Canvas retains its placement and returns a safe stale or forbidden projection.
+3. A candidate replacement may be shown by branch and identifier.
+4. Canvas does not silently rebind because current plan IDs are path-derived.
+5. User removes the placement or explicitly confirms a replacement.
 
 ### Acceptance Notes
 
-- Every node exposes its kind, name, lifecycle/status, and available actions through an accessible label.
-- Selection, blocked state, and session lifecycle use text/icon cues in addition to color.
-- Reduced-motion preference removes animated edges and uses static running indicators.
-- Zoom controls, fit-to-content, focus mode, auto-layout, and reset are available as visible buttons.
+- A forbidden reference never exposes its former cached title.
+- Datastore, deployment, and access-mode labels do not determine UI action behavior.
+- Provider availability changes do not rearrange or delete nodes.
+- Agentless Remote Snapshot behavior is not delivered by PM-037; future snapshot UI consumes the same capability states.
+
+## Scenario 6: Keyboard And Narrow-Window Operation
+
+### Goal
+
+> Operate essential Canvas workflows without precise pointer input.
+
+### Flow 6.1: Search And Move
+
+1. User tabs to **Search nodes**.
+2. User filters by plan identifier, title, branch, or session state.
+3. Selecting a result focuses the node and opens its Workbench.
+4. Documented keyboard controls move the node by a bounded increment.
+5. Save status is announced.
+6. Escape returns focus from Workbench to the selected node or search result.
+
+### Flow 6.2: Narrow Window
+
+1. User opens Canvas in a narrow desktop window.
+2. Workbench opens as an overlay.
+3. User closes it through an explicit **Return to Canvas** action.
+4. Search and **Fit content** recover nodes that are outside the current viewport.
+
+### Acceptance Notes
+
+- Every node exposes kind, title, branch, lifecycle/status, and blocked state in its accessible name.
+- Git, verification freshness, branch mismatch, and session state use text/icon cues in addition to color.
+- Reduced-motion preference removes smooth Canvas transitions.
+- Essential navigation and launch actions remain available through normal focusable controls.

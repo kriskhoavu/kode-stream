@@ -1,211 +1,258 @@
-# Frontend Design: Terminal Canvas And Workbench
+# Frontend Design: Focused Terminal Canvas
 
 ## Overview
 
-Add a lazy-loaded `/canvas` route and Workspace navigation entry. The page uses the existing `@xyflow/react`
-dependency and Knowledge Graph conventions for pan, zoom, selection, handles, and viewport fitting. Custom semantic
-nodes show current workspace, plan, session, and artifact state. Selecting a node opens a resizable right or bottom
-Workbench that composes existing terminal, item, file, diff, Git, and verification features.
+Add a lazy-loaded `/canvas` route that renders one branch-scoped workspace Canvas with draggable workspace, plan, and
+session nodes. The page uses the existing `@xyflow/react` dependency and Knowledge Graph interaction patterns, but it is
+not a general graph editor. It presents current workspace state, launches branch-safe sessions, shows Git and
+verification freshness, and links to existing detailed pages.
 
-The Canvas is an additional orchestrator, not a replacement for Workstream or Item Workspace. Existing detailed pages
-remain directly reachable from node actions.
+The frontend never derives support from deployment or workspace mode names. It renders the current action capability
+state returned for each resolved entity and handles capability changes without discarding layout.
 
-## Route And Navigation
+## Route And Context
 
-| Route / control         | Behavior                                                                                 |
-|-------------------------|------------------------------------------------------------------------------------------|
-| `/canvas`               | Resolve the default Canvas for the active workspace.                                     |
-| `/canvas?canvasId={id}` | Open a specific owned Canvas document.                                                   |
-| Workspace nav: Canvas   | Navigate to the active workspace's Canvas without changing workspace selection.          |
-| Node: Open full view    | Navigate to existing Item Workspace, Workstream, Workspace, or verification destination. |
-| Command palette         | Search and focus Canvas nodes while the Canvas route is active.                          |
+| Route or Control                 | Behavior                                                                                     |
+|----------------------------------|----------------------------------------------------------------------------------------------|
+| `/canvas`                        | Resolve the default layout for the active workspace and selected branch.                     |
+| Workspace navigation: **Canvas** | Open Canvas without changing workspace or branch selection.                                  |
+| Branch control                   | Use the existing selected branch context; changing branch resolves a different layout.       |
+| **Open full view**               | Navigate to the existing Workspace, Workstream, Item Workspace, or verification destination. |
+| Node search                      | Find and focus a visible workspace, plan, or session node.                                   |
 
-The Canvas page is not rendered in the Chrome extension surface during the first PM-037 delivery because PM-034 does
-not support embedded terminal streaming there. A future extension-safe read-only surface can reuse the same capability
-gates without changing the Canvas data model.
+PM-037 does not add Canvas to the Chrome extension surface. It does not introduce canvas IDs, copies, lists, or
+cross-workspace routing.
 
 ## Frontend Data Model
 
 ### API Types
 
-| Type                   | Responsibility                                                                      |
-|------------------------|-------------------------------------------------------------------------------------|
-| `CanvasDocument`       | Persisted document identity, version, viewport, preferences, nodes, and edges.      |
-| `CanvasNode`           | Node layout, kind, entity reference, grouping, and note presentation data.          |
-| `CanvasEdge`           | Typed relationship between two node IDs.                                            |
-| `ResolvedCanvasNode`   | Current title, status, resolution, capabilities, and recovery guidance.             |
-| `CanvasCapabilities`   | Effective layout, repository, terminal, AI, Git, runtime, and verification actions. |
-| `CanvasUpdateInput`    | Expected version plus complete validated spatial document body.                     |
-| `ActiveSessionSummary` | Safe session lifecycle metadata without channel grant or terminal bytes.            |
+| Type                    | Responsibility                                                                         |
+|-------------------------|----------------------------------------------------------------------------------------|
+| `CanvasLayout`          | Layout identity, workspace, branch context, viewport, and metadata version.            |
+| `CanvasPlacement`       | Node ID, entity reference, absolute position, collapsed state, and placement revision. |
+| `CanvasEntityRef`       | Workspace, branch-aware plan, or durable session identity.                             |
+| `ResolvedCanvasNode`    | Current title, status, resolution, capabilities, and recovery guidance.                |
+| `ActionCapability`      | Action state, reason code, message, and recovery actions.                              |
+| `SessionRecord`         | Durable safe lifecycle metadata plus current live-binding availability.                |
+| `VerificationFreshness` | `fresh`, `stale`, or `inconclusive` with verified/current revision summaries.          |
+| `PlacementPatch`        | Changed coordinates and expected placement revision.                                   |
 
 ### Local Interaction State
 
-| State                     | Owner                | Persistence                                                         |
-|---------------------------|----------------------|---------------------------------------------------------------------|
-| Selected node IDs         | `CanvasPage`         | Session only.                                                       |
-| Active Workbench tab      | Workbench controller | Local storage per user and Canvas; not server domain state.         |
-| Unsaved nodes and edges   | Canvas editor hook   | In memory until debounced save succeeds.                            |
-| Save status and conflict  | Canvas editor hook   | In memory; visible through status region and conflict dialog.       |
-| Search and focus mode     | Canvas toolbar       | Session only unless promoted to a display preference.               |
-| Saved viewport/layout     | Canvas document      | App-state repository through versioned API.                         |
-| Terminal emulator/process | Existing AI session  | Existing in-memory manager and WebSocket; never Canvas persistence. |
+| State                                       | Owner                           | Persistence                              |
+|---------------------------------------------|---------------------------------|------------------------------------------|
+| Layout and placement revisions              | Server query state              | App-state repository                     |
+| Optimistic positions and dirty node IDs     | Canvas state hook               | Memory until acknowledged                |
+| Selected node                               | Canvas page                     | Memory                                   |
+| Node search query                           | Search control                  | Memory                                   |
+| Workbench width and open state              | Existing UI preference pattern  | Local preference where appropriate       |
+| Terminal channel, grant, and xterm instance | Existing terminal-session layer | Memory only                              |
+| Current capabilities and freshness          | Query projection                | Refetched; never written with placements |
 
-## Component Structure
+## Node Types
 
-> `CanvasPage` -> `CanvasToolbar`, `CanvasViewport`, `CanvasWorkbench`, `CanvasStatusRegion`, and conflict/empty dialogs.
+### Workspace Node
 
-> `CanvasViewport` -> React Flow -> `WorkspaceCanvasNode`, `PlanCanvasNode`, `SessionCanvasNode`, `ArtifactCanvasNode`,
-> `NoteCanvasNode`, and `GroupCanvasNode`.
+Displays workspace name, selected branch, HEAD summary, dirty/conflict status, and the most important action
+capabilities. Selecting it opens the Workspace panel with Git status and links to full workspace controls.
 
-> `CanvasWorkbench` -> `TerminalWorkbench`, `PlanWorkbench`, `ArtifactWorkbench`, or read-only snapshot guidance.
+Dragging a Workspace node moves only that node. It does not translate plan or session nodes and does not change
+workspace membership, branch selection, or repository state.
 
-Suggested files:
+### Plan Node
 
-| File / area                                         | Purpose                                                                               |
-|-----------------------------------------------------|---------------------------------------------------------------------------------------|
-| `web/src/pages/CanvasPage.tsx`                      | Route-level loading, ownership, empty, error, and orchestration states.               |
-| `web/src/features/canvas/CanvasViewport.tsx`        | React Flow setup, viewport, selection, keyboard focus, and node/edge change handling. |
-| `web/src/features/canvas/canvasModel.ts`            | Convert API document plus projections into React Flow nodes and edges.                |
-| `web/src/features/canvas/useCanvasDocument.ts`      | Load/resolve, optimistic edit state, debounced save, conflict, and retry behavior.    |
-| `web/src/features/canvas/useCanvasLayout.ts`        | Deterministic initial and reset layout.                                               |
-| `web/src/features/canvas/nodes/*`                   | Semantic node components with bounded detail and accessible actions.                  |
-| `web/src/features/canvas/CanvasWorkbench.tsx`       | Selected-node workbench shell and resize behavior.                                    |
-| `web/src/features/ai-session/TerminalWorkbench.tsx` | Reusable terminal renderer extracted from the current dock.                           |
-| `web/src/features/canvas/canvas.css`                | Canvas, node, toolbar, Workbench, responsive, and motion styling.                     |
+Displays plan identifier, title, plan status, branch, observed commit, verification freshness, and live-session count.
+Selecting it opens the Plan panel with launch, verification, and full-view actions.
 
-## Semantic Zoom
+The branch label remains visible at the normal detail level. An executable action never relies on color alone to show
+whether the plan matches the current checkout.
 
-| Detail level | Approximate zoom | Visible information                                                            |
-|--------------|------------------|--------------------------------------------------------------------------------|
-| Overview     | below 0.55       | Node kind, title, aggregate health/status, active-session count.               |
-| Standard     | 0.55 to 1.25     | Branch/status, owner/provider, dependency badges, verification summary.        |
-| Detail       | above 1.25       | Secondary metadata and compact actions; full content still opens in Workbench. |
+### Session Node
 
-Zoom thresholds are frontend constants and do not change persisted entity data. Node dimensions remain bounded so
-semantic detail does not cause uncontrolled re-layout.
+Displays durable provider label, linked plan, requested branch, lifecycle state, and live-binding availability. A
+running live binding opens the terminal. An ended or interrupted record opens lifecycle detail and a relaunch action.
 
-## Default Layout
+Removing the node removes only its placement. Stopping a process requires a separate explicit action and confirmation.
 
-The initial layout is deterministic and recoverable:
+## Derived Connections
 
-1. Place one workspace node at the left origin.
-2. Group plan nodes in columns by existing status order.
-3. Order plans by current Workstream ordering with stable item ID as a tie-breaker.
-4. Place active session nodes beside their associated plan; place workspace-only sessions in a separate workbench lane.
-5. Place verification artifacts after the plan or session that produced them.
-6. Fit the viewport only after node sizes settle.
-7. Save positions after creation or explicit reset preview acceptance.
+PM-037 may render subtle orientation lines for:
 
-Manual node moves do not trigger auto-layout. New indexed plans enter an **Unplaced work** tray until the user chooses
-**Place new items** or runs auto-layout, preventing background scans from rearranging spatial memory.
+- Workspace contains plan, derived from repository/index state.
+- Plan launched session, derived from the durable session record.
 
-## Workbench Behavior
+Connections have no handles, labels, delete action, or persistence in Canvas writes. The UI must not imply that moving,
+hiding, or removing a node changes the underlying relationship.
 
-| Selected kind | Default Workbench content                                                                 |
-|---------------|-------------------------------------------------------------------------------------------|
-| Workspace     | Workspace health, branch state, scan, and workspace-level AI launch.                      |
-| Plan          | Markdown preview, files, metadata, diff, Jira, Git, verification, and AI launch controls. |
-| Session       | Existing xterm terminal plus lifecycle controls and plan/workspace context.               |
-| Artifact      | Verification result, Git-change summary, commit, or linked file detail.                   |
-| Note / group  | App-owned text or group properties; never repository content.                             |
-| Stale node    | Resolution explanation, remove reference, locate replacement, or relaunch action.         |
+## Initial And Restored Layout
 
-Extract reusable terminal presentation from `EmbeddedTerminalDock` while preserving the dock as an alternate host.
-One session has one xterm/channel attachment at a time. Moving it between dock and Canvas Workbench transfers the
-presentation owner rather than creating two simultaneous terminal consumers.
+- First load creates deterministic suggested positions for the workspace, current branch plans, and durable sessions.
+- Existing placements always win over new suggestions.
+- Newly indexed plans and new sessions enter an **Unplaced work** list with a suggested position.
+- **Place new items** accepts suggestions without moving existing nodes.
+- **Reset layout** shows a preview and requires confirmation before patching positions.
+- Page reload restores node positions. Current entity labels, status, Git state, capabilities, live-binding state, and
+  verification freshness are resolved again.
+- Viewport restoration must never hide the selected workspace with no obvious **Fit content** recovery control.
+
+## Placement Save Behavior
+
+1. Apply drag positions locally and record affected node IDs.
+2. Save on drag end after a short debounce; coalesce multi-select movement into one bounded patch.
+3. Include only position, collapsed state when changed, and expected placement revision.
+4. Update successful revisions without replacing unaffected placements.
+5. Preserve dirty positions through transient failures and retry with bounded backoff.
+6. On conflict, pause retries for the affected nodes and offer **Reload position** or **Apply my position to latest** after
+   an explicit comparison.
+7. Warn before navigation only when dirty placement changes cannot be retained or retried.
+
+Viewport saves use the layout metadata version and cannot conflict with placement revisions.
+
+## Focused Workbench
+
+| Selected Node                | PM-037 Content                                                                                           |
+|------------------------------|----------------------------------------------------------------------------------------------------------|
+| Workspace                    | Branch and Git status summary, refresh, and links to existing workspace controls.                        |
+| Plan                         | Plan summary, branch context, terminal or AI launch, verification action/status, and **Open full view**. |
+| Live session                 | Existing xterm surface and lifecycle controls.                                                           |
+| Ended or interrupted session | Safe lifecycle summary, remove placement, and relaunch from linked plan.                                 |
+| Stale node                   | Explanation, remove placement, and explicit replacement candidate when available.                        |
+
+PM-037 does not embed Markdown editing, file browsing, diff, Jira, complete Git controls, or full verification artifacts.
+Those remain in their existing authoritative views.
+
+Only one full terminal surface is mounted in the Canvas Workbench. Selecting another node must not stop its process,
+but the terminal presentation may detach under existing reconnect rules. The implementation must not create a second
+subscriber or xterm owner for the same session when switching between existing terminal UI and Canvas.
+
+## Branch Mismatch UX
+
+When `terminal.launch` is `conflicted` because the plan branch differs from the checkout:
+
+- Show expected and current branch names next to the disabled launch action.
+- Explain whether the working tree is dirty or conflicted when that information is available.
+- Offer **Open branch controls** or **Refresh context** only when supported.
+- Do not offer a one-click automatic switch from Canvas.
+- Do not create a session placement for a rejected launch.
+- If the branch changes between rendering and submission, display the structured server rejection and refresh the node.
+
+The same launch idempotency key is reused while a single user submission is pending, preventing double-click process
+creation.
+
+## Session Lifecycle UX
+
+| State                          | Presentation                                                                      |
+|--------------------------------|-----------------------------------------------------------------------------------|
+| `starting`                     | Durable record exists; launch is pending and cannot be submitted again.           |
+| `running` with live binding    | Terminal can attach under existing grant rules.                                   |
+| `running` without live binding | Refresh briefly; reconcile to interrupted rather than offering a false reconnect. |
+| `exited`                       | Show exit outcome and optional relaunch.                                          |
+| `cancelled`                    | Show explicit user cancellation.                                                  |
+| `failed`                       | Show safe launch/process failure without command arguments or prompt.             |
+| `interrupted`                  | Explain that metadata survived but the live process did not.                      |
+
+A hidden or unplaced running session remains visible in a compact **Active sessions** indicator so users understand that
+it consumes a process slot.
+
+## Git And Verification UX
+
+### Git
+
+The Workspace node and panel show current branch, clean/dirty/conflicted status, and changed-file count. Detailed file
+operations remain in the existing Git UI.
+
+### Verification
+
+The Plan node shows result status separately from freshness:
+
+- **Passed · current**
+- **Passed · stale**
+- **Failed · stale**
+- **Inconclusive · repository changed during run**
+- **Running for {abbreviated fingerprint}**
+
+A stale green result must not use the same success emphasis as a current green result. The panel shows verified and
+current branch/commit summaries and offers rerun when `verification.run` is available. Repository changes update
+freshness without moving the node.
 
 ## Capability Presentation
 
-Node and Workbench actions consume the backend capability snapshot and current global runtime context.
+| State         | UI Behavior                                                                               |
+|---------------|-------------------------------------------------------------------------------------------|
+| `available`   | Enable the action.                                                                        |
+| `unavailable` | Disable it and show temporary recovery guidance.                                          |
+| `unsupported` | Hide secondary actions or show a concise unsupported explanation for primary actions.     |
+| `forbidden`   | Disable or hide according to disclosure policy and explain the missing permission safely. |
+| `conflicted`  | Disable execution and present the context that must be resolved.                          |
 
-| State                  | Presentation                                                                            |
-|------------------------|-----------------------------------------------------------------------------------------|
-| Local writable         | Full repository and terminal actions.                                                   |
-| Agent-Backed online    | Full role-authorized actions with **Cloud Agent** execution label.                      |
-| Agent-Backed offline   | Read model remains; execution actions disabled with **Reconnect owner Agent** guidance. |
-| Remote Snapshot        | Commit/ref label, read-only content, and **Connect Agent** or **Open locally** handoff. |
-| Role lacks Canvas edit | Canvas controls are read-only; entity actions follow their independent permissions.     |
-| Stale entity           | Mutating/execution controls hidden; recovery actions remain.                            |
-
-Do not infer support from `runtimeContext.mode` alone. Workspace access mode, role, effective capabilities, and Agent
-availability may each remove actions.
-
-## Save And Conflict UX
-
-- Apply node moves, viewport changes, grouping, notes, and edges locally first.
-- Debounce document saves and coalesce rapid drag/zoom changes.
-- Show compact **Saving**, **Saved**, **Offline**, or **Conflict** state without blocking Canvas interaction.
-- Keep unsaved state in memory after transient failures and retry with bounded backoff.
-- On `409`, stop automatic retries and show **Reload latest** and **Keep my layout as a copy**.
-- Warn before navigation only when unsaved changes cannot be queued or recovered.
-- Never include resolved titles/status, terminal grants, terminal output, file content, or diffs in update payloads.
+Capability reason codes drive presentation; deployment, access-mode, provider, and datastore labels do not drive
+behavior. Labels may still appear as contextual information when useful.
 
 ## Interaction Design
 
-| Interaction          | Result                                                                                |
-|----------------------|---------------------------------------------------------------------------------------|
-| Single select        | Focus node and open/update Workbench.                                                 |
-| Double click / Enter | Open the entity's full existing page or activate terminal focus.                      |
-| Drag node            | Move within Canvas and mark layout dirty.                                             |
-| Connect handles      | Offer only relationship kinds valid for the selected source/target kinds.             |
-| Search               | Filter by visible title/context and focus the chosen node.                            |
-| Focus mode           | Dim or hide nodes not connected to the selected plan.                                 |
-| Fit content          | Fit currently visible nodes without changing saved positions.                         |
-| Auto-layout          | Preview deterministic positions; confirmation replaces current positions.             |
-| Delete node          | Remove reference only; explicit message states the source entity is unchanged.        |
-| Delete Canvas        | Confirm metadata-only deletion; workspace, plans, sessions, and Git remain unchanged. |
+| Interaction           | Result                                                                                     |
+|-----------------------|--------------------------------------------------------------------------------------------|
+| Single select         | Focus node and open or update the Workbench.                                               |
+| Double click or Enter | Open the full entity view, or focus a live terminal for a session node.                    |
+| Drag node             | Move only selected placement or selected placement set.                                    |
+| Node search           | Filter by current resolved title, identifier, branch, or session state and focus a result. |
+| Fit content           | Fit visible nodes without changing saved positions.                                        |
+| Place new items       | Accept positions for currently unplaced entities without moving saved nodes.               |
+| Reset layout          | Preview deterministic positions and confirm before applying them.                          |
+| Remove node           | Remove placement only after stating that the source entity and process are unchanged.      |
+
+There are no connection handles, group drop targets, note editors, edge menus, minimap requirement, or semantic zoom
+modes in PM-037.
 
 ## Accessibility
 
-- Treat the toolbar and Workbench as normal focusable regions; do not rely on Canvas drag gestures for essential actions.
-- Provide node search/list navigation as the keyboard-equivalent spatial navigator.
-- Give every node an accessible name containing kind, title, status, and blocked state.
-- Return focus predictably between selected node and Workbench controls.
-- Announce load, selection, save, conflict, Agent availability, and session lifecycle in polite live regions.
-- Expose visible zoom, fit, focus, auto-layout, and reset controls.
-- Use text and iconography in addition to color for edge kinds and node states.
-- Respect `prefers-reduced-motion`; disable animated edges and smooth viewport transitions.
-- Preserve minimum target sizes, visible focus rings, and usable contrast in both themes.
+- Provide a normal toolbar, node search/list, Workbench, and status regions outside the graphical viewport.
+- Give every node an accessible name with kind, title, branch, lifecycle/status, and blocked state.
+- Support keyboard node selection and bounded keyboard movement with an announced save result.
+- Return focus predictably between a node, its Workbench, and dialogs.
+- Announce load, selection, save, conflict, branch mismatch, session lifecycle, and verification freshness changes.
+- Provide visible zoom and fit controls; do not require precise drag gestures for essential navigation.
+- Use text and icon cues in addition to color.
+- Respect reduced motion and disable smooth viewport transitions when requested.
+- Preserve visible focus rings, minimum target sizes, and both-theme contrast.
 
 ## Responsive Behavior
 
-| Width           | Canvas / Workbench behavior                                                                     |
-|-----------------|-------------------------------------------------------------------------------------------------|
-| Large desktop   | Canvas fills content area; Workbench docks right with bounded resize.                           |
-| Medium desktop  | Workbench may switch between right panel and bottom panel.                                      |
-| Narrow viewport | Canvas remains navigable; Workbench becomes a full overlay with explicit return-to-node action. |
-
-The first release optimizes for desktop engineering workflows. It must remain recoverable on narrow windows but does
-not claim touch-first mobile editing.
+PM-037 targets desktop engineering workflows. On narrow windows, the Workbench becomes an overlay with an explicit
+return-to-node action. The Canvas remains recoverable through search and fit controls but does not claim touch-first
+editing support.
 
 ## Performance
 
-- Lazy-load `CanvasPage`, React Flow node code, and xterm Workbench code.
-- Resolve entity state in backend batches and avoid per-node network requests.
-- Memoize node components and pass small projection objects.
-- Render full terminal, Markdown, diff, and verification content only for the selected Workbench node.
-- Keep animations disabled for large graphs and reduced-motion users.
-- Measure initial layout, save payload, and interaction performance at 100, 500, and the 1,000-node server limit.
+- Lazy-load Canvas and xterm code.
+- Resolve node projections in bounded backend batches.
+- Memoize node components and avoid one request per node.
+- Mount the terminal only for the selected live session.
+- Measure first render, drag, save, and selection at 25, 100, and the 300-placement MVP limit.
+- Avoid animated connections and background auto-layout.
 
 ## Testing
 
-| Level            | Coverage                                                                                        |
-|------------------|-------------------------------------------------------------------------------------------------|
-| Model unit       | Entity-to-node conversion, semantic detail, edge kinds, deterministic layout, stale references. |
-| Hook unit        | Resolve/load, debounced save, retry, conflict pause, copy recovery, active-session refresh.     |
-| Component        | Empty/loading/error, node selection, Workbench switching, capability denial, Agent state.       |
-| Router/App shell | `/canvas`, active workspace changes, lazy loading, extension-surface exclusion.                 |
-| Accessibility    | Labels, focus return, live regions, visible controls, reduced motion, keyboard search.          |
-| Browser playbook | Create/restore Canvas, launch terminal, inspect read-only snapshot, recover offline/conflict.   |
+| Level                | Coverage                                                                                              |
+|----------------------|-------------------------------------------------------------------------------------------------------|
+| Model unit           | API normalization, branch-aware references, derived connections, and verification labels.             |
+| Hook unit            | Resolve/load, placement patching, retry, per-node conflict, viewport independence, and unplaced work. |
+| Component            | Three node kinds, movement semantics, branch mismatch, capability states, and session reconciliation. |
+| Terminal integration | One live binding and one terminal owner; selection never relaunches or cancels.                       |
+| Router               | Active workspace and branch changes resolve the correct layout.                                       |
+| Accessibility        | Search, keyboard movement, focus return, live regions, reduced motion, and non-color states.          |
+| Browser playbook     | Arrange and restore, launch safely, inspect Git, verify, mutate repository, and observe stale result. |
 
 ## Design Decisions
 
-| Decision                                      | Rationale                                                                                       |
-|-----------------------------------------------|-------------------------------------------------------------------------------------------------|
-| Reuse React Flow and Knowledge Graph patterns | Reduces custom viewport code and keeps interactions consistent with an existing dependency.     |
-| Lazy-load Canvas and full Workbench content   | Protects current Workstream startup and avoids rendering many expensive detail components.      |
-| Keep one selected full terminal               | Prevents dozens of xterm renderers and competing channel consumers while nodes remain live.     |
-| Use an unplaced-work tray                     | Background indexing must not destroy the user's saved spatial memory.                           |
-| Preserve existing full pages                  | Canvas provides orchestration while mature page-specific actions remain available.              |
-| Explicit conflict recovery                    | Users choose between the latest shared document and their own copy; no silent coordinate loss.  |
-| Capability-driven controls                    | One UI supports Local, connected/offline Agent-Backed, Agentless, and role restrictions safely. |
+| Decision                                          | Rationale                                                                                        |
+|---------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| Three semantic node types only                    | Keeps the first workflow coherent and daily-use focused.                                         |
+| Workspace moves independently                     | Semantic containment never becomes surprising spatial parenting.                                 |
+| Thin Workbench                                    | Existing detailed views stay authoritative while Canvas validates orchestration value.           |
+| Placement patches                                 | Drag saves stay small and unrelated nodes do not conflict.                                       |
+| Branch context always visible                     | Terminal execution remains understandable and trustworthy.                                       |
+| Durable record shown separately from live binding | Restored metadata never promises a process that no longer exists.                                |
+| Verification status and freshness are separate    | A historical pass cannot look current after repository changes.                                  |
+| No graph authoring in PM-037                      | Relationship meaning is deferred until repository, application, and visual origins are explicit. |

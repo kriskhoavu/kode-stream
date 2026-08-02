@@ -2,114 +2,182 @@
 
 ## Overview
 
-PM-037 adds a spatial Canvas that organizes Kode Stream work as workspace -> plan -> terminal workbench. Users can pan,
-zoom, arrange plans, launch or focus embedded AI sessions, inspect files and diffs, and see verification state without
-leaving the Canvas. Canvas layout is app-owned metadata that references Git-backed work instead of copying repository
-content. Local and Agent-Backed Cloud workspaces support the full execution flow. Remote Snapshot workspaces provide a
-read-only planning surface with local or Agent connection guidance instead of process execution.
+PM-037 adds a focused spatial workbench for the daily workspace -> plan -> session loop. Users can arrange workspace,
+plan, and durable session nodes; launch a branch-safe embedded terminal from a plan; inspect Git and verification state;
+and return to the same layout. Canvas remains a projection of real workspace state. It owns placements and presentation
+only, while repositories, Git, verification, session metadata, and live process managers remain authoritative for their
+domains.
+
+PM-037 establishes the foundation for a larger Canvas product without shipping a general graph editor in the first
+release. Groups, notes, artifacts, custom edges, multiple canvases, snapshots, and collaborative layouts remain explicit
+follow-up investments.
+
+## MVP Outcome
+
+A successful first release proves this loop:
+
+> Open a workspace Canvas -> arrange workspace, plan, and session nodes -> launch a terminal on the correct branch ->
+> inspect Git state -> run verification -> see verification become stale after repository change -> reload and restore
+> the saved arrangement.
 
 ## Scope
 
 ### Goals
 
-- Add a workspace-scoped infinite Canvas with semantic workspace, plan, terminal-session, and artifact nodes.
-- Generate a useful default layout from the selected workspace and its indexed plans.
-- Open the selected node in a resizable workbench for terminal, plan, files, diff, Git, and verification views.
-- Launch an embedded AI session from a plan node and preserve its relationship to the plan while it is active.
-- Persist Canvas documents through the existing app-state storage boundary.
-- Support Local `datadir`, Local SQLite `database`, and Cloud Postgres `database` stores.
-- Gate editing and execution from runtime and workspace capabilities rather than deployment-name checks.
-- Keep terminal output, channel grants, credentials, and repository content outside Canvas persistence.
-- Provide keyboard navigation, focus mode, reduced-motion behavior, and recoverable auto-layout.
+- Add one default Canvas for each workspace and branch context.
+- Make workspace, plan, and durable session nodes draggable.
+- Persist node placements independently from the entities they reference.
+- Restore saved placements while resolving titles, status, capabilities, Git state, verification freshness, and live
+  process availability from their authoritative services.
+- Launch an embedded terminal or AI session only after server-side workspace and branch validation.
+- Separate durable session metadata from live terminal processes, channel grants, and terminal bytes.
+- Record the repository fingerprint verified by each result and report whether that result is fresh or stale.
+- Derive actions from current workspace capabilities instead of deployment or access-mode names.
+- Support the current Local data-dir and SQLite app-state stores through one Canvas repository boundary.
+- Provide clear keyboard access, save state, reset-layout recovery, stale-reference handling, and non-color status cues.
 
-### Non-Goals
+### Non-Goals For PM-037
 
-- No unattended background-agent queue or autonomous multi-agent scheduler.
-- No terminal or AI execution for Agentless Remote Snapshot workspaces.
-- No terminal transcript persistence, replay, or search.
-- No repository-side Canvas file by default.
-- No real-time multi-user co-editing or CRDT in the first release.
-- No arbitrary user-authored node plug-in system.
-- No replacement of Workstream, Item Workspace, Knowledge, or the existing terminal dock.
-- No provider-side Git mutations for Remote Snapshot workspaces.
+- No group, note, or artifact nodes.
+- No user-authored edges or arbitrary relationship editing.
+- No multiple canvases, canvas copies, or collaborative layout merging.
+- No cross-workspace or multi-branch Canvas.
+- No automatic branch switching or worktree creation.
+- No Agent-Backed Cloud execution delivery; the contracts must allow it without mode branching.
+- No Agentless Remote Snapshot Canvas UX; snapshot-backed content is a separate provider capability phase.
+- No full Item Workspace, Workstream, Jira, file editor, or diff UI embedded in Canvas.
+- No transcript persistence, replay, or search.
+- No unattended agent queue or autonomous multi-agent scheduler.
+- No repository-side Canvas file.
+- No touch-first mobile editor or arbitrary node plug-in system.
+
+## Product Direction After PM-037
+
+| Stage | Direction                             | Candidate Capabilities                                                                |
+|-------|---------------------------------------|---------------------------------------------------------------------------------------|
+| 1     | Dependable personal workbench         | PM-037 MVP workflow                                                                   |
+| 2     | Execution orchestrator                | Cloud Agent execution, worktrees, richer session history, verification lineage        |
+| 3     | Knowledge and coordination surface    | Groups, notes, artifacts, derived relationships, Canvas-only links, multiple canvases |
+| 4     | Collaborative engineering environment | Shared layouts, presence, ownership, handoff, and multi-agent visibility              |
+
+Later stages must reuse the PM-037 provider, capability, placement, session, and verification contracts rather than add
+deployment-specific branches to Canvas components.
 
 ## Related Plans
 
-| Item                          | Relationship                 | Key Context                                                                                       |
-|-------------------------------|------------------------------|---------------------------------------------------------------------------------------------------|
-| [PM-020](../PM-020/README.md) | Embedded terminal foundation | Reuse bounded PTYs, channel grants, reconnect leases, cancellation, and the app-level session UI. |
-| [PM-027](../PM-027/README.md) | Session layout foundation    | Reuse movable, resizable, minimized, maximized, and right-panel presentation behavior.            |
-| [PM-032](../PM-032/README.md) | Cloud execution boundary     | Agent-Backed Cloud executes terminal, Git, AI, and verification on the user's machine.            |
-| [PM-033](../PM-033/README.md) | App-state storage boundary   | Add Canvas repositories for Local data-dir, Local SQLite, and Cloud Postgres.                     |
-| [PM-034](../PM-034/README.md) | Agentless workspace boundary | Remote Snapshot nodes are commit-pinned and read-only, with no terminal or AI execution.          |
-| [PM-036](../PM-036/README.md) | E2E runbook surface          | Reuse plan-local browser playbooks and durable journey enrichment after implementation.           |
+| Item                          | Relationship                    | Key Context                                                                                   |
+|-------------------------------|---------------------------------|-----------------------------------------------------------------------------------------------|
+| [PM-020](../PM-020/README.md) | Embedded terminal foundation    | Reuse bounded PTYs, grants, reconnect leases, cancellation, and shutdown behavior.            |
+| [PM-027](../PM-027/README.md) | Session presentation foundation | Reuse the existing terminal surface without introducing a second process owner.               |
+| [PM-032](../PM-032/README.md) | Cloud execution boundary        | Future Agent execution stays on the user's machine and routes through the Agent.              |
+| [PM-033](../PM-033/README.md) | App-state storage boundary      | Add Canvas placements and session records through provider-selected repositories.             |
+| [PM-034](../PM-034/README.md) | Remote Snapshot boundary        | Snapshot content and missing execution are separate provider capabilities, not a Canvas mode. |
+| [PM-036](../PM-036/README.md) | E2E runbook surface             | Reuse provider-neutral playbooks and enrich durable journey coverage after implementation.    |
 
 ## Glossary
 
-| Term                 | Meaning                                                                                        | Maps To (code)                  |
-|----------------------|------------------------------------------------------------------------------------------------|---------------------------------|
-| Terminal Canvas      | Spatial workspace surface that connects plans, sessions, and produced artifacts.               | `CanvasPage`                    |
-| Canvas Document      | App-owned persisted viewport, nodes, edges, and display preferences.                           | `canvas.Document`               |
-| Canvas Node          | Positioned reference to a workspace, plan, terminal session, artifact, note, or group.         | `canvas.Node`                   |
-| Entity Reference     | Stable type and ID link from a Canvas node to an existing Kode Stream entity.                  | `canvas.EntityRef`              |
-| Semantic Zoom        | Detail policy that changes node content by zoom level instead of only scaling it.              | `CanvasDetailLevel`             |
-| Terminal Workbench   | Resizable detail surface that hosts the selected terminal or existing plan/file tooling.       | `TerminalWorkbench`             |
-| Session Summary      | Non-sensitive lifecycle metadata for an active embedded session; never terminal output.        | `ai.Session` projection         |
-| Capability Snapshot  | Effective actions allowed by runtime role, workspace access mode, and Agent availability.      | `CanvasCapabilities`            |
-| Remote Snapshot Node | Read-only node backed by provider content at an immutable resolved commit.                     | `remote_snapshot` workspace     |
-| Stale Reference      | Canvas entity reference whose source workspace, plan, session, or artifact no longer resolves. | Canvas resolution warning state |
+| Term                   | Meaning                                                                           | Maps To                              |
+|------------------------|-----------------------------------------------------------------------------------|--------------------------------------|
+| Terminal Canvas        | Spatial workbench for workspace, plan, and session orchestration.                 | `CanvasPage`                         |
+| Canvas Layout          | App-owned identity and branch-scoped collection of placements.                    | `canvas.Layout`                      |
+| Placement              | Canvas-local position and presentation for an entity reference.                   | `canvas.Placement`                   |
+| Entity Reference       | Branch-aware pointer to an existing workspace, plan, or durable session.          | `canvas.EntityRef`                   |
+| Workspace Context      | Workspace plus branch/ref and observed repository revision used by the Canvas.    | `canvas.WorkspaceContext`            |
+| Action Capability      | Current action state with availability and a machine-readable denial reason.      | `workspace.ActionCapability`         |
+| Session Record         | Durable, non-sensitive metadata describing requested and completed terminal work. | `ai.SessionRecord`                   |
+| Process Binding        | In-memory PTY, process, subscribers, buffer, grants, and reconnect timers.        | Existing terminal manager            |
+| Repository Fingerprint | Branch, HEAD, index, worktree, and verification configuration identity.           | `verification.RepositoryFingerprint` |
+| Fresh Result           | Verification result whose fingerprint still matches the repository.               | Resolved verification projection     |
+| Stale Reference        | Placement whose referenced entity no longer resolves or is no longer accessible.  | Placement resolution warning         |
 
-## Components
+## Concern Boundaries
 
-| Layer    | Component                 | Purpose                                                                                             |
-|----------|---------------------------|-----------------------------------------------------------------------------------------------------|
-| Domain   | `internal/canvas`         | Validate documents, node kinds, entity references, ownership, limits, and optimistic versions.      |
-| Storage  | Canvas repositories       | Persist app-owned documents in `canvases.yaml`, SQLite, or Postgres and include them in sync.       |
-| Service  | Canvas service            | Resolve the default workspace Canvas and enrich references with current plan/session state.         |
-| API      | Canvas endpoints          | List, create, read, update, delete, and resolve Canvas documents with capability-aware responses.   |
-| AI       | Active session projection | List safe session summaries so Canvas terminals survive navigation and can reconnect while alive.   |
-| Frontend | Canvas feature            | Render React Flow viewport, semantic nodes, connections, selection, focus mode, and auto-layout.    |
-| Frontend | Terminal workbench        | Reuse the embedded terminal and item tooling in a Canvas-owned detail surface.                      |
-| Frontend | Capability presentation   | Disable unsupported actions and explain Agentless, offline-Agent, role, and stale-reference states. |
+| Concern                    | Examples                                          | Responsibility                                    |
+|----------------------------|---------------------------------------------------|---------------------------------------------------|
+| Deployment topology        | Local app, Cloud control plane                    | Authentication, ownership, and request routing    |
+| Workspace content provider | Local checkout, Agent checkout, provider snapshot | Repository reads and Git state                    |
+| Execution provider         | Local process, connected Agent, none              | Terminal, AI, runtime, and verification execution |
+| App-state datastore        | Data directory, SQLite, Postgres                  | Canvas placement and durable metadata persistence |
+| Authorization              | Local policy, Cloud role                          | What the current user may do                      |
+
+Canvas may observe these axes through resolved capabilities, but domain and frontend components must not infer behavior
+from deployment, access-mode, or datastore names.
+
+## Capability States
+
+| State         | Meaning                                                         | Example                                         |
+|---------------|-----------------------------------------------------------------|-------------------------------------------------|
+| `available`   | The action is supported, authorized, and ready now.             | Local terminal launch on the checked-out branch |
+| `unavailable` | The action is supported but temporarily cannot run.             | Future owner Agent is offline                   |
+| `unsupported` | The selected providers cannot perform the action.               | Provider snapshot with no execution provider    |
+| `forbidden`   | The provider supports the action but the user lacks permission. | Viewer attempts layout edit                     |
+| `conflicted`  | The action needs context recovery before it can run.            | Plan branch differs from current checkout       |
+
+Capability responses include a stable action name, state, reason code, and safe recovery guidance. The backend
+revalidates every action at execution time; frontend capability state is advisory and may change.
+
+## Data Ownership
+
+| Data                                                  | Authority                 | Canvas Persistence               |
+|-------------------------------------------------------|---------------------------|----------------------------------|
+| Plan content, title, status, repository relationships | Repository and item index | Reference only                   |
+| Branch, commit, dirty state, changed files            | Git                       | Never                            |
+| Verification result and fingerprint                   | Verification domain       | Reference/status projection only |
+| Safe session lifecycle metadata                       | Session record repository | Reference only                   |
+| PTY, process, grants, output, prompt, arguments       | Live process manager      | Never                            |
+| Node position and collapsed presentation              | Canvas repository         | Yes                              |
+| Current resolved labels and capabilities              | Resolver                  | Never                            |
+
+## Node Movement Semantics
+
+- Moving any workspace, plan, or session node changes only that node's placement.
+- A workspace node is a semantic anchor, not a spatial parent. Moving it never moves plan or session nodes.
+- Repository containment does not create drag parenting.
+- Removing a placement never deletes or mutates the referenced entity or live process.
+- Reset layout previews a deterministic placement set before replacing saved positions.
+- Future groups will be explicit visual frames: moving a group applies a delta to members, deleting it leaves members in
+  place, and overlap alone never creates membership.
+
+## Relationship Provenance
+
+| Origin        | Owner                          | MVP Behavior                                            |
+|---------------|--------------------------------|---------------------------------------------------------|
+| `repository`  | Repository or item index       | Derived, read-only, and not persisted by Canvas         |
+| `application` | Session or verification domain | Derived from durable application metadata               |
+| `canvas`      | Canvas layout                  | Reserved for later visual links; not authored in PM-037 |
+
+PM-037 may render workspace-to-plan and plan-to-session connections for orientation. Users cannot edit them, and
+hiding or removing a placement does not mutate the relationship source.
 
 ## Data Flow
 
-> Canvas route -> resolve workspace Canvas -> Canvas repository -> saved document -> entity resolver -> current
-> workspace, item, session, Git, and verification projections -> React Flow nodes -> selected node -> contextual
-> workbench -> explicit file/Git/session action -> existing guarded service.
+> Canvas route -> resolve workspace and branch context -> load placements -> resolve workspace, plan, session, Git, and
+> verification projections -> attach current action capabilities -> render nodes -> select node -> open focused panel or
+> existing full view.
 
-> Layout change -> debounced versioned Canvas update -> selected app-state repository -> updated document version.
+> Drag end -> update affected placement locally -> debounced placement patch with expected placement revision -> Canvas
+> repository -> saved state.
 
-> Plan launch -> existing embedded AI launch -> safe active-session summary -> terminal node relationship -> existing
-> bounded WebSocket channel -> Terminal Workbench. Terminal bytes never enter the Canvas document.
+> Plan launch -> server revalidates execution capability and checkout branch -> create durable session record -> start
+> ephemeral process binding -> attach terminal channel -> update safe lifecycle metadata.
 
-## Support Matrix
-
-| Deployment / workspace mode     | App-state store       | Canvas layout | Plan content                | Terminal / AI workbench            |
-|---------------------------------|-----------------------|---------------|-----------------------------|------------------------------------|
-| Local application               | `datadir`             | Full          | Read and guarded write      | Full, on the local machine         |
-| Local application               | SQLite `database`     | Full          | Read and guarded write      | Full, on the local machine         |
-| Cloud Agent-Backed              | Postgres `database`   | Full          | Through owner Cloud Agent   | Full when owner Agent is connected |
-| Cloud Agentless Remote Snapshot | Postgres `database`   | Full metadata | Commit-pinned and read-only | Unavailable; show handoff guidance |
-| Local Docker                    | Selected local option | Full          | Mounted workspace           | Runs inside the container          |
-
-Canvas layout edits are app-state writes. They remain available for an editable Canvas containing read-only Remote
-Snapshot entities. Repository mutations and process actions are independently disabled.
+> Verification -> capture start fingerprint -> execute -> capture completion fingerprint -> store result fingerprint ->
+> compare with current repository fingerprint on every read -> return fresh, stale, or inconclusive status.
 
 ## Design Decisions
 
-| Decision                                      | Alternatives Considered                            | Rationale                                                                                       |
-|-----------------------------------------------|----------------------------------------------------|-------------------------------------------------------------------------------------------------|
-| Persist references, not copied entity content | Store plan/session snapshots in every node         | Git, indexes, and runtime services remain authoritative and Canvas data stays small.            |
-| Reuse `@xyflow/react`                         | Build pan, zoom, selection, and edges from scratch | The dependency and Knowledge Graph patterns already exist in the frontend.                      |
-| Start workspace-scoped                        | Ship cross-workspace free-form canvases first      | It proves workspace -> plan -> terminal orchestration with clear ownership and bounded queries. |
-| Keep the existing views                       | Replace Workstream and Item Workspace              | Canvas is an orchestrator; established detailed workflows remain reusable.                      |
-| Persist one versioned document blob           | Normalize every node and edge into separate rows   | Matches current JSON-backed stores and keeps v1 migrations and data-dir parity manageable.      |
-| Use optimistic document versions              | Last writer silently wins                          | Cloud users receive a visible conflict instead of losing another update.                        |
-| Persist safe session references only          | Persist transcript or PTY buffer                   | Preserves the existing terminal secrecy and lifecycle boundaries.                               |
-| Derive actions from capabilities              | Branch UI directly on Local/Cloud mode names       | Supports Local, Agent-Backed, Remote Snapshot, roles, and future adapters consistently.         |
-| Make semantic edges typed                     | Allow decorative untyped connections               | Typed relationships remain understandable and can drive focus/filter behavior.                  |
-| Auto-layout is recoverable                    | Force manual arrangement                           | New users get immediate value while saved spatial memory remains under user control.            |
+| Decision                                                   | Alternatives Considered                         | Rationale                                                                                |
+|------------------------------------------------------------|-------------------------------------------------|------------------------------------------------------------------------------------------|
+| Ship a focused workbench MVP                               | General graph editor in the first release       | Validates the daily orchestration loop before expanding node and relationship authoring. |
+| Separate topology, providers, datastore, and authorization | Deployment-mode support matrix                  | Supports new provider combinations without spreading mode checks.                        |
+| Persist placements separately from entities                | Persist resolved graph snapshots                | Preserves source-of-truth boundaries and avoids stale copied data.                       |
+| Patch affected placements                                  | Replace one large Canvas document               | Reduces save payloads and unrelated drag conflicts.                                      |
+| Make the default Canvas branch-scoped                      | Mix branches in one initial graph               | Gives terminal launch a clear execution context and bounds the first workflow.           |
+| Block branch-mismatched launch                             | Silently launch or switch checkout              | Protects user trust and repository safety.                                               |
+| Separate session records from process bindings             | Treat in-memory terminal sessions as durable    | Restores honest lifecycle metadata without persisting terminal secrets.                  |
+| Fingerprint verification inputs                            | Keep the last result green until rerun          | Prevents stale verification from appearing current.                                      |
+| Defer groups and custom edges                              | Ship generic spatial authoring immediately      | Avoids ambiguous movement and relationship semantics.                                    |
+| Treat snapshots as provider composition                    | Treat Agentless as a restricted deployment mode | Allows future read and execution capability combinations independently.                  |
 
 ## Documents
 

@@ -1,84 +1,99 @@
-# UI Playbook 1: Orchestrate A Plan Terminal
+# UI Playbook 1: Operate The Focused Terminal Canvas
 
 ## Goal
 
-> Validate that a user can create or restore a workspace Canvas, launch a plan-linked terminal Workbench when execution
-> is supported, and receive accurate capability guidance when it is not.
+> Validate that a user can arrange and restore workspace, plan, and session nodes; launch one terminal on the correct
+> branch; inspect Git state; and see verification become stale after a repository change.
 
 ## Preconditions
 
-- A PM-037 feature build is deployed to the supplied environment.
-- The account reference and roles are supplied at run time.
-- A writable isolated Local workspace contains at least one indexed plan.
-- An enabled and authenticated AI provider is available if the terminal launch section will run.
-- Optional Cloud data identifies an Agent-Backed workspace and a Remote Snapshot workspace.
-- Do not use production workspaces or credentials.
+- A PM-037 feature build is deployed to the supplied non-production environment.
+- The supplied account can read the workspace, edit app-owned layout, launch the selected provider, and run
+  verification.
+- A writable isolated Local Git workspace contains at least one indexed plan on the current checkout branch.
+- A second safe branch or a controlled branch-mismatch setup is available.
+- The repository can be returned to its starting state after a reversible test file change.
+- Do not use production workspaces, credentials, branches, or provider prompts.
 
 ## Runtime Inputs
 
-| Input                     | Required Value                                                      |
-|---------------------------|---------------------------------------------------------------------|
-| Base URL                  | Supplied at run time                                                |
-| Authentication            | Supplied at run time                                                |
-| Local workspace           | Name of isolated writable workspace with an indexed plan            |
-| Plan                      | Visible plan title or identifier                                    |
-| AI provider               | Test-safe authenticated provider; required only for terminal launch |
-| Agent-Backed workspace    | Optional workspace and owner Agent controls                         |
-| Remote Snapshot workspace | Optional authorized workspace with visible ref and resolved commit  |
+| Input                   | Required Value                                                  |
+|-------------------------|-----------------------------------------------------------------|
+| Base URL                | Supplied at run time                                            |
+| Authentication          | Supplied at run time                                            |
+| Local workspace         | Isolated writable workspace name                                |
+| Plan                    | Visible plan identifier or title on the current branch          |
+| Matching branch         | Current checkout branch containing the plan                     |
+| Mismatch branch         | Safe alternate branch or controlled mismatch procedure          |
+| AI or terminal provider | Test-safe authenticated provider                                |
+| Verification profile    | Deterministic test-safe profile                                 |
+| Repository mutation     | Reversible file change relevant to the verification fingerprint |
 
-## Section A: Create And Restore A Local Canvas
+## Section A: Arrange And Restore The Canvas
 
-| #   | Agent Action                                                                            | Wait Condition                                          | Expected Result                                                                                                  | Write Class |
-|-----|-----------------------------------------------------------------------------------------|---------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|-------------|
-| 1   | Navigate to Kode Stream and select the supplied Local workspace.                        | Workspace name is visible in the application shell.     | Workstream or current workspace view loads without an error.                                                     | Read-only   |
-| 2   | Choose **Canvas** from Workspace navigation.                                            | Canvas loading state finishes.                          | A workspace Canvas opens; first use creates or resolves the default app-owned Canvas.                            | Safe write  |
-| 3   | Inspect the initial spatial view.                                                       | Nodes finish positioning and the viewport fits content. | One workspace node and the indexed plan node are visible; an empty workspace instead shows scan/source guidance. | Read-only   |
-| 4   | Select the supplied plan through node search.                                           | The plan node receives visible focus.                   | Node status is announced and the plan Workbench opens with current plan context.                                 | Read-only   |
-| 5   | Move the plan node to a distinct position and wait until save status becomes **Saved**. | Save status changes from **Saving** to **Saved**.       | The Canvas remains interactive and reports a successful app-state save.                                          | Safe write  |
-| 6   | Reload the page and return to the same Canvas.                                          | Canvas loading and entity resolution finish.            | The moved position and viewport are restored while plan labels/status reflect current indexed state.             | Read-only   |
+| #   | Agent Action                                                                                | Wait Condition                                             | Expected Result                                                                                                           | Write Class |
+|-----|---------------------------------------------------------------------------------------------|------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|-------------|
+| 1   | Navigate to Kode Stream and select the supplied Local workspace and matching branch.        | Workspace and branch are visible in the application shell. | The workspace loads without an error.                                                                                     | Read-only   |
+| 2   | Choose **Canvas** from Workspace navigation.                                                | Canvas loading finishes and **Fit content** is available.  | One workspace node and current branch plan nodes are visible; no group, note, artifact, or editable edge controls appear. | Safe write  |
+| 3   | Record the positions of one workspace node and one plan node, then move the workspace node. | Save status changes from **Saving** to **Saved**.          | Only the workspace position changes; the plan position is unchanged.                                                      | Safe write  |
+| 4   | Move the supplied plan node to a distinct position.                                         | Save status becomes **Saved**.                             | The plan moves without changing the workspace position or repository data.                                                | Safe write  |
+| 5   | Reload the page and reopen Canvas for the same workspace and branch.                        | Entity resolution and placement loading finish.            | Workspace and plan positions are restored while labels, Git state, and capabilities reflect current state.                | Read-only   |
+| 6   | If **Unplaced work** is visible, choose **Place new items**.                                | Placement save finishes.                                   | New items receive positions without moving previously saved nodes.                                                        | Safe write  |
 
-## Section B: Launch And Operate A Plan Terminal
+## Section B: Launch One Branch-Safe Session
 
-| #   | Agent Action                                                                            | Wait Condition                                       | Expected Result                                                                                                     | Write Class |
-|-----|-----------------------------------------------------------------------------------------|------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|-------------|
-| 1   | Select the supplied plan node and choose **Open AI session**.                           | AI launch dialog is visible.                         | Dialog shows current plan/workspace context and enabled providers.                                                  | Read-only   |
-| 2   | Select the supplied provider, embedded surface, and a test-safe prompt; confirm launch. | Session reaches **running** or shows a launch error. | A successful launch opens Terminal Workbench and adds a session node connected to the plan; an error is contextual. | Safe write  |
-| 3   | Select the plan node, then return to the session node.                                  | Each selected node updates the Workbench.            | Terminal transport stays active while the Workbench switches; returning does not launch a second process.           | Read-only   |
-| 4   | Use the visible terminal controls to change Workbench presentation and then restore it. | Terminal fit and status stabilize after each change. | The same running session remains attached and focus can return to the node.                                         | Read-only   |
-| 5   | Close the active session and accept the cancellation confirmation.                      | Session lifecycle changes to cancelled or exited.    | Session node shows a final state; removing its reference does not remove the plan or repository content.            | Safe write  |
+| #   | Agent Action                                                                            | Wait Condition                                                | Expected Result                                                                                                                                 | Write Class |
+|-----|-----------------------------------------------------------------------------------------|---------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| 1   | Select the supplied plan node.                                                          | The Plan Workbench is visible.                                | The plan identifier, matching branch, terminal action, verification action, and **Open full view** are visible as capabilities allow.           | Read-only   |
+| 2   | Choose **Open session**, select the supplied provider, and submit one test-safe launch. | Session becomes running or a contextual launch error appears. | One durable session is created. A successful launch exposes one live terminal and one session node or unplaced session item linked to the plan. | Safe write  |
+| 3   | While submission is pending, activate the launch control again if it remains enabled.   | The original request settles.                                 | At most one session and one process exist for the submission; no duplicate terminal appears.                                                    | Safe write  |
+| 4   | Select the workspace node, then return to the session node.                             | Each Workbench state finishes loading.                        | The same process remains active and returning to the session does not relaunch it.                                                              | Read-only   |
+| 5   | Move the session node and reload the browser page without restarting the backend.       | Canvas and session state reload.                              | Session placement is restored; the record remains visible and reconnect follows existing grant/lease behavior.                                  | Safe write  |
 
-## Section C: Capability Boundaries
+## Section C: Reject A Branch Mismatch
 
-Run only the subsections for which suitable Cloud runtime inputs were supplied.
+Run only when the supplied environment provides a reversible branch-mismatch procedure. Do not switch branches when
+the repository is dirty or conflicted unless the supplied setup explicitly makes that safe.
 
-| #   | Agent Action                                                                                | Wait Condition                                   | Expected Result                                                                                                                   | Write Class |
-|-----|---------------------------------------------------------------------------------------------|--------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|-------------|
-| 1   | Open the supplied Agent-Backed workspace Canvas while its owner Agent is connected.         | Canvas and Agent status finish loading.          | Workspace is labeled Agent-Backed and role-authorized terminal actions are available.                                             | Read-only   |
-| 2   | Disconnect or stop the isolated owner Agent using the supplied test control.                | UI reports the owner Agent as offline.           | Existing nodes remain visible; terminal, Git, file mutation, AI, runtime, and verification actions are unavailable with guidance. | Safe write  |
-| 3   | Reconnect the owner Agent.                                                                  | UI reports the Agent as connected.               | Supported actions return without recreating or rearranging the Canvas.                                                            | Safe write  |
-| 4   | Open the supplied Remote Snapshot workspace Canvas.                                         | Commit-pinned content and Canvas finish loading. | Workspace shows **Remote Snapshot**, selected ref, resolved commit, and read-only plan state.                                     | Read-only   |
-| 5   | Inspect the plan node's available actions.                                                  | Capability state is visible.                     | No terminal/AI, file mutation, Git mutation, runtime, or verification action is enabled; Agent/local handoff is visible.          | Read-only   |
-| 6   | Move a Remote Snapshot plan node and wait for **Saved**, if the account can edit app state. | Save status settles or role denial appears.      | Layout saves independently of repository read-only state, or role-specific denial explains why it cannot.                         | Safe write  |
+| #   | Agent Action                                                                                                       | Wait Condition                              | Expected Result                                                                                                           | Write Class |
+|-----|--------------------------------------------------------------------------------------------------------------------|---------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|-------------|
+| 1   | Use the supplied safe setup to make the plan branch differ from the current checkout, then refresh Canvas context. | Branch and capability state finish loading. | The plan shows expected and current branch context; launch is conflicted or the server is ready to reject stale UI state. | Safe write  |
+| 2   | Attempt **Open session** only when the controlled fixture intentionally leaves the stale action available.         | A branch-mismatch result is visible.        | The launch is rejected with expected/current branch guidance and no new session or process is created.                    | Safe write  |
+| 3   | Open the offered branch recovery control.                                                                          | Existing branch controls load.              | Canvas does not switch branches automatically and does not bypass dirty-tree safeguards.                                  | Read-only   |
 
-## Section D: Keyboard And Recovery
+## Section D: Git And Verification Freshness
 
-| #   | Agent Action                                                                                      | Wait Condition                           | Expected Result                                                                                     | Write Class |
-|-----|---------------------------------------------------------------------------------------------------|------------------------------------------|-----------------------------------------------------------------------------------------------------|-------------|
-| 1   | Use only visible keyboard controls to open node search and select a plan.                         | Selected node and Workbench are visible. | Focus order is predictable and the selected kind, title, and state are announced.                   | Read-only   |
-| 2   | Enable the browser or OS reduced-motion preference and revisit the Canvas.                        | Canvas finishes rendering.               | Running and relationship states remain understandable without animated edges or smooth transitions. | Read-only   |
-| 3   | If a controlled version-conflict fixture is supplied, edit from two views and save the older one. | Conflict message is visible.             | Automatic saving pauses and offers **Reload latest** or **Keep my layout as a copy**.               | Safe write  |
+| #   | Agent Action                                                                            | Wait Condition                                          | Expected Result                                                                                                        | Write Class |
+|-----|-----------------------------------------------------------------------------------------|---------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|-------------|
+| 1   | Return to the matching branch and select the workspace node.                            | Git status finishes loading.                            | Current branch plus clean, dirty, or conflicted status and changed-file count are visible.                             | Read-only   |
+| 2   | Select the supplied plan and run the supplied verification profile.                     | Verification reaches a final state.                     | A completed result shows command outcome separately from freshness and includes a safe abbreviated verified revision.  | Safe write  |
+| 3   | If the result passed and is current, apply the supplied reversible repository mutation. | Git state refreshes and verification freshness updates. | Git becomes dirty or changes revision, and the previous result becomes **stale** without moving the plan node.         | Safe write  |
+| 4   | Rerun verification after the mutation when permitted.                                   | Verification reaches a final state.                     | The new result is associated with the changed repository fingerprint; the previous result is not presented as current. | Safe write  |
+
+## Section E: Removal, Keyboard, And Recovery
+
+| #   | Agent Action                                                                              | Wait Condition                                     | Expected Result                                                                                                      | Write Class |
+|-----|-------------------------------------------------------------------------------------------|----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------|
+| 1   | Use node search to focus the supplied plan without pointer selection.                     | The plan node and Workbench receive visible focus. | The accessible state includes kind, title, branch, status, and blocked state where applicable.                       | Read-only   |
+| 2   | Use the documented keyboard move control on the plan.                                     | Save status is announced as **Saved**.             | The plan moves by a bounded increment and other node positions remain unchanged.                                     | Safe write  |
+| 3   | Select the session node and choose **Remove from Canvas** without cancelling the process. | Removal confirmation and save finish.              | The placement disappears, while the session record/process remains discoverable through active or unplaced sessions. | Safe write  |
+| 4   | Use **Reset layout**, inspect the preview, and cancel it.                                 | Preview closes.                                    | Saved positions remain unchanged.                                                                                    | Read-only   |
+| 5   | Enable reduced motion and revisit Canvas.                                                 | Canvas finishes rendering.                         | Status remains understandable without smooth viewport transitions or animated connections.                           | Read-only   |
 
 ## Evidence
 
-- Capture the initial Canvas after auto-layout.
-- Capture the plan-linked running session node and Terminal Workbench without recording sensitive terminal content.
-- Capture Agent offline guidance when the optional Agent-Backed section runs.
-- Capture Remote Snapshot labels and disabled execution guidance when the optional Agentless section runs.
-- Capture version-conflict recovery when the controlled fixture is available.
+- Capture the initial Canvas and the independently moved workspace and plan positions.
+- Capture the restored layout after reload.
+- Capture one plan-linked session without recording terminal content, prompts, arguments, or credentials.
+- Capture branch-mismatch guidance when the controlled setup is available.
+- Capture a completed current verification result and the same result after it becomes stale.
+- Capture keyboard focus and non-color status cues.
 
 ## Cleanup
 
-- Cancel any terminal session created by this playbook.
-- Remove only the test Canvas/session references when safe; do not delete the workspace, plan, branch, or repository.
-- Restore the isolated owner Agent if the Agent-Backed section changed its connection state.
-- Record skipped optional sections and missing runtime inputs in `results/latest.md`.
+- Cancel any process created by this playbook through the normal terminal control.
+- Revert the isolated repository mutation through the supplied safe procedure.
+- Restore the original test branch through existing guarded controls.
+- Keep or remove test placements according to the supplied environment policy; never delete the workspace, plan,
+  branch, or repository.
+- Record skipped conditional steps and missing runtime inputs in `results/latest.md`.

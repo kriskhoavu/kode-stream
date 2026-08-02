@@ -1,215 +1,239 @@
-# Implementation Plan: PM-037 - Terminal Canvas Workspace Orchestrator
+# Implementation Plan: PM-037 - Focused Terminal Canvas
 
 ## Overview
 
-Implement a workspace-scoped spatial Canvas that persists app-owned layouts, resolves current workspace/plan/session
-state, and opens selected entities in a contextual Workbench. Local data-dir and SQLite support the full flow. Cloud
-uses Postgres; Agent-Backed workspaces execute through the owner Agent, while Remote Snapshot workspaces stay
-commit-pinned and read-only for repository/process actions.
+Implement a polished Local Canvas MVP for the workspace -> plan -> session loop. Establish provider-neutral capabilities,
+branch-aware references, placement persistence, durable safe session metadata, and verification freshness before adding
+the viewport and Workbench. Every phase preserves existing terminal, Git, item, verification, and storage ownership.
 
-## Terminology Lock
-
-All code, fields, API parameters, tests, and UI labels use:
-
-- `Canvas Document` for the persisted app-owned spatial document.
-- `Canvas Node` and `Canvas Edge` for positioned references and typed relationships.
-- `Entity Reference` for links to workspace, plan, session, or artifact entities.
-- `Terminal Canvas` for the product surface.
-- `Terminal Workbench` for the selected session's full terminal presentation.
-- `Remote Snapshot` for Agentless Cloud workspaces; never use `remote workspace` as an execution promise.
-- `Agent-Backed` for Cloud workspaces that route privileged actions through an owner Cloud Agent.
-
-Do not use `canvas` to rename the existing xterm host class unless the code refers to the Terminal Canvas feature.
-
-## Dependencies And Delivery Gates
-
-| Dependency                         | Required behavior                                                                 | PM-037 handling                                                                            |
-|------------------------------------|-----------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
-| PM-020 / PM-027 embedded sessions  | Bounded PTY, grants, reconnect, cancellation, and reusable terminal presentation. | Reuse and refactor without changing secrecy or process limits.                             |
-| PM-032 Agent command routing       | Owner Agent accepts and streams terminal, AI, Git, and verification actions.      | Capability remains unavailable until routing exists; do not execute on the Cloud host.     |
-| PM-033 storage providers and sync  | Provider-backed app state in data-dir, SQLite, and Postgres.                      | Add Canvas repository to every provider and manual-sync snapshot.                          |
-| PM-034 Remote Snapshot read models | Commit-pinned workspace and indexed plan reads without an Agent.                  | Show only currently resolvable snapshot entities; no fabricated plan/session state.        |
-| PM-036 E2E quality surface         | Ticket-local playbooks can be enriched into a canonical reusable browser journey. | Update PM-037 playbook during implementation, then run `wiki-enrich` before final handoff. |
-
-Local delivery is independently testable. Agent-Backed and complete Remote Snapshot acceptance must not be reported as
-finished while their required access-adapter capabilities are unavailable.
+The broader Canvas vision remains in the README roadmap. Groups, notes, artifacts, custom edges, multiple canvases,
+Cloud Agent execution, Remote Snapshot UX, worktrees, and collaboration are not implementation deliverables for
+PM-037.
 
 ## Phases Summary
 
-| Phase | Name                                       | Track    | Status  |
-|-------|--------------------------------------------|----------|---------|
-| B1    | Canvas domain and repositories             | Backend  | Pending |
-| B2    | Canvas service and API contracts           | Backend  | Pending |
-| B3    | Resolution, capability, and session state  | Backend  | Pending |
-| F1    | Canvas route, types, and document state    | Frontend | Pending |
-| F2    | Infinite viewport and semantic nodes       | Frontend | Pending |
-| F3    | Terminal and entity Workbench              | Frontend | Pending |
-| F4    | Mode gating, accessibility, and resilience | Frontend | Pending |
-| F5    | Browser journey and final integration      | Frontend | Pending |
+| Phase | Name                                                  | Track      | Status  |
+|-------|-------------------------------------------------------|------------|---------|
+| B1    | Provider axes and action capabilities                 | Backend    | Pending |
+| B2    | Layout, placement, and session repositories           | Backend    | Pending |
+| B3    | Durable session lifecycle and branch-safe launch      | Backend    | Pending |
+| B4    | Verification freshness and Canvas API                 | Backend    | Pending |
+| F1    | Canvas route and placement state                      | Frontend   | Pending |
+| F2    | Draggable semantic nodes and restored layout          | Frontend   | Pending |
+| F3    | Focused Workbench and session terminal                | Frontend   | Pending |
+| F4    | Git, verification, capability, and accessibility UX   | Frontend   | Pending |
+| I1    | Browser journey, documentation, and final integration | Full stack | Pending |
 
 ## Backend Phases
 
-### Phase B1: Canvas Domain And Repositories
+### Phase B1: Provider Axes And Action Capabilities
 
 **Deliverables:**
 
-- [ ] Add `internal/canvas` document, node, edge, entity-reference, viewport, preference, and validation models.
-- [ ] Define Canvas repository operations for list, resolve default, get, versioned update, create copy, and delete.
-- [ ] Add bounded validation for ownership, kinds, IDs, references, groups, coordinates, zoom, counts, and payload size.
-- [ ] Add file-backed Canvas repository using app data `canvases.yaml` and atomic guarded writes.
-- [ ] Add SQL Canvas repository and migration version 2 for SQLite and Postgres.
-- [ ] Extend `storage.RepositoryBundle`, provider composition, status fixtures, and cleanup with Canvas repository support.
-- [ ] Extend manual storage sync and backups so Canvas documents round-trip between Local data-dir and SQLite.
-- [ ] Add repository contract, migration, version-conflict, isolation, and sync tests.
+- [ ] Define deployment-topology, workspace-content-provider, execution-provider, datastore, and authorization concerns
+  without adding Canvas behavior keyed by deployment names.
+- [ ] Add action capability state, reason code, safe message, and recovery-action models.
+- [ ] Implement capability composition for `layout.move`, `repo.read`, `git.status`, `terminal.launch`, and
+  `verification.run`.
+- [ ] Map current Local checkout and Local process behavior into content and execution provider adapters.
+- [ ] Keep current Cloud role and Remote Snapshot behavior working outside Canvas while exposing adapter-compatible
+  support for future phases.
+- [ ] Revalidate capabilities within the existing guarded action services rather than trusting UI projections.
+- [ ] Add tests for available, unavailable, unsupported, forbidden, and branch-conflicted outcomes.
 
-**Verification:** `go test ./internal/canvas ./internal/storage`
+**Verification:** `go test ./internal/workspace ./internal/server/api ./internal/provider`
 
-**Commit:** `PM-037: Add Canvas domain and app-state repositories`
+**Commit:** `PM-037: Add provider-aware action capabilities`
 
 ---
 
-### Phase B2: Canvas Service And API Contracts
+### Phase B2: Layout, Placement, And Session Repositories
 
 **Deliverables:**
 
-- [ ] Add Canvas service ownership and workspace-access validation.
-- [ ] Implement idempotent default Canvas resolution by owner, workspace, workspace scope, and `default` document key.
-- [ ] Add list, resolve, get, versioned update, create-copy, and metadata-only delete handlers under `/api/canvases`.
-- [ ] Register Gin routes through the existing transport boundary.
-- [ ] Add stable bad-request, forbidden, not-found, size-limit, and `canvas_version_conflict` mappings.
-- [ ] Audit Canvas mutations and blocked intents without serialized document, note content, prompts, or terminal data.
-- [ ] Add API tests for Local identity, Cloud ownership isolation, roles, conflicts, validation, and deletion isolation.
+- [ ] Add `internal/canvas` layout, placement, branch-aware entity-reference, validation, and repository contracts.
+- [ ] Implement one default layout for owner, workspace, and branch key.
+- [ ] Implement placement-level optimistic revisions and bounded batch updates.
+- [ ] Add durable safe session-record domain and repository contracts under the AI/session boundary.
+- [ ] Add data-dir repositories with guarded atomic writes for layouts, placements, and session records.
+- [ ] Add the next SQLite migration and repositories for normalized layouts, placements, and session records.
+- [ ] Extend `storage.RepositoryBundle`, provider composition, manual Local storage sync, backups, status fixtures, and
+  cleanup.
+- [ ] Reject terminal data, repository content, cross-workspace references, invalid geometry, and invalid revisions.
+- [ ] Add repository contract, migration, sync, backup, isolation, limit, and conflict tests.
 
-**Verification:** `go test ./internal/canvas ./internal/server/api`
+**Verification:** `go test ./internal/canvas ./internal/ai ./internal/storage`
 
-**Commit:** `PM-037: Add Canvas service and API`
+**Commit:** `PM-037: Persist Canvas placements and session records`
 
 ---
 
-### Phase B3: Resolution, Capability, And Session State
+### Phase B3: Durable Session Lifecycle And Branch-Safe Launch
 
 **Deliverables:**
 
-- [ ] Resolve workspace and plan references in bounded batches from registered workspaces and current item indexes.
-- [ ] Resolve Remote Snapshot references only at their selected immutable commit and mark incomplete read models clearly.
-- [ ] Add safe active embedded-session listing by accessible workspace without channel grants, output, input, prompts, or arguments.
-- [ ] Resolve session nodes against the existing in-memory manager and return explicit ended/stale states.
-- [ ] Compose Canvas capabilities from runtime role, workspace access mode, editability, owner Agent availability, and action capability.
-- [ ] Route Canvas-initiated execution into existing guarded services and workspace access adapters; never execute on Cloud host.
-- [ ] Return recovery guidance for offline Agent, Remote Snapshot, missing workspace/plan/session, and role denial.
-- [ ] Add Local, Agent-Backed online/offline, Remote Snapshot, stale-reference, and safe-projection tests.
-- [ ] Confirm existing PM-020 session limit, lease, grant, cancellation, and shutdown tests remain unchanged.
+- [ ] Split safe durable session lifecycle metadata from ephemeral PTY/process binding state.
+- [ ] Associate the current terminal manager binding with a session-record ID without persisting grants, bytes, prompts,
+  arguments, buffers, environment variables, or credentials.
+- [ ] Add safe session-record listing by accessible workspace and branch.
+- [ ] Reconcile `starting` and `running` records without live bindings to `interrupted` during application startup.
+- [ ] Extend launch requests with expected workspace, plan branch, observed commit, and idempotency key.
+- [ ] Re-resolve the plan and current checkout immediately before process start.
+- [ ] Return `terminal_branch_mismatch` with expected/current branch and safe Git recovery context.
+- [ ] Ensure repeated submissions with one idempotency key return one record and start at most one process.
+- [ ] Preserve current PM-020 grant, lease, cancellation, session-limit, origin, and shutdown behavior.
+- [ ] Add matched branch, changed branch, dirty tree, stale plan, forbidden plan, launch failure, page reload, application
+  restart, cancellation, placement removal, and sensitive-field tests.
 
-**Verification:** `go test ./internal/ai ./internal/canvas ./internal/workspace ./internal/server/api`
+**Verification:** `go test ./internal/ai ./internal/git ./internal/item ./internal/server/api`
 
-**Commit:** `PM-037: Resolve Canvas entities and execution capabilities`
+**Commit:** `PM-037: Add durable branch-safe terminal sessions`
+
+---
+
+### Phase B4: Verification Freshness And Canvas API
+
+**Deliverables:**
+
+- [ ] Add deterministic repository fingerprinting for branch, HEAD, staged content, relevant tracked/untracked working
+  content, and verification configuration.
+- [ ] Capture start and completion fingerprints on verification jobs.
+- [ ] Project `fresh`, `stale`, or `inconclusive` by comparing completed and current fingerprints.
+- [ ] Keep verification jobs in memory for PM-037; do not introduce durable verification history.
+- [ ] Add Canvas default resolve, get, placement patch, and viewport patch handlers.
+- [ ] Resolve workspace, branch plan, durable session, live-binding, Git, and verification projections in bounded batches.
+- [ ] Add deterministic initial placements plus unplaced projections for new plans and sessions.
+- [ ] Render repository and application relationships as response-only derived connections.
+- [ ] Return stale and forbidden references without deleting placements or leaking former titles.
+- [ ] Add API tests for branch scoping, per-placement conflicts, viewport independence, new unplaced work, stale references,
+  capability states, safe sessions, and verification freshness.
+
+**Verification:** `go test ./internal/canvas ./internal/verification ./internal/git ./internal/server/api`
+
+**Commit:** `PM-037: Resolve Canvas state and verification freshness`
 
 ## Frontend Phases
 
-### Phase F1: Canvas Route, Types, And Document State
+### Phase F1: Canvas Route And Placement State
 
 **Deliverables:**
 
-- [ ] Add Canvas API types and methods to the existing shared API layer.
-- [ ] Add `/canvas` and `canvasId` routing with lazy-loaded `CanvasPage`.
-- [ ] Add the Canvas entry to Workspace navigation outside the Chrome extension surface.
-- [ ] Implement resolve/load, local edits, debounced versioned save, retry, save status, and conflict pause hooks.
-- [ ] Implement **Reload latest** and **Keep my layout as a copy** conflict recovery.
-- [ ] Preserve active workspace selection and route behavior when switching workspaces.
-- [ ] Add router, API normalization, hook, ownership/error, and conflict tests.
+- [ ] Add Canvas, placement, branch-aware entity reference, action capability, safe session, and verification freshness
+  API types.
+- [ ] Add lazy-loaded `/canvas` routing for the active workspace and selected branch.
+- [ ] Add **Canvas** to Workspace navigation outside the Chrome extension surface.
+- [ ] Implement default resolve/load and branch-context switching.
+- [ ] Implement optimistic node positions, dirty-node tracking, debounced placement patches, and bounded retry.
+- [ ] Keep viewport saves independent from placement revisions.
+- [ ] Implement affected-node conflict recovery through **Reload position** and explicit reapply to latest.
+- [ ] Preserve dirty positions through transient failures and warn only when navigation risks losing them.
+- [ ] Add router, API normalization, branch-change, placement-save, conflict, retry, and viewport tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/app web/src/features/canvas`
 
-**Commit:** `PM-037: Add Canvas route and document state`
+**Commit:** `PM-037: Add Canvas route and placement state`
 
 ---
 
-### Phase F2: Infinite Viewport And Semantic Nodes
+### Phase F2: Draggable Semantic Nodes And Restored Layout
 
 **Deliverables:**
 
-- [ ] Add React Flow viewport with pan, zoom, fit, selection, minimap threshold, grid preference, and bounded controls.
-- [ ] Add workspace, plan, session, artifact, note, and group node renderers.
-- [ ] Add typed relationship edges and valid source/target connection rules.
-- [ ] Implement overview, standard, and detail semantic zoom levels.
-- [ ] Add deterministic initial/reset layout and preview confirmation.
-- [ ] Add **Unplaced work** behavior so scans do not rearrange saved manual layouts.
-- [ ] Add search-to-focus, focus mode, remove-reference, and open-full-view actions.
-- [ ] Memoize nodes and test model conversion at 100, 500, and 1,000 nodes.
-- [ ] Add model, layout, node, edge, selection, and empty-state tests.
+- [ ] Add the React Flow viewport with visible pan, zoom, fit, selection, and reset controls.
+- [ ] Add memoized workspace, plan, and session node renderers only.
+- [ ] Make all three node kinds draggable and prove that moving the workspace does not move other nodes.
+- [ ] Render repository and application connections without handles or edit/delete controls.
+- [ ] Implement deterministic first placement, restored saved positions, **Unplaced work**, and **Place new items**.
+- [ ] Implement reset-layout preview and confirmation.
+- [ ] Add node search and focus by title, identifier, branch, and session state.
+- [ ] Implement placement removal with explicit entity/process isolation messaging.
+- [ ] Measure behavior at 25, 100, and 300 placements.
+- [ ] Add movement, save, restore, unplaced, reset, removal, search, and render-limit tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas`
 
-**Commit:** `PM-037: Add infinite Canvas and semantic nodes`
+**Commit:** `PM-037: Add draggable Canvas work nodes`
 
 ---
 
-### Phase F3: Terminal And Entity Workbench
+### Phase F3: Focused Workbench And Session Terminal
 
 **Deliverables:**
 
-- [ ] Extract a reusable `TerminalWorkbench` presentation from `EmbeddedTerminalDock` without duplicating session ownership.
-- [ ] Preserve floating, side-panel, maximized, minimized, resize, reconnect, cancellation, and focus behaviors.
-- [ ] Add Canvas Workbench shell with right, bottom, and narrow-viewport overlay presentations.
-- [ ] Compose existing plan Markdown, files, metadata, diff, Jira, Git, and verification features for selected plan nodes.
-- [ ] Launch workspace or plan AI sessions through existing composer controls and add the resulting session node relationship.
-- [ ] Keep active terminal transports alive while selecting other Canvas nodes.
-- [ ] Add stale/ended session recovery and remove-reference actions.
-- [ ] Add tests proving one session has one active terminal host and moving between dock/Workbench does not relaunch.
+- [ ] Add a focused Workbench shell with right-panel and narrow-window overlay presentations.
+- [ ] Show workspace Git summary, plan actions, live session terminal, and ended/interrupted lifecycle detail.
+- [ ] Reuse the existing xterm/session presentation without introducing a second process, subscriber, or terminal owner.
+- [ ] Add plan launch with one idempotency key per pending user submission.
+- [ ] Show expected/current branch and recovery actions for `terminal_branch_mismatch`.
+- [ ] Add a new session to unplaced work or accept its deterministic position near the plan.
+- [ ] Preserve the live process when selecting another node; follow existing reconnect rules on return.
+- [ ] Show active unplaced sessions so hidden processes remain discoverable.
+- [ ] Separate **Remove from Canvas** from **Cancel process** and retain confirmations.
+- [ ] Add matching-branch, mismatch, double-submit, selection switch, reload, interruption, cancellation, and isolation tests.
 
-**Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session web/src/features/canvas web/src/pages/ItemWorkspacePage.test.ts`
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session web/src/features/canvas`
 
-**Commit:** `PM-037: Add Canvas Terminal Workbench`
+**Commit:** `PM-037: Add branch-safe Canvas terminal Workbench`
 
 ---
 
-### Phase F4: Mode Gating, Accessibility, And Resilience
+### Phase F4: Git, Verification, Capability, And Accessibility UX
 
 **Deliverables:**
 
-- [ ] Drive every node and Workbench action from effective capabilities rather than runtime-name checks.
-- [ ] Add Local data-dir/SQLite labels only where storage context helps recovery, not as normal workflow noise.
-- [ ] Add Agent-Backed online/offline execution labels and recovery guidance.
-- [ ] Add Remote Snapshot ref/commit labels, read-only Workbench state, and Agent/local handoff guidance.
-- [ ] Add accessible node names, keyboard search/navigation, visible toolbar controls, focus return, and live status regions.
-- [ ] Add reduced-motion behavior, non-color state cues, both-theme contrast, and responsive Workbench layouts.
-- [ ] Retain unsaved edits across transient API failures and warn only when navigation risks losing them.
-- [ ] Add role, Agent state, Remote Snapshot, keyboard, reduced-motion, responsive, and retry tests.
+- [ ] Show branch, HEAD summary, clean/dirty/conflicted state, and changed-file count on the workspace node and panel.
+- [ ] Show verification result status separately from current/stale/inconclusive freshness.
+- [ ] Remove current-success emphasis from stale passed results and show verified/current revision summaries.
+- [ ] Refresh freshness after branch, commit, staged, unstaged, untracked, or verification configuration changes.
+- [ ] Drive every action from action capability state and reason code, not deployment, access-mode, provider, or datastore
+  names.
+- [ ] Add safe stale-reference recovery and never display cached titles for forbidden entities.
+- [ ] Add keyboard node search/selection/movement, accessible names, focus return, and polite status regions.
+- [ ] Add non-color state cues, reduced-motion behavior, both-theme contrast, and narrow-window recovery.
+- [ ] Add Git, freshness, capability, stale/forbidden, keyboard, reduced-motion, responsive, and retry tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
 
-**Commit:** `PM-037: Complete Canvas modes and accessible UX`
+**Commit:** `PM-037: Complete Canvas status and accessible UX`
 
----
+## Integration Phase
 
-### Phase F5: Browser Journey And Final Integration
+### Phase I1: Browser Journey, Documentation, And Final Integration
 
 **Deliverables:**
 
-- [ ] Update `automation/scenario-01-orchestrate-plan-terminal.md` to match implemented visible labels and states.
-- [ ] Run the Local browser playbook in a fresh Playwright MCP context when runtime inputs are supplied.
-- [ ] Exercise Agent-Backed and Remote Snapshot sections only when suitable Cloud runtime inputs exist.
-- [ ] Record passed, failed, blocked, and skipped results in `automation/results/latest.md` with evidence references.
-- [ ] Run `wiki-enrich` so durable reusable Canvas coverage is synthesized under `wiki/e2e-testing/`.
-- [ ] Verify canonical E2E coverage describes Local, offline Agent, and Agentless capability boundaries.
-- [ ] Update architecture, storage, Cloud mode, and user-facing README documentation with actual delivered behavior.
-- [ ] Run full backend, frontend, production build, formatting, and plan consistency checks.
+- [ ] Update the PM-037 playbook to match implemented labels and selectors.
+- [ ] Run the Local journey in a fresh Playwright MCP context when runtime inputs are supplied.
+- [ ] Verify independent workspace, plan, and session movement plus restored layout.
+- [ ] Verify matching-branch launch, double-submit protection, branch-mismatch rejection, and session interruption semantics.
+- [ ] Verify Git state and passed-result staleness after a controlled repository mutation.
+- [ ] Record passed, failed, blocked, and skipped steps in `automation/results/latest.md` with safe evidence references.
+- [ ] Run `wiki-enrich` and verify the durable Canvas journey documents delivered Local behavior and future capability
+  boundaries accurately.
+- [ ] Update architecture, storage, terminal, verification, and user-facing README documentation with delivered behavior.
+- [ ] Confirm deferred graph, Cloud Agent, and Remote Snapshot features are not described as implemented.
+- [ ] Run full backend tests, frontend tests, production build, Markdown formatting, and plan consistency checks.
 
 **Verification:** `go test ./... && npm run build && npm test -- --run`
 
-**Commit:** `PM-037: Verify and document Terminal Canvas`
+**Commit:** `PM-037: Verify and document focused Terminal Canvas`
 
 ## Post-Implementation Checklist
 
-- [ ] Every phase is committed separately with its listed PM-037 commit subject.
-- [ ] Canvas content remains app-owned and outside registered repositories.
-- [ ] Local `datadir` and Local SQLite behavior match, including manual storage sync.
-- [ ] Cloud uses Postgres; no Cloud data-dir behavior is introduced.
-- [ ] Agent-Backed commands execute only through the owner Agent and never on the Cloud host.
-- [ ] Remote Snapshot has no terminal, AI, Git mutation, file mutation, runtime, or verification execution.
-- [ ] Terminal grants, bytes, prompts, arguments, credentials, repository content, and diffs are absent from Canvas storage/logs.
-- [ ] Canvas delete and node removal do not delete source entities.
-- [ ] Version conflicts never silently overwrite a newer Canvas document.
-- [ ] Existing Workstream, Item Workspace, Knowledge Graph, external terminal, and embedded dock workflows still pass.
-- [ ] `plan.e2e-runbook` remains true and durable wiki journey coverage is verified before handoff.
-- [ ] Planning documents contain no stale terminology, endpoint, type, or file references.
+- [ ] Every phase is verified and committed separately with its listed PM-037 subject.
+- [ ] Canvas stores placements and presentation only, never copied entity state.
+- [ ] Workspace, plan, and session nodes are all draggable; moving a workspace moves no other node.
+- [ ] Placement conflicts are scoped to affected nodes and viewport saves are independent.
+- [ ] Current branch is revalidated on the server immediately before terminal process start.
+- [ ] Repeated launch submissions start at most one process.
+- [ ] Durable session records contain no prompt, argument, environment, grant, output, input, buffer, credential, or file
+  content.
+- [ ] Application restart marks records without live bindings interrupted and never offers false reconnect.
+- [ ] Verification becomes stale after relevant repository or configuration change and inconclusive after during-run
+  change.
+- [ ] Action behavior uses capability states and reason codes, not mode or datastore checks.
+- [ ] Layout removal and reset never mutate workspaces, plans, sessions, processes, Git, or verification entities.
+- [ ] Groups, notes, artifacts, custom edges, multiple canvases, Agent execution, snapshot UX, and collaboration remain
+  deferred.
+- [ ] Existing Workstream, Item Workspace, terminal dock, Git, and verification workflows still pass.
+- [ ] `plan.e2e-runbook` remains true and durable wiki journey coverage is verified before final handoff.
