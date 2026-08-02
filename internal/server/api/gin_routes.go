@@ -26,6 +26,7 @@ func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 	a.registerNavigationRoutes(api)
 	a.registerSystemRoutes(api)
 	a.registerStorageRoutes(api)
+	a.registerCanvasRoutes(api)
 	a.registerStateSearchAIRoutes(api)
 	a.registerCloudAgentRoutes(api)
 	a.registerWorkspaceReadRoutes(api)
@@ -34,6 +35,14 @@ func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 	a.registerKnowledgeVerificationRoutes(api)
 	a.registerGitRoutes(api)
 	a.registerStreamingRoutes(api)
+}
+
+func (a *API) registerCanvasRoutes(api *gin.RouterGroup) {
+	api.POST("/canvas/default", ginHTTPHandler(a.resolveDefaultCanvas))
+	api.GET("/canvas/layouts/:id", ginHTTPHandler(a.canvasLayout))
+	api.PATCH("/canvas/layouts/:id/placements", ginHTTPHandler(a.patchCanvasPlacements))
+	api.PATCH("/canvas/layouts/:id/viewport", ginHTTPHandler(a.patchCanvasViewport))
+	api.DELETE("/canvas/layouts/:id/placements/:nodeId", ginHTTPHandler(a.removeCanvasPlacement))
 }
 
 func (a *API) registerStorageRoutes(api *gin.RouterGroup) {

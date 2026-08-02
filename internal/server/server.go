@@ -14,6 +14,8 @@ import (
 	"syscall"
 
 	"kode-stream/internal/ai"
+	"kode-stream/internal/canvas"
+	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
 	appgit "kode-stream/internal/git"
 	"kode-stream/internal/item/writer"
@@ -72,11 +74,24 @@ func NewServer(port int) (*Server, error) {
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore)
 	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithDatabaseHealth(state.SQLStore).WithStorageServices(state.StatusService, state.SyncService).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
+	canvasService := canvas.NewService(state.Canvas, reg, idx, git, aiSessionService, apiHandler.VerificationService(), runtimeConfig.Mode, canvasDatastore(state.Config), runtimeConfig.Capabilities)
+	apiHandler.WithCanvas(canvasService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())
 	mux.Handle("/", spaHandler())
 	return &Server{port: port, bindAddress: runtimeConfig.BindAddress, app: api.Log(mux), sessions: sessionManager, storage: state.SQLStore}, nil
+}
+
+func canvasDatastore(config storage.Config) models.AppStateDatastore {
+	switch config.Driver {
+	case storage.StorageDriverPostgres:
+		return models.AppStateDatastorePostgres
+	case storage.StorageDriverSQLite:
+		return models.AppStateDatastoreSQLite
+	default:
+		return models.AppStateDatastoreDataDir
+	}
 }
 
 func (s *Server) Close() error {

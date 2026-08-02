@@ -17,7 +17,7 @@ PM-037.
 | B1    | Provider axes and action capabilities                 | Backend    | Complete |
 | B2    | Layout, placement, and session repositories           | Backend    | Complete |
 | B3    | Durable session lifecycle and branch-safe launch      | Backend    | Complete |
-| B4    | Verification freshness and Canvas API                 | Backend    | Pending  |
+| B4    | Verification freshness and Canvas API                 | Backend    | Complete |
 | F1    | Canvas route and placement state                      | Frontend   | Pending  |
 | F2    | Draggable semantic nodes and restored layout          | Frontend   | Pending  |
 | F3    | Focused Workbench and session terminal                | Frontend   | Pending  |
@@ -95,17 +95,17 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Add deterministic repository fingerprinting for branch, HEAD, staged content, relevant tracked/untracked working
+- [x] Add deterministic repository fingerprinting for branch, HEAD, staged content, relevant tracked/untracked working
   content, and verification configuration.
-- [ ] Capture start and completion fingerprints on verification jobs.
-- [ ] Project `fresh`, `stale`, or `inconclusive` by comparing completed and current fingerprints.
-- [ ] Keep verification jobs in memory for PM-037; do not introduce durable verification history.
-- [ ] Add Canvas default resolve, get, placement patch, and viewport patch handlers.
-- [ ] Resolve workspace, branch plan, durable session, live-binding, Git, and verification projections in bounded batches.
-- [ ] Add deterministic initial placements plus unplaced projections for new plans and sessions.
-- [ ] Render repository and application relationships as response-only derived connections.
-- [ ] Return stale and forbidden references without deleting placements or leaking former titles.
-- [ ] Add API tests for branch scoping, per-placement conflicts, viewport independence, new unplaced work, stale references,
+- [x] Capture start and completion fingerprints on verification jobs.
+- [x] Project `fresh`, `stale`, or `inconclusive` by comparing completed and current fingerprints.
+- [x] Keep verification jobs in memory for PM-037; do not introduce durable verification history.
+- [x] Add Canvas default resolve, get, placement patch, and viewport patch handlers.
+- [x] Resolve workspace, branch plan, durable session, live-binding, Git, and verification projections in bounded batches.
+- [x] Add deterministic initial placements plus unplaced projections for new plans and sessions.
+- [x] Render repository and application relationships as response-only derived connections.
+- [x] Return stale and forbidden references without deleting placements or leaking former titles.
+- [x] Add API tests for branch scoping, per-placement conflicts, viewport independence, new unplaced work, stale references,
   capability states, safe sessions, and verification freshness.
 
 **Verification:** `go test ./internal/canvas ./internal/verification ./internal/git ./internal/server/api`

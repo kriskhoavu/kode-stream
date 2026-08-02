@@ -18,6 +18,7 @@ import (
 
 	appaisession "kode-stream/internal/ai"
 	"kode-stream/internal/audit"
+	appcanvas "kode-stream/internal/canvas"
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/httpx"
 	"kode-stream/internal/common/models"
@@ -59,6 +60,7 @@ type API struct {
 	jira            *appjira.Service
 	knowledge       *knowledgeindex.KnowledgeService
 	verification    *appverification.Service
+	canvas          *appcanvas.Service
 	runtimeConfig   system.RuntimeConfig
 	databaseHealth  databaseHealthChecker
 	storageStatus   storageStatusService
@@ -113,6 +115,13 @@ func (a *API) WithStorageServices(status storageStatusService, sync storageSyncS
 
 func (a *API) WithVerification(service *appverification.Service) *API {
 	a.verification = service
+	return a
+}
+
+func (a *API) VerificationService() *appverification.Service { return a.verification }
+
+func (a *API) WithCanvas(service *appcanvas.Service) *API {
+	a.canvas = service
 	return a
 }
 

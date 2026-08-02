@@ -42,6 +42,20 @@ const (
 	JobModeAutomation JobMode = "automation"
 )
 
+type Freshness string
+
+const (
+	FreshnessFresh        Freshness = "fresh"
+	FreshnessStale        Freshness = "stale"
+	FreshnessInconclusive Freshness = "inconclusive"
+)
+
+type RepositoryFingerprint struct {
+	Value  string `json:"value"`
+	Branch string `json:"branch"`
+	Commit string `json:"commit"`
+}
+
 type StepResult struct {
 	Step       string    `json:"step"`
 	Status     string    `json:"status"`
@@ -79,6 +93,10 @@ type Job struct {
 	Steps              []StepResult                   `json:"steps"`
 	Artifacts          []Artifact                     `json:"artifacts"`
 	Runtime            *models.WorkspaceRuntimeConfig `json:"runtime,omitempty"`
+	StartFingerprint   *RepositoryFingerprint         `json:"startFingerprint,omitempty"`
+	FinishFingerprint  *RepositoryFingerprint         `json:"finishFingerprint,omitempty"`
+	CurrentFingerprint *RepositoryFingerprint         `json:"currentFingerprint,omitempty"`
+	Freshness          Freshness                      `json:"freshness"`
 }
 
 type CreateInput struct {
@@ -102,15 +120,16 @@ type CheckpointEvent struct {
 }
 
 type Service struct {
-	registry registry.Repository
-	runtime  *appruntime.Service
-	mu       sync.RWMutex
-	jobs     map[string]*Job
-	seq      atomic.Int64
-	slots    chan struct{}
-	timeout  time.Duration
-	ctx      context.Context
-	cancel   context.CancelFunc
+	registry    registry.Repository
+	runtime     *appruntime.Service
+	mu          sync.RWMutex
+	jobs        map[string]*Job
+	seq         atomic.Int64
+	slots       chan struct{}
+	timeout     time.Duration
+	ctx         context.Context
+	cancel      context.CancelFunc
+	fingerprint Fingerprinter
 }
 
 func NewService(reg registry.Repository, runtimeService *appruntime.Service) *Service {
@@ -125,7 +144,14 @@ func NewServiceWithPolicy(reg registry.Repository, runtimeService *appruntime.Se
 		timeout = 10 * time.Minute
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Service{registry: reg, runtime: runtimeService, jobs: map[string]*Job{}, slots: make(chan struct{}, maxRunning), timeout: timeout, ctx: ctx, cancel: cancel}
+	return &Service{registry: reg, runtime: runtimeService, jobs: map[string]*Job{}, slots: make(chan struct{}, maxRunning), timeout: timeout, ctx: ctx, cancel: cancel, fingerprint: GitFingerprinter{}}
+}
+
+func (s *Service) ConfigureFingerprinter(fingerprinter Fingerprinter) *Service {
+	if fingerprinter != nil {
+		s.fingerprint = fingerprinter
+	}
+	return s
 }
 
 func (s *Service) Close() {
@@ -182,6 +208,10 @@ func (s *Service) Start(workspaceID string, input CreateInput) (Job, error) {
 		RenderedCommand:    automation.renderedCommand,
 		Steps:              []StepResult{},
 		Artifacts:          []Artifact{},
+		Freshness:          FreshnessInconclusive,
+	}
+	if fingerprint, fingerprintErr := s.fingerprint.Fingerprint(workspace, *job); fingerprintErr == nil {
+		job.StartFingerprint = &fingerprint
 	}
 	select {
 	case s.slots <- struct{}{}:
@@ -198,15 +228,38 @@ func (s *Service) Start(workspaceID string, input CreateInput) (Job, error) {
 
 func (s *Service) Get(workspaceID, jobID string) (Job, bool) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 	job, ok := s.jobs[jobID]
 	if !ok || job.WorkspaceID != workspaceID {
+		s.mu.RUnlock()
 		return Job{}, false
 	}
 	copy := cloneJob(*job)
-	copy.Artifacts = append([]Artifact(nil), job.Artifacts...)
-	copy.Steps = append([]StepResult(nil), job.Steps...)
+	s.mu.RUnlock()
+	if workspace, found, err := s.registry.Get(workspaceID); err == nil && found {
+		if current, fingerprintErr := s.fingerprint.Fingerprint(workspace, copy); fingerprintErr == nil {
+			copy.CurrentFingerprint = &current
+		}
+	}
+	copy.Freshness = projectFreshness(copy)
 	return copy, true
+}
+
+func (s *Service) Latest(workspaceID string) (Job, bool) {
+	s.mu.RLock()
+	var latest Job
+	found := false
+	for _, job := range s.jobs {
+		if job.WorkspaceID != workspaceID || (found && !job.StartedAt.After(latest.StartedAt)) {
+			continue
+		}
+		latest = cloneJob(*job)
+		found = true
+	}
+	s.mu.RUnlock()
+	if !found {
+		return Job{}, false
+	}
+	return s.Get(workspaceID, latest.ID)
 }
 
 func (s *Service) Artifacts(workspaceID, jobID string) ([]Artifact, error) {
@@ -263,6 +316,12 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	}
 	job.Status = JobStatusRunning
 	job.StartedAt = time.Now().UTC()
+	finalStatus := JobStatusFailed
+	defer func() {
+		s.captureFinishFingerprint(job, workspace)
+		job.Status = finalStatus
+		job.FinishedAt = time.Now().UTC()
+	}()
 	config := job.Runtime
 	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
 	defer cancel()
@@ -328,9 +387,30 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 
 	s.collectArtifacts(job, artifactRoot)
 	s.collectAutomationArtifacts(job)
-	job.Status = JobStatusPassed
+	finalStatus = JobStatusPassed
 	job.ExitCode = 0
-	job.FinishedAt = time.Now().UTC()
+}
+
+func (s *Service) captureFinishFingerprint(job *Job, workspace models.WorkspaceConfig) {
+	if current, found, err := s.registry.Get(workspace.ID); err == nil && found {
+		workspace = current
+	}
+	if fingerprint, err := s.fingerprint.Fingerprint(workspace, *job); err == nil {
+		job.FinishFingerprint = &fingerprint
+	}
+}
+
+func projectFreshness(job Job) Freshness {
+	if job.Status == JobStatusQueued || job.Status == JobStatusRunning || job.StartFingerprint == nil || job.FinishFingerprint == nil || job.CurrentFingerprint == nil {
+		return FreshnessInconclusive
+	}
+	if job.StartFingerprint.Value != job.FinishFingerprint.Value {
+		return FreshnessInconclusive
+	}
+	if job.FinishFingerprint.Value != job.CurrentFingerprint.Value {
+		return FreshnessStale
+	}
+	return FreshnessFresh
 }
 
 type automationJobConfig struct {
@@ -571,10 +651,8 @@ func classifyArtifact(path string) string {
 }
 
 func (s *Service) failJob(job *Job, failure FailureType, code int, message string, err error) {
-	job.Status = JobStatusFailed
 	job.FailureType = failure
 	job.ExitCode = code
-	job.FinishedAt = time.Now().UTC()
 	job.Steps = append(job.Steps, StepResult{
 		Step:       "failure",
 		Status:     "failed",
