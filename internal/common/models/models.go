@@ -272,6 +272,77 @@ const (
 	CapabilityVerification          Capability = "verification"
 )
 
+type DeploymentTopology string
+
+const (
+	DeploymentTopologyLocalApplication  DeploymentTopology = "local_application"
+	DeploymentTopologyCloudControlPlane DeploymentTopology = "cloud_control_plane"
+)
+
+type WorkspaceContentProvider string
+
+const (
+	WorkspaceContentProviderLocalCheckout    WorkspaceContentProvider = "local_checkout"
+	WorkspaceContentProviderAgentCheckout    WorkspaceContentProvider = "agent_checkout"
+	WorkspaceContentProviderProviderSnapshot WorkspaceContentProvider = "provider_snapshot"
+)
+
+type WorkspaceExecutionProvider string
+
+const (
+	WorkspaceExecutionProviderLocalProcess WorkspaceExecutionProvider = "local_process"
+	WorkspaceExecutionProviderCloudAgent   WorkspaceExecutionProvider = "cloud_agent"
+	WorkspaceExecutionProviderNone         WorkspaceExecutionProvider = "none"
+)
+
+type AppStateDatastore string
+
+const (
+	AppStateDatastoreDataDir  AppStateDatastore = "data_dir"
+	AppStateDatastoreSQLite   AppStateDatastore = "sqlite"
+	AppStateDatastorePostgres AppStateDatastore = "postgres"
+)
+
+type WorkspaceProviderAxes struct {
+	Topology          DeploymentTopology         `json:"topology"`
+	ContentProvider   WorkspaceContentProvider   `json:"contentProvider"`
+	ExecutionProvider WorkspaceExecutionProvider `json:"executionProvider"`
+	Datastore         AppStateDatastore          `json:"datastore,omitempty"`
+}
+
+type WorkspaceAction string
+
+const (
+	WorkspaceActionLayoutMove      WorkspaceAction = "layout.move"
+	WorkspaceActionRepositoryRead  WorkspaceAction = "repo.read"
+	WorkspaceActionGitStatus       WorkspaceAction = "git.status"
+	WorkspaceActionTerminalLaunch  WorkspaceAction = "terminal.launch"
+	WorkspaceActionVerificationRun WorkspaceAction = "verification.run"
+)
+
+type ActionCapabilityState string
+
+const (
+	ActionCapabilityAvailable   ActionCapabilityState = "available"
+	ActionCapabilityUnavailable ActionCapabilityState = "unavailable"
+	ActionCapabilityUnsupported ActionCapabilityState = "unsupported"
+	ActionCapabilityForbidden   ActionCapabilityState = "forbidden"
+	ActionCapabilityConflicted  ActionCapabilityState = "conflicted"
+)
+
+type CapabilityRecoveryAction struct {
+	Action string `json:"action"`
+	Label  string `json:"label"`
+}
+
+type ActionCapability struct {
+	Action          WorkspaceAction            `json:"action"`
+	State           ActionCapabilityState      `json:"state"`
+	ReasonCode      string                     `json:"reasonCode,omitempty"`
+	Message         string                     `json:"message,omitempty"`
+	RecoveryActions []CapabilityRecoveryAction `json:"recoveryActions"`
+}
+
 type CloudUser struct {
 	ID      string    `json:"id"`
 	Email   string    `json:"email,omitempty"`

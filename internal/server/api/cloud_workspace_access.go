@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"kode-stream/internal/common/models"
+	workspacecap "kode-stream/internal/workspace"
 )
 
 type cloudCommandInput struct {
@@ -23,12 +24,24 @@ type agentAccessAdapter struct {
 }
 
 func (a agentAccessAdapter) Command(session cloudSession, workspace models.WorkspaceConfig, input cloudCommandInput) (models.CommandResult, int, string) {
-	if !a.agents.HasConnected(session.User.ID, workspace.AgentID) {
-		return models.CommandResult{}, http.StatusServiceUnavailable, "Cloud Agent is offline"
-	}
 	capability := input.Capability
 	if capability == "" {
 		capability = capabilityForCommandType(input.Type)
+	}
+	connected := a.agents.HasConnected(session.User.ID, workspace.AgentID)
+	if action, ok := commandAction(capability); ok {
+		resolved := workspacecap.ResolveActionCapabilities(workspacecap.ActionCapabilityInput{
+			Axes:               workspacecap.ProviderAxes(models.RuntimeModeCloud, models.AppStateDatastorePostgres, workspace),
+			Authorization:      roleCapabilities(session.User.Role),
+			ContentAvailable:   connected,
+			ExecutionAvailable: connected,
+			Writable:           true,
+		})[action]
+		if resolved.State != models.ActionCapabilityAvailable {
+			return models.CommandResult{}, actionCapabilityHTTPStatus(resolved.State), resolved.Message
+		}
+	} else if !connected {
+		return models.CommandResult{}, http.StatusServiceUnavailable, "Cloud Agent is offline"
 	}
 	if !roleCapabilities(session.User.Role)[capability] {
 		return models.CommandResult{}, http.StatusForbidden, "role cannot run this command"
@@ -43,6 +56,34 @@ func (a agentAccessAdapter) Command(session cloudSession, workspace models.Works
 		Payload:     input.Payload,
 	}
 	return models.CommandResult{Accepted: true, Command: command, Log: redactCommandLog(input.Log)}, http.StatusAccepted, ""
+}
+
+func commandAction(capability models.Capability) (models.WorkspaceAction, bool) {
+	switch capability {
+	case models.CapabilityRead:
+		return models.WorkspaceActionRepositoryRead, true
+	case models.CapabilityGit:
+		return models.WorkspaceActionGitStatus, true
+	case models.CapabilityTerminal:
+		return models.WorkspaceActionTerminalLaunch, true
+	case models.CapabilityVerification:
+		return models.WorkspaceActionVerificationRun, true
+	default:
+		return "", false
+	}
+}
+
+func actionCapabilityHTTPStatus(state models.ActionCapabilityState) int {
+	switch state {
+	case models.ActionCapabilityUnavailable:
+		return http.StatusServiceUnavailable
+	case models.ActionCapabilityForbidden:
+		return http.StatusForbidden
+	case models.ActionCapabilityConflicted:
+		return http.StatusConflict
+	default:
+		return http.StatusUnprocessableEntity
+	}
 }
 
 func (a *API) workspaceAccessAdapter(workspace models.WorkspaceConfig) (workspaceAccessAdapter, int, string) {

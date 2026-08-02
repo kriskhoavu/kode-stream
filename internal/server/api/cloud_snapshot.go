@@ -8,11 +8,13 @@ import (
 	"strings"
 
 	"kode-stream/internal/common/models"
+	workspacecap "kode-stream/internal/workspace"
 )
 
 type remoteSnapshotView struct {
-	Workspace    models.WorkspaceConfig `json:"workspace"`
-	Capabilities map[string]bool        `json:"capabilities"`
+	Workspace    models.WorkspaceConfig                             `json:"workspace"`
+	Capabilities map[string]bool                                    `json:"capabilities"`
+	Actions      map[models.WorkspaceAction]models.ActionCapability `json:"actions"`
 }
 
 func (a *API) remoteSnapshot(r *http.Request) (remoteSnapshotAdapter, cloudSession, models.WorkspaceConfig, int, string) {
@@ -34,6 +36,16 @@ func snapshotCapabilities() map[string]bool {
 	return map[string]bool{"read": true, "snapshot_selection": true, "terminal_handoff": true, "write": false, "git": false, "terminal": false, "ai": false, "runtime": false, "verification": false}
 }
 
+func snapshotActionCapabilities(role models.CloudRole, workspace models.WorkspaceConfig) map[models.WorkspaceAction]models.ActionCapability {
+	return workspacecap.ResolveActionCapabilities(workspacecap.ActionCapabilityInput{
+		Axes:               workspacecap.ProviderAxes(models.RuntimeModeCloud, models.AppStateDatastorePostgres, workspace),
+		Authorization:      roleCapabilities(role),
+		ContentAvailable:   true,
+		ExecutionAvailable: false,
+		Writable:           false,
+	})
+}
+
 func (a *API) cloudSnapshotInfo(w http.ResponseWriter, r *http.Request) {
 	adapter, session, workspace, status, message := a.remoteSnapshot(r)
 	if message != "" {
@@ -46,7 +58,7 @@ func (a *API) cloudSnapshotInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.cloudWorkspaces.Upsert(resolved)
-	writeJSON(w, http.StatusOK, remoteSnapshotView{Workspace: resolved, Capabilities: snapshotCapabilities()})
+	writeJSON(w, http.StatusOK, remoteSnapshotView{Workspace: resolved, Capabilities: snapshotCapabilities(), Actions: snapshotActionCapabilities(session.User.Role, resolved)})
 }
 
 func (a *API) cloudSnapshotTree(w http.ResponseWriter, r *http.Request) {

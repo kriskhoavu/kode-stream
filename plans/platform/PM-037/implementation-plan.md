@@ -12,17 +12,17 @@ PM-037.
 
 ## Phases Summary
 
-| Phase | Name                                                  | Track      | Status  |
-|-------|-------------------------------------------------------|------------|---------|
-| B1    | Provider axes and action capabilities                 | Backend    | Pending |
-| B2    | Layout, placement, and session repositories           | Backend    | Pending |
-| B3    | Durable session lifecycle and branch-safe launch      | Backend    | Pending |
-| B4    | Verification freshness and Canvas API                 | Backend    | Pending |
-| F1    | Canvas route and placement state                      | Frontend   | Pending |
-| F2    | Draggable semantic nodes and restored layout          | Frontend   | Pending |
-| F3    | Focused Workbench and session terminal                | Frontend   | Pending |
-| F4    | Git, verification, capability, and accessibility UX   | Frontend   | Pending |
-| I1    | Browser journey, documentation, and final integration | Full stack | Pending |
+| Phase | Name                                                  | Track      | Status   |
+|-------|-------------------------------------------------------|------------|----------|
+| B1    | Provider axes and action capabilities                 | Backend    | Complete |
+| B2    | Layout, placement, and session repositories           | Backend    | Pending  |
+| B3    | Durable session lifecycle and branch-safe launch      | Backend    | Pending  |
+| B4    | Verification freshness and Canvas API                 | Backend    | Pending  |
+| F1    | Canvas route and placement state                      | Frontend   | Pending  |
+| F2    | Draggable semantic nodes and restored layout          | Frontend   | Pending  |
+| F3    | Focused Workbench and session terminal                | Frontend   | Pending  |
+| F4    | Git, verification, capability, and accessibility UX   | Frontend   | Pending  |
+| I1    | Browser journey, documentation, and final integration | Full stack | Pending  |
 
 ## Backend Phases
 
@@ -30,16 +30,16 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Define deployment-topology, workspace-content-provider, execution-provider, datastore, and authorization concerns
+- [x] Define deployment-topology, workspace-content-provider, execution-provider, datastore, and authorization concerns
   without adding Canvas behavior keyed by deployment names.
-- [ ] Add action capability state, reason code, safe message, and recovery-action models.
-- [ ] Implement capability composition for `layout.move`, `repo.read`, `git.status`, `terminal.launch`, and
+- [x] Add action capability state, reason code, safe message, and recovery-action models.
+- [x] Implement capability composition for `layout.move`, `repo.read`, `git.status`, `terminal.launch`, and
   `verification.run`.
-- [ ] Map current Local checkout and Local process behavior into content and execution provider adapters.
-- [ ] Keep current Cloud role and Remote Snapshot behavior working outside Canvas while exposing adapter-compatible
+- [x] Map current Local checkout and Local process behavior into content and execution provider adapters.
+- [x] Keep current Cloud role and Remote Snapshot behavior working outside Canvas while exposing adapter-compatible
   support for future phases.
-- [ ] Revalidate capabilities within the existing guarded action services rather than trusting UI projections.
-- [ ] Add tests for available, unavailable, unsupported, forbidden, and branch-conflicted outcomes.
+- [x] Revalidate capabilities within the existing guarded action services rather than trusting UI projections.
+- [x] Add tests for available, unavailable, unsupported, forbidden, and branch-conflicted outcomes.
 
 **Verification:** `go test ./internal/workspace ./internal/server/api ./internal/provider`
 

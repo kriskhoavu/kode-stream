@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -50,6 +51,19 @@ func TestCloudSnapshotReadsCommitPinnedProviderContent(t *testing.T) {
 		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "commit-1") {
 			t.Fatalf("%s: status = %d body = %s", endpoint, response.Code, response.Body.String())
 		}
+	}
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/workspaces/"+workspace.ID+"/snapshot", nil)
+	request.Header.Set("X-Kode-Stream-Subject", "editor")
+	request.Header.Set("X-Kode-Stream-Role", "editor")
+	handler.ServeHTTP(response, request)
+	var view remoteSnapshotView
+	if err := json.Unmarshal(response.Body.Bytes(), &view); err != nil {
+		t.Fatal(err)
+	}
+	if view.Actions[models.WorkspaceActionRepositoryRead].State != models.ActionCapabilityAvailable || view.Actions[models.WorkspaceActionTerminalLaunch].State != models.ActionCapabilityUnsupported {
+		t.Fatalf("snapshot actions = %#v", view.Actions)
 	}
 }
 
