@@ -21,7 +21,7 @@ PM-037.
 | F1    | Canvas route and placement state                      | Frontend   | Complete |
 | F2    | Draggable semantic nodes and restored layout          | Frontend   | Complete |
 | F3    | Focused Workbench and session terminal                | Frontend   | Complete |
-| F4    | Git, verification, capability, and accessibility UX   | Frontend   | Pending  |
+| F4    | Git, verification, capability, and accessibility UX   | Frontend   | Complete |
 | I1    | Browser journey, documentation, and final integration | Full stack | Pending  |
 
 ## Backend Phases
@@ -181,16 +181,16 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Show branch, HEAD summary, clean/dirty/conflicted state, and changed-file count on the workspace node and panel.
-- [ ] Show verification result status separately from current/stale/inconclusive freshness.
-- [ ] Remove current-success emphasis from stale passed results and show verified/current revision summaries.
-- [ ] Refresh freshness after branch, commit, staged, unstaged, untracked, or verification configuration changes.
-- [ ] Drive every action from action capability state and reason code, not deployment, access-mode, provider, or datastore
+- [x] Show branch, HEAD summary, clean/dirty/conflicted state, and changed-file count on the workspace node and panel.
+- [x] Show verification result status separately from current/stale/inconclusive freshness.
+- [x] Remove current-success emphasis from stale passed results and show verified/current revision summaries.
+- [x] Refresh freshness after branch, commit, staged, unstaged, untracked, or verification configuration changes.
+- [x] Drive every action from action capability state and reason code, not deployment, access-mode, provider, or datastore
   names.
-- [ ] Add safe stale-reference recovery and never display cached titles for forbidden entities.
-- [ ] Add keyboard node search/selection/movement, accessible names, focus return, and polite status regions.
-- [ ] Add non-color state cues, reduced-motion behavior, both-theme contrast, and narrow-window recovery.
-- [ ] Add Git, freshness, capability, stale/forbidden, keyboard, reduced-motion, responsive, and retry tests.
+- [x] Add safe stale-reference recovery and never display cached titles for forbidden entities.
+- [x] Add keyboard node search/selection/movement, accessible names, focus return, and polite status regions.
+- [x] Add non-color state cues, reduced-motion behavior, both-theme contrast, and narrow-window recovery.
+- [x] Add Git, freshness, capability, stale/forbidden, keyboard, reduced-motion, responsive, and retry tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
 

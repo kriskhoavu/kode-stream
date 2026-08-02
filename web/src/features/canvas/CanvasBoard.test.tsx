@@ -24,6 +24,7 @@ describe('CanvasBoard', () => {
 		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
 		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '2');
 		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-visible-only', 'true');
+		expect(document.querySelectorAll('[data-draggable-node="true"]')).toHaveLength(3);
 		expect(screen.getAllByText(/^drag /)).toHaveLength(3);
 		fireEvent.click(screen.getByText('drag workspace:workspace-1'));
 		expect(onMoveNode).toHaveBeenCalledWith('workspace:workspace-1', { x: 999, y: 888 });
@@ -46,6 +47,30 @@ describe('CanvasBoard', () => {
 		expect(onPlaceUnplaced).toHaveBeenCalled();
 		expect(onReset).toHaveBeenCalled();
 		expect(onRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 'plan:item-1' }));
+	});
+
+	it('moves nodes by keyboard and disables every layout action from capabilities', () => {
+		const onMoveNode = vi.fn();
+		const projection = baseProjection();
+		const first = renderBoard(projection, { onMoveNode });
+		fireEvent.keyDown(screen.getByLabelText('Plan: PM-037 Focused Canvas main'), { key: 'ArrowRight' });
+		expect(onMoveNode).toHaveBeenCalledWith('plan:item-1', { x: 372, y: 0 });
+		first.unmount();
+
+		const unavailable = baseProjection();
+		unavailable.nodes = unavailable.nodes.map((node) => node.workspace ? { ...node, workspace: { ...node.workspace, actions: { 'layout.move': { action: 'layout.move', state: 'forbidden', message: 'No layout access', recoveryActions: [] } } } } : node.plan ? { ...node, plan: { ...node.plan, actions: { 'layout.move': { action: 'layout.move', state: 'forbidden', message: 'No layout access', recoveryActions: [] } } } } : node);
+		const second = renderBoard(unavailable, { selectedId: 'plan:item-1' });
+		expect(second.getByRole('button', { name: /Reset layout/ })).toBeDisabled();
+		expect(second.getByRole('button', { name: /Remove from Canvas/ })).toBeDisabled();
+	});
+
+	it('shows Git HEAD and verification result separately from stale freshness', () => {
+		const projection = baseProjection();
+		projection.nodes[0] = { ...projection.nodes[0], workspace: { ...projection.nodes[0].workspace!, commit: 'abcdef123456', verification: { id: 'verify-1', workspaceId: 'workspace-1', profile: 'smoke', status: 'passed', exitCode: 0, steps: [], artifacts: [], freshness: 'stale' } } };
+		renderBoard(projection);
+		expect(screen.getByText('HEAD abcdef12')).toBeInTheDocument();
+		expect(screen.getByText('passed')).toBeInTheDocument();
+		expect(screen.getByText('Freshness: stale')).toBeInTheDocument();
 	});
 
 	it.each([25, 100, 300])('keeps %i placements virtualized', (count) => {

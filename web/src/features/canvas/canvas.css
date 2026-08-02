@@ -30,7 +30,12 @@
 .canvas-derived-handle { opacity: 0; pointer-events: none; }
 .canvas-edge { stroke: var(--line); stroke-width: 1.5; }
 .canvas-edge-session_launched_from { stroke-dasharray: 5 4; }
-.canvas-session-state.state-running { color: var(--success); font-weight: 700; }
+.canvas-session-state.state-running { color: var(--green); font-weight: 700; }
+.canvas-verification-result { font-weight: 700; text-transform: capitalize; }
+.canvas-verification-result.result-passed.freshness-fresh { color: var(--green); }
+.canvas-verification-result.freshness-stale, .canvas-verification-result.freshness-inconclusive { color: var(--muted); }
+.canvas-semantic-node:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 65%, white); outline-offset: 3px; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 .react-flow__controls { border: 1px solid var(--line); border-radius: 8px; box-shadow: none; overflow: hidden; }
 .react-flow__controls-button { border-color: var(--line); background: var(--panel); fill: var(--text); }
 .canvas-workbench { flex: 0 0 0; width: 0; min-width: 0; overflow: hidden; border-left: 0 solid var(--line); background: var(--panel); transition: flex-basis .18s ease; }
@@ -52,6 +57,9 @@
 .canvas-branch-mismatch p { margin: 4px 0 8px; font-size: 12px; }
 .canvas-branch-mismatch button { display: inline-flex; align-items: center; gap: 5px; }
 .canvas-workbench-error { margin: 12px; color: var(--danger); font-size: 12px; }
+.canvas-reference-warning { border-left: 4px solid var(--danger); }
+.canvas-verification .verification-summary.freshness-stale, .canvas-verification .verification-summary.freshness-inconclusive { padding: 9px; border: 1px dashed var(--line); border-radius: 8px; background: var(--panel-soft); }
+.canvas-verification .verification-summary.freshness-fresh.result-passed { padding: 9px; border: 1px solid color-mix(in srgb, var(--green) 40%, var(--line)); border-radius: 8px; }
 .canvas-active-unplaced button { display: flex; width: 100%; align-items: center; gap: 8px; text-align: left; }
 .canvas-active-unplaced button span { display: grid; }
 .canvas-active-unplaced button small { color: var(--muted); }
@@ -61,4 +69,4 @@
 .canvas-workbench .embedded-terminal-compact > header { min-height: 54px; }
 @media (max-width: 800px) { .canvas-toolbar { overflow-x: auto; } .canvas-search { min-width: 220px; } .canvas-page-header { align-items: flex-start; } }
 @media (max-width: 900px) { .canvas-workbench.open { position: absolute; z-index: 8; inset: 0 0 0 auto; width: min(440px, 94vw); max-width: 94vw; box-shadow: -16px 0 36px rgb(0 0 0 / .18); } }
-@media (prefers-reduced-motion: reduce) { .canvas-semantic-node { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .canvas-semantic-node, .canvas-workbench { transition: none; } }

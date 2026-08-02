@@ -6,7 +6,7 @@ import { CanvasWorkbench } from './CanvasWorkbench';
 
 vi.mock('../../lib/api', async () => {
 	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
-	return { ...actual, api: { aiSessionRecords: vi.fn(), aiSettings: vi.fn(), startEmbeddedAISession: vi.fn(), embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn() } };
+	return { ...actual, api: { aiSessionRecords: vi.fn(), aiSettings: vi.fn(), startEmbeddedAISession: vi.fn(), embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn() } };
 });
 vi.mock('../ai-session/EmbeddedTerminal', () => ({ EmbeddedTerminal: ({ initial, visible }: { initial: EmbeddedAISessionResult; visible: boolean }) => <div data-testid={`terminal-${initial.session.id}`} data-visible={String(visible)}>terminal</div> }));
 
@@ -73,6 +73,26 @@ describe('CanvasWorkbench', () => {
 		fireEvent.click(await screen.findByRole('button', { name: 'Cancel process' }));
 		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
 	});
+
+	it('separates verification result from freshness and removes stale success emphasis', () => {
+		const workspace = workspaceNode();
+		renderWorkbench(workspace);
+		expect(screen.getByText('Passed (historical)')).toBeInTheDocument();
+		expect(screen.getByText('stale')).toBeInTheDocument();
+		expect(screen.getByText('11111111')).toBeInTheDocument();
+  expect(screen.getAllByText('22222222')).toHaveLength(2);
+		expect(screen.getByRole('button', { name: /Run smoke verification/ })).toBeDisabled();
+	});
+
+	it('hides cached details for forbidden references and offers safe refresh', () => {
+		const forbidden: CanvasNode = { id: 'plan:gone', kind: 'plan', state: 'forbidden', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'gone', itemPath: 'private/Secret', identifier: 'SECRET-TITLE', branchKey: 'main' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1 };
+		const reload = vi.fn();
+		renderWorkbench(forbidden, { onReload: reload });
+		expect(screen.getByText('Access restricted')).toBeInTheDocument();
+		expect(screen.queryByText('SECRET-TITLE')).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: /Refresh reference/ }));
+		expect(reload).toHaveBeenCalled();
+	});
 });
 
 function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.ComponentProps<typeof CanvasWorkbench>> = {}) {
@@ -102,4 +122,8 @@ function sessionRecord(): SafeSessionRecord {
 
 function sessionResult(): EmbeddedAISessionResult {
 	return { session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }, grant: { sessionId: 'session-1', token: 'grant', expiresAt: '' }, record: sessionRecord() };
+}
+
+function workspaceNode(): CanvasNode {
+	return { id: 'workspace:workspace-1', kind: 'workspace', state: 'resolved', entityRef: { kind: 'workspace', workspaceId: 'workspace-1' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, workspace: { id: 'workspace-1', name: 'Workspace', branch: 'main', commit: '222222223333', git: { workspaceId: 'workspace-1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }, providerAxes: { topology: 'local_application', contentProvider: 'local_checkout', executionProvider: 'local_process' }, actions: { 'verification.run': { action: 'verification.run', state: 'unsupported', message: 'No runtime', recoveryActions: [] } }, verification: { id: 'verify-1', workspaceId: 'workspace-1', profile: 'smoke', status: 'passed', exitCode: 0, steps: [], artifacts: [], freshness: 'stale', finishFingerprint: { value: 'one', branch: 'main', commit: '111111112222' }, currentFingerprint: { value: 'two', branch: 'main', commit: '222222223333' } } } };
 }

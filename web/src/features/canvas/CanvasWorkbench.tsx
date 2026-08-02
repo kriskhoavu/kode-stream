@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, GitBranch, Play, RefreshCw, Square, TerminalSquare, X } from 'lucide-react';
 import { EmbeddedTerminal } from '../ai-session/EmbeddedTerminal';
 import { api, ApiError } from '../../lib/api';
-import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult, SafeSessionRecord } from '../../lib/types';
+import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult, SafeSessionRecord, VerificationJob } from '../../lib/types';
 
 export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, onSelectNode, onPlaceUnplaced }: { projection: CanvasProjection; selectedNode?: CanvasNode; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceUnplaced: () => Promise<unknown> | void }) {
 	const [results, setResults] = useState<Record<string, EmbeddedAISessionResult>>({});
 	const [records, setRecords] = useState<SafeSessionRecord[]>([]);
 	const [activeTerminalId, setActiveTerminalId] = useState('');
 	const [launching, setLaunching] = useState(false);
+	const [verifying, setVerifying] = useState(false);
 	const [error, setError] = useState('');
 	const [mismatch, setMismatch] = useState<Record<string, string>>();
 	const pendingKey = useRef('');
@@ -36,6 +37,7 @@ export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, o
 	const unplacedActive = records.filter((record) => record.live && !placedSessionIDs.has(record.id));
 	const launchCapability = selectedNode?.plan?.actions['terminal.launch'];
 	const canLaunch = selectedNode?.kind === 'plan' && launchCapability?.state === 'available';
+	const verificationCapability = selectedNode?.workspace?.actions['verification.run'];
 
 	const launch = async () => {
 		if (!selectedNode?.plan || launching || pendingKey.current) return;
@@ -80,6 +82,25 @@ export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, o
 		}
 	};
 
+	const runVerification = async () => {
+		if (!selectedNode?.workspace || verificationCapability?.state !== 'available' || verifying) return;
+		setVerifying(true);
+		setError('');
+		try {
+			let job = await api.createVerificationJob(selectedNode.workspace.id, { profile: 'smoke', trigger: 'canvas' });
+			await Promise.resolve(onReload());
+			for (let attempt = 0; attempt < 60 && (job.status === 'queued' || job.status === 'running'); attempt += 1) {
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+				job = await api.verificationJob(selectedNode.workspace.id, job.id);
+				await Promise.resolve(onReload());
+			}
+		} catch (caught) {
+			setError(caught instanceof Error ? caught.message : 'Verification could not run.');
+		} finally {
+			setVerifying(false);
+		}
+	};
+
 	const terminalVisible = (result: EmbeddedAISessionResult) => {
 		if (result.session.id !== activeTerminalId) return false;
 		if (selectedNode?.kind === 'session') return selectedNode.entityRef.sessionId === result.session.id;
@@ -89,7 +110,9 @@ export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, o
 	return <aside className={`canvas-workbench${selectedNode ? ' open' : ''}`} aria-label="Canvas Workbench">
 		<header><div><span>Workbench</span><strong>{workbenchTitle(selectedNode)}</strong></div>{selectedNode && <button type="button" className="icon-button" aria-label="Close Workbench" onClick={onClose}><X size={16} /></button>}</header>
 		{!selectedNode && <div className="canvas-workbench-empty"><TerminalSquare size={22} /><p>Select a workspace, plan, or session to inspect it here.</p></div>}
-		{selectedNode?.workspace && <section className="canvas-workbench-section"><h2>Git summary</h2><dl><dt>Branch</dt><dd>{selectedNode.workspace.branch || 'Unavailable'}</dd><dt>HEAD</dt><dd><code>{shortSHA(selectedNode.workspace.commit)}</code></dd><dt>Working tree</dt><dd>{selectedNode.workspace.git?.conflicted ? 'Conflicted' : selectedNode.workspace.git?.dirty ? `${selectedNode.workspace.git.changes.length} changed files` : 'Clean'}</dd></dl></section>}
+		{selectedNode && selectedNode.state !== 'resolved' && <section className="canvas-workbench-section canvas-reference-warning" role="status"><h2>{selectedNode.state === 'forbidden' ? 'Access restricted' : 'Reference unavailable'}</h2><p>{selectedNode.state === 'forbidden' ? 'You no longer have permission to view this entity. Cached titles are hidden.' : 'The entity no longer resolves on this workspace branch. Its placement is retained for recovery.'}</p><button type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh reference</button></section>}
+		{selectedNode?.workspace && <section className="canvas-workbench-section"><h2>Git summary</h2><dl><dt>Branch</dt><dd>{selectedNode.workspace.branch || 'Unavailable'}</dd><dt>HEAD</dt><dd><code>{shortSHA(selectedNode.workspace.commit)}</code></dd><dt>Working tree</dt><dd>{selectedNode.workspace.git?.conflicted ? 'Conflicted' : selectedNode.workspace.git?.dirty ? `${selectedNode.workspace.git.changes.length} changed files` : 'Clean'}</dd></dl><button type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh Git status</button></section>}
+		{selectedNode?.workspace && <section className="canvas-workbench-section canvas-verification"><h2>Verification</h2>{selectedNode.workspace.verification ? <VerificationSummary job={selectedNode.workspace.verification} /> : <p>No verification result in this application run.</p>}<button className="primary" type="button" disabled={verificationCapability?.state !== 'available' || verifying} title={verificationCapability?.state !== 'available' ? verificationCapability?.message : undefined} onClick={() => void runVerification()}><Play size={14} /> {verifying ? 'Verifying…' : 'Run smoke verification'}</button>{verificationCapability && verificationCapability.state !== 'available' && <p className="canvas-capability-message">{verificationCapability.message}</p>}</section>}
 		{selectedNode?.plan && <section className="canvas-workbench-section"><h2>{selectedNode.plan.identifier || 'Plan'}</h2><p>{selectedNode.plan.title}</p><p className="canvas-workbench-branch"><GitBranch size={13} /> {selectedNode.plan.branch} · <code>{shortSHA(selectedNode.plan.commit)}</code></p><button className="primary" type="button" disabled={!canLaunch || launching} onClick={() => void launch()}><Play size={14} /> {launching ? 'Launching…' : 'Launch terminal'}</button>{launchCapability && launchCapability.state !== 'available' && <p className="canvas-capability-message">{launchCapability.message}</p>}</section>}
 		{selectedNode?.session && <SessionDetails record={selectedNode.session.record} onOpen={() => setActiveTerminalId(selectedNode.session!.record.id)} onCancel={() => void cancel(selectedNode.session!.record.id)} />}
 		{mismatch && <section className="canvas-branch-mismatch" role="alert"><AlertTriangle size={17} /><div><strong>Checkout changed</strong><p>Expected <code>{mismatch.expectedBranch || mismatch.branch || mismatch.expectedCommit}</code>; current <code>{mismatch.currentBranch || mismatch.currentCommit}</code>.</p><button type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh Canvas and Git status</button></div></section>}
@@ -104,6 +127,12 @@ function SessionDetails({ record, onOpen, onCancel }: { record: SafeSessionRecor
 	return <section className="canvas-workbench-section"><h2>Terminal session</h2><dl><dt>Provider</dt><dd>{record.provider}</dd><dt>Branch</dt><dd>{record.requestedBranch}</dd><dt>State</dt><dd>{record.state}</dd>{record.exitCode !== undefined && <><dt>Exit code</dt><dd>{record.exitCode}</dd></>}</dl>{record.live && <button className="primary" type="button" onClick={onOpen}><TerminalSquare size={14} /> Open terminal</button>}{active && <button className="danger-confirm" type="button" onClick={onCancel}><Square size={13} /> Cancel process</button>}{record.state === 'interrupted' && <p>The application restarted without this process. Reconnect is unavailable; launch a new session.</p>}</section>;
 }
 
-function workbenchTitle(node?: CanvasNode) { return node?.workspace?.name || node?.plan?.identifier || node?.session?.record.provider || 'No selection'; }
+function VerificationSummary({ job }: { job: VerificationJob }) {
+	const freshness = job.freshness || 'inconclusive';
+	const historicalPass = job.status === 'passed' && freshness !== 'fresh';
+	return <dl className={`verification-summary result-${job.status} freshness-${freshness}`}><dt>Result</dt><dd>{historicalPass ? 'Passed (historical)' : job.status}</dd><dt>Freshness</dt><dd>{freshness}</dd><dt>Verified revision</dt><dd><code>{shortSHA(job.finishFingerprint?.commit || job.startFingerprint?.commit)}</code></dd><dt>Current revision</dt><dd><code>{shortSHA(job.currentFingerprint?.commit)}</code></dd></dl>;
+}
+
+function workbenchTitle(node?: CanvasNode) { return node?.workspace?.name || node?.plan?.identifier || node?.session?.record.provider || (node ? node.state === 'forbidden' ? 'Restricted node' : 'Unavailable node' : 'No selection'); }
 function shortSHA(value?: string) { return value ? value.slice(0, 8) : 'Unavailable'; }
 function newIdempotencyKey() { return globalThis.crypto?.randomUUID?.() ?? `canvas-${Date.now()}-${Math.random().toString(16).slice(2)}`; }

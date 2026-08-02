@@ -10,6 +10,8 @@ interface CanvasNodeData extends Record<string, unknown> {
 	selected: boolean;
 	conflicted: boolean;
 	onSelect: (id: string) => void;
+	onKeyboardMove: (node: DomainNode, position: CanvasPosition) => void;
+	layoutAvailable: boolean;
 }
 
 type CanvasFlowNode = Node<CanvasNodeData>;
@@ -29,14 +31,16 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 	onReset: () => void;
 	onRemove: (node: DomainNode) => void;
 }) {
+	const layoutCapability = projection.nodes.find((node) => node.workspace)?.workspace?.actions['layout.move'];
+	const layoutAvailable = layoutCapability?.state === 'available';
 	const modelNodes = useMemo(() => projection.nodes.map((node): CanvasFlowNode => ({
 		id: node.id,
 		type: node.kind,
 		position: node.position,
-		draggable: canMove(node),
+		draggable: canMove(node, layoutAvailable),
 		selectable: true,
-		data: { node, selected: node.id === selectedId, conflicted: conflicts.includes(node.id), onSelect: (id) => onSelect(id) }
-	})), [conflicts, onSelect, projection.nodes, selectedId]);
+		data: { node, selected: node.id === selectedId, conflicted: conflicts.includes(node.id), onSelect: (id) => onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), layoutAvailable }
+	})), [conflicts, layoutAvailable, onMoveNode, onSelect, projection.nodes, selectedId]);
 	const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNode>(modelNodes);
 	useEffect(() => setNodes(modelNodes), [modelNodes, setNodes]);
 	const edges = useMemo(() => projection.connections.map((connection): Edge => ({ id: connection.id, source: connection.source, target: connection.target, selectable: false, focusable: false, className: `canvas-edge canvas-edge-${connection.kind}` })), [projection.connections]);
@@ -47,11 +51,12 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 	return <div className="canvas-board-shell">
 		<div className="canvas-toolbar" aria-label="Canvas tools">
 			<CanvasSearch nodes={projection.nodes} onSelect={onSelect} />
-			<button type="button" onClick={onPlaceUnplaced} disabled={projection.unplaced.length === 0}><Box size={14} /> Place new items ({projection.unplaced.length})</button>
-			<button type="button" onClick={onReset} disabled={projection.nodes.length === 0}><Workflow size={14} /> Reset layout</button>
-			{selected && <button type="button" onClick={() => onRemove(selected)}><Trash2 size={14} /> Remove from Canvas</button>}
+			<button type="button" onClick={onPlaceUnplaced} disabled={!layoutAvailable || projection.unplaced.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Box size={14} /> Place new items ({projection.unplaced.length})</button>
+			<button type="button" onClick={onReset} disabled={!layoutAvailable || projection.nodes.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Workflow size={14} /> Reset layout</button>
+			{selected && <button type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={14} /> Remove from Canvas</button>}
 			{selected && conflicts.includes(selected.id) && <span className="canvas-conflict-actions" role="alert"><span>Position conflict</span><button type="button" onClick={() => onReloadPosition(selected.id)}>Reload position</button><button type="button" onClick={() => onReapplyPosition(selected.id)}>Reapply my move</button></span>}
 		</div>
+		<div className="sr-only" role="status" aria-live="polite">{selected ? `Selected ${nodeSearchText(selected)}` : 'No Canvas node selected'}</div>
 		<div className="canvas-board" data-node-count={nodes.length}>
 			<ReactFlow key={projection.layout.id} nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onNodeDragStop={onDragStop} onNodeClick={(_, node) => onSelect(node.id)} onPaneClick={() => onSelect(undefined)} onMoveEnd={onMoveEnd} defaultViewport={projection.layout.viewport} minZoom={0.1} maxZoom={2} onlyRenderVisibleElements nodesDraggable elementsSelectable edgesFocusable={false} fitView={false}>
 				<Background color="var(--line)" gap={24} />
@@ -68,6 +73,8 @@ function WorkspaceCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 		<strong>{workspace?.name || 'Unavailable workspace'}</strong>
 		<span><GitBranch size={12} /> {workspace?.branch || node.entityRef.branchKey || 'Unknown branch'}</span>
 		<span>{gitSummary(workspace?.git)}</span>
+		{workspace?.commit && <span>HEAD {workspace.commit.slice(0, 8)}</span>}
+		{workspace?.verification && <><span className={`canvas-verification-result result-${workspace.verification.status} freshness-${workspace.verification.freshness}`}>{workspace.verification.status}</span><span>Freshness: {workspace.verification.freshness || 'inconclusive'}</span></>}
 	</NodeFrame>;
 }
 
@@ -90,7 +97,18 @@ function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 }
 
 function NodeFrame({ data, eyebrow, icon, children }: { data: CanvasNodeData; eyebrow: string; icon: React.ReactNode; children: React.ReactNode }) {
-	return <div className={`canvas-semantic-node kind-${data.node.kind} state-${data.node.state}${data.selected ? ' selected' : ''}${data.conflicted ? ' conflicted' : ''}`} role="button" tabIndex={0} aria-label={`${eyebrow}: ${nodeSearchText(data.node)}`} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); data.onSelect(data.node.id); } }}>
+	return <div data-canvas-node-id={data.node.id} className={`canvas-semantic-node kind-${data.node.kind} state-${data.node.state}${data.selected ? ' selected' : ''}${data.conflicted ? ' conflicted' : ''}`} role="button" tabIndex={0} aria-label={`${eyebrow}: ${nodeSearchText(data.node)}`} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); }} onKeyDown={(event) => {
+		if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); data.onSelect(data.node.id); return; }
+		if (!canMove(data.node, data.layoutAvailable) || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+		event.preventDefault();
+		const step = event.shiftKey ? 1 : 12;
+		const position = { ...data.node.position };
+		if (event.key === 'ArrowLeft') position.x -= step;
+		if (event.key === 'ArrowRight') position.x += step;
+		if (event.key === 'ArrowUp') position.y -= step;
+		if (event.key === 'ArrowDown') position.y += step;
+		data.onKeyboardMove(data.node, position);
+	}}>
 		<Handle className="canvas-derived-handle" type="target" position={Position.Left} isConnectable={false} />
 		<header>{icon}<span>{eyebrow}</span>{data.node.state !== 'resolved' && <em>{data.node.state}</em>}</header>
 		<div>{children}</div>
@@ -112,13 +130,14 @@ function CanvasSearch({ nodes, onSelect }: { nodes: DomainNode[]; onSelect: (id?
 		setMatches([]);
 		const target = getNode(node.id);
 		if (target) void fitView({ nodes: [target], padding: 0.8, maxZoom: 1.25, duration: 180 });
+		requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-canvas-node-id="${node.id.replaceAll('"', '\\"')}"]`)?.focus());
 	};
 	return <div className="canvas-search"><Search size={14} /><input aria-label="Search Canvas nodes" value={query} onChange={(event) => search(event.target.value)} placeholder="Search plans and sessions" />{matches.length > 0 && <div className="canvas-search-results" role="listbox">{matches.map((node) => <button key={node.id} type="button" role="option" onClick={() => focus(node)}>{nodeSearchText(node)}</button>)}</div>}</div>;
 }
 
-function canMove(node: DomainNode) {
+function canMove(node: DomainNode, workspaceLayoutAvailable = false) {
 	const actions = node.workspace?.actions ?? node.plan?.actions;
-	return actions?.['layout.move']?.state !== 'forbidden';
+	return actions?.['layout.move']?.state === 'available' || (!actions && workspaceLayoutAvailable);
 }
 
 function nodeSearchText(node: DomainNode) {
