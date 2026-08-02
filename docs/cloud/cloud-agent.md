@@ -1,8 +1,11 @@
 # Cloud Agent
 
-Cloud Agent is the local execution component for Cloud mode. It connects outbound to the Cloud public URL and keeps
+Cloud Agent is the local execution component for Agent-Backed Cloud workspaces. It connects outbound to the Cloud public URL and keeps
 repository files, Git credentials, terminal sessions, AI CLIs, runtime commands, and verification commands on the user's
 machine. It connects only to the Cloud API and never connects directly to Postgres.
+
+Remote Snapshot workspaces intentionally do not use Cloud Agent. They read an authorized provider repository at an
+immutable commit and expose only read/snapshot-selection capabilities. See [Cloud deployment modes](cloud-modes.md).
 
 ## CLI
 

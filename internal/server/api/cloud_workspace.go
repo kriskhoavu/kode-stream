@@ -41,12 +41,30 @@ func (s *cloudWorkspaceStore) Get(userID, workspaceID string) (models.WorkspaceC
 }
 
 func (s *cloudWorkspaceStore) Upsert(workspace models.WorkspaceConfig) models.WorkspaceConfig {
+	workspace = normalizeCloudWorkspaceAccess(workspace)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.workspaces[workspace.OwnerUserID] == nil {
 		s.workspaces[workspace.OwnerUserID] = map[string]models.WorkspaceConfig{}
 	}
 	s.workspaces[workspace.OwnerUserID][workspace.ID] = workspace
+	return workspace
+}
+
+func normalizeCloudWorkspaceAccess(workspace models.WorkspaceConfig) models.WorkspaceConfig {
+	if workspace.AccessMode == "" {
+		workspace.AccessMode = models.WorkspaceAccessModeAgentBacked
+	}
+	if workspace.AccessMode == models.WorkspaceAccessModeAgentBacked {
+		workspace.Location = models.WorkspaceLocationCloudAgent
+	}
+	if workspace.AccessMode == models.WorkspaceAccessModeRemoteSnapshot {
+		workspace.Location = models.WorkspaceLocationCloudRemoteSnapshot
+		workspace.Path = ""
+		workspace.AgentID = ""
+		workspace.LocalRootLabel = ""
+		workspace.RemoteURL = ""
+	}
 	return workspace
 }
 
@@ -89,6 +107,7 @@ func (a *API) registerCloudWorkspaceFromAgent(w http.ResponseWriter, r *http.Req
 		Name:             name,
 		Path:             "",
 		Location:         models.WorkspaceLocationCloudAgent,
+		AccessMode:       models.WorkspaceAccessModeAgentBacked,
 		OwnerUserID:      token.UserID,
 		AgentID:          token.AgentID,
 		LocalRootLabel:   redactRootLabel(input.LocalRootLabel),
@@ -147,4 +166,29 @@ func (a *API) rejectCloudBrowserWorkspaceRegistration(w http.ResponseWriter, inp
 	}
 	writeError(w, http.StatusBadRequest, "Cloud workspaces must be registered by Cloud Agent")
 	return true
+}
+
+func (a *API) createCloudRemoteSnapshotWorkspace(w http.ResponseWriter, r *http.Request, input models.WorkspaceInput) {
+	session, ok := cloudSessionFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "Cloud session is required")
+		return
+	}
+	if input.AccessMode != models.WorkspaceAccessModeRemoteSnapshot {
+		writeError(w, http.StatusBadRequest, "Cloud browser registration supports Remote Snapshot workspaces; use Cloud Agent registration for agent-backed workspaces")
+		return
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" || strings.TrimSpace(input.ProviderInstanceID) == "" || strings.TrimSpace(input.ProviderRepository) == "" || strings.TrimSpace(input.SelectedRef) == "" {
+		writeError(w, http.StatusBadRequest, "workspace name, provider instance, repository, and ref are required")
+		return
+	}
+	workspace := models.WorkspaceConfig{ID: stableCloudUserID(session.User.ID + ":snapshot:" + input.ProviderInstanceID + ":" + input.ProviderRepository), Name: name, AccessMode: models.WorkspaceAccessModeRemoteSnapshot, OwnerUserID: session.User.ID, Provider: strings.TrimSpace(input.Provider), ProviderInstanceID: strings.TrimSpace(input.ProviderInstanceID), ProviderRepository: strings.TrimSpace(input.ProviderRepository), SelectedRef: strings.TrimSpace(input.SelectedRef), BaselineBranch: strings.TrimSpace(input.SelectedRef), Sources: normalizeCloudSources(input.Sources), CreatedAt: time.Now().UTC(), LastScannedAt: time.Now().UTC()}
+	adapter := remoteSnapshotAdapter{providers: a.cloudProviders}
+	resolved, _, err := adapter.Resolve(r.Context(), session, workspace)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "provider repository or ref is not available")
+		return
+	}
+	writeJSON(w, http.StatusCreated, a.cloudWorkspaces.Upsert(resolved))
 }

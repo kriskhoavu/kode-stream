@@ -1,9 +1,36 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, api } from '.';
+import { ApiError, api, apiURL, isExtensionSurface, localAPIOrigin } from '.';
 
 describe('shared api facade', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it('resolves API URLs for normal and extension surfaces', () => {
+    expect(isExtensionSurface('http:')).toBe(false);
+    expect(isExtensionSurface('chrome-extension:')).toBe(true);
+    expect(apiURL('/api/state')).toBe('/api/state');
+    expect(apiURL('/api/state', true)).toBe('http://127.0.0.1:4317/api/state');
+    expect(apiURL('https://example.com/api/state')).toBe('https://example.com/api/state');
+  });
+
+  it('normalizes local API origin override values', () => {
+    expect(localAPIOrigin()).toBe('http://127.0.0.1:4317');
+    localStorage.setItem('kodeStreamApiOrigin', ' http://127.0.0.1:9999/ ');
+    expect(localAPIOrigin()).toBe('http://127.0.0.1:9999');
+  });
+
+  it('treats any health HTTP response as a reachable local server', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+
+    await expect(api.localServerReachable()).resolves.toBe(true);
+  });
+
+  it('treats failed health fetch as an unreachable local server', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+    await expect(api.localServerReachable()).resolves.toBe(false);
   });
 
   it('normalizes workspace sources', async () => {

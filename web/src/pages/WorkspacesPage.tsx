@@ -727,18 +727,20 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
                       </div>
                     </> : <>
                       <dl className="workspace-overview-grid">
-                        <div><dt>Location</dt><dd>{repo.location === 'cloud_agent' ? (repo.localRootLabel || 'Cloud Agent workspace') : <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} title={repo.path}>{repo.path}</button>}</dd></div>
+                        <div><dt>Location</dt><dd>{repo.location === 'cloud_agent' ? (repo.localRootLabel || 'Cloud Agent workspace') : repo.location === 'cloud_remote_snapshot' ? 'Remote Snapshot (read-only)' : <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} title={repo.path}>{repo.path}</button>}</dd></div>
                         <div><dt>Base branch</dt><dd>{repo.baselineBranch}</dd></div>
-                        <div><dt>Registration</dt><dd>{repo.location === 'cloud_agent' ? 'Cloud Agent' : repo.registrationMode === 'remote_clone' ? 'Remote clone' : repo.registrationMode === 'existing_workspace' ? 'Imported workspace' : 'Local folder'}</dd></div>
+                        <div><dt>Registration</dt><dd>{repo.location === 'cloud_agent' ? 'Cloud Agent' : repo.location === 'cloud_remote_snapshot' ? 'Remote Snapshot' : repo.registrationMode === 'remote_clone' ? 'Remote clone' : repo.registrationMode === 'existing_workspace' ? 'Imported workspace' : 'Local folder'}</dd></div>
                         {repo.agentId && <div><dt>Agent</dt><dd>{repo.agentId}</dd></div>}
+						{repo.location === 'cloud_remote_snapshot' && <><div><dt>Repository</dt><dd>{repo.providerRepository || 'Not selected'}</dd></div><div><dt>Ref</dt><dd>{repo.selectedRef || 'Not selected'}</dd></div><div><dt>Commit</dt><dd>{repo.resolvedCommitSha || 'Resolved when opened'}</dd></div></>}
                         {repo.scanStatus && <div><dt>Scan</dt><dd>{repo.scanStatus}</dd></div>}
                         {repo.remoteUrl && <div><dt>Remote URL</dt><dd>{repo.remoteUrl}</dd></div>}
                         <div><dt>Created</dt><dd>{repo.createdAt ? new Date(repo.createdAt).toLocaleString() : 'Unknown'}</dd></div>
                       </dl>
                       <div className="repo-row-actions workspace-detail-actions">
-                        {repo.location !== 'cloud_agent' && <button className="secondary" type="button" onClick={() => revealPath(repo.path)}><ExternalLink size={16} /> Reveal folder</button>}
-                        {repo.location !== 'cloud_agent' && <button className="primary" type="button" onClick={() => startEdit(repo, 'general')}><Pencil size={16} /> Edit general</button>}
+						{repo.location !== 'cloud_agent' && repo.location !== 'cloud_remote_snapshot' && <button className="secondary" type="button" onClick={() => revealPath(repo.path)}><ExternalLink size={16} /> Reveal folder</button>}
+						{repo.location !== 'cloud_agent' && repo.location !== 'cloud_remote_snapshot' && <button className="primary" type="button" onClick={() => startEdit(repo, 'general')}><Pencil size={16} /> Edit general</button>}
                       </div>
+						{repo.location === 'cloud_remote_snapshot' && <p className="workspace-inline-notice">This is a read-only provider snapshot. Run local Git or terminal work on your machine; Cloud cannot launch or observe that terminal.</p>}
                     </>}
                   </OverviewSection>
 

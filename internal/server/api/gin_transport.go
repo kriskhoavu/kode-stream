@@ -3,11 +3,14 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"kode-stream/internal/common/httpx"
+	"kode-stream/internal/common/models"
+	"kode-stream/internal/system"
 )
 
 const (
@@ -15,18 +18,36 @@ const (
 	requestTimeout  = 30 * time.Second
 )
 
-func newTransport(register func(*gin.RouterGroup)) http.Handler {
+func newTransport(config system.RuntimeConfig, register func(*gin.RouterGroup)) http.Handler {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.RedirectTrailingSlash = false
 	engine.RedirectFixedPath = false
 	engine.HandleMethodNotAllowed = false
-	engine.Use(gin.Recovery(), requestIDMiddleware(), timeoutMiddleware(requestTimeout))
+	engine.Use(gin.Recovery(), localExtensionCORSMiddleware(config), requestIDMiddleware(), timeoutMiddleware(requestTimeout))
 	api := engine.Group("/api")
 	if register != nil {
 		register(api)
 	}
 	return engine
+}
+
+func localExtensionCORSMiddleware(config system.RuntimeConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if config.Mode == models.RuntimeModeLocal && strings.HasPrefix(origin, "chrome-extension://") {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Headers", "Content-Type, X-Request-ID")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			c.Header("Vary", "Origin")
+			if c.Request.Method == http.MethodOptions {
+				c.Status(http.StatusNoContent)
+				c.Abort()
+				return
+			}
+		}
+		c.Next()
+	}
 }
 
 func requestIDMiddleware() gin.HandlerFunc {

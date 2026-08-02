@@ -69,6 +69,34 @@ func TestCloudCommandRejectsViewerWriteCapability(t *testing.T) {
 	}
 }
 
+func TestCloudCommandRejectsRemoteSnapshotExecutionWithoutProviderCall(t *testing.T) {
+	apiHandler, _ := cloudCommandTestAPI(t, true)
+	userID := stableCloudUserID("editor")
+	workspace := apiHandler.cloudWorkspaces.Upsert(models.WorkspaceConfig{
+		ID:                 "ws-snapshot",
+		Name:               "Snapshot",
+		OwnerUserID:        userID,
+		AccessMode:         models.WorkspaceAccessModeRemoteSnapshot,
+		Provider:           "github",
+		ProviderInstanceID: "github",
+		ProviderRepository: "acme/repo",
+		SelectedRef:        "main",
+		Sources:            []string{},
+	})
+	handler := apiHandler.Routes()
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/commands", strings.NewReader(`{"type":"git"}`))
+	request.Header.Set("X-Kode-Stream-Subject", "editor")
+	request.Header.Set("X-Kode-Stream-Role", "editor")
+	request.Header.Set(csrfHeader, stableCloudUserID("editor:csrf"))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "read-only snapshot") {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+}
+
 func TestCloudDeniesHostedExecutionRoutes(t *testing.T) {
 	apiHandler, workspaceID := cloudCommandTestAPI(t, true)
 	handler := apiHandler.Routes()

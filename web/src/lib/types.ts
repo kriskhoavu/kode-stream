@@ -66,8 +66,14 @@ export interface WorkspaceConfig {
   name: string;
   path: string;
   location?: WorkspaceLocation;
+  accessMode?: WorkspaceAccessMode;
   ownerUserId?: string;
   agentId?: string;
+  provider?: string;
+  providerInstanceId?: string;
+  providerRepository?: string;
+  selectedRef?: string;
+  resolvedCommitSha?: string;
   localRootLabel?: string;
   publishedSummary?: boolean;
   scanStatus?: string;
@@ -284,7 +290,8 @@ export interface WorkspaceInput {
 }
 
 export type WorkspaceRegistrationMode = 'local_path' | 'remote_clone' | 'existing_workspace';
-export type WorkspaceLocation = 'local_path' | 'cloud_agent';
+export type WorkspaceLocation = 'local_path' | 'cloud_agent' | 'cloud_remote_snapshot';
+export type WorkspaceAccessMode = 'agent_backed' | 'remote_snapshot';
 export type RuntimeMode = 'local' | 'cloud';
 export type CloudRole = 'admin' | 'editor' | 'viewer';
 export type Capability = 'read' | 'write' | 'workspace_registration' | 'git' | 'system' | 'terminal' | 'ai' | 'runtime' | 'verification';

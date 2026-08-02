@@ -1,0 +1,12 @@
+flowchart LR
+  browser[Authenticated browser] --> api[Cloud API]
+  api <-->|Approved command envelopes\nHTTPS / WebSocket| agent[Outbound Cloud Agent]
+  agent --> repo[Owner's local repository]
+  agent --> tools[Local Git, terminal, AI,\nruntime, verification]
+  api --> postgres[(Postgres metadata)]
+  agent -. never connects .-> postgres
+
+  classDef runtime fill:#f8fafc,stroke:#64748b,color:#0f172a
+  classDef db fill:#eef7ff,stroke:#2563eb,color:#0f172a
+  class browser,api,agent,repo,tools runtime
+  class postgres db

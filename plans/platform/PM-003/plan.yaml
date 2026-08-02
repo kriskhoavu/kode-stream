@@ -4,7 +4,7 @@ plan:
   ticket: PM-003
   title: Technical Architecture Refactoring
   service: platform
-  status: draft
+  status: done
   owner: null
   tags:
     - kode-stream

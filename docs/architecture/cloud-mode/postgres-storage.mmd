@@ -1,0 +1,13 @@
+flowchart LR
+  api[Kode Stream Cloud API] --> postgres[(Postgres\nshared app-owned state)]
+  postgres --> metadata[Workspace metadata]
+  postgres --> indexes[Derived indexes and branch scans]
+  postgres --> audit[Audit and settings]
+  operators[Approved operator tooling] --> postgres
+  agent[Cloud Agent] -. never connects .-> postgres
+  repository[Repository source files] -. never stored .-> postgres
+
+  classDef runtime fill:#f8fafc,stroke:#64748b,color:#0f172a
+  classDef db fill:#eef7ff,stroke:#2563eb,color:#0f172a
+  class api,metadata,indexes,audit,operators,agent,repository runtime
+  class postgres db

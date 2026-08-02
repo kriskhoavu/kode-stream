@@ -4,7 +4,7 @@ plan:
   ticket: PM-001
   title: Kode Stream Read-Only MVP
   service: platform
-  status: draft
+  status: done
   owner: null
   tags:
     - kode-stream

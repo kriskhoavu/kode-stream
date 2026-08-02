@@ -1,5 +1,8 @@
 # Cloud Deployment
 
+Cloud deployments support Agent-Backed and Agentless Remote Snapshot workspaces. Both run the same authenticated
+control plane and Postgres metadata store; only the workspace access boundary differs. See [Cloud deployment modes](cloud-modes.md).
+
 Cloud mode runs Kode Stream as a hosted control plane behind OAuth2Proxy. The public endpoint is OAuth2Proxy, which
 redirects users to Keycloak and forwards authenticated identity headers to Kode Stream. Kode Stream itself stays on a
 private VM/container port, stores metadata in Postgres, keeps optional exports under `KODE_STREAM_DATA_DIR`, and routes
@@ -55,7 +58,8 @@ Postgres before upgrades and verify `/api/health` reports database readiness and
 hosted workspace terminals.
 
 Cloud Agents connect only to the Cloud API. They never receive Postgres credentials and never connect directly to the
-database.
+database. Remote Snapshot workspaces do not require an Agent; Cloud reads their selected provider repository with
+read-only authorization and resolves every selected ref to a commit SHA before returning content.
 
 ## Smoke Check
 
@@ -63,22 +67,21 @@ database.
 npm run build
 go build -o ./bin/kode-stream ./cmd/kode-stream
 docker build -t kode-stream:cloud .
-docker compose -f docker/cloud/compose.yaml up -d
+docker compose -f runbooks/docker/cloud-mode/compose.yaml up -d
 curl -fsS http://127.0.0.1:4318/api/health
 ```
 
-Open the public OAuth2Proxy URL, for example `https://kode-stream.example.com`, to see the login page. In the sample
-compose file, local port `4318` is OAuth2Proxy and the app port is not published. After login, connect a Cloud Agent and
-register a workspace from the agent. Command-capable actions should be unavailable until the owner agent is connected.
+The repository Compose file is the self-contained local stack: local port `4318` is OAuth2Proxy and the app port is not
+published. After login, use the Agent-Backed or Agentless Remote Snapshot workflow described in [Local Cloud Stack](../../runbooks/docker/cloud-mode/README.md).
 
 ## Local OAuth2Proxy And Keycloak Stack
 
-For a full local login flow, use the Docker Compose stack in [Local Cloud Auth Stack](cloud/local.md). It starts
+For a full local login flow, use the Docker Compose stack in [Local Cloud Stack](../../runbooks/docker/cloud-mode/README.md). It starts
 Keycloak with an imported `kode-stream` realm, OAuth2Proxy on `http://kode-stream.localhost:4318`, and Kode Stream as a
 private upstream.
 
 ```bash
-docker compose -f docker/cloud/local-compose.yaml up -d --build
+docker compose -f runbooks/docker/cloud-mode/compose.yaml up -d --build
 curl -fsS http://kode-stream.localhost:4318/api/health
 ```
 

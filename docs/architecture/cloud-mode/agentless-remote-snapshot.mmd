@@ -1,0 +1,13 @@
+flowchart LR
+  browser[Authenticated browser] --> api[Cloud API]
+  api --> workspace[Remote Snapshot workspace]
+  workspace --> provider[Authorized read-only\nGit provider API]
+  provider --> ref[Selected ref]
+  ref --> commit[Resolved immutable commit]
+  commit --> content[Read-only plans, files,\nboard, and search]
+  noAgent[No Agent, local path, checkout,\nprocess, or provider write] -. boundary .-> workspace
+
+  classDef runtime fill:#f8fafc,stroke:#64748b,color:#0f172a
+  classDef boundary fill:#fefce8,stroke:#ca8a04,color:#422006
+  class browser,api,provider,ref,commit,content runtime
+  class workspace,noAgent boundary

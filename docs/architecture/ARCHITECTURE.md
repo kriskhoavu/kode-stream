@@ -24,19 +24,53 @@ Browser
   -> Optional integrations
 ```
 
-## Runtime Modes
+## Deployment Model
 
-Kode Stream has two runtime modes:
+Kode Stream has three deployment models and two independent local storage choices. Do not use “Cloud mode” to imply
+that every Cloud workspace has an Agent: the Cloud control plane supports both Agent-Backed and Agentless Remote
+Snapshot workspaces.
 
-- Local mode is the default single-user app. The server binds to loopback, workspace files are local paths or managed
-  clones, and Git, terminal, AI, runtime, and verification commands execute on the same machine.
-- Cloud mode is a hosted control plane. It authenticates users, enforces roles, stores app-owned state in Postgres, and
-  routes workspace commands to the owner Cloud Agent. The hosted process does not clone repositories or execute
-  workspace commands.
+```mermaid
+flowchart TD
+  D[Choose deployment model] --> L[Local application]
+  D --> CA[Cloud control plane + Cloud Agent]
+  D --> CS[Cloud control plane + Remote Snapshot]
+  L --> LD[datadir storage]
+  L --> LDB[SQLite database storage]
+  CA --> PG[Postgres database storage]
+  CS --> PG
+  CA --> Machine[User machine: Git, files, terminal, AI, verification]
+  CS --> Provider[Read-only Git provider API at pinned commit]
+```
 
-Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Cloud workspace records use
-`WorkspaceLocation=cloud_agent` and store metadata such as owner user, agent id, redacted local path label, remote URL,
-scan status, and published summaries.
+| Deployment model                | Where Kode Stream runs                                                      | Workspace execution/data boundary                                                                                     | Supported storage              | Intended use                                                                                   |
+|---------------------------------|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|--------------------------------|------------------------------------------------------------------------------------------------|
+| Local application               | User machine; installed with Homebrew, built locally, or run in Docker      | Local paths and managed clones; Git, file writes, terminal, AI, runtime, and verification run locally                 | `datadir` or SQLite `database` | One user working directly with local repositories                                              |
+| Cloud Agent-Backed              | Cloud API on VM/container plus Cloud Agent on the workspace owner’s machine | Agent keeps repository files, Git credentials, processes, and terminals local; Cloud sends approved command envelopes | Postgres `database` only       | Hosted collaboration with privileged work kept on user machines                                |
+| Cloud Agentless Remote Snapshot | Cloud API on VM/container                                                   | Cloud reads an authorized provider repository at a resolved immutable commit; no checkout or process runs in Cloud    | Postgres `database` only       | Current backend foundation: read-only metadata, tree, and file endpoints without a local Agent |
+
+### Capability Boundary
+
+```text
+Local application
+  Browser -> loopback Go server -> local repository + local app state
+  Read, write, Git, terminal, AI, runtime, verification
+  Docker variant: server and tools run in the container; a host repository is mounted at /workspace
+
+Cloud Agent-Backed
+  Browser -> Cloud API -> outbound Cloud Agent -> user's repository + local tools
+  Hosted metadata; privileged actions execute only on the user's machine
+
+Cloud Agentless Remote Snapshot
+  Browser -> Cloud API -> provider read API -> commit-pinned tree and files
+  Read, snapshot selection, terminal handoff guidance only
+```
+
+Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Agent-Backed workspace records use
+`WorkspaceLocation=cloud_agent`; Remote Snapshot records use `WorkspaceLocation=cloud_remote_snapshot` and never
+contain a local path, agent ID, command envelope, or provider credential.
+
+Remote Snapshot's end-user provider registration and snapshot-backed board/search views are planned follow-up work.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -58,8 +92,16 @@ scan status, and published summaries.
 └────────────────────────────────┘  └───────────────────────────┘
 ```
 
-Rendered architecture diagram: [Storage architecture](docs/storage/storage-architecture-diagram.svg). Source:
-[storage-architecture-diagram.mmd](docs/storage/storage-architecture-diagram.mmd).
+For the mode-specific diagrams and use cases, see [Local mode](local-mode/README.md),
+[Cloud mode](cloud-mode/README.md), and [Chrome extension](chrome-extension/README.md). The Local storage-options
+diagram source is [Mermaid](local-mode/storage-options.mmd).
+
+## Deployment Adapter Boundaries
+
+Kode Stream does not use one abstract `DeploymentMode` interface. Instead, the runtime mode is configuration and
+policy, while the variable concerns use smaller abstractions: `StorageProvider` for app-owned state and
+`workspaceAccessAdapter` for Cloud workspace commands. The Chrome extension is a frontend API-origin adapter, not a
+server-side runtime mode. See the [deployment adapter class diagrams](deployment-adapters.md).
 
 ## Backend Layers
 
@@ -130,7 +172,7 @@ Storage is selected at server startup:
 | Local        | `database`     | SQLite   | `KODE_STREAM_STORAGE_OPTION=database` or optional SQLite override | Workspace metadata, derived item indexes, audit, navigation, settings |
 | Cloud        | `database`     | Postgres | `KODE_STREAM_STORAGE_DRIVER=postgres`, `KODE_STREAM_DATABASE_URL` | Shared control-plane metadata, branch indexes, audit, settings        |
 
-Local data-dir storage is a supported option, not a deprecated path. See [Storage](docs/storage/storage-architecture.md)
+Local data-dir storage is a supported option, not a deprecated path. See [Storage](../storage/storage-architecture.md)
 for the option matrix, manual sync, backup, restore, and performance comparison.
 
 `internal/storage` resolves `KODE_STREAM_STORAGE_OPTION`, composes a provider-backed `RepositoryBundle`, opens SQL

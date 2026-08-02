@@ -22,40 +22,27 @@ func (a *API) cloudWorkspaceCommand(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
 	}
-	if !a.agentStore.HasConnected(session.User.ID, workspace.AgentID) {
-		writeError(w, http.StatusServiceUnavailable, "Cloud Agent is offline")
-		return
-	}
-	var input struct {
-		Type       string            `json:"type"`
-		Capability models.Capability `json:"capability"`
-		Payload    map[string]string `json:"payload"`
-		Log        string            `json:"log"`
-	}
+	var input cloudCommandInput
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	capability := input.Capability
-	if capability == "" {
-		capability = capabilityForCommandType(input.Type)
-	}
-	if !roleCapabilities(session.User.Role)[capability] {
-		writeError(w, http.StatusForbidden, "role cannot run this command")
+	adapter, status, message := a.workspaceAccessAdapter(workspace)
+	if message != "" {
+		writeError(w, status, message)
 		return
 	}
-	command := models.CommandEnvelope{
-		ID:          stableCloudUserID(session.User.ID + ":" + workspace.ID + ":" + input.Type),
-		Type:        strings.TrimSpace(input.Type),
-		WorkspaceID: workspace.ID,
-		UserID:      session.User.ID,
-		AgentID:     workspace.AgentID,
-		Capability:  capability,
-		Payload:     input.Payload,
+	result, status, message := adapter.Command(session, workspace, input)
+	if message != "" {
+		if status == 0 {
+			status = http.StatusConflict
+		}
+		writeError(w, status, message)
+		return
 	}
-	writeJSON(w, http.StatusAccepted, models.CommandResult{Accepted: true, Command: command, Log: redactCommandLog(input.Log)})
+	writeJSON(w, status, result)
 }
 
 func capabilityForCommandType(commandType string) models.Capability {

@@ -21,17 +21,28 @@ clearer local Git operations.
 - Indexes LLM Wiki content and graph relationships for structured knowledge workflows.
 - Stores app registry, cache, audit log, filters, recents, and AI settings outside managed repositories.
 
-## Runtime Modes
+## Deployment Modes
 
-Kode Stream supports Local and Cloud runtime modes.
+Kode Stream has three supported deployment models. Storage is a separate choice only for Local.
 
-- Local mode is the default. The app binds to `127.0.0.1`, registers local paths or managed clones, and runs workspace
-  Git, terminal, AI, runtime, and verification commands on the user's machine.
-- Cloud mode runs a hosted control plane with authentication, role policy, metadata storage, and Cloud Agent routing.
-  In the default deployment, OAuth2Proxy is the public endpoint and redirects to Keycloak; Kode Stream stays on a
-  private port and trusts OAuth2Proxy identity headers. Cloud mode requires Postgres for app-owned state. The hosted app
-  does not clone repositories or execute workspace commands. Command-capable actions require the workspace owner's
-  connected Cloud Agent.
+| Model                           | Install/run location                          | Workspace capability                                                                            | Storage                                  |
+|---------------------------------|-----------------------------------------------|-------------------------------------------------------------------------------------------------|------------------------------------------|
+| Local application               | User machine; Homebrew or local binary        | Full local reads, writes, Git, terminal, AI, runtime, and verification                          | `datadir` (default) or SQLite `database` |
+| Cloud Agent-Backed              | Cloud VM/container plus Agent on user machine | Cloud coordinates; Agent executes privileged actions locally                                    | Postgres `database`                      |
+| Cloud Agentless Remote Snapshot | Cloud VM/container                            | Read-only provider snapshot pinned to a commit; no Agent, checkout, or hosted command execution | Postgres `database`                      |
+
+```text
+Local: Browser -> loopback Kode Stream -> local repository
+Cloud + Agent: Browser -> Cloud API -> outbound Agent -> local repository
+Cloud snapshot: Browser -> Cloud API -> provider API -> immutable repository commit
+```
+
+Remote Snapshot currently provides the commit-pinned backend foundation for metadata, tree, and file reads. Its
+self-service registration and snapshot-backed board/search UI remain planned work.
+
+See [Architecture](docs/architecture/ARCHITECTURE.md) for the capability boundary, [Cloud modes](docs/cloud/cloud-modes.md) for operating
+guidance, [Storage](docs/storage/storage-architecture.md) for the storage decision matrix, and the
+[Documentation map](docs/README.md) for the full documentation taxonomy.
 
 ## Tech Stack
 
@@ -132,11 +143,31 @@ kode-stream agent start|status|doctor
 - `doctor`: checks the environment and repository setup.
 - `agent`: starts, checks, or diagnoses the Cloud Agent command surface.
 
-For a local Cloud-mode smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy, and a foreground Cloud Agent:
+For a local Agent-Backed Cloud smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy, and a foreground Cloud Agent:
 
 ```bash
-./run-docker-cloud.sh
+./runbooks/docker/cloud-mode/run.sh
 ```
+
+For the Agentless Remote Snapshot control-plane stack, use:
+
+```bash
+KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./runbooks/docker/cloud-mode/run.sh
+```
+
+See [Local Cloud Stack](runbooks/docker/cloud-mode/README.md) for both flows.
+
+## Local Docker Mode
+
+Local mode can also run in Docker with either supported Local storage option:
+
+```bash
+./runbooks/docker/local-mode/run.sh
+KODE_STREAM_STORAGE_OPTION=database ./runbooks/docker/local-mode/run.sh
+```
+
+The selected host workspace is mounted at `/workspace`. See [Local Docker Stack](runbooks/docker/local-mode/README.md) for the
+storage boundary and container limitations for Git credentials, terminal, AI, dialogs, and path reveal.
 
 ## Storage And Data Directory
 
@@ -241,6 +272,6 @@ cards:
 
 ## Architecture
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries, storage design, data flow, and API structure.
+See [Architecture](docs/architecture/ARCHITECTURE.md) for system boundaries, storage design, data flow, and API structure.
 
 For hosted deployment, see [Cloud Deployment](docs/cloud/cloud-deployment.md).

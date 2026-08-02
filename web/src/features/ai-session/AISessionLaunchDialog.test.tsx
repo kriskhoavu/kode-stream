@@ -136,6 +136,14 @@ describe('AISessionLaunchDialog', () => {
 		expect(launched).toHaveBeenCalledWith(expect.objectContaining({ session: expect.objectContaining({ id: 'session-1' }) }), expect.objectContaining({ surface: 'embedded' }));
 	});
 
+	it('hides embedded sessions when embedded launch is disabled', async () => {
+		mockOptions();
+		render(<AISessionLaunchDialog itemId="item-1" allowEmbedded={false} preference={{ provider: 'codex', terminal: 'terminal', contextMode: 'card_context', surface: 'embedded' }} onClose={vi.fn()} onLaunched={vi.fn()} />);
+
+		expect(await screen.findByLabelText('Integrated terminal')).toBeChecked();
+		expect(screen.queryByLabelText('Embedded terminal')).not.toBeInTheDocument();
+	});
+
 	it('includes selected provider capabilities in the launch payload', async () => {
 		mockOptions();
 		vi.mocked(api.launchAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', contextMode: 'card_context', startedAt: '2026-07-02T00:00:00Z' });

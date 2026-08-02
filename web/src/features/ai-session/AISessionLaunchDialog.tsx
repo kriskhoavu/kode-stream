@@ -16,7 +16,7 @@ import type {
 } from '../../lib/types';
 import { appendJiraDescriptionPrompt, removeJiraDescriptionPrompt } from './jiraPrompt';
 
-export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, preference, onClose, onLaunched }: { itemId?: string; workspaceTarget?: { workspaceId: string; contextPath: string }; e2eRunbook?: E2ERunbook; preference?: AISessionLaunchInput | null; onClose: () => void; onLaunched: (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => void }) {
+export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, preference, allowEmbedded = true, onClose, onLaunched }: { itemId?: string; workspaceTarget?: { workspaceId: string; contextPath: string }; e2eRunbook?: E2ERunbook; preference?: AISessionLaunchInput | null; allowEmbedded?: boolean; onClose: () => void; onLaunched: (result: AISessionLaunchResult | EmbeddedAISessionResult, input: AISessionLaunchInput) => void }) {
 	const e2eMode = Boolean(workspaceTarget && e2eRunbook);
 	const [settings, setSettings] = useState<AISettings | null>(null);
 	const [capabilities, setCapabilities] = useState<AICapability[]>([]);
@@ -70,10 +70,10 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 			setJiraPromptError('');
 			setSelectedSkills([]);
 			setSelectedAgents([]);
-			setSurface(preference?.surface ?? 'external');
+			setSurface(allowEmbedded ? preference?.surface ?? 'external' : 'external');
 		}).catch((caught) => active && setError(caught instanceof Error ? caught.message : 'AI session options are unavailable.')).finally(() => active && setLoading(false));
 		return () => { active = false; };
-	}, [itemId, preference, e2eMode, e2eRunbook?.resultPath, workspaceTarget?.contextPath]);
+	}, [allowEmbedded, itemId, preference, e2eMode, e2eRunbook?.resultPath, workspaceTarget?.contextPath]);
 
 	useEffect(() => {
 		if (!provider) return;
@@ -203,7 +203,7 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 				{error && <p className="error" role="alert">{error}</p>}
 				{settings && eligibility && <div className="ai-launch-fields">
 					<label>AI provider<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providers.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>
-					<fieldset><legend>Session surface</legend><label><input type="radio" name="ai-surface" checked={surface === 'external'} onChange={() => setSurface('external')} /> Integrated terminal</label><label><input type="radio" name="ai-surface" checked={surface === 'embedded'} onChange={() => setSurface('embedded')} /> Embedded terminal</label></fieldset>
+					<fieldset><legend>Session surface</legend><label><input type="radio" name="ai-surface" checked={surface === 'external'} onChange={() => setSurface('external')} /> Integrated terminal</label>{allowEmbedded && <label><input type="radio" name="ai-surface" checked={surface === 'embedded'} onChange={() => setSurface('embedded')} /> Embedded terminal</label>}</fieldset>
 					{surface === 'external' && <label>Terminal<select value={terminal} onChange={(event) => setTerminal(event.target.value)}>{terminals.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>}
 					{!e2eMode && <fieldset><legend>Session context</legend><label><input type="radio" name="ai-context" checked={contextMode === 'workspace_only'} onChange={() => setContextMode('workspace_only')} /> Workspace only — start with a free prompt</label><label><input type="radio" name="ai-context" checked={contextMode === 'card_context'} disabled={!eligibility.cardContextAvailable} aria-describedby="card-context-readiness" onChange={() => setContextMode('card_context')} /> Selected card — provide its path and related documents</label></fieldset>}
 					{contextMode === 'workspace_only' && <p className="eligibility-ready">No card context will be injected. The AI opens at the workspace root so you can manually reference any relevant file or directory.</p>}
