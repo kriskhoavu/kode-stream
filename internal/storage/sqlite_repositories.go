@@ -15,6 +15,7 @@ import (
 
 	"kode-stream/internal/ai"
 	"kode-stream/internal/audit"
+	"kode-stream/internal/canvas"
 	"kode-stream/internal/common/models"
 	appgit "kode-stream/internal/git"
 	itemindex "kode-stream/internal/item/index"
@@ -839,13 +840,31 @@ func ImportLegacyFiles(paths system.Paths, git *appgit.GitAdapter, state *AppOwn
 	}); err != nil {
 		return err
 	}
-	return importOnce(state.ImportStatus, "ai-settings.yaml", func() error {
+	if err := importOnce(state.ImportStatus, "ai-settings.yaml", func() error {
 		settings, err := ai.NewSettingsRepository(paths.AISettingsFile).Load()
 		if err != nil {
 			return ignoreMissing(paths.AISettingsFile, err)
 		}
 		_, err = state.AISettings.Save(settings)
 		return err
+	}); err != nil {
+		return err
+	}
+	if err := importOnce(state.ImportStatus, "canvases.yaml", func() error {
+		snapshot, err := canvas.NewFileRepository(paths.CanvasFile).Snapshot()
+		if err != nil {
+			return ignoreMissing(paths.CanvasFile, err)
+		}
+		return state.Canvas.ReplaceAll(snapshot)
+	}); err != nil {
+		return err
+	}
+	return importOnce(state.ImportStatus, "ai-session-records.yaml", func() error {
+		records, err := ai.NewFileSessionRecordRepository(paths.AISessionRecordsFile).Snapshot()
+		if err != nil {
+			return ignoreMissing(paths.AISessionRecordsFile, err)
+		}
+		return state.SessionRecords.ReplaceAll(records)
 	})
 }
 

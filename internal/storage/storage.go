@@ -14,6 +14,7 @@ import (
 
 	"kode-stream/internal/ai"
 	"kode-stream/internal/audit"
+	"kode-stream/internal/canvas"
 	"kode-stream/internal/common/models"
 	appgit "kode-stream/internal/git"
 	itemindex "kode-stream/internal/item/index"
@@ -50,31 +51,35 @@ type Config struct {
 }
 
 type AppOwnedState struct {
-	Config        Config
-	Workspaces    registry.Repository
-	Items         itemindex.Repository
-	ImportStatus  ImportStatusRepository
-	Audit         audit.Repository
-	Navigation    navigation.Repository
-	AISettings    ai.SettingsStore
-	Knowledge     *knowledge.Store
-	LegacyFiles   system.Paths
-	SQLStore      *SQLStore
-	SQLiteStore   *SQLiteStore
-	PostgresStore *PostgresStore
-	Provider      StorageProvider
-	Repositories  RepositoryBundle
-	StatusService *StorageStatusService
-	SyncService   *StorageSyncService
+	Config         Config
+	Workspaces     registry.Repository
+	Items          itemindex.Repository
+	ImportStatus   ImportStatusRepository
+	Audit          audit.Repository
+	Navigation     navigation.Repository
+	AISettings     ai.SettingsStore
+	Canvas         canvas.Repository
+	SessionRecords ai.SessionRecordRepository
+	Knowledge      *knowledge.Store
+	LegacyFiles    system.Paths
+	SQLStore       *SQLStore
+	SQLiteStore    *SQLiteStore
+	PostgresStore  *PostgresStore
+	Provider       StorageProvider
+	Repositories   RepositoryBundle
+	StatusService  *StorageStatusService
+	SyncService    *StorageSyncService
 }
 
 type RepositoryBundle struct {
-	Workspaces registry.Repository
-	Items      itemindex.Repository
-	Audit      audit.Repository
-	Navigation navigation.Repository
-	AISettings ai.SettingsStore
-	Knowledge  *knowledge.Store
+	Workspaces     registry.Repository
+	Items          itemindex.Repository
+	Audit          audit.Repository
+	Navigation     navigation.Repository
+	AISettings     ai.SettingsStore
+	Canvas         canvas.Repository
+	SessionRecords ai.SessionRecordRepository
+	Knowledge      *knowledge.Store
 }
 
 type StorageProvider interface {
@@ -205,22 +210,26 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		return nil, err
 	}
 	state := &AppOwnedState{
-		Config:      config,
-		Workspaces:  registry.New(paths.RegistryFile, git),
-		Items:       itemindex.New(paths.PlanIndexFile),
-		Audit:       audit.New(paths.AuditLogFile),
-		Navigation:  navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile),
-		AISettings:  ai.NewSettingsRepository(paths.AISettingsFile),
-		Knowledge:   knowledge.NewStore(paths.KnowledgeIndexFile),
-		LegacyFiles: paths,
+		Config:         config,
+		Workspaces:     registry.New(paths.RegistryFile, git),
+		Items:          itemindex.New(paths.PlanIndexFile),
+		Audit:          audit.New(paths.AuditLogFile),
+		Navigation:     navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile),
+		AISettings:     ai.NewSettingsRepository(paths.AISettingsFile),
+		Canvas:         canvas.NewFileRepository(paths.CanvasFile),
+		SessionRecords: ai.NewFileSessionRecordRepository(paths.AISessionRecordsFile),
+		Knowledge:      knowledge.NewStore(paths.KnowledgeIndexFile),
+		LegacyFiles:    paths,
 	}
 	state.Repositories = RepositoryBundle{
-		Workspaces: state.Workspaces,
-		Items:      state.Items,
-		Audit:      state.Audit,
-		Navigation: state.Navigation,
-		AISettings: state.AISettings,
-		Knowledge:  state.Knowledge,
+		Workspaces:     state.Workspaces,
+		Items:          state.Items,
+		Audit:          state.Audit,
+		Navigation:     state.Navigation,
+		AISettings:     state.AISettings,
+		Canvas:         state.Canvas,
+		SessionRecords: state.SessionRecords,
+		Knowledge:      state.Knowledge,
 	}
 	switch config.Driver {
 	case StorageDriverFile:
@@ -238,7 +247,9 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		state.Audit = &SQLiteAuditRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
 		state.Navigation = &SQLiteNavigationRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
 		state.AISettings = &SQLiteAISettingsRepository{db: sqlStore.db, driver: sqlStore.driver}
-		state.Repositories = RepositoryBundle{Workspaces: state.Workspaces, Items: state.Items, Audit: state.Audit, Navigation: state.Navigation, AISettings: state.AISettings, Knowledge: state.Knowledge}
+		state.Canvas = &SQLiteCanvasRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
+		state.SessionRecords = &SQLiteSessionRecordRepository{db: sqlStore.db, driver: sqlStore.driver}
+		state.Repositories = RepositoryBundle{Workspaces: state.Workspaces, Items: state.Items, Audit: state.Audit, Navigation: state.Navigation, AISettings: state.AISettings, Canvas: state.Canvas, SessionRecords: state.SessionRecords, Knowledge: state.Knowledge}
 		state.Provider = &SQLiteProvider{store: state.SQLiteStore, repositories: state.Repositories}
 		if err := ImportLegacyFiles(paths, git, state); err != nil {
 			_ = sqlStore.Close()
@@ -257,7 +268,9 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		state.Audit = &SQLiteAuditRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
 		state.Navigation = &SQLiteNavigationRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
 		state.AISettings = &SQLiteAISettingsRepository{db: sqlStore.db, driver: sqlStore.driver}
-		state.Repositories = RepositoryBundle{Workspaces: state.Workspaces, Items: state.Items, Audit: state.Audit, Navigation: state.Navigation, AISettings: state.AISettings, Knowledge: state.Knowledge}
+		state.Canvas = &SQLiteCanvasRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
+		state.SessionRecords = &SQLiteSessionRecordRepository{db: sqlStore.db, driver: sqlStore.driver}
+		state.Repositories = RepositoryBundle{Workspaces: state.Workspaces, Items: state.Items, Audit: state.Audit, Navigation: state.Navigation, AISettings: state.AISettings, Canvas: state.Canvas, SessionRecords: state.SessionRecords, Knowledge: state.Knowledge}
 		state.Provider = &PostgresProvider{store: state.PostgresStore, repositories: state.Repositories}
 	}
 	state.StatusService = NewStorageStatusService(config, paths, runtime, state.SQLStore)
@@ -457,23 +470,67 @@ CREATE TABLE IF NOT EXISTS recent_items (item_id TEXT PRIMARY KEY, workspace_id 
 CREATE TABLE IF NOT EXISTS ai_settings (id TEXT PRIMARY KEY, settings_json TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS knowledge_indexes (workspace_id TEXT NOT NULL, root TEXT NOT NULL, wiki_json TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (workspace_id, root));
 CREATE TABLE IF NOT EXISTS import_status (source_name TEXT PRIMARY KEY, completed_at TEXT NOT NULL);`,
+	}, {
+		Version: 2,
+		Name:    "canvas_and_session_records",
+		SQL: `CREATE TABLE IF NOT EXISTS canvas_layouts (
+id TEXT PRIMARY KEY,
+owner_user_id TEXT NOT NULL DEFAULT '',
+workspace_id TEXT NOT NULL,
+branch_key TEXT NOT NULL,
+viewport_json TEXT NOT NULL,
+version INTEGER NOT NULL,
+created_at TEXT NOT NULL,
+updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS canvas_layouts_owner_workspace_branch ON canvas_layouts (owner_user_id, workspace_id, branch_key);
+CREATE TABLE IF NOT EXISTS canvas_placements (
+layout_id TEXT NOT NULL,
+node_id TEXT NOT NULL,
+entity_ref_json TEXT NOT NULL,
+x REAL NOT NULL,
+y REAL NOT NULL,
+collapsed INTEGER NOT NULL DEFAULT 0,
+revision INTEGER NOT NULL,
+updated_at TEXT NOT NULL,
+PRIMARY KEY (layout_id, node_id)
+);
+CREATE TABLE IF NOT EXISTS ai_session_records (
+id TEXT PRIMARY KEY,
+workspace_id TEXT NOT NULL,
+plan_ref_json TEXT NOT NULL DEFAULT '',
+provider TEXT NOT NULL,
+intent TEXT NOT NULL,
+requested_branch TEXT NOT NULL,
+observed_commit TEXT NOT NULL DEFAULT '',
+idempotency_key TEXT NOT NULL DEFAULT '',
+state TEXT NOT NULL,
+started_at TEXT NOT NULL,
+ended_at TEXT,
+exit_code INTEGER,
+last_known_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ai_session_records_workspace_idempotency ON ai_session_records (workspace_id, idempotency_key) WHERE idempotency_key <> '';`,
 	}}
 }
 
 func postgresMigrations() []Migration {
-	sqlite := sqliteMigrations()[0]
-	sqlite.SQL = strings.NewReplacer(
-		"INTEGER PRIMARY KEY", "INTEGER PRIMARY KEY",
-		"TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP", "TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP",
-		"created_at TEXT", "created_at TIMESTAMPTZ",
-		"last_scanned_at TEXT", "last_scanned_at TIMESTAMPTZ",
-		"scanned_at TEXT", "scanned_at TIMESTAMPTZ",
-		"event_time TEXT", "event_time TIMESTAMPTZ",
-		"updated_at TEXT", "updated_at TIMESTAMPTZ",
-		"opened_at TEXT", "opened_at TIMESTAMPTZ",
-		"completed_at TEXT", "completed_at TIMESTAMPTZ",
-		"clone_path_managed INTEGER", "clone_path_managed BOOLEAN",
-		"editable INTEGER", "editable BOOLEAN",
-	).Replace(sqlite.SQL)
-	return []Migration{sqlite}
+	migrations := sqliteMigrations()
+	for index := range migrations {
+		migrations[index].SQL = strings.NewReplacer(
+			"INTEGER PRIMARY KEY", "INTEGER PRIMARY KEY",
+			"TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP", "TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP",
+			"created_at TEXT", "created_at TIMESTAMPTZ",
+			"last_scanned_at TEXT", "last_scanned_at TIMESTAMPTZ",
+			"scanned_at TEXT", "scanned_at TIMESTAMPTZ",
+			"event_time TEXT", "event_time TIMESTAMPTZ",
+			"updated_at TEXT", "updated_at TIMESTAMPTZ",
+			"opened_at TEXT", "opened_at TIMESTAMPTZ",
+			"completed_at TEXT", "completed_at TIMESTAMPTZ",
+			"clone_path_managed INTEGER", "clone_path_managed BOOLEAN",
+			"editable INTEGER", "editable BOOLEAN",
+			"collapsed INTEGER", "collapsed BOOLEAN",
+		).Replace(migrations[index].SQL)
+	}
+	return migrations
 }

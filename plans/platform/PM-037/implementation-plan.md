@@ -15,7 +15,7 @@ PM-037.
 | Phase | Name                                                  | Track      | Status   |
 |-------|-------------------------------------------------------|------------|----------|
 | B1    | Provider axes and action capabilities                 | Backend    | Complete |
-| B2    | Layout, placement, and session repositories           | Backend    | Pending  |
+| B2    | Layout, placement, and session repositories           | Backend    | Complete |
 | B3    | Durable session lifecycle and branch-safe launch      | Backend    | Pending  |
 | B4    | Verification freshness and Canvas API                 | Backend    | Pending  |
 | F1    | Canvas route and placement state                      | Frontend   | Pending  |
@@ -51,16 +51,16 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Add `internal/canvas` layout, placement, branch-aware entity-reference, validation, and repository contracts.
-- [ ] Implement one default layout for owner, workspace, and branch key.
-- [ ] Implement placement-level optimistic revisions and bounded batch updates.
-- [ ] Add durable safe session-record domain and repository contracts under the AI/session boundary.
-- [ ] Add data-dir repositories with guarded atomic writes for layouts, placements, and session records.
-- [ ] Add the next SQLite migration and repositories for normalized layouts, placements, and session records.
-- [ ] Extend `storage.RepositoryBundle`, provider composition, manual Local storage sync, backups, status fixtures, and
+- [x] Add `internal/canvas` layout, placement, branch-aware entity-reference, validation, and repository contracts.
+- [x] Implement one default layout for owner, workspace, and branch key.
+- [x] Implement placement-level optimistic revisions and bounded batch updates.
+- [x] Add durable safe session-record domain and repository contracts under the AI/session boundary.
+- [x] Add data-dir repositories with guarded atomic writes for layouts, placements, and session records.
+- [x] Add the next SQLite migration and repositories for normalized layouts, placements, and session records.
+- [x] Extend `storage.RepositoryBundle`, provider composition, manual Local storage sync, backups, status fixtures, and
   cleanup.
-- [ ] Reject terminal data, repository content, cross-workspace references, invalid geometry, and invalid revisions.
-- [ ] Add repository contract, migration, sync, backup, isolation, limit, and conflict tests.
+- [x] Reject terminal data, repository content, cross-workspace references, invalid geometry, and invalid revisions.
+- [x] Add repository contract, migration, sync, backup, isolation, limit, and conflict tests.
 
 **Verification:** `go test ./internal/canvas ./internal/ai ./internal/storage`
 

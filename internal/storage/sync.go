@@ -17,6 +17,7 @@ import (
 
 	"kode-stream/internal/ai"
 	"kode-stream/internal/audit"
+	"kode-stream/internal/canvas"
 	"kode-stream/internal/common/models"
 	appgit "kode-stream/internal/git"
 	itemindex "kode-stream/internal/item/index"
@@ -52,13 +53,15 @@ type StorageSyncService struct {
 }
 
 type storageSnapshot struct {
-	Workspaces []models.WorkspaceConfig
-	Items      []models.ItemDetail
-	Scans      []models.BranchScanMetadata
-	Audit      []models.AuditEvent
-	Filters    []models.SavedFilter
-	Recents    []models.RecentItem
-	AISettings ai.Settings
+	Workspaces     []models.WorkspaceConfig
+	Items          []models.ItemDetail
+	Scans          []models.BranchScanMetadata
+	Audit          []models.AuditEvent
+	Filters        []models.SavedFilter
+	Recents        []models.RecentItem
+	AISettings     ai.Settings
+	Canvas         canvas.Snapshot
+	SessionRecords []ai.SessionRecord
 }
 
 type fileIndexState struct {
@@ -120,12 +123,15 @@ func (s *StorageSyncService) Sync(ctx context.Context, request StorageSyncReques
 
 func (s storageSnapshot) summary() map[string]int {
 	return map[string]int{
-		"workspaces":   len(s.Workspaces),
-		"items":        len(s.Items),
-		"branchScans":  len(s.Scans),
-		"auditEvents":  len(s.Audit),
-		"savedFilters": len(s.Filters),
-		"recentItems":  len(s.Recents),
+		"workspaces":       len(s.Workspaces),
+		"items":            len(s.Items),
+		"branchScans":      len(s.Scans),
+		"auditEvents":      len(s.Audit),
+		"savedFilters":     len(s.Filters),
+		"recentItems":      len(s.Recents),
+		"canvasLayouts":    len(s.Canvas.Layouts),
+		"canvasPlacements": len(s.Canvas.Placements),
+		"sessionRecords":   len(s.SessionRecords),
 	}
 }
 
@@ -193,8 +199,14 @@ func (s *StorageSyncService) writeDatabaseSnapshot(snapshot storageSnapshot) err
 	if err != nil {
 		return err
 	}
+	if err := (&SQLiteCanvasRepository{db: store.db, driver: store.driver, now: time.Now}).ReplaceAll(snapshot.Canvas); err != nil {
+		return err
+	}
+	if err := (&SQLiteSessionRecordRepository{db: store.db, driver: store.driver}).ReplaceAll(snapshot.SessionRecords); err != nil {
+		return err
+	}
 	status := &SQLiteImportStatusRepository{db: store.db, driver: store.driver}
-	for _, source := range []string{"workspaces.yaml", "item-index.yaml", "audit-log.jsonl", "navigation", "ai-settings.yaml"} {
+	for _, source := range []string{"workspaces.yaml", "item-index.yaml", "audit-log.jsonl", "navigation", "ai-settings.yaml", "canvases.yaml", "ai-session-records.yaml"} {
 		if err := status.MarkImportCompleted(source, time.Now().UTC()); err != nil {
 			return err
 		}
@@ -216,21 +228,25 @@ func (s *StorageSyncService) readDatabaseSnapshot() (storageSnapshot, error) {
 	}
 	defer store.Close()
 	return readRepositorySnapshot(RepositoryBundle{
-		Workspaces: newSQLiteWorkspaceRepository(store, s.paths, s.git),
-		Items:      &SQLiteItemRepository{db: store.db, driver: store.driver},
-		Audit:      &SQLiteAuditRepository{db: store.db, driver: store.driver, now: time.Now},
-		Navigation: &SQLiteNavigationRepository{db: store.db, driver: store.driver, now: time.Now},
-		AISettings: &SQLiteAISettingsRepository{db: store.db, driver: store.driver},
+		Workspaces:     newSQLiteWorkspaceRepository(store, s.paths, s.git),
+		Items:          &SQLiteItemRepository{db: store.db, driver: store.driver},
+		Audit:          &SQLiteAuditRepository{db: store.db, driver: store.driver, now: time.Now},
+		Navigation:     &SQLiteNavigationRepository{db: store.db, driver: store.driver, now: time.Now},
+		AISettings:     &SQLiteAISettingsRepository{db: store.db, driver: store.driver},
+		Canvas:         &SQLiteCanvasRepository{db: store.db, driver: store.driver, now: time.Now},
+		SessionRecords: &SQLiteSessionRecordRepository{db: store.db, driver: store.driver},
 	})
 }
 
 func readDataDirSnapshot(paths system.Paths) (storageSnapshot, error) {
 	snapshot, err := readRepositorySnapshot(RepositoryBundle{
-		Workspaces: registry.New(paths.RegistryFile, nil),
-		Items:      itemindex.New(paths.PlanIndexFile),
-		Audit:      audit.New(paths.AuditLogFile),
-		Navigation: navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile),
-		AISettings: ai.NewSettingsRepository(paths.AISettingsFile),
+		Workspaces:     registry.New(paths.RegistryFile, nil),
+		Items:          itemindex.New(paths.PlanIndexFile),
+		Audit:          audit.New(paths.AuditLogFile),
+		Navigation:     navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile),
+		AISettings:     ai.NewSettingsRepository(paths.AISettingsFile),
+		Canvas:         canvas.NewFileRepository(paths.CanvasFile),
+		SessionRecords: ai.NewFileSessionRecordRepository(paths.AISessionRecordsFile),
 	})
 	if err != nil {
 		return storageSnapshot{}, err
@@ -269,7 +285,15 @@ func readRepositorySnapshot(repositories RepositoryBundle) (storageSnapshot, err
 	if err != nil {
 		return storageSnapshot{}, err
 	}
-	return storageSnapshot{Workspaces: workspaces, Items: items, Scans: scans, Audit: events, Filters: filters, Recents: recents, AISettings: settings}, nil
+	canvasSnapshot, err := repositories.Canvas.Snapshot()
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	sessionRecords, err := repositories.SessionRecords.Snapshot()
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	return storageSnapshot{Workspaces: workspaces, Items: items, Scans: scans, Audit: events, Filters: filters, Recents: recents, AISettings: settings, Canvas: canvasSnapshot, SessionRecords: sessionRecords}, nil
 }
 
 func readItemSnapshot(repository itemindex.Repository) ([]models.ItemDetail, []models.BranchScanMetadata, error) {
@@ -382,7 +406,7 @@ func (r *SQLiteItemRepository) allBranchScans() ([]models.BranchScanMetadata, er
 }
 
 func clearSQLAppState(store *SQLStore) error {
-	for _, table := range []string{"workspaces", "indexed_items", "branch_scans", "scan_warnings", "audit_events", "saved_filters", "recent_items", "ai_settings", "knowledge_indexes", "import_status"} {
+	for _, table := range []string{"canvas_placements", "canvas_layouts", "ai_session_records", "workspaces", "indexed_items", "branch_scans", "scan_warnings", "audit_events", "saved_filters", "recent_items", "ai_settings", "knowledge_indexes", "import_status"} {
 		if _, err := execSQL(store.db, store.driver, "DELETE FROM "+table); err != nil {
 			return err
 		}
@@ -418,7 +442,13 @@ func writeDataDirSnapshot(paths system.Paths, snapshot storageSnapshot) error {
 	if err := writeYAMLFile(paths.RecentItemsFile, snapshot.Recents); err != nil {
 		return err
 	}
-	return writeYAMLFile(paths.AISettingsFile, snapshot.AISettings)
+	if err := writeYAMLFile(paths.AISettingsFile, snapshot.AISettings); err != nil {
+		return err
+	}
+	if err := canvas.NewFileRepository(paths.CanvasFile).ReplaceAll(snapshot.Canvas); err != nil {
+		return err
+	}
+	return ai.NewFileSessionRecordRepository(paths.AISessionRecordsFile).ReplaceAll(snapshot.SessionRecords)
 }
 
 func writeYAMLFile(path string, value any) error {
@@ -476,7 +506,7 @@ func backupDataDirTarget(paths system.Paths, direction string, now time.Time) (s
 	if err := os.MkdirAll(backupPath, 0o755); err != nil {
 		return "", err
 	}
-	for _, source := range []string{paths.RegistryFile, paths.PlanIndexFile, paths.AuditLogFile, paths.SavedFiltersFile, paths.RecentItemsFile, paths.AISettingsFile, paths.KnowledgeIndexFile} {
+	for _, source := range []string{paths.RegistryFile, paths.PlanIndexFile, paths.AuditLogFile, paths.SavedFiltersFile, paths.RecentItemsFile, paths.AISettingsFile, paths.CanvasFile, paths.AISessionRecordsFile, paths.KnowledgeIndexFile} {
 		if err := copyIfExists(source, filepath.Join(backupPath, filepath.Base(source))); err != nil {
 			return "", err
 		}

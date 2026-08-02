@@ -13,18 +13,20 @@ import (
 )
 
 type Paths struct {
-	Dir                string
-	DefaultDir         string
-	RegistryFile       string
-	PlanIndexFile      string
-	SQLiteDatabaseFile string
-	KnowledgeIndexFile string
-	AuditLogFile       string
-	SavedFiltersFile   string
-	RecentItemsFile    string
-	AISettingsFile     string
-	CloneRootDir       string
-	FrontendAssets     string
+	Dir                  string
+	DefaultDir           string
+	RegistryFile         string
+	PlanIndexFile        string
+	SQLiteDatabaseFile   string
+	KnowledgeIndexFile   string
+	AuditLogFile         string
+	SavedFiltersFile     string
+	RecentItemsFile      string
+	AISettingsFile       string
+	CanvasFile           string
+	AISessionRecordsFile string
+	CloneRootDir         string
+	FrontendAssets       string
 }
 
 func ResolvePaths() (Paths, error) {
@@ -44,17 +46,19 @@ func ResolvePaths() (Paths, error) {
 		return Paths{}, err
 	}
 	paths := Paths{
-		Dir:                dir,
-		DefaultDir:         defaultDir,
-		RegistryFile:       filepath.Join(dir, "workspaces.yaml"),
-		PlanIndexFile:      filepath.Join(dir, "item-index.yaml"),
-		SQLiteDatabaseFile: filepath.Join(dir, "kode-stream.db"),
-		KnowledgeIndexFile: filepath.Join(dir, "knowledge-index.yaml"),
-		AuditLogFile:       filepath.Join(dir, "audit-log.jsonl"),
-		SavedFiltersFile:   filepath.Join(dir, "saved-filters.yaml"),
-		RecentItemsFile:    filepath.Join(dir, "recent-items.yaml"),
-		AISettingsFile:     filepath.Join(dir, "ai-settings.yaml"),
-		CloneRootDir:       cloneRootDir,
+		Dir:                  dir,
+		DefaultDir:           defaultDir,
+		RegistryFile:         filepath.Join(dir, "workspaces.yaml"),
+		PlanIndexFile:        filepath.Join(dir, "item-index.yaml"),
+		SQLiteDatabaseFile:   filepath.Join(dir, "kode-stream.db"),
+		KnowledgeIndexFile:   filepath.Join(dir, "knowledge-index.yaml"),
+		AuditLogFile:         filepath.Join(dir, "audit-log.jsonl"),
+		SavedFiltersFile:     filepath.Join(dir, "saved-filters.yaml"),
+		RecentItemsFile:      filepath.Join(dir, "recent-items.yaml"),
+		AISettingsFile:       filepath.Join(dir, "ai-settings.yaml"),
+		CanvasFile:           filepath.Join(dir, "canvases.yaml"),
+		AISessionRecordsFile: filepath.Join(dir, "ai-session-records.yaml"),
+		CloneRootDir:         cloneRootDir,
 	}
 	return paths, nil
 }

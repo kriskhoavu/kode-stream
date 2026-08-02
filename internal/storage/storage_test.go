@@ -10,6 +10,7 @@ import (
 
 	"kode-stream/internal/ai"
 	"kode-stream/internal/audit"
+	"kode-stream/internal/canvas"
 	"kode-stream/internal/common/models"
 	gitadapter "kode-stream/internal/git"
 	itemindex "kode-stream/internal/item/index"
@@ -111,10 +112,10 @@ func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 	if !health.OK {
 		t.Fatalf("health = %#v", health)
 	}
-	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 1 {
-		t.Fatalf("health = %#v, want sqlite version 1", health)
+	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 2 {
+		t.Fatalf("health = %#v, want sqlite version 2", health)
 	}
-	for _, table := range []string{"workspaces", "branch_scans", "indexed_items", "import_status"} {
+	for _, table := range []string{"workspaces", "branch_scans", "indexed_items", "import_status", "canvas_layouts", "canvas_placements", "ai_session_records"} {
 		var name string
 		err := state.SQLStore.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&name)
 		if err != nil {
@@ -250,12 +251,23 @@ func TestStorageSyncDataDirToDatabaseCreatesBackupAndCopiesState(t *testing.T) {
 	if _, err := source.List(); err != nil {
 		t.Fatal(err)
 	}
+	layout, err := canvas.NewFileRepository(paths.CanvasFile).ResolveDefault("", workspace.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := canvas.NewFileRepository(paths.CanvasFile).PatchPlacements(layout.ID, []canvas.PlacementPatch{{NodeID: "workspace", EntityRef: canvas.EntityRef{Kind: canvas.EntityWorkspace, WorkspaceID: workspace.ID}}}); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if _, err := ai.NewFileSessionRecordRepository(paths.AISessionRecordsFile).Upsert(ai.SessionRecord{ID: "session-1", WorkspaceID: workspace.ID, Provider: "codex", Intent: "implement", RequestedBranch: "main", State: ai.StateInterrupted, StartedAt: now, LastKnownAt: now}); err != nil {
+		t.Fatal(err)
+	}
 	service := NewStorageSyncService(Config{StorageOption: StorageOptionDataDir, Driver: StorageDriverFile, SQLitePath: paths.SQLiteDatabaseFile, Migrations: "auto"}, paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil)
 	result, err := service.Sync(context.Background(), StorageSyncRequest{Direction: SyncDataDirToDatabase, Confirm: true})
 	if err != nil {
 		t.Fatalf("Sync returned error: %v", err)
 	}
-	if !result.OK || result.BackupPath == "" || result.Summary["workspaces"] != 1 || result.Summary["items"] != 1 {
+	if !result.OK || result.BackupPath == "" || result.Summary["workspaces"] != 1 || result.Summary["items"] != 1 || result.Summary["canvasPlacements"] != 1 || result.Summary["sessionRecords"] != 1 {
 		t.Fatalf("result = %#v", result)
 	}
 	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, databaseEnv)
@@ -270,6 +282,14 @@ func TestStorageSyncDataDirToDatabaseCreatesBackupAndCopiesState(t *testing.T) {
 	items, err := state.Items.BranchItems(workspace.ID, "main")
 	if err != nil || len(items) != 1 || items[0].ID != item.ID {
 		t.Fatalf("items = %#v err=%v", items, err)
+	}
+	placements, err := state.Canvas.Placements(layout.ID)
+	if err != nil || len(placements) != 1 || placements[0].NodeID != "workspace" {
+		t.Fatalf("placements = %#v err=%v", placements, err)
+	}
+	records, err := state.SessionRecords.List(workspace.ID, "main")
+	if err != nil || len(records) != 1 || records[0].ID != "session-1" {
+		t.Fatalf("session records = %#v err=%v", records, err)
 	}
 	if _, err := os.Stat(result.BackupPath); err != nil {
 		t.Fatalf("backup path missing: %v", err)
@@ -291,6 +311,17 @@ func TestStorageSyncDatabaseToDataDirCreatesBackupAndCopiesState(t *testing.T) {
 	if err := state.Items.ReplaceWorkspaceBranch(workspace.ID, "main", []models.ItemDetail{item}, models.BranchScanMetadata{WorkspaceID: workspace.ID, Branch: "main", SourceMode: "working_tree", Editable: true, ScannedAt: time.Now().UTC()}); err != nil {
 		t.Fatal(err)
 	}
+	layout, err := state.Canvas.ResolveDefault("", workspace.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.Canvas.PatchPlacements(layout.ID, []canvas.PlacementPatch{{NodeID: "workspace", EntityRef: canvas.EntityRef{Kind: canvas.EntityWorkspace, WorkspaceID: workspace.ID}}}); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if _, err := state.SessionRecords.Upsert(ai.SessionRecord{ID: "session-1", WorkspaceID: workspace.ID, Provider: "codex", Intent: "implement", RequestedBranch: "main", State: ai.StateInterrupted, StartedAt: now, LastKnownAt: now}); err != nil {
+		t.Fatal(err)
+	}
 	if err := state.SQLStore.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +334,7 @@ func TestStorageSyncDatabaseToDataDirCreatesBackupAndCopiesState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sync returned error: %v", err)
 	}
-	if !result.OK || result.BackupPath == "" || result.Summary["workspaces"] != 1 || result.Summary["items"] != 1 {
+	if !result.OK || result.BackupPath == "" || result.Summary["workspaces"] != 1 || result.Summary["items"] != 1 || result.Summary["canvasPlacements"] != 1 || result.Summary["sessionRecords"] != 1 {
 		t.Fatalf("result = %#v", result)
 	}
 	workspaces, err := registry.New(paths.RegistryFile, nil).List()
@@ -313,6 +344,14 @@ func TestStorageSyncDatabaseToDataDirCreatesBackupAndCopiesState(t *testing.T) {
 	items, err := itemindex.New(paths.PlanIndexFile).BranchItems(workspace.ID, "main")
 	if err != nil || len(items) != 1 || items[0].ID != item.ID {
 		t.Fatalf("items = %#v err=%v", items, err)
+	}
+	placements, err := canvas.NewFileRepository(paths.CanvasFile).Placements(layout.ID)
+	if err != nil || len(placements) != 1 || placements[0].NodeID != "workspace" {
+		t.Fatalf("placements = %#v err=%v", placements, err)
+	}
+	records, err := ai.NewFileSessionRecordRepository(paths.AISessionRecordsFile).List(workspace.ID, "main")
+	if err != nil || len(records) != 1 || records[0].ID != "session-1" {
+		t.Fatalf("session records = %#v err=%v", records, err)
 	}
 	if _, err := os.Stat(filepath.Join(result.BackupPath, filepath.Base(paths.RegistryFile))); err != nil {
 		t.Fatalf("target backup missing registry file: %v", err)
@@ -385,15 +424,17 @@ func TestOpenAppOwnedStatePostgresIntegration(t *testing.T) {
 
 func testPaths(dataDir string) system.Paths {
 	return system.Paths{
-		Dir:                dataDir,
-		RegistryFile:       filepath.Join(dataDir, "workspaces.yaml"),
-		PlanIndexFile:      filepath.Join(dataDir, "item-index.yaml"),
-		SQLiteDatabaseFile: filepath.Join(dataDir, "kode-stream.db"),
-		KnowledgeIndexFile: filepath.Join(dataDir, "knowledge-index.yaml"),
-		AuditLogFile:       filepath.Join(dataDir, "audit-log.jsonl"),
-		SavedFiltersFile:   filepath.Join(dataDir, "saved-filters.yaml"),
-		RecentItemsFile:    filepath.Join(dataDir, "recent-items.yaml"),
-		AISettingsFile:     filepath.Join(dataDir, "ai-settings.yaml"),
+		Dir:                  dataDir,
+		RegistryFile:         filepath.Join(dataDir, "workspaces.yaml"),
+		PlanIndexFile:        filepath.Join(dataDir, "item-index.yaml"),
+		SQLiteDatabaseFile:   filepath.Join(dataDir, "kode-stream.db"),
+		KnowledgeIndexFile:   filepath.Join(dataDir, "knowledge-index.yaml"),
+		AuditLogFile:         filepath.Join(dataDir, "audit-log.jsonl"),
+		SavedFiltersFile:     filepath.Join(dataDir, "saved-filters.yaml"),
+		RecentItemsFile:      filepath.Join(dataDir, "recent-items.yaml"),
+		AISettingsFile:       filepath.Join(dataDir, "ai-settings.yaml"),
+		CanvasFile:           filepath.Join(dataDir, "canvases.yaml"),
+		AISessionRecordsFile: filepath.Join(dataDir, "ai-session-records.yaml"),
 	}
 }
 
