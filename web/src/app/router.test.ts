@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { knowledgeLocationFromSearch, knowledgePath, pathForRoute, routeFromLocation } from './router';
+import { canvasLocationFromSearch, canvasPath, knowledgeLocationFromSearch, knowledgePath, pathForRoute, routeFromLocation } from './router';
 
 describe('router', () => {
   it('parses item workspace routes', () => {
@@ -23,6 +23,14 @@ describe('router', () => {
 		expect(routeFromLocation()).toEqual({ name: 'knowledge', location: { workspaceId: 'ws', root: 'docs/wiki', slug: 'overview', view: 'read' } });
 		expect(knowledgeLocationFromSearch('?view=invalid&slug=page')).toEqual({ slug: 'page' });
 		expect(knowledgePath()).toBe('/knowledge');
+	});
+
+	it('parses and builds Canvas branch context', () => {
+		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&branch=feature%2FPM-037');
+		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', branch: 'feature/PM-037' } });
+		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', branch: 'main' } })).toBe('/canvas?workspaceId=ws+one&branch=main');
+		expect(canvasLocationFromSearch('?branch=main')).toEqual({ branch: 'main' });
+		expect(canvasPath()).toBe('/canvas');
 	});
 
   it('falls removed top-level list routes back to Workstream', () => {

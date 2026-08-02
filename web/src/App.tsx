@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Plus, Search, Sun, Boxes, FolderGit2, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
+import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Plus, Search, Sun, Boxes, FolderGit2, PanelLeftClose, PanelLeftOpen, Settings, Workflow } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
@@ -16,6 +16,7 @@ import { useAppSettings } from './features/settings/appSettings';
 import { EmbeddedTerminalDock } from './features/ai-session/EmbeddedTerminalDock';
 
 const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((module) => ({ default: module.KnowledgePage })));
+const CanvasPage = lazy(() => import('./pages/CanvasPage').then((module) => ({ default: module.CanvasPage })));
 
 export function App() {
   const extensionSurface = isExtensionSurface();
@@ -112,6 +113,7 @@ export function App() {
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>
           <NavButton active={route.name === 'workstream'} onClick={() => navigate({ name: 'workstream' })} icon={<WorkstreamIcon size={18} />} label="Workstream" />
+					{!extensionSurface && <NavButton active={route.name === 'canvas'} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id, branch: activeRepo?.lastSelectedBranch || activeRepo?.baselineBranch } })} icon={<Workflow size={18} />} label="Canvas" />}
           <NavButton active={route.name === 'knowledge'} onClick={() => navigate({ name: 'knowledge' })} icon={<BookOpen size={18} />} label="Knowledge" />
         </div>
         <div className="workspace-list">
@@ -264,11 +266,13 @@ export function App() {
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={() => refreshAppData()} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} activeWorkspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
+		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Canvas...</section>}><CanvasPage workspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} /></Suspense>}
       </main>
 
       <nav className="bottom-nav">
         <button className={route.name === 'workstream' ? 'active' : ''} onClick={() => navigate({ name: 'workstream' })}><WorkstreamIcon size={18} />Workstream</button>
         <button className={route.name === 'knowledge' ? 'active' : ''} onClick={() => navigate({ name: 'knowledge' })}><BookOpen size={18} />Knowledge</button>
+		{!extensionSurface && <button className={route.name === 'canvas' ? 'active' : ''} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id, branch: activeRepo?.lastSelectedBranch || activeRepo?.baselineBranch } })}><Workflow size={18} />Canvas</button>}
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}><Settings size={18} />Settings</button>
       </nav>

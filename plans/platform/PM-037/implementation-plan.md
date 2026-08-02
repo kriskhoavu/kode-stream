@@ -18,7 +18,7 @@ PM-037.
 | B2    | Layout, placement, and session repositories           | Backend    | Complete |
 | B3    | Durable session lifecycle and branch-safe launch      | Backend    | Complete |
 | B4    | Verification freshness and Canvas API                 | Backend    | Complete |
-| F1    | Canvas route and placement state                      | Frontend   | Pending  |
+| F1    | Canvas route and placement state                      | Frontend   | Complete |
 | F2    | Draggable semantic nodes and restored layout          | Frontend   | Pending  |
 | F3    | Focused Workbench and session terminal                | Frontend   | Pending  |
 | F4    | Git, verification, capability, and accessibility UX   | Frontend   | Pending  |
@@ -118,16 +118,16 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Add Canvas, placement, branch-aware entity reference, action capability, safe session, and verification freshness
+- [x] Add Canvas, placement, branch-aware entity reference, action capability, safe session, and verification freshness
   API types.
-- [ ] Add lazy-loaded `/canvas` routing for the active workspace and selected branch.
-- [ ] Add **Canvas** to Workspace navigation outside the Chrome extension surface.
-- [ ] Implement default resolve/load and branch-context switching.
-- [ ] Implement optimistic node positions, dirty-node tracking, debounced placement patches, and bounded retry.
-- [ ] Keep viewport saves independent from placement revisions.
-- [ ] Implement affected-node conflict recovery through **Reload position** and explicit reapply to latest.
-- [ ] Preserve dirty positions through transient failures and warn only when navigation risks losing them.
-- [ ] Add router, API normalization, branch-change, placement-save, conflict, retry, and viewport tests.
+- [x] Add lazy-loaded `/canvas` routing for the active workspace and selected branch.
+- [x] Add **Canvas** to Workspace navigation outside the Chrome extension surface.
+- [x] Implement default resolve/load and branch-context switching.
+- [x] Implement optimistic node positions, dirty-node tracking, debounced placement patches, and bounded retry.
+- [x] Keep viewport saves independent from placement revisions.
+- [x] Implement affected-node conflict recovery through **Reload position** and explicit reapply to latest.
+- [x] Preserve dirty positions through transient failures and warn only when navigation risks losing them.
+- [x] Add router, API normalization, branch-change, placement-save, conflict, retry, and viewport tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/app web/src/features/canvas`
 

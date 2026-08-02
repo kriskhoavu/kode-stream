@@ -182,7 +182,14 @@ export interface VerificationJob {
   steps: VerificationStepResult[];
   artifacts: RunArtifact[];
   runtime?: WorkspaceRuntimeConfig;
+	startFingerprint?: RepositoryFingerprint;
+	finishFingerprint?: RepositoryFingerprint;
+	currentFingerprint?: RepositoryFingerprint;
+	freshness?: VerificationFreshness;
 }
+
+export type VerificationFreshness = 'fresh' | 'stale' | 'inconclusive';
+export interface RepositoryFingerprint { value: string; branch: string; commit: string; }
 
 export interface VerificationTestSelection {
   selectedSpecs: string[];
@@ -516,7 +523,29 @@ export interface EmbeddedAISession {
 export interface EmbeddedAISessionResult {
 	session: EmbeddedAISession;
 	grant: { sessionId: string; token: string; expiresAt: string };
+	record?: SafeSessionRecord;
 }
+
+export type WorkspaceAction = 'layout.move' | 'repo.read' | 'git.status' | 'terminal.launch' | 'verification.run';
+export type ActionCapabilityState = 'available' | 'unavailable' | 'unsupported' | 'forbidden' | 'conflicted';
+export interface CapabilityRecoveryAction { action: string; label: string; }
+export interface ActionCapability { action: WorkspaceAction; state: ActionCapabilityState; reasonCode?: string; message?: string; recoveryActions: CapabilityRecoveryAction[]; }
+export interface WorkspaceProviderAxes { topology: string; contentProvider: string; executionProvider: string; datastore?: string; }
+
+export type CanvasEntityKind = 'workspace' | 'plan' | 'session';
+export interface CanvasEntityRef { kind: CanvasEntityKind; workspaceId: string; itemId?: string; itemPath?: string; identifier?: string; branchKey?: string; observedCommit?: string; sessionId?: string; }
+export interface CanvasPosition { x: number; y: number; }
+export interface CanvasViewport extends CanvasPosition { zoom: number; }
+export interface CanvasLayout { id: string; ownerUserId?: string; workspaceId: string; branchKey: string; viewport: CanvasViewport; version: number; createdAt: string; updatedAt: string; }
+export interface CanvasPlacementPatch { nodeId: string; entityRef: CanvasEntityRef; position: CanvasPosition; collapsed: boolean; expectedRevision: number; }
+export interface SafeSessionPlanRef { itemId: string; itemPath: string; identifier?: string; branchKey: string; observedCommit?: string; }
+export interface SafeSessionRecord { id: string; workspaceId: string; planRef?: SafeSessionPlanRef; provider: string; intent: string; requestedBranch: string; observedCommit?: string; state: EmbeddedAISessionState | 'interrupted'; startedAt: string; endedAt?: string; exitCode?: number; lastKnownAt: string; live?: boolean; }
+export interface CanvasWorkspaceNode { id: string; name?: string; branch?: string; commit?: string; git?: GitStatus; providerAxes: WorkspaceProviderAxes; actions: Partial<Record<WorkspaceAction, ActionCapability>>; verification?: VerificationJob; }
+export interface CanvasPlanNode { itemId: string; identifier?: string; title?: string; branch?: string; commit?: string; editable: boolean; actions: Partial<Record<WorkspaceAction, ActionCapability>>; }
+export interface CanvasSessionNode { record: SafeSessionRecord; }
+export interface CanvasNode { id: string; kind: CanvasEntityKind; state: 'resolved' | 'stale' | 'forbidden'; entityRef: CanvasEntityRef; position: CanvasPosition; collapsed: boolean; revision: number; workspace?: CanvasWorkspaceNode; plan?: CanvasPlanNode; session?: CanvasSessionNode; }
+export interface CanvasConnection { id: string; source: string; target: string; kind: 'repository_contains' | 'session_launched_from' | string; sourceOfTruth: 'derived'; }
+export interface CanvasProjection { layout: CanvasLayout; nodes: CanvasNode[]; connections: CanvasConnection[]; unplaced: CanvasEntityRef[]; }
 
 export interface SourceStructureSettings {
   version: number;

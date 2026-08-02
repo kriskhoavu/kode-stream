@@ -17,6 +17,9 @@ import type {
   WorkstreamBranchLoadResult,
   BranchCreateInput,
   BranchSwitchInput,
+	CanvasPlacementPatch,
+	CanvasProjection,
+	CanvasViewport,
   CreateVerificationJobInput,
   FileContent,
   FileNode,
@@ -85,12 +88,20 @@ import type {
 export class ApiError extends Error {
   recoveryHint?: string;
   operationLog?: string;
+	code?: string;
+	nodeIds?: string[];
+	details?: Record<string, string>;
+	status?: number;
 
-  constructor(message: string, recoveryHint?: string, operationLog?: string) {
+  constructor(message: string, recoveryHint?: string, operationLog?: string, metadata?: { code?: string; nodeIds?: string[]; details?: Record<string, string>; status?: number }) {
     super(message);
     this.name = 'ApiError';
     this.recoveryHint = recoveryHint;
     this.operationLog = operationLog;
+		this.code = metadata?.code;
+		this.nodeIds = metadata?.nodeIds;
+		this.details = metadata?.details;
+		this.status = metadata?.status;
   }
 }
 
@@ -128,7 +139,7 @@ async function request<T>(path: string, options?: RequestInit, dedupe = options?
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog ?? payload.log);
+      throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog ?? payload.log, { code: payload.code, nodeIds: payload.nodeIds, details: payload.details, status: res.status });
     }
     return payload as T;
   })();
@@ -142,6 +153,11 @@ async function request<T>(path: string, options?: RequestInit, dedupe = options?
 }
 
 export const api = {
+	resolveDefaultCanvas: (workspaceId: string, branchKey?: string) => request<CanvasProjection>('/api/canvas/default', { method: 'POST', body: JSON.stringify({ workspaceId, branchKey }) }, false),
+	canvasLayout: (layoutId: string) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}`, undefined, false),
+	patchCanvasPlacements: (layoutId: string, patches: CanvasPlacementPatch[]) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/placements`, { method: 'PATCH', body: JSON.stringify({ patches }) }, false),
+	patchCanvasViewport: (layoutId: string, expectedVersion: number, viewport: CanvasViewport) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/viewport`, { method: 'PATCH', body: JSON.stringify({ expectedVersion, viewport }) }, false),
+	removeCanvasPlacement: (layoutId: string, nodeId: string, expectedRevision: number) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/placements/${encodeURIComponent(nodeId)}?expectedRevision=${expectedRevision}`, { method: 'DELETE' }, false),
 	knowledgeWikis: async (workspaceId: string) => (await request<KnowledgeWiki[] | null>(`/api/knowledge/wikis?workspaceId=${encodeURIComponent(workspaceId)}`)) ?? [],
 	knowledgePages: (workspaceId: string, root: string) => request<KnowledgePagesResponse>(knowledgeURL(workspaceId, root, 'pages')),
 	knowledgePage: (workspaceId: string, root: string, slug: string) => request<KnowledgePageDetail>(`${knowledgeURL(workspaceId, root, 'pages')}/${encodeURIComponent(slug)}`),

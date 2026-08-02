@@ -89,6 +89,10 @@ export function useAppState() {
       navigate({ name: 'knowledge', location: { workspaceId: repo.id, view: 'browse' } });
       return;
     }
+		if (route.name === 'canvas') {
+			navigate({ name: 'canvas', location: { workspaceId: repo.id, branch: repo.lastSelectedBranch || repo.baselineBranch } });
+			return;
+		}
     navigate({ name: 'workstream' });
   };
 
