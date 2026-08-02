@@ -526,6 +526,16 @@ export interface EmbeddedAISessionResult {
 	record?: SafeSessionRecord;
 }
 
+export interface EmbeddedAISessionLaunchInput extends Pick<AISessionLaunchInput, 'provider' | 'contextMode' | 'presetId' | 'promptDraft' | 'customPrompt' | 'selectedSkills' | 'selectedAgents'> {
+	contextPath?: string;
+	expectedWorkspaceId?: string;
+	expectedBranch?: string;
+	observedCommit?: string;
+	idempotencyKey?: string;
+	columns?: number;
+	rows?: number;
+}
+
 export type WorkspaceAction = 'layout.move' | 'repo.read' | 'git.status' | 'terminal.launch' | 'verification.run';
 export type ActionCapabilityState = 'available' | 'unavailable' | 'unsupported' | 'forbidden' | 'conflicted';
 export interface CapabilityRecoveryAction { action: string; label: string; }

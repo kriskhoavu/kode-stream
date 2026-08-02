@@ -20,7 +20,7 @@ PM-037.
 | B4    | Verification freshness and Canvas API                 | Backend    | Complete |
 | F1    | Canvas route and placement state                      | Frontend   | Complete |
 | F2    | Draggable semantic nodes and restored layout          | Frontend   | Complete |
-| F3    | Focused Workbench and session terminal                | Frontend   | Pending  |
+| F3    | Focused Workbench and session terminal                | Frontend   | Complete |
 | F4    | Git, verification, capability, and accessibility UX   | Frontend   | Pending  |
 | I1    | Browser journey, documentation, and final integration | Full stack | Pending  |
 
@@ -160,16 +160,16 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Add a focused Workbench shell with right-panel and narrow-window overlay presentations.
-- [ ] Show workspace Git summary, plan actions, live session terminal, and ended/interrupted lifecycle detail.
-- [ ] Reuse the existing xterm/session presentation without introducing a second process, subscriber, or terminal owner.
-- [ ] Add plan launch with one idempotency key per pending user submission.
-- [ ] Show expected/current branch and recovery actions for `terminal_branch_mismatch`.
-- [ ] Add a new session to unplaced work or accept its deterministic position near the plan.
-- [ ] Preserve the live process when selecting another node; follow existing reconnect rules on return.
-- [ ] Show active unplaced sessions so hidden processes remain discoverable.
-- [ ] Separate **Remove from Canvas** from **Cancel process** and retain confirmations.
-- [ ] Add matching-branch, mismatch, double-submit, selection switch, reload, interruption, cancellation, and isolation tests.
+- [x] Add a focused Workbench shell with right-panel and narrow-window overlay presentations.
+- [x] Show workspace Git summary, plan actions, live session terminal, and ended/interrupted lifecycle detail.
+- [x] Reuse the existing xterm/session presentation without introducing a second process, subscriber, or terminal owner.
+- [x] Add plan launch with one idempotency key per pending user submission.
+- [x] Show expected/current branch and recovery actions for `terminal_branch_mismatch`.
+- [x] Add a new session to unplaced work or accept its deterministic position near the plan.
+- [x] Preserve the live process when selecting another node; follow existing reconnect rules on return.
+- [x] Show active unplaced sessions so hidden processes remain discoverable.
+- [x] Separate **Remove from Canvas** from **Cancel process** and retain confirmations.
+- [x] Add matching-branch, mismatch, double-submit, selection switch, reload, interruption, cancellation, and isolation tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session web/src/features/canvas`
 

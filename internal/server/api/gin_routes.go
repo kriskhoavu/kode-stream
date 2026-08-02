@@ -178,6 +178,7 @@ func (a *API) registerStreamingRoutes(api *gin.RouterGroup) {
 	api.POST("/workspaces/:id/ai-sessions", ginHTTPHandler(a.launchWorkspaceAISession))
 	api.POST("/workspaces/:id/ai-sessions/embedded", ginHTTPHandler(a.startEmbeddedWorkspaceAISession))
 	api.GET("/ai/sessions/:sessionId", ginHTTPHandler(a.embeddedAISession))
+	api.POST("/ai/sessions/:sessionId/grant", ginHTTPHandler(a.embeddedAISessionGrant))
 	api.DELETE("/ai/sessions/:sessionId", ginHTTPHandler(a.cancelEmbeddedAISession))
 	api.GET("/ai/sessions/:sessionId/channel", ginHTTPHandler(a.embeddedAISessionChannel))
 }

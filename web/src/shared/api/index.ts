@@ -8,7 +8,9 @@ import type {
   AISessionLaunchInput,
   AISessionLaunchResult,
 	EmbeddedAISession,
+	EmbeddedAISessionLaunchInput,
   EmbeddedAISessionResult,
+	SafeSessionRecord,
   E2ERunbookList,
   AppState,
   AgentConnectToken,
@@ -180,9 +182,15 @@ export const api = {
   aiSessionEligibility: (itemId: string) => request<AISessionEligibility>(`/api/items/${encodeURIComponent(itemId)}/ai-session-eligibility`),
   launchAISession: (itemId: string, input: AISessionLaunchInput) => request<AISessionLaunchResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions`, { method: 'POST', body: JSON.stringify(input) }),
 	launchWorkspaceAISession: (workspaceId: string, input: AISessionLaunchInput & { contextPath: string }) => request<AISessionLaunchResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/ai-sessions`, { method: 'POST', body: JSON.stringify(input) }),
-	startEmbeddedAISession: (itemId: string, input: Pick<AISessionLaunchInput, 'provider' | 'contextMode' | 'presetId' | 'promptDraft' | 'customPrompt' | 'selectedSkills' | 'selectedAgents'> & { columns?: number; rows?: number }) => request<EmbeddedAISessionResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }),
-	startEmbeddedWorkspaceAISession: (workspaceId: string, input: Pick<AISessionLaunchInput, 'provider' | 'contextMode' | 'presetId' | 'promptDraft' | 'customPrompt' | 'selectedSkills' | 'selectedAgents'> & { contextPath: string; columns?: number; rows?: number }) => request<EmbeddedAISessionResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }),
+	startEmbeddedAISession: (itemId: string, input: EmbeddedAISessionLaunchInput) => request<EmbeddedAISessionResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }, false),
+	startEmbeddedWorkspaceAISession: (workspaceId: string, input: EmbeddedAISessionLaunchInput & { contextPath: string }) => request<EmbeddedAISessionResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }, false),
 	embeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
+	embeddedAISessionGrant: (sessionId: string) => request<EmbeddedAISessionResult['grant']>(`/api/ai/sessions/${encodeURIComponent(sessionId)}/grant`, { method: 'POST' }, false),
+	aiSessionRecords: async (workspaceId: string, branch?: string) => {
+		const query = new URLSearchParams({ workspaceId });
+		if (branch) query.set('branch', branch);
+		return (await request<SafeSessionRecord[] | null>(`/api/ai/session-records?${query.toString()}`, undefined, false)) ?? [];
+	},
   cancelEmbeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
   health: () => request<{ status?: string }>('/api/health', undefined, false),
   localServerReachable: async () => {

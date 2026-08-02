@@ -1,22 +1,24 @@
 .canvas-page { min-height: calc(100vh - 64px); display: flex; flex-direction: column; background: var(--bg); }
-.canvas-page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.canvas-page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .canvas-page-header h1 { margin: 2px 0 0; font-size: 20px; }
 .canvas-page-header label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .canvas-page-header select { min-width: 160px; }
 .canvas-eyebrow { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .canvas-state { display: flex; align-items: center; gap: 12px; padding: 12px 24px; color: var(--muted); }
 .canvas-state.error { color: var(--danger); }
-.canvas-status-strip { min-height: 42px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.canvas-status-strip { min-height: 42px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.canvas-work-area { position: relative; flex: 1; min-height: 560px; display: flex; overflow: hidden; }
+.canvas-work-area .canvas-board-shell { flex: 1 1 auto; min-width: 0; }
 .canvas-board-shell { position: relative; flex: 1; min-height: 560px; overflow: hidden; }
 .canvas-board { position: absolute; inset: 48px 0 0; }
-.canvas-toolbar { position: absolute; z-index: 6; inset: 0 0 auto; height: 48px; display: flex; align-items: center; gap: 8px; padding: 7px 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.canvas-toolbar { position: absolute; z-index: 6; inset: 0 0 auto; height: 48px; display: flex; align-items: center; gap: 8px; padding: 7px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .canvas-toolbar > button, .canvas-conflict-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
 .canvas-search { position: relative; display: flex; align-items: center; gap: 7px; min-width: 280px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .canvas-search input { width: 100%; border: 0; background: transparent; outline: 0; }
-.canvas-search-results { position: absolute; z-index: 10; top: 38px; left: 0; width: 100%; display: grid; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: 0 12px 28px rgb(0 0 0 / .14); }
+.canvas-search-results { position: absolute; z-index: 10; top: 38px; left: 0; width: 100%; display: grid; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: 0 12px 28px rgb(0 0 0 / .14); }
 .canvas-search-results button { overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-conflict-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--danger); font-size: 12px; }
-.canvas-semantic-node { position: relative; width: 245px; min-height: 116px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / .09); color: var(--text); cursor: grab; }
+.canvas-semantic-node { position: relative; width: 245px; min-height: 116px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 8px 24px rgb(0 0 0 / .09); color: var(--text); cursor: grab; }
 .canvas-semantic-node:active { cursor: grabbing; }
 .canvas-semantic-node.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent), 0 10px 28px rgb(0 0 0 / .12); }
 .canvas-semantic-node.conflicted { border-style: dashed; border-color: var(--danger); }
@@ -30,6 +32,33 @@
 .canvas-edge-session_launched_from { stroke-dasharray: 5 4; }
 .canvas-session-state.state-running { color: var(--success); font-weight: 700; }
 .react-flow__controls { border: 1px solid var(--line); border-radius: 8px; box-shadow: none; overflow: hidden; }
-.react-flow__controls-button { border-color: var(--line); background: var(--surface); fill: var(--text); }
+.react-flow__controls-button { border-color: var(--line); background: var(--panel); fill: var(--text); }
+.canvas-workbench { flex: 0 0 0; width: 0; min-width: 0; overflow: hidden; border-left: 0 solid var(--line); background: var(--panel); transition: flex-basis .18s ease; }
+.canvas-workbench.open { flex-basis: min(410px, 38vw); width: min(410px, 38vw); border-left-width: 1px; overflow-y: auto; }
+.canvas-workbench > header { position: sticky; z-index: 4; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.canvas-workbench > header div { display: grid; gap: 2px; }
+.canvas-workbench > header span { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.canvas-workbench-empty { display: grid; place-items: center; gap: 8px; padding: 48px 24px; color: var(--muted); text-align: center; }
+.canvas-workbench-section { display: grid; gap: 10px; padding: 16px; border-bottom: 1px solid var(--line); }
+.canvas-workbench-section h2, .canvas-workbench-section p { margin: 0; }
+.canvas-workbench-section h2 { font-size: 15px; }
+.canvas-workbench-section dl { display: grid; grid-template-columns: 90px 1fr; gap: 7px 12px; margin: 0; font-size: 12px; }
+.canvas-workbench-section dt { color: var(--muted); }
+.canvas-workbench-section dd { margin: 0; overflow-wrap: anywhere; }
+.canvas-workbench-section > button { justify-self: start; display: inline-flex; align-items: center; gap: 6px; }
+.canvas-workbench-branch { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; }
+.canvas-capability-message, .canvas-workbench-section > p { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.canvas-branch-mismatch { display: flex; gap: 10px; margin: 12px; padding: 12px; border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line)); border-radius: 9px; background: color-mix(in srgb, var(--danger) 7%, var(--panel)); }
+.canvas-branch-mismatch p { margin: 4px 0 8px; font-size: 12px; }
+.canvas-branch-mismatch button { display: inline-flex; align-items: center; gap: 5px; }
+.canvas-workbench-error { margin: 12px; color: var(--danger); font-size: 12px; }
+.canvas-active-unplaced button { display: flex; width: 100%; align-items: center; gap: 8px; text-align: left; }
+.canvas-active-unplaced button span { display: grid; }
+.canvas-active-unplaced button small { color: var(--muted); }
+.canvas-workbench-terminal-pool { min-height: 0; }
+.canvas-workbench-terminal-pool:has(.embedded-terminal-panel.active) { height: 430px; border-bottom: 1px solid var(--line); }
+.canvas-workbench .embedded-terminal-panel.active { height: 430px; }
+.canvas-workbench .embedded-terminal-compact > header { min-height: 54px; }
 @media (max-width: 800px) { .canvas-toolbar { overflow-x: auto; } .canvas-search { min-width: 220px; } .canvas-page-header { align-items: flex-start; } }
+@media (max-width: 900px) { .canvas-workbench.open { position: absolute; z-index: 8; inset: 0 0 0 auto; width: min(440px, 94vw); max-width: 94vw; box-shadow: -16px 0 36px rgb(0 0 0 / .18); } }
 @media (prefers-reduced-motion: reduce) { .canvas-semantic-node { transition: none; } }

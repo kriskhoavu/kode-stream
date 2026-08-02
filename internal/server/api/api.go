@@ -304,6 +304,23 @@ func (a *API) embeddedAISession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, session)
 }
 
+func (a *API) embeddedAISessionGrant(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil || a.aiSessions.EmbeddedManager() == nil {
+		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
+		return
+	}
+	grant, err := a.aiSessions.EmbeddedManager().IssueGrant(r.PathValue("sessionId"))
+	if err != nil {
+		if errors.Is(err, appaisession.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, grant)
+}
+
 func (a *API) cancelEmbeddedAISession(w http.ResponseWriter, r *http.Request) {
 	if a.aiSessions == nil || a.aiSessions.EmbeddedManager() == nil {
 		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")

@@ -61,6 +61,21 @@ func TestAISessionRecordsRouteReturnsDurableSafeMetadata(t *testing.T) {
 	}
 }
 
+func TestEmbeddedSessionGrantRouteReattachesOnlyLiveProcess(t *testing.T) {
+	manager := appaisession.NewTerminalManager(appaisession.Config{})
+	t.Cleanup(func() { _ = manager.Close() })
+	session, _, err := manager.Start(appaisession.StartRequest{ID: "session-live", Executable: "/bin/sh", Args: []string{"-c", "sleep 10"}, Dir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(appaisession.New(nil).ConfigureEmbedded(manager)).Routes()
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/ai/sessions/"+session.ID+"/grant", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"sessionId":"session-live"`) || !strings.Contains(response.Body.String(), `"token":`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 type fakeDatabaseHealth struct {
 	health storage.DatabaseHealth
 }

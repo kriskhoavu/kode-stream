@@ -1,0 +1,105 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError, api } from '../../lib/api';
+import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult, SafeSessionRecord } from '../../lib/types';
+import { CanvasWorkbench } from './CanvasWorkbench';
+
+vi.mock('../../lib/api', async () => {
+	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
+	return { ...actual, api: { aiSessionRecords: vi.fn(), aiSettings: vi.fn(), startEmbeddedAISession: vi.fn(), embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn() } };
+});
+vi.mock('../ai-session/EmbeddedTerminal', () => ({ EmbeddedTerminal: ({ initial, visible }: { initial: EmbeddedAISessionResult; visible: boolean }) => <div data-testid={`terminal-${initial.session.id}`} data-visible={String(visible)}>terminal</div> }));
+
+describe('CanvasWorkbench', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.mocked(api.aiSessionRecords).mockResolvedValue([]);
+		vi.mocked(api.aiSettings).mockResolvedValue({ defaultProvider: 'codex', defaultTerminal: '', providers: {}, terminals: {} });
+		vi.mocked(api.startEmbeddedAISession).mockResolvedValue(sessionResult());
+		vi.mocked(api.embeddedAISession).mockResolvedValue(sessionResult().session);
+		vi.mocked(api.embeddedAISessionGrant).mockResolvedValue(sessionResult().grant);
+		vi.mocked(api.cancelEmbeddedAISession).mockResolvedValue({ ...sessionResult().session, state: 'cancelled' });
+		vi.spyOn(window, 'confirm').mockReturnValue(true);
+	});
+
+	it('launches one branch-safe process for a double submission', async () => {
+		let resolveSettings!: (value: Awaited<ReturnType<typeof api.aiSettings>>) => void;
+		vi.mocked(api.aiSettings).mockReturnValue(new Promise((resolve) => { resolveSettings = resolve; }));
+		const reload = vi.fn();
+		renderWorkbench(planNode(), { onReload: reload });
+		const launch = screen.getByRole('button', { name: 'Launch terminal' });
+		fireEvent.click(launch);
+		fireEvent.click(launch);
+		expect(api.aiSettings).toHaveBeenCalledTimes(1);
+		resolveSettings({ defaultProvider: 'codex', defaultTerminal: '', providers: {}, terminals: {} });
+		await waitFor(() => expect(api.startEmbeddedAISession).toHaveBeenCalledTimes(1));
+		expect(api.startEmbeddedAISession).toHaveBeenCalledWith('item-1', expect.objectContaining({ expectedWorkspaceId: 'workspace-1', expectedBranch: 'main', observedCommit: 'abc123', idempotencyKey: expect.any(String) }));
+		await waitFor(() => expect(screen.getByTestId('terminal-session-1')).toHaveAttribute('data-visible', 'true'));
+		expect(reload).toHaveBeenCalled();
+	});
+
+	it('shows expected and current branch recovery without starting a terminal', async () => {
+		vi.mocked(api.startEmbeddedAISession).mockRejectedValue(new ApiError('checkout changed', undefined, undefined, { code: 'terminal_branch_mismatch', details: { expectedBranch: 'main', currentBranch: 'other', dirty: 'true' }, status: 409 }));
+		const reload = vi.fn();
+		renderWorkbench(planNode(), { onReload: reload });
+		fireEvent.click(screen.getByRole('button', { name: 'Launch terminal' }));
+		await screen.findByText('Checkout changed');
+		expect(screen.getByText('main')).toBeInTheDocument();
+		expect(screen.getByText('other')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: /Refresh Canvas/ }));
+		expect(reload).toHaveBeenCalled();
+		expect(screen.queryByTestId(/terminal-/)).not.toBeInTheDocument();
+	});
+
+	it('reattaches one live terminal and preserves it while selection changes', async () => {
+		const session = sessionNode({ ...sessionRecord(), live: true });
+		const projection = baseProjection([planNode(), session]);
+		const props = defaultProps(projection, session);
+		const view = render(<CanvasWorkbench {...props} />);
+		await waitFor(() => expect(screen.getByTestId('terminal-session-1')).toHaveAttribute('data-visible', 'true'));
+		const otherPlan = { ...planNode(), id: 'plan:item-2', plan: { ...planNode().plan!, itemId: 'item-2' }, entityRef: { ...planNode().entityRef, itemId: 'item-2' } };
+		view.rerender(<CanvasWorkbench {...props} selectedNode={otherPlan} />);
+		expect(screen.getByTestId('terminal-session-1')).toHaveAttribute('data-visible', 'false');
+		view.rerender(<CanvasWorkbench {...props} selectedNode={session} />);
+		expect(screen.getByTestId('terminal-session-1')).toHaveAttribute('data-visible', 'true');
+		expect(api.embeddedAISessionGrant).toHaveBeenCalledTimes(1);
+	});
+
+	it('explains interrupted sessions and cancels a process without removing placement', async () => {
+		const interrupted = sessionNode({ ...sessionRecord(), state: 'interrupted', live: false });
+		const view = renderWorkbench(interrupted);
+		expect(screen.getByText(/application restarted without this process/i)).toBeInTheDocument();
+		view.rerender(<CanvasWorkbench {...defaultProps(baseProjection([sessionNode(sessionRecord())]), sessionNode(sessionRecord()))} />);
+		fireEvent.click(await screen.findByRole('button', { name: 'Cancel process' }));
+		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
+	});
+});
+
+function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.ComponentProps<typeof CanvasWorkbench>> = {}) {
+	const projection = baseProjection([planNode(), selectedNode]);
+	return render(<CanvasWorkbench {...defaultProps(projection, selectedNode)} {...overrides} />);
+}
+
+function defaultProps(projection: CanvasProjection, selectedNode?: CanvasNode): React.ComponentProps<typeof CanvasWorkbench> {
+	return { projection, selectedNode, onClose: vi.fn(), onReload: vi.fn(), onSelectNode: vi.fn(), onPlaceUnplaced: vi.fn() };
+}
+
+function baseProjection(nodes: CanvasNode[] = [planNode()]): CanvasProjection {
+	return { layout: { id: 'layout', workspaceId: 'workspace-1', branchKey: 'main', viewport: { x: 0, y: 0, zoom: 1 }, version: 1, createdAt: '', updatedAt: '' }, nodes, connections: [], unplaced: [] };
+}
+
+function planNode(): CanvasNode {
+	return { id: 'plan:item-1', kind: 'plan', state: 'resolved', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'item-1', itemPath: 'plans/item-1', branchKey: 'main', observedCommit: 'abc123' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, plan: { itemId: 'item-1', identifier: 'PM-037', title: 'Canvas', branch: 'main', commit: 'abc123', editable: true, actions: { 'terminal.launch': { action: 'terminal.launch', state: 'available', recoveryActions: [] } } } };
+}
+
+function sessionNode(record: SafeSessionRecord): CanvasNode {
+	return { id: `session:${record.id}`, kind: 'session', state: 'resolved', entityRef: { kind: 'session', workspaceId: record.workspaceId, sessionId: record.id, branchKey: record.requestedBranch }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, session: { record } };
+}
+
+function sessionRecord(): SafeSessionRecord {
+	return { id: 'session-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', requestedBranch: 'main', state: 'running', startedAt: '', lastKnownAt: '', live: true };
+}
+
+function sessionResult(): EmbeddedAISessionResult {
+	return { session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }, grant: { sessionId: 'session-1', token: 'grant', expiresAt: '' }, record: sessionRecord() };
+}
