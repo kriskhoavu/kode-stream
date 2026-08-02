@@ -159,7 +159,44 @@ export function useCanvasState(workspaceId?: string, branch?: string) {
 		}
 	}, [setProjection]);
 
-	return { projection, loading, error, conflicts, dirtyCount, hasUnsavedChanges: dirtyCount > 0, moveNode, saveViewport, reloadPosition, reapplyPosition, reload: load };
+	const placeUnplaced = useCallback(async () => {
+		let current = projectionRef.current;
+		if (!current || current.unplaced.length === 0) return;
+		setError('');
+		try {
+			for (let start = 0; start < current.unplaced.length; start += 50) {
+				const refs = current.unplaced.slice(start, start + 50);
+				const patches = refs.map((entityRef, index) => ({ nodeId: nodeID(entityRef), entityRef, position: deterministicPosition(current!.nodes.length + start + index, entityRef.kind), collapsed: false, expectedRevision: 0 }));
+				current = await api.patchCanvasPlacements(current.layout.id, patches);
+			}
+			setProjection(current);
+		} catch (caught) {
+			setError(messageFrom(caught));
+		}
+	}, [setProjection]);
+
+	const removeNode = useCallback(async (nodeId: string) => {
+		const current = projectionRef.current;
+		const node = current?.nodes.find((candidate) => candidate.id === nodeId);
+		if (!current || !node) return;
+		try {
+			dirtyRef.current.delete(nodeId);
+			setProjection(await api.removeCanvasPlacement(current.layout.id, nodeId, node.revision));
+			setConflicts((previous) => previous.filter((id) => id !== nodeId));
+			setDirtyVersion((version) => version + 1);
+		} catch (caught) {
+			setError(messageFrom(caught));
+		}
+	}, [setProjection]);
+
+	const resetPositions = useCallback(() => {
+		const current = projectionRef.current;
+		if (!current) return;
+		const ordered = [...current.nodes].sort((left, right) => left.kind.localeCompare(right.kind) || left.id.localeCompare(right.id));
+		for (const [index, node] of ordered.entries()) moveNode(node.id, deterministicPosition(index, node.kind));
+	}, [moveNode]);
+
+	return { projection, loading, error, conflicts, dirtyCount, hasUnsavedChanges: dirtyCount > 0, moveNode, saveViewport, reloadPosition, reapplyPosition, placeUnplaced, removeNode, resetPositions, reload: load };
 }
 
 function overlayDirty(projection: CanvasProjection, dirty: Map<string, DirtyPlacement>): CanvasProjection {
@@ -176,4 +213,16 @@ function messageFrom(error: unknown): string {
 
 export function canvasNodeById(nodes: CanvasNode[], id: string) {
 	return nodes.find((node) => node.id === id);
+}
+
+function nodeID(ref: CanvasProjection['unplaced'][number]) {
+	if (ref.kind === 'workspace') return `workspace:${ref.workspaceId}`;
+	if (ref.kind === 'plan') return `plan:${ref.itemId}`;
+	return `session:${ref.sessionId}`;
+}
+
+function deterministicPosition(index: number, kind: CanvasProjection['unplaced'][number]['kind']): CanvasPosition {
+	if (kind === 'workspace') return { x: 0, y: 0 };
+	const offset = kind === 'session' ? 420 : 0;
+	return { x: 360 + (index % 3) * 320, y: offset + Math.floor(index / 3) * 190 };
 }

@@ -6,7 +6,7 @@ import { useCanvasState } from './useCanvasState';
 
 vi.mock('../../lib/api', async () => {
 	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
-	return { ...actual, api: { resolveDefaultCanvas: vi.fn(), canvasLayout: vi.fn(), patchCanvasPlacements: vi.fn(), patchCanvasViewport: vi.fn() } };
+	return { ...actual, api: { resolveDefaultCanvas: vi.fn(), canvasLayout: vi.fn(), patchCanvasPlacements: vi.fn(), patchCanvasViewport: vi.fn(), removeCanvasPlacement: vi.fn() } };
 });
 
 const projection = (revision = 1): CanvasProjection => ({
@@ -23,6 +23,7 @@ describe('useCanvasState', () => {
 		vi.mocked(api.patchCanvasPlacements).mockResolvedValue(projection(2));
 		vi.mocked(api.patchCanvasViewport).mockResolvedValue({ ...projection(), layout: { ...projection().layout, version: 2, viewport: { x: 5, y: 6, zoom: 1.2 } } });
 		vi.mocked(api.canvasLayout).mockResolvedValue(projection(2));
+		vi.mocked(api.removeCanvasPlacement).mockResolvedValue({ ...projection(), nodes: [], unplaced: [projection().nodes[0].entityRef] });
 	});
 	afterEach(() => vi.useRealTimers());
 
@@ -76,5 +77,20 @@ describe('useCanvasState', () => {
 		await act(async () => { await vi.advanceTimersByTimeAsync(351); });
 		expect(api.patchCanvasPlacements).toHaveBeenCalledTimes(2);
 		expect(result.current.dirtyCount).toBe(0);
+	});
+
+	it('places unplaced entities, resets deterministically, and removes only the placement', async () => {
+		const unplaced = { ...projection(), nodes: [], unplaced: [projection().nodes[0].entityRef] };
+		vi.mocked(api.resolveDefaultCanvas).mockResolvedValue(unplaced);
+		vi.mocked(api.patchCanvasPlacements).mockResolvedValue(projection());
+		const { result } = renderHook(() => useCanvasState('workspace-1', 'main'));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		await act(async () => { await result.current.placeUnplaced(); });
+		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', expectedRevision: 0 })]);
+		act(() => result.current.resetPositions());
+		expect(result.current.projection?.nodes[0].position).toEqual({ x: 360, y: 0 });
+		await act(async () => { await result.current.removeNode('plan:item-1'); });
+		expect(api.removeCanvasPlacement).toHaveBeenCalledWith('layout-1', 'plan:item-1', 1);
+		expect(result.current.projection?.nodes).toHaveLength(0);
 	});
 });

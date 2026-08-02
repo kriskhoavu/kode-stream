@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CanvasLocation } from '../app/router';
 import { useCanvasState } from '../features/canvas/useCanvasState';
+import { CanvasBoard } from '../features/canvas/CanvasBoard';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api } from '../lib/api';
 import type { WorkspaceConfig } from '../lib/types';
 import '../features/canvas/canvas.css';
@@ -11,6 +13,8 @@ export function CanvasPage({ workspace, location, onLocationChange }: { workspac
 	const branch = location?.branch ?? fallbackBranch;
 	const canvas = useCanvasState(workspaceId, branch);
 	const [branches, setBranches] = useState<string[]>([]);
+	const [selectedId, setSelectedId] = useState<string>();
+	const [confirmation, setConfirmation] = useState<'reset' | 'remove'>();
 
 	useEffect(() => {
 		if (!workspaceId) {
@@ -27,6 +31,7 @@ export function CanvasPage({ workspace, location, onLocationChange }: { workspac
 	}, [branch, location?.branch, location?.workspaceId, onLocationChange, workspaceId]);
 
 	const title = useMemo(() => canvas.projection?.nodes.find((node) => node.kind === 'workspace')?.workspace?.name ?? workspace?.name ?? 'Canvas', [canvas.projection, workspace?.name]);
+	const selectedNode = canvas.projection?.nodes.find((node) => node.id === selectedId);
 	if (!workspaceId) return <section className="empty-state"><h1>Canvas</h1><p>Select a workspace to arrange plans and terminal sessions.</p></section>;
 
 	return (
@@ -40,9 +45,12 @@ export function CanvasPage({ workspace, location, onLocationChange }: { workspac
 			</header>
 			{canvas.loading && <div className="canvas-state" role="status">Loading Canvas…</div>}
 			{canvas.error && <div className="canvas-state error" role="alert">{canvas.error}<button type="button" onClick={() => void canvas.reload()}>Retry</button></div>}
-			{canvas.projection && <div className="canvas-state" data-testid="canvas-ready">
+			{canvas.projection && <div className="canvas-state canvas-status-strip" data-testid="canvas-ready">
 				<strong>{canvas.projection.nodes.length} placed</strong><span>{canvas.projection.unplaced.length} unplaced</span>{canvas.dirtyCount > 0 && <span aria-live="polite">Saving {canvas.dirtyCount} position{canvas.dirtyCount === 1 ? '' : 's'}…</span>}
 			</div>}
+			{canvas.projection && <CanvasBoard projection={canvas.projection} conflicts={canvas.conflicts} selectedId={selectedId} onSelect={setSelectedId} onMoveNode={canvas.moveNode} onSaveViewport={canvas.saveViewport} onReloadPosition={(id) => void canvas.reloadPosition(id)} onReapplyPosition={(id) => void canvas.reapplyPosition(id)} onPlaceUnplaced={() => void canvas.placeUnplaced()} onReset={() => setConfirmation('reset')} onRemove={(node) => { setSelectedId(node.id); setConfirmation('remove'); }} />}
+			{confirmation === 'reset' && <ConfirmDialog title="Reset Canvas layout?" message="Preview: the workspace returns to the origin and plans and sessions return to the deterministic grid. This changes presentation only; repository entities and terminal processes are untouched." confirmLabel="Reset layout" onCancel={() => setConfirmation(undefined)} onConfirm={() => { canvas.resetPositions(); setConfirmation(undefined); }} />}
+			{confirmation === 'remove' && selectedNode && <ConfirmDialog title="Remove node from Canvas?" message={`Remove ${selectedNode.kind} from this layout? The underlying ${selectedNode.kind} and any live terminal process continue unchanged.`} confirmLabel="Remove from Canvas" danger onCancel={() => setConfirmation(undefined)} onConfirm={() => { void canvas.removeNode(selectedNode.id); setSelectedId(undefined); setConfirmation(undefined); }} />}
 		</section>
 	);
 }

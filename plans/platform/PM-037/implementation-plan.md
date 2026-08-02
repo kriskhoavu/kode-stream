@@ -19,7 +19,7 @@ PM-037.
 | B3    | Durable session lifecycle and branch-safe launch      | Backend    | Complete |
 | B4    | Verification freshness and Canvas API                 | Backend    | Complete |
 | F1    | Canvas route and placement state                      | Frontend   | Complete |
-| F2    | Draggable semantic nodes and restored layout          | Frontend   | Pending  |
+| F2    | Draggable semantic nodes and restored layout          | Frontend   | Complete |
 | F3    | Focused Workbench and session terminal                | Frontend   | Pending  |
 | F4    | Git, verification, capability, and accessibility UX   | Frontend   | Pending  |
 | I1    | Browser journey, documentation, and final integration | Full stack | Pending  |
@@ -139,16 +139,16 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Add the React Flow viewport with visible pan, zoom, fit, selection, and reset controls.
-- [ ] Add memoized workspace, plan, and session node renderers only.
-- [ ] Make all three node kinds draggable and prove that moving the workspace does not move other nodes.
-- [ ] Render repository and application connections without handles or edit/delete controls.
-- [ ] Implement deterministic first placement, restored saved positions, **Unplaced work**, and **Place new items**.
-- [ ] Implement reset-layout preview and confirmation.
-- [ ] Add node search and focus by title, identifier, branch, and session state.
-- [ ] Implement placement removal with explicit entity/process isolation messaging.
-- [ ] Measure behavior at 25, 100, and 300 placements.
-- [ ] Add movement, save, restore, unplaced, reset, removal, search, and render-limit tests.
+- [x] Add the React Flow viewport with visible pan, zoom, fit, selection, and reset controls.
+- [x] Add memoized workspace, plan, and session node renderers only.
+- [x] Make all three node kinds draggable and prove that moving the workspace does not move other nodes.
+- [x] Render repository and application connections without handles or edit/delete controls.
+- [x] Implement deterministic first placement, restored saved positions, **Unplaced work**, and **Place new items**.
+- [x] Implement reset-layout preview and confirmation.
+- [x] Add node search and focus by title, identifier, branch, and session state.
+- [x] Implement placement removal with explicit entity/process isolation messaging.
+- [x] Measure behavior at 25, 100, and 300 placements.
+- [x] Add movement, save, restore, unplaced, reset, removal, search, and render-limit tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas`
 
