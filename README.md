@@ -37,6 +37,9 @@ Cloud + Agent: Browser -> Cloud API -> outbound Agent -> local repository
 Cloud snapshot: Browser -> Cloud API -> provider API -> immutable repository commit
 ```
 
+Remote Snapshot currently provides the commit-pinned backend foundation for metadata, tree, and file reads. Its
+self-service registration and snapshot-backed board/search UI remain planned work.
+
 See [Architecture](docs/architecture/ARCHITECTURE.md) for the capability boundary, [Cloud modes](docs/cloud/cloud-modes.md) for operating
 guidance, [Storage](docs/storage/storage-architecture.md) for the storage decision matrix, and the
 [Documentation map](docs/README.md) for the full documentation taxonomy.

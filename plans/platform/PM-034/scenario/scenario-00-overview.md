@@ -2,14 +2,14 @@
 
 ## Scenario List
 
-| #   | Title                      | Description                                                          |
-|-----|----------------------------|----------------------------------------------------------------------|
-| 0   | Current localhost-only app | User runs Kode Stream and opens the UI from `http://localhost`.      |
-| 1   | Extension opens local app  | User loads the unpacked extension and reaches the bundled React UI.  |
-| 2   | Files and Git showcase     | User edits workspace files and runs branch-oriented Git actions.     |
-| 3   | Local server unavailable   | Extension explains that `kode-stream serve` must be running.         |
-| 4   | Agentless Cloud snapshot   | User browses a provider-hosted repository without a Cloud Agent.     |
-| 5   | Agentless Cloud limits     | User sees clear limits for local Git, files, and terminal execution. |
+| #   | Title                      | Description                                                                              |
+|-----|----------------------------|------------------------------------------------------------------------------------------|
+| 0   | Current localhost-only app | User runs Kode Stream and opens the UI from `http://localhost`.                          |
+| 1   | Extension opens local app  | User loads the unpacked extension and reaches the bundled React UI.                      |
+| 2   | Files and Git showcase     | User edits workspace files and runs branch-oriented Git actions.                         |
+| 3   | Local server unavailable   | Extension explains that `kode-stream serve` must be running.                             |
+| 4   | Agentless Cloud snapshot   | Target workflow; backend currently exposes commit-pinned metadata, tree, and file reads. |
+| 5   | Agentless Cloud limits     | Workspace details show the local Git/files/terminal execution boundary.                  |
 
 ---
 
@@ -38,7 +38,7 @@ Chrome tab on localhost
 
 # Scenario 1: Extension Opens Local App
 
-## Goal
+## Target Goal
 
 Let a user load Kode Stream from an unpacked Chrome extension while the local server supplies API behavior.
 
@@ -60,7 +60,13 @@ User loads unpacked extension
     -> UI loads state, workspaces, and files from the local API
 ```
 
-## Expected Result
+## Current Result
+
+The backend resolves a selected ref to a commit SHA and exposes read-only snapshot metadata, tree, and file endpoints.
+The provider connection and repository/ref selection user workflow, plus snapshot-backed board and search, remain
+follow-up work.
+
+## Target Result
 
 The extension-hosted UI shows the same Kode Stream workspace experience as the localhost UI for supported Files + Git
 workflows.
@@ -69,7 +75,7 @@ workflows.
 
 # Scenario 2: Files And Git Showcase
 
-## Goal
+## Current Goal
 
 Prove that existing cloned folders still work when the UI is bundled as a Chrome extension.
 
@@ -130,7 +136,13 @@ User opens extension while kode-stream is stopped
 
 # Scenario 4: Agentless Cloud Snapshot
 
-## Goal
+## Current State
+
+The backend can resolve a preconfigured provider connection and workspace ref to a commit SHA, then return read-only
+snapshot metadata, tree, and file responses. There is not yet a self-service provider connection, repository/ref
+selection, or snapshot-backed board/search UI.
+
+## Target Workflow
 
 Let a Cloud user browse an approved Git-provider repository without a Cloud Agent.
 
@@ -145,7 +157,11 @@ User selects Remote Snapshot workspace
     -> UI renders read-only tree, plans, board, and search
 ```
 
-## Expected Result
+## Current Result
+
+Cloud never accesses a local path, runs Git, or requires a user-machine process for the implemented snapshot endpoints.
+
+## Target Result
 
 Cloud never accesses a local path, runs Git, or requires a user-machine process for this workspace type.
 
@@ -153,11 +169,12 @@ Cloud never accesses a local path, runs Git, or requires a user-machine process 
 
 # Scenario 5: Agentless Cloud Limits
 
-## Goal
+## Current Goal
 
 Make the remote-snapshot boundary clear without hiding useful local-terminal guidance.
 
 ## Expected Result
 
-The UI labels the selected commit and omits dirty state, file writes, Git mutations, embedded terminal, AI, runtime, and
-verification controls. A terminal handoff explains that the user performs local Git and process work outside Cloud.
+Workspace details label the selected repository, ref, and resolved commit, and explain that local Git and terminal work
+happens outside Cloud. Capability-driven removal of all unsupported controls from snapshot-backed explorer, plan, board,
+and search views remains follow-up work.

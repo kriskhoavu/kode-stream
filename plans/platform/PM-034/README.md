@@ -1,9 +1,19 @@
 # PM-034: Chrome Extension And Agentless Cloud Showcase
 
-PM-034 packages Kode Stream as a manually loaded Chrome extension showcase for Local mode and adds an agentless Cloud
-workspace path for remote Git snapshots. The extension calls the local Kode Stream API on `127.0.0.1:4317`; the Cloud
-path reads an approved Git-provider repository at a selected immutable commit. Local files, dirty state, Git commands,
+PM-034 packages Kode Stream as a manually loaded Chrome extension showcase for Local mode and establishes the backend
+foundation for agentless Cloud remote snapshots. The extension calls the local Kode Stream API on `127.0.0.1:4317`.
+Cloud supports commit-pinned snapshot metadata, tree, and file reads; the end-to-end registration UI, board/search
+read models, and durable provider-connection workflow remain follow-up work. Local files, dirty state, Git commands,
 terminal sessions, AI CLI, verification, and guarded writes remain an opt-in Cloud Agent responsibility.
+
+## Delivery Status
+
+| Area                          | Current state                                                                                                                                                                                  |
+|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Chrome extension showcase     | Delivered: unpacked MV3 build, local API-origin adapter, unavailable-server recovery, and Local Files + Git workflow.                                                                          |
+| Cloud access modes            | Delivered foundation: Agent-Backed command routing and Remote Snapshot selection with commit-pinned metadata/tree/file endpoints.                                                              |
+| Agentless Cloud user workflow | Partial: workspace detail displays Remote Snapshot metadata and terminal-handoff guidance; registration, provider connection, board/search, and capability-driven workspace UI remain pending. |
+| Provider operations           | Pending: durable encrypted provider connections, operator configuration workflow, rotation/revocation handling, and Cloud smoke.                                                               |
 
 ## Related Plans
 
@@ -24,7 +34,7 @@ Chrome:
 - Showcase workspace browsing, Markdown read/edit/save, Git status, branch listing, and branch switching.
 - Show a clear unavailable state when the local server is not running.
 - Keep the normal localhost web build and embedded Go binary build unchanged.
-- Let Cloud users register an approved provider repository without a Cloud Agent and browse a selected remote snapshot.
+- Establish commit-pinned Remote Snapshot backend reads without a Cloud Agent.
 - Split Cloud workspace behavior by access adapter so agent-backed commands and agentless provider reads remain isolated.
 
 ## Non-Goals
@@ -70,7 +80,7 @@ Browser extension page -> React app -> API origin adapter -> Kode Stream local A
 Git history.
 
 Cloud remote workspace -> workspace access resolver -> remote snapshot adapter -> Git provider API -> commit-pinned
-tree, file, board, search, and capability response.
+metadata, tree, file, and capability response. Board and search read models remain follow-up work.
 
 ## Design Decisions
 
@@ -93,5 +103,5 @@ tree, file, board, search, and capability response.
 - [Pipeline Design](design/design-03-pipeline.md)
 - [Agentless Cloud Design](design/design-04-agentless-cloud.md)
 - [Implementation Plan](implementation-plan.md)
-- [Showcase Runbook](../../../runbooks/chrome-extension-showcase.md)
+- [Showcase Runbook](../../../runbooks/chrome-extension.md)
 - [Remote Snapshot Operations](../../../docs/cloud/remote-snapshot-operations.md)

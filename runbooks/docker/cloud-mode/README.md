@@ -11,10 +11,10 @@ This local stack mirrors the VM deployment shape:
 The stack supports both Cloud workspace access modes. Both start OAuth2Proxy, Keycloak, Kode Stream, and Postgres with
 Cloud `database` storage. The mode determines whether the helper also starts a local Cloud Agent.
 
-| Helper mode               | Command                                                                          | What it validates                                                                           |
-|---------------------------|----------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
-| Agent-Backed              | `./runbooks/docker/cloud-mode/run.sh`                                            | Cloud control plane plus a foreground Agent for a local repository                          |
-| Agentless Remote Snapshot | `KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./runbooks/docker/cloud-mode/run.sh` | Cloud control plane without an Agent; then validate a read-only provider snapshot in the UI |
+| Helper mode               | Command                                                                          | What it validates                                                                                                 |
+|---------------------------|----------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| Agent-Backed              | `./runbooks/docker/cloud-mode/run.sh`                                            | Cloud control plane plus a foreground Agent for a local repository                                                |
+| Agentless Remote Snapshot | `KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./runbooks/docker/cloud-mode/run.sh` | Cloud control plane without an Agent; supports backend Remote Snapshot verification with preconfigured test state |
 
 ## Agent-Backed Run
 
@@ -49,10 +49,10 @@ Start only the Cloud control plane:
 KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./runbooks/docker/cloud-mode/run.sh
 ```
 
-The helper waits for health and exits without building or starting an Agent. Open the Cloud URL, configure an approved
-read-only provider connection, then register a Remote Snapshot workspace and select a repository/ref. Verify that the
-returned content is pinned to a resolved commit SHA and that write, Git, terminal, AI, runtime, and verification
-actions are unavailable. See [Remote Snapshot operations](../../docs/cloud/remote-snapshot-operations.md).
+The helper waits for health and exits without building or starting an Agent. The current Remote Snapshot foundation
+requires preconfigured provider and workspace test state; the self-service provider connection, registration, and
+snapshot-backed UI are not yet available. Verify commit-pinned metadata, tree, and file responses and confirm that
+write, Git, terminal, AI, runtime, and verification actions are unavailable. See [Remote Snapshot operations](../../../docs/cloud/remote-snapshot-operations.md).
 
 Manual stack startup:
 

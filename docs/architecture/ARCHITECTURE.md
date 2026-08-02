@@ -43,11 +43,11 @@ flowchart TD
   CS --> Provider[Read-only Git provider API at pinned commit]
 ```
 
-| Deployment model                | Where Kode Stream runs                                                      | Workspace execution/data boundary                                                                                     | Supported storage              | Intended use                                                    |
-|---------------------------------|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|--------------------------------|-----------------------------------------------------------------|
-| Local application               | User machine; installed with Homebrew, built locally, or run in Docker      | Local paths and managed clones; Git, file writes, terminal, AI, runtime, and verification run locally                 | `datadir` or SQLite `database` | One user working directly with local repositories               |
-| Cloud Agent-Backed              | Cloud API on VM/container plus Cloud Agent on the workspace owner’s machine | Agent keeps repository files, Git credentials, processes, and terminals local; Cloud sends approved command envelopes | Postgres `database` only       | Hosted collaboration with privileged work kept on user machines |
-| Cloud Agentless Remote Snapshot | Cloud API on VM/container                                                   | Cloud reads an authorized provider repository at a resolved immutable commit; no checkout or process runs in Cloud    | Postgres `database` only       | Read-only plans, files, board, and search without a local Agent |
+| Deployment model                | Where Kode Stream runs                                                      | Workspace execution/data boundary                                                                                     | Supported storage              | Intended use                                                                                   |
+|---------------------------------|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|--------------------------------|------------------------------------------------------------------------------------------------|
+| Local application               | User machine; installed with Homebrew, built locally, or run in Docker      | Local paths and managed clones; Git, file writes, terminal, AI, runtime, and verification run locally                 | `datadir` or SQLite `database` | One user working directly with local repositories                                              |
+| Cloud Agent-Backed              | Cloud API on VM/container plus Cloud Agent on the workspace owner’s machine | Agent keeps repository files, Git credentials, processes, and terminals local; Cloud sends approved command envelopes | Postgres `database` only       | Hosted collaboration with privileged work kept on user machines                                |
+| Cloud Agentless Remote Snapshot | Cloud API on VM/container                                                   | Cloud reads an authorized provider repository at a resolved immutable commit; no checkout or process runs in Cloud    | Postgres `database` only       | Current backend foundation: read-only metadata, tree, and file endpoints without a local Agent |
 
 ### Capability Boundary
 
@@ -69,6 +69,8 @@ Cloud Agentless Remote Snapshot
 Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Agent-Backed workspace records use
 `WorkspaceLocation=cloud_agent`; Remote Snapshot records use `WorkspaceLocation=cloud_remote_snapshot` and never
 contain a local path, agent ID, command envelope, or provider credential.
+
+Remote Snapshot's end-user provider registration and snapshot-backed board/search views are planned follow-up work.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐

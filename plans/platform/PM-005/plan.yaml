@@ -4,7 +4,7 @@ plan:
   ticket: PM-005
   title: Search And Navigation
   service: platform
-  status: draft
+  status: done
   owner: null
   tags:
     - kode-stream

@@ -21,13 +21,16 @@ Source: [cloud-mode.mmd](cloud-mode.mmd).
 
 ## Workspace access modes
 
-| Mode                      | Repository boundary                                                                                 | Capabilities                                                                           | Use case                                                      |
-|---------------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|---------------------------------------------------------------|
-| Agent-Backed              | Repository, credentials, and tools stay on the owner’s machine behind an outbound Agent connection. | Reads and role/Agent-gated file, Git, terminal, AI, runtime, and verification actions. | Hosted collaboration where privileged work must remain local. |
-| Agentless Remote Snapshot | Cloud reads an authorized provider repository at a resolved immutable commit.                       | Read-only content, ref selection, and terminal handoff guidance.                       | Safe shared review without a local Agent or checkout.         |
+| Mode                      | Repository boundary                                                                                 | Capabilities                                                                                       | Use case                                                                     |
+|---------------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| Agent-Backed              | Repository, credentials, and tools stay on the owner’s machine behind an outbound Agent connection. | Reads and role/Agent-gated file, Git, terminal, AI, runtime, and verification actions.             | Hosted collaboration where privileged work must remain local.                |
+| Agentless Remote Snapshot | Cloud reads an authorized provider repository at a resolved immutable commit.                       | Current backend: commit-pinned metadata, tree, and file reads; workspace-detail terminal guidance. | Backend foundation for safe shared review without a local Agent or checkout. |
 
 Cloud always uses `KODE_STREAM_STORAGE_OPTION=database`, `KODE_STREAM_STORAGE_DRIVER=postgres`, and a secret-managed
 `KODE_STREAM_DATABASE_URL`. Cloud Agents never connect directly to Postgres.
+
+The full Remote Snapshot user workflow is not yet complete: provider connection/registration, snapshot-backed
+board/search, and durable provider operations remain planned work. See [Remote Snapshot operations](../../cloud/remote-snapshot-operations.md).
 
 Focused Mermaid diagrams: [Agent-Backed workspace](agent-backed.mmd),
 [Agentless Remote Snapshot](agentless-remote-snapshot.mmd), and [Cloud Postgres storage](postgres-storage.mmd).

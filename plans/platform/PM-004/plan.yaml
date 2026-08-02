@@ -4,7 +4,7 @@ plan:
   ticket: PM-004
   title: Reliability, Safety, And Observability
   service: platform
-  status: draft
+  status: done
   owner: null
   tags:
     - kode-stream

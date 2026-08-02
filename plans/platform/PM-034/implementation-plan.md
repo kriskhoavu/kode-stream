@@ -2,10 +2,10 @@
 
 ## Overview
 
-Implement a local unpacked Chrome extension showcase for Kode Stream and an agentless Cloud remote-snapshot workspace.
-The extension bundles the existing React app and routes API calls to the local server. The Cloud path reads an approved
-Git-provider snapshot without a Cloud Agent. A common workspace access interface keeps the existing PM-032 agent-backed
-command path separate from the new provider-read path.
+Implement a local unpacked Chrome extension showcase for Kode Stream and the backend foundation for an agentless Cloud
+remote-snapshot workspace. The extension bundles the existing React app and routes API calls to the local server. The
+Cloud path reads approved provider metadata, trees, and files at a resolved commit without a Cloud Agent. The full
+agentless registration, board/search, and provider-operations workflow remains follow-up work.
 
 ## Terminology Lock
 
@@ -44,11 +44,11 @@ Avoid:
 | F2    | Extension surface behavior              | Frontend | Done    |
 | C1    | Extension build artifact                | DevOps   | Done    |
 | C2    | Showcase verification and documentation | DevOps   | Done    |
-| B1    | Cloud workspace access adapters         | Backend  | Done    |
-| B2    | Provider remote snapshot adapter        | Backend  | Done    |
-| B3    | Snapshot read and capability API        | Backend  | Done    |
-| F3    | Agentless workspace registration        | Frontend | Planned |
-| F4    | Snapshot workspace capability UI        | Frontend | Planned |
+| B1    | Cloud workspace access adapters         | Backend  | Partial |
+| B2    | Provider remote snapshot adapter        | Backend  | Partial |
+| B3    | Snapshot read and capability API        | Backend  | Partial |
+| F3    | Agentless workspace registration        | Frontend | Partial |
+| F4    | Snapshot workspace capability UI        | Frontend | Partial |
 | C3    | Provider authorization and Cloud smoke  | DevOps   | Planned |
 
 ## Frontend Phases
@@ -123,10 +123,15 @@ Avoid:
 
 ### Phase B1: Cloud Workspace Access Adapters
 
+**Current implementation:** `WorkspaceAccessMode` and the adapter resolver are present. The shared adapter interface
+currently covers command execution; snapshot reads remain separate API methods and are not yet a complete shared
+workspace-read contract.
+
 **Deliverables:**
 
 - [x] Add `WorkspaceAccessMode` to Cloud workspace persistence and API types; migrate current `cloud_agent` workspaces to `agent_backed`.
-- [x] Define `WorkspaceAccessAdapter` responsibilities for workspace state, snapshots, read models, capabilities, and command execution.
+- [x] Define `WorkspaceAccessAdapter` command execution and resolver selection for the two Cloud access modes.
+- [ ] Extend the shared adapter contract to cover workspace state, snapshots, read models, and capabilities.
 - [x] Implement `AgentAccessAdapter` by delegating to the existing PM-032 registry and command-envelope path.
 - [x] Add one resolver at the Cloud API/service boundary; remove route-level assumptions that every Cloud workspace has an agent ID.
 - [x] Add tests for migration, adapter selection, owner isolation, and unchanged agent-backed command behavior.
@@ -139,12 +144,17 @@ Avoid:
 
 ### Phase B2: Provider Remote Snapshot Adapter
 
+**Current implementation:** the read-only provider contract, GitHub/Bitbucket adapters, and commit resolution are
+present. Provider instances and user connections are process-local; durable encrypted connection storage and operator
+configuration belong to C3.
+
 **Deliverables:**
 
 - [x] Define `GitProviderIntegration` for authorization state, repository discovery, ref resolution, tree reads, file reads, and commit metadata.
 - [x] Implement approved GitHub and Bitbucket Server/Data Center adapters with read-only authorization and strict repository ownership checks.
 - [x] Implement `RemoteSnapshotAdapter`; it does not invoke Git or access local paths.
-- [x] Persist provider repository identity, selected ref, resolved commit SHA, and opaque, user-scoped authorization state without exposing tokens.
+- [x] Persist provider repository identity, selected ref, and resolved commit SHA in the current Cloud workspace store.
+- [ ] Persist opaque, user-scoped authorization state durably without exposing tokens.
 - [x] Resolve selected branches and tags to immutable commit SHAs before returning content.
 - [x] Add provider contract tests for revoked access, missing refs, forbidden repositories, and snapshot resolution.
 
@@ -155,6 +165,9 @@ Avoid:
 ---
 
 ### Phase B3: Snapshot Read And Capability API
+
+**Current implementation:** snapshot info, tree, and file endpoints resolve every request to a commit SHA. Board and
+search read models, their frontend integration, and commit-keyed invalidation remain follow-up work.
 
 **Deliverables:**
 
@@ -172,9 +185,12 @@ Avoid:
 
 ### Phase F3: Agentless Workspace Registration
 
+**Current implementation:** shared workspace types and the Cloud `POST /api/workspaces` Remote Snapshot path exist.
+The user-facing mode choice, provider connection, repository discovery, and ref-selection UI are not implemented.
+
 **Deliverables:**
 
-- [ ] Extend workspace and runtime types with access mode, provider repository identity, selected ref, resolved commit SHA, and capabilities.
+- [x] Extend workspace types with access mode, provider repository identity, selected ref, and resolved commit SHA.
 - [ ] Add Cloud integration settings with an admin-only provider-instance section and a user-owned connected-account section.
 - [ ] Support multiple named Bitbucket Server/Data Center instances; selecting one scopes repository discovery only for that Remote Snapshot workspace.
 - [ ] Add an explicit Cloud workspace choice: Agent-Backed or Remote Snapshot.
@@ -190,9 +206,12 @@ Avoid:
 
 ### Phase F4: Snapshot Workspace Capability UI
 
+**Current implementation:** the workspace detail view displays a Remote Snapshot location, repository, ref, resolved
+commit, and terminal-handoff guidance. It does not yet render snapshot-backed explorer, plan, board, or search views.
+
 **Deliverables:**
 
-- [ ] Render a Remote Snapshot badge, provider repository, selected ref, and resolved commit SHA in Cloud workspace views.
+- [x] Render Remote Snapshot location, provider repository, selected ref, resolved commit SHA, and terminal-handoff guidance in workspace details.
 - [ ] Key workspace read queries by commit SHA and invalidate them after ref changes.
 - [ ] Render read-only explorer, plan, board, and search views from normalized snapshot responses.
 - [ ] Hide local dirty state, file mutations, Git mutations, embedded terminal, AI, runtime, and verification controls when unsupported.
