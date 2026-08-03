@@ -19,6 +19,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | R2    | Atomic import and snapshot verification         | Backend    | Complete |
 | R3    | Routed import and index consistency             | Backend    | Complete |
 | R4    | Review serialization and transactional index    | Full stack | Complete |
+| R5    | Latest-request Branch Review state              | Frontend   | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -152,3 +153,16 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./internal/workstream ./internal/item/index ./internal/server/api && npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx`
 
 **Commit:** `PM-038: Serialize review refresh and index persistence`
+
+## Phase R5: Latest-Request Branch Review State
+
+**Deliverables:**
+
+- [x] Assign each review load a monotonically increasing request identity and route-context key.
+- [x] Allow only the latest request to update review, error, selected-plan, and loading state.
+- [x] Add reverse-resolution coverage proving stale branch content and actions cannot replace the current branch.
+- [x] Synchronize the frontend design and durable branch-context reference.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx && npm test -- --run`
+
+**Commit:** `PM-038: Ignore superseded branch review responses`

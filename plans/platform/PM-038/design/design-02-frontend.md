@@ -31,6 +31,9 @@ review and opens Workstream.
 - Dirty checkout switching uses the existing guarded confirmation flow.
 - Disable **Switch workspace to this branch** while the initial review or a snapshot refresh is loading, preventing a
   competing switch request from being initiated by the same review surface.
+- Give each review load a monotonically increasing request identity tied to its workspace, requested branch, and
+  checkout context. Only the current identity may update the review, error, selected plan, or loading state, so a
+  superseded response cannot expose actions for a branch different from the route and selector.
 
 ## Synchronization
 

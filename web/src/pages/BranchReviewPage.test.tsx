@@ -1,5 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReviewLocation } from '../app/router';
 import type { FileContent, WorkspaceConfig, WorkstreamBranchLoadResult } from '../lib/types';
 import { BranchReviewPage } from './BranchReviewPage';
 
@@ -8,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../lib/api', () => ({ api: { loadBranchReview: mocks.loadBranchReview, files: mocks.files, file: mocks.file, importReviewedPlan: mocks.importReviewedPlan } }));
 vi.mock('../features/workstream-explorer/useWorkspaceBranches', () => ({
-  useWorkspaceBranches: () => ({ states: { 'ws-1': { workspaceId: 'ws-1', current: 'main', branches: ['main', 'feature/review'], loading: false, switching: false, error: '', recoveryHint: '' } }, switchBranch: mocks.switchBranch })
+  useWorkspaceBranches: () => ({ states: { 'ws-1': { workspaceId: 'ws-1', current: 'main', branches: ['main', 'feature/review', 'feature/slow', 'feature/fast'], loading: false, switching: false, error: '', recoveryHint: '' } }, switchBranch: mocks.switchBranch })
 }));
 vi.mock('../features/content-viewer/ContentViewer', () => ({ ContentViewer: ({ file }: { file: FileContent }) => <div>Previewing {file.path}</div> }));
 
@@ -68,12 +70,60 @@ describe('BranchReviewPage', () => {
     finishRefresh(reviewResult());
     await waitFor(() => expect(switchButton).toBeEnabled());
   });
+
+  it('ignores a superseded branch response that resolves after the current request', async () => {
+    let finishSlow!: (result: WorkstreamBranchLoadResult) => void;
+    let finishFast!: (result: WorkstreamBranchLoadResult) => void;
+    mocks.loadBranchReview.mockImplementation((_workspaceId: string, input: { branch: string }) => new Promise((resolve) => {
+      if (input.branch === 'feature/slow') finishSlow = resolve;
+      if (input.branch === 'feature/fast') finishFast = resolve;
+    }));
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    renderReview('feature/slow');
+    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/slow', force: false }));
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Review branch' }), { target: { value: 'feature/fast' } });
+    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/fast', force: false }));
+    await act(async () => { finishFast(reviewResultFor('feature/fast', 'FAST-001')); });
+    expect(await screen.findAllByText('FAST-001')).not.toHaveLength(0);
+
+    await act(async () => { finishSlow(reviewResultFor('feature/slow', 'SLOW-001')); });
+    expect(screen.queryByText('SLOW-001')).not.toBeInTheDocument();
+    expect(screen.getByText('feature/fast', { selector: '.branch-context-chip.review strong' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Import selected plan' }));
+    await waitFor(() => expect(mocks.importReviewedPlan).toHaveBeenCalledWith('ws-1', expect.objectContaining({ sourceBranch: 'feature/fast', itemId: 'feature-fast-item' })));
+  });
+
+  it('keeps loading owned by the newest request when a superseded request settles first', async () => {
+    let finishSlow!: (result: WorkstreamBranchLoadResult) => void;
+    let finishFast!: (result: WorkstreamBranchLoadResult) => void;
+    mocks.loadBranchReview.mockImplementation((_workspaceId: string, input: { branch: string }) => new Promise((resolve) => {
+      if (input.branch === 'feature/slow') finishSlow = resolve;
+      if (input.branch === 'feature/fast') finishFast = resolve;
+    }));
+    renderReview('feature/slow');
+    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/slow', force: false }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Review branch' }), { target: { value: 'feature/fast' } });
+    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/fast', force: false }));
+
+    await act(async () => { finishSlow(reviewResultFor('feature/slow', 'SLOW-001')); });
+    expect(screen.getByRole('status')).toHaveTextContent('Loading committed snapshot…');
+    expect(screen.queryByText('SLOW-001')).not.toBeInTheDocument();
+
+    await act(async () => { finishFast(reviewResultFor('feature/fast', 'FAST-001')); });
+    expect(screen.queryByText('Loading committed snapshot…')).not.toBeInTheDocument();
+    expect(screen.getByText('feature/fast', { selector: '.branch-context-chip.review strong' })).toBeInTheDocument();
+  });
 });
 
 const workspace: WorkspaceConfig = { id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '' };
 
-function renderReview() {
-  return render(<BranchReviewPage workspace={workspace} location={{ workspaceId: workspace.id, branch: 'feature/review' }} onLocationChange={vi.fn()} onExit={vi.fn()} onImported={vi.fn()} onCheckoutSwitched={vi.fn()} />);
+function renderReview(initialBranch = 'feature/review') {
+  function Harness() {
+    const [location, setLocation] = useState<ReviewLocation>({ workspaceId: workspace.id, branch: initialBranch });
+    return <BranchReviewPage workspace={workspace} location={location} onLocationChange={setLocation} onExit={vi.fn()} onImported={vi.fn()} onCheckoutSwitched={vi.fn()} />;
+  }
+  return render(<Harness />);
 }
 
 function reviewResult(overrides: Partial<WorkstreamBranchLoadResult> = {}): WorkstreamBranchLoadResult {
@@ -82,6 +132,16 @@ function reviewResult(overrides: Partial<WorkstreamBranchLoadResult> = {}): Work
     items: [{ id: 'snapshot-1', workspaceId: workspace.id, workspaceName: workspace.name, scope: 'platform', branch: 'feature/review', identifier: 'PM-038', title: 'Checkout-first review', status: 'review', tags: [], metadataSource: 'plan.yaml', itemPath: 'plans/platform/PM-038', sourceMode: 'snapshot', editable: false }],
     ...overrides
   };
+}
+
+function reviewResultFor(branch: string, identifier: string): WorkstreamBranchLoadResult {
+  const slug = branch.replace('/', '-');
+  return reviewResult({
+    branch,
+    selectedBranch: branch,
+    branchRef: `refs/heads/${branch}`,
+    items: [{ id: `${slug}-item`, workspaceId: workspace.id, workspaceName: workspace.name, scope: 'platform', branch, identifier, title: identifier, status: 'review', tags: [], metadataSource: 'plan.yaml', itemPath: `plans/platform/${identifier}`, sourceMode: 'snapshot', editable: false }]
+  });
 }
 
 function file(): FileContent {

@@ -63,5 +63,7 @@ User chooses Switch workspace to this branch
 - Checkout load holds the same lock through scan-and-replace, so an older scan cannot overwrite the imported index.
 - Review refresh holds that lock through checkout validation and snapshot scan-and-replace, so it cannot overwrite a
   newly operational checkout index.
+- When review branch requests overlap, only the newest workspace, branch, and checkout context may update the page or
+  enable review actions; superseded responses are ignored regardless of completion order.
 - Snapshot mutation payloads return `snapshot_read_only` and never trigger a copy.
 - External Git checkout changes are detected when the application regains focus.

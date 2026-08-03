@@ -54,7 +54,9 @@ Operational checkout loads hold that lock through fingerprinting, scanning, and 
 scan started before import from overwriting the post-import index. Branch Review also holds the lock across checkout
 validation, commit-pinned scanning, and branch index replacement. A refresh therefore cannot publish snapshot rows for
 a branch that becomes operational during the scan. The review UI disables switching while its initial load or refresh
-is pending.
+is pending. Each review load also has a monotonically increasing identity bound to its workspace, requested branch,
+and checkout context. Only the current request may publish review data, errors, plan selection, or loading completion;
+superseded responses cannot make actions target a branch different from the route and selector.
 
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->

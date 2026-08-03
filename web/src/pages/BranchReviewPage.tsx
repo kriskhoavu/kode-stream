@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Download, FileText, GitBranch, RefreshCw } from 'lucide-react';
 import type { ReviewLocation } from '../app/router';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
@@ -23,11 +23,15 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
   const [fileLoading, setFileLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
+  const reviewRequestId = useRef(0);
   const branchState = useWorkspaceBranches(workspace ? [workspace] : [], async () => {
     await onCheckoutSwitched();
   });
   const workspaceState = workspace ? branchState.states[workspace.id] : undefined;
   const branch = location?.branch ?? '';
+  const reviewContext = `${workspace?.id ?? ''}\u0000${branch}\u0000${workspaceState?.current ?? ''}`;
+  const reviewContextRef = useRef(reviewContext);
+  useLayoutEffect(() => { reviewContextRef.current = reviewContext; }, [reviewContext]);
   const branchOptions = useMemo(
     () => (workspaceState?.branches ?? []).filter((candidate) => candidate !== workspaceState?.current),
     [workspaceState?.branches, workspaceState?.current]
@@ -37,31 +41,40 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
 
   const loadReview = async (force = false) => {
     if (!workspace || !branch) return;
+    const requestId = ++reviewRequestId.current;
+    const requestContext = reviewContext;
+    const isCurrentRequest = () => requestId === reviewRequestId.current && requestContext === reviewContextRef.current;
     if (branch === workspaceState?.current) {
       setReview(null);
       setError('This branch is already checked out. Exit review to use the operational pages.');
+      setLoading(false);
       return;
     }
     setLoading(true);
     setError('');
     try {
       const result = await api.loadBranchReview(workspace.id, { branch, force });
+      if (!isCurrentRequest()) return;
       setReview(result);
       setSelectedItemId((current) => result.items.some((item) => item.id === current) ? current : result.items[0]?.id ?? '');
     } catch (caught) {
+      if (!isCurrentRequest()) return;
       setReview(null);
       setError(caught instanceof Error ? caught.message : 'Branch review failed to load');
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) setLoading(false);
     }
   };
 
   useEffect(() => {
+    reviewRequestId.current += 1;
     setReview(null);
     setSelectedItemId('');
     setFiles([]);
     setFile(null);
+    setLoading(false);
     if (branch) void loadReview(false);
+    return () => { reviewRequestId.current += 1; };
   }, [workspace?.id, branch, workspaceState?.current]);
 
   useEffect(() => {
