@@ -16,12 +16,19 @@ import (
 	gitadapter "kode-stream/internal/git"
 	itemindex "kode-stream/internal/item/index"
 	"kode-stream/internal/workspace/registry"
+	"kode-stream/internal/workspace/scanner"
 )
 
 func TestCanvasAPIDefaultProjectionPlacementConflictAndViewportIndependence(t *testing.T) {
 	root := t.TempDir()
 	apiCanvasGit(t, root, "init", "-b", "main")
-	if err := os.MkdirAll(filepath.Join(root, "plans"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "plans", "platform", "PM-001"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "plans", "platform", "PM-001", "README.md"), []byte("# PM-001: Main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "plans", "platform", "PM-001", "plan.yaml"), []byte("plan:\n  status: draft\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("seed"), 0o644); err != nil {
@@ -50,7 +57,7 @@ func TestCanvasAPIDefaultProjectionPlacementConflictAndViewportIndependence(t *t
 	}
 	repository := appcanvas.NewFileRepository(filepath.Join(dataDir, "canvas.yaml"))
 	service := appcanvas.NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
-	handler := New(reg, items, nil, nil, nil, git, nil).WithCanvas(service).Routes()
+	handler := New(reg, items, scanner.New(git), nil, nil, git, nil).WithCanvas(service).Routes()
 
 	body, _ := json.Marshal(map[string]string{"workspaceId": workspaceConfig.ID, "branchKey": "main"})
 	response := httptest.NewRecorder()
@@ -69,6 +76,12 @@ func TestCanvasAPIDefaultProjectionPlacementConflictAndViewportIndependence(t *t
 		if node.EntityRef.ItemID == "other-item" {
 			t.Fatal("projection crossed branch scope")
 		}
+	}
+	mismatchBody, _ := json.Marshal(map[string]string{"workspaceId": workspaceConfig.ID, "branchKey": "other"})
+	mismatch := httptest.NewRecorder()
+	handler.ServeHTTP(mismatch, httptest.NewRequest(http.MethodPost, "/api/canvas/default", bytes.NewReader(mismatchBody)))
+	if mismatch.Code != http.StatusConflict || !bytes.Contains(mismatch.Body.Bytes(), []byte(`"code":"canvas_branch_mismatch"`)) {
+		t.Fatalf("mismatch status=%d body=%s", mismatch.Code, mismatch.Body.String())
 	}
 
 	conflictBody, _ := json.Marshal(map[string]any{"patches": []appcanvas.PlacementPatch{{NodeID: projection.Nodes[0].ID, EntityRef: projection.Nodes[0].EntityRef, Position: appcanvas.Position{X: 5, Y: 5}, ExpectedRevision: 999}}})

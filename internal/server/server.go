@@ -72,7 +72,7 @@ func NewServer(port int) (*Server, error) {
 	sessionManager := ai.NewTerminalManager(ai.Config{})
 	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager).ConfigureSessionRecords(state.SessionRecords, git)
 	jiraService := appjira.NewService(reg, idx, appjira.New())
-	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore)
+	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore).ConfigureCheckout(git)
 	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithDatabaseHealth(state.SQLStore).WithStorageServices(state.StatusService, state.SyncService).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
 	canvasService := canvas.NewService(state.Canvas, reg, idx, git, aiSessionService, apiHandler.VerificationService(), runtimeConfig.Mode, canvasDatastore(state.Config), runtimeConfig.Capabilities)
 	apiHandler.WithCanvas(canvasService)

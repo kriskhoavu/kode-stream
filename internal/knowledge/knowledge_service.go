@@ -42,6 +42,10 @@ type workspaceDetector interface {
 type gitPuller interface {
 	Pull(string, models.GitOperationInput) models.GitOperationResult
 }
+type checkoutReader interface {
+	CurrentBranch(string) (string, error)
+	ResolveBranch(string, string) (string, string, error)
+}
 type auditAppender interface {
 	Append(models.AuditEvent) (models.AuditEvent, error)
 }
@@ -51,6 +55,7 @@ type KnowledgeService struct {
 	store         *Store
 	detector      workspaceDetector
 	git           gitPuller
+	checkout      checkoutReader
 	audit         auditAppender
 	enrichTimeout time.Duration
 }
@@ -61,6 +66,11 @@ func NewService(registry registry.Repository, store *Store) *KnowledgeService {
 
 func (s *KnowledgeService) ConfigureActions(detector workspaceDetector, git gitPuller, audit auditAppender) *KnowledgeService {
 	s.detector, s.git, s.audit = detector, git, audit
+	return s
+}
+
+func (s *KnowledgeService) ConfigureCheckout(reader checkoutReader) *KnowledgeService {
+	s.checkout = reader
 	return s
 }
 
@@ -85,6 +95,10 @@ func (s *KnowledgeService) Rescan(ctx context.Context, workspaceID, root string)
 		return KnowledgeActionResult{}, err
 	}
 	if ok {
+		wiki, err = s.stampWiki(workspace, wiki)
+		if err != nil {
+			return KnowledgeActionResult{}, err
+		}
 		if err := s.store.ReplaceWiki(workspaceID, root, wiki); err != nil {
 			s.recordAudit(workspaceID, "knowledge_rescan", root, started, err)
 			return KnowledgeActionResult{}, err
@@ -116,6 +130,9 @@ func (s *KnowledgeService) Sync(ctx context.Context, workspaceID string, input m
 		return KnowledgeActionResult{OK: false, Operation: "sync", Message: gitResult.Message, Wikis: []KnowledgeWiki{}, Warnings: []KnowledgeWarning{}, CompletedAt: time.Now().UTC()}, nil
 	}
 	wikis, err := s.detector.DetectWorkspace(ctx, workspace)
+	if err == nil {
+		wikis, err = s.stampWikis(workspace, wikis)
+	}
 	if err == nil {
 		err = s.store.ReplaceWorkspace(workspaceID, wikis)
 	}
@@ -173,6 +190,9 @@ func (s *KnowledgeService) Enrich(ctx context.Context, workspaceID string, confi
 		return KnowledgeActionResult{OK: false, Operation: "enrich", Message: sanitizeError(err), Wikis: []KnowledgeWiki{}, Warnings: []KnowledgeWarning{}, Log: buffer.String(), LogTruncated: buffer.truncated, CompletedAt: time.Now().UTC()}, nil
 	}
 	wikis, err := s.detector.DetectWorkspace(ctx, workspace)
+	if err == nil {
+		wikis, err = s.stampWikis(workspace, wikis)
+	}
 	if err == nil {
 		err = s.store.ReplaceWorkspace(workspaceID, wikis)
 	}
@@ -248,6 +268,9 @@ func (s *KnowledgeService) Wikis(workspaceID string) ([]KnowledgeWiki, error) {
 	}
 	if requireKnowledgeEnabled(workspace) != nil {
 		return []KnowledgeWiki{}, nil
+	}
+	if err := s.ensureCheckoutFresh(context.Background(), workspace); err != nil {
+		return nil, err
 	}
 	wikis, err := s.store.List(workspaceID)
 	if err != nil {
@@ -514,6 +537,9 @@ func (s *KnowledgeService) wiki(workspaceID, root string) (KnowledgeWiki, error)
 	if err := requireKnowledgeEnabled(workspace); err != nil {
 		return KnowledgeWiki{}, err
 	}
+	if err := s.ensureCheckoutFresh(context.Background(), workspace); err != nil {
+		return KnowledgeWiki{}, err
+	}
 	if clean := filepath.ToSlash(filepath.Clean(root)); clean != root || clean == "." || filepath.IsAbs(root) || strings.HasPrefix(clean, "../") {
 		return KnowledgeWiki{}, ErrUnsafePath
 	}
@@ -530,6 +556,71 @@ func (s *KnowledgeService) wiki(workspaceID, root string) (KnowledgeWiki, error)
 		}
 	}
 	return KnowledgeWiki{}, ErrWikiNotFound
+}
+
+func (s *KnowledgeService) ensureCheckoutFresh(ctx context.Context, workspace models.WorkspaceConfig) error {
+	if s.checkout == nil || s.detector == nil {
+		return nil
+	}
+	branch, err := s.checkout.CurrentBranch(workspace.Path)
+	if err != nil {
+		return err
+	}
+	_, commit, err := s.checkout.ResolveBranch(workspace.Path, branch)
+	if err != nil {
+		return err
+	}
+	wikis, err := s.store.List(workspace.ID)
+	if err != nil {
+		return err
+	}
+	fresh := len(wikis) > 0
+	for _, wiki := range wikis {
+		if wiki.CheckoutBranch != branch || wiki.CheckoutCommit != commit {
+			fresh = false
+			break
+		}
+	}
+	if fresh {
+		return nil
+	}
+	wikis, err = s.detector.DetectWorkspace(ctx, workspace)
+	if err != nil {
+		return err
+	}
+	wikis = stampKnowledgeWikis(wikis, branch, commit)
+	return s.store.ReplaceWorkspace(workspace.ID, wikis)
+}
+
+func (s *KnowledgeService) stampWiki(workspace models.WorkspaceConfig, wiki KnowledgeWiki) (KnowledgeWiki, error) {
+	wikis, err := s.stampWikis(workspace, []KnowledgeWiki{wiki})
+	if err != nil {
+		return KnowledgeWiki{}, err
+	}
+	return wikis[0], nil
+}
+
+func (s *KnowledgeService) stampWikis(workspace models.WorkspaceConfig, wikis []KnowledgeWiki) ([]KnowledgeWiki, error) {
+	if s.checkout == nil {
+		return wikis, nil
+	}
+	branch, err := s.checkout.CurrentBranch(workspace.Path)
+	if err != nil {
+		return nil, err
+	}
+	_, commit, err := s.checkout.ResolveBranch(workspace.Path, branch)
+	if err != nil {
+		return nil, err
+	}
+	return stampKnowledgeWikis(wikis, branch, commit), nil
+}
+
+func stampKnowledgeWikis(wikis []KnowledgeWiki, branch, commit string) []KnowledgeWiki {
+	for i := range wikis {
+		wikis[i].CheckoutBranch = branch
+		wikis[i].CheckoutCommit = commit
+	}
+	return wikis
 }
 
 func requireKnowledgeEnabled(workspace models.WorkspaceConfig) error {

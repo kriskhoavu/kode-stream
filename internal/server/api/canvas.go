@@ -25,7 +25,16 @@ func (a *API) resolveDefaultCanvas(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "workspaceId is required")
 		return
 	}
-	projection, err := a.canvas.ResolveDefault(a.canvasOwner(r), input.WorkspaceID, input.BranchKey)
+	checkout, err := a.workstream.LoadCheckout(input.WorkspaceID, false)
+	if err != nil {
+		a.respondCanvas(w, appcanvas.Projection{}, err)
+		return
+	}
+	if requested := strings.TrimSpace(input.BranchKey); requested != "" && requested != checkout.Branch {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "Canvas branch differs from the current checkout", "code": "canvas_branch_mismatch", "checkoutBranch": checkout.Branch})
+		return
+	}
+	projection, err := a.canvas.ResolveDefault(a.canvasOwner(r), input.WorkspaceID, checkout.Branch)
 	a.respondCanvas(w, projection, err)
 }
 

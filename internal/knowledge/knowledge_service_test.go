@@ -47,6 +47,16 @@ type stubPuller struct {
 	input  models.GitOperationInput
 }
 
+type stubCheckout struct {
+	branch string
+	commit string
+}
+
+func (s *stubCheckout) CurrentBranch(string) (string, error) { return s.branch, nil }
+func (s *stubCheckout) ResolveBranch(string, string) (string, string, error) {
+	return "refs/heads/" + s.branch, s.commit, nil
+}
+
 func (p *stubPuller) Pull(_ string, input models.GitOperationInput) models.GitOperationResult {
 	p.input = input
 	return p.result
@@ -178,6 +188,35 @@ func TestDisabledKnowledgeRejectsActionsAndHidesPersistedWikis(t *testing.T) {
 	}
 	if _, err := service.Enrich(context.Background(), "ws", true); err != ErrKnowledgeDisabled {
 		t.Fatalf("enrich err=%v", err)
+	}
+}
+
+func TestKnowledgeRebuildsWhenCheckoutIdentityChanges(t *testing.T) {
+	directory := t.TempDir()
+	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: directory, Sources: []string{"docs"}}
+	data, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(directory, "workspaces.yaml")
+	if err := os.WriteFile(registryPath, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(filepath.Join(directory, "knowledge-index.yaml"))
+	detector := &stubDetector{wikis: []KnowledgeWiki{{Root: "docs", DisplayName: "Docs", Pages: []KnowledgePage{}, Warnings: []KnowledgeWarning{}}}}
+	checkout := &stubCheckout{branch: "main", commit: "aaa"}
+	service := NewService(registry.New(registryPath, gitadapter.New()), store).ConfigureActions(detector, nil, nil).ConfigureCheckout(checkout)
+	wikis, err := service.Wikis("ws")
+	if err != nil || len(wikis) != 1 || wikis[0].CheckoutBranch != "main" || wikis[0].CheckoutCommit != "aaa" || detector.calls != 1 {
+		t.Fatalf("initial wikis=%+v calls=%d err=%v", wikis, detector.calls, err)
+	}
+	if _, err := service.Wikis("ws"); err != nil || detector.calls != 1 {
+		t.Fatalf("fresh index rescanned: calls=%d err=%v", detector.calls, err)
+	}
+	checkout.branch, checkout.commit = "feature", "bbb"
+	wikis, err = service.Wikis("ws")
+	if err != nil || wikis[0].CheckoutBranch != "feature" || wikis[0].CheckoutCommit != "bbb" || detector.calls != 2 {
+		t.Fatalf("refreshed wikis=%+v calls=%d err=%v", wikis, detector.calls, err)
 	}
 }
 

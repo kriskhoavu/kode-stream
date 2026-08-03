@@ -11,7 +11,7 @@ read-only review route, and make cross-branch plan copying explicit.
 |-------|-------------------------------------------------|------------|----------|
 | P1    | Feature contract and browser playbook           | Full stack | Complete |
 | B1    | Checkout loader, review, and explicit import    | Backend    | Complete |
-| B2    | Canvas and Knowledge checkout synchronization   | Backend    | Pending  |
+| B2    | Canvas and Knowledge checkout synchronization   | Backend    | Complete |
 | F1    | Checkout-first operational surfaces             | Frontend   | Pending  |
 | F2    | Dedicated read-only Branch Review               | Frontend   | Pending  |
 | I1    | Integration, durable documentation, and browser | Full stack | Pending  |
@@ -46,10 +46,10 @@ read-only review route, and make cross-branch plan copying explicit.
 
 **Deliverables:**
 
-- [ ] Make Canvas derive its layout branch from the checkout and ensure the item index is current before seeding.
-- [ ] Reject mismatching legacy Canvas branch requests.
-- [ ] Stamp Knowledge indexes with checkout branch and commit and rebuild after checkout changes.
-- [ ] Add direct Canvas load and Knowledge checkout-change tests.
+- [x] Make Canvas derive its layout branch from the checkout and ensure the item index is current before seeding.
+- [x] Reject mismatching legacy Canvas branch requests.
+- [x] Stamp Knowledge indexes with checkout branch and commit and rebuild after checkout changes.
+- [x] Add direct Canvas load and Knowledge checkout-change tests.
 
 **Verification:** `go test ./internal/canvas ./internal/knowledge ./internal/server/api`
 
