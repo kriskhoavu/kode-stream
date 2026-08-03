@@ -55,45 +55,6 @@ describe('Workstream card drag and drop', () => {
     await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(1));
   });
 
-  it('asks before materializing a snapshot card dropped onto another status', async () => {
-    const snapshotItems = items.map((item) => item.id === 'item-1' ? { ...item, sourceMode: 'snapshot' as const, editable: false } : item);
-    const confirm = vi.fn(() => true);
-    vi.stubGlobal('confirm', confirm);
-    const fetchMock = boardFetchMock(snapshotItems);
-    vi.stubGlobal('fetch', fetchMock);
-    renderPage();
-    await screen.findByText('Draggable item');
-
-    const dataTransfer = createDataTransfer();
-    act(() => {
-      fireEvent.dragStart(cardFor('Draggable item'), { dataTransfer });
-      fireEvent.drop(column('Review'), { dataTransfer });
-    });
-
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('copy the whole plan at plans/platform/PM-012 into the current checkout branch'));
-    expect(within(column('Review')).getByText('Draggable item')).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(1));
-    expect(statusRequestBody(fetchMock)).toMatchObject({ status: 'review', materializeConfirmed: true });
-  });
-
-  it('leaves a snapshot card in place when drag/drop materialization is declined', async () => {
-    const snapshotItems = items.map((item) => item.id === 'item-1' ? { ...item, sourceMode: 'snapshot' as const, editable: false } : item);
-    vi.stubGlobal('confirm', vi.fn(() => false));
-    const fetchMock = boardFetchMock(snapshotItems);
-    vi.stubGlobal('fetch', fetchMock);
-    renderPage();
-    await screen.findByText('Draggable item');
-
-    const dataTransfer = createDataTransfer();
-    act(() => {
-      fireEvent.dragStart(cardFor('Draggable item'), { dataTransfer });
-      fireEvent.drop(column('Review'), { dataTransfer });
-    });
-
-    expect(within(column('Draft')).getByText('Draggable item')).toBeInTheDocument();
-    expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(0);
-  });
-
   it('treats same-column, outside, and protected drops as no-ops', async () => {
     const fetchMock = boardFetchMock();
     vi.stubGlobal('fetch', fetchMock);
@@ -223,7 +184,7 @@ function createDataTransfer(): DataTransfer {
 function boardFetchMock(boardItems: ItemSummary[] = items) {
   return vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
-    if (url === '/api/workspaces/workspace-1/workstream/branch') return Promise.resolve(response(workstreamBranchLoadResult(boardItems)));
+    if (url === '/api/workspaces/workspace-1/workstream/checkout') return Promise.resolve(response(workstreamBranchLoadResult(boardItems)));
     if (url.startsWith('/api/items?')) return Promise.resolve(response(boardItems));
     if (url === '/api/saved-filters') return Promise.resolve(response([]));
     if (url === '/api/items/item-1') return Promise.resolve(response({ ...boardItems[0], documents: [], metadata: {}, counts: { files: 0 } }));

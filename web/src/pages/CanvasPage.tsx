@@ -4,32 +4,20 @@ import { useCanvasState } from '../features/canvas/useCanvasState';
 import { CanvasBoard } from '../features/canvas/CanvasBoard';
 import { CanvasWorkbench } from '../features/canvas/CanvasWorkbench';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { api } from '../lib/api';
 import type { WorkspaceConfig } from '../lib/types';
 import '../features/canvas/canvas.css';
 
 export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, onOpenWorkspaces }: { workspace?: WorkspaceConfig; location?: CanvasLocation; onLocationChange: (location: CanvasLocation) => void; onOpenItem?: (itemId: string) => void; onOpenWorkspaces?: () => void }) {
 	const workspaceId = location?.workspaceId ?? workspace?.id;
-	const fallbackBranch = workspace?.lastSelectedBranch || workspace?.baselineBranch;
-	const branch = location?.branch ?? fallbackBranch;
-	const canvas = useCanvasState(workspaceId, branch);
-	const [branches, setBranches] = useState<string[]>([]);
+	const canvas = useCanvasState(workspaceId);
 	const [selectedId, setSelectedId] = useState<string>();
 	const [confirmation, setConfirmation] = useState<'reset' | 'remove'>();
 
 	useEffect(() => {
-		if (!workspaceId) {
-			setBranches([]);
-			return;
+		if (workspaceId && location?.workspaceId !== workspaceId) {
+			onLocationChange({ workspaceId });
 		}
-		void api.workspaceBranches(workspaceId).then((result) => setBranches(result.branches)).catch(() => setBranches(branch ? [branch] : []));
-	}, [branch, workspaceId]);
-
-	useEffect(() => {
-		if (workspaceId && (location?.workspaceId !== workspaceId || location?.branch !== branch)) {
-			onLocationChange({ workspaceId, branch });
-		}
-	}, [branch, location?.branch, location?.workspaceId, onLocationChange, workspaceId]);
+	}, [location?.workspaceId, onLocationChange, workspaceId]);
 
 	const title = useMemo(() => canvas.projection?.nodes.find((node) => node.kind === 'workspace')?.workspace?.name ?? workspace?.name ?? 'Canvas', [canvas.projection, workspace?.name]);
 	const selectedNode = canvas.projection?.nodes.find((node) => node.id === selectedId);
@@ -44,10 +32,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		<section className="canvas-page" aria-label="Workspace Canvas">
 			<header className="canvas-page-header">
 				<div><span className="canvas-eyebrow">Workspace Canvas</span><h1>{title}</h1></div>
-				<label>Branch<select aria-label="Canvas branch" value={branch} onChange={(event) => {
-					if (canvas.hasUnsavedChanges && !window.confirm('Some positions are not saved yet. Switching branches may lose those moves. Continue?')) return;
-					onLocationChange({ workspaceId, branch: event.target.value });
-				}}>{Array.from(new Set([branch, ...branches])).filter(Boolean).map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
+				<span className="branch-context-chip" aria-label={`Checkout: ${canvas.projection?.layout.branchKey ?? 'Loading'}`}><span>Checkout</span><strong>{canvas.projection?.layout.branchKey ?? 'Loading…'}</strong></span>
 			</header>
 			{canvas.loading && <div className="canvas-state" role="status">Loading Canvas…</div>}
 			{canvas.error && <div className="canvas-state error" role="alert">{canvas.error}<button type="button" onClick={() => void canvas.reload()}>Retry</button></div>}

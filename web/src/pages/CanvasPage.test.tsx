@@ -12,17 +12,17 @@ vi.mock('../features/canvas/CanvasWorkbench', () => ({ CanvasWorkbench: ({ selec
 describe('CanvasPage', () => {
 	it('returns keyboard focus to the selected node after closing the Workbench', async () => {
 		canvasState.projection = projection();
-		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, branch: 'main' }} onLocationChange={vi.fn()} />);
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
 		const node = screen.getByRole('button', { name: 'Plan: PM-037 Canvas main' });
 		fireEvent.click(node);
 		fireEvent.click(screen.getByRole('button', { name: 'Close Workbench' }));
 		await waitFor(() => expect(node).toHaveFocus());
 	});
 
-	it('keeps branch context explicit and exposes a polite save-status region', async () => {
+	it('shows checkout context and exposes a polite save-status region', async () => {
 		canvasState.projection = projection();
-		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, branch: 'main' }} onLocationChange={vi.fn()} />);
-		await waitFor(() => expect(screen.getByRole('combobox', { name: 'Canvas branch' })).toHaveValue('main'));
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		await waitFor(() => expect(screen.getByLabelText('Checkout: main')).toBeInTheDocument());
 		expect(screen.getByTestId('canvas-ready')).toHaveTextContent('1 placed');
 		expect(screen.getByRole('status')).toHaveTextContent('Saved');
 	});

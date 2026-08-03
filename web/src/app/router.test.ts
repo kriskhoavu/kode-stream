@@ -25,11 +25,11 @@ describe('router', () => {
 		expect(knowledgePath()).toBe('/knowledge');
 	});
 
-	it('parses and builds Canvas branch context', () => {
+	it('parses and builds checkout-derived Canvas context', () => {
 		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&branch=feature%2FPM-037');
-		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', branch: 'feature/PM-037' } });
-		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', branch: 'main' } })).toBe('/canvas?workspaceId=ws+one&branch=main');
-		expect(canvasLocationFromSearch('?branch=main')).toEqual({ branch: 'main' });
+		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one' } });
+		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one' } })).toBe('/canvas?workspaceId=ws+one');
+		expect(canvasLocationFromSearch('?branch=main')).toBeUndefined();
 		expect(canvasPath()).toBe('/canvas');
 	});
 

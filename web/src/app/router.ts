@@ -1,6 +1,6 @@
 export type KnowledgeView = 'browse' | 'read' | 'graph';
 export interface KnowledgeLocation { workspaceId?: string; root?: string; slug?: string; view?: KnowledgeView; }
-export interface CanvasLocation { workspaceId?: string; branch?: string; }
+export interface CanvasLocation { workspaceId?: string; }
 
 export type Route =
   | { name: 'workstream'; focusedItemId?: string }
@@ -48,14 +48,12 @@ export function pathForRoute(route: Route): string {
 export function canvasLocationFromSearch(search: string): CanvasLocation | undefined {
 	const query = new URLSearchParams(search);
 	const workspaceId = query.get('workspaceId')?.trim() || undefined;
-	const branch = query.get('branch')?.trim() || undefined;
-	return workspaceId || branch ? { workspaceId, branch } : undefined;
+	return workspaceId ? { workspaceId } : undefined;
 }
 
 export function canvasPath(location?: CanvasLocation): string {
 	const query = new URLSearchParams();
 	if (location?.workspaceId) query.set('workspaceId', location.workspaceId);
-	if (location?.branch) query.set('branch', location.branch);
 	return query.size ? `/canvas?${query.toString()}` : '/canvas';
 }
 

@@ -70,6 +70,19 @@ export function useAppState() {
   }, []);
 
   useEffect(() => {
+    const refreshCheckoutContext = () => void refreshAppData();
+    const refreshVisibleCheckoutContext = () => {
+      if (document.visibilityState === 'visible') refreshCheckoutContext();
+    };
+    window.addEventListener('focus', refreshCheckoutContext);
+    document.addEventListener('visibilitychange', refreshVisibleCheckoutContext);
+    return () => {
+      window.removeEventListener('focus', refreshCheckoutContext);
+      document.removeEventListener('visibilitychange', refreshVisibleCheckoutContext);
+    };
+  }, []);
+
+  useEffect(() => {
     if (workspaces.length === 0) {
       setActiveWorkspaceId('');
       localStorage.removeItem('activeWorkspaceId');
@@ -90,7 +103,7 @@ export function useAppState() {
       return;
     }
 		if (route.name === 'canvas') {
-			navigate({ name: 'canvas', location: { workspaceId: repo.id, branch: repo.lastSelectedBranch || repo.baselineBranch } });
+			navigate({ name: 'canvas', location: { workspaceId: repo.id } });
 			return;
 		}
     navigate({ name: 'workstream' });

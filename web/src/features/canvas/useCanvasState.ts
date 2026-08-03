@@ -8,7 +8,7 @@ interface DirtyPlacement {
 	retries: number;
 }
 
-export function useCanvasState(workspaceId?: string, branch?: string) {
+export function useCanvasState(workspaceId?: string) {
 	const [projection, setProjectionState] = useState<CanvasProjection>();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
@@ -36,7 +36,7 @@ export function useCanvasState(workspaceId?: string, branch?: string) {
 		setLoading(true);
 		setError('');
 		try {
-			const next = await api.resolveDefaultCanvas(workspaceId, branch);
+			const next = await api.resolveDefaultCanvas(workspaceId);
 			dirtyRef.current.clear();
 			setConflicts([]);
 			setProjection(next);
@@ -45,7 +45,7 @@ export function useCanvasState(workspaceId?: string, branch?: string) {
 		} finally {
 			setLoading(false);
 		}
-	}, [branch, setProjection, workspaceId]);
+	}, [setProjection, workspaceId]);
 
 	const refresh = useCallback(async () => {
 		const current = projectionRef.current;

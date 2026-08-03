@@ -704,6 +704,12 @@ export interface WorkstreamBranchLoadResult {
   items: ItemSummary[];
 }
 
+export interface ReviewedPlanImportInput {
+	sourceBranch: string;
+	expectedCommit: string;
+	itemId: string;
+}
+
 export interface WorkspaceTreeEntry {
   id: string;
   name: string;

@@ -31,7 +31,6 @@ import { isDocumentationMetadataSource, labels, metadataSourceLabel as genericMe
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/workstream/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
-import { BranchSnapshotPicker } from '../features/workstream/BranchSnapshotPicker';
 import { inferCompatibilityFields, lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
@@ -126,12 +125,12 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const appliedFocusRef = useRef('');
   const text = query;
 
-  const loadBranch = async (branch = selectedBranch, force = false) => {
+  const loadCheckout = async (force = false) => {
     if (!workspace) return;
     setLoading(true);
     setError('');
     try {
-      const result = await api.loadWorkstreamBranch(workspace.id, { branch: branch || undefined, force });
+      const result = await api.loadWorkstreamCheckout(workspace.id, { force });
       setBranchContext(result);
       setSelectedBranch(result.branch);
       setPlans(result.items);
@@ -139,11 +138,11 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       try {
         const fallbackItems = await api.items(new URLSearchParams({ workspaceId: workspace.id }));
         setBranchContext(null);
-        setSelectedBranch(branch || workspace.baselineBranch);
+        setSelectedBranch(workspace.baselineBranch);
         setPlans(fallbackItems);
         setError('');
       } catch {
-        setError(err instanceof Error ? err.message : 'Failed to load branch snapshot');
+        setError(err instanceof Error ? err.message : 'Failed to load checkout');
         setPlans([]);
       }
     } finally {
@@ -159,7 +158,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       setLoading(false);
       return;
     }
-    void loadBranch(workspace.lastSelectedBranch || workspace.baselineBranch, false);
+    void loadCheckout(false);
   }, [workspace?.id, refreshKey]);
 
   useEffect(() => {
@@ -292,7 +291,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     if (!workspace) return;
     setScanState('Refreshing');
     try {
-      const result = await api.loadWorkstreamBranch(workspace.id, { branch: selectedBranch || undefined, force: true });
+      const result = await api.loadWorkstreamCheckout(workspace.id, { force: true });
       notifyReliabilityChanged();
       setScanState(`${result.itemCount} items indexed`);
       setBranchContext(result);
@@ -306,7 +305,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   const reloadPlans = async () => {
     if (!workspace) return;
-    await loadBranch(selectedBranch, false);
+    await loadCheckout(false);
   };
 
   const moveItem = async (itemId: string, status: ItemStatus) => {
@@ -315,12 +314,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
     const previousStatus = item.status;
     setError('');
-    const materializeConfirmed = confirmSnapshotMaterialization(item, 'status');
-    if (materializeConfirmed === null) return;
     setPlans((current) => applyItemStatus(current, itemId, status));
     setPendingItemIds((current) => new Set(current).add(itemId));
     try {
-      const result = await api.updateStatus(itemId, { status, materializeConfirmed });
+      const result = await api.updateStatus(itemId, { status });
       setPlans((current) => current.map((candidate) => candidate.id === itemId ? { ...candidate, ...result.item } : candidate));
       notifyReliabilityChanged();
       await onWorkspacesChanged();
@@ -544,10 +541,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const applySavedFilter = (saved: SavedFilter) => {
     const value = saved.filters as { filters?: Partial<Filters>; query?: string };
     const nextFilters = { ...emptyFilters, ...(value.filters ?? {}) };
-    if (nextFilters.branches.length > 0) {
-      void loadBranch(nextFilters.branches[0], false);
-      nextFilters.branches = [];
-    }
+    nextFilters.branches = [];
     setFilters(nextFilters);
     setQuery(value.query ?? '');
   };
@@ -577,15 +571,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         </div>
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
-            <BranchSnapshotPicker
-              selectedBranch={selectedBranch}
-              currentCheckoutBranch={currentBranch}
-              sourceMode={sourceMode}
-              branches={branchOptions}
-              ariaLabel="Select board branch"
-              listboxLabel="Board branches"
-              onSelect={(branch) => void loadBranch(branch, false)}
-            />
+            <span className="branch-context-chip"><GitBranch size={14} /><span>Checkout</span><strong>{currentBranch}</strong></span>
             {workspace.sources.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
             ))}
@@ -600,7 +586,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         <button className="secondary" onClick={scan}>
           <RotateCw size={16} /> Refresh
             </button>
-            <button className="primary" onClick={() => setNewPlanOpen(true)} disabled={sourceMode === 'snapshot'}>
+            <button className="primary" onClick={() => setNewPlanOpen(true)}>
               + New Work Item
             </button>
         <span className="scan-state">{scanState}</span>
@@ -1393,16 +1379,6 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
   );
 }
 
-function confirmSnapshotMaterialization(item: ItemSummary | ItemDetail | null, operation: 'file' | 'metadata' | 'status'): boolean | null {
-  if (!item || item.sourceMode !== 'snapshot') return false;
-  const copyTarget = isDocumentationMetadataSource(item.metadataSource)
-    ? `only this ${genericMetadataSourceLabel(item.metadataSource).toLowerCase()} file`
-    : `the whole plan at ${item.itemPath || item.identifier}`;
-  const action = operation === 'status' ? 'move it' : operation === 'metadata' ? 'edit its metadata' : 'edit it';
-  const message = `This item is loaded from branch ${item.branch}. To ${action}, Kode Stream will copy ${copyTarget} into the current checkout branch, then apply your change there.`;
-  return window.confirm(message) ? true : null;
-}
-
 function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
   status: ItemStatus;
   itemCount: number;
@@ -1673,12 +1649,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setAutoSaveState('saving');
     setError('');
     try {
-      const materializeConfirmed = confirmSnapshotMaterialization(plan, 'file');
-      if (materializeConfirmed === null) {
-        setAutoSaveState('idle');
-        return false;
-      }
-      const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash, materializeConfirmed });
+      const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash });
       notifyReliabilityChanged();
       setFile(updated);
       setSavedContent(content);
@@ -1770,9 +1741,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setSavingMetadata(true);
     setError('');
     try {
-      const materializeConfirmed = confirmSnapshotMaterialization(plan, 'metadata');
-      if (materializeConfirmed === null) return;
-      const result = await api.saveMetadata(itemId, { ...metadataDraft, materializeConfirmed });
+      const result = await api.saveMetadata(itemId, metadataDraft);
       notifyReliabilityChanged();
       setPlan(result.item);
       await loadGitStatus(plan.workspaceId);

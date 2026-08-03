@@ -74,14 +74,14 @@ describe('shared api facade', () => {
     });
   });
 
-	it('sends Canvas branch, placement, and viewport contracts', async () => {
+	it('sends checkout-scoped Canvas, placement, and viewport contracts', async () => {
 		const projection = { layout: { id: 'layout-1' }, nodes: [], connections: [], unplaced: [] };
 		const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => projection });
 		vi.stubGlobal('fetch', fetchMock);
-		await api.resolveDefaultCanvas('workspace/one', 'feature/one');
+		await api.resolveDefaultCanvas('workspace/one');
 		await api.patchCanvasPlacements('layout/one', [{ nodeId: 'plan:1', entityRef: { kind: 'plan', workspaceId: 'workspace/one', itemId: '1', itemPath: 'plans/1', branchKey: 'feature/one' }, position: { x: 1, y: 2 }, collapsed: false, expectedRevision: 3 }]);
 		await api.patchCanvasViewport('layout/one', 4, { x: 5, y: 6, zoom: 1.2 });
-		expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/canvas/default', expect.objectContaining({ method: 'POST', body: JSON.stringify({ workspaceId: 'workspace/one', branchKey: 'feature/one' }) }));
+		expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/canvas/default', expect.objectContaining({ method: 'POST', body: JSON.stringify({ workspaceId: 'workspace/one' }) }));
 		expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/canvas/layouts/layout%2Fone/placements', expect.objectContaining({ method: 'PATCH' }));
 		expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/canvas/layouts/layout%2Fone/viewport', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ expectedVersion: 4, viewport: { x: 5, y: 6, zoom: 1.2 } }) }));
 	});

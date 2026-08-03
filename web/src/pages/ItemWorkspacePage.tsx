@@ -43,8 +43,6 @@ import { AISessionLaunchControl } from '../features/ai-session/AISessionLaunchCo
 import { JiraItemPanel } from '../features/jira/JiraItemPanel';
 import { WorkstreamExplorer } from './WorkstreamExplorer';
 import type { ExplorerLocation } from '../features/workstream-explorer/types';
-import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
-import { BranchSnapshotPicker } from '../features/workstream/BranchSnapshotPicker';
 import { E2EQualityPanel } from '../features/e2e-testing/E2EQualityPanel';
 
 type Tab = 'preview' | 'raw' | 'diff';
@@ -52,7 +50,6 @@ type RightPanelTab = 'info' | 'jira' | 'quality';
 type DiffMode = 'review' | 'raw';
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
 type DetailViewMode = 'plan' | 'workspace' | 'git';
-type BranchViewState = { branch: string; currentCheckoutBranch: string; sourceMode: 'working_tree' | 'snapshot'; missing: true };
 type OpenItemFileTab = { id: string; path: string; name: string; editable: boolean };
 
 export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOpenItem, onContentChanged, allowEmbeddedAISessions = true }: { itemId: string; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onOpenItem: (itemId: string) => void; onContentChanged?: () => void | Promise<void>; allowEmbeddedAISessions?: boolean }) {
@@ -78,8 +75,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('info');
   const [error, setError] = useState('');
   const [recoveryHint, setRecoveryHint] = useState('');
-  const [branchLoading, setBranchLoading] = useState(false);
-  const [branchView, setBranchView] = useState<BranchViewState | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(300);
@@ -203,11 +198,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   };
 
   const editor = useFileEditorSession({
-    save: (targetFile, content) => {
-      const materializeConfirmed = confirmSnapshotMaterialization(plan, 'file');
-      if (materializeConfirmed === null) throw new Error('Snapshot materialization canceled');
-      return api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash, materializeConfirmed });
-    },
+    save: (targetFile, content) => api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash }),
     onSaved: () => {
       scheduleFileChangeRefresh();
       notifyReliabilityChanged();
@@ -223,7 +214,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   useEffect(() => {
     setError('');
     setRecoveryHint('');
-    setBranchView(null);
     editor.open(null);
     setOpenTabs([]);
     setActiveTabId('');
@@ -438,58 +428,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const visibleWarnings = useMemo(() => visibleItemWarnings(plan), [plan]);
   const fileStateByPath = useMemo(() => buildFileStateMap(plan, gitStatus, file, dirtyFile), [plan, gitStatus, file, dirtyFile]);
   const explorerWorkspaces = useMemo(() => workspaceConfig ? [workspaceConfig] : [], [workspaceConfig]);
-  const selectedDetailBranch = branchView?.branch ?? plan?.branch ?? '';
-  const detailSourceMode = branchView?.sourceMode ?? plan?.sourceMode ?? 'working_tree';
-  const itemWorkspaceBranches = useWorkspaceBranches(explorerWorkspaces);
-  const currentCheckoutBranch = gitStatus?.branch || itemWorkspaceBranches.states[workspaceConfig?.id ?? '']?.current || workspaceConfig?.baselineBranch || '';
-  const branchOptions = useMemo(() => unique([
-    ...(workspaceConfig ? itemWorkspaceBranches.states[workspaceConfig.id]?.branches ?? [] : []),
-    currentCheckoutBranch,
-    workspaceConfig?.baselineBranch ?? '',
-    selectedDetailBranch
-  ]), [currentCheckoutBranch, itemWorkspaceBranches.states, selectedDetailBranch, workspaceConfig]);
-  const switchItemBranch = async (branch: string) => {
-    if (!workspaceConfig || !plan || branch === selectedDetailBranch) return;
-    if (branch === plan.branch) {
-      setBranchView(null);
-      setError('');
-      setRecoveryHint('');
-      return;
-    }
-    if (dirtyMetadata) {
-      setError('Save metadata changes before loading another branch snapshot.');
-      return;
-    }
-    if (dirtyFile && !(await editor.saveNow())) return;
-    setBranchLoading(true);
-    setError('');
-    setRecoveryHint('');
-    try {
-      const result = await api.loadWorkstreamBranch(workspaceConfig.id, { branch });
-      const matched = matchingBranchItem(result.items, plan);
-      if (!matched) {
-        editor.open(null);
-        setFiles([]);
-        setDiff('');
-        setMatchContext(null);
-        setSelectedDirectoryPath('');
-        setSelectedTreeNode(null);
-        setBranchView({
-          branch: result.branch || branch,
-          currentCheckoutBranch: result.currentCheckoutBranch,
-          sourceMode: result.sourceMode,
-          missing: true
-        });
-        return;
-      }
-      setBranchView(null);
-      onOpenItem(matched.id);
-    } catch (caught) {
-      showOperationError(caught, 'Branch snapshot failed to load');
-    } finally {
-      setBranchLoading(false);
-    }
-  };
+  const currentCheckoutBranch = gitStatus?.branch || plan?.branch || workspaceConfig?.baselineBranch || '';
   const gridStyle = {
     '--left-panel-width': `${leftCollapsed ? 44 : leftWidth}px`,
     '--right-panel-width': `${rightCollapsed ? 44 : rightWidth}px`,
@@ -743,9 +682,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     setSavingMetadata(true);
     setError('');
     try {
-      const materializeConfirmed = confirmSnapshotMaterialization(plan, 'metadata');
-      if (materializeConfirmed === null) return;
-      const result = await api.saveMetadata(itemId, { ...metadataDraft, materializeConfirmed });
+      const result = await api.saveMetadata(itemId, metadataDraft);
       setPlan(result.item);
       if (plan) await loadGitStatus(plan.workspaceId);
       await onContentChanged?.();
@@ -1157,20 +1094,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           <div className="workspace-item-path" aria-label="Item location">
             <span className="workspace-item-path-segment">{plan?.scope ?? '...'}</span>
             <span className="workspace-item-path-separator">/</span>
-            {workspaceConfig ? (
-              <BranchSnapshotPicker
-                selectedBranch={selectedDetailBranch}
-                currentCheckoutBranch={currentCheckoutBranch}
-                sourceMode={detailSourceMode}
-                branches={branchOptions}
-                disabled={branchLoading || itemWorkspaceBranches.states[workspaceConfig.id]?.switching}
-                ariaLabel="Select item branch"
-                listboxLabel="Item branches"
-                onSelect={(branch) => void switchItemBranch(branch)}
-              />
-            ) : (
-              <span className="workspace-item-path-segment">{plan?.branch ?? '...'}</span>
-            )}
+            <span className="workspace-item-path-segment">Checkout: {currentCheckoutBranch || '...'}</span>
             <span className="workspace-item-path-separator">/</span>
             <span className="workspace-item-path-segment">{plan?.identifier ?? '...'}</span>
           </div>
@@ -1190,13 +1114,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
         </div>
       </header>
       {aiLaunchMessage && <div className="operation-notice" role="status">{aiLaunchMessage}</div>}
-      {branchView?.missing ? (
-        <section className="workspace-branch-empty" role="status">
-          <FileText size={28} />
-          <strong>{plan?.identifier ?? 'This item'} is not on {branchView.branch}</strong>
-          <span>The current checkout branch is {branchView.currentCheckoutBranch}. The selected branch was loaded as a snapshot, but no matching item exists there.</span>
-        </section>
-      ) : plan && workspaceConfig && detailSourceMode !== 'snapshot' ? (
+      {plan && workspaceConfig ? (
         <WorkstreamExplorer
           embedded
           showModeSelector={false}
@@ -1640,26 +1558,6 @@ function parentDirectoryPath(path: string): string {
   const normalized = path.replace(/\/+$/, '');
   const separator = normalized.lastIndexOf('/');
   return separator >= 0 ? normalized.slice(0, separator) : '';
-}
-
-function matchingBranchItem(items: { id: string; itemPath?: string; scope?: string; identifier?: string }[], current: ItemDetail) {
-  const currentPath = normalizePath(current.itemPath ?? '');
-  return items.find((item) => currentPath && normalizePath(item.itemPath ?? '') === currentPath)
-    ?? items.find((item) => item.scope === current.scope && item.identifier === current.identifier);
-}
-
-function confirmSnapshotMaterialization(item: ItemDetail | null, operation: 'file' | 'metadata'): boolean | null {
-  if (!item || item.sourceMode !== 'snapshot') return false;
-  const copyTarget = isDocumentationMetadataSource(item.metadataSource)
-    ? `only this ${metadataSourceLabel(item.metadataSource).toLowerCase()} file`
-    : `the whole plan at ${item.itemPath || item.identifier}`;
-  const action = operation === 'metadata' ? 'edit its metadata' : 'edit it';
-  const message = `This item is loaded from branch ${item.branch}. To ${action}, Kode Stream will copy ${copyTarget} into the current checkout branch, then apply your change there.`;
-  return window.confirm(message) ? true : null;
-}
-
-function unique(values: string[]): string[] {
-  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
 function toWorkspaceRelativePath(workspacePath: string | undefined, absolutePath: string): string {

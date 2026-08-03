@@ -17,6 +17,7 @@ import type {
   CloudAgent,
   AuditEvent,
   WorkstreamBranchLoadResult,
+	ReviewedPlanImportInput,
   BranchCreateInput,
   BranchSwitchInput,
 	CanvasPlacementPatch,
@@ -155,7 +156,7 @@ async function request<T>(path: string, options?: RequestInit, dedupe = options?
 }
 
 export const api = {
-	resolveDefaultCanvas: (workspaceId: string, branchKey?: string) => request<CanvasProjection>('/api/canvas/default', { method: 'POST', body: JSON.stringify({ workspaceId, branchKey }) }, false),
+	resolveDefaultCanvas: (workspaceId: string) => request<CanvasProjection>('/api/canvas/default', { method: 'POST', body: JSON.stringify({ workspaceId }) }, false),
 	canvasLayout: (layoutId: string) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}`, undefined, false),
 	patchCanvasPlacements: (layoutId: string, patches: CanvasPlacementPatch[]) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/placements`, { method: 'PATCH', body: JSON.stringify({ patches }) }, false),
 	patchCanvasViewport: (layoutId: string, expectedVersion: number, viewport: CanvasViewport) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/viewport`, { method: 'PATCH', body: JSON.stringify({ expectedVersion, viewport }) }, false),
@@ -316,6 +317,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(input)
     }, true).then(normalizeWorkstreamBranchLoadResult),
+	loadWorkstreamCheckout: (workspaceId: string, input: { force?: boolean } = {}) =>
+		request<WorkstreamBranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/workstream/checkout`, {
+			method: 'POST', body: JSON.stringify(input)
+		}, true).then(normalizeWorkstreamBranchLoadResult),
+	loadBranchReview: (workspaceId: string, input: { branch: string; force?: boolean }) =>
+		request<WorkstreamBranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/reviews/branch`, {
+			method: 'POST', body: JSON.stringify(input)
+		}, true).then(normalizeWorkstreamBranchLoadResult),
+	importReviewedPlan: (workspaceId: string, input: ReviewedPlanImportInput) =>
+		request<WriteResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/reviews/import`, {
+			method: 'POST', body: JSON.stringify(input)
+		}),
   workspaceHealth: (workspaceId: string) => request<WorkspaceHealth>(`/api/workspaces/${workspaceId}/health`).then(normalizeWorkspaceHealth),
   sourceStructure: (workspaceId: string, directory: string) =>
     request<SourceSettingsResult>(`/api/workspaces/${workspaceId}/source-structure?directory=${encodeURIComponent(directory)}`),

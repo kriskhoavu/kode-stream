@@ -113,7 +113,7 @@ export function App() {
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>
           <NavButton active={route.name === 'workstream'} onClick={() => navigate({ name: 'workstream' })} icon={<WorkstreamIcon size={18} />} label="Workstream" />
-					{!extensionSurface && <NavButton active={route.name === 'canvas'} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id, branch: activeRepo?.lastSelectedBranch || activeRepo?.baselineBranch } })} icon={<Workflow size={18} />} label="Canvas" />}
+					{!extensionSurface && <NavButton active={route.name === 'canvas'} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })} icon={<Workflow size={18} />} label="Canvas" />}
           <NavButton active={route.name === 'knowledge'} onClick={() => navigate({ name: 'knowledge' })} icon={<BookOpen size={18} />} label="Knowledge" />
         </div>
         <div className="workspace-list">
@@ -272,7 +272,7 @@ export function App() {
       <nav className="bottom-nav">
         <button className={route.name === 'workstream' ? 'active' : ''} onClick={() => navigate({ name: 'workstream' })}><WorkstreamIcon size={18} />Workstream</button>
         <button className={route.name === 'knowledge' ? 'active' : ''} onClick={() => navigate({ name: 'knowledge' })}><BookOpen size={18} />Knowledge</button>
-		{!extensionSurface && <button className={route.name === 'canvas' ? 'active' : ''} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id, branch: activeRepo?.lastSelectedBranch || activeRepo?.baselineBranch } })}><Workflow size={18} />Canvas</button>}
+		{!extensionSurface && <button className={route.name === 'canvas' ? 'active' : ''} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })}><Workflow size={18} />Canvas</button>}
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}><Settings size={18} />Settings</button>
       </nav>
