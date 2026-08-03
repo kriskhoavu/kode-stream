@@ -34,6 +34,9 @@ review and opens Workstream.
 - Give each review load a monotonically increasing request identity tied to its workspace, requested branch, and
   checkout context. Only the current identity may update the review, error, selected plan, or loading state, so a
   superseded response cannot expose actions for a branch different from the route and selector.
+- Treat the reviewed commit as part of the selected plan's file-loading identity. When refresh advances a branch while
+  preserving the stable item ID, clear and reload the file tree and preview so every visible field comes from the new
+  commit.
 
 ## Synchronization
 

@@ -67,3 +67,11 @@ sourceCount: 0
 - Pages created: none
 - Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-04] correction | PM-038 Commit-Consistent File Preview
+<!-- chunkId: wiki-ingest-log-pm-038-commit-file-preview-correction -->
+<!-- keywords: PM-038, reviewed commit, file preview, stable item ID -->
+
+- Pages created: none
+- Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
+- Files conformed: 0

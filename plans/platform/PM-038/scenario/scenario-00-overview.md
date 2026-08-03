@@ -65,5 +65,7 @@ User chooses Switch workspace to this branch
   newly operational checkout index.
 - When review branch requests overlap, only the newest workspace, branch, and checkout context may update the page or
   enable review actions; superseded responses are ignored regardless of completion order.
+- When refresh advances the reviewed commit, the selected plan's file tree and preview reload even if its item ID is
+  unchanged, so plan metadata and file content always describe the same commit.
 - Snapshot mutation payloads return `snapshot_read_only` and never trigger a copy.
 - External Git checkout changes are detected when the application regains focus.

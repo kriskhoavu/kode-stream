@@ -97,7 +97,7 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
       if (active) setFileLoading(false);
     });
     return () => { active = false; };
-  }, [selectedItemId]);
+  }, [selectedItemId, review?.commit]);
 
   const openFile = async (node: FileNode) => {
     if (!selectedItemId || node.type !== 'file') return;

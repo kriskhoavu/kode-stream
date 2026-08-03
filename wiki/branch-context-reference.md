@@ -56,7 +56,10 @@ validation, commit-pinned scanning, and branch index replacement. A refresh ther
 a branch that becomes operational during the scan. The review UI disables switching while its initial load or refresh
 is pending. Each review load also has a monotonically increasing identity bound to its workspace, requested branch,
 and checkout context. Only the current request may publish review data, errors, plan selection, or loading completion;
-superseded responses cannot make actions target a branch different from the route and selector.
+superseded responses cannot make actions target a branch different from the route and selector. The file tree and
+preview are keyed by both selected item ID and reviewed commit. If refresh advances a branch while the stable item ID
+remains unchanged, the frontend clears and reloads those files so the header, plan metadata, and preview stay on one
+commit.
 
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->

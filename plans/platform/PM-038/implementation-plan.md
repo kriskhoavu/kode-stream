@@ -20,6 +20,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | R3    | Routed import and index consistency             | Backend    | Complete |
 | R4    | Review serialization and transactional index    | Full stack | Complete |
 | R5    | Latest-request Branch Review state              | Frontend   | Complete |
+| R6    | Commit-consistent reviewed file preview         | Frontend   | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -166,3 +167,16 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx && npm test -- --run`
 
 **Commit:** `PM-038: Ignore superseded branch review responses`
+
+## Phase R6: Commit-Consistent Reviewed File Preview
+
+**Deliverables:**
+
+- [x] Include the reviewed commit in the selected plan's file-loading identity.
+- [x] Clear and reload the file tree and preview when refresh advances the commit with a stable item ID.
+- [x] Add regression coverage returning different file content for the same item ID after refresh.
+- [x] Synchronize the frontend design and durable commit-consistency reference.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx && npm test -- --run`
+
+**Commit:** `PM-038: Reload reviewed files when commit advances`

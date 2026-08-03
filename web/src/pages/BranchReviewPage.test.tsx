@@ -12,7 +12,7 @@ vi.mock('../lib/api', () => ({ api: { loadBranchReview: mocks.loadBranchReview, 
 vi.mock('../features/workstream-explorer/useWorkspaceBranches', () => ({
   useWorkspaceBranches: () => ({ states: { 'ws-1': { workspaceId: 'ws-1', current: 'main', branches: ['main', 'feature/review', 'feature/slow', 'feature/fast'], loading: false, switching: false, error: '', recoveryHint: '' } }, switchBranch: mocks.switchBranch })
 }));
-vi.mock('../features/content-viewer/ContentViewer', () => ({ ContentViewer: ({ file }: { file: FileContent }) => <div>Previewing {file.path}</div> }));
+vi.mock('../features/content-viewer/ContentViewer', () => ({ ContentViewer: ({ file }: { file: FileContent }) => <><div>Previewing {file.path}</div><div>{file.content}</div></> }));
 
 describe('BranchReviewPage', () => {
   beforeEach(() => {
@@ -69,6 +69,27 @@ describe('BranchReviewPage', () => {
     expect(mocks.switchBranch).not.toHaveBeenCalled();
     finishRefresh(reviewResult());
     await waitFor(() => expect(switchButton).toBeEnabled());
+  });
+
+  it('reloads the same item files when refresh advances the reviewed commit', async () => {
+    mocks.loadBranchReview
+      .mockResolvedValueOnce(reviewResult({ commit: 'oldcommit123456' }))
+      .mockResolvedValueOnce(reviewResult({ commit: 'newcommit654321' }));
+    mocks.file
+      .mockResolvedValueOnce(file('# Content from old commit'))
+      .mockResolvedValueOnce(file('# Content from new commit'));
+    renderReview();
+    expect(await screen.findByText('# Content from old commit')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh snapshot' }));
+
+    expect(await screen.findByText('newcommi')).toBeInTheDocument();
+    expect(await screen.findByText('# Content from new commit')).toBeInTheDocument();
+    expect(screen.queryByText('# Content from old commit')).not.toBeInTheDocument();
+    expect(mocks.files).toHaveBeenCalledTimes(2);
+    expect(mocks.files).toHaveBeenNthCalledWith(1, 'snapshot-1');
+    expect(mocks.files).toHaveBeenNthCalledWith(2, 'snapshot-1');
+    expect(mocks.file).toHaveBeenCalledTimes(2);
   });
 
   it('ignores a superseded branch response that resolves after the current request', async () => {
@@ -144,6 +165,6 @@ function reviewResultFor(branch: string, identifier: string): WorkstreamBranchLo
   });
 }
 
-function file(): FileContent {
-  return { id: 'README_md', path: 'README.md', content: '# PM-038', language: 'markdown', hash: 'hash', kind: 'markdown', sizeBytes: 8, editable: false };
+function file(content = '# PM-038'): FileContent {
+  return { id: 'README_md', path: 'README.md', content, language: 'markdown', hash: 'hash', kind: 'markdown', sizeBytes: content.length, editable: false };
 }
