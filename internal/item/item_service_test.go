@@ -294,7 +294,7 @@ func TestSnapshotEditsAreReadOnly(t *testing.T) {
 	if string(data) != "# Existing\n" {
 		t.Fatalf("existing checkout file was overwritten: %q", data)
 	}
-	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ItemID: "snapshot-item"})
+	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: "snapshot-item"})
 	if err == nil || !strings.Contains(err.Error(), "already exist") {
 		t.Fatalf("expected import conflict, got %v", err)
 	}
@@ -328,7 +328,17 @@ func TestImportReviewedPlanCopiesPinnedStructuredPlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := New(reg, idx, fileaccess.New(), itemwriter.New(fileaccess.New(), scanner.New(git), idx, reg), git)
-	result, err := service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ItemID: item.ID})
+	itemGitRun(t, root, "branch", "other")
+	itemGitRun(t, root, "switch", "other")
+	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+	if !errors.Is(err, ErrReviewCheckoutMoved) {
+		t.Fatalf("expected checkout change rejection, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "plans/platform/PM-038")); !os.IsNotExist(statErr) {
+		t.Fatalf("changed-checkout import created target, err=%v", statErr)
+	}
+	itemGitRun(t, root, "switch", "main")
+	result, err := service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,6 +352,82 @@ func TestImportReviewedPlanCopiesPinnedStructuredPlan(t *testing.T) {
 	current, _ := git.CurrentBranch(root)
 	if current != "main" {
 		t.Fatalf("import switched checkout to %q", current)
+	}
+}
+
+func TestImportReviewedPlanRejectsOccupiedTargetRootWithoutMatchingFiles(t *testing.T) {
+	root := newItemGitRepo(t)
+	writeItemGitFile(t, root, "plans/.keep", "")
+	itemGitCommit(t, root, "main")
+	itemGitRun(t, root, "switch", "-c", "feature")
+	writeItemGitFile(t, root, "plans/platform/PM-038/README.md", "# PM-038: Review import\n")
+	writeItemGitFile(t, root, "plans/platform/PM-038/plan.yaml", "plan:\n  status: draft\n")
+	itemGitCommit(t, root, "reviewed plan")
+	itemGitRun(t, root, "switch", "main")
+	writeItemGitFile(t, root, "plans/platform/PM-038/unrelated.txt", "preserve me\n")
+
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(filepath.Join(dir, "items.yaml"))
+	ref, commit, err := git.ResolveBranch(root, "feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "review-item", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name, Branch: "feature", BranchRef: ref, Commit: commit, SourceMode: "snapshot", Scope: "platform", Identifier: "PM-038", MetadataSource: "plan.yaml", ItemPath: "plans/platform/PM-038"}}
+	if err := idx.ReplaceWorkspaceBranch(workspace.ID, "feature", []models.ItemDetail{item}, models.BranchScanMetadata{Branch: "feature", Commit: commit, SourceMode: "snapshot", ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	service := New(reg, idx, fileaccess.New(), itemwriter.New(fileaccess.New(), scanner.New(git), idx, reg), git)
+	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+	if err == nil || !strings.Contains(err.Error(), "target already exists") {
+		t.Fatalf("expected occupied root rejection, got %v", err)
+	}
+	data, readErr := os.ReadFile(filepath.Join(root, "plans/platform/PM-038/unrelated.txt"))
+	if readErr != nil || string(data) != "preserve me\n" {
+		t.Fatalf("unrelated target content=%q err=%v", data, readErr)
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "plans/platform/PM-038/README.md")); !os.IsNotExist(statErr) {
+		t.Fatalf("import merged into occupied root, err=%v", statErr)
+	}
+	if err := os.Remove(filepath.Join(root, "plans/platform/PM-038/unrelated.txt")); err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+	if err == nil || !strings.Contains(err.Error(), "target already exists") {
+		t.Fatalf("expected empty root rejection, got %v", err)
+	}
+}
+
+func TestSnapshotImportReadsCapturedCommitAfterBranchAdvances(t *testing.T) {
+	root := newItemGitRepo(t)
+	writeItemGitFile(t, root, "plans/.keep", "")
+	itemGitCommit(t, root, "main")
+	itemGitRun(t, root, "switch", "-c", "feature")
+	writeItemGitFile(t, root, "plans/platform/PM-038/README.md", "# Captured\n")
+	itemGitCommit(t, root, "captured snapshot")
+	git := gitadapter.New()
+	ref, commit, err := git.ResolveBranch(root, "feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeItemGitFile(t, root, "plans/platform/PM-038/README.md", "# Advanced\n")
+	itemGitCommit(t, root, "advance branch")
+	itemGitRun(t, root, "switch", "main")
+
+	writer := itemwriter.New(fileaccess.New(), scanner.New(git), nil, nil)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"plans"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{Branch: "feature", BranchRef: ref, Commit: commit, SourceMode: "snapshot", MetadataSource: "plan.yaml", ItemPath: "plans/platform/PM-038"}}
+	if err := writer.MaterializeSnapshotItem(workspace, item, ""); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "plans/platform/PM-038/README.md"))
+	if err != nil || string(data) != "# Captured\n" {
+		t.Fatalf("imported content=%q err=%v", data, err)
 	}
 }
 
@@ -452,6 +538,23 @@ func TestSnapshotFileContentResolvesNestedDocsPath(t *testing.T) {
 	}
 	if !strings.Contains(content.Content, "Challenge") {
 		t.Fatalf("content = %q", content.Content)
+	}
+	writeItemGitFile(t, root, "docs/a12/a12-challenges-in-discovery-epsap.md", "# Advanced\n")
+	writeItemGitFile(t, root, "docs/a12/new-after-review.md", "# New\n")
+	itemGitCommit(t, root, "advance reviewed branch")
+	pinnedTree, err := service.Files("snapshot-docs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pinnedTree) != 1 || len(pinnedTree[0].Children) != 2 {
+		t.Fatalf("snapshot tree followed mutable branch: %#v", pinnedTree)
+	}
+	pinnedContent, err := service.FileContent("snapshot-docs", tree[0].Children[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(pinnedContent.Content, "Challenge") || strings.Contains(pinnedContent.Content, "Advanced") {
+		t.Fatalf("snapshot content followed mutable branch: %q", pinnedContent.Content)
 	}
 }
 

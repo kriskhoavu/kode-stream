@@ -707,6 +707,7 @@ export interface WorkstreamBranchLoadResult {
 export interface ReviewedPlanImportInput {
 	sourceBranch: string;
 	expectedCommit: string;
+	expectedCheckoutBranch: string;
 	itemId: string;
 }
 

@@ -26,13 +26,15 @@ review and opens Workstream.
 - Banner: **Read-only committed snapshot** with no working-tree status implication.
 - Actions: **Refresh snapshot**, **Import plan into checkout**, **Switch workspace to this branch**, and **Exit review**.
 - Files render through the existing safe Markdown/content viewer without editor controls.
-- Import shows source, commit, destination checkout, and target directory before confirmation.
+- Import shows source, commit, destination checkout, and target directory before confirmation and sends that displayed
+  checkout as the expected import destination.
 - Dirty checkout switching uses the existing guarded confirmation flow.
 
 ## Synchronization
 
 - The application owns one checkout context per active workspace.
 - Successful checkout refreshes workspaces and increments the content refresh key once.
-- Focus and visibility refresh compare the backend checkout with the stored context and invalidate content when changed.
+- Focus and visibility refresh reload the workspace branch inventory, compare the backend checkout with the stored
+  context, and invalidate content when changed.
 - Operational routes remove snapshot branch parameters and normalize legacy Canvas URLs.
 - An item missing after checkout returns to Workstream with a concise message instead of showing another branch's item.

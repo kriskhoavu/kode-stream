@@ -730,9 +730,10 @@ type WorkstreamBranchLoadInput struct {
 }
 
 type ReviewedPlanImportInput struct {
-	SourceBranch   string `json:"sourceBranch" yaml:"sourceBranch"`
-	ExpectedCommit string `json:"expectedCommit" yaml:"expectedCommit"`
-	ItemID         string `json:"itemId" yaml:"itemId"`
+	SourceBranch           string `json:"sourceBranch" yaml:"sourceBranch"`
+	ExpectedCommit         string `json:"expectedCommit" yaml:"expectedCommit"`
+	ExpectedCheckoutBranch string `json:"expectedCheckoutBranch" yaml:"expectedCheckoutBranch"`
+	ItemID                 string `json:"itemId" yaml:"itemId"`
 }
 
 type WorkstreamBranchLoadResult struct {

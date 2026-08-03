@@ -64,4 +64,17 @@ describe('useWorkspaceBranches', () => {
     expect(api.switchBranch).toHaveBeenNthCalledWith(2, 'ws', { name: 'feature/a', confirm: true });
     await waitFor(() => expect(result.current.states.ws?.current).toBe('feature/a'));
   });
+
+  it('refreshes checkout state when the application regains focus', async () => {
+    vi.spyOn(api, 'workspaceBranches')
+      .mockResolvedValueOnce({ workspaceId: 'ws', current: 'main', branches: ['feature/a', 'main'] })
+      .mockResolvedValueOnce({ workspaceId: 'ws', current: 'feature/a', branches: ['feature/a', 'main'] });
+    const { result } = renderHook(() => useWorkspaceBranches([workspace]));
+    await waitFor(() => expect(result.current.states.ws?.current).toBe('main'));
+
+    act(() => window.dispatchEvent(new FocusEvent('focus')));
+
+    await waitFor(() => expect(result.current.states.ws?.current).toBe('feature/a'));
+    expect(api.workspaceBranches).toHaveBeenCalledTimes(2);
+  });
 });

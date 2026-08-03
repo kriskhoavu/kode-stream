@@ -106,7 +106,7 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
     setImporting(true);
     setError('');
     try {
-      const result = await api.importReviewedPlan(workspace.id, { sourceBranch: review.branch, expectedCommit: review.commit, itemId: selectedItem.id });
+      const result = await api.importReviewedPlan(workspace.id, { sourceBranch: review.branch, expectedCommit: review.commit, expectedCheckoutBranch: review.currentCheckoutBranch, itemId: selectedItem.id });
       onImported(result.item.id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Reviewed plan import failed');

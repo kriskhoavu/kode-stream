@@ -280,9 +280,13 @@ func (s *Scanner) parseItem(request ScanRequest, reader SourceReader, branch, sc
 	relForGit := filepath.ToSlash(relItemPath)
 	updated := time.Time{}
 	author := ""
-	if request.BranchRef != "" {
-		updated = s.git.LastUpdateAtRef(workspace.Path, request.BranchRef, relForGit)
-		author = s.git.LastAuthorAtRef(workspace.Path, request.BranchRef, relForGit)
+	gitMetadataRef := request.BranchRef
+	if request.SourceMode == "snapshot" && request.Commit != "" {
+		gitMetadataRef = request.Commit
+	}
+	if gitMetadataRef != "" {
+		updated = s.git.LastUpdateAtRef(workspace.Path, gitMetadataRef, relForGit)
+		author = s.git.LastAuthorAtRef(workspace.Path, gitMetadataRef, relForGit)
 	} else {
 		updated = s.git.LastUpdate(workspace.Path, relForGit)
 		author = s.git.LastAuthor(workspace.Path, relForGit)

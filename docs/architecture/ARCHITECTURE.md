@@ -244,14 +244,15 @@ Load an operational page
 
 Open Branch Review
   -> resolve a non-checkout branch to a pinned ref and commit
-  -> scan or reuse that branch with the Git-tree reader
+  -> use the commit SHA for every Git-tree scan and file read; retain the ref as metadata
   -> expose plans and committed files without mutation or execution actions
   -> keep the checkout and operational routes unchanged
 
 Import one reviewed structured plan
   -> re-resolve and require the pinned source commit
-  -> reject an existing destination or unsafe path
-  -> copy into the current checkout and refresh its index
+  -> re-resolve and require the checkout confirmed by the user
+  -> reject an existing destination item root or unsafe path
+  -> copy into the confirmed checkout and refresh its index
 ```
 
 ### Write

@@ -104,21 +104,37 @@ func (w *Writer) UpdateStatus(workspace models.WorkspaceConfig, item models.Item
 }
 
 func (w *Writer) MaterializeSnapshotItem(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) error {
+	return w.materializeSnapshotItem(workspace, item, fileID, nil)
+}
+
+func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string, beforeWrite func() error) error {
 	if item.SourceMode != "snapshot" {
 		return nil
 	}
-	if strings.TrimSpace(item.BranchRef) == "" {
-		return fmt.Errorf("snapshot branch reference is missing")
+	if strings.TrimSpace(item.Commit) == "" {
+		return fmt.Errorf("snapshot commit is missing")
 	}
-	reader := scanner.NewGitTreeSourceReader(workspace.Path, item.BranchRef, gitadapter.New())
+	reader := scanner.NewGitTreeSourceReader(workspace.Path, item.Commit, gitadapter.New())
 	scopeRoot := item.ItemPath
 	copyOneFile := isDocumentationRoot(item)
+	var targetItemRoot string
 	if copyOneFile {
 		relPath := materializeRelativeFile(item, fileID)
 		if relPath == "" {
 			return fmt.Errorf("snapshot file is not part of the indexed item")
 		}
 		scopeRoot = filepath.ToSlash(filepath.Join(item.ItemPath, relPath))
+	} else {
+		var err error
+		targetItemRoot, err = safeJoin(workspace.Path, item.ItemPath)
+		if err != nil {
+			return err
+		}
+		if _, err := os.Lstat(targetItemRoot); err == nil {
+			return fmt.Errorf("import target already exists in the current checkout branch")
+		} else if !os.IsNotExist(err) {
+			return err
+		}
 	}
 	var files []string
 	if copyOneFile {
@@ -156,6 +172,22 @@ func (w *Writer) MaterializeSnapshotItem(workspace models.WorkspaceConfig, item 
 			return err
 		}
 	}
+	if beforeWrite != nil {
+		if err := beforeWrite(); err != nil {
+			return err
+		}
+	}
+	if !copyOneFile {
+		if err := os.MkdirAll(filepath.Dir(targetItemRoot), 0o755); err != nil {
+			return err
+		}
+		if err := os.Mkdir(targetItemRoot, 0o755); err != nil {
+			if os.IsExist(err) {
+				return fmt.Errorf("import target already exists in the current checkout branch")
+			}
+			return err
+		}
+	}
 	for _, rel := range files {
 		if !isInsideConfiguredSource(workspace, rel) {
 			return fmt.Errorf("materialized path is outside configured sources")
@@ -178,14 +210,14 @@ func (w *Writer) MaterializeSnapshotItem(workspace models.WorkspaceConfig, item 
 	return nil
 }
 
-func (w *Writer) ImportSnapshotPlan(workspace models.WorkspaceConfig, item models.ItemDetail) (models.WriteResult, error) {
+func (w *Writer) ImportSnapshotPlan(workspace models.WorkspaceConfig, item models.ItemDetail, beforeWrite func() error) (models.WriteResult, error) {
 	if item.SourceMode != "snapshot" {
 		return models.WriteResult{}, fmt.Errorf("reviewed plan must come from a snapshot")
 	}
 	if isDocumentationRoot(item) {
 		return models.WriteResult{}, fmt.Errorf("only structured plans can be imported")
 	}
-	if err := w.MaterializeSnapshotItem(workspace, item, ""); err != nil {
+	if err := w.materializeSnapshotItem(workspace, item, "", beforeWrite); err != nil {
 		return models.WriteResult{}, err
 	}
 	return w.refresh(workspace, item.ItemPath)

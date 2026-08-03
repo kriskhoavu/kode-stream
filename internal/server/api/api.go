@@ -1060,6 +1060,8 @@ func (a *API) importReviewedPlan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "item not found")
 	case errors.Is(err, appitem.ErrReviewCommitMoved):
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "review_commit_moved"})
+	case errors.Is(err, appitem.ErrReviewCheckoutMoved):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "review_checkout_moved"})
 	case errors.Is(err, appitem.ErrReviewedPlan):
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "reviewed_plan_required"})
 	case err != nil && strings.Contains(strings.ToLower(err.Error()), "already exist"):

@@ -39,6 +39,19 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
     workspaces.forEach((workspace) => void load(workspace));
   }, [load, workspaceKey]);
 
+  useEffect(() => {
+    const refreshBranches = () => workspaces.forEach((workspace) => void load(workspace));
+    const refreshVisibleBranches = () => {
+      if (document.visibilityState === 'visible') refreshBranches();
+    };
+    window.addEventListener('focus', refreshBranches);
+    document.addEventListener('visibilitychange', refreshVisibleBranches);
+    return () => {
+      window.removeEventListener('focus', refreshBranches);
+      document.removeEventListener('visibilitychange', refreshVisibleBranches);
+    };
+  }, [load, workspaceKey]);
+
   const switchBranch = useCallback(async (workspace: WorkspaceConfig, branch: string) => {
     const current = states[workspace.id];
     if (!branch || branch === current?.current || current?.switching) return branch === current?.current;

@@ -21,9 +21,10 @@ import (
 )
 
 var (
-	ErrSnapshotReadOnly  = errors.New("snapshot item is read-only; import it into the checkout before editing")
-	ErrReviewCommitMoved = errors.New("reviewed branch changed since it was loaded")
-	ErrReviewedPlan      = errors.New("reviewed snapshot plan is required")
+	ErrSnapshotReadOnly    = errors.New("snapshot item is read-only; import it into the checkout before editing")
+	ErrReviewCommitMoved   = errors.New("reviewed branch changed since it was loaded")
+	ErrReviewCheckoutMoved = errors.New("checkout changed since branch review was loaded")
+	ErrReviewedPlan        = errors.New("reviewed snapshot plan is required")
 )
 
 type ListInput struct {
@@ -141,8 +142,21 @@ func (s *Service) ImportReviewedPlan(input models.ReviewedPlanImportInput) (mode
 	if commit != expectedCommit {
 		return models.WriteResult{}, ErrReviewCommitMoved
 	}
+	expectedCheckout := strings.TrimSpace(input.ExpectedCheckoutBranch)
+	if expectedCheckout == "" {
+		return models.WriteResult{}, ErrReviewCheckoutMoved
+	}
 	item.BranchRef = ref
-	return s.writer.ImportSnapshotPlan(workspace, item)
+	return s.writer.ImportSnapshotPlan(workspace, item, func() error {
+		currentCheckout, err := s.git.CurrentBranch(workspace.Path)
+		if err != nil {
+			return err
+		}
+		if currentCheckout != expectedCheckout {
+			return ErrReviewCheckoutMoved
+		}
+		return nil
+	})
 }
 
 func (s *Service) RevertFile(id, fileID string, validatePaths func(models.WorkspaceConfig, []string) error) (models.ScanResult, error) {
@@ -418,7 +432,11 @@ func (s *Service) workingTreeItem(workspace models.WorkspaceConfig, item models.
 }
 
 func (s *Service) snapshotFiles(workspace models.WorkspaceConfig, item models.ItemDetail) ([]models.FileNode, error) {
-	entries, err := s.git.TreeWalk(workspace.Path, item.BranchRef, item.ItemPath)
+	commit, err := snapshotCommit(item)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := s.git.TreeWalk(workspace.Path, commit, item.ItemPath)
 	if err != nil {
 		return nil, err
 	}
@@ -438,6 +456,10 @@ func (s *Service) snapshotFiles(workspace models.WorkspaceConfig, item models.It
 }
 
 func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) (models.FileContent, error) {
+	commit, err := snapshotCommit(item)
+	if err != nil {
+		return models.FileContent{}, err
+	}
 	candidates := []string{}
 	if relPath := fileIDToRelativePath(item, fileID); relPath != "" {
 		candidates = append(candidates, relPath)
@@ -476,7 +498,7 @@ func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item mod
 		lastErr error
 	)
 	for _, candidate := range uniqueCandidates {
-		attempt, readErr := s.git.TreeReadFile(workspace.Path, item.BranchRef, filepath.ToSlash(filepath.Join(item.ItemPath, candidate)))
+		attempt, readErr := s.git.TreeReadFile(workspace.Path, commit, filepath.ToSlash(filepath.Join(item.ItemPath, candidate)))
 		if readErr != nil {
 			lastErr = readErr
 			if strings.Contains(readErr.Error(), "does not exist in") {
@@ -501,8 +523,8 @@ func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item mod
 }
 
 func (s *Service) fullDescription(workspace models.WorkspaceConfig, item models.ItemDetail) string {
-	if item.SourceMode == "snapshot" && item.BranchRef != "" && item.ItemPath != "" {
-		data, err := s.git.TreeReadFile(workspace.Path, item.BranchRef, filepath.ToSlash(filepath.Join(item.ItemPath, "README.md")))
+	if item.SourceMode == "snapshot" && item.Commit != "" && item.ItemPath != "" {
+		data, err := s.git.TreeReadFile(workspace.Path, item.Commit, filepath.ToSlash(filepath.Join(item.ItemPath, "README.md")))
 		if err == nil {
 			if description := FirstMarkdownParagraph(string(data)); description != "" {
 				return description
@@ -510,6 +532,14 @@ func (s *Service) fullDescription(workspace models.WorkspaceConfig, item models.
 		}
 	}
 	return FullReadmeDescription(workspace, item)
+}
+
+func snapshotCommit(item models.ItemDetail) (string, error) {
+	commit := strings.TrimSpace(item.Commit)
+	if commit == "" {
+		return "", fmt.Errorf("snapshot commit is missing")
+	}
+	return commit, nil
 }
 
 func FallbackPath(workspace models.WorkspaceConfig, item models.ItemDetail) string {

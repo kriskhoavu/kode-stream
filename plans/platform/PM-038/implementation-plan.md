@@ -15,6 +15,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | F1    | Checkout-first operational surfaces             | Frontend   | Complete |
 | F2    | Dedicated read-only Branch Review               | Frontend   | Complete |
 | I1    | Integration, durable documentation, and browser | Full stack | Complete |
+| R1    | Fail-closed review and import remediation       | Full stack | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -94,3 +95,17 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./... && npm run typecheck && npm test -- --run`
 
 **Commit:** `PM-038: Verify checkout-first branch context`
+
+## Phase R1: Fail-Closed Review And Import Remediation
+
+**Deliverables:**
+
+- [x] Pin every snapshot tree read to the resolved commit while retaining the branch ref as metadata.
+- [x] Require and revalidate the expected checkout branch immediately before import writes.
+- [x] Reject an existing target item root, including empty directories and directories with unrelated files.
+- [x] Refresh Branch Review checkout inventory after focus or visibility changes.
+- [x] Add moved-ref, changed-checkout, target-root, and frontend refresh regression tests.
+
+**Verification:** `go test ./internal/workstream ./internal/item ./internal/item/writer ./internal/server/api && npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx web/src/features/workstream-explorer/useWorkspaceBranches.test.tsx web/src/shared/api/index.test.ts`
+
+**Commit:** `PM-038: Close branch review race windows`

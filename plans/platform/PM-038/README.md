@@ -30,13 +30,14 @@ surface retains commit-pinned snapshot reading without letting a review ref beco
 
 ## Glossary
 
-| Term                | Meaning                                                                       | Code                                     |
-|---------------------|-------------------------------------------------------------------------------|------------------------------------------|
-| Operational Context | Current checkout plus working-tree content used by mutable application pages. | `WorkstreamBranchLoadResult`             |
-| Branch Review       | Commit-pinned, read-only view of another local branch's plans and files.      | `BranchReviewPage`, `BranchReviewResult` |
-| Reviewed Commit     | Commit resolved when a review is loaded and required by import.               | `expectedCommit`                         |
-| Plan Import         | Explicit copy of one structured snapshot plan into the checkout.              | `ImportReviewedPlan`                     |
-| Checkout Refresh    | Re-index and UI invalidation after the Git checkout changes.                  | workspace content refresh                |
+| Term                | Meaning                                                                        | Code                                     |
+|---------------------|--------------------------------------------------------------------------------|------------------------------------------|
+| Operational Context | Current checkout plus working-tree content used by mutable application pages.  | `WorkstreamBranchLoadResult`             |
+| Branch Review       | Commit-pinned, read-only view of another local branch's plans and files.       | `BranchReviewPage`, `BranchReviewResult` |
+| Reviewed Commit     | Immutable commit used for all snapshot reads and required by import.           | `expectedCommit`                         |
+| Expected Checkout   | Destination branch shown at confirmation and revalidated before import writes. | `expectedCheckoutBranch`                 |
+| Plan Import         | Explicit copy of one structured snapshot plan into the expected checkout.      | `ImportReviewedPlan`                     |
+| Checkout Refresh    | Re-index and UI invalidation after the Git checkout changes.                   | workspace content refresh                |
 
 ## Data Flow
 
@@ -48,12 +49,12 @@ Open operational page
 
 Open Branch Review
   -> resolve requested branch and commit
-  -> scan/reuse Git-tree snapshot
+  -> scan/reuse Git-tree snapshot by commit SHA
   -> render read-only plans and committed files
 
 Import reviewed plan
-  -> revalidate reviewed commit and checkout
-  -> reject any existing target path
+  -> revalidate reviewed commit and expected checkout
+  -> reject any existing target item root
   -> copy the structured plan directory
   -> refresh checkout index
   -> open the imported operational item

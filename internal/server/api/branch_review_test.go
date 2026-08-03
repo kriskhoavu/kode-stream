@@ -67,7 +67,17 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	if mutation.Code != http.StatusConflict || !bytes.Contains(mutation.Body.Bytes(), []byte(`"code":"snapshot_read_only"`)) {
 		t.Fatalf("mutation status=%d body=%s", mutation.Code, mutation.Body.String())
 	}
-	input, _ := json.Marshal(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: result.Commit, ItemID: result.Items[0].ID})
+	input, _ := json.Marshal(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: result.Commit, ExpectedCheckoutBranch: "main", ItemID: result.Items[0].ID})
+	branchReviewGit(t, root, "branch", "other")
+	branchReviewGit(t, root, "switch", "other")
+	changedCheckout := branchReviewRequest(t, handler, http.MethodPost, "/api/workspaces/"+workspace.ID+"/reviews/import", string(input))
+	if changedCheckout.Code != http.StatusConflict || !bytes.Contains(changedCheckout.Body.Bytes(), []byte(`"code":"review_checkout_moved"`)) {
+		t.Fatalf("changed checkout status=%d body=%s", changedCheckout.Code, changedCheckout.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "plans/platform/PM-038")); !os.IsNotExist(err) {
+		t.Fatalf("changed-checkout import created target: %v", err)
+	}
+	branchReviewGit(t, root, "switch", "main")
 	imported := branchReviewRequest(t, handler, http.MethodPost, "/api/workspaces/"+workspace.ID+"/reviews/import", string(input))
 	if imported.Code != http.StatusOK {
 		t.Fatalf("import status=%d body=%s", imported.Code, imported.Body.String())

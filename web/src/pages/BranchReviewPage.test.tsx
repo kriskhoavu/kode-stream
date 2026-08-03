@@ -43,6 +43,7 @@ describe('BranchReviewPage', () => {
     renderReview();
     fireEvent.click(await screen.findByRole('button', { name: 'Import selected plan' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Target plan already exists');
+    expect(mocks.importReviewedPlan).toHaveBeenCalledWith('ws-1', { sourceBranch: 'feature/review', expectedCommit: 'abcdef123456', expectedCheckoutBranch: 'main', itemId: 'snapshot-1' });
   });
 
   it('uses the guarded workspace switch action for the reviewed branch', async () => {

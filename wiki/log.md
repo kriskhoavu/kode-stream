@@ -27,3 +27,11 @@ sourceCount: 0
 - Pages enriched: `wiki/canvas-concept.md` (sourceCount 1→2), `wiki/canvas-workflows.md` (sourceCount 1→2),
   `wiki/canvas-reference.md` (sourceCount 1→2)
 - Files conformed: 0
+
+## [2026-08-03] correction | PM-038 Fail-Closed Branch Review
+<!-- chunkId: wiki-ingest-log-pm-038-fail-closed-correction -->
+<!-- keywords: PM-038, pinned commit, expected checkout, import conflict -->
+
+- Pages created: none
+- Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
+- Files conformed: 0

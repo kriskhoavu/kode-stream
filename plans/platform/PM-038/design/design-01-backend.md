@@ -9,11 +9,11 @@ commit that produced its index.
 
 ## API Contract
 
-| Method | Endpoint                                   | Request                                    | Response                       |
-|--------|--------------------------------------------|--------------------------------------------|--------------------------------|
-| POST   | `/api/workspaces/{id}/workstream/checkout` | optional `force`                           | checkout branch load result    |
-| POST   | `/api/workspaces/{id}/reviews/branch`      | `branch`, optional `force`                 | read-only branch review result |
-| POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `itemId` | imported checkout item         |
+| Method | Endpoint                                   | Request                                                              | Response                       |
+|--------|--------------------------------------------|----------------------------------------------------------------------|--------------------------------|
+| POST   | `/api/workspaces/{id}/workstream/checkout` | optional `force`                                                     | checkout branch load result    |
+| POST   | `/api/workspaces/{id}/reviews/branch`      | `branch`, optional `force`                                           | read-only branch review result |
+| POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `expectedCheckoutBranch`, `itemId` | imported checkout item         |
 
 The legacy Workstream branch endpoint accepts the current checkout during one compatibility cycle. A different branch
 returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_only` even when a legacy
@@ -22,10 +22,15 @@ returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_
 ## Review And Import Rules
 
 - Resolve a review branch to its full ref and commit before scanning.
+- Use the resolved commit SHA for every review scan, metadata lookup, tree walk, file read, and import source read;
+  retain the branch ref only as descriptive metadata.
 - Review files use Git-tree reads and never fall back to the filesystem.
 - Import only structured item roots under a configured source.
 - Re-resolve the source branch and require `expectedCommit` immediately before copying.
-- Reject any existing target path; do not merge, overwrite, or rename.
+- Resolve the checkout immediately before writing and require `expectedCheckoutBranch`; return
+  `409 review_checkout_moved` when it changed after confirmation.
+- Reject the target item root when any filesystem entry already occupies it, including an empty directory or one with
+  unrelated files; do not merge, overwrite, or rename.
 - Preserve unrelated dirty checkout content and never call reset, clean, stash, checkout, or switch.
 - Refresh the checkout index after copying and return the imported checkout item.
 

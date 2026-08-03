@@ -97,7 +97,7 @@ func (s *Service) load(workspace models.WorkspaceConfig, selectedBranch, current
 		return models.WorkstreamBranchLoadResult{}, err
 	}
 	sourceMode, editable := "snapshot", false
-	reader := scanner.SourceReader(scanner.NewGitTreeSourceReader(workspace.Path, ref, s.git))
+	reader := scanner.SourceReader(scanner.NewGitTreeSourceReader(workspace.Path, commit, s.git))
 	if !snapshot {
 		sourceMode = "working_tree"
 		editable = true

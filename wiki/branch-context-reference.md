@@ -28,14 +28,15 @@ workspace and checkout branch; see [[platform-terminal-canvas-reference]].
 <!-- chunkId: platform-branch-context-reference-apis -->
 <!-- keywords: endpoint, checkout, review, import, commit -->
 
-| Method | Endpoint                                   | Required request                           | Result                     |
-|--------|--------------------------------------------|--------------------------------------------|----------------------------|
-| POST   | `/api/workspaces/{id}/workstream/checkout` | optional `force`                           | Working-tree branch result |
-| POST   | `/api/workspaces/{id}/reviews/branch`      | `branch`, optional `force`                 | Read-only pinned snapshot  |
-| POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `itemId` | Imported checkout item     |
+| Method | Endpoint                                   | Required request                                                     | Result                     |
+|--------|--------------------------------------------|----------------------------------------------------------------------|----------------------------|
+| POST   | `/api/workspaces/{id}/workstream/checkout` | optional `force`                                                     | Working-tree branch result |
+| POST   | `/api/workspaces/{id}/reviews/branch`      | `branch`, optional `force`                                           | Read-only pinned snapshot  |
+| POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `expectedCheckoutBranch`, `itemId` | Imported checkout item     |
 
 Snapshot file trees and content are served by the normal item read endpoints because indexed snapshot items retain
-their branch ref and commit. Mutation endpoints reject those items even if a legacy materialization flag is supplied.
+their branch ref and commit. Every snapshot tree operation uses the immutable commit SHA; the branch ref is metadata
+only. Mutation endpoints reject those items even if a legacy materialization flag is supplied.
 
 ## Synchronization Rules
 <!-- chunkId: platform-branch-context-reference-synchronization -->
@@ -44,7 +45,7 @@ their branch ref and commit. Mutation endpoints reject those items even if a leg
 The checkout loader compares branch commit, source configuration, and a working-tree hash before reusing an index.
 Canvas invokes it before resolving the default layout and rejects a legacy `branchKey` that differs from checkout.
 Knowledge records the checkout branch and commit that produced its index and rebuilds after either changes. The frontend
-increments its content refresh key after guarded switches and when focus or visibility returns.
+reloads branch inventory on focus or visibility return and increments its content refresh key when checkout changed.
 
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->
@@ -56,8 +57,9 @@ increments its content refresh key after guarded switches and when focus or visi
 | Snapshot mutation                             | 409    | `snapshot_read_only`           |
 | Legacy Canvas branch differs from checkout    | 409    | `canvas_branch_mismatch`       |
 | Review requests current checkout              | 409    | Review must exit to Workstream |
-| Source branch moved before import             | 409    | Import fails closed            |
-| Target path already exists                    | 409    | Import does not overwrite      |
+| Source branch moved before import             | 409    | `review_commit_moved`          |
+| Destination checkout changed before import    | 409    | `review_checkout_moved`        |
+| Target item root already exists               | 409    | `import_target_exists`         |
 
 `lastSelectedBranch` remains serialized for compatibility but is not read or written for navigation. Existing branch
 scan rows and Canvas layouts remain reusable derived state.
@@ -66,6 +68,7 @@ scan rows and Canvas layouts remain reusable derived state.
 <!-- chunkId: platform-branch-context-reference-safety -->
 <!-- keywords: safe path, symlink, reset, overwrite, dirty tree -->
 
-Review reads Git objects only. Import accepts structured plans within configured sources, rejects traversal and symlink
-escape, revalidates the expected commit, and creates no merge or overwrite behavior. Review and import never reset,
-clean, stash, checkout, or switch. Only the explicit guarded switch action may change the checkout.
+Review reads Git objects by immutable commit SHA only. Import accepts structured plans within configured sources,
+rejects traversal and symlink escape, revalidates both the expected source commit and destination checkout, and rejects
+the complete target item root when any entry already occupies it. Review and import never reset, clean, stash, checkout,
+or switch. Only the explicit guarded switch action may change the checkout.

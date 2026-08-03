@@ -20,7 +20,7 @@
 ```text
 User opens Review branch
   -> backend resolves branch B to a commit
-  -> Git-tree scanner returns snapshot plans
+  -> Git-tree scanner and file readers stay pinned to that commit SHA
   -> review renders read-only plans and files
   -> Git checkout and branch A working tree remain unchanged
 ```
@@ -30,7 +30,8 @@ User opens Review branch
 ```text
 User previews Import into checkout
   -> backend revalidates branch B commit
-  -> destination path is checked for conflicts
+  -> backend revalidates branch A as the confirmed destination checkout
+  -> destination item root is checked for any existing filesystem entry
   -> plan directory is copied into branch A working tree
   -> branch A index refreshes
   -> imported operational item opens
@@ -49,6 +50,6 @@ User chooses Switch workspace to this branch
 ## Expected Safety Outcomes
 
 - Review never changes Git, files, Canvas layout, sessions, or verification.
-- Import fails closed on moved refs, existing destinations, unsafe paths, or symlink escape.
+- Import fails closed on moved refs, changed destination checkouts, existing item roots, unsafe paths, or symlink escape.
 - Snapshot mutation payloads return `snapshot_read_only` and never trigger a copy.
 - External Git checkout changes are detected when the application regains focus.
