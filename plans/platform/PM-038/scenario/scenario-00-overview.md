@@ -29,6 +29,7 @@ User opens Review branch
 
 ```text
 User previews Import into checkout
+  -> backend requires the reviewed item to belong to the workspace named by the route
   -> backend acquires the workspace mutation lock shared with in-app checkout switching
   -> backend revalidates branch B commit and branch A destination under that lock
   -> destination item root is checked for any existing filesystem entry
@@ -54,6 +55,8 @@ User chooses Switch workspace to this branch
 - Review never changes Git, files, Canvas layout, sessions, or verification.
 - Import fails closed on moved refs, changed destination checkouts, existing item roots, unsafe paths, or symlink escape.
 - Failed staging removes temporary content and leaves no target item root, so the import can be retried.
+- Failed checkout index refresh rolls publication back, so the API error does not strand an occupied target.
 - In-app checkout switching waits until import publication and checkout index refresh complete.
+- Checkout load holds the same lock through scan-and-replace, so an older scan cannot overwrite the imported index.
 - Snapshot mutation payloads return `snapshot_read_only` and never trigger a copy.
 - External Git checkout changes are detected when the application regains focus.

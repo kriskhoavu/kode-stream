@@ -22,6 +22,14 @@ type failingSnapshotReader struct {
 	reads int
 }
 
+type failingRefreshIndex struct {
+	itemindex.Repository
+}
+
+func (failingRefreshIndex) ReplaceWorkspaceBranch(string, string, []models.ItemDetail, models.BranchScanMetadata) error {
+	return errors.New("injected index refresh failure")
+}
+
 func (r *failingSnapshotReader) ReadFile(path string) ([]byte, error) {
 	r.reads++
 	if r.reads == 2 {
@@ -380,6 +388,39 @@ func TestStructuredSnapshotFailureLeavesNoTargetAndCanRetry(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(targetRoot, filepath.FromSlash(itemPath), "README.md"))
 	if err != nil || string(data) != "# PM-038\n" {
 		t.Fatalf("retry content=%q err=%v", data, err)
+	}
+}
+
+func TestImportSnapshotPlanRollsBackPublicationWhenRefreshFails(t *testing.T) {
+	sourceRoot := t.TempDir()
+	targetRoot := t.TempDir()
+	itemPath := "plans/platform/PM-038"
+	writeFile(t, sourceRoot, itemPath+"/README.md", "# PM-038\n")
+	writeFile(t, sourceRoot, itemPath+"/plan.yaml", "plan:\n  status: draft\n")
+	baseReader := scanner.NewFilesystemSourceReader(sourceRoot)
+	writer := New(fileaccess.New(), scanner.New(gitadapter.New()), failingRefreshIndex{}, nil)
+	writer.snapshotReader = func(models.WorkspaceConfig, models.ItemDetail) scanner.SourceReader { return baseReader }
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Path: targetRoot, BaselineBranch: "main", Sources: []string{"plans"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{Commit: "captured", SourceMode: "snapshot", MetadataSource: "plan.yaml", ItemPath: itemPath}}
+
+	_, err := writer.ImportSnapshotPlan(workspace, item)
+	if err == nil || !strings.Contains(err.Error(), "injected index refresh failure") {
+		t.Fatalf("expected refresh failure, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(targetRoot, filepath.FromSlash(itemPath))); !os.IsNotExist(statErr) {
+		t.Fatalf("refresh failure left published target, err=%v", statErr)
+	}
+	staging, globErr := filepath.Glob(filepath.Join(targetRoot, "plans/platform/.PM-038.import-*"))
+	if globErr != nil || len(staging) != 0 {
+		t.Fatalf("refresh failure left staging directories: %#v err=%v", staging, globErr)
+	}
+
+	writer.index = nil
+	if _, err := writer.ImportSnapshotPlan(workspace, item); err != nil {
+		t.Fatalf("retry failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(targetRoot, filepath.FromSlash(itemPath), "README.md")); err != nil {
+		t.Fatalf("retry did not publish target: %v", err)
 	}
 }
 

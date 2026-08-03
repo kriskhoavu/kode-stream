@@ -54,12 +54,14 @@ Open Branch Review
   -> render read-only plans and committed files
 
 Import reviewed plan
+  -> require the reviewed item to belong to the workspace in the route
   -> acquire the workspace mutation lock
   -> revalidate reviewed commit and expected checkout under the lock
   -> reject any existing target item root
   -> build the complete plan in a sibling temporary directory
   -> atomically rename the staged plan into the checkout
   -> refresh checkout index
+  -> remove the published target if index refresh fails
   -> release the workspace mutation lock
   -> open the imported operational item
 ```

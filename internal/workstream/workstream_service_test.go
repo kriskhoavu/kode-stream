@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"kode-stream/internal/common/models"
 	gitadapter "kode-stream/internal/git"
@@ -16,6 +17,50 @@ import (
 	"kode-stream/internal/workspace/registry"
 	"kode-stream/internal/workspace/scanner"
 )
+
+func TestCheckoutLoadWaitsForWorkspaceMutation(t *testing.T) {
+	root := newWorkstreamGitRepo(t)
+	writeWorkstreamGitFile(t, root, "plans/platform/PM-001/README.md", "# PM-001\n")
+	workstreamGitCommit(t, root, "main plan")
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), git)
+	locked := make(chan struct{})
+	release := make(chan struct{})
+	go func() {
+		_ = git.WithWorkspaceMutation(root, func() error {
+			close(locked)
+			<-release
+			return nil
+		})
+	}()
+	<-locked
+
+	type loadResult struct {
+		result models.WorkstreamBranchLoadResult
+		err    error
+	}
+	done := make(chan loadResult, 1)
+	go func() {
+		result, loadErr := service.LoadCheckout(workspace.ID, true)
+		done <- loadResult{result: result, err: loadErr}
+	}()
+	select {
+	case outcome := <-done:
+		t.Fatalf("checkout load completed while workspace mutation was locked: %v", outcome.err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	outcome := <-done
+	if outcome.err != nil || outcome.result.ItemCount != 1 {
+		t.Fatalf("checkout load result=%+v err=%v", outcome.result, outcome.err)
+	}
+}
 
 func TestLoadBranchRejectsNonCheckoutOperationalContext(t *testing.T) {
 	root := newWorkstreamGitRepo(t)

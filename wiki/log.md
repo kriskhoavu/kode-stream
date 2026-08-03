@@ -43,3 +43,11 @@ sourceCount: 0
 - Pages created: none
 - Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-03] correction | PM-038 Routed Import Index Consistency
+<!-- chunkId: wiki-ingest-log-pm-038-routed-index-correction -->
+<!-- keywords: PM-038, workspace ownership, refresh rollback, scan serialization -->
+
+- Pages created: none
+- Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
+- Files conformed: 0

@@ -27,6 +27,8 @@ returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_
 - Read verification selection and discovered automation specs for snapshot items from `plan.yaml` at the resolved
   commit; never consult the checkout filesystem or an external automation working tree for snapshot metadata.
 - Review files use Git-tree reads and never fall back to the filesystem.
+- Require the snapshot item to belong to the workspace named by `/api/workspaces/{id}/reviews/import` before acquiring
+  a mutation lock; return item-not-found semantics for cross-workspace item IDs.
 - Import only structured item roots under a configured source.
 - Serialize in-app checkout switching and import with one workspace-scoped mutation lock.
 - Under that lock, re-resolve the source branch and require `expectedCommit`, then resolve the checkout and require
@@ -35,6 +37,8 @@ returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_
   unrelated files; do not merge, overwrite, or rename.
 - Build every source file in a sibling temporary directory, remove that directory on any failure, and atomically rename
   the complete directory to the target. Hold the mutation lock through publication and checkout index refresh.
+- If checkout scanning or index persistence fails after publication, remove the newly published target before returning
+  the error so a retry is not converted into `import_target_exists`.
 - Preserve unrelated dirty checkout content and never call reset, clean, stash, checkout, or switch.
 - Refresh the checkout index after copying and return the imported checkout item.
 
@@ -42,6 +46,8 @@ returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_
 
 - A shared checkout loader resolves the current branch, working-tree hash, and source configuration before reusing an
   index entry.
+- Hold the workspace mutation lock across checkout fingerprinting, scanning, and branch index replacement so a scan
+  started before import cannot replace the post-import index afterward.
 - Workstream and Canvas call the loader rather than reading an unverified branch cache.
 - Canvas derives layout branch identity from the loader result.
 - Knowledge stores checkout branch and commit metadata and rebuilds when either differs.

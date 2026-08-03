@@ -50,6 +50,8 @@ Knowledge records the checkout branch and commit that produced its index and reb
 reloads branch inventory on focus or visibility return and increments its content refresh key when checkout changed.
 In-app checkout switching and reviewed-plan import share one workspace-scoped mutation lock. Import holds it from source
 and destination revalidation through atomic publication and checkout index refresh, so switching cannot interleave.
+Operational checkout loads hold that lock through fingerprinting, scanning, and branch index replacement, preventing a
+scan started before import from overwriting the post-import index.
 
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->
@@ -61,6 +63,7 @@ and destination revalidation through atomic publication and checkout index refre
 | Snapshot mutation                             | 409    | `snapshot_read_only`           |
 | Legacy Canvas branch differs from checkout    | 409    | `canvas_branch_mismatch`       |
 | Review requests current checkout              | 409    | Review must exit to Workstream |
+| Import item belongs to another workspace      | 404    | Item not found                 |
 | Source branch moved before import             | 409    | `review_commit_moved`          |
 | Destination checkout changed before import    | 409    | `review_checkout_moved`        |
 | Target item root already exists               | 409    | `import_target_exists`         |
@@ -73,8 +76,9 @@ scan rows and Canvas layouts remain reusable derived state.
 <!-- keywords: safe path, symlink, reset, overwrite, dirty tree -->
 
 Review reads Git objects by immutable commit SHA only. Import accepts structured plans within configured sources,
-rejects traversal and symlink escape, revalidates both the expected source commit and destination checkout, and rejects
-the complete target item root when any entry already occupies it. Import writes every file into a sibling temporary
-directory, removes staging on failure, and publishes only the complete plan through an atomic rename. Review and import
-never reset, clean, stash, checkout, or switch. Only the explicit guarded switch action may change the checkout, and it
-is serialized with import for the same workspace.
+requires the item to belong to the workspace named by the route, rejects traversal and symlink escape, revalidates both
+the expected source commit and destination checkout, and rejects the complete target item root when any entry already
+occupies it. Import writes every file into a sibling temporary directory, removes staging on failure, and publishes only
+the complete plan through an atomic rename. If checkout index refresh fails after publication, import removes the new
+target before returning the error. Review and import never reset, clean, stash, checkout, or switch. Only the explicit
+guarded switch action may change the checkout, and it is serialized with import for the same workspace.

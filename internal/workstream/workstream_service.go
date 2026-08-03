@@ -39,23 +39,31 @@ func New(reg registry.Repository, idx itemindex.Repository, scan *scanner.Scanne
 }
 
 func (s *Service) LoadBranch(id string, input models.WorkstreamBranchLoadInput) (models.WorkstreamBranchLoadResult, error) {
-	workspace, currentCheckoutBranch, err := s.workspaceAndCheckout(id)
-	if err != nil {
-		return models.WorkstreamBranchLoadResult{}, err
-	}
-	selectedBranch := strings.TrimSpace(input.Branch)
-	if selectedBranch != "" && selectedBranch != currentCheckoutBranch {
-		return models.WorkstreamBranchLoadResult{}, ErrBranchReviewRequired
-	}
-	return s.load(workspace, currentCheckoutBranch, currentCheckoutBranch, input.Force, false)
+	return s.loadCheckout(id, strings.TrimSpace(input.Branch), input.Force)
 }
 
 func (s *Service) LoadCheckout(id string, force bool) (models.WorkstreamBranchLoadResult, error) {
-	workspace, currentCheckoutBranch, err := s.workspaceAndCheckout(id)
+	return s.loadCheckout(id, "", force)
+}
+
+func (s *Service) loadCheckout(id, requestedBranch string, force bool) (models.WorkstreamBranchLoadResult, error) {
+	workspace, err := s.workspace(id)
 	if err != nil {
 		return models.WorkstreamBranchLoadResult{}, err
 	}
-	return s.load(workspace, currentCheckoutBranch, currentCheckoutBranch, force, false)
+	var result models.WorkstreamBranchLoadResult
+	err = s.git.WithWorkspaceMutation(workspace.Path, func() error {
+		currentCheckoutBranch, err := s.git.CurrentBranch(workspace.Path)
+		if err != nil {
+			return err
+		}
+		if requestedBranch != "" && requestedBranch != currentCheckoutBranch {
+			return ErrBranchReviewRequired
+		}
+		result, err = s.load(workspace, currentCheckoutBranch, currentCheckoutBranch, force, false)
+		return err
+	})
+	return result, err
 }
 
 func (s *Service) ReviewBranch(id string, input models.WorkstreamBranchLoadInput) (models.WorkstreamBranchLoadResult, error) {
@@ -74,21 +82,29 @@ func (s *Service) ReviewBranch(id string, input models.WorkstreamBranchLoadInput
 }
 
 func (s *Service) workspaceAndCheckout(id string) (models.WorkspaceConfig, string, error) {
-	workspace, ok, err := s.registry.Get(id)
+	workspace, err := s.workspace(id)
 	if err != nil {
 		return models.WorkspaceConfig{}, "", err
-	}
-	if !ok {
-		return models.WorkspaceConfig{}, "", apperrors.ErrWorkspaceNotFound
-	}
-	if s.git == nil {
-		s.git = gitadapter.New()
 	}
 	currentCheckoutBranch, err := s.git.CurrentBranch(workspace.Path)
 	if err != nil {
 		return models.WorkspaceConfig{}, "", err
 	}
 	return workspace, currentCheckoutBranch, nil
+}
+
+func (s *Service) workspace(id string) (models.WorkspaceConfig, error) {
+	workspace, ok, err := s.registry.Get(id)
+	if err != nil {
+		return models.WorkspaceConfig{}, err
+	}
+	if !ok {
+		return models.WorkspaceConfig{}, apperrors.ErrWorkspaceNotFound
+	}
+	if s.git == nil {
+		s.git = gitadapter.New()
+	}
+	return workspace, nil
 }
 
 func (s *Service) load(workspace models.WorkspaceConfig, selectedBranch, currentCheckoutBranch string, force, snapshot bool) (models.WorkstreamBranchLoadResult, error) {

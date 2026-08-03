@@ -1054,7 +1054,7 @@ func (a *API) importReviewedPlan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	result, err := a.items.ImportReviewedPlan(input)
+	result, err := a.items.ImportReviewedPlan(r.PathValue("id"), input)
 	switch {
 	case errors.Is(err, apperrors.ErrItemNotFound):
 		writeError(w, http.StatusNotFound, "item not found")

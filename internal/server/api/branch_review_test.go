@@ -41,6 +41,17 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	otherRoot := t.TempDir()
+	branchReviewGit(t, otherRoot, "init", "-b", "main")
+	branchReviewGit(t, otherRoot, "config", "user.name", "Kode Stream")
+	branchReviewGit(t, otherRoot, "config", "user.email", "kode-stream@example.test")
+	branchReviewWrite(t, otherRoot, "plans/.keep", "")
+	branchReviewGit(t, otherRoot, "add", ".")
+	branchReviewGit(t, otherRoot, "commit", "-m", "other workspace")
+	otherWorkspace, err := reg.Create(models.WorkspaceInput{Name: "Other Workspace", Path: otherRoot, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	idx := itemindex.New(filepath.Join(dataDir, "items.yaml"))
 	scan := scanner.New(git)
 	files := fileaccess.New()
@@ -68,6 +79,13 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 		t.Fatalf("mutation status=%d body=%s", mutation.Code, mutation.Body.String())
 	}
 	input, _ := json.Marshal(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: result.Commit, ExpectedCheckoutBranch: "main", ItemID: result.Items[0].ID})
+	wrongWorkspace := branchReviewRequest(t, handler, http.MethodPost, "/api/workspaces/"+otherWorkspace.ID+"/reviews/import", string(input))
+	if wrongWorkspace.Code != http.StatusNotFound {
+		t.Fatalf("cross-workspace import status=%d body=%s", wrongWorkspace.Code, wrongWorkspace.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "plans/platform/PM-038")); !os.IsNotExist(err) {
+		t.Fatalf("cross-workspace import created target: %v", err)
+	}
 	branchReviewGit(t, root, "branch", "other")
 	branchReviewGit(t, root, "switch", "other")
 	changedCheckout := branchReviewRequest(t, handler, http.MethodPost, "/api/workspaces/"+workspace.ID+"/reviews/import", string(input))

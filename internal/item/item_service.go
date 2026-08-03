@@ -122,11 +122,14 @@ func (s *Service) SaveFile(id, fileID string, input models.FileSaveInput) (model
 	return s.files.WriteMarkdown(workspace, item, input)
 }
 
-func (s *Service) ImportReviewedPlan(input models.ReviewedPlanImportInput) (models.WriteResult, error) {
+func (s *Service) ImportReviewedPlan(workspaceID string, input models.ReviewedPlanImportInput) (models.WriteResult, error) {
 	itemID := strings.TrimSpace(input.ItemID)
 	workspace, item, err := s.workspaceAndItem(itemID)
 	if err != nil {
 		return models.WriteResult{}, err
+	}
+	if workspace.ID != strings.TrimSpace(workspaceID) {
+		return models.WriteResult{}, apperrors.ErrItemNotFound
 	}
 	if item.SourceMode != "snapshot" || item.Branch != strings.TrimSpace(input.SourceBranch) || isDocumentationItem(item) {
 		return models.WriteResult{}, ErrReviewedPlan

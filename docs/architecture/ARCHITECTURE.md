@@ -249,11 +249,13 @@ Open Branch Review
   -> keep the checkout and operational routes unchanged
 
 Import one reviewed structured plan
+  -> require the item to belong to the workspace named by the route
   -> acquire the workspace mutation lock shared with in-app checkout switching
   -> re-resolve and require the pinned source commit and confirmed checkout under the lock
   -> reject an existing destination item root or unsafe path
   -> stage the complete plan beside its destination
   -> atomically rename it into the confirmed checkout and refresh its index
+  -> remove the published target if refresh fails
   -> release the workspace mutation lock
 ```
 

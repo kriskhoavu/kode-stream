@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
 	gitadapter "kode-stream/internal/git"
@@ -364,7 +365,7 @@ func TestSnapshotEditsAreReadOnly(t *testing.T) {
 	if string(data) != "# Existing\n" {
 		t.Fatalf("existing checkout file was overwritten: %q", data)
 	}
-	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: "snapshot-item"})
+	_, err = service.ImportReviewedPlan(workspace.ID, models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: "snapshot-item"})
 	if err == nil || !strings.Contains(err.Error(), "already exist") {
 		t.Fatalf("expected import conflict, got %v", err)
 	}
@@ -398,9 +399,34 @@ func TestImportReviewedPlanCopiesPinnedStructuredPlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := New(reg, idx, fileaccess.New(), itemwriter.New(fileaccess.New(), scanner.New(git), idx, reg), git)
+	ownershipLocked := make(chan struct{})
+	ownershipRelease := make(chan struct{})
+	go func() {
+		_ = git.WithWorkspaceMutation(root, func() error {
+			close(ownershipLocked)
+			<-ownershipRelease
+			return nil
+		})
+	}()
+	<-ownershipLocked
+	wrongWorkspaceDone := make(chan error, 1)
+	go func() {
+		_, importErr := service.ImportReviewedPlan("other-workspace", models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+		wrongWorkspaceDone <- importErr
+	}()
+	select {
+	case importErr := <-wrongWorkspaceDone:
+		if !errors.Is(importErr, apperrors.ErrItemNotFound) {
+			t.Fatalf("cross-workspace import error=%v", importErr)
+		}
+	case <-time.After(50 * time.Millisecond):
+		close(ownershipRelease)
+		t.Fatal("cross-workspace ownership check waited for the mutation lock")
+	}
+	close(ownershipRelease)
 	itemGitRun(t, root, "branch", "other")
 	itemGitRun(t, root, "switch", "other")
-	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+	_, err = service.ImportReviewedPlan(workspace.ID, models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
 	if !errors.Is(err, ErrReviewCheckoutMoved) {
 		t.Fatalf("expected checkout change rejection, got %v", err)
 	}
@@ -424,7 +450,7 @@ func TestImportReviewedPlanCopiesPinnedStructuredPlan(t *testing.T) {
 	}
 	done := make(chan importResult, 1)
 	go func() {
-		result, importErr := service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+		result, importErr := service.ImportReviewedPlan(workspace.ID, models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
 		done <- importResult{result: result, err: importErr}
 	}()
 	select {
@@ -482,7 +508,7 @@ func TestImportReviewedPlanRejectsOccupiedTargetRootWithoutMatchingFiles(t *test
 		t.Fatal(err)
 	}
 	service := New(reg, idx, fileaccess.New(), itemwriter.New(fileaccess.New(), scanner.New(git), idx, reg), git)
-	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+	_, err = service.ImportReviewedPlan(workspace.ID, models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
 	if err == nil || !strings.Contains(err.Error(), "target already exists") {
 		t.Fatalf("expected occupied root rejection, got %v", err)
 	}
@@ -496,7 +522,7 @@ func TestImportReviewedPlanRejectsOccupiedTargetRootWithoutMatchingFiles(t *test
 	if err := os.Remove(filepath.Join(root, "plans/platform/PM-038/unrelated.txt")); err != nil {
 		t.Fatal(err)
 	}
-	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+	_, err = service.ImportReviewedPlan(workspace.ID, models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
 	if err == nil || !strings.Contains(err.Error(), "target already exists") {
 		t.Fatalf("expected empty root rejection, got %v", err)
 	}

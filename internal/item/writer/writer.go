@@ -263,7 +263,18 @@ func (w *Writer) ImportSnapshotPlan(workspace models.WorkspaceConfig, item model
 	if err := w.materializeSnapshotItem(workspace, item, ""); err != nil {
 		return models.WriteResult{}, err
 	}
-	return w.refresh(workspace, item.ItemPath)
+	result, err := w.refresh(workspace, item.ItemPath)
+	if err == nil {
+		return result, nil
+	}
+	targetItemRoot, pathErr := safeJoin(workspace.Path, item.ItemPath)
+	if pathErr != nil {
+		return models.WriteResult{}, fmt.Errorf("refresh imported plan: %w; resolve rollback target: %v", err, pathErr)
+	}
+	if rollbackErr := os.RemoveAll(targetItemRoot); rollbackErr != nil {
+		return models.WriteResult{}, fmt.Errorf("refresh imported plan: %w; rollback failed: %v", err, rollbackErr)
+	}
+	return models.WriteResult{}, err
 }
 
 func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewItemInput) (models.WriteResult, error) {

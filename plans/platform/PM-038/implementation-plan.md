@@ -17,6 +17,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | I1    | Integration, durable documentation, and browser | Full stack | Complete |
 | R1    | Fail-closed review and import remediation       | Full stack | Complete |
 | R2    | Atomic import and snapshot verification         | Backend    | Complete |
+| R3    | Routed import and index consistency             | Backend    | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -124,3 +125,16 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./internal/git ./internal/item ./internal/item/writer ./internal/server/api`
 
 **Commit:** `PM-038: Make reviewed plan import atomic`
+
+## Phase R3: Routed Import And Index Consistency
+
+**Deliverables:**
+
+- [x] Require the reviewed item to belong to the workspace named by the import route before locking or writing.
+- [x] Roll back an atomically published target when checkout index refresh fails so retry remains possible.
+- [x] Serialize checkout scan-and-replace with import publication through the shared workspace mutation lock.
+- [x] Add cross-workspace route, refresh rollback, retry, and checkout-load serialization regression tests.
+
+**Verification:** `go test ./internal/workstream ./internal/item ./internal/item/writer ./internal/server/api`
+
+**Commit:** `PM-038: Preserve routed import index consistency`
