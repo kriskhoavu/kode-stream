@@ -67,5 +67,7 @@ User chooses Switch workspace to this branch
   enable review actions; superseded responses are ignored regardless of completion order.
 - When refresh advances the reviewed commit, the selected plan's file tree and preview reload even if its item ID is
   unchanged, so plan metadata and file content always describe the same commit.
+- Every snapshot file request carries the displayed commit and fails with `review_commit_moved` if the indexed item no
+  longer matches. Late automatic or manual file responses are ignored after refresh starts.
 - Snapshot mutation payloads return `snapshot_read_only` and never trigger a copy.
 - External Git checkout changes are detected when the application regains focus.

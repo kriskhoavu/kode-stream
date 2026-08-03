@@ -87,9 +87,39 @@ describe('BranchReviewPage', () => {
     expect(await screen.findByText('# Content from new commit')).toBeInTheDocument();
     expect(screen.queryByText('# Content from old commit')).not.toBeInTheDocument();
     expect(mocks.files).toHaveBeenCalledTimes(2);
-    expect(mocks.files).toHaveBeenNthCalledWith(1, 'snapshot-1');
-    expect(mocks.files).toHaveBeenNthCalledWith(2, 'snapshot-1');
+    expect(mocks.files).toHaveBeenNthCalledWith(1, 'snapshot-1', 'oldcommit123456');
+    expect(mocks.files).toHaveBeenNthCalledWith(2, 'snapshot-1', 'newcommit654321');
     expect(mocks.file).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores an older manual file response after refresh publishes a new commit', async () => {
+    let finishManual!: (content: FileContent) => void;
+    let oldCommitReads = 0;
+    mocks.loadBranchReview
+      .mockResolvedValueOnce(reviewResult({ commit: 'oldcommit123456' }))
+      .mockResolvedValueOnce(reviewResult({ commit: 'newcommit654321' }));
+    mocks.file.mockImplementation((_itemId: string, _fileId: string, expectedCommit: string) => {
+      if (expectedCommit === 'oldcommit123456' && oldCommitReads++ === 0) {
+        return Promise.resolve(file('# Initial old content'));
+      }
+      if (expectedCommit === 'oldcommit123456') {
+        return new Promise((resolve) => { finishManual = resolve; });
+      }
+      return Promise.resolve(file('# Refreshed new content'));
+    });
+    renderReview();
+    expect(await screen.findByText('# Initial old content')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'README.md' }));
+    await waitFor(() => expect(mocks.file).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh snapshot' }));
+    expect(await screen.findByText('# Refreshed new content')).toBeInTheDocument();
+
+    await act(async () => { finishManual(file('# Late old manual content')); });
+    expect(screen.getByText('# Refreshed new content')).toBeInTheDocument();
+    expect(screen.queryByText('# Late old manual content')).not.toBeInTheDocument();
+    expect(mocks.file).toHaveBeenCalledWith('snapshot-1', 'README_md', 'oldcommit123456');
+    expect(mocks.file).toHaveBeenCalledWith('snapshot-1', 'README_md', 'newcommit654321');
   });
 
   it('ignores a superseded branch response that resolves after the current request', async () => {

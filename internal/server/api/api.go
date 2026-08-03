@@ -1210,9 +1210,13 @@ func (a *API) itemDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) itemFiles(w http.ResponseWriter, r *http.Request) {
-	tree, err := a.items.Files(r.PathValue("id"))
+	tree, err := a.items.Files(r.PathValue("id"), r.URL.Query().Get("expectedCommit"))
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	if errors.Is(err, appitem.ErrReviewCommitMoved) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "review_commit_moved"})
 		return
 	}
 	respond(w, tree, err)
@@ -1231,9 +1235,13 @@ func (a *API) itemContentSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) itemFileContent(w http.ResponseWriter, r *http.Request) {
-	content, err := a.items.FileContent(r.PathValue("id"), r.PathValue("fileID"))
+	content, err := a.items.FileContent(r.PathValue("id"), r.PathValue("fileID"), r.URL.Query().Get("expectedCommit"))
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	if errors.Is(err, appitem.ErrReviewCommitMoved) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "review_commit_moved"})
 		return
 	}
 	respond(w, content, err)

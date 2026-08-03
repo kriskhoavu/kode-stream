@@ -37,6 +37,9 @@ review and opens Workstream.
 - Treat the reviewed commit as part of the selected plan's file-loading identity. When refresh advances a branch while
   preserving the stable item ID, clear and reload the file tree and preview so every visible field comes from the new
   commit.
+- Send that commit as `expectedCommit` on every reviewed file-tree and file-content request, making GET deduplication
+  commit-specific. Use one file-request generation for automatic and manual reads; refresh invalidates older requests,
+  and only the current generation may update files, errors, preview content, or loading state.
 
 ## Synchronization
 

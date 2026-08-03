@@ -14,6 +14,8 @@ commit that produced its index.
 | POST   | `/api/workspaces/{id}/workstream/checkout` | optional `force`                                                     | checkout branch load result    |
 | POST   | `/api/workspaces/{id}/reviews/branch`      | `branch`, optional `force`                                           | read-only branch review result |
 | POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `expectedCheckoutBranch`, `itemId` | imported checkout item         |
+| GET    | `/api/items/{id}/files`                    | `expectedCommit` required for snapshot items                         | commit-pinned file tree        |
+| GET    | `/api/items/{id}/files/{fileId}`           | `expectedCommit` required for snapshot items                         | commit-pinned file content     |
 
 The legacy Workstream branch endpoint accepts the current checkout during one compatibility cycle. A different branch
 returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_only` even when a legacy
@@ -30,6 +32,10 @@ returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_
 - Read verification selection and discovered automation specs for snapshot items from `plan.yaml` at the resolved
   commit; never consult the checkout filesystem or an external automation working tree for snapshot metadata.
 - Review files use Git-tree reads and never fall back to the filesystem.
+- Require `expectedCommit` on snapshot file-tree and file-content reads. Compare it with the indexed snapshot before
+  reading and return `409 review_commit_moved` when missing or different; working-tree reads remain compatible without
+  the parameter. Once validated, read through the copied item's immutable commit even if another refresh replaces the
+  shared index concurrently.
 - Require the snapshot item to belong to the workspace named by `/api/workspaces/{id}/reviews/import` before acquiring
   a mutation lock; return item-not-found semantics for cross-workspace item IDs.
 - Import only structured item roots under a configured source.

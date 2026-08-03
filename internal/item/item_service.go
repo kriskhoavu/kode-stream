@@ -70,9 +70,12 @@ func (s *Service) Detail(id string) (models.ItemDetail, error) {
 	return NormalizeDetail(item), nil
 }
 
-func (s *Service) Files(id string) ([]models.FileNode, error) {
+func (s *Service) Files(id, expectedCommit string) ([]models.FileNode, error) {
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
+		return nil, err
+	}
+	if err := requireExpectedSnapshotCommit(item, expectedCommit); err != nil {
 		return nil, err
 	}
 	if item.SourceMode == "snapshot" {
@@ -81,15 +84,25 @@ func (s *Service) Files(id string) ([]models.FileNode, error) {
 	return s.files.Tree(workspace, item)
 }
 
-func (s *Service) FileContent(id, fileID string) (models.FileContent, error) {
+func (s *Service) FileContent(id, fileID, expectedCommit string) (models.FileContent, error) {
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
+		return models.FileContent{}, err
+	}
+	if err := requireExpectedSnapshotCommit(item, expectedCommit); err != nil {
 		return models.FileContent{}, err
 	}
 	if item.SourceMode == "snapshot" {
 		return s.snapshotFileContent(workspace, item, fileID)
 	}
 	return s.files.Read(workspace, item, fileID)
+}
+
+func requireExpectedSnapshotCommit(item models.ItemDetail, expectedCommit string) error {
+	if item.SourceMode == "snapshot" && (strings.TrimSpace(expectedCommit) == "" || item.Commit != strings.TrimSpace(expectedCommit)) {
+		return ErrReviewCommitMoved
+	}
+	return nil
 }
 
 func (s *Service) Diff(id string) (string, error) {

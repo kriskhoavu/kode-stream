@@ -644,7 +644,7 @@ func TestSnapshotFileContentResolvesNestedDocsPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tree, err := service.Files("snapshot-docs")
+	tree, err := service.Files("snapshot-docs", commit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -654,7 +654,7 @@ func TestSnapshotFileContentResolvesNestedDocsPath(t *testing.T) {
 	if tree[0].Children[0].ID != "a12__a12-challenges-in-discovery-epsap_md" {
 		t.Fatalf("unexpected file id: %q", tree[0].Children[0].ID)
 	}
-	content, err := service.FileContent("snapshot-docs", tree[0].Children[0].ID)
+	content, err := service.FileContent("snapshot-docs", tree[0].Children[0].ID, commit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -667,19 +667,38 @@ func TestSnapshotFileContentResolvesNestedDocsPath(t *testing.T) {
 	writeItemGitFile(t, root, "docs/a12/a12-challenges-in-discovery-epsap.md", "# Advanced\n")
 	writeItemGitFile(t, root, "docs/a12/new-after-review.md", "# New\n")
 	itemGitCommit(t, root, "advance reviewed branch")
-	pinnedTree, err := service.Files("snapshot-docs")
+	pinnedTree, err := service.Files("snapshot-docs", commit)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(pinnedTree) != 1 || len(pinnedTree[0].Children) != 2 {
 		t.Fatalf("snapshot tree followed mutable branch: %#v", pinnedTree)
 	}
-	pinnedContent, err := service.FileContent("snapshot-docs", tree[0].Children[0].ID)
+	pinnedContent, err := service.FileContent("snapshot-docs", tree[0].Children[0].ID, commit)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(pinnedContent.Content, "Challenge") || strings.Contains(pinnedContent.Content, "Advanced") {
 		t.Fatalf("snapshot content followed mutable branch: %q", pinnedContent.Content)
+	}
+	advancedRef, advancedCommit, err := git.ResolveBranch(root, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	advancedItem, ok, err := idx.Get("snapshot-docs")
+	if err != nil || !ok {
+		t.Fatalf("advanced item: ok=%v err=%v", ok, err)
+	}
+	advancedItem.BranchRef = advancedRef
+	advancedItem.Commit = advancedCommit
+	if err := idx.ReplaceWorkspaceBranch(workspace.ID, "main", []models.ItemDetail{advancedItem}, models.BranchScanMetadata{Commit: advancedCommit, SourceMode: "snapshot", ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Files("snapshot-docs", commit); !errors.Is(err, ErrReviewCommitMoved) {
+		t.Fatalf("stale expected tree commit error=%v", err)
+	}
+	if _, err := service.FileContent("snapshot-docs", tree[0].Children[0].ID, commit); !errors.Is(err, ErrReviewCommitMoved) {
+		t.Fatalf("stale expected content commit error=%v", err)
 	}
 }
 

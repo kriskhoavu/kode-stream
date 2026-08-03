@@ -21,6 +21,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | R4    | Review serialization and transactional index    | Full stack | Complete |
 | R5    | Latest-request Branch Review state              | Frontend   | Complete |
 | R6    | Commit-consistent reviewed file preview         | Frontend   | Complete |
+| R7    | End-to-end commit-pinned file reads             | Full stack | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -180,3 +181,17 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx && npm test -- --run`
 
 **Commit:** `PM-038: Reload reviewed files when commit advances`
+
+## Phase R7: End-To-End Commit-Pinned File Reads
+
+**Deliverables:**
+
+- [x] Require and validate `expectedCommit` for snapshot file-tree and content endpoints.
+- [x] Include the reviewed commit in client URLs so GET deduplication cannot cross commits.
+- [x] Apply one request-generation guard to automatic and manual reviewed-file loads.
+- [x] Add service, transport, API-client, and late-manual-response regression coverage.
+- [x] Synchronize backend/frontend designs and the durable commit-consistency reference.
+
+**Verification:** `go test ./internal/item ./internal/server/api && npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx web/src/shared/api/index.test.ts && go test ./... && npm test -- --run`
+
+**Commit:** `PM-038: Pin reviewed file requests end to end`

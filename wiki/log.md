@@ -75,3 +75,11 @@ sourceCount: 0
 - Pages created: none
 - Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-04] correction | PM-038 End-To-End Commit-Pinned Files
+<!-- chunkId: wiki-ingest-log-pm-038-end-to-end-file-pinning-correction -->
+<!-- keywords: PM-038, expected commit, snapshot files, request generation -->
+
+- Pages created: none
+- Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
+- Files conformed: 0

@@ -24,6 +24,7 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
   const reviewRequestId = useRef(0);
+  const fileRequestId = useRef(0);
   const branchState = useWorkspaceBranches(workspace ? [workspace] : [], async () => {
     await onCheckoutSwitched();
   });
@@ -41,6 +42,10 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
 
   const loadReview = async (force = false) => {
     if (!workspace || !branch) return;
+    if (force) {
+      fileRequestId.current += 1;
+      setFileLoading(false);
+    }
     const requestId = ++reviewRequestId.current;
     const requestContext = reviewContext;
     const isCurrentRequest = () => requestId === reviewRequestId.current && requestContext === reviewContextRef.current;
@@ -78,37 +83,46 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
   }, [workspace?.id, branch, workspaceState?.current]);
 
   useEffect(() => {
+    const requestId = ++fileRequestId.current;
+    const expectedCommit = review?.commit ?? '';
+    const isCurrentRequest = () => requestId === fileRequestId.current;
     setFiles([]);
     setFile(null);
-    if (!selectedItemId) return;
-    let active = true;
+    setFileLoading(false);
+    if (!selectedItemId || !expectedCommit) return;
     setFileLoading(true);
-    api.files(selectedItemId).then((tree) => {
-      if (!active) return;
+    api.files(selectedItemId, expectedCommit).then((tree) => {
+      if (!isCurrentRequest()) return;
       setFiles(tree);
       const first = flattenFiles(tree)[0];
       if (!first) return;
-      return api.file(selectedItemId, first.id).then((content) => {
-        if (active) setFile(content);
+      return api.file(selectedItemId, first.id, expectedCommit).then((content) => {
+        if (isCurrentRequest()) setFile(content);
       });
     }).catch((caught) => {
-      if (active) setError(caught instanceof Error ? caught.message : 'Reviewed files failed to load');
+      if (isCurrentRequest()) setError(caught instanceof Error ? caught.message : 'Reviewed files failed to load');
     }).finally(() => {
-      if (active) setFileLoading(false);
+      if (isCurrentRequest()) setFileLoading(false);
     });
-    return () => { active = false; };
+    return () => {
+      if (isCurrentRequest()) fileRequestId.current += 1;
+    };
   }, [selectedItemId, review?.commit]);
 
   const openFile = async (node: FileNode) => {
-    if (!selectedItemId || node.type !== 'file') return;
+    const expectedCommit = review?.commit ?? '';
+    if (!selectedItemId || !expectedCommit || node.type !== 'file') return;
+    const requestId = ++fileRequestId.current;
+    const isCurrentRequest = () => requestId === fileRequestId.current;
     setFileLoading(true);
     setError('');
     try {
-      setFile(await api.file(selectedItemId, node.id));
+      const content = await api.file(selectedItemId, node.id, expectedCommit);
+      if (isCurrentRequest()) setFile(content);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Reviewed file failed to load');
+      if (isCurrentRequest()) setError(caught instanceof Error ? caught.message : 'Reviewed file failed to load');
     } finally {
-      setFileLoading(false);
+      if (isCurrentRequest()) setFileLoading(false);
     }
   };
 

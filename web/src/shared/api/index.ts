@@ -388,10 +388,16 @@ export const api = {
     request<StorageSyncResult>('/api/storage/sync', { method: 'POST', body: JSON.stringify({ direction, confirm: true }) }).then(normalizeStorageSyncResult),
   items: async (params: URLSearchParams) => ((await request<ItemSummary[] | null>(`/api/items?${params.toString()}`)) ?? []).map(normalizeItem),
   item: async (id: string) => normalizeItemDetail(await request<ItemDetail>(`/api/items/${id}`)),
-  files: async (id: string) => (await request<FileNode[] | null>(`/api/items/${id}/files`)) ?? [],
+  files: async (id: string, expectedCommit?: string) => {
+		const query = expectedCommit ? `?expectedCommit=${encodeURIComponent(expectedCommit)}` : '';
+		return (await request<FileNode[] | null>(`/api/items/${encodeURIComponent(id)}/files${query}`)) ?? [];
+	},
 	searchItemContent: async (id: string, params: { q: string; caseSensitive?: boolean }) =>
 		normalizeContentSearchResponse(await request<WorkspaceContentSearchResponse>(`/api/items/${encodeURIComponent(id)}/content-search?${contentSearchQuery(params).toString()}`)),
-  file: (id: string, fileId: string) => request<FileContent>(`/api/items/${id}/files/${fileId}`),
+  file: (id: string, fileId: string, expectedCommit?: string) => {
+		const query = expectedCommit ? `?expectedCommit=${encodeURIComponent(expectedCommit)}` : '';
+		return request<FileContent>(`/api/items/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}${query}`);
+	},
   saveFile: (id: string, fileId: string, input: FileSaveInput) =>
     request<FileContent>(`/api/items/${id}/files/${fileId}`, { method: 'POST', body: JSON.stringify(input) }),
   revertFile: (id: string, fileId: string) =>

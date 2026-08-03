@@ -33,10 +33,14 @@ workspace and checkout branch; see [[platform-terminal-canvas-reference]].
 | POST   | `/api/workspaces/{id}/workstream/checkout` | optional `force`                                                     | Working-tree branch result |
 | POST   | `/api/workspaces/{id}/reviews/branch`      | `branch`, optional `force`                                           | Read-only pinned snapshot  |
 | POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `expectedCheckoutBranch`, `itemId` | Imported checkout item     |
+| GET    | `/api/items/{id}/files`                    | `expectedCommit` for snapshots                                       | Commit-pinned file tree    |
+| GET    | `/api/items/{id}/files/{fileId}`           | `expectedCommit` for snapshots                                       | Commit-pinned file content |
 
 Snapshot file trees and content are served by the normal item read endpoints because indexed snapshot items retain
 their branch ref and commit. Every snapshot tree operation uses the immutable commit SHA; the branch ref is metadata
-only. Snapshot verification selection and discovered automation specs also come from `plan.yaml` at that commit;
+only. Snapshot file endpoints require the displayed commit as `expectedCommit`, reject a missing or mismatching value
+with `409 review_commit_moved`, and then read through the validated item's copied immutable SHA. Snapshot verification
+selection and discovered automation specs also come from `plan.yaml` at that commit;
 snapshot reads never consult checkout or external automation working trees. Mutation endpoints reject those items even
 if a legacy materialization flag is supplied.
 
@@ -59,22 +63,25 @@ and checkout context. Only the current request may publish review data, errors, 
 superseded responses cannot make actions target a branch different from the route and selector. The file tree and
 preview are keyed by both selected item ID and reviewed commit. If refresh advances a branch while the stable item ID
 remains unchanged, the frontend clears and reloads those files so the header, plan metadata, and preview stay on one
-commit.
+commit. The commit is part of each request URL, so in-flight GET deduplication cannot cross commits. Automatic and
+manual file reads share a request generation; refresh invalidates older generations and late responses cannot replace
+newer preview content or loading state.
 
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->
 <!-- keywords: conflict code, snapshot read-only, branch mismatch, moved commit -->
 
-| Condition                                     | Status | Code or behavior               |
-|-----------------------------------------------|--------|--------------------------------|
-| Legacy operational load requests other branch | 409    | `branch_review_required`       |
-| Snapshot mutation                             | 409    | `snapshot_read_only`           |
-| Legacy Canvas branch differs from checkout    | 409    | `canvas_branch_mismatch`       |
-| Review requests current checkout              | 409    | Review must exit to Workstream |
-| Import item belongs to another workspace      | 404    | Item not found                 |
-| Source branch moved before import             | 409    | `review_commit_moved`          |
-| Destination checkout changed before import    | 409    | `review_checkout_moved`        |
-| Target item root already exists               | 409    | `import_target_exists`         |
+| Condition                                      | Status | Code or behavior               |
+|------------------------------------------------|--------|--------------------------------|
+| Legacy operational load requests other branch  | 409    | `branch_review_required`       |
+| Snapshot mutation                              | 409    | `snapshot_read_only`           |
+| Legacy Canvas branch differs from checkout     | 409    | `canvas_branch_mismatch`       |
+| Review requests current checkout               | 409    | Review must exit to Workstream |
+| Import item belongs to another workspace       | 404    | Item not found                 |
+| Source branch moved before import              | 409    | `review_commit_moved`          |
+| Snapshot file expected commit missing or stale | 409    | `review_commit_moved`          |
+| Destination checkout changed before import     | 409    | `review_checkout_moved`        |
+| Target item root already exists                | 409    | `import_target_exists`         |
 
 `lastSelectedBranch` remains serialized for compatibility but is not read or written for navigation. Existing branch
 scan rows and Canvas layouts remain reusable derived state.

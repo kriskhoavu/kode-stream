@@ -33,6 +33,19 @@ describe('shared api facade', () => {
     await expect(api.localServerReachable()).resolves.toBe(false);
   });
 
+  it('pins snapshot file requests to the expected reviewed commit', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'README_md', path: 'README.md', content: '# Review' }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await api.files('snapshot/item', 'commit/one');
+    await api.file('snapshot/item', 'README md', 'commit/one');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/items/snapshot%2Fitem/files?expectedCommit=commit%2Fone', expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/items/snapshot%2Fitem/files/README%20md?expectedCommit=commit%2Fone', expect.any(Object));
+  });
+
   it('normalizes workspace sources', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

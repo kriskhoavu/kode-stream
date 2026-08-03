@@ -74,6 +74,28 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	if err := json.Unmarshal(review.Body.Bytes(), &result); err != nil || len(result.Items) != 1 || result.SourceMode != "snapshot" {
 		t.Fatalf("review=%+v err=%v", result, err)
 	}
+	itemFilesPath := "/api/items/" + result.Items[0].ID + "/files"
+	missingCommit := branchReviewRequest(t, handler, http.MethodGet, itemFilesPath, "")
+	if missingCommit.Code != http.StatusConflict || !bytes.Contains(missingCommit.Body.Bytes(), []byte(`"code":"review_commit_moved"`)) {
+		t.Fatalf("missing file commit status=%d body=%s", missingCommit.Code, missingCommit.Body.String())
+	}
+	wrongCommit := branchReviewRequest(t, handler, http.MethodGet, itemFilesPath+"?expectedCommit=wrong", "")
+	if wrongCommit.Code != http.StatusConflict || !bytes.Contains(wrongCommit.Body.Bytes(), []byte(`"code":"review_commit_moved"`)) {
+		t.Fatalf("wrong file commit status=%d body=%s", wrongCommit.Code, wrongCommit.Body.String())
+	}
+	matchingFiles := branchReviewRequest(t, handler, http.MethodGet, itemFilesPath+"?expectedCommit="+result.Commit, "")
+	var reviewFiles []models.FileNode
+	if err := json.Unmarshal(matchingFiles.Body.Bytes(), &reviewFiles); err != nil || matchingFiles.Code != http.StatusOK || len(reviewFiles) == 0 {
+		t.Fatalf("matching files status=%d files=%+v err=%v body=%s", matchingFiles.Code, reviewFiles, err, matchingFiles.Body.String())
+	}
+	matchingContent := branchReviewRequest(t, handler, http.MethodGet, itemFilesPath+"/"+reviewFiles[0].ID+"?expectedCommit="+result.Commit, "")
+	if matchingContent.Code != http.StatusOK {
+		t.Fatalf("matching content status=%d body=%s", matchingContent.Code, matchingContent.Body.String())
+	}
+	wrongContent := branchReviewRequest(t, handler, http.MethodGet, itemFilesPath+"/"+reviewFiles[0].ID+"?expectedCommit=wrong", "")
+	if wrongContent.Code != http.StatusConflict || !bytes.Contains(wrongContent.Body.Bytes(), []byte(`"code":"review_commit_moved"`)) {
+		t.Fatalf("wrong content commit status=%d body=%s", wrongContent.Code, wrongContent.Body.String())
+	}
 	mutation := branchReviewRequest(t, handler, http.MethodPatch, "/api/items/"+result.Items[0].ID+"/metadata", `{"status":"review","materializeConfirmed":true}`)
 	if mutation.Code != http.StatusConflict || !bytes.Contains(mutation.Body.Bytes(), []byte(`"code":"snapshot_read_only"`)) {
 		t.Fatalf("mutation status=%d body=%s", mutation.Code, mutation.Body.String())
