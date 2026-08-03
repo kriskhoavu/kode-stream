@@ -17,3 +17,13 @@ sourceCount: 0
   `wiki/e2e-testing/cross-domain/terminal-canvas.md`
 - Pages enriched: none
 - Files conformed: 0
+
+## [2026-08-03] ingest | PM-038 Checkout-First Branch Context And Snapshot Review
+<!-- chunkId: wiki-ingest-log-pm-038 -->
+<!-- keywords: PM-038, checkout, branch review, ingest -->
+
+- Pages created: `wiki/branch-context-concept.md`, `wiki/branch-review-workflows.md`,
+  `wiki/branch-context-reference.md`, `wiki/e2e-testing/cross-domain/branch-review-and-checkout.md`
+- Pages enriched: `wiki/canvas-concept.md` (sourceCount 1→2), `wiki/canvas-workflows.md` (sourceCount 1→2),
+  `wiki/canvas-reference.md` (sourceCount 1→2)
+- Files conformed: 0

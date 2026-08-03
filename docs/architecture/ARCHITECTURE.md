@@ -123,7 +123,7 @@ parameters instead of framework-specific request objects.
 | Domain       | Package                 | Responsibility                                                    |
 |--------------|-------------------------|-------------------------------------------------------------------|
 | Workspace    | `internal/workspace`    | Registration, import, scanning, source settings, files, health    |
-| Workstream   | `internal/workstream`   | Board snapshots, branch-scoped views, filters, active workspace   |
+| Workstream   | `internal/workstream`   | Checkout board loading, commit-pinned branch review, filters      |
 | Item         | `internal/item`         | Item detail, Markdown writes, metadata, status, creation, refresh |
 | Search       | `internal/search`       | Indexed item search, content search, and workspace path search    |
 | Knowledge    | `internal/knowledge`    | LLM Wiki indexing, graph, sync, reads, and enrichment             |
@@ -148,6 +148,7 @@ parameters instead of framework-specific request objects.
 | Item workspace  | `web/src/pages/ItemWorkspacePage.tsx`  | Files, preview, editor, diff, metadata, Jira, Git tools  |
 | Explorer        | `web/src/pages/WorkstreamExplorer.tsx` | Workspace tree, file editor, content search, inspector   |
 | Canvas          | `web/src/pages/CanvasPage.tsx`         | Draggable workspace, plan, and durable session workbench |
+| Branch review   | `web/src/pages/BranchReviewPage.tsx`   | Read-only plans and files from a pinned non-checkout ref |
 | Feature modules | `web/src/features/*`                   | Search, reliability, content rendering, editor, explorer |
 | Shared modules  | `web/src/shared/*`                     | Reusable API, domain, and UI support code                |
 
@@ -230,16 +231,27 @@ Register or scan workspace
   -> report warnings without blocking valid items
 ```
 
-### Branch Load And Re-index
+### Checkout Load, Review, And Re-index
 
 ```text
-Load selected branch
-  -> resolve branch ref and commit
-  -> choose working-tree reader or Git tree snapshot reader
+Load an operational page
+  -> resolve the current Git checkout and commit
+  -> use the working-tree reader only
   -> compare commit, source configuration hash, and working-tree hash with stored branch scan metadata
   -> reuse stored branch index when fresh
-  -> otherwise scan branch and replace branch rows, warnings, and metadata in one transaction
-  -> return current branch board/search data
+  -> otherwise replace checkout branch rows, warnings, and metadata in one transaction
+  -> return checkout board, Canvas, Knowledge, or item data
+
+Open Branch Review
+  -> resolve a non-checkout branch to a pinned ref and commit
+  -> scan or reuse that branch with the Git-tree reader
+  -> expose plans and committed files without mutation or execution actions
+  -> keep the checkout and operational routes unchanged
+
+Import one reviewed structured plan
+  -> re-resolve and require the pinned source commit
+  -> reject an existing destination or unsafe path
+  -> copy into the current checkout and refresh its index
 ```
 
 ### Write
@@ -267,7 +279,7 @@ Terminal and AI sessions
   -> record audit outcome without prompt content
 
 Terminal Canvas
-  -> resolve one layout for workspace and branch
+  -> resolve one layout for workspace and current checkout branch
   -> combine saved placements with current workspace, plan, Git, verification, and session projections
   -> revalidate capabilities and branch context before actions
   -> keep safe durable session metadata separate from the in-memory PTY/process binding

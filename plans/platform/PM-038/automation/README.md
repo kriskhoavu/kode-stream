@@ -17,7 +17,7 @@ selection, and explicit repository writes.
 
 | Playbook                                                | Covers                                             | Status |
 |---------------------------------------------------------|----------------------------------------------------|--------|
-| [Scenario 1](scenario-01-review-and-activate-branch.md) | Review, import, checkout, and cross-page alignment | Draft  |
+| [Scenario 1](scenario-01-review-and-activate-branch.md) | Review, import, checkout, and cross-page alignment | Passed |
 
 ## Latest Result
 

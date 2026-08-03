@@ -6,8 +6,9 @@ roles: BA, DEVELOPER, USER
 topics: canvas, workspace, plan, session, capabilities
 summary: Terminal Canvas is a branch-scoped projection for arranging and operating workspace, plan, and session state.
 sourceRef: plans/platform/PM-037/README.md
-sourceCount: 1
-lastTicket: PM-037
+sourceRef: plans/platform/PM-038/README.md
+sourceCount: 2
+lastTicket: PM-038
 ---
 
 ## Purpose And Boundary
@@ -15,9 +16,10 @@ lastTicket: PM-037
 <!-- keywords: canvas, projection, workspace, plan, session -->
 
 Terminal Canvas supports the daily workspace → plan → session loop without becoming another source of truth. It stores
-layout identity, viewport, positions, collapsed presentation, and branch-aware references. Repository plans, Git state,
+layout identity, viewport, positions, collapsed presentation, and checkout-aware references. Repository plans, Git state,
 verification, safe session records, and live terminal processes remain authoritative in their own domains. See
-[[platform-terminal-canvas-reference]] for exact ownership.
+[[platform-terminal-canvas-reference]] for exact ownership and [[platform-branch-context-concept]] for the operational
+checkout boundary.
 
 ## Independent Runtime Concerns
 <!-- chunkId: platform-terminal-canvas-concept-runtime-concerns -->
@@ -45,4 +47,5 @@ must use explicit membership rather than overlap.
 
 Terminal launch rechecks the plan and current checkout immediately before process start. Durable session metadata stays
 separate from live PTY state, and verification outcome stays separate from fingerprint freshness. These boundaries are
-exercised in [[platform-terminal-canvas-workflows]] and [[platform-terminal-canvas-journey]].
+exercised in [[platform-terminal-canvas-workflows]], [[platform-terminal-canvas-journey]], and
+[[platform-branch-review-checkout-journey]]. Canvas never treats a reviewed snapshot branch as executable context.

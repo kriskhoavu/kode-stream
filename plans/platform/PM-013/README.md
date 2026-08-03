@@ -2,6 +2,10 @@
 
 PM-013 lets Kanban view one selected branch at a time without checking it out. When a user edits content loaded from a non-checkout branch, Kode Stream copies safe plan content into the current checkout branch and applies the edit there.
 
+> **Superseded by [PM-038](../PM-038/README.md):** Git-tree readers and branch-scoped indexes remain in use, but
+> operational branch selection and edit-triggered materialization were removed. Non-checkout content now belongs to
+> the read-only Branch Review route, and copying requires an explicit structured-plan import.
+
 ## Related Plans
 
 | Ticket                        | Relationship     | Key Context                                                                               |

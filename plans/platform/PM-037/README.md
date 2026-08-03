@@ -12,6 +12,10 @@ PM-037 establishes the foundation for a larger Canvas product without shipping a
 release. Groups, notes, artifacts, custom edges, multiple canvases, snapshots, and collaborative layouts remain explicit
 follow-up investments.
 
+> **Branch-context follow-up:** [PM-038](../PM-038/README.md) makes Canvas resolve the current checkout itself before
+> indexing and seeding plan nodes. Canvas no longer accepts a page-selected snapshot branch; non-checkout plans are
+> reviewed separately.
+
 ## MVP Outcome
 
 A successful first release proves this loop:

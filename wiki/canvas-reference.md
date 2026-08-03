@@ -7,8 +7,9 @@ topics: canvas, api, storage, sessions, verification
 summary: Reference for Canvas ownership, branch-aware APIs, safe session records, and verification freshness.
 sourceRef: plans/platform/PM-037/design/design-01-backend.md
 sourceRef: plans/platform/PM-037/design/design-02-frontend.md
-sourceCount: 1
-lastTicket: PM-037
+sourceRef: plans/platform/PM-038/design/design-01-backend.md
+sourceCount: 2
+lastTicket: PM-038
 ---
 
 ## Ownership
@@ -28,9 +29,11 @@ lastTicket: PM-037
 <!-- chunkId: platform-terminal-canvas-reference-api -->
 <!-- keywords: api, resolve, placements, viewport, conflict -->
 
-`POST /api/canvas/resolve` resolves or creates the default owner/workspace/branch layout. `GET /api/canvas/{layoutId}`
-refreshes the projection. Placement and viewport PATCH operations use independent optimistic revisions; a placement
-conflict affects only reported nodes. Branch-aware references cannot cross workspaces or silently rebind stale plans.
+`POST /api/canvas/default` resolves the current checkout through the Workstream loader before it creates or projects the
+default workspace/branch layout. A legacy request branch is accepted only when it matches the checkout; otherwise it
+returns `canvas_branch_mismatch`. `GET /api/canvas/layouts/{layoutId}` refreshes the projection. Placement and viewport
+PATCH operations use independent optimistic revisions; a placement conflict affects only reported nodes. References
+cannot cross workspaces or silently rebind stale plans. See [[platform-branch-context-reference]].
 
 ## Session Safety
 <!-- chunkId: platform-terminal-canvas-reference-session -->
@@ -53,5 +56,6 @@ configuration. `fresh` means start, finish, and current fingerprints match; `sta
 <!-- keywords: limits, placements, coordinates, sessions, deferred -->
 
 The MVP bounds a layout to 300 placements, a patch to 50 placements, coordinate magnitude to 1,000,000, viewport zoom
-to 0.1–2.0, and safe records to 500 per workspace. Postgres Canvas persistence, Cloud Agent execution, snapshot UX,
-groups, custom edges, and durable verification history are deferred.
+to 0.1–2.0, and safe records to 500 per workspace. Postgres Canvas persistence, Cloud Agent execution, snapshot-backed
+Canvas UX, groups, custom edges, and durable verification history are deferred. Local non-checkout review is provided
+by [[platform-branch-review-workflows]], not by Canvas.

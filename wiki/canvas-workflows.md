@@ -6,21 +6,26 @@ roles: USER, BA, TESTER
 topics: canvas, drag, terminal, git, verification
 summary: How to arrange work, launch a branch-safe terminal, and interpret Git and verification state in Canvas.
 sourceRef: plans/platform/PM-037/scenario/scenario-00-overview.md
-sourceCount: 1
-lastTicket: PM-037
+sourceRef: plans/platform/PM-038/scenario/scenario-00-overview.md
+sourceCount: 2
+lastTicket: PM-038
 ---
 
 ## Arrange And Restore Work
 <!-- chunkId: platform-terminal-canvas-workflows-arrange -->
 <!-- keywords: canvas, nodes, drag, keyboard, restore -->
 
-Open **Canvas** for the active workspace and selected branch. Drag a workspace, plan, or session node independently, or
+Open **Canvas** for the active workspace checkout. Canvas resolves Git before loading or seeding the branch-scoped
+layout; it has no independent branch selector. Drag a workspace, plan, or session node independently, or
 focus it and use an arrow key to move 12 pixels; Shift plus an arrow moves one pixel. Wait for **Saved** before reloading.
 **Place new items** accepts deterministic positions without moving saved nodes. **Reset layout** previews and confirms a
 presentation-only reset. **Remove from Canvas** removes only the placement.
 
 Use **Search Canvas nodes** to find a title, identifier, branch, or session state. **Fit view** recovers off-screen nodes.
 Closing the Workbench returns focus to the selected node.
+
+To inspect a different branch without checkout, exit Canvas and use [[platform-branch-review-workflows]]. Returning to a
+previous checkout restores that branch's saved layout without making its layout a global branch selection.
 
 ## Launch A Session
 <!-- chunkId: platform-terminal-canvas-workflows-launch -->

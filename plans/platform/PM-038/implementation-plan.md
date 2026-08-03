@@ -14,7 +14,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | B2    | Canvas and Knowledge checkout synchronization   | Backend    | Complete |
 | F1    | Checkout-first operational surfaces             | Frontend   | Complete |
 | F2    | Dedicated read-only Branch Review               | Frontend   | Complete |
-| I1    | Integration, durable documentation, and browser | Full stack | Pending  |
+| I1    | Integration, durable documentation, and browser | Full stack | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -86,10 +86,10 @@ read-only review route, and make cross-branch plan copying explicit.
 
 **Deliverables:**
 
-- [ ] Run full Go, TypeScript, and frontend test suites.
-- [ ] Update architecture, affected plan history, and durable wiki guidance.
-- [ ] Execute the safe browser journey where runtime inputs permit and record results.
-- [ ] Mark the plan done only after verification succeeds.
+- [x] Run full Go, TypeScript, and frontend test suites.
+- [x] Update architecture, affected plan history, and durable wiki guidance.
+- [x] Execute the safe browser journey in a disposable two-branch Local workspace and record results.
+- [x] Mark the plan done only after verification succeeds.
 
 **Verification:** `go test ./... && npm run typecheck && npm test -- --run`
 

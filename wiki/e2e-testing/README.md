@@ -18,8 +18,9 @@ environment-specific secrets out of durable documentation.
 
 ## Pages
 <!-- chunkId: e2e-testing-index-pages -->
-<!-- keywords: pages, journey, canvas, coverage -->
+<!-- keywords: pages, journey, canvas, branch review -->
 
-| Journey                              | Type   | Roles             | Sources | Summary                                                                  |
-|--------------------------------------|--------|-------------------|---------|--------------------------------------------------------------------------|
-| [[platform-terminal-canvas-journey]] | HOW_TO | TESTER, DEVELOPER | 1       | Arrange Canvas nodes, launch safely, and observe verification staleness. |
+| Journey                                     | Type   | Roles             | Sources | Summary                                                                  |
+|---------------------------------------------|--------|-------------------|---------|--------------------------------------------------------------------------|
+| [[platform-branch-review-checkout-journey]] | HOW_TO | TESTER, DEVELOPER | 1       | Review, import, switch checkout, and verify operational synchronization. |
+| [[platform-terminal-canvas-journey]]        | HOW_TO | TESTER, DEVELOPER | 1       | Arrange Canvas nodes, launch safely, and observe verification staleness. |
