@@ -33,6 +33,7 @@ workspace and checkout branch; see [[platform-terminal-canvas-reference]].
 | POST   | `/api/workspaces/{id}/workstream/checkout` | optional `force`                                                     | Working-tree branch result |
 | POST   | `/api/workspaces/{id}/reviews/branch`      | `branch`, optional `force`                                           | Read-only pinned snapshot  |
 | POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `expectedCheckoutBranch`, `itemId` | Imported checkout item     |
+| GET    | `/api/items/{id}`                          | Working-tree item ID                                                 | Operational item detail    |
 | GET    | `/api/items/{id}/files`                    | `expectedCommit` for snapshots                                       | Commit-pinned file tree    |
 | GET    | `/api/items/{id}/files/{fileId}`           | `expectedCommit` for snapshots                                       | Commit-pinned file content |
 | GET    | `/api/items/{id}/diff`                     | Working-tree item ID                                                 | Checkout diff              |
@@ -44,8 +45,9 @@ only. Snapshot file endpoints require the displayed commit as `expectedCommit`, 
 with `409 review_commit_moved`, and then read through the validated item's copied immutable SHA. Snapshot verification
 selection and discovered automation specs also come from `plan.yaml` at that commit;
 snapshot reads never consult checkout or external automation working trees. Mutation endpoints reject those items even
-if a legacy materialization flag is supplied. Diff and item content search have no snapshot mode: they reject a
-snapshot ID with `409 snapshot_review_only` before invoking checkout-backed readers.
+if a legacy materialization flag is supplied. Operational item detail, diff, and item content search have no snapshot
+mode: they reject a snapshot ID with `409 snapshot_review_only` before returning Item Workspace metadata or invoking
+checkout-backed readers.
 
 ## Synchronization Rules
 <!-- chunkId: platform-branch-context-reference-synchronization -->
@@ -75,6 +77,11 @@ queries exclude them by default. Only the branch-scoped review query opts in. Op
 consumers, and global search therefore expose current-checkout rows only, while storage synchronization preserves the
 review cache without making it operational.
 
+Item Workspace treats successful working-tree detail as its authorization to render operational controls. It clears
+the prior plan when the route identity changes and does not request item files or diff until detail succeeds. A stale
+snapshot bookmark therefore shows only a fail-closed message and Back action; it cannot retain metadata or controls
+from the previously open checkout item.
+
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->
 <!-- keywords: conflict code, snapshot read-only, branch mismatch, moved commit -->
@@ -83,7 +90,7 @@ review cache without making it operational.
 |------------------------------------------------|--------|--------------------------------|
 | Legacy operational load requests other branch  | 409    | `branch_review_required`       |
 | Snapshot mutation                              | 409    | `snapshot_read_only`           |
-| Snapshot diff or item content search           | 409    | `snapshot_review_only`         |
+| Snapshot operational detail, diff, or search   | 409    | `snapshot_review_only`         |
 | Legacy Canvas branch differs from checkout     | 409    | `canvas_branch_mismatch`       |
 | Review requests current checkout               | 409    | Review must exit to Workstream |
 | Import item belongs to another workspace       | 404    | Item not found                 |

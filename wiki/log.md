@@ -91,3 +91,12 @@ sourceCount: 0
 - Pages created: none
 - Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-04] correction | PM-038 Operational Item Detail Isolation
+<!-- chunkId: wiki-ingest-log-pm-038-operational-item-detail-isolation-correction -->
+<!-- keywords: PM-038, snapshot detail, stale bookmark, Item Workspace -->
+
+- Pages created: none
+- Pages enriched: `wiki/branch-context-reference.md` and
+  `wiki/e2e-testing/cross-domain/branch-review-and-checkout.md` (corrected existing PM-038 contract; sourceCount unchanged)
+- Files conformed: 0

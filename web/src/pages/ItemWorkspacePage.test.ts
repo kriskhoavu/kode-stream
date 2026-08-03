@@ -64,6 +64,33 @@ rename to docs/new.md
 });
 
 describe('ItemWorkspacePage', () => {
+  it('removes operational controls when a stale snapshot route is rejected', async () => {
+    const requests: string[] = [];
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      requests.push(url);
+      if (url === '/api/items/item-1') return Promise.resolve(response({
+        id: 'item-1', workspaceId: 'ws-1', workspaceName: 'Workspace', scope: 'platform', branch: 'main',
+        identifier: 'PM-038', title: 'Checkout item', status: 'draft', tags: [], metadataSource: 'plan.yaml',
+        itemPath: 'plans/platform/PM-038', counts: { files: 0 }, warnings: []
+      }));
+      if (url === '/api/items/item-1/files') return Promise.resolve(response([]));
+      if (url === '/api/items/item-1/diff') return Promise.resolve(response({ diff: '' }));
+      if (url === '/api/items/snapshot-item') return Promise.resolve(errorResponse(409, 'snapshot item is available only in Branch Review', 'snapshot_review_only'));
+      return Promise.resolve(response({}));
+    }));
+    const props = { refreshKey: 0, workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }], onBack: vi.fn(), onOpenItem: vi.fn() };
+    const view = render(createElement(ItemWorkspacePage, { ...props, itemId: 'item-1' }));
+    expect(await screen.findByRole('button', { name: 'Plan' })).toBeInTheDocument();
+
+    view.rerender(createElement(ItemWorkspacePage, { ...props, itemId: 'snapshot-item' }));
+    expect(await screen.findByText('snapshot item is available only in Branch Review')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Plan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New file' })).not.toBeInTheDocument();
+    expect(requests).not.toContain('/api/items/snapshot-item/files');
+    expect(requests).not.toContain('/api/items/snapshot-item/diff');
+  });
+
   it('switches from item files to embedded workspace tree mode', async () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
@@ -372,7 +399,9 @@ describe('ItemWorkspacePage', () => {
       onContentChanged: vi.fn()
     }));
 
-    fireEvent.click(await screen.findByRole('button', { name: /Quality/i }));
+    await waitFor(() => expect(screen.getByTestId('embedded-explorer')).toHaveTextContent('ws-1|plans/platform/PM-029|all'));
+    fireEvent.click(screen.getByRole('button', { name: /Quality/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Quality/i })).toHaveClass('active'));
     fireEvent.click(await screen.findByRole('button', { name: 'Browse' }));
     fireEvent.click(await screen.findByRole('button', { name: 'cypress' }));
     fireEvent.click(await screen.findByRole('button', { name: 'e2e' }));
@@ -393,5 +422,13 @@ function response(payload: unknown) {
   return {
     ok: true,
     json: async () => payload
+  };
+}
+
+function errorResponse(status: number, error: string, code: string) {
+  return {
+    ok: false,
+    status,
+    json: async () => ({ error, code })
   };
 }

@@ -1206,6 +1206,10 @@ func (a *API) itemDetail(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
 	}
+	if errors.Is(err, appitem.ErrSnapshotReviewOnly) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "snapshot_review_only"})
+		return
+	}
 	respond(w, item, err)
 }
 

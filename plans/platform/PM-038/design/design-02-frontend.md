@@ -49,3 +49,5 @@ review and opens Workstream.
   context, and invalidate content when changed.
 - Operational routes remove snapshot branch parameters and normalize legacy Canvas URLs.
 - An item missing after checkout returns to Workstream with a concise message instead of showing another branch's item.
+- Item Workspace clears the prior plan when its route identity changes and waits for operational item detail before
+  loading files or diff. A rejected snapshot identity renders only the error and Back action, never checkout controls.

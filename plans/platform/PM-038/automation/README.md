@@ -15,9 +15,9 @@ selection, and explicit repository writes.
 
 ## Playbooks
 
-| Playbook                                                | Covers                                             | Status |
-|---------------------------------------------------------|----------------------------------------------------|--------|
-| [Scenario 1](scenario-01-review-and-activate-branch.md) | Review, import, checkout, and cross-page alignment | Passed |
+| Playbook                                                | Covers                                                         | Status                   |
+|---------------------------------------------------------|----------------------------------------------------------------|--------------------------|
+| [Scenario 1](scenario-01-review-and-activate-branch.md) | Review, stale-route isolation, import, checkout, and alignment | Passed; R9 delta not run |
 
 ## Latest Result
 

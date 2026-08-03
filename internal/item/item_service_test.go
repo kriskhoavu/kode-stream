@@ -643,6 +643,9 @@ func TestSnapshotFileContentResolvesNestedDocsPath(t *testing.T) {
 	}}, models.BranchScanMetadata{ScannedAt: time.Now().UTC()}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := service.Detail("snapshot-docs"); !errors.Is(err, ErrSnapshotReviewOnly) {
+		t.Fatalf("snapshot detail error = %v", err)
+	}
 
 	tree, err := service.Files("snapshot-docs", commit)
 	if err != nil {

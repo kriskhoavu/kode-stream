@@ -78,6 +78,10 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	if operationalItems.Code != http.StatusOK || string(operationalItems.Body.Bytes()) != "[]\n" {
 		t.Fatalf("snapshot leaked into operational items: status=%d body=%s", operationalItems.Code, operationalItems.Body.String())
 	}
+	snapshotDetail := branchReviewRequest(t, handler, http.MethodGet, "/api/items/"+result.Items[0].ID, "")
+	if snapshotDetail.Code != http.StatusConflict || !bytes.Contains(snapshotDetail.Body.Bytes(), []byte(`"code":"snapshot_review_only"`)) {
+		t.Fatalf("snapshot detail status=%d body=%s", snapshotDetail.Code, snapshotDetail.Body.String())
+	}
 	snapshotDiff := branchReviewRequest(t, handler, http.MethodGet, "/api/items/"+result.Items[0].ID+"/diff", "")
 	if snapshotDiff.Code != http.StatusConflict || !bytes.Contains(snapshotDiff.Body.Bytes(), []byte(`"code":"snapshot_review_only"`)) {
 		t.Fatalf("snapshot diff status=%d body=%s", snapshotDiff.Code, snapshotDiff.Body.String())

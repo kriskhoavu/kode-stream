@@ -67,6 +67,9 @@ func (s *Service) Detail(id string) (models.ItemDetail, error) {
 	if err != nil {
 		return models.ItemDetail{}, err
 	}
+	if item.SourceMode == "snapshot" {
+		return models.ItemDetail{}, ErrSnapshotReviewOnly
+	}
 	item.Description = s.fullDescription(workspace, item)
 	return NormalizeDetail(item), nil
 }

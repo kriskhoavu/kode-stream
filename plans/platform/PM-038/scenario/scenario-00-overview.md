@@ -71,5 +71,7 @@ User chooses Switch workspace to this branch
   longer matches. Late automatic or manual file responses are ignored after refresh starts.
 - Snapshot rows remain available to Branch Review but are excluded from operational item lists, workspace consumers,
   and global search. Checkout-backed diff and content search reject snapshot IDs before reading any files.
+- A stale `/items/{snapshot-id}` bookmark returns `snapshot_review_only`; Item Workspace clears any prior plan and
+  renders no file, Git, AI, verification, or mutation controls while the identity is rejected.
 - Snapshot mutation payloads return `snapshot_read_only` and never trigger a copy.
 - External Git checkout changes are detected when the application regains focus.

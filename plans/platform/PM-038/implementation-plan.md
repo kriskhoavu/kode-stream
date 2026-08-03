@@ -23,6 +23,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | R6    | Commit-consistent reviewed file preview         | Frontend   | Complete |
 | R7    | End-to-end commit-pinned file reads             | Full stack | Complete |
 | R8    | Operational snapshot query isolation            | Backend    | Complete |
+| R9    | Operational item detail isolation               | Full stack | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -210,3 +211,17 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./internal/item/index ./internal/item ./internal/search ./internal/storage ./internal/server/api && go test ./...`
 
 **Commit:** `PM-038: Isolate snapshots from operational queries`
+
+## Phase R9: Operational Item Detail Isolation
+
+**Deliverables:**
+
+- [x] Reject snapshot IDs from the operational item-detail service and API with `snapshot_review_only`.
+- [x] Clear stale Item Workspace state before resolving a new item route.
+- [x] Gate operational file and diff loading on successful working-tree item detail.
+- [x] Render only loading or fail-closed navigation while item identity is unresolved or rejected.
+- [x] Add service, transport, component, and reusable browser-runbook regression coverage.
+
+**Verification:** `go test ./internal/item ./internal/server/api && npm run typecheck && npm test -- --run web/src/pages/ItemWorkspacePage.test.ts && go test ./... && npm test -- --run`
+
+**Commit:** `PM-038: Reject snapshots from Item Workspace`

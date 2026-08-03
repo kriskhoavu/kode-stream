@@ -32,7 +32,10 @@ evidence. Chrome DevTools may diagnose a failed Playwright step but is not the e
 3. Assert branch B and a short commit appear while checkout remains branch A.
 4. Open the unique plan and one file; assert committed content is visible and editing, status, terminal, AI, and
    verification controls are absent.
-5. Visit Canvas and Knowledge, then return to the review URL; assert both operational pages still use branch A.
+5. When a stale `/items/{snapshot-id}` bookmark is supplied, open it and wait for item loading to finish. Assert only
+   the review-only error and Back action remain; plan, file, Git, AI, verification, and mutation controls are absent.
+6. Use **Back**, visit Canvas and Knowledge, then return to the review URL; assert both operational pages still use
+   branch A.
 
 These steps are read-only. Capture the checkout label, review context, and committed file preview.
 

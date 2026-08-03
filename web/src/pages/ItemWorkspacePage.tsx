@@ -212,25 +212,38 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   }, [openTabs]);
 
   useEffect(() => {
+    let active = true;
     setError('');
     setRecoveryHint('');
+    setPlan(null);
+    setFiles([]);
+    setDiff('');
     editor.open(null);
     setOpenTabs([]);
     setActiveTabId('');
-    api.item(itemId).then(setPlan).catch((err: Error) => setError(err.message));
-    api.files(itemId).then((tree) => {
-      setFiles(tree);
-      const first = preferredFile(tree);
-      if (first) {
-        setSelectedDirectoryPath('');
-        setSelectedTreeNode({ path: first.path, type: 'file' });
-        void openFile(first.id);
-      } else {
-        setSelectedDirectoryPath('');
-        setSelectedTreeNode(null);
+    void (async () => {
+      try {
+        const nextPlan = await api.item(itemId);
+        if (!active) return;
+        setPlan(nextPlan);
+        const tree = await api.files(itemId);
+        if (!active) return;
+        setFiles(tree);
+        const first = preferredFile(tree);
+        if (first) {
+          setSelectedDirectoryPath('');
+          setSelectedTreeNode({ path: first.path, type: 'file' });
+          void openFile(first.id);
+        } else {
+          setSelectedDirectoryPath('');
+          setSelectedTreeNode(null);
+        }
+        void loadDiff();
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : 'Item failed to load');
       }
-    }).catch((err: Error) => setError(err.message));
-    void loadDiff();
+    })();
+    return () => { active = false; };
   }, [itemId, refreshKey]);
 
   useEffect(() => {
@@ -1079,8 +1092,8 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     </>
   );
 
-  if (error && !plan) {
-    return <section className="empty-state"><button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button><p className="error">{error}</p></section>;
+  if (!plan) {
+    return <section className="empty-state"><button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button>{error ? <p className="error">{error}</p> : <p>Loading item...</p>}</section>;
   }
 
   return (

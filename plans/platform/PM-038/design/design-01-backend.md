@@ -14,6 +14,7 @@ commit that produced its index.
 | POST   | `/api/workspaces/{id}/workstream/checkout` | optional `force`                                                     | checkout branch load result    |
 | POST   | `/api/workspaces/{id}/reviews/branch`      | `branch`, optional `force`                                           | read-only branch review result |
 | POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `expectedCheckoutBranch`, `itemId` | imported checkout item         |
+| GET    | `/api/items/{id}`                          | working-tree item ID                                                 | operational item detail        |
 | GET    | `/api/items/{id}/files`                    | `expectedCommit` required for snapshot items                         | commit-pinned file tree        |
 | GET    | `/api/items/{id}/files/{fileId}`           | `expectedCommit` required for snapshot items                         | commit-pinned file content     |
 | GET    | `/api/items/{id}/diff`                     | working-tree item ID                                                 | checkout diff                  |
@@ -21,8 +22,9 @@ commit that produced its index.
 
 The legacy Workstream branch endpoint accepts the current checkout during one compatibility cycle. A different branch
 returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_only` even when a legacy
-`materializeConfirmed` field is present. Snapshot diff and content-search requests return
-`409 snapshot_review_only` because those operations are checkout-backed and have no commit-pinned implementation.
+`materializeConfirmed` field is present. Snapshot operational detail, diff, and content-search requests return
+`409 snapshot_review_only`; detail cannot open a review identity inside Item Workspace, and the latter operations are
+checkout-backed without a commit-pinned implementation.
 
 ## Review And Import Rules
 
@@ -40,6 +42,7 @@ returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_
 - Preserve snapshot rows when synchronizing or migrating storage, while keeping the operational query default in both
   file-backed and SQLite repositories.
 - Reject snapshot diff and item content-search requests before invoking Git diff or filesystem content search.
+- Reject snapshot item detail before reading a checkout README or returning metadata to operational consumers.
 - Require `expectedCommit` on snapshot file-tree and file-content reads. Compare it with the indexed snapshot before
   reading and return `409 review_commit_moved` when missing or different; working-tree reads remain compatible without
   the parameter. Once validated, read through the copied item's immutable commit even if another refresh replaces the
