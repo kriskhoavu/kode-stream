@@ -22,6 +22,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | R5    | Latest-request Branch Review state              | Frontend   | Complete |
 | R6    | Commit-consistent reviewed file preview         | Frontend   | Complete |
 | R7    | End-to-end commit-pinned file reads             | Full stack | Complete |
+| R8    | Operational snapshot query isolation            | Backend    | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -195,3 +196,17 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./internal/item ./internal/server/api && npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx web/src/shared/api/index.test.ts && go test ./... && npm test -- --run`
 
 **Commit:** `PM-038: Pin reviewed file requests end to end`
+
+## Phase R8: Operational Snapshot Query Isolation
+
+**Deliverables:**
+
+- [x] Exclude reviewed snapshot rows from item listing, workspace consumers, and global search by default.
+- [x] Keep snapshot rows available only through the explicit branch-scoped review query.
+- [x] Reject snapshot diff and item content-search requests before they can inspect the checkout filesystem.
+- [x] Preserve snapshot rows during storage migration and synchronization without exposing them operationally.
+- [x] Add file-index, SQLite, search, service, and transport regression coverage.
+
+**Verification:** `go test ./internal/item/index ./internal/item ./internal/search ./internal/storage ./internal/server/api && go test ./...`
+
+**Commit:** `PM-038: Isolate snapshots from operational queries`

@@ -74,6 +74,18 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	if err := json.Unmarshal(review.Body.Bytes(), &result); err != nil || len(result.Items) != 1 || result.SourceMode != "snapshot" {
 		t.Fatalf("review=%+v err=%v", result, err)
 	}
+	operationalItems := branchReviewRequest(t, handler, http.MethodGet, "/api/items?workspaceId="+workspace.ID, "")
+	if operationalItems.Code != http.StatusOK || string(operationalItems.Body.Bytes()) != "[]\n" {
+		t.Fatalf("snapshot leaked into operational items: status=%d body=%s", operationalItems.Code, operationalItems.Body.String())
+	}
+	snapshotDiff := branchReviewRequest(t, handler, http.MethodGet, "/api/items/"+result.Items[0].ID+"/diff", "")
+	if snapshotDiff.Code != http.StatusConflict || !bytes.Contains(snapshotDiff.Body.Bytes(), []byte(`"code":"snapshot_review_only"`)) {
+		t.Fatalf("snapshot diff status=%d body=%s", snapshotDiff.Code, snapshotDiff.Body.String())
+	}
+	snapshotSearch := branchReviewRequest(t, handler, http.MethodGet, "/api/items/"+result.Items[0].ID+"/content-search?q=reviewed", "")
+	if snapshotSearch.Code != http.StatusConflict || !bytes.Contains(snapshotSearch.Body.Bytes(), []byte(`"code":"snapshot_review_only"`)) {
+		t.Fatalf("snapshot content search status=%d body=%s", snapshotSearch.Code, snapshotSearch.Body.String())
+	}
 	itemFilesPath := "/api/items/" + result.Items[0].ID + "/files"
 	missingCommit := branchReviewRequest(t, handler, http.MethodGet, itemFilesPath, "")
 	if missingCommit.Code != http.StatusConflict || !bytes.Contains(missingCommit.Body.Bytes(), []byte(`"code":"review_commit_moved"`)) {

@@ -40,10 +40,11 @@ type Repository interface {
 }
 
 type Query struct {
-	WorkspaceID string
-	Branch      string
-	Status      string
-	Text        string
+	WorkspaceID      string
+	Branch           string
+	Status           string
+	Text             string
+	IncludeSnapshots bool
 }
 
 func New(path string) *Index {
@@ -164,6 +165,9 @@ func (i *Index) Query(q Query) ([]models.ItemSummary, error) {
 	text := strings.ToLower(strings.TrimSpace(q.Text))
 	out := make([]models.ItemSummary, 0, len(i.state.Items))
 	for _, detail := range i.state.Items {
+		if !q.IncludeSnapshots && detail.SourceMode == "snapshot" {
+			continue
+		}
 		if q.WorkspaceID != "" && detail.WorkspaceID != q.WorkspaceID {
 			continue
 		}
@@ -188,7 +192,7 @@ func (i *Index) Query(q Query) ([]models.ItemSummary, error) {
 }
 
 func (i *Index) BranchItems(workspaceID, branch string) ([]models.ItemSummary, error) {
-	return i.Query(Query{WorkspaceID: workspaceID, Branch: branch})
+	return i.Query(Query{WorkspaceID: workspaceID, Branch: branch, IncludeSnapshots: true})
 }
 
 func (i *Index) BranchScan(workspaceID, branch string) (models.BranchScanMetadata, bool, error) {

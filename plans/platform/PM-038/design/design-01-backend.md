@@ -16,10 +16,13 @@ commit that produced its index.
 | POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `expectedCheckoutBranch`, `itemId` | imported checkout item         |
 | GET    | `/api/items/{id}/files`                    | `expectedCommit` required for snapshot items                         | commit-pinned file tree        |
 | GET    | `/api/items/{id}/files/{fileId}`           | `expectedCommit` required for snapshot items                         | commit-pinned file content     |
+| GET    | `/api/items/{id}/diff`                     | working-tree item ID                                                 | checkout diff                  |
+| GET    | `/api/items/{id}/content-search`           | working-tree item ID and query                                       | checkout content matches       |
 
 The legacy Workstream branch endpoint accepts the current checkout during one compatibility cycle. A different branch
 returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_only` even when a legacy
-`materializeConfirmed` field is present.
+`materializeConfirmed` field is present. Snapshot diff and content-search requests return
+`409 snapshot_review_only` because those operations are checkout-backed and have no commit-pinned implementation.
 
 ## Review And Import Rules
 
@@ -32,6 +35,11 @@ returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_
 - Read verification selection and discovered automation specs for snapshot items from `plan.yaml` at the resolved
   commit; never consult the checkout filesystem or an external automation working tree for snapshot metadata.
 - Review files use Git-tree reads and never fall back to the filesystem.
+- Shared index queries exclude `sourceMode: snapshot` by default. Only the branch-scoped review query opts in, so item
+  listing, workspace consumers, and global search cannot route users from operational pages into reviewed items.
+- Preserve snapshot rows when synchronizing or migrating storage, while keeping the operational query default in both
+  file-backed and SQLite repositories.
+- Reject snapshot diff and item content-search requests before invoking Git diff or filesystem content search.
 - Require `expectedCommit` on snapshot file-tree and file-content reads. Compare it with the indexed snapshot before
   reading and return `409 review_commit_moved` when missing or different; working-tree reads remain compatible without
   the parameter. Once validated, read through the copied item's immutable commit even if another refresh replaces the

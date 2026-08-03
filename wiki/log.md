@@ -83,3 +83,11 @@ sourceCount: 0
 - Pages created: none
 - Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-04] correction | PM-038 Operational Snapshot Isolation
+<!-- chunkId: wiki-ingest-log-pm-038-operational-snapshot-isolation-correction -->
+<!-- keywords: PM-038, snapshot index, operational search, review-only reads -->
+
+- Pages created: none
+- Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
+- Files conformed: 0

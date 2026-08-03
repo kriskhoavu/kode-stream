@@ -2,13 +2,26 @@ package search
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"kode-stream/internal/common/models"
+	appitem "kode-stream/internal/item"
 	"kode-stream/internal/workspace/files"
 )
+
+func TestSearchItemRejectsSnapshotBeforeReadingCheckout(t *testing.T) {
+	workspace := models.WorkspaceConfig{ID: "ws", Path: t.TempDir()}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "review-item", WorkspaceID: workspace.ID, ItemPath: "plans/PM-038", SourceMode: "snapshot"}}
+	service := NewContentSearchService(fakeRegistry{[]models.WorkspaceConfig{workspace}}, fakeIndex{item}, workspacefiles.NewWithIgnoreChecker(nil))
+
+	response, err := service.SearchItem(context.Background(), item.ID, models.WorkspaceContentSearchRequest{Query: "checkout-only"})
+	if !errors.Is(err, appitem.ErrSnapshotReviewOnly) {
+		t.Fatalf("error = %v, response = %#v", err, response)
+	}
+}
 
 type fakeRegistry struct{ workspaces []models.WorkspaceConfig }
 

@@ -115,3 +115,31 @@ func TestReplaceWorkspaceBranchPreservesOtherBranches(t *testing.T) {
 		t.Fatalf("metadata = %#v ok=%v", metadata, ok)
 	}
 }
+
+func TestQueryExcludesSnapshotsUnlessExplicitlyIncluded(t *testing.T) {
+	idx := New(filepath.Join(t.TempDir(), "items.yaml"))
+	now := time.Now().UTC()
+	if err := idx.ReplaceWorkspaceBranch("workspace-a", "main", []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{ID: "checkout-item", WorkspaceID: "workspace-a", Branch: "main", SourceMode: "working_tree"},
+	}}, models.BranchScanMetadata{SourceMode: "working_tree", ScannedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.ReplaceWorkspaceBranch("workspace-a", "feature", []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{ID: "review-item", WorkspaceID: "workspace-a", Branch: "feature", SourceMode: "snapshot"},
+	}}, models.BranchScanMetadata{SourceMode: "snapshot", ScannedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+
+	operational, err := idx.Query(Query{WorkspaceID: "workspace-a"})
+	if err != nil || len(operational) != 1 || operational[0].ID != "checkout-item" {
+		t.Fatalf("operational items = %#v, err = %v", operational, err)
+	}
+	review, err := idx.BranchItems("workspace-a", "feature")
+	if err != nil || len(review) != 1 || review[0].ID != "review-item" {
+		t.Fatalf("review items = %#v, err = %v", review, err)
+	}
+	all, err := idx.Query(Query{WorkspaceID: "workspace-a", IncludeSnapshots: true})
+	if err != nil || len(all) != 2 {
+		t.Fatalf("all items = %#v, err = %v", all, err)
+	}
+}

@@ -53,6 +53,7 @@ Open Branch Review
   -> verify the requested branch is not the checkout
   -> resolve and scan the Git-tree snapshot by commit SHA
   -> replace the branch index transactionally and release the lock
+  -> expose snapshot rows only through the branch-scoped review result
   -> render read-only plans and committed files
 
 Import reviewed plan
@@ -78,6 +79,7 @@ Import reviewed plan
 | Import is an explicit action                  | Remove cross-branch copying entirely | Safe plan reuse remains useful when source and destination are unambiguous.     |
 | Existing Canvas layouts remain branch-scoped  | Migrate to one workspace-wide layout | Returning to a checkout should restore its prior arrangement without data loss. |
 | Legacy selection state is ignored, not erased | Destructive app-state migration      | Existing scans and layouts remain useful and rollback stays safe.               |
+| Snapshot indexes are review-scoped by query   | Separate persistence store           | Preserve branch caches while preventing review rows from entering operations.   |
 
 ## Documents
 

@@ -432,7 +432,7 @@ func (r *SQLiteItemRepository) Query(q itemindex.Query) ([]models.ItemSummary, e
 }
 
 func (r *SQLiteItemRepository) BranchItems(workspaceID, branch string) ([]models.ItemSummary, error) {
-	return r.Query(itemindex.Query{WorkspaceID: workspaceID, Branch: branch})
+	return r.Query(itemindex.Query{WorkspaceID: workspaceID, Branch: branch, IncludeSnapshots: true})
 }
 
 func (r *SQLiteItemRepository) BranchScan(workspaceID, branch string) (models.BranchScanMetadata, bool, error) {
@@ -473,6 +473,10 @@ func (r *SQLiteItemRepository) Get(id string) (models.ItemDetail, bool, error) {
 func (r *SQLiteItemRepository) queryDetails(q itemindex.Query) ([]models.ItemDetail, error) {
 	where := []string{"1=1"}
 	args := []any{}
+	if !q.IncludeSnapshots {
+		where = append(where, "source_mode != ?")
+		args = append(args, "snapshot")
+	}
 	if q.WorkspaceID != "" {
 		where = append(where, "workspace_id = ?")
 		args = append(args, q.WorkspaceID)
@@ -766,7 +770,7 @@ func ImportLegacyFiles(paths system.Paths, git *appgit.GitAdapter, state *AppOwn
 	}
 	if err := importOnce(state.ImportStatus, "item-index.yaml", func() error {
 		legacy := itemindex.New(paths.PlanIndexFile)
-		summaries, err := legacy.Query(itemindex.Query{})
+		summaries, err := legacy.Query(itemindex.Query{IncludeSnapshots: true})
 		if err != nil {
 			return ignoreMissing(paths.PlanIndexFile, err)
 		}

@@ -298,14 +298,14 @@ func readRepositorySnapshot(repositories RepositoryBundle) (storageSnapshot, err
 
 func readItemSnapshot(repository itemindex.Repository) ([]models.ItemDetail, []models.BranchScanMetadata, error) {
 	if sqlItems, ok := repository.(*SQLiteItemRepository); ok {
-		items, err := sqlItems.queryDetails(itemindex.Query{})
+		items, err := sqlItems.queryDetails(itemindex.Query{IncludeSnapshots: true})
 		if err != nil {
 			return nil, nil, err
 		}
 		scans, err := sqlItems.allBranchScans()
 		return items, scans, err
 	}
-	summaries, err := repository.Query(itemindex.Query{})
+	summaries, err := repository.Query(itemindex.Query{IncludeSnapshots: true})
 	if err != nil {
 		return nil, nil, err
 	}

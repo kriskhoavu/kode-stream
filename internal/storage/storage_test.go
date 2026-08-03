@@ -399,6 +399,14 @@ func TestSQLiteItemRepositoryDefaultsMissingUpdatedAt(t *testing.T) {
 	if !stored.UpdatedAt.Equal(scannedAt) {
 		t.Fatalf("updatedAt = %v, want %v", stored.UpdatedAt, scannedAt)
 	}
+	operational, err := state.Items.Query(itemindex.Query{WorkspaceID: "workspace-1"})
+	if err != nil || len(operational) != 0 {
+		t.Fatalf("snapshot leaked into operational query: items=%#v err=%v", operational, err)
+	}
+	review, err := state.Items.BranchItems("workspace-1", "main")
+	if err != nil || len(review) != 1 || review[0].ID != item.ID {
+		t.Fatalf("review items=%#v err=%v", review, err)
+	}
 }
 
 func TestOpenAppOwnedStatePostgresIntegration(t *testing.T) {

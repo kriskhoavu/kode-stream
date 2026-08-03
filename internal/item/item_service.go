@@ -22,6 +22,7 @@ import (
 
 var (
 	ErrSnapshotReadOnly    = errors.New("snapshot item is read-only; import it into the checkout before editing")
+	ErrSnapshotReviewOnly  = errors.New("snapshot item is available only in Branch Review")
 	ErrReviewCommitMoved   = errors.New("reviewed branch changed since it was loaded")
 	ErrReviewCheckoutMoved = errors.New("checkout changed since branch review was loaded")
 	ErrReviewedPlan        = errors.New("reviewed snapshot plan is required")
@@ -109,6 +110,9 @@ func (s *Service) Diff(id string) (string, error) {
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
 		return "", err
+	}
+	if item.SourceMode == "snapshot" {
+		return "", ErrSnapshotReviewOnly
 	}
 	diff, err := s.git.Diff(workspace.Path, item.ItemPath)
 	if err != nil {

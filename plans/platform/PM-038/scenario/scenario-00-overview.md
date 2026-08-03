@@ -69,5 +69,7 @@ User chooses Switch workspace to this branch
   unchanged, so plan metadata and file content always describe the same commit.
 - Every snapshot file request carries the displayed commit and fails with `review_commit_moved` if the indexed item no
   longer matches. Late automatic or manual file responses are ignored after refresh starts.
+- Snapshot rows remain available to Branch Review but are excluded from operational item lists, workspace consumers,
+  and global search. Checkout-backed diff and content search reject snapshot IDs before reading any files.
 - Snapshot mutation payloads return `snapshot_read_only` and never trigger a copy.
 - External Git checkout changes are detected when the application regains focus.

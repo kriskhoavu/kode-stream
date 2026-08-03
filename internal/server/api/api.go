@@ -1253,6 +1253,10 @@ func (a *API) itemDiff(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
 	}
+	if errors.Is(err, appitem.ErrSnapshotReviewOnly) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "snapshot_review_only"})
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1640,6 +1644,8 @@ func respondContentSearch(w http.ResponseWriter, data any, err error) {
 	switch {
 	case err == nil:
 		writeJSON(w, http.StatusOK, data)
+	case errors.Is(err, appitem.ErrSnapshotReviewOnly):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "snapshot_review_only"})
 	case errors.Is(err, apperrors.ErrItemNotFound), errors.Is(err, apperrors.ErrWorkspaceNotFound), errors.Is(err, os.ErrNotExist):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, context.Canceled):

@@ -9,6 +9,7 @@ import (
 
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
+	appitem "kode-stream/internal/item"
 	workspaceaccess "kode-stream/internal/workspace/files"
 )
 
@@ -49,6 +50,9 @@ func (s *Service) SearchItem(ctx context.Context, itemID string, request models.
 	}
 	if !ok {
 		return emptyResponse(), apperrors.ErrItemNotFound
+	}
+	if item.SourceMode == "snapshot" {
+		return emptyResponse(), appitem.ErrSnapshotReviewOnly
 	}
 	workspace, ok, err := s.registry.Get(item.WorkspaceID)
 	if err != nil {

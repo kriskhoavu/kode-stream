@@ -3,15 +3,23 @@ package search
 // Search service contract tests.
 
 import (
+	"path/filepath"
 	"testing"
+	"time"
 
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/item/index"
 )
 
-type itemStub struct{ items []models.ItemSummary }
+type itemStub struct {
+	items []models.ItemSummary
+	query *itemindex.Query
+}
 
 func (s itemStub) Query(query itemindex.Query) ([]models.ItemSummary, error) {
+	if s.query != nil {
+		*s.query = query
+	}
 	items := make([]models.ItemSummary, 0)
 	for _, item := range s.items {
 		if query.WorkspaceID == "" || item.WorkspaceID == query.WorkspaceID {
@@ -19,6 +27,37 @@ func (s itemStub) Query(query itemindex.Query) ([]models.ItemSummary, error) {
 		}
 	}
 	return items, nil
+}
+
+func TestSearchUsesOperationalItemQuery(t *testing.T) {
+	var query itemindex.Query
+	service := New(itemStub{items: []models.ItemSummary{{ID: "checkout", Identifier: "PM-038"}}, query: &query})
+	if _, err := service.Search(models.SearchQuery{Text: "PM-038"}); err != nil {
+		t.Fatal(err)
+	}
+	if query.IncludeSnapshots {
+		t.Fatal("global search opted into reviewed snapshots")
+	}
+}
+
+func TestSearchDoesNotReturnReviewedSnapshotRows(t *testing.T) {
+	idx := itemindex.New(filepath.Join(t.TempDir(), "items.yaml"))
+	now := time.Now().UTC()
+	if err := idx.ReplaceWorkspaceBranch("workspace", "main", []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{ID: "checkout", WorkspaceID: "workspace", Branch: "main", Identifier: "PM-038", SourceMode: "working_tree"},
+	}}, models.BranchScanMetadata{SourceMode: "working_tree", ScannedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.ReplaceWorkspaceBranch("workspace", "feature", []models.ItemDetail{{
+		ItemSummary: models.ItemSummary{ID: "review", WorkspaceID: "workspace", Branch: "feature", Identifier: "PM-038-REVIEW", SourceMode: "snapshot"},
+	}}, models.BranchScanMetadata{SourceMode: "snapshot", ScannedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+
+	results, err := New(idx).Search(models.SearchQuery{Text: "PM-038"})
+	if err != nil || len(results) != 1 || results[0].ID != "checkout" {
+		t.Fatalf("results = %#v, err = %v", results, err)
+	}
 }
 
 func TestSearchRanksExactIdentifierBeforeOtherMatches(t *testing.T) {

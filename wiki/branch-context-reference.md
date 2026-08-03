@@ -35,6 +35,8 @@ workspace and checkout branch; see [[platform-terminal-canvas-reference]].
 | POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `expectedCheckoutBranch`, `itemId` | Imported checkout item     |
 | GET    | `/api/items/{id}/files`                    | `expectedCommit` for snapshots                                       | Commit-pinned file tree    |
 | GET    | `/api/items/{id}/files/{fileId}`           | `expectedCommit` for snapshots                                       | Commit-pinned file content |
+| GET    | `/api/items/{id}/diff`                     | Working-tree item ID                                                 | Checkout diff              |
+| GET    | `/api/items/{id}/content-search`           | Working-tree item ID and query                                       | Checkout content matches   |
 
 Snapshot file trees and content are served by the normal item read endpoints because indexed snapshot items retain
 their branch ref and commit. Every snapshot tree operation uses the immutable commit SHA; the branch ref is metadata
@@ -42,7 +44,8 @@ only. Snapshot file endpoints require the displayed commit as `expectedCommit`, 
 with `409 review_commit_moved`, and then read through the validated item's copied immutable SHA. Snapshot verification
 selection and discovered automation specs also come from `plan.yaml` at that commit;
 snapshot reads never consult checkout or external automation working trees. Mutation endpoints reject those items even
-if a legacy materialization flag is supplied.
+if a legacy materialization flag is supplied. Diff and item content search have no snapshot mode: they reject a
+snapshot ID with `409 snapshot_review_only` before invoking checkout-backed readers.
 
 ## Synchronization Rules
 <!-- chunkId: platform-branch-context-reference-synchronization -->
@@ -67,6 +70,11 @@ commit. The commit is part of each request URL, so in-flight GET deduplication c
 manual file reads share a request generation; refresh invalidates older generations and late responses cannot replace
 newer preview content or loading state.
 
+Snapshot rows may remain in the shared derived index so Branch Review can reuse branch caches, but ordinary index
+queries exclude them by default. Only the branch-scoped review query opts in. Operational item listing, workspace
+consumers, and global search therefore expose current-checkout rows only, while storage synchronization preserves the
+review cache without making it operational.
+
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->
 <!-- keywords: conflict code, snapshot read-only, branch mismatch, moved commit -->
@@ -75,6 +83,7 @@ newer preview content or loading state.
 |------------------------------------------------|--------|--------------------------------|
 | Legacy operational load requests other branch  | 409    | `branch_review_required`       |
 | Snapshot mutation                              | 409    | `snapshot_read_only`           |
+| Snapshot diff or item content search           | 409    | `snapshot_review_only`         |
 | Legacy Canvas branch differs from checkout     | 409    | `canvas_branch_mismatch`       |
 | Review requests current checkout               | 409    | Review must exit to Workstream |
 | Import item belongs to another workspace       | 404    | Item not found                 |
