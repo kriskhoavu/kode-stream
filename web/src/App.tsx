@@ -17,6 +17,7 @@ import { EmbeddedTerminalDock } from './features/ai-session/EmbeddedTerminalDock
 
 const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((module) => ({ default: module.KnowledgePage })));
 const CanvasPage = lazy(() => import('./pages/CanvasPage').then((module) => ({ default: module.CanvasPage })));
+const BranchReviewPage = lazy(() => import('./pages/BranchReviewPage').then((module) => ({ default: module.BranchReviewPage })));
 
 export function App() {
   const extensionSurface = isExtensionSurface();
@@ -260,6 +261,7 @@ export function App() {
             onOpenPlan={(itemId) => navigate({ name: 'item', itemId })}
             onWorkspacesChanged={() => refreshAppData()}
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
+            onOpenReview={() => navigate({ name: 'review', location: { workspaceId: activeRepo?.id } })}
           />
         )}
         {route.name === 'item' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} allowEmbeddedAISessions={!extensionSurface} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={() => refreshAppStateOnly()} />}
@@ -267,6 +269,14 @@ export function App() {
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} activeWorkspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
 		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Canvas...</section>}><CanvasPage workspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
+        {route.name === 'review' && <Suspense fallback={<section className="empty-state">Loading Branch Review...</section>}><BranchReviewPage
+          workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo}
+          location={route.location}
+          onLocationChange={(location) => navigate({ name: 'review', location })}
+          onExit={() => navigate({ name: 'workstream' })}
+          onImported={(itemId) => { void refreshAppData(); navigate({ name: 'item', itemId }); }}
+          onCheckoutSwitched={async () => { await refreshAppData(); navigate({ name: 'workstream' }); }}
+        /></Suspense>}
       </main>
 
       <nav className="bottom-nav">

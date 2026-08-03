@@ -1,6 +1,7 @@
 @import "./app-shell.css";
 @import "../features/workstream-explorer/workstream-explorer.css";
 @import "../features/content-search/content-search.css";
+@import "../features/branch-review/branch-review.css";
 
 :root {
   color-scheme: light;

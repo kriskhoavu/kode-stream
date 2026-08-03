@@ -1,0 +1,21 @@
+.branch-review-page { display: flex; flex-direction: column; min-height: 100%; gap: 16px; padding: 24px; }
+.branch-review-header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+.branch-review-header h1 { margin: 10px 0 4px; }
+.branch-review-header p { margin: 0; color: var(--muted); }
+.branch-review-context, .branch-review-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.branch-review-toolbar { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.branch-review-toolbar label { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.branch-review-toolbar select { min-width: 240px; }
+.branch-context-chip.review code { opacity: .75; }
+.branch-review-grid { display: grid; grid-template-columns: minmax(220px, 280px) minmax(220px, 300px) minmax(0, 1fr); flex: 1; min-height: 520px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.branch-review-plans, .branch-review-files { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-right: 1px solid var(--line); overflow: auto; }
+.branch-review-plans h2, .branch-review-files h2 { display: flex; justify-content: space-between; margin: 0 0 8px; font-size: 14px; }
+.branch-review-plans button, .branch-review-files button { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: inherit; text-align: left; }
+.branch-review-files button { flex-direction: row; align-items: center; width: 100%; }
+.branch-review-plans button:hover, .branch-review-plans button.active, .branch-review-files button:hover, .branch-review-files button.active { border-color: var(--blue); background: var(--panel-soft); }
+.branch-review-plans small { color: var(--muted); }
+.branch-review-preview { min-width: 0; overflow: auto; }
+.branch-review-file-heading { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.branch-review-file-heading span { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+.branch-review-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 360px; color: var(--muted); }
+@media (max-width: 900px) { .branch-review-grid { grid-template-columns: 1fr; } .branch-review-plans, .branch-review-files { border-right: 0; border-bottom: 1px solid var(--line); max-height: 240px; } .branch-review-header { flex-direction: column; } }

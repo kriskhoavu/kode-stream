@@ -13,7 +13,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | B1    | Checkout loader, review, and explicit import    | Backend    | Complete |
 | B2    | Canvas and Knowledge checkout synchronization   | Backend    | Complete |
 | F1    | Checkout-first operational surfaces             | Frontend   | Complete |
-| F2    | Dedicated read-only Branch Review               | Frontend   | Pending  |
+| F2    | Dedicated read-only Branch Review               | Frontend   | Complete |
 | I1    | Integration, durable documentation, and browser | Full stack | Pending  |
 
 ## Phase P1: Feature Contract And Browser Playbook
@@ -72,11 +72,11 @@ read-only review route, and make cross-branch plan copying explicit.
 
 **Deliverables:**
 
-- [ ] Add `/review` routing, review state, plan list/detail, and committed file reading.
-- [ ] Add the Review entry point to the operational workspace context.
-- [ ] Keep every mutation and execution control absent or disabled.
-- [ ] Add explicit import preview and guarded checkout actions.
-- [ ] Add read-only, missing-plan, import-conflict, and checkout tests.
+- [x] Add `/review` routing, review state, plan list/detail, and committed file reading.
+- [x] Add the Review entry point to the operational workspace context.
+- [x] Keep every mutation and execution control absent or disabled.
+- [x] Add explicit import preview and guarded checkout actions.
+- [x] Add read-only, missing-plan, import-conflict, and checkout tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/branch-review web/src/app`
 

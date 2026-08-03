@@ -106,6 +106,10 @@ export function useAppState() {
 			navigate({ name: 'canvas', location: { workspaceId: repo.id } });
 			return;
 		}
+    if (route.name === 'review') {
+      navigate({ name: 'review', location: { workspaceId: repo.id } });
+      return;
+    }
     navigate({ name: 'workstream' });
   };
 

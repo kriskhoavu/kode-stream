@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canvasLocationFromSearch, canvasPath, knowledgeLocationFromSearch, knowledgePath, pathForRoute, routeFromLocation } from './router';
+import { canvasLocationFromSearch, canvasPath, knowledgeLocationFromSearch, knowledgePath, pathForRoute, reviewLocationFromSearch, reviewPath, routeFromLocation } from './router';
 
 describe('router', () => {
   it('parses item workspace routes', () => {
@@ -32,6 +32,14 @@ describe('router', () => {
 		expect(canvasLocationFromSearch('?branch=main')).toBeUndefined();
 		expect(canvasPath()).toBe('/canvas');
 	});
+
+  it('parses and builds Branch Review selections', () => {
+    window.history.pushState(null, '', '/review?workspaceId=ws+one&branch=feature%2Fone');
+    expect(routeFromLocation()).toEqual({ name: 'review', location: { workspaceId: 'ws one', branch: 'feature/one' } });
+    expect(pathForRoute({ name: 'review', location: { workspaceId: 'ws one', branch: 'feature/one' } })).toBe('/review?workspaceId=ws+one&branch=feature%2Fone');
+    expect(reviewLocationFromSearch('')).toBeUndefined();
+    expect(reviewPath()).toBe('/review');
+  });
 
   it('falls removed top-level list routes back to Workstream', () => {
     window.history.pushState(null, '', '/items');

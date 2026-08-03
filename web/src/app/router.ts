@@ -1,6 +1,7 @@
 export type KnowledgeView = 'browse' | 'read' | 'graph';
 export interface KnowledgeLocation { workspaceId?: string; root?: string; slug?: string; view?: KnowledgeView; }
 export interface CanvasLocation { workspaceId?: string; }
+export interface ReviewLocation { workspaceId?: string; branch?: string; }
 
 export type Route =
   | { name: 'workstream'; focusedItemId?: string }
@@ -8,6 +9,7 @@ export type Route =
   | { name: 'settings' }
   | { name: 'knowledge'; location?: KnowledgeLocation }
   | { name: 'canvas'; location?: CanvasLocation }
+  | { name: 'review'; location?: ReviewLocation }
   | { name: 'item'; itemId: string };
 
 export function routeFromLocation(): Route {
@@ -27,6 +29,9 @@ export function routeFromLocation(): Route {
 	if (path === '/canvas') {
 		return { name: 'canvas', location: canvasLocationFromSearch(window.location.search) };
 	}
+  if (path === '/review') {
+    return { name: 'review', location: reviewLocationFromSearch(window.location.search) };
+  }
   if (path === '/workstream' || path === '/') {
     return { name: 'workstream', focusedItemId: workstreamFocusedItemFromSearch(window.location.search) };
   }
@@ -36,6 +41,7 @@ export function routeFromLocation(): Route {
 export function pathForRoute(route: Route): string {
 	if (route.name === 'knowledge') return knowledgePath(route.location);
 	if (route.name === 'canvas') return canvasPath(route.location);
+  if (route.name === 'review') return reviewPath(route.location);
   return route.name === 'item'
     ? `/items/${encodeURIComponent(route.itemId)}`
     : route.name === 'workspaces'
@@ -55,6 +61,20 @@ export function canvasPath(location?: CanvasLocation): string {
 	const query = new URLSearchParams();
 	if (location?.workspaceId) query.set('workspaceId', location.workspaceId);
 	return query.size ? `/canvas?${query.toString()}` : '/canvas';
+}
+
+export function reviewLocationFromSearch(search: string): ReviewLocation | undefined {
+  const query = new URLSearchParams(search);
+  const workspaceId = query.get('workspaceId')?.trim() || undefined;
+  const branch = query.get('branch')?.trim() || undefined;
+  return workspaceId || branch ? { workspaceId, branch } : undefined;
+}
+
+export function reviewPath(location?: ReviewLocation): string {
+  const query = new URLSearchParams();
+  if (location?.workspaceId) query.set('workspaceId', location.workspaceId);
+  if (location?.branch) query.set('branch', location.branch);
+  return query.size ? `/review?${query.toString()}` : '/review';
 }
 
 export function knowledgeLocationFromSearch(search: string): KnowledgeLocation | undefined {

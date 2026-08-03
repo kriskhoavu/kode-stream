@@ -81,7 +81,7 @@ const emptyNewWorkItemDraft = (): NewWorkItemDraft => ({
 
 export { filterPlans };
 
-export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
+export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces, onOpenReview }: {
   workspace?: WorkspaceConfig;
   refreshKey: number;
   visibleStatuses?: ItemStatus[];
@@ -89,6 +89,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   onOpenPlan: (itemId: string) => void;
   onWorkspacesChanged: () => void | Promise<void>;
   onOpenWorkspaces?: () => void;
+  onOpenReview?: () => void;
 }) {
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [query, setQuery] = useState('');
@@ -572,6 +573,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
             <span className="branch-context-chip"><GitBranch size={14} /><span>Checkout</span><strong>{currentBranch}</strong></span>
+            {onOpenReview && <button className="secondary" type="button" onClick={onOpenReview}>Review branch</button>}
             {workspace.sources.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
             ))}
