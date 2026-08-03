@@ -1,6 +1,7 @@
 package item
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +18,12 @@ import (
 	"kode-stream/internal/workspace/registry"
 
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	ErrSnapshotReadOnly  = errors.New("snapshot item is read-only; import it into the checkout before editing")
+	ErrReviewCommitMoved = errors.New("reviewed branch changed since it was loaded")
+	ErrReviewedPlan      = errors.New("reviewed snapshot plan is required")
 )
 
 type ListInput struct {
@@ -114,6 +121,30 @@ func (s *Service) SaveFile(id, fileID string, input models.FileSaveInput) (model
 	return s.files.WriteMarkdown(workspace, item, input)
 }
 
+func (s *Service) ImportReviewedPlan(input models.ReviewedPlanImportInput) (models.WriteResult, error) {
+	itemID := strings.TrimSpace(input.ItemID)
+	workspace, item, err := s.workspaceAndItem(itemID)
+	if err != nil {
+		return models.WriteResult{}, err
+	}
+	if item.SourceMode != "snapshot" || item.Branch != strings.TrimSpace(input.SourceBranch) || isDocumentationItem(item) {
+		return models.WriteResult{}, ErrReviewedPlan
+	}
+	expectedCommit := strings.TrimSpace(input.ExpectedCommit)
+	if expectedCommit == "" || item.Commit != expectedCommit {
+		return models.WriteResult{}, ErrReviewCommitMoved
+	}
+	ref, commit, err := s.git.ResolveBranch(workspace.Path, item.Branch)
+	if err != nil {
+		return models.WriteResult{}, err
+	}
+	if commit != expectedCommit {
+		return models.WriteResult{}, ErrReviewCommitMoved
+	}
+	item.BranchRef = ref
+	return s.writer.ImportSnapshotPlan(workspace, item)
+}
+
 func (s *Service) RevertFile(id, fileID string, validatePaths func(models.WorkspaceConfig, []string) error) (models.ScanResult, error) {
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
@@ -173,6 +204,9 @@ func (s *Service) SaveVerificationTests(id string, input models.VerificationTest
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
 		return models.ItemVerificationTests{}, err
+	}
+	if item.SourceMode == "snapshot" {
+		return models.ItemVerificationTests{}, ErrSnapshotReadOnly
 	}
 	if _, err := s.writer.SaveVerificationTests(workspace, item, input); err != nil {
 		return models.ItemVerificationTests{}, err
@@ -349,15 +383,16 @@ func (s *Service) materializeIfNeeded(workspace models.WorkspaceConfig, item mod
 	if item.SourceMode != "snapshot" {
 		return nil
 	}
-	if !confirmed {
-		return fmt.Errorf("snapshot edit requires materialization confirmation")
-	}
-	return s.writer.MaterializeSnapshotItem(workspace, item, fileID)
+	return ErrSnapshotReadOnly
+}
+
+func isDocumentationItem(item models.ItemDetail) bool {
+	return item.MetadataSource == "docs" || item.MetadataSource == "wiki"
 }
 
 func (s *Service) requireCurrentCheckoutBranch(workspace models.WorkspaceConfig, item models.ItemDetail) error {
 	if item.SourceMode == "snapshot" {
-		return fmt.Errorf("snapshot edit requires materialization confirmation")
+		return ErrSnapshotReadOnly
 	}
 	current, err := s.git.CurrentBranch(workspace.Path)
 	if err != nil {

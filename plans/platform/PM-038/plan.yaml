@@ -1,5 +1,5 @@
 plan:
-  status: draft
+  status: in_progress
   wiki_enriched: false
   e2e-runbook: true
 automation-test:

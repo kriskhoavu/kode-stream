@@ -3,6 +3,7 @@ package item
 // Item service contract tests.
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -235,7 +236,7 @@ Future: playwright/create-offer.spec.ts
 	}
 }
 
-func TestSnapshotMaterializationBlocksExistingTargetFiles(t *testing.T) {
+func TestSnapshotEditsAreReadOnly(t *testing.T) {
 	root := newItemGitRepo(t)
 	writeItemGitFile(t, root, "plans/platform/PM-013/README.md", "# Existing\n")
 	writeItemGitFile(t, root, "plans/platform/PM-013/plan.yaml", "plan:\n  status: draft\n")
@@ -283,8 +284,8 @@ func TestSnapshotMaterializationBlocksExistingTargetFiles(t *testing.T) {
 	}
 
 	_, err = service.SaveMetadata("snapshot-item", models.ItemMetadataUpdateInput{Status: models.StatusReview, MaterializeConfirmed: true})
-	if err == nil || !strings.Contains(err.Error(), "files already exist") {
-		t.Fatalf("expected conflict error, got %v", err)
+	if !errors.Is(err, ErrSnapshotReadOnly) {
+		t.Fatalf("expected snapshot read-only error, got %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(root, "plans/platform/PM-013/README.md"))
 	if err != nil {
@@ -292,6 +293,55 @@ func TestSnapshotMaterializationBlocksExistingTargetFiles(t *testing.T) {
 	}
 	if string(data) != "# Existing\n" {
 		t.Fatalf("existing checkout file was overwritten: %q", data)
+	}
+	_, err = service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ItemID: "snapshot-item"})
+	if err == nil || !strings.Contains(err.Error(), "already exist") {
+		t.Fatalf("expected import conflict, got %v", err)
+	}
+}
+
+func TestImportReviewedPlanCopiesPinnedStructuredPlan(t *testing.T) {
+	root := newItemGitRepo(t)
+	writeItemGitFile(t, root, "README.md", "# Workspace\n")
+	writeItemGitFile(t, root, "plans/.keep", "")
+	itemGitCommit(t, root, "main")
+	itemGitRun(t, root, "switch", "-c", "feature")
+	writeItemGitFile(t, root, "plans/platform/PM-038/README.md", "# PM-038: Review import\n")
+	writeItemGitFile(t, root, "plans/platform/PM-038/plan.yaml", "plan:\n  status: draft\n")
+	itemGitCommit(t, root, "reviewed plan")
+	itemGitRun(t, root, "switch", "main")
+
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(filepath.Join(dir, "items.yaml"))
+	ref, commit, err := git.ResolveBranch(root, "feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "review-item", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name, Branch: "feature", BranchRef: ref, Commit: commit, SourceMode: "snapshot", Editable: false, Scope: "platform", Identifier: "PM-038", Title: "Review import", Status: models.StatusDraft, MetadataSource: "plan.yaml", ItemPath: "plans/platform/PM-038"}}
+	if err := idx.ReplaceWorkspaceBranch(workspace.ID, "feature", []models.ItemDetail{item}, models.BranchScanMetadata{Branch: "feature", Commit: commit, SourceMode: "snapshot", ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	service := New(reg, idx, fileaccess.New(), itemwriter.New(fileaccess.New(), scanner.New(git), idx, reg), git)
+	result, err := service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ItemID: item.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Item.Branch != "main" || result.Item.ItemPath != item.ItemPath {
+		t.Fatalf("import result=%+v", result.Item)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "plans/platform/PM-038/README.md"))
+	if err != nil || string(data) != "# PM-038: Review import\n" {
+		t.Fatalf("imported README=%q err=%v", data, err)
+	}
+	current, _ := git.CurrentBranch(root)
+	if current != "main" {
+		t.Fatalf("import switched checkout to %q", current)
 	}
 }
 

@@ -7,14 +7,14 @@ read-only review route, and make cross-branch plan copying explicit.
 
 ## Phases Summary
 
-| Phase | Name                                            | Track      | Status      |
-|-------|-------------------------------------------------|------------|-------------|
-| P1    | Feature contract and browser playbook           | Full stack | In progress |
-| B1    | Checkout loader, review, and explicit import    | Backend    | Pending     |
-| B2    | Canvas and Knowledge checkout synchronization   | Backend    | Pending     |
-| F1    | Checkout-first operational surfaces             | Frontend   | Pending     |
-| F2    | Dedicated read-only Branch Review               | Frontend   | Pending     |
-| I1    | Integration, durable documentation, and browser | Full stack | Pending     |
+| Phase | Name                                            | Track      | Status   |
+|-------|-------------------------------------------------|------------|----------|
+| P1    | Feature contract and browser playbook           | Full stack | Complete |
+| B1    | Checkout loader, review, and explicit import    | Backend    | Complete |
+| B2    | Canvas and Knowledge checkout synchronization   | Backend    | Pending  |
+| F1    | Checkout-first operational surfaces             | Frontend   | Pending  |
+| F2    | Dedicated read-only Branch Review               | Frontend   | Pending  |
+| I1    | Integration, durable documentation, and browser | Full stack | Pending  |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -32,11 +32,11 @@ read-only review route, and make cross-branch plan copying explicit.
 
 **Deliverables:**
 
-- [ ] Split checkout loading from commit-pinned branch review.
-- [ ] Add review and explicit structured-plan import APIs.
-- [ ] Reject snapshot mutations and legacy non-checkout operational loading.
-- [ ] Preserve branch caches while removing `lastSelectedBranch` behavior.
-- [ ] Add service and API tests for review isolation, commit movement, conflicts, and compatibility.
+- [x] Split checkout loading from commit-pinned branch review.
+- [x] Add review and explicit structured-plan import APIs.
+- [x] Reject snapshot mutations and legacy non-checkout operational loading.
+- [x] Preserve branch caches while removing `lastSelectedBranch` behavior.
+- [x] Add service tests for review isolation, conflicts, and compatibility plus transport error contracts.
 
 **Verification:** `go test ./internal/workstream ./internal/item ./internal/server/api`
 

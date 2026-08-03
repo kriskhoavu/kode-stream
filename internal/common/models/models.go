@@ -729,6 +729,12 @@ type WorkstreamBranchLoadInput struct {
 	Force  bool   `json:"force,omitempty" yaml:"force,omitempty"`
 }
 
+type ReviewedPlanImportInput struct {
+	SourceBranch   string `json:"sourceBranch" yaml:"sourceBranch"`
+	ExpectedCommit string `json:"expectedCommit" yaml:"expectedCommit"`
+	ItemID         string `json:"itemId" yaml:"itemId"`
+}
+
 type WorkstreamBranchLoadResult struct {
 	WorkspaceID           string        `json:"workspaceId" yaml:"workspaceId"`
 	Branch                string        `json:"branch" yaml:"branch"`

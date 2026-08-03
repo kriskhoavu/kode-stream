@@ -178,6 +178,19 @@ func (w *Writer) MaterializeSnapshotItem(workspace models.WorkspaceConfig, item 
 	return nil
 }
 
+func (w *Writer) ImportSnapshotPlan(workspace models.WorkspaceConfig, item models.ItemDetail) (models.WriteResult, error) {
+	if item.SourceMode != "snapshot" {
+		return models.WriteResult{}, fmt.Errorf("reviewed plan must come from a snapshot")
+	}
+	if isDocumentationRoot(item) {
+		return models.WriteResult{}, fmt.Errorf("only structured plans can be imported")
+	}
+	if err := w.MaterializeSnapshotItem(workspace, item, ""); err != nil {
+		return models.WriteResult{}, err
+	}
+	return w.refresh(workspace, item.ItemPath)
+}
+
 func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewItemInput) (models.WriteResult, error) {
 	input.Source = strings.TrimSpace(input.Source)
 	input.Scope = strings.TrimSpace(input.Scope)

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -21,6 +22,11 @@ import (
 	"kode-stream/internal/workspace/scanner"
 )
 
+var (
+	ErrBranchReviewRequired  = errors.New("non-checkout branches must be opened in Branch Review")
+	ErrReviewMatchesCheckout = errors.New("the reviewed branch is already the current checkout")
+)
+
 type Service struct {
 	registry registry.Repository
 	index    itemindex.Repository
@@ -33,32 +39,66 @@ func New(reg registry.Repository, idx itemindex.Repository, scan *scanner.Scanne
 }
 
 func (s *Service) LoadBranch(id string, input models.WorkstreamBranchLoadInput) (models.WorkstreamBranchLoadResult, error) {
-	workspace, ok, err := s.registry.Get(id)
+	workspace, currentCheckoutBranch, err := s.workspaceAndCheckout(id)
 	if err != nil {
 		return models.WorkstreamBranchLoadResult{}, err
 	}
+	selectedBranch := strings.TrimSpace(input.Branch)
+	if selectedBranch != "" && selectedBranch != currentCheckoutBranch {
+		return models.WorkstreamBranchLoadResult{}, ErrBranchReviewRequired
+	}
+	return s.load(workspace, currentCheckoutBranch, currentCheckoutBranch, input.Force, false)
+}
+
+func (s *Service) LoadCheckout(id string, force bool) (models.WorkstreamBranchLoadResult, error) {
+	workspace, currentCheckoutBranch, err := s.workspaceAndCheckout(id)
+	if err != nil {
+		return models.WorkstreamBranchLoadResult{}, err
+	}
+	return s.load(workspace, currentCheckoutBranch, currentCheckoutBranch, force, false)
+}
+
+func (s *Service) ReviewBranch(id string, input models.WorkstreamBranchLoadInput) (models.WorkstreamBranchLoadResult, error) {
+	workspace, currentCheckoutBranch, err := s.workspaceAndCheckout(id)
+	if err != nil {
+		return models.WorkstreamBranchLoadResult{}, err
+	}
+	selectedBranch := strings.TrimSpace(input.Branch)
+	if selectedBranch == "" {
+		return models.WorkstreamBranchLoadResult{}, errors.New("review branch is required")
+	}
+	if selectedBranch == currentCheckoutBranch {
+		return models.WorkstreamBranchLoadResult{}, ErrReviewMatchesCheckout
+	}
+	return s.load(workspace, selectedBranch, currentCheckoutBranch, input.Force, true)
+}
+
+func (s *Service) workspaceAndCheckout(id string) (models.WorkspaceConfig, string, error) {
+	workspace, ok, err := s.registry.Get(id)
+	if err != nil {
+		return models.WorkspaceConfig{}, "", err
+	}
 	if !ok {
-		return models.WorkstreamBranchLoadResult{}, apperrors.ErrWorkspaceNotFound
+		return models.WorkspaceConfig{}, "", apperrors.ErrWorkspaceNotFound
 	}
 	if s.git == nil {
 		s.git = gitadapter.New()
 	}
 	currentCheckoutBranch, err := s.git.CurrentBranch(workspace.Path)
 	if err != nil {
-		return models.WorkstreamBranchLoadResult{}, err
+		return models.WorkspaceConfig{}, "", err
 	}
-	selectedBranch := strings.TrimSpace(input.Branch)
-	if selectedBranch == "" {
-		selectedBranch = firstNonEmpty(workspace.LastSelectedBranch, workspace.BaselineBranch, currentCheckoutBranch)
-	}
+	return workspace, currentCheckoutBranch, nil
+}
+
+func (s *Service) load(workspace models.WorkspaceConfig, selectedBranch, currentCheckoutBranch string, force, snapshot bool) (models.WorkstreamBranchLoadResult, error) {
 	ref, commit, err := s.git.ResolveBranch(workspace.Path, selectedBranch)
 	if err != nil {
 		return models.WorkstreamBranchLoadResult{}, err
 	}
-	sourceMode := "snapshot"
-	editable := false
+	sourceMode, editable := "snapshot", false
 	reader := scanner.SourceReader(scanner.NewGitTreeSourceReader(workspace.Path, ref, s.git))
-	if selectedBranch == currentCheckoutBranch {
+	if !snapshot {
 		sourceMode = "working_tree"
 		editable = true
 		reader = scanner.NewFilesystemSourceReader(workspace.Path)
@@ -71,18 +111,18 @@ func (s *Service) LoadBranch(id string, input models.WorkstreamBranchLoadInput) 
 			return models.WorkstreamBranchLoadResult{}, err
 		}
 	}
-	if !input.Force {
+	if !force {
 		if metadata, ok, err := s.index.BranchScan(workspace.ID, selectedBranch); err != nil {
 			return models.WorkstreamBranchLoadResult{}, err
 		} else if ok &&
 			metadata.Commit == commit &&
+			metadata.SourceMode == sourceMode &&
 			metadata.SourceConfigurationHash == sourceHash &&
 			(sourceMode != "working_tree" || metadata.WorkingTreeHash == workingTreeHash) {
 			items, err := s.index.BranchItems(workspace.ID, selectedBranch)
 			if err != nil {
 				return models.WorkstreamBranchLoadResult{}, err
 			}
-			_ = s.registry.SetLastSelectedBranch(workspace.ID, selectedBranch)
 			return branchLoadResult(workspace.ID, selectedBranch, ref, commit, currentCheckoutBranch, sourceMode, editable, metadata.ScannedAt, metadata.Warnings, items), nil
 		}
 	}
@@ -115,7 +155,6 @@ func (s *Service) LoadBranch(id string, input models.WorkstreamBranchLoadInput) 
 		return models.WorkstreamBranchLoadResult{}, err
 	}
 	_ = s.registry.TouchScanned(workspace.ID, scannedAt)
-	_ = s.registry.SetLastSelectedBranch(workspace.ID, selectedBranch)
 	items, err := s.index.BranchItems(workspace.ID, selectedBranch)
 	if err != nil {
 		return models.WorkstreamBranchLoadResult{}, err
@@ -190,13 +229,4 @@ func branchLoadResult(workspaceID, branch, ref, commit, checkout, sourceMode str
 		Warnings:              warnings,
 		Items:                 items,
 	}
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
-		}
-	}
-	return ""
 }

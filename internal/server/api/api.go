@@ -999,7 +999,74 @@ func (a *API) loadWorkstreamBranch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
 	}
+	if errors.Is(err, appworkstream.ErrBranchReviewRequired) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "branch_review_required"})
+		return
+	}
 	respond(w, result, err)
+}
+
+func (a *API) loadWorkstreamCheckout(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Force bool `json:"force,omitempty"`
+	}
+	if r.Body != nil {
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+	}
+	result, err := a.workstream.LoadCheckout(r.PathValue("id"), input.Force)
+	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+	respond(w, result, err)
+}
+
+func (a *API) loadBranchReview(w http.ResponseWriter, r *http.Request) {
+	var input models.WorkstreamBranchLoadInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.workstream.ReviewBranch(r.PathValue("id"), input)
+	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+	if errors.Is(err, appworkstream.ErrReviewMatchesCheckout) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "review_matches_checkout"})
+		return
+	}
+	respond(w, result, err)
+}
+
+func (a *API) importReviewedPlan(w http.ResponseWriter, r *http.Request) {
+	var input models.ReviewedPlanImportInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.items.ImportReviewedPlan(input)
+	switch {
+	case errors.Is(err, apperrors.ErrItemNotFound):
+		writeError(w, http.StatusNotFound, "item not found")
+	case errors.Is(err, appitem.ErrReviewCommitMoved):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "review_commit_moved"})
+	case errors.Is(err, appitem.ErrReviewedPlan):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "reviewed_plan_required"})
+	case err != nil && strings.Contains(strings.ToLower(err.Error()), "already exist"):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "import_target_exists"})
+	default:
+		respond(w, result, err)
+	}
 }
 
 func (a *API) getSourceStructure(w http.ResponseWriter, r *http.Request) {
@@ -1197,7 +1264,7 @@ func (a *API) saveItemFile(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	result, err := a.items.SaveFile(r.PathValue("id"), r.PathValue("fileID"), input)
 	a.record(item.WorkspaceID, item.ID, "save_file", "File saved.", []string{result.Path}, started, err)
-	respond(w, result, err)
+	respondItemMutation(w, result, err)
 }
 
 func (a *API) revertItemFile(w http.ResponseWriter, r *http.Request) {
@@ -1206,7 +1273,7 @@ func (a *API) revertItemFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
 	}
-	respond(w, result, err)
+	respondItemMutation(w, result, err)
 }
 
 func (a *API) saveItemMetadata(w http.ResponseWriter, r *http.Request) {
@@ -1223,7 +1290,7 @@ func (a *API) saveItemMetadata(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
 	}
-	respond(w, result, err)
+	respondItemMutation(w, result, err)
 }
 
 func (a *API) itemVerificationTests(w http.ResponseWriter, r *http.Request) {
@@ -1273,7 +1340,7 @@ func (a *API) saveItemVerificationTests(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusNotFound, "item not found")
 		return
 	}
-	respond(w, tests, err)
+	respondItemMutation(w, tests, err)
 }
 
 func (a *API) updateItemStatus(w http.ResponseWriter, r *http.Request) {
@@ -1288,6 +1355,14 @@ func (a *API) updateItemStatus(w http.ResponseWriter, r *http.Request) {
 	a.record(item.WorkspaceID, item.ID, "update_status", "Item status updated.", []string{item.ItemPath}, started, err)
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	respondItemMutation(w, result, err)
+}
+
+func respondItemMutation(w http.ResponseWriter, result any, err error) {
+	if errors.Is(err, appitem.ErrSnapshotReadOnly) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "snapshot_read_only"})
 		return
 	}
 	respond(w, result, err)

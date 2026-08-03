@@ -1,6 +1,7 @@
 package workstream
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +17,29 @@ import (
 	"kode-stream/internal/workspace/scanner"
 )
 
-func TestLoadBranchScansSnapshotWithoutCheckout(t *testing.T) {
+func TestLoadBranchRejectsNonCheckoutOperationalContext(t *testing.T) {
+	root := newWorkstreamGitRepo(t)
+	writeWorkstreamGitFile(t, root, "plans/platform/PM-001/README.md", "# PM-001\n")
+	workstreamGitCommit(t, root, "main plan")
+	workstreamGitRun(t, root, "branch", "feature")
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), git)
+	if _, err := service.LoadBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "feature"}); !errors.Is(err, ErrBranchReviewRequired) {
+		t.Fatalf("expected review requirement, got %v", err)
+	}
+	checkout, err := service.LoadCheckout(workspace.ID, true)
+	if err != nil || checkout.Branch != "main" || checkout.SourceMode != "working_tree" {
+		t.Fatalf("checkout result=%+v err=%v", checkout, err)
+	}
+}
+
+func TestReviewBranchScansSnapshotWithoutCheckout(t *testing.T) {
 	root := newWorkstreamGitRepo(t)
 	writeWorkstreamGitFile(t, root, "plans/platform/PM-001/README.md", "# PM-001: Main\n")
 	workstreamGitCommit(t, root, "main plan")
@@ -36,7 +59,7 @@ func TestLoadBranchScansSnapshotWithoutCheckout(t *testing.T) {
 	idx := itemindex.New(filepath.Join(dir, "items.yaml"))
 	service := New(reg, idx, scanner.New(git), git)
 
-	result, err := service.LoadBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "feature", Force: true})
+	result, err := service.ReviewBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "feature", Force: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +170,7 @@ func TestLoadBranchKeepsSameIdentifierContentSeparateInSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	featureResult, err := service.LoadBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "feature", Force: true})
+	featureResult, err := service.ReviewBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "feature", Force: true})
 	if err != nil {
 		t.Fatal(err)
 	}
