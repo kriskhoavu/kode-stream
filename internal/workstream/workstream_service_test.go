@@ -123,6 +123,63 @@ func TestReviewBranchScansSnapshotWithoutCheckout(t *testing.T) {
 	}
 }
 
+func TestReviewBranchWaitsForSwitchAndDoesNotOverwriteCheckoutIndex(t *testing.T) {
+	root := newWorkstreamGitRepo(t)
+	writeWorkstreamGitFile(t, root, "plans/.keep", "")
+	workstreamGitCommit(t, root, "main")
+	workstreamGitRun(t, root, "switch", "-c", "feature")
+	writeWorkstreamGitFile(t, root, "plans/platform/PM-038/README.md", "# PM-038\n")
+	workstreamGitCommit(t, root, "feature plan")
+	workstreamGitRun(t, root, "switch", "main")
+
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(filepath.Join(dir, "items.yaml"))
+	operational := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "operational-feature", WorkspaceID: workspace.ID, Branch: "feature", SourceMode: "working_tree", Editable: true, ItemPath: "plans/platform/PM-038"}}
+	if err := idx.ReplaceWorkspaceBranch(workspace.ID, "feature", []models.ItemDetail{operational}, models.BranchScanMetadata{SourceMode: "working_tree", Editable: true, ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	service := New(reg, idx, scanner.New(git), git)
+	locked := make(chan struct{})
+	release := make(chan struct{})
+	go func() {
+		_ = git.WithWorkspaceMutation(root, func() error {
+			close(locked)
+			<-release
+			return nil
+		})
+	}()
+	<-locked
+	done := make(chan error, 1)
+	go func() {
+		_, reviewErr := service.ReviewBranch(workspace.ID, models.WorkstreamBranchLoadInput{Branch: "feature", Force: true})
+		done <- reviewErr
+	}()
+	select {
+	case reviewErr := <-done:
+		t.Fatalf("review completed while switch mutation was locked: %v", reviewErr)
+	case <-time.After(50 * time.Millisecond):
+	}
+	workstreamGitRun(t, root, "switch", "feature")
+	close(release)
+	if reviewErr := <-done; !errors.Is(reviewErr, ErrReviewMatchesCheckout) {
+		t.Fatalf("review after switch error=%v", reviewErr)
+	}
+	metadata, ok, err := idx.BranchScan(workspace.ID, "feature")
+	if err != nil || !ok || metadata.SourceMode != "working_tree" || !metadata.Editable {
+		t.Fatalf("feature metadata=%+v ok=%v err=%v", metadata, ok, err)
+	}
+	items, err := idx.BranchItems(workspace.ID, "feature")
+	if err != nil || len(items) != 1 || items[0].ID != operational.ID || !items[0].Editable {
+		t.Fatalf("feature items=%+v err=%v", items, err)
+	}
+}
+
 func TestLoadBranchRescansWorkingTreeWhenItemDirectoryIsDeleted(t *testing.T) {
 	root := newWorkstreamGitRepo(t)
 	itemPath := "plans/platform/PM-001"

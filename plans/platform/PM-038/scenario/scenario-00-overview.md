@@ -19,8 +19,10 @@
 
 ```text
 User opens Review branch
-  -> backend resolves branch B to a commit
-  -> Git-tree scanner and file readers stay pinned to that commit SHA
+  -> backend acquires the workspace mutation lock
+  -> backend confirms branch B is not the checkout and resolves it to a commit
+  -> Git-tree scanner, file readers, and index replacement stay pinned to that commit SHA
+  -> backend releases the workspace mutation lock
   -> review renders read-only plans and files
   -> Git checkout and branch A working tree remain unchanged
 ```
@@ -56,7 +58,10 @@ User chooses Switch workspace to this branch
 - Import fails closed on moved refs, changed destination checkouts, existing item roots, unsafe paths, or symlink escape.
 - Failed staging removes temporary content and leaves no target item root, so the import can be retried.
 - Failed checkout index refresh rolls publication back, so the API error does not strand an occupied target.
+- Failed file-index persistence restores the prior in-memory state, so rolled-back imports do not remain as ghost items.
 - In-app checkout switching waits until import publication and checkout index refresh complete.
 - Checkout load holds the same lock through scan-and-replace, so an older scan cannot overwrite the imported index.
+- Review refresh holds that lock through checkout validation and snapshot scan-and-replace, so it cannot overwrite a
+  newly operational checkout index.
 - Snapshot mutation payloads return `snapshot_read_only` and never trigger a copy.
 - External Git checkout changes are detected when the application regains focus.

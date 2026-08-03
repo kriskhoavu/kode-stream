@@ -67,7 +67,7 @@ func (s *Service) loadCheckout(id, requestedBranch string, force bool) (models.W
 }
 
 func (s *Service) ReviewBranch(id string, input models.WorkstreamBranchLoadInput) (models.WorkstreamBranchLoadResult, error) {
-	workspace, currentCheckoutBranch, err := s.workspaceAndCheckout(id)
+	workspace, err := s.workspace(id)
 	if err != nil {
 		return models.WorkstreamBranchLoadResult{}, err
 	}
@@ -75,22 +75,19 @@ func (s *Service) ReviewBranch(id string, input models.WorkstreamBranchLoadInput
 	if selectedBranch == "" {
 		return models.WorkstreamBranchLoadResult{}, errors.New("review branch is required")
 	}
-	if selectedBranch == currentCheckoutBranch {
-		return models.WorkstreamBranchLoadResult{}, ErrReviewMatchesCheckout
-	}
-	return s.load(workspace, selectedBranch, currentCheckoutBranch, input.Force, true)
-}
-
-func (s *Service) workspaceAndCheckout(id string) (models.WorkspaceConfig, string, error) {
-	workspace, err := s.workspace(id)
-	if err != nil {
-		return models.WorkspaceConfig{}, "", err
-	}
-	currentCheckoutBranch, err := s.git.CurrentBranch(workspace.Path)
-	if err != nil {
-		return models.WorkspaceConfig{}, "", err
-	}
-	return workspace, currentCheckoutBranch, nil
+	var result models.WorkstreamBranchLoadResult
+	err = s.git.WithWorkspaceMutation(workspace.Path, func() error {
+		currentCheckoutBranch, err := s.git.CurrentBranch(workspace.Path)
+		if err != nil {
+			return err
+		}
+		if selectedBranch == currentCheckoutBranch {
+			return ErrReviewMatchesCheckout
+		}
+		result, err = s.load(workspace, selectedBranch, currentCheckoutBranch, input.Force, true)
+		return err
+	})
+	return result, err
 }
 
 func (s *Service) workspace(id string) (models.WorkspaceConfig, error) {

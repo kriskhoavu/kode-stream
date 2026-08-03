@@ -18,6 +18,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | R1    | Fail-closed review and import remediation       | Full stack | Complete |
 | R2    | Atomic import and snapshot verification         | Backend    | Complete |
 | R3    | Routed import and index consistency             | Backend    | Complete |
+| R4    | Review serialization and transactional index    | Full stack | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -138,3 +139,16 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./internal/workstream ./internal/item ./internal/item/writer ./internal/server/api`
 
 **Commit:** `PM-038: Preserve routed import index consistency`
+
+## Phase R4: Review Serialization And Transactional Index
+
+**Deliverables:**
+
+- [x] Hold the workspace mutation lock across review checkout validation, snapshot scanning, and index replacement.
+- [x] Disable review branch switching while a snapshot refresh is loading.
+- [x] Restore the complete prior file-index state when persistence fails after any replacement or deletion mutation.
+- [x] Add review-lock, switch-guard, and failed-persistence ghost-item regression tests.
+
+**Verification:** `go test ./internal/workstream ./internal/item/index ./internal/server/api && npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx`
+
+**Commit:** `PM-038: Serialize review refresh and index persistence`

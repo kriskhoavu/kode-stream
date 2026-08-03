@@ -51,3 +51,11 @@ sourceCount: 0
 - Pages created: none
 - Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-03] correction | PM-038 Review And Index Serialization
+<!-- chunkId: wiki-ingest-log-pm-038-review-index-correction -->
+<!-- keywords: PM-038, review refresh, workspace lock, transactional index -->
+
+- Pages created: none
+- Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
+- Files conformed: 0

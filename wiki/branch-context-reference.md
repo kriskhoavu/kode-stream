@@ -51,7 +51,10 @@ reloads branch inventory on focus or visibility return and increments its conten
 In-app checkout switching and reviewed-plan import share one workspace-scoped mutation lock. Import holds it from source
 and destination revalidation through atomic publication and checkout index refresh, so switching cannot interleave.
 Operational checkout loads hold that lock through fingerprinting, scanning, and branch index replacement, preventing a
-scan started before import from overwriting the post-import index.
+scan started before import from overwriting the post-import index. Branch Review also holds the lock across checkout
+validation, commit-pinned scanning, and branch index replacement. A refresh therefore cannot publish snapshot rows for
+a branch that becomes operational during the scan. The review UI disables switching while its initial load or refresh
+is pending.
 
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->
@@ -81,4 +84,6 @@ the expected source commit and destination checkout, and rejects the complete ta
 occupies it. Import writes every file into a sibling temporary directory, removes staging on failure, and publishes only
 the complete plan through an atomic rename. If checkout index refresh fails after publication, import removes the new
 target before returning the error. Review and import never reset, clean, stash, checkout, or switch. Only the explicit
-guarded switch action may change the checkout, and it is serialized with import for the same workspace.
+guarded switch action may change the checkout, and it is serialized with import and review refresh for the same
+workspace. File-backed index replacement and deletion restore their complete prior in-memory state if persistence
+fails, preventing a rolled-back filesystem import from remaining visible as a ghost item.

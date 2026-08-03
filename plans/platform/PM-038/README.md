@@ -49,8 +49,10 @@ Open operational page
   -> render checkout content and capabilities
 
 Open Branch Review
-  -> resolve requested branch and commit
-  -> scan/reuse Git-tree snapshot by commit SHA
+  -> acquire the workspace mutation lock
+  -> verify the requested branch is not the checkout
+  -> resolve and scan the Git-tree snapshot by commit SHA
+  -> replace the branch index transactionally and release the lock
   -> render read-only plans and committed files
 
 Import reviewed plan
@@ -61,7 +63,7 @@ Import reviewed plan
   -> build the complete plan in a sibling temporary directory
   -> atomically rename the staged plan into the checkout
   -> refresh checkout index
-  -> remove the published target if index refresh fails
+  -> remove the published target and restore prior index state if refresh fails
   -> release the workspace mutation lock
   -> open the imported operational item
 ```

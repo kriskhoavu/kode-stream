@@ -29,6 +29,8 @@ review and opens Workstream.
 - Import shows source, commit, destination checkout, and target directory before confirmation and sends that displayed
   checkout as the expected import destination.
 - Dirty checkout switching uses the existing guarded confirmation flow.
+- Disable **Switch workspace to this branch** while the initial review or a snapshot refresh is loading, preventing a
+  competing switch request from being initiated by the same review surface.
 
 ## Synchronization
 

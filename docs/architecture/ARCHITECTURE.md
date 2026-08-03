@@ -243,8 +243,10 @@ Load an operational page
   -> return checkout board, Canvas, Knowledge, or item data
 
 Open Branch Review
-  -> resolve a non-checkout branch to a pinned ref and commit
+  -> acquire the workspace mutation lock shared with checkout loading and switching
+  -> verify the requested branch is not the checkout, then resolve it to a pinned ref and commit
   -> use the commit SHA for every Git-tree scan and file read; retain the ref as metadata
+  -> transactionally replace the branch index and release the lock
   -> expose plans and committed files without mutation or execution actions
   -> keep the checkout and operational routes unchanged
 

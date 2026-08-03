@@ -51,6 +51,23 @@ describe('BranchReviewPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Switch workspace to this branch' }));
     await waitFor(() => expect(mocks.switchBranch).toHaveBeenCalledWith(workspace, 'feature/review'));
   });
+
+  it('disables checkout switching while refreshing the snapshot', async () => {
+    let finishRefresh!: (result: WorkstreamBranchLoadResult) => void;
+    mocks.loadBranchReview
+      .mockResolvedValueOnce(reviewResult())
+      .mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
+    renderReview();
+    const switchButton = await screen.findByRole('button', { name: 'Switch workspace to this branch' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh snapshot' }));
+
+    await waitFor(() => expect(switchButton).toBeDisabled());
+    fireEvent.click(switchButton);
+    expect(mocks.switchBranch).not.toHaveBeenCalled();
+    finishRefresh(reviewResult());
+    await waitFor(() => expect(switchButton).toBeEnabled());
+  });
 });
 
 const workspace: WorkspaceConfig = { id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '' };

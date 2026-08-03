@@ -22,6 +22,9 @@ returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_
 ## Review And Import Rules
 
 - Resolve a review branch to its full ref and commit before scanning.
+- Hold the workspace mutation lock across the current-checkout check, commit resolution, snapshot scan, and branch
+  index replacement. A concurrent switch therefore completes first or waits; a review can never publish snapshot rows
+  for a branch that has become the checkout.
 - Use the resolved commit SHA for every review scan, metadata lookup, tree walk, file read, and import source read;
   retain the branch ref only as descriptive metadata.
 - Read verification selection and discovered automation specs for snapshot items from `plan.yaml` at the resolved
@@ -38,7 +41,8 @@ returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_
 - Build every source file in a sibling temporary directory, remove that directory on any failure, and atomically rename
   the complete directory to the target. Hold the mutation lock through publication and checkout index refresh.
 - If checkout scanning or index persistence fails after publication, remove the newly published target before returning
-  the error so a retry is not converted into `import_target_exists`.
+  the error so a retry is not converted into `import_target_exists`. File-backed index mutations restore the complete
+  prior in-memory state when persistence fails, preventing a rolled-back target from remaining as a ghost item.
 - Preserve unrelated dirty checkout content and never call reset, clean, stash, checkout, or switch.
 - Refresh the checkout index after copying and return the imported checkout item.
 

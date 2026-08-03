@@ -146,7 +146,7 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
           </select>
         </label>
         {review && <button className="secondary" type="button" disabled={loading} onClick={() => void loadReview(true)}><RefreshCw size={15} /> Refresh snapshot</button>}
-        {review && <button className="secondary" type="button" disabled={workspaceState?.switching} onClick={() => void switchCheckout()}><GitBranch size={15} /> {workspaceState?.switching ? 'Switching…' : 'Switch workspace to this branch'}</button>}
+        {review && <button className="secondary" type="button" disabled={loading || workspaceState?.switching} onClick={() => void switchCheckout()}><GitBranch size={15} /> {workspaceState?.switching ? 'Switching…' : 'Switch workspace to this branch'}</button>}
         {review && <button className="primary" type="button" disabled={!canImportSelected || importing} title={selectedItem && !canImportSelected ? 'Only structured plans can be imported' : undefined} onClick={() => void importPlan()}><Download size={15} /> {importing ? 'Importing…' : 'Import selected plan'}</button>}
       </div>
 

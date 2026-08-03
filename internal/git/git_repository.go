@@ -327,6 +327,12 @@ func (g *GitAdapter) SwitchBranch(workspacePath, name string) error {
 
 func (g *GitAdapter) WithWorkspaceMutation(workspacePath string, action func() error) error {
 	key := filepath.Clean(workspacePath)
+	if absolute, err := filepath.Abs(key); err == nil {
+		key = absolute
+	}
+	if resolved, err := filepath.EvalSymlinks(key); err == nil {
+		key = resolved
+	}
 	value, _ := g.mutations.LoadOrStore(key, &sync.Mutex{})
 	lock := value.(*sync.Mutex)
 	lock.Lock()

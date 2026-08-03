@@ -3,12 +3,47 @@ package itemindex
 // Package itemindex persists the Item domain read model.
 
 import (
+	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
 	"kode-stream/internal/common/models"
 )
+
+func TestReplaceWorkspaceBranchRestoresInMemoryStateWhenPersistenceFails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "items.yaml")
+	idx := New(path)
+	now := time.Now().UTC()
+	previousItem := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "main-before", WorkspaceID: "workspace-a", Branch: "main", Title: "Before"}}
+	previousMetadata := models.BranchScanMetadata{Commit: "before", SourceMode: "working_tree", Editable: true, ScannedAt: now, Warnings: []models.ScanWarning{{Message: "before warning"}}}
+	if err := idx.ReplaceWorkspaceBranch("workspace-a", "main", []models.ItemDetail{previousItem}, previousMetadata); err != nil {
+		t.Fatal(err)
+	}
+	before := cloneState(idx.state)
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	err := idx.ReplaceWorkspaceBranch("workspace-a", "main", []models.ItemDetail{{ItemSummary: models.ItemSummary{ID: "ghost-import", WorkspaceID: "workspace-a", Branch: "main", Title: "Ghost"}}}, models.BranchScanMetadata{Commit: "after", SourceMode: "working_tree", Editable: true, ScannedAt: now.Add(time.Second)})
+	if err == nil {
+		t.Fatal("expected persistence failure")
+	}
+	if !reflect.DeepEqual(idx.state, before) {
+		t.Fatalf("in-memory state changed after persistence failure:\n before=%#v\n after=%#v", before, idx.state)
+	}
+	items, err := idx.BranchItems("workspace-a", "main")
+	if err != nil || len(items) != 1 || items[0].ID != previousItem.ID {
+		t.Fatalf("items after failed replacement=%#v err=%v", items, err)
+	}
+	if _, ok, err := idx.Get("ghost-import"); err != nil || ok {
+		t.Fatalf("ghost item remains: ok=%v err=%v", ok, err)
+	}
+}
 
 func TestDeleteWorkspaceRemovesPlansAndKeepsOthers(t *testing.T) {
 	idx := New(filepath.Join(t.TempDir(), "items.yaml"))

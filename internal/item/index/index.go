@@ -56,6 +56,7 @@ func (i *Index) ReplaceWorkspace(workspaceID string, items []models.ItemDetail, 
 	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	previous := cloneState(i.state)
 	next := i.state.Items[:0]
 	for _, item := range i.state.Items {
 		if item.WorkspaceID != workspaceID {
@@ -82,7 +83,7 @@ func (i *Index) ReplaceWorkspace(workspaceID string, items []models.ItemDetail, 
 		i.state.BranchScans = map[string]map[string]models.BranchScanMetadata{}
 	}
 	delete(i.state.BranchScans, workspaceID)
-	return i.saveLocked()
+	return i.saveOrRestoreLocked(previous)
 }
 
 func (i *Index) ReplaceWorkspaceBranch(workspaceID, branch string, items []models.ItemDetail, metadata models.BranchScanMetadata) error {
@@ -91,6 +92,7 @@ func (i *Index) ReplaceWorkspaceBranch(workspaceID, branch string, items []model
 	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	previous := cloneState(i.state)
 	next := i.state.Items[:0]
 	for _, item := range i.state.Items {
 		if item.WorkspaceID == workspaceID && item.Branch == branch {
@@ -124,7 +126,7 @@ func (i *Index) ReplaceWorkspaceBranch(workspaceID, branch string, items []model
 	metadata.WorkspaceID = workspaceID
 	metadata.Branch = branch
 	i.state.BranchScans[workspaceID][branch] = metadata
-	return i.saveLocked()
+	return i.saveOrRestoreLocked(previous)
 }
 
 func (i *Index) DeleteWorkspace(workspaceID string) error {
@@ -133,6 +135,7 @@ func (i *Index) DeleteWorkspace(workspaceID string) error {
 	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	previous := cloneState(i.state)
 	next := i.state.Items[:0]
 	for _, item := range i.state.Items {
 		if item.WorkspaceID != workspaceID {
@@ -149,7 +152,7 @@ func (i *Index) DeleteWorkspace(workspaceID string) error {
 	i.state.Warnings = nextWarnings
 	delete(i.state.Scans, workspaceID)
 	delete(i.state.BranchScans, workspaceID)
-	return i.saveLocked()
+	return i.saveOrRestoreLocked(previous)
 }
 
 func (i *Index) Query(q Query) ([]models.ItemSummary, error) {
@@ -300,4 +303,32 @@ func (i *Index) saveLocked() error {
 		return err
 	}
 	return os.WriteFile(i.path, data, 0o600)
+}
+
+func (i *Index) saveOrRestoreLocked(previous state) error {
+	if err := i.saveLocked(); err != nil {
+		i.state = previous
+		return err
+	}
+	return nil
+}
+
+func cloneState(source state) state {
+	cloned := state{
+		Items:       append([]models.ItemDetail(nil), source.Items...),
+		Warnings:    append([]models.ScanWarning(nil), source.Warnings...),
+		Scans:       make(map[string]time.Time, len(source.Scans)),
+		BranchScans: make(map[string]map[string]models.BranchScanMetadata, len(source.BranchScans)),
+	}
+	for workspaceID, scannedAt := range source.Scans {
+		cloned.Scans[workspaceID] = scannedAt
+	}
+	for workspaceID, branches := range source.BranchScans {
+		cloned.BranchScans[workspaceID] = make(map[string]models.BranchScanMetadata, len(branches))
+		for branch, metadata := range branches {
+			metadata.Warnings = append([]models.ScanWarning(nil), metadata.Warnings...)
+			cloned.BranchScans[workspaceID][branch] = metadata
+		}
+	}
+	return cloned
 }
