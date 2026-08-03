@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react';
-import { Background, Controls, Handle, Position, ReactFlow, useNodesState, useReactFlow } from '@xyflow/react';
+import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
 import type { Edge, Node, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
 import { Box, GitBranch, Play, Search, TerminalSquare, Trash2, Workflow } from 'lucide-react';
 import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasViewport, GitStatus } from '../../lib/types';
@@ -48,7 +48,7 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 	const onMoveEnd: OnMoveEnd = (_, viewport) => onSaveViewport(viewport);
 	const selected = projection.nodes.find((node) => node.id === selectedId);
 
-	return <div className="canvas-board-shell">
+	return <ReactFlowProvider><div className="canvas-board-shell">
 		<div className="canvas-toolbar" aria-label="Canvas tools">
 			<CanvasSearch nodes={projection.nodes} onSelect={onSelect} />
 			<button type="button" onClick={onPlaceUnplaced} disabled={!layoutAvailable || projection.unplaced.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Box size={14} /> Place new items ({projection.unplaced.length})</button>
@@ -63,7 +63,7 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 				<Controls position="bottom-left" showInteractive={false} />
 			</ReactFlow>
 		</div>
-	</div>;
+	</div></ReactFlowProvider>;
 }
 
 function WorkspaceCanvasNode({ data }: NodeProps<CanvasFlowNode>) {

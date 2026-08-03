@@ -5,17 +5,30 @@ import type { CanvasNode, CanvasProjection } from '../../lib/types';
 import { CanvasBoard } from './CanvasBoard';
 
 const fitView = vi.fn();
-vi.mock('@xyflow/react', () => ({
-	ReactFlow: ({ nodes, edges, nodeTypes, onNodeDragStop, onNodeClick, onlyRenderVisibleElements, nodesDraggable, children }: { nodes: Array<{ id: string; type: string; data: Record<string, unknown>; position: { x: number; y: number }; draggable?: boolean }>; edges: Array<{ id: string }>; nodeTypes: Record<string, ComponentType<{ data: Record<string, unknown> }>>; onNodeDragStop: (event: unknown, node: unknown) => void; onNodeClick: (event: unknown, node: { id: string }) => void; onlyRenderVisibleElements: boolean; nodesDraggable: boolean; children: ReactNode }) => <div data-testid="react-flow" data-nodes={nodes.length} data-edges={edges.length} data-visible-only={String(onlyRenderVisibleElements)} data-draggable={String(nodesDraggable)}>{nodes.map((node) => { const Component = nodeTypes[node.type]; return <div key={node.id} data-draggable-node={String(node.draggable)}><Component data={node.data} /><button type="button" onClick={() => onNodeDragStop({}, { ...node, position: { x: 999, y: 888 } })}>drag {node.id}</button><button type="button" onClick={() => onNodeClick({}, node)}>select {node.id}</button></div>; })}{children}</div>,
-	Background: () => null,
-	Controls: () => <div data-testid="flow-controls" />,
-	Handle: () => null,
-	Position: { Left: 'left', Right: 'right' },
-	useNodesState: <T,>(initial: T[]) => [initial, vi.fn(), vi.fn()],
-	useReactFlow: () => ({ fitView, getNode: (id: string) => ({ id }) })
-}));
+vi.mock('@xyflow/react', async () => {
+	const React = await import('react');
+	const FlowContext = React.createContext(false);
+	return {
+		ReactFlowProvider: ({ children }: { children: ReactNode }) => <FlowContext.Provider value>{children}</FlowContext.Provider>,
+		ReactFlow: ({ nodes, edges, nodeTypes, onNodeDragStop, onNodeClick, onlyRenderVisibleElements, nodesDraggable, children }: { nodes: Array<{ id: string; type: string; data: Record<string, unknown>; position: { x: number; y: number }; draggable?: boolean }>; edges: Array<{ id: string }>; nodeTypes: Record<string, ComponentType<{ data: Record<string, unknown> }>>; onNodeDragStop: (event: unknown, node: unknown) => void; onNodeClick: (event: unknown, node: { id: string }) => void; onlyRenderVisibleElements: boolean; nodesDraggable: boolean; children: ReactNode }) => <div data-testid="react-flow" data-nodes={nodes.length} data-edges={edges.length} data-visible-only={String(onlyRenderVisibleElements)} data-draggable={String(nodesDraggable)}>{nodes.map((node) => { const Component = nodeTypes[node.type]; return <div key={node.id} data-draggable-node={String(node.draggable)}><Component data={node.data} /><button type="button" onClick={() => onNodeDragStop({}, { ...node, position: { x: 999, y: 888 } })}>drag {node.id}</button><button type="button" onClick={() => onNodeClick({}, node)}>select {node.id}</button></div>; })}{children}</div>,
+		Background: () => null,
+		Controls: () => <div data-testid="flow-controls" />,
+		Handle: () => null,
+		Position: { Left: 'left', Right: 'right' },
+		useNodesState: <T,>(initial: T[]) => [initial, vi.fn(), vi.fn()],
+		useReactFlow: () => {
+			if (!React.useContext(FlowContext)) throw new Error('ReactFlowProvider is required');
+			return { fitView, getNode: (id: string) => ({ id }) };
+		}
+	};
+});
 
 describe('CanvasBoard', () => {
+	it('provides React Flow context to toolbar search', () => {
+		expect(() => renderBoard(baseProjection())).not.toThrow();
+		expect(screen.getByLabelText('Search Canvas nodes')).toBeInTheDocument();
+	});
+
 	it('renders all semantic nodes as independent draggable placements with derived edges', () => {
 		const onMoveNode = vi.fn();
 		renderBoard(baseProjection(), { onMoveNode });
