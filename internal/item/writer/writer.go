@@ -22,14 +22,20 @@ import (
 )
 
 type Writer struct {
-	files    *fileaccess.Access
-	scanner  *scanner.Scanner
-	index    itemindex.Repository
-	registry registry.Repository
+	files          *fileaccess.Access
+	scanner        *scanner.Scanner
+	index          itemindex.Repository
+	registry       registry.Repository
+	snapshotReader func(models.WorkspaceConfig, models.ItemDetail) scanner.SourceReader
 }
 
 func New(files *fileaccess.Access, scan *scanner.Scanner, idx itemindex.Repository, reg registry.Repository) *Writer {
-	return &Writer{files: files, scanner: scan, index: idx, registry: reg}
+	return &Writer{
+		files: files, scanner: scan, index: idx, registry: reg,
+		snapshotReader: func(workspace models.WorkspaceConfig, item models.ItemDetail) scanner.SourceReader {
+			return scanner.NewGitTreeSourceReader(workspace.Path, item.Commit, gitadapter.New())
+		},
+	}
 }
 
 func (w *Writer) SaveMarkdown(workspace models.WorkspaceConfig, item models.ItemDetail, input models.FileSaveInput) (models.WriteResult, error) {
@@ -104,17 +110,17 @@ func (w *Writer) UpdateStatus(workspace models.WorkspaceConfig, item models.Item
 }
 
 func (w *Writer) MaterializeSnapshotItem(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) error {
-	return w.materializeSnapshotItem(workspace, item, fileID, nil)
+	return w.materializeSnapshotItem(workspace, item, fileID)
 }
 
-func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string, beforeWrite func() error) error {
+func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) error {
 	if item.SourceMode != "snapshot" {
 		return nil
 	}
 	if strings.TrimSpace(item.Commit) == "" {
 		return fmt.Errorf("snapshot commit is missing")
 	}
-	reader := scanner.NewGitTreeSourceReader(workspace.Path, item.Commit, gitadapter.New())
+	reader := w.snapshotReader(workspace, item)
 	scopeRoot := item.ItemPath
 	copyOneFile := isDocumentationRoot(item)
 	var targetItemRoot string
@@ -158,6 +164,9 @@ func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item 
 	if len(files) == 0 {
 		return fmt.Errorf("snapshot item has no files to materialize")
 	}
+	if !copyOneFile {
+		return w.publishStructuredSnapshot(workspace, item, reader, files, targetItemRoot)
+	}
 	for _, rel := range files {
 		if !isInsideConfiguredSource(workspace, rel) {
 			return fmt.Errorf("materialized path is outside configured sources")
@@ -169,22 +178,6 @@ func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item 
 		if _, err := os.Stat(full); err == nil {
 			return fmt.Errorf("This snapshot item cannot be copied because files already exist in the current checkout branch. Resolve the conflict manually or switch branches first.")
 		} else if !os.IsNotExist(err) {
-			return err
-		}
-	}
-	if beforeWrite != nil {
-		if err := beforeWrite(); err != nil {
-			return err
-		}
-	}
-	if !copyOneFile {
-		if err := os.MkdirAll(filepath.Dir(targetItemRoot), 0o755); err != nil {
-			return err
-		}
-		if err := os.Mkdir(targetItemRoot, 0o755); err != nil {
-			if os.IsExist(err) {
-				return fmt.Errorf("import target already exists in the current checkout branch")
-			}
 			return err
 		}
 	}
@@ -210,14 +203,64 @@ func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item 
 	return nil
 }
 
-func (w *Writer) ImportSnapshotPlan(workspace models.WorkspaceConfig, item models.ItemDetail, beforeWrite func() error) (models.WriteResult, error) {
+func (w *Writer) publishStructuredSnapshot(workspace models.WorkspaceConfig, item models.ItemDetail, reader scanner.SourceReader, files []string, targetItemRoot string) error {
+	parent := filepath.Dir(targetItemRoot)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return err
+	}
+	stagingRoot, err := os.MkdirTemp(parent, "."+filepath.Base(targetItemRoot)+".import-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stagingRoot)
+	if err := os.Chmod(stagingRoot, 0o755); err != nil {
+		return err
+	}
+	for _, rel := range files {
+		if !isInsideConfiguredSource(workspace, rel) {
+			return fmt.Errorf("materialized path is outside configured sources")
+		}
+		withinItem, err := filepath.Rel(filepath.FromSlash(item.ItemPath), filepath.FromSlash(rel))
+		if err != nil || withinItem == ".." || strings.HasPrefix(withinItem, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("snapshot file is outside the reviewed item root")
+		}
+		data, err := reader.ReadFile(rel)
+		if err != nil {
+			return err
+		}
+		stagedPath, err := safeJoin(stagingRoot, withinItem)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(stagedPath), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(stagedPath, data, 0o644); err != nil {
+			return err
+		}
+	}
+	if _, err := os.Lstat(targetItemRoot); err == nil {
+		return fmt.Errorf("import target already exists in the current checkout branch")
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.Rename(stagingRoot, targetItemRoot); err != nil {
+		if os.IsExist(err) {
+			return fmt.Errorf("import target already exists in the current checkout branch")
+		}
+		return err
+	}
+	return nil
+}
+
+func (w *Writer) ImportSnapshotPlan(workspace models.WorkspaceConfig, item models.ItemDetail) (models.WriteResult, error) {
 	if item.SourceMode != "snapshot" {
 		return models.WriteResult{}, fmt.Errorf("reviewed plan must come from a snapshot")
 	}
 	if isDocumentationRoot(item) {
 		return models.WriteResult{}, fmt.Errorf("only structured plans can be imported")
 	}
-	if err := w.materializeSnapshotItem(workspace, item, "", beforeWrite); err != nil {
+	if err := w.materializeSnapshotItem(workspace, item, ""); err != nil {
 		return models.WriteResult{}, err
 	}
 	return w.refresh(workspace, item.ItemPath)
@@ -396,15 +439,29 @@ type planFields struct {
 }
 
 func readPlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail) (planYAML, error) {
-	root, err := safeItemPath(workspace, item)
-	if err != nil {
-		return planYAML{}, err
-	}
 	var meta planYAML
-	data, err := os.ReadFile(filepath.Join(root, "plan.yaml"))
-	if os.IsNotExist(err) {
-		meta.Documents = item.Documents
-		return meta, nil
+	var data []byte
+	var err error
+	if item.SourceMode == "snapshot" {
+		commit := strings.TrimSpace(item.Commit)
+		if commit == "" {
+			return meta, fmt.Errorf("snapshot commit is missing")
+		}
+		data, err = gitadapter.New().TreeReadFile(workspace.Path, commit, filepath.ToSlash(filepath.Join(item.ItemPath, "plan.yaml")))
+		if err != nil && snapshotMetadataPathMissing(err) {
+			meta.Documents = item.Documents
+			return meta, nil
+		}
+	} else {
+		root, pathErr := safeItemPath(workspace, item)
+		if pathErr != nil {
+			return meta, pathErr
+		}
+		data, err = os.ReadFile(filepath.Join(root, "plan.yaml"))
+		if os.IsNotExist(err) {
+			meta.Documents = item.Documents
+			return meta, nil
+		}
 	}
 	if err != nil {
 		return meta, err
@@ -421,6 +478,11 @@ func readPlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail) 
 	meta.Plan.Ticket = ""
 	meta.Plan.Service = ""
 	return meta, nil
+}
+
+func snapshotMetadataPathMissing(err error) bool {
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "does not exist in") || strings.Contains(message, "exists on disk, but not in") || strings.Contains(message, "unknown revision or path")
 }
 
 func applyMetadata(meta *planYAML, item models.ItemDetail, input models.ItemMetadataUpdateInput) {

@@ -37,6 +37,7 @@ surface retains commit-pinned snapshot reading without letting a review ref beco
 | Reviewed Commit     | Immutable commit used for all snapshot reads and required by import.           | `expectedCommit`                         |
 | Expected Checkout   | Destination branch shown at confirmation and revalidated before import writes. | `expectedCheckoutBranch`                 |
 | Plan Import         | Explicit copy of one structured snapshot plan into the expected checkout.      | `ImportReviewedPlan`                     |
+| Workspace Mutation  | Per-workspace lock shared by plan import and in-app checkout changes.          | `WithWorkspaceMutation`                  |
 | Checkout Refresh    | Re-index and UI invalidation after the Git checkout changes.                   | workspace content refresh                |
 
 ## Data Flow
@@ -53,10 +54,13 @@ Open Branch Review
   -> render read-only plans and committed files
 
 Import reviewed plan
-  -> revalidate reviewed commit and expected checkout
+  -> acquire the workspace mutation lock
+  -> revalidate reviewed commit and expected checkout under the lock
   -> reject any existing target item root
-  -> copy the structured plan directory
+  -> build the complete plan in a sibling temporary directory
+  -> atomically rename the staged plan into the checkout
   -> refresh checkout index
+  -> release the workspace mutation lock
   -> open the imported operational item
 ```
 

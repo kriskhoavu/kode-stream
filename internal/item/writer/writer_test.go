@@ -3,6 +3,7 @@ package itemwriter
 // Package itemwriter persists and refreshes Item domain files.
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,19 @@ import (
 	"kode-stream/internal/item/index"
 	"kode-stream/internal/workspace/scanner"
 )
+
+type failingSnapshotReader struct {
+	scanner.SourceReader
+	reads int
+}
+
+func (r *failingSnapshotReader) ReadFile(path string) ([]byte, error) {
+	r.reads++
+	if r.reads == 2 {
+		return nil, errors.New("injected snapshot read failure")
+	}
+	return r.SourceReader.ReadFile(path)
+}
 
 func TestSaveMetadataCreatesPlanYAML(t *testing.T) {
 	root := t.TempDir()
@@ -330,6 +344,42 @@ func TestSaveMetadataRefreshesIndex(t *testing.T) {
 	}
 	if items[0].Status != models.StatusDone {
 		t.Fatalf("status = %q, want done", items[0].Status)
+	}
+}
+
+func TestStructuredSnapshotFailureLeavesNoTargetAndCanRetry(t *testing.T) {
+	sourceRoot := t.TempDir()
+	targetRoot := t.TempDir()
+	itemPath := "plans/platform/PM-038"
+	writeFile(t, sourceRoot, itemPath+"/README.md", "# PM-038\n")
+	writeFile(t, sourceRoot, itemPath+"/plan.yaml", "plan:\n  status: draft\n")
+	baseReader := scanner.NewFilesystemSourceReader(sourceRoot)
+	writer := New(nil, nil, nil, nil)
+	writer.snapshotReader = func(models.WorkspaceConfig, models.ItemDetail) scanner.SourceReader {
+		return &failingSnapshotReader{SourceReader: baseReader}
+	}
+	workspace := models.WorkspaceConfig{Path: targetRoot, Sources: []string{"plans"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{Commit: "captured", SourceMode: "snapshot", MetadataSource: "plan.yaml", ItemPath: itemPath}}
+
+	err := writer.MaterializeSnapshotItem(workspace, item, "")
+	if err == nil || !strings.Contains(err.Error(), "injected snapshot read failure") {
+		t.Fatalf("expected injected read failure, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(targetRoot, filepath.FromSlash(itemPath))); !os.IsNotExist(statErr) {
+		t.Fatalf("failed import left target root, err=%v", statErr)
+	}
+	staging, err := filepath.Glob(filepath.Join(targetRoot, "plans/platform/.PM-038.import-*"))
+	if err != nil || len(staging) != 0 {
+		t.Fatalf("failed import left staging directories: %#v err=%v", staging, err)
+	}
+
+	writer.snapshotReader = func(models.WorkspaceConfig, models.ItemDetail) scanner.SourceReader { return baseReader }
+	if err := writer.MaterializeSnapshotItem(workspace, item, ""); err != nil {
+		t.Fatalf("retry failed: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(targetRoot, filepath.FromSlash(itemPath), "README.md"))
+	if err != nil || string(data) != "# PM-038\n" {
+		t.Fatalf("retry content=%q err=%v", data, err)
 	}
 }
 

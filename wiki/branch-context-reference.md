@@ -36,7 +36,9 @@ workspace and checkout branch; see [[platform-terminal-canvas-reference]].
 
 Snapshot file trees and content are served by the normal item read endpoints because indexed snapshot items retain
 their branch ref and commit. Every snapshot tree operation uses the immutable commit SHA; the branch ref is metadata
-only. Mutation endpoints reject those items even if a legacy materialization flag is supplied.
+only. Snapshot verification selection and discovered automation specs also come from `plan.yaml` at that commit;
+snapshot reads never consult checkout or external automation working trees. Mutation endpoints reject those items even
+if a legacy materialization flag is supplied.
 
 ## Synchronization Rules
 <!-- chunkId: platform-branch-context-reference-synchronization -->
@@ -46,6 +48,8 @@ The checkout loader compares branch commit, source configuration, and a working-
 Canvas invokes it before resolving the default layout and rejects a legacy `branchKey` that differs from checkout.
 Knowledge records the checkout branch and commit that produced its index and rebuilds after either changes. The frontend
 reloads branch inventory on focus or visibility return and increments its content refresh key when checkout changed.
+In-app checkout switching and reviewed-plan import share one workspace-scoped mutation lock. Import holds it from source
+and destination revalidation through atomic publication and checkout index refresh, so switching cannot interleave.
 
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->
@@ -70,5 +74,7 @@ scan rows and Canvas layouts remain reusable derived state.
 
 Review reads Git objects by immutable commit SHA only. Import accepts structured plans within configured sources,
 rejects traversal and symlink escape, revalidates both the expected source commit and destination checkout, and rejects
-the complete target item root when any entry already occupies it. Review and import never reset, clean, stash, checkout,
-or switch. Only the explicit guarded switch action may change the checkout.
+the complete target item root when any entry already occupies it. Import writes every file into a sibling temporary
+directory, removes staging on failure, and publishes only the complete plan through an atomic rename. Review and import
+never reset, clean, stash, checkout, or switch. Only the explicit guarded switch action may change the checkout, and it
+is serialized with import for the same workspace.

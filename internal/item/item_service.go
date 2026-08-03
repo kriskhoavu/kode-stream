@@ -135,19 +135,19 @@ func (s *Service) ImportReviewedPlan(input models.ReviewedPlanImportInput) (mode
 	if expectedCommit == "" || item.Commit != expectedCommit {
 		return models.WriteResult{}, ErrReviewCommitMoved
 	}
-	ref, commit, err := s.git.ResolveBranch(workspace.Path, item.Branch)
-	if err != nil {
-		return models.WriteResult{}, err
-	}
-	if commit != expectedCommit {
-		return models.WriteResult{}, ErrReviewCommitMoved
-	}
 	expectedCheckout := strings.TrimSpace(input.ExpectedCheckoutBranch)
 	if expectedCheckout == "" {
 		return models.WriteResult{}, ErrReviewCheckoutMoved
 	}
-	item.BranchRef = ref
-	return s.writer.ImportSnapshotPlan(workspace, item, func() error {
+	var result models.WriteResult
+	err = s.git.WithWorkspaceMutation(workspace.Path, func() error {
+		ref, commit, err := s.git.ResolveBranch(workspace.Path, item.Branch)
+		if err != nil {
+			return err
+		}
+		if commit != expectedCommit {
+			return ErrReviewCommitMoved
+		}
 		currentCheckout, err := s.git.CurrentBranch(workspace.Path)
 		if err != nil {
 			return err
@@ -155,8 +155,11 @@ func (s *Service) ImportReviewedPlan(input models.ReviewedPlanImportInput) (mode
 		if currentCheckout != expectedCheckout {
 			return ErrReviewCheckoutMoved
 		}
-		return nil
+		item.BranchRef = ref
+		result, err = s.writer.ImportSnapshotPlan(workspace, item)
+		return err
 	})
+	return result, err
 }
 
 func (s *Service) RevertFile(id, fileID string, validatePaths func(models.WorkspaceConfig, []string) error) (models.ScanResult, error) {
@@ -259,6 +262,21 @@ func DiscoverVerificationSpecs(workspace models.WorkspaceConfig, item models.Ite
 	}
 	specs := []models.DiscoveredVerificationSpec{}
 	seen := map[string]struct{}{}
+	if item.SourceMode == "snapshot" {
+		commit, err := snapshotCommit(item)
+		if err != nil {
+			return nil, err
+		}
+		sourcePath := filepath.ToSlash(filepath.Join(item.ItemPath, "plan.yaml"))
+		data, err := gitadapter.New().TreeReadFile(workspace.Path, commit, sourcePath)
+		if err != nil {
+			if snapshotPathMissing(err) {
+				return specs, nil
+			}
+			return nil, err
+		}
+		return discoverVerificationSpecsInPlanYAMLData(data, sourcePath, workspace.Runtime.Automation.Runner, seen)
+	}
 	if workspace.Path != "" && item.ItemPath != "" {
 		found, err := discoverVerificationSpecsInPlanYAML(workspace.Path, filepath.Join(workspace.Path, item.ItemPath), workspace.Runtime.Automation.Runner, seen)
 		if err != nil {
@@ -324,13 +342,17 @@ func discoverVerificationSpecsInPlanYAML(repoRoot, planRoot string, fallbackRunn
 	if err != nil {
 		return nil, err
 	}
-	var meta verificationPlanYAML
-	if err := yaml.Unmarshal(data, &meta); err != nil {
-		return nil, err
-	}
 	sourcePath, err := filepath.Rel(repoRoot, filepath.Join(planRoot, "plan.yaml"))
 	if err != nil {
 		sourcePath = filepath.Join(planRoot, "plan.yaml")
+	}
+	return discoverVerificationSpecsInPlanYAMLData(data, filepath.ToSlash(sourcePath), fallbackRunner, seen)
+}
+
+func discoverVerificationSpecsInPlanYAMLData(data []byte, sourcePath string, fallbackRunner models.AutomationRunner, seen map[string]struct{}) ([]models.DiscoveredVerificationSpec, error) {
+	var meta verificationPlanYAML
+	if err := yaml.Unmarshal(data, &meta); err != nil {
+		return nil, err
 	}
 	specs := []models.DiscoveredVerificationSpec{}
 	for _, entry := range meta.AutomationTests {
@@ -349,6 +371,11 @@ func discoverVerificationSpecsInPlanYAML(repoRoot, planRoot string, fallbackRunn
 		})
 	}
 	return specs, nil
+}
+
+func snapshotPathMissing(err error) bool {
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "does not exist in") || strings.Contains(message, "exists on disk, but not in") || strings.Contains(message, "unknown revision or path")
 }
 
 func runnerForSpecPath(path string, fallback models.AutomationRunner) models.AutomationRunner {

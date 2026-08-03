@@ -35,3 +35,11 @@ sourceCount: 0
 - Pages created: none
 - Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-03] correction | PM-038 Atomic Branch Review Import
+<!-- chunkId: wiki-ingest-log-pm-038-atomic-import-correction -->
+<!-- keywords: PM-038, workspace lock, atomic rename, snapshot verification -->
+
+- Pages created: none
+- Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
+- Files conformed: 0

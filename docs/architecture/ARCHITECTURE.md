@@ -249,10 +249,12 @@ Open Branch Review
   -> keep the checkout and operational routes unchanged
 
 Import one reviewed structured plan
-  -> re-resolve and require the pinned source commit
-  -> re-resolve and require the checkout confirmed by the user
+  -> acquire the workspace mutation lock shared with in-app checkout switching
+  -> re-resolve and require the pinned source commit and confirmed checkout under the lock
   -> reject an existing destination item root or unsafe path
-  -> copy into the confirmed checkout and refresh its index
+  -> stage the complete plan beside its destination
+  -> atomically rename it into the confirmed checkout and refresh its index
+  -> release the workspace mutation lock
 ```
 
 ### Write

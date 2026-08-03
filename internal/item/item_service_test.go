@@ -236,6 +236,76 @@ Future: playwright/create-offer.spec.ts
 	}
 }
 
+func TestSnapshotVerificationTestsReadCapturedCommit(t *testing.T) {
+	root := newItemGitRepo(t)
+	writeItemGitFile(t, root, "plans/platform/PM-038/plan.yaml", `plan:
+  status: draft
+verificationTests:
+  selectedSpecs:
+    - checkout.cy.ts
+automation-test:
+  - path: checkout.cy.ts
+`)
+	itemGitCommit(t, root, "checkout plan")
+	itemGitRun(t, root, "switch", "-c", "feature")
+	writeItemGitFile(t, root, "plans/platform/PM-038/plan.yaml", `plan:
+  status: draft
+verificationTests:
+  selectedSpecs:
+    - reviewed.cy.ts
+automation-test:
+  - path: reviewed.cy.ts
+`)
+	itemGitCommit(t, root, "captured review")
+	git := gitadapter.New()
+	ref, commit, err := git.ResolveBranch(root, "feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeItemGitFile(t, root, "plans/platform/PM-038/plan.yaml", `plan:
+  status: done
+verificationTests:
+  selectedSpecs:
+    - advanced.cy.ts
+automation-test:
+  - path: advanced.cy.ts
+`)
+	itemGitCommit(t, root, "advanced review")
+	itemGitRun(t, root, "switch", "main")
+
+	dataDir := t.TempDir()
+	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{
+		Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"},
+		Runtime: &models.WorkspaceRuntimeConfig{
+			Type: models.RuntimeTypeCustom, RebuildPolicy: models.RebuildPolicyNever,
+			Commands:   models.RuntimeCommandSet{Up: "true", Down: "true", Verify: models.RuntimeVerifyCommands{Smoke: "true"}},
+			Automation: &models.RuntimeAutomationConfig{Enabled: true, RepositoryPath: root, Runner: models.AutomationRunnerCypress},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(filepath.Join(dataDir, "items.yaml"))
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "snapshot-verification", WorkspaceID: workspace.ID, Branch: "feature", BranchRef: ref, Commit: commit, SourceMode: "snapshot", Scope: "platform", Identifier: "PM-038", MetadataSource: "plan.yaml", ItemPath: "plans/platform/PM-038"}}
+	if err := idx.ReplaceWorkspaceBranch(workspace.ID, "feature", []models.ItemDetail{item}, models.BranchScanMetadata{Branch: "feature", Commit: commit, SourceMode: "snapshot", ScannedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	files := fileaccess.New()
+	service := New(reg, idx, files, itemwriter.New(files, scanner.New(git), idx, reg), git)
+
+	result, err := service.VerificationTests(item.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Selection.SelectedSpecs) != 1 || result.Selection.SelectedSpecs[0] != "reviewed.cy.ts" {
+		t.Fatalf("snapshot selection followed mutable content: %#v", result.Selection)
+	}
+	if len(result.DiscoveredSpecs) != 1 || result.DiscoveredSpecs[0].Path != "reviewed.cy.ts" || result.DiscoveredSpecs[0].SourcePath != "plans/platform/PM-038/plan.yaml" {
+		t.Fatalf("snapshot discovery followed mutable content: %#v", result.DiscoveredSpecs)
+	}
+}
+
 func TestSnapshotEditsAreReadOnly(t *testing.T) {
 	root := newItemGitRepo(t)
 	writeItemGitFile(t, root, "plans/platform/PM-013/README.md", "# Existing\n")
@@ -338,7 +408,36 @@ func TestImportReviewedPlanCopiesPinnedStructuredPlan(t *testing.T) {
 		t.Fatalf("changed-checkout import created target, err=%v", statErr)
 	}
 	itemGitRun(t, root, "switch", "main")
-	result, err := service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+	locked := make(chan struct{})
+	release := make(chan struct{})
+	go func() {
+		_ = git.WithWorkspaceMutation(root, func() error {
+			close(locked)
+			<-release
+			return nil
+		})
+	}()
+	<-locked
+	type importResult struct {
+		result models.WriteResult
+		err    error
+	}
+	done := make(chan importResult, 1)
+	go func() {
+		result, importErr := service.ImportReviewedPlan(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: commit, ExpectedCheckoutBranch: "main", ItemID: item.ID})
+		done <- importResult{result: result, err: importErr}
+	}()
+	select {
+	case outcome := <-done:
+		t.Fatalf("import completed while workspace mutation was locked: %v", outcome.err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "plans/platform/PM-038")); !os.IsNotExist(statErr) {
+		t.Fatalf("blocked import created target, err=%v", statErr)
+	}
+	close(release)
+	outcome := <-done
+	result, err := outcome.result, outcome.err
 	if err != nil {
 		t.Fatal(err)
 	}

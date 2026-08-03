@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"kode-stream/internal/common/models"
@@ -24,6 +25,7 @@ import (
 type GitAdapter struct {
 	timeout      time.Duration
 	cloneTimeout time.Duration
+	mutations    sync.Map
 }
 
 type TreeEntry struct {
@@ -317,8 +319,19 @@ func (g *GitAdapter) CreateBranch(workspacePath, name, startPoint string, checko
 }
 
 func (g *GitAdapter) SwitchBranch(workspacePath, name string) error {
-	_, err := g.run(workspacePath, "switch", name)
-	return err
+	return g.WithWorkspaceMutation(workspacePath, func() error {
+		_, err := g.run(workspacePath, "switch", name)
+		return err
+	})
+}
+
+func (g *GitAdapter) WithWorkspaceMutation(workspacePath string, action func() error) error {
+	key := filepath.Clean(workspacePath)
+	value, _ := g.mutations.LoadOrStore(key, &sync.Mutex{})
+	lock := value.(*sync.Mutex)
+	lock.Lock()
+	defer lock.Unlock()
+	return action()
 }
 
 func (g *GitAdapter) Clone(remoteURL, destination string) error {

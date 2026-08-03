@@ -16,6 +16,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | F2    | Dedicated read-only Branch Review               | Frontend   | Complete |
 | I1    | Integration, durable documentation, and browser | Full stack | Complete |
 | R1    | Fail-closed review and import remediation       | Full stack | Complete |
+| R2    | Atomic import and snapshot verification         | Backend    | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -109,3 +110,17 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./internal/workstream ./internal/item ./internal/item/writer ./internal/server/api && npm run typecheck && npm test -- --run web/src/pages/BranchReviewPage.test.tsx web/src/features/workstream-explorer/useWorkspaceBranches.test.tsx web/src/shared/api/index.test.ts`
 
 **Commit:** `PM-038: Close branch review race windows`
+
+## Phase R2: Atomic Import And Snapshot Verification
+
+**Deliverables:**
+
+- [x] Serialize in-app checkout changes and reviewed-plan imports with a shared workspace-scoped mutation lock.
+- [x] Hold the lock from destination checkout validation through import publication and index refresh.
+- [x] Read snapshot verification selection and discovered specs from the reviewed commit.
+- [x] Stage complete plans in a sibling temporary directory and atomically publish them without partial targets.
+- [x] Add lock serialization, commit-pinned verification, failure cleanup, and retry regression tests.
+
+**Verification:** `go test ./internal/git ./internal/item ./internal/item/writer ./internal/server/api`
+
+**Commit:** `PM-038: Make reviewed plan import atomic`
