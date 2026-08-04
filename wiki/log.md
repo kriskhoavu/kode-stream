@@ -100,3 +100,11 @@ sourceCount: 0
 - Pages enriched: `wiki/branch-context-reference.md` and
   `wiki/e2e-testing/cross-domain/branch-review-and-checkout.md` (corrected existing PM-038 contract; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-04] correction | PM-038 Snapshot Runbook And Blocked Audit Isolation
+<!-- chunkId: wiki-ingest-log-pm-038-snapshot-runbook-audit-correction -->
+<!-- keywords: PM-038, snapshot runbook, audit context, blocked status -->
+
+- Pages created: none
+- Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
+- Files conformed: 0

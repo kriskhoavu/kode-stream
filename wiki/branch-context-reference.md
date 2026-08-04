@@ -3,8 +3,8 @@ slug: platform-branch-context-reference
 title: Checkout And Branch Review Reference
 pageType: REFERENCE
 roles: DEVELOPER, TESTER, BA
-topics: checkout loader, branch review API, import API, canvas, knowledge
-summary: API, synchronization, compatibility, and safety contracts for checkout-scoped operation and commit-pinned review.
+topics: checkout loader, branch review API, import API, e2e runbooks, mutation audit, canvas, knowledge
+summary: API, synchronization, read-boundary, audit, and safety contracts for checkout-scoped operation and commit-pinned review.
 sourceRef: plans/platform/PM-038/design/design-01-backend.md
 sourceRef: plans/platform/PM-038/design/design-02-frontend.md
 sourceCount: 1
@@ -38,6 +38,7 @@ workspace and checkout branch; see [[platform-terminal-canvas-reference]].
 | GET    | `/api/items/{id}/files/{fileId}`           | `expectedCommit` for snapshots                                       | Commit-pinned file content |
 | GET    | `/api/items/{id}/diff`                     | Working-tree item ID                                                 | Checkout diff              |
 | GET    | `/api/items/{id}/content-search`           | Working-tree item ID and query                                       | Checkout content matches   |
+| GET    | `/api/items/{id}/e2e-runbooks`             | Working-tree item ID                                                 | Reusable E2E coverage      |
 
 Snapshot file trees and content are served by the normal item read endpoints because indexed snapshot items retain
 their branch ref and commit. Every snapshot tree operation uses the immutable commit SHA; the branch ref is metadata
@@ -48,6 +49,10 @@ snapshot reads never consult checkout or external automation working trees. Muta
 if a legacy materialization flag is supplied. Operational item detail, diff, and item content search have no snapshot
 mode: they reject a snapshot ID with `409 snapshot_review_only` before returning Item Workspace metadata or invoking
 checkout-backed readers.
+
+E2E runbook discovery is also operational-only. A snapshot ID returns `409 snapshot_review_only` before the service
+can read checkout `plan.yaml`, ticket-local `automation/` files, latest results, or canonical Knowledge coverage. The
+endpoint has no reviewed-commit request contract, so it must not resolve review identities through checkout paths.
 
 ## Synchronization Rules
 <!-- chunkId: platform-branch-context-reference-synchronization -->
@@ -82,6 +87,18 @@ the prior plan when the route identity changes and does not request item files o
 snapshot bookmark therefore shows only a fail-closed message and Back action; it cannot retain metadata or controls
 from the previously open checkout item.
 
+## Mutation Audit Semantics
+<!-- chunkId: platform-branch-context-reference-mutation-audit -->
+<!-- keywords: snapshot mutation, audit context, blocked status, workspace history -->
+
+Rejected snapshot file, metadata, and status mutations resolve audit identity directly from the raw item index. This
+lookup supplies only workspace, item, and path context; it does not weaken the operational detail boundary or expose a
+snapshot in Item Workspace. The resulting audit records remain visible in workspace-scoped history and preserve the
+snapshot item ID.
+
+`snapshot_read_only` is an expected safety rejection, so these audit events use `blocked`, not `failed`. The original
+error remains on the event for diagnostics. Other errors retain the existing failed-or-recovery-hint classification.
+
 ## Conflict And Compatibility Codes
 <!-- chunkId: platform-branch-context-reference-conflicts -->
 <!-- keywords: conflict code, snapshot read-only, branch mismatch, moved commit -->
@@ -91,6 +108,7 @@ from the previously open checkout item.
 | Legacy operational load requests other branch  | 409    | `branch_review_required`       |
 | Snapshot mutation                              | 409    | `snapshot_read_only`           |
 | Snapshot operational detail, diff, or search   | 409    | `snapshot_review_only`         |
+| Snapshot E2E runbook discovery                 | 409    | `snapshot_review_only`         |
 | Legacy Canvas branch differs from checkout     | 409    | `canvas_branch_mismatch`       |
 | Review requests current checkout               | 409    | Review must exit to Workstream |
 | Import item belongs to another workspace       | 404    | Item not found                 |

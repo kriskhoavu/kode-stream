@@ -17,7 +17,7 @@ sourceCount: 0
 |---------------------------------------------|-----------|-----------------------------|-------------|-----------------------------------------------------------------------|
 | [[platform-branch-context-concept]]         | CONCEPT   | BA, DEVELOPER, TESTER, USER | 1           | Checkout operation and commit-pinned review boundary.                 |
 | [[platform-branch-review-workflows]]        | HOW_TO    | USER, BA, TESTER            | 1           | Review, import, or activate another local branch.                     |
-| [[platform-branch-context-reference]]       | REFERENCE | DEVELOPER, TESTER, BA       | 1           | Branch APIs, synchronization, conflicts, and safety.                  |
+| [[platform-branch-context-reference]]       | REFERENCE | DEVELOPER, TESTER, BA       | 1           | Branch APIs, read boundaries, audit classification, and safety.       |
 | [[platform-terminal-canvas-concept]]        | CONCEPT   | BA, DEVELOPER, USER         | 2           | Canvas purpose, boundaries, capabilities, and checkout context.       |
 | [[platform-terminal-canvas-workflows]]      | HOW_TO    | USER, BA, TESTER            | 2           | Arrange nodes, launch a terminal, and inspect freshness.              |
 | [[platform-terminal-canvas-reference]]      | REFERENCE | DEVELOPER, TESTER, BA       | 2           | Ownership, APIs, storage, session, and verification contracts.        |
