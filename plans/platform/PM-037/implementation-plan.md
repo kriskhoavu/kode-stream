@@ -19,6 +19,7 @@ PM-037.
 | B3    | Durable session lifecycle and branch-safe launch      | Backend    | Complete |
 | B4    | Verification freshness and Canvas API                 | Backend    | Complete |
 | B5    | Durable hidden placement semantics                    | Backend    | Complete |
+| B6    | Session disclosure state migration                    | Backend    | Complete |
 | F1    | Canvas route and placement state                      | Frontend   | Complete |
 | F2    | Draggable semantic nodes and restored layout          | Frontend   | Complete |
 | F3    | Focused Workbench and session terminal                | Frontend   | Complete |
@@ -130,6 +131,21 @@ PM-037.
 **Verification:** `go test ./internal/canvas ./internal/storage ./internal/server/api`
 
 **Commit:** `PM-037: Preserve removed Canvas placements`
+
+---
+
+### Phase B6: Session Disclosure State Migration
+
+**Deliverables:**
+
+- [x] Default newly placed sessions to collapsed terminal presentation.
+- [x] Migrate existing data-dir and SQL session placements to collapsed once.
+- [x] Preserve later explicit disclosure choices across reloads and datastore sync.
+- [x] Add migration and repository regression tests.
+
+**Verification:** `go test ./internal/canvas ./internal/storage`
+
+**Commit:** `PM-037: Migrate session disclosure state`
 
 ## Frontend Phases
 

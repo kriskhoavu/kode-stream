@@ -515,6 +515,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS ai_session_records_workspace_idempotency ON ai
 		Version: 3,
 		Name:    "hidden_canvas_placements",
 		SQL:     `ALTER TABLE canvas_placements ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;`,
+	}, {
+		Version: 4,
+		Name:    "collapse_existing_canvas_sessions",
+		SQL:     `UPDATE canvas_placements SET collapsed = TRUE WHERE entity_ref_json LIKE '%"kind":"session"%';`,
 	}}
 }
 

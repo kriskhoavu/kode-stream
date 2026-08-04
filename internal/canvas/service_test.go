@@ -43,6 +43,10 @@ func TestCanvasServiceSeedsProjectsAndKeepsPlacementIndependent(t *testing.T) {
 	}
 	workspaceNode := findProjectedNode(t, projection, workspaceNodeID(workspaceConfig.ID))
 	planNode := findProjectedNode(t, projection, planNodeID(initialItems[0].ID))
+	sessionNode := findProjectedNode(t, projection, sessionNodeID(session.ID))
+	if !sessionNode.Collapsed {
+		t.Fatal("new session placement was not collapsed")
+	}
 	planPosition := planNode.Position
 	projection, err = service.PatchPlacements("", projection.Layout.ID, []PlacementPatch{{NodeID: workspaceNode.ID, EntityRef: workspaceNode.EntityRef, Position: Position{X: 99, Y: 77}, ExpectedRevision: workspaceNode.Revision}})
 	if err != nil {
@@ -59,7 +63,6 @@ func TestCanvasServiceSeedsProjectsAndKeepsPlacementIndependent(t *testing.T) {
 	if findProjectedNode(t, projection, planNode.ID).Revision != planRevision {
 		t.Fatal("viewport save changed placement revision")
 	}
-	sessionNode := findProjectedNode(t, projection, sessionNodeID(session.ID))
 	projection, err = service.RemovePlacement("", projection.Layout.ID, sessionNode.ID, sessionNode.Revision)
 	if err != nil {
 		t.Fatal(err)

@@ -112,8 +112,8 @@ func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 	if !health.OK {
 		t.Fatalf("health = %#v", health)
 	}
-	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 3 {
-		t.Fatalf("health = %#v, want sqlite version 3", health)
+	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 4 {
+		t.Fatalf("health = %#v, want sqlite version 4", health)
 	}
 	for _, table := range []string{"workspaces", "branch_scans", "indexed_items", "import_status", "canvas_layouts", "canvas_placements", "ai_session_records"} {
 		var name string
@@ -125,6 +125,17 @@ func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 	var hiddenColumn string
 	if err := state.SQLStore.db.QueryRow(`SELECT name FROM pragma_table_info('canvas_placements') WHERE name = 'hidden'`).Scan(&hiddenColumn); err != nil || hiddenColumn != "hidden" {
 		t.Fatalf("canvas placement hidden column was not created: %q %v", hiddenColumn, err)
+	}
+}
+
+func TestCanvasSessionDisclosureMigrationIsCrossDriverSafe(t *testing.T) {
+	sqlite := sqliteMigrations()
+	postgres := postgresMigrations()
+	if sqlite[len(sqlite)-1].Version != 4 || postgres[len(postgres)-1].Version != 4 {
+		t.Fatalf("latest migrations = sqlite %d postgres %d", sqlite[len(sqlite)-1].Version, postgres[len(postgres)-1].Version)
+	}
+	if sqlite[len(sqlite)-1].SQL != postgres[len(postgres)-1].SQL {
+		t.Fatalf("session disclosure migration diverged across drivers: sqlite=%q postgres=%q", sqlite[len(sqlite)-1].SQL, postgres[len(postgres)-1].SQL)
 	}
 }
 

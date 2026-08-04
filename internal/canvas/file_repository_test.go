@@ -3,9 +3,12 @@ package canvas
 import (
 	"errors"
 	"math"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestFileRepositoryResolvesAndPatchesIndependentPlacements(t *testing.T) {
@@ -41,6 +44,35 @@ func TestFileRepositoryResolvesAndPatchesIndependentPlacements(t *testing.T) {
 	placements, err = repository.Placements(layout.ID)
 	if err != nil || len(placements) != 2 || !placements[0].Hidden || placements[0].Revision != 2 {
 		t.Fatalf("hidden placements = %#v err=%v", placements, err)
+	}
+}
+
+func TestFileRepositoryMigratesLegacySessionsToCollapsedOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "canvases.yaml")
+	layout, err := NewLayout("", "workspace-1", "main", time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := Snapshot{Layouts: []Layout{layout}, Placements: []Placement{{LayoutID: layout.ID, NodeID: "session:one", EntityRef: EntityRef{Kind: EntitySession, WorkspaceID: "workspace-1", SessionID: "one", BranchKey: "main"}, Revision: 1, UpdatedAt: time.Now().UTC()}}}
+	data, err := yaml.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	repository := NewFileRepository(path)
+	placements, err := repository.Placements(layout.ID)
+	if err != nil || len(placements) != 1 || !placements[0].Collapsed {
+		t.Fatalf("migrated placements = %#v err=%v", placements, err)
+	}
+	updated, err := repository.PatchPlacements(layout.ID, []PlacementPatch{{NodeID: "session:one", Position: placements[0].Position, Collapsed: false, ExpectedRevision: placements[0].Revision}})
+	if err != nil || len(updated) != 1 || updated[0].Collapsed {
+		t.Fatalf("updated placements = %#v err=%v", updated, err)
+	}
+	snapshot, err := repository.Snapshot()
+	if err != nil || snapshot.Version != CurrentSnapshotVersion || snapshot.Placements[0].Collapsed {
+		t.Fatalf("snapshot = %#v err=%v", snapshot, err)
 	}
 }
 

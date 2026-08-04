@@ -249,7 +249,7 @@ func (s *Service) seedInitialPlacements(layout Layout) error {
 		if len(patches) == MaxPlacements {
 			break
 		}
-		patches = append(patches, PlacementPatch{NodeID: sessionNodeID(session.ID), EntityRef: sessionRef(session), Position: Position{X: 360 + float64(i%3)*320, Y: 420 + float64(i/3)*190}})
+		patches = append(patches, PlacementPatch{NodeID: sessionNodeID(session.ID), EntityRef: sessionRef(session), Position: Position{X: 360 + float64(i%3)*320, Y: 420 + float64(i/3)*190}, Collapsed: true})
 	}
 	for start := 0; start < len(patches); start += MaxPlacementBatch {
 		end := start + MaxPlacementBatch

@@ -218,7 +218,7 @@ func (r *SQLiteCanvasRepository) Snapshot() (canvas.Snapshot, error) {
 		}
 		placements = append(placements, items...)
 	}
-	return canvas.Snapshot{Layouts: layouts, Placements: placements}, nil
+	return canvas.Snapshot{Version: canvas.CurrentSnapshotVersion, Layouts: layouts, Placements: placements}, nil
 }
 
 func (r *SQLiteCanvasRepository) ReplaceAll(snapshot canvas.Snapshot) error {

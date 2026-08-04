@@ -11,11 +11,12 @@ import (
 )
 
 const (
-	MaxPlacements     = 300
-	MaxPlacementBatch = 50
-	MaxCoordinate     = 1_000_000
-	MinZoom           = 0.1
-	MaxZoom           = 2.0
+	MaxPlacements          = 300
+	MaxPlacementBatch      = 50
+	MaxCoordinate          = 1_000_000
+	MinZoom                = 0.1
+	MaxZoom                = 2.0
+	CurrentSnapshotVersion = 2
 )
 
 var ErrNotFound = errors.New("canvas layout not found")
@@ -177,6 +178,14 @@ func finiteCoordinate(value float64) bool {
 }
 
 func normalizeSnapshot(snapshot Snapshot) Snapshot {
+	if snapshot.Version < CurrentSnapshotVersion {
+		for index := range snapshot.Placements {
+			if snapshot.Placements[index].EntityRef.Kind == EntitySession {
+				snapshot.Placements[index].Collapsed = true
+			}
+		}
+		snapshot.Version = CurrentSnapshotVersion
+	}
 	if snapshot.Layouts == nil {
 		snapshot.Layouts = []Layout{}
 	}

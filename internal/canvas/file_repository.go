@@ -168,7 +168,7 @@ func (r *FileRepository) Snapshot() (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{Layouts: append([]Layout(nil), state.Layouts...), Placements: append([]Placement(nil), state.Placements...)}, nil
+	return Snapshot{Version: state.Version, Layouts: append([]Layout(nil), state.Layouts...), Placements: append([]Placement(nil), state.Placements...)}, nil
 }
 
 func (r *FileRepository) ReplaceAll(snapshot Snapshot) error {

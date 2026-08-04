@@ -63,6 +63,7 @@ type PlacementPatch struct {
 }
 
 type Snapshot struct {
+	Version    int         `json:"version,omitempty" yaml:"version,omitempty"`
 	Layouts    []Layout    `json:"layouts" yaml:"layouts"`
 	Placements []Placement `json:"placements" yaml:"placements"`
 }
