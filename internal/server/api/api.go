@@ -1269,9 +1269,13 @@ func (a *API) itemDiff(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) saveItemFile(w http.ResponseWriter, r *http.Request) {
-	item, detailErr := a.items.Detail(r.PathValue("id"))
-	if errors.Is(detailErr, apperrors.ErrItemNotFound) {
+	auditContext, contextErr := a.items.AuditContext(r.PathValue("id"))
+	if errors.Is(contextErr, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	if contextErr != nil {
+		respond(w, nil, contextErr)
 		return
 	}
 	var input models.FileSaveInput
@@ -1281,7 +1285,11 @@ func (a *API) saveItemFile(w http.ResponseWriter, r *http.Request) {
 	}
 	started := time.Now()
 	result, err := a.items.SaveFile(r.PathValue("id"), r.PathValue("fileID"), input)
-	a.record(item.WorkspaceID, item.ID, "save_file", "File saved.", []string{result.Path}, started, err)
+	paths := []string{result.Path}
+	if result.Path == "" {
+		paths = []string{auditContext.ItemPath}
+	}
+	a.record(auditContext.WorkspaceID, auditContext.ItemID, "save_file", "File saved.", paths, started, err)
 	respondItemMutation(w, result, err)
 }
 
@@ -1300,10 +1308,18 @@ func (a *API) saveItemMetadata(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	item, _ := a.items.Detail(r.PathValue("id"))
+	auditContext, contextErr := a.items.AuditContext(r.PathValue("id"))
+	if errors.Is(contextErr, apperrors.ErrItemNotFound) {
+		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	if contextErr != nil {
+		respond(w, nil, contextErr)
+		return
+	}
 	started := time.Now()
 	result, err := a.items.SaveMetadata(r.PathValue("id"), input)
-	a.record(item.WorkspaceID, item.ID, "save_metadata", "Item metadata saved.", []string{item.ItemPath}, started, err)
+	a.record(auditContext.WorkspaceID, auditContext.ItemID, "save_metadata", "Item metadata saved.", []string{auditContext.ItemPath}, started, err)
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
@@ -1324,6 +1340,10 @@ func (a *API) itemE2ERunbooks(w http.ResponseWriter, r *http.Request) {
 	result, sources, err := a.items.E2ERunbooks(r.PathValue("id"))
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	if errors.Is(err, appitem.ErrSnapshotReviewOnly) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "snapshot_review_only"})
 		return
 	}
 	if err != nil {
@@ -1367,10 +1387,18 @@ func (a *API) updateItemStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	item, _ := a.items.Detail(r.PathValue("id"))
+	auditContext, contextErr := a.items.AuditContext(r.PathValue("id"))
+	if errors.Is(contextErr, apperrors.ErrItemNotFound) {
+		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	if contextErr != nil {
+		respond(w, nil, contextErr)
+		return
+	}
 	started := time.Now()
 	result, err := a.items.UpdateStatus(r.PathValue("id"), input)
-	a.record(item.WorkspaceID, item.ID, "update_status", "Item status updated.", []string{item.ItemPath}, started, err)
+	a.record(auditContext.WorkspaceID, auditContext.ItemID, "update_status", "Item status updated.", []string{auditContext.ItemPath}, started, err)
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return

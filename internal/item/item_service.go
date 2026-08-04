@@ -35,6 +35,12 @@ type ListInput struct {
 	Text        string
 }
 
+type AuditContext struct {
+	WorkspaceID string
+	ItemID      string
+	ItemPath    string
+}
+
 type ItemService struct {
 	registry registry.Repository
 	index    itemindex.Repository
@@ -72,6 +78,17 @@ func (s *Service) Detail(id string) (models.ItemDetail, error) {
 	}
 	item.Description = s.fullDescription(workspace, item)
 	return NormalizeDetail(item), nil
+}
+
+func (s *Service) AuditContext(id string) (AuditContext, error) {
+	item, ok, err := s.index.Get(id)
+	if err != nil {
+		return AuditContext{}, err
+	}
+	if !ok {
+		return AuditContext{}, apperrors.ErrItemNotFound
+	}
+	return AuditContext{WorkspaceID: item.WorkspaceID, ItemID: item.ID, ItemPath: item.ItemPath}, nil
 }
 
 func (s *Service) Files(id, expectedCommit string) ([]models.FileNode, error) {

@@ -19,12 +19,15 @@ commit that produced its index.
 | GET    | `/api/items/{id}/files/{fileId}`           | `expectedCommit` required for snapshot items                         | commit-pinned file content     |
 | GET    | `/api/items/{id}/diff`                     | working-tree item ID                                                 | checkout diff                  |
 | GET    | `/api/items/{id}/content-search`           | working-tree item ID and query                                       | checkout content matches       |
+| GET    | `/api/items/{id}/e2e-runbooks`             | working-tree item ID                                                 | reusable E2E coverage          |
 
 The legacy Workstream branch endpoint accepts the current checkout during one compatibility cycle. A different branch
 returns `409 branch_review_required`. Snapshot writes return `409 snapshot_read_only` even when a legacy
 `materializeConfirmed` field is present. Snapshot operational detail, diff, and content-search requests return
 `409 snapshot_review_only`; detail cannot open a review identity inside Item Workspace, and the latter operations are
 checkout-backed without a commit-pinned implementation.
+Snapshot E2E runbook requests also return `409 snapshot_review_only`; the endpoint reads ticket-local and canonical
+coverage without an expected-commit contract and is therefore operational-only.
 
 ## Review And Import Rules
 
@@ -43,6 +46,8 @@ checkout-backed without a commit-pinned implementation.
   file-backed and SQLite repositories.
 - Reject snapshot diff and item content-search requests before invoking Git diff or filesystem content search.
 - Reject snapshot item detail before reading a checkout README or returning metadata to operational consumers.
+- Reject snapshot E2E runbook requests before reading checkout `plan.yaml`, `automation/`, result files, or canonical
+  Knowledge coverage.
 - Require `expectedCommit` on snapshot file-tree and file-content reads. Compare it with the indexed snapshot before
   reading and return `409 review_commit_moved` when missing or different; working-tree reads remain compatible without
   the parameter. Once validated, read through the copied item's immutable commit even if another refresh replaces the
@@ -62,6 +67,8 @@ checkout-backed without a commit-pinned implementation.
   prior in-memory state when persistence fails, preventing a rolled-back target from remaining as a ghost item.
 - Preserve unrelated dirty checkout content and never call reset, clean, stash, checkout, or switch.
 - Refresh the checkout index after copying and return the imported checkout item.
+- Resolve audit identity for blocked mutations directly from the raw item index so snapshot file, metadata, and status
+  failures remain visible in workspace-scoped history without weakening operational detail isolation.
 
 ## Operational Refresh
 

@@ -24,6 +24,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | R7    | End-to-end commit-pinned file reads             | Full stack | Complete |
 | R8    | Operational snapshot query isolation            | Backend    | Complete |
 | R9    | Operational item detail isolation               | Full stack | Complete |
+| R10   | Snapshot runbook and audit isolation            | Backend    | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -225,3 +226,16 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./internal/item ./internal/server/api && npm run typecheck && npm test -- --run web/src/pages/ItemWorkspacePage.test.ts && go test ./... && npm test -- --run`
 
 **Commit:** `PM-038: Reject snapshots from Item Workspace`
+
+## Phase R10: Snapshot Runbook And Audit Isolation
+
+**Deliverables:**
+
+- [x] Reject snapshot E2E runbook requests before reading checkout plan, automation, or result files.
+- [x] Resolve mutation audit identity through a raw index lookup that does not expose operational snapshot detail.
+- [x] Keep blocked snapshot file, metadata, and status audit events scoped to their workspace and item.
+- [x] Add service and transport regression coverage for both isolation boundaries.
+
+**Verification:** `go test ./internal/item ./internal/server/api && go test ./...`
+
+**Commit:** `PM-038: Isolate snapshot runbooks and mutation audits`

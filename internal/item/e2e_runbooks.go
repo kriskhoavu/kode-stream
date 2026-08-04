@@ -24,6 +24,9 @@ func (s *Service) E2ERunbooks(id string) (models.E2ERunbookList, []string, error
 	if err != nil {
 		return models.E2ERunbookList{}, nil, err
 	}
+	if item.SourceMode == "snapshot" {
+		return models.E2ERunbookList{}, nil, ErrSnapshotReviewOnly
+	}
 	root, err := pathguard.ResolveExisting(workspace.Path, item.ItemPath)
 	if err != nil {
 		return models.E2ERunbookList{}, nil, err

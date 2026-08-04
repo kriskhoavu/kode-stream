@@ -358,6 +358,9 @@ func TestSnapshotEditsAreReadOnly(t *testing.T) {
 	if !errors.Is(err, ErrSnapshotReadOnly) {
 		t.Fatalf("expected snapshot read-only error, got %v", err)
 	}
+	if _, _, err := service.E2ERunbooks("snapshot-item"); !errors.Is(err, ErrSnapshotReviewOnly) {
+		t.Fatalf("snapshot E2E runbooks error = %v", err)
+	}
 	data, err := os.ReadFile(filepath.Join(root, "plans/platform/PM-013/README.md"))
 	if err != nil {
 		t.Fatal(err)

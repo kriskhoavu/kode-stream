@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"kode-stream/internal/audit"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
 	gitadapter "kode-stream/internal/git"
@@ -56,7 +57,8 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	scan := scanner.New(git)
 	files := fileaccess.New()
 	writer := itemwriter.New(files, scan, idx, reg)
-	handler := New(reg, idx, scan, files, writer, git, nil).Routes()
+	auditStore := audit.New(filepath.Join(dataDir, "audit.jsonl"))
+	handler := NewWithReliability(reg, idx, scan, files, writer, git, nil, auditStore, nil).Routes()
 
 	checkout := branchReviewRequest(t, handler, http.MethodPost, "/api/workspaces/"+workspace.ID+"/workstream/checkout", `{}`)
 	if checkout.Code != http.StatusOK || !bytes.Contains(checkout.Body.Bytes(), []byte(`"sourceMode":"working_tree"`)) {
@@ -90,6 +92,10 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	if snapshotSearch.Code != http.StatusConflict || !bytes.Contains(snapshotSearch.Body.Bytes(), []byte(`"code":"snapshot_review_only"`)) {
 		t.Fatalf("snapshot content search status=%d body=%s", snapshotSearch.Code, snapshotSearch.Body.String())
 	}
+	snapshotRunbooks := branchReviewRequest(t, handler, http.MethodGet, "/api/items/"+result.Items[0].ID+"/e2e-runbooks", "")
+	if snapshotRunbooks.Code != http.StatusConflict || !bytes.Contains(snapshotRunbooks.Body.Bytes(), []byte(`"code":"snapshot_review_only"`)) {
+		t.Fatalf("snapshot E2E runbooks status=%d body=%s", snapshotRunbooks.Code, snapshotRunbooks.Body.String())
+	}
 	itemFilesPath := "/api/items/" + result.Items[0].ID + "/files"
 	missingCommit := branchReviewRequest(t, handler, http.MethodGet, itemFilesPath, "")
 	if missingCommit.Code != http.StatusConflict || !bytes.Contains(missingCommit.Body.Bytes(), []byte(`"code":"review_commit_moved"`)) {
@@ -112,9 +118,32 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	if wrongContent.Code != http.StatusConflict || !bytes.Contains(wrongContent.Body.Bytes(), []byte(`"code":"review_commit_moved"`)) {
 		t.Fatalf("wrong content commit status=%d body=%s", wrongContent.Code, wrongContent.Body.String())
 	}
-	mutation := branchReviewRequest(t, handler, http.MethodPatch, "/api/items/"+result.Items[0].ID+"/metadata", `{"status":"review","materializeConfirmed":true}`)
-	if mutation.Code != http.StatusConflict || !bytes.Contains(mutation.Body.Bytes(), []byte(`"code":"snapshot_read_only"`)) {
-		t.Fatalf("mutation status=%d body=%s", mutation.Code, mutation.Body.String())
+	mutations := []struct {
+		method string
+		path   string
+		body   string
+	}{
+		{http.MethodPost, "/api/items/" + result.Items[0].ID + "/files/README_md", `{"content":"blocked","materializeConfirmed":true}`},
+		{http.MethodPatch, "/api/items/" + result.Items[0].ID + "/metadata", `{"status":"review","materializeConfirmed":true}`},
+		{http.MethodPatch, "/api/items/" + result.Items[0].ID + "/status", `{"status":"review","materializeConfirmed":true}`},
+	}
+	for _, request := range mutations {
+		mutation := branchReviewRequest(t, handler, request.method, request.path, request.body)
+		if mutation.Code != http.StatusConflict || !bytes.Contains(mutation.Body.Bytes(), []byte(`"code":"snapshot_read_only"`)) {
+			t.Fatalf("mutation %s status=%d body=%s", request.path, mutation.Code, mutation.Body.String())
+		}
+	}
+	auditEvents, err := auditStore.Recent(len(mutations))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(auditEvents) != len(mutations) {
+		t.Fatalf("audit events = %#v", auditEvents)
+	}
+	for _, event := range auditEvents {
+		if event.WorkspaceID != workspace.ID || event.ItemID != result.Items[0].ID {
+			t.Fatalf("unscoped snapshot mutation audit event = %#v", event)
+		}
 	}
 	input, _ := json.Marshal(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: result.Commit, ExpectedCheckoutBranch: "main", ItemID: result.Items[0].ID})
 	wrongWorkspace := branchReviewRequest(t, handler, http.MethodPost, "/api/workspaces/"+otherWorkspace.ID+"/reviews/import", string(input))
