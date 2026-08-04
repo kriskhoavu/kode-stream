@@ -20,6 +20,7 @@ vi.mock('@xyflow/react', async () => {
 		Background: () => null,
 		Controls: () => <div data-testid="flow-controls" />,
 		Handle: () => null,
+		NodeResizer: ({ handleClassName }: { handleClassName?: string }) => <div data-testid="node-resizer" className={handleClassName} />,
 		Position: { Left: 'left', Right: 'right' },
 		useNodesState: <T,>(initial: T[]) => [initial, vi.fn(), vi.fn()],
 		useReactFlow: () => {
@@ -46,6 +47,7 @@ describe('CanvasBoard', () => {
 		expanded.nodes[2] = { ...expanded.nodes[2], collapsed: false };
 		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} selectedId="session:session-1" onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
 		expect(await screen.findByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');
+		expect(screen.getByTestId('node-resizer')).toHaveClass('canvas-session-resize-handle');
 		fireEvent.change(screen.getByLabelText('Terminal prompt'), { target: { value: 'review this change' } });
 		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
 		expect(screen.getByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');
@@ -97,15 +99,14 @@ describe('CanvasBoard', () => {
 		expect(onMoveNode).toHaveBeenCalledTimes(1);
 	});
 
-	it('searches and focuses by identifier, resets, and removes a placement in isolation', () => {
+	it('filters Canvas nodes by identifier without showing autocomplete results', () => {
 		const onSelect = vi.fn();
 		const onReset = vi.fn();
 		const onRemove = vi.fn();
 		renderBoard(baseProjection(), { selectedId: 'plan:item-1', onSelect, onReset, onRemove });
 		fireEvent.change(screen.getByLabelText('Search Canvas nodes'), { target: { value: 'PM-037' } });
-		fireEvent.click(screen.getByRole('option', { name: /PM-037/ }));
-		expect(onSelect).toHaveBeenCalledWith('plan:item-1');
-		expect(fitView).toHaveBeenCalled();
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '1');
+		expect(screen.queryByRole('option')).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Add new nodes/ })).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: /Reset layout/ }));
 		fireEvent.click(screen.getByRole('button', { name: /Remove from Canvas/ }));

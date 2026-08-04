@@ -46,11 +46,10 @@ func (s *Service) LaunchWorkspace(workspaceID string, input LaunchInput) (result
 		return LaunchResult{}, launchError("workspace_not_found", "workspace not found")
 	}
 	contextPath := strings.TrimSpace(input.ContextPath)
-	if contextPath == "" {
-		return LaunchResult{}, launchError("invalid_context_path", "contextPath is required")
-	}
-	if _, pathErr := pathguard.ValidateMarkdownFile(workspace.Path, contextPath); pathErr != nil {
-		return LaunchResult{}, launchError("invalid_context_path", "context path must be an existing Markdown file inside the workspace")
+	if contextPath != "" {
+		if _, pathErr := pathguard.ValidateMarkdownFile(workspace.Path, contextPath); pathErr != nil {
+			return LaunchResult{}, launchError("invalid_context_path", "context path must be an existing Markdown file inside the workspace")
+		}
 	}
 	settings, settingsErr := s.Settings()
 	if settingsErr != nil {
@@ -75,7 +74,11 @@ func (s *Service) LaunchWorkspace(workspaceID string, input LaunchInput) (result
 	if promptErr != nil {
 		return LaunchResult{}, promptErr
 	}
-	values := map[string]string{"workspace": workspace.Path, "contextFile": contextPath, "itemPath": contextPath, "identifier": contextPath, "contextMode": "workspace_only", "intent": "workspace_only", "prompt": prompt}
+	contextLabel := contextPath
+	if contextLabel == "" {
+		contextLabel = "workspace root"
+	}
+	values := map[string]string{"workspace": workspace.Path, "contextFile": contextLabel, "itemPath": contextLabel, "identifier": contextLabel, "contextMode": "workspace_only", "intent": "workspace_only", "prompt": prompt}
 	sessionID := "external-" + randomID()
 	if startErr := s.startTerminal(terminalID, terminal, expandAll(terminal.Args, values), workspace.Path, expand(provider.Executable, values), launchProviderArgs("workspace_only", provider.Args, values), verificationCheckpoint{WorkspaceID: workspace.ID, Provider: providerID, SessionID: sessionID, TerminalMode: "external", Profile: "smoke"}); startErr != nil {
 		return LaunchResult{}, launchErrorWith("launch_failed", startErr)

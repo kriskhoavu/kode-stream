@@ -136,6 +136,26 @@ describe('AISessionLaunchDialog', () => {
 		expect(launched).toHaveBeenCalledWith(expect.objectContaining({ session: expect.objectContaining({ id: 'session-1' }) }), expect.objectContaining({ surface: 'embedded' }));
 	});
 
+	it('starts a workspace-root embedded session without card context', async () => {
+		mockOptions();
+		vi.mocked(api.startEmbeddedWorkspaceAISession).mockResolvedValue({ session: { id: 'session-1', itemId: '', workspaceId: 'workspace-1', provider: 'codex', intent: 'workspace_only', state: 'running', startedAt: '2026-07-03T00:00:00Z' }, grant: { sessionId: 'session-1', token: 'secret', expiresAt: '2026-07-03T00:01:00Z' } });
+		render(<AISessionLaunchDialog workspaceTarget={{ workspaceId: 'workspace-1' }} onClose={vi.fn()} onLaunched={vi.fn()} />);
+		expect(await screen.findByText(/workspace root/i)).toBeInTheDocument();
+		expect(screen.queryByText('Selected card — provide its path and related documents')).not.toBeInTheDocument();
+		fireEvent.click(screen.getByLabelText('Embedded terminal'));
+		fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
+		await waitFor(() => expect(api.startEmbeddedWorkspaceAISession).toHaveBeenCalledWith('workspace-1', expect.objectContaining({ contextMode: 'workspace_only', contextPath: '' })));
+	});
+
+	it('preserves embedded launch guards supplied by a canvas', async () => {
+		mockOptions();
+		vi.mocked(api.startEmbeddedAISession).mockResolvedValue({ session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '2026-07-03T00:00:00Z' }, grant: { sessionId: 'session-1', token: 'secret', expiresAt: '2026-07-03T00:01:00Z' } });
+		render(<AISessionLaunchDialog itemId="item-1" embeddedLaunchGuards={{ expectedWorkspaceId: 'workspace-1', expectedBranch: 'main', observedCommit: 'abc123', idempotencyKey: 'canvas-launch-1' }} onClose={vi.fn()} onLaunched={vi.fn()} />);
+		fireEvent.click(await screen.findByLabelText('Embedded terminal'));
+		fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
+		await waitFor(() => expect(api.startEmbeddedAISession).toHaveBeenCalledWith('item-1', expect.objectContaining({ expectedWorkspaceId: 'workspace-1', expectedBranch: 'main', observedCommit: 'abc123', idempotencyKey: 'canvas-launch-1' })));
+	});
+
 	it('hides embedded sessions when embedded launch is disabled', async () => {
 		mockOptions();
 		render(<AISessionLaunchDialog itemId="item-1" allowEmbedded={false} preference={{ provider: 'codex', terminal: 'terminal', contextMode: 'card_context', surface: 'embedded' }} onClose={vi.fn()} onLaunched={vi.fn()} />);

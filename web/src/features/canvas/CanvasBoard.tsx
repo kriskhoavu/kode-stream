@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
+import { Background, Controls, Handle, NodeResizer, Position, ReactFlow, ReactFlowProvider, useNodesState } from '@xyflow/react';
 import type { Edge, Node as XYNode, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
-import { Box, ChevronDown, GitBranch, Maximize2, Minimize2, Play, Search, Square, TerminalSquare, Trash2, Workflow } from 'lucide-react';
+import { Bot, Box, ChevronDown, GitBranch, Maximize2, Minimize2, Play, Search, Square, TerminalSquare, Trash2, Workflow } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasViewport, EmbeddedAISessionResult, EmbeddedAISessionState, GitStatus, SafeSessionRecord } from '../../lib/types';
 import { EmbeddedTerminal } from '../ai-session/EmbeddedTerminal';
@@ -22,7 +22,7 @@ type CanvasFlowNode = XYNode<CanvasNodeData>;
 
 const nodeTypes = { workspace: memo(WorkspaceCanvasNode), plan: memo(PlanCanvasNode), session: memo(SessionCanvasNode) };
 
-export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMoveNode, onSetCollapsed, onArrange, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove }: {
+export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMoveNode, onSetCollapsed, onArrange, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onOpenAISession, aiSessionDisabled = true }: {
 	projection: CanvasProjection;
 	conflicts: string[];
 	selectedId?: string;
@@ -36,15 +36,19 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 	onReapplyPosition: (id: string) => void;
 	onReset: () => void;
 	onRemove: (node: DomainNode) => void;
+	onOpenAISession?: () => void;
+	aiSessionDisabled?: boolean;
 }) {
 	const [statusFilters, setStatusFilters] = useState<string[]>([]);
 	const [serviceFilters, setServiceFilters] = useState<string[]>([]);
+	const [searchQuery, setSearchQuery] = useState('');
 	const [openMenu, setOpenMenu] = useState('');
 	const layoutCapability = projection.nodes.find((node) => node.workspace)?.workspace?.actions['layout.move'];
 	const layoutAvailable = layoutCapability?.state === 'available';
 	const statuses = useMemo(() => Array.from(new Set(projection.nodes.flatMap((node) => node.plan ? [node.plan.status] : []))), [projection.nodes]);
 	const services = useMemo(() => Array.from(new Set(projection.nodes.flatMap((node) => node.plan?.service ? [node.plan.service] : []))).sort(), [projection.nodes]);
-	const visibleDomainNodes = useMemo(() => projection.nodes.filter((node) => !node.plan || ((statusFilters.length === 0 || statusFilters.includes(node.plan.status)) && (serviceFilters.length === 0 || serviceFilters.includes(node.plan.service ?? '')))), [projection.nodes, serviceFilters, statusFilters]);
+	const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+	const visibleDomainNodes = useMemo(() => projection.nodes.filter((node) => (!node.plan || ((statusFilters.length === 0 || statusFilters.includes(node.plan.status)) && (serviceFilters.length === 0 || serviceFilters.includes(node.plan.service ?? '')))) && (!normalizedSearchQuery || nodeSearchText(node).toLowerCase().includes(normalizedSearchQuery))), [normalizedSearchQuery, projection.nodes, serviceFilters, statusFilters]);
 	const visibleIDs = useMemo(() => new Set(visibleDomainNodes.map((node) => node.id)), [visibleDomainNodes]);
 	const hiddenCount = projection.nodes.length - visibleDomainNodes.length;
 	const modelNodes = useMemo(() => visibleDomainNodes.map((node): CanvasFlowNode => ({
@@ -65,7 +69,8 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 	return <ReactFlowProvider><div className="canvas-board-shell">
 		<div className="canvas-toolbar" aria-label="Canvas tools">
 			<div className="canvas-board-toolbar">
-				<CanvasSearch nodes={visibleDomainNodes} onSelect={onSelect} />
+				<CanvasSearch query={searchQuery} onQueryChange={setSearchQuery} />
+				<button className="primary" type="button" disabled={aiSessionDisabled} onClick={onOpenAISession}><Bot size={15} /> AI session</button>
 				<button className="secondary" type="button" onClick={onReset} disabled={!layoutAvailable || projection.nodes.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Workflow size={15} /> Reset layout</button>
 				{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
 			</div>
@@ -115,15 +120,16 @@ function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	const record = data.node.session?.record;
 	const expanded = Boolean(record && !data.node.collapsed);
 	const disclosure = record ? <button className="icon-button canvas-node-action nodrag nopan" type="button" aria-label={expanded ? 'Collapse session terminal' : 'Expand session terminal'} title={expanded ? 'Collapse terminal' : 'Expand terminal'} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); data.onSetCollapsed(data.node.id, expanded); }}>{expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button> : undefined;
-	return <NodeFrame data={data} eyebrow="Session" icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => data.onSetCollapsed(data.node.id, true)} onReload={data.onReload} /> : undefined}>
+	return <NodeFrame data={data} eyebrow="Session" icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => data.onSetCollapsed(data.node.id, true)} onReload={data.onReload} /> : undefined}>
 		<strong>{record?.provider || 'Unavailable session'}</strong>
 		<span className={`canvas-session-state state-${record?.state || 'stale'}`}><Play size={11} /> {record?.state || stateLabel(data.node)}</span>
 		<span>{record?.requestedBranch || data.node.entityRef.branchKey}</span>
 	</NodeFrame>;
 }
 
-function NodeFrame({ data, eyebrow, icon, children, addon, action, expanded = false }: { data: CanvasNodeData; eyebrow: string; icon: React.ReactNode; children: React.ReactNode; addon?: React.ReactNode; action?: React.ReactNode; expanded?: boolean }) {
+function NodeFrame({ data, eyebrow, icon, children, addon, action, expanded = false, resizable = false }: { data: CanvasNodeData; eyebrow: string; icon: React.ReactNode; children: React.ReactNode; addon?: React.ReactNode; action?: React.ReactNode; expanded?: boolean; resizable?: boolean }) {
 	return <div className={`canvas-semantic-node kind-${data.node.kind} state-${data.node.state}${data.selected ? ' selected' : ''}${data.conflicted ? ' conflicted' : ''}${expanded ? ' expanded' : ''}`}>
+		{resizable && <NodeResizer isVisible minWidth={520} minHeight={500} handleClassName="canvas-session-resize-handle" lineClassName="canvas-session-resize-line" />}
 		<Handle className="canvas-derived-handle" type="target" position={Position.Left} isConnectable={false} />
 		<div data-canvas-node-id={data.node.id} className="canvas-node-select-target" role="button" tabIndex={0} aria-label={`${eyebrow}: ${nodeSearchText(data.node)}`} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); }} onKeyDown={(event) => {
 		if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); data.onSelect(data.node.id); return; }
@@ -189,23 +195,8 @@ function CanvasSessionTerminal({ record, visible, onClose, onReload }: { record:
 	</section>;
 }
 
-function CanvasSearch({ nodes, onSelect }: { nodes: DomainNode[]; onSelect: (id?: string) => void }) {
-	const [query, setQuery] = useState('');
-	const [matches, setMatches] = useState<DomainNode[]>([]);
-	const { fitView, getNode } = useReactFlow();
-	const search = (value: string) => {
-		setQuery(value);
-		const normalized = value.trim().toLowerCase();
-		setMatches(normalized ? nodes.filter((node) => nodeSearchText(node).toLowerCase().includes(normalized)).slice(0, 8) : []);
-	};
-	const focus = (node: DomainNode) => {
-		onSelect(node.id);
-		setMatches([]);
-		const target = getNode(node.id);
-		if (target) void fitView({ nodes: [target], padding: 0.8, maxZoom: 1.25, duration: 180 });
-		requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-canvas-node-id="${node.id.replaceAll('"', '\\"')}"]`)?.focus());
-	};
-	return <label className="filter-input plan-search canvas-search"><Search size={15} /><input aria-label="Search Canvas nodes" value={query} onChange={(event) => search(event.target.value)} placeholder="Search items..." />{matches.length > 0 && <div className="canvas-search-results" role="listbox">{matches.map((node) => <button key={node.id} type="button" role="option" onClick={() => focus(node)}>{nodeSearchText(node)}</button>)}</div>}</label>;
+function CanvasSearch({ query, onQueryChange }: { query: string; onQueryChange: (value: string) => void }) {
+	return <label className="filter-input plan-search canvas-search"><Search size={15} /><input aria-label="Search Canvas nodes" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Search items..." /></label>;
 }
 
 function CanvasFacetMenu({ title, options, selected, open, onOpen, onClose, onToggle, onClear }: { title: string; options: Array<{ value: string; label: string }>; selected: string[]; open: boolean; onOpen: () => void; onClose: () => void; onToggle: (value: string) => void; onClear: () => void }) {

@@ -1,21 +1,24 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, api } from '../../lib/api';
+import { api } from '../../lib/api';
 import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult, SafeSessionRecord } from '../../lib/types';
 import { CanvasWorkbench } from './CanvasWorkbench';
 
 vi.mock('../../lib/api', async () => {
 	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
-	return { ...actual, api: { aiSettings: vi.fn(), startEmbeddedAISession: vi.fn(), embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn() } };
+	return { ...actual, api: { embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn(), itemE2ERunbooks: vi.fn(), item: vi.fn(), saveMetadata: vi.fn() } };
 });
+vi.mock('../ai-session/AISessionLaunchDialog', () => ({
+	AISessionLaunchDialog: ({ onLaunched }: { onLaunched: (result: EmbeddedAISessionResult, input: { provider: string; terminal: string; contextMode: 'card_context'; surface: 'embedded' }) => void }) => <button type="button" aria-label="Complete embedded AI session" onClick={() => onLaunched({ session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }, grant: { sessionId: 'session-1', token: 'grant', expiresAt: '' } }, { provider: 'codex', terminal: 'terminal', contextMode: 'card_context', surface: 'embedded' })}>Complete embedded AI session</button>
+}));
 describe('CanvasWorkbench', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(api.aiSettings).mockResolvedValue({ defaultProvider: 'codex', defaultTerminal: '', providers: {}, terminals: {} });
-		vi.mocked(api.startEmbeddedAISession).mockResolvedValue(sessionResult());
 		vi.mocked(api.embeddedAISession).mockResolvedValue(sessionResult().session);
 		vi.mocked(api.embeddedAISessionGrant).mockResolvedValue(sessionResult().grant);
 		vi.mocked(api.cancelEmbeddedAISession).mockResolvedValue({ ...sessionResult().session, state: 'cancelled' });
+		vi.mocked(api.itemE2ERunbooks).mockResolvedValue({ runbooks: [] });
+		vi.mocked(api.item).mockRejectedValue(new Error('Item details unavailable in this test.'));
 		vi.spyOn(window, 'confirm').mockReturnValue(true);
 	});
 
@@ -24,35 +27,30 @@ describe('CanvasWorkbench', () => {
 		expect(screen.queryByLabelText('Canvas Workbench')).not.toBeInTheDocument();
 	});
 
-	it('launches one branch-safe process for a double submission', async () => {
-		let resolveSettings!: (value: Awaited<ReturnType<typeof api.aiSettings>>) => void;
-		vi.mocked(api.aiSettings).mockReturnValue(new Promise((resolve) => { resolveSettings = resolve; }));
+	it('opens an AI session dialog from a workspace node when terminal launch is available', () => {
+		const workspace = workspaceNode();
+		workspace.workspace!.actions['terminal.launch'] = { action: 'terminal.launch', state: 'available', recoveryActions: [] };
+		renderWorkbench(workspace, { aiSessionDialogOpen: true });
+		expect(screen.getByRole('button', { name: 'Complete embedded AI session' })).toBeInTheDocument();
+	});
+
+	it('opens the AI session dialog and adds its embedded session to the canvas', async () => {
 		const reload = vi.fn();
 		const placeSession = vi.fn();
 		const selectNode = vi.fn();
-		renderWorkbench(planNode(), { onReload: reload, onPlaceSession: placeSession, onSelectNode: selectNode });
-		const launch = screen.getByRole('button', { name: 'Launch terminal' });
-		fireEvent.click(launch);
-		fireEvent.click(launch);
-		expect(api.aiSettings).toHaveBeenCalledTimes(1);
-		resolveSettings({ defaultProvider: 'codex', defaultTerminal: '', providers: {}, terminals: {} });
-		await waitFor(() => expect(api.startEmbeddedAISession).toHaveBeenCalledTimes(1));
-		expect(api.startEmbeddedAISession).toHaveBeenCalledWith('item-1', expect.objectContaining({ expectedWorkspaceId: 'workspace-1', expectedBranch: 'main', observedCommit: 'abc123', idempotencyKey: expect.any(String) }));
+		renderWorkbench(planNode(), { aiSessionDialogOpen: true, onReload: reload, onPlaceSession: placeSession, onSelectNode: selectNode });
+		expect(screen.getByRole('button', { name: 'Complete embedded AI session' })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Complete embedded AI session' }));
 		await waitFor(() => expect(placeSession).toHaveBeenCalledWith('session-1'));
 		expect(selectNode).toHaveBeenCalledWith('session:session-1');
 		expect(reload).toHaveBeenCalled();
 	});
 
-	it('shows expected and current branch recovery without starting a terminal', async () => {
-		vi.mocked(api.startEmbeddedAISession).mockRejectedValue(new ApiError('checkout changed', undefined, undefined, { code: 'terminal_branch_mismatch', details: { expectedBranch: 'main', currentBranch: 'other', dirty: 'true' }, status: 409 }));
-		const reload = vi.fn();
-		renderWorkbench(planNode(), { onReload: reload });
-		fireEvent.click(screen.getByRole('button', { name: 'Launch terminal' }));
-		await screen.findByText('Checkout changed');
-		expect(screen.getByText('main')).toBeInTheDocument();
-		expect(screen.getByText('other')).toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: /Refresh Canvas/ }));
-		expect(reload).toHaveBeenCalled();
+	it('reports a canvas placement failure after an embedded session opens', async () => {
+		const placeSession = vi.fn().mockRejectedValue(new Error('Canvas unavailable'));
+		renderWorkbench(planNode(), { aiSessionDialogOpen: true, onPlaceSession: placeSession });
+		fireEvent.click(screen.getByRole('button', { name: 'Complete embedded AI session' }));
+		expect(await screen.findByText('Canvas unavailable')).toHaveAttribute('role', 'alert');
 	});
 
 	it('separates verification result from freshness and removes stale success emphasis', async () => {
@@ -72,9 +70,10 @@ describe('CanvasWorkbench', () => {
 		const openFullView = vi.fn();
 		vi.mocked(api.createVerificationJob).mockResolvedValue({ id: 'verify-2', workspaceId: 'workspace-1', profile: 'smoke', status: 'passed', exitCode: 0, steps: [], artifacts: [] });
 		render(<CanvasWorkbench {...defaultProps(projection, plan)} onOpenFullView={openFullView} />);
-		fireEvent.click(screen.getByRole('button', { name: 'Run smoke verification' }));
-		await waitFor(() => expect(api.createVerificationJob).toHaveBeenCalledWith('workspace-1', { profile: 'smoke', trigger: 'canvas' }));
-		fireEvent.click(screen.getByRole('button', { name: 'Open full view' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Quality' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Run smoke verify' }));
+		await waitFor(() => expect(api.createVerificationJob).toHaveBeenCalledWith('workspace-1', { profile: 'smoke', trigger: 'manual_checkpoint', terminalMode: 'embedded' }));
+		fireEvent.click(screen.getByRole('button', { name: 'View details' }));
 		expect(openFullView).toHaveBeenCalledWith(plan);
 	});
 

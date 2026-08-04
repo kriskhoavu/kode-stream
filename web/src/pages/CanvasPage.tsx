@@ -13,6 +13,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	const canvas = useCanvasState(workspaceId);
 	const [selectedId, setSelectedId] = useState<string>();
 	const [confirmation, setConfirmation] = useState<'reset' | 'remove'>();
+	const [aiSessionDialogOpen, setAISessionDialogOpen] = useState(false);
 
 	useEffect(() => {
 		if (workspaceId && location?.workspaceId !== workspaceId) {
@@ -22,9 +23,12 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 
 	const title = useMemo(() => canvas.projection?.nodes.find((node) => node.kind === 'workspace')?.workspace?.name ?? workspace?.name ?? 'Canvas', [canvas.projection, workspace?.name]);
 	const selectedNode = canvas.projection?.nodes.find((node) => node.id === selectedId);
+	const terminalLaunch = selectedNode?.plan?.actions['terminal.launch'] ?? selectedNode?.workspace?.actions['terminal.launch'];
+	const canOpenAISession = Boolean(selectedNode && (selectedNode.plan || selectedNode.workspace) && terminalLaunch?.state === 'available');
 	const workbenchNode = selectedNode?.session ? undefined : selectedNode;
 	const closeWorkbench = () => {
 		const focusID = selectedId;
+		setAISessionDialogOpen(false);
 		setSelectedId(undefined);
 		if (focusID) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-canvas-node-id="${focusID.replaceAll('"', '\\"')}"]`)?.focus());
 	};
@@ -41,7 +45,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 			{canvas.projection && <div className="canvas-state canvas-status-strip" data-testid="canvas-ready">
 				<strong>{canvas.projection.nodes.length} node{canvas.projection.nodes.length === 1 ? '' : 's'}</strong><span role="status" aria-live="polite">{canvas.saveStatus === 'saving' ? `Saving ${canvas.dirtyCount} position${canvas.dirtyCount === 1 ? '' : 's'}…` : canvas.saveStatus === 'saved' ? 'Saved' : ''}</span>
 			</div>}
-			{canvas.projection && <div className={`canvas-work-area${workbenchNode ? ' workbench-open' : ''}`}><CanvasBoard projection={canvas.projection} conflicts={canvas.conflicts} selectedId={selectedId} onSelect={setSelectedId} onMoveNode={canvas.moveNode} onSetCollapsed={canvas.setNodeCollapsed} onArrange={canvas.arrangePlans} onSaveViewport={canvas.saveViewport} onReload={canvas.refresh} onReloadPosition={(id) => void canvas.reloadPosition(id)} onReapplyPosition={(id) => void canvas.reapplyPosition(id)} onReset={() => setConfirmation('reset')} onRemove={(node) => { setSelectedId(node.id); setConfirmation('remove'); }} /><CanvasWorkbench projection={canvas.projection} selectedNode={workbenchNode} onClose={closeWorkbench} onReload={canvas.refresh} onSelectNode={setSelectedId} onPlaceSession={canvas.placeSession} onOpenFullView={(node) => node.plan ? onOpenItem?.(node.plan.itemId) : node.workspace ? onOpenWorkspaces?.() : undefined} /></div>}
+			{canvas.projection && <div className={`canvas-work-area${workbenchNode ? ' workbench-open' : ''}`}><CanvasBoard projection={canvas.projection} conflicts={canvas.conflicts} selectedId={selectedId} onSelect={setSelectedId} onMoveNode={canvas.moveNode} onSetCollapsed={canvas.setNodeCollapsed} onArrange={canvas.arrangePlans} onSaveViewport={canvas.saveViewport} onReload={canvas.refresh} onReloadPosition={(id) => void canvas.reloadPosition(id)} onReapplyPosition={(id) => void canvas.reapplyPosition(id)} onReset={() => setConfirmation('reset')} onRemove={(node) => { setSelectedId(node.id); setConfirmation('remove'); }} onOpenAISession={() => setAISessionDialogOpen(true)} aiSessionDisabled={!canOpenAISession} /><CanvasWorkbench projection={canvas.projection} selectedNode={workbenchNode} aiSessionDialogOpen={aiSessionDialogOpen} onAISessionDialogOpenChange={setAISessionDialogOpen} onClose={closeWorkbench} onReload={canvas.refresh} onSelectNode={setSelectedId} onPlaceSession={canvas.placeSession} onOpenFullView={(node) => node.plan ? onOpenItem?.(node.plan.itemId) : node.workspace ? onOpenWorkspaces?.() : undefined} /></div>}
 			{confirmation === 'reset' && <ConfirmDialog title="Reset Canvas layout?" message="Preview: the workspace returns to the origin and plans and sessions return to the deterministic grid. This changes presentation only; repository entities and terminal processes are untouched." confirmLabel="Reset layout" onCancel={() => setConfirmation(undefined)} onConfirm={() => { canvas.resetPositions(); setConfirmation(undefined); }} />}
 			{confirmation === 'remove' && selectedNode && <ConfirmDialog title="Remove node from Canvas?" message={`Remove ${selectedNode.kind} from this layout? The underlying ${selectedNode.kind} and any live terminal process continue unchanged.`} confirmLabel="Remove from Canvas" danger onCancel={() => setConfirmation(undefined)} onConfirm={() => { void canvas.removeNode(selectedNode.id); setSelectedId(undefined); setConfirmation(undefined); }} />}
 		</section>
