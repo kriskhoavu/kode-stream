@@ -79,4 +79,17 @@ describe('EmbeddedTerminal', () => {
 		expect(screen.getByRole('button', { name: 'Restore embedded terminal size' })).toBeInTheDocument();
 	});
 
+	it('keeps one channel when lifecycle projections replace the result object', async () => {
+		vi.stubGlobal('WebSocket', TestSocket);
+		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+		const view = render(<EmbeddedTerminal initial={initial} {...terminalProps} onClose={vi.fn()} />);
+		await waitFor(() => expect(TestSocket.instances).toHaveLength(1));
+		const socket = TestSocket.instances[0];
+		view.rerender(<EmbeddedTerminal initial={{ ...initial, session: { ...initial.session, state: 'running' } }} {...terminalProps} onClose={vi.fn()} />);
+		await act(async () => { await Promise.resolve(); });
+		expect(TestSocket.instances).toHaveLength(1);
+		expect(socket.close).not.toHaveBeenCalled();
+		expect(terminalConstructor).toHaveBeenCalledTimes(1);
+	});
+
 });

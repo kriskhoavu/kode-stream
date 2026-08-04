@@ -23,6 +23,7 @@ PM-037.
 | F3    | Focused Workbench and session terminal                | Frontend   | Complete |
 | F4    | Git, verification, capability, and accessibility UX   | Frontend   | Complete |
 | F5    | Interactive terminal session nodes                    | Frontend   | Complete |
+| F6    | Stable embedded terminal channel lifecycle            | Frontend   | Complete |
 | I1    | Browser journey, documentation, and final integration | Full stack | Complete |
 
 ## Backend Phases
@@ -214,6 +215,21 @@ PM-037.
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
 
 **Commit:** `PM-037: Embed terminal sessions in Canvas nodes`
+
+---
+
+### Phase F6: Stable Embedded Terminal Channel Lifecycle
+
+**Deliverables:**
+
+- [x] Keep one xterm and WebSocket channel when a session lifecycle projection replaces the result object.
+- [x] Reconnect only when the session identity or channel grant changes.
+- [x] Use the latest lifecycle state and callback when handling server frames and socket closure.
+- [x] Add a regression test that fails when a harmless result-object replacement opens another channel.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
+
+**Commit:** `PM-037: Stabilize embedded terminal channels`
 
 ## Integration Phase
 

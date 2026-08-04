@@ -19,7 +19,18 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onSt
 	const terminalRef = useRef<Terminal | null>(null);
 	const fitRef = useRef<FitAddon | null>(null);
 	const socketRef = useRef<WebSocket | null>(null);
+	const stateRef = useRef<EmbeddedAISessionState>(initial.session.state);
+	const onStateChangeRef = useRef(onStateChange);
+	const sessionId = initial.session.id;
+	const grantToken = initial.grant.token;
 	const active = state === 'starting' || state === 'running';
+
+	useEffect(() => { onStateChangeRef.current = onStateChange; }, [onStateChange]);
+	useEffect(() => {
+		stateRef.current = initial.session.state;
+		setState(initial.session.state);
+		setExitCode(initial.session.exitCode);
+	}, [initial.session.exitCode, initial.session.state]);
 
 	useEffect(() => {
 		if (!active) return;
@@ -30,21 +41,23 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onSt
 
 	useEffect(() => {
 		if (!hostRef.current) return;
+		setConnection('connecting');
+		setMessage('');
 		let disposed = false; let retry: number | undefined; let terminal: Terminal | undefined; let observer: ResizeObserver | undefined; let dataDisposable: { dispose(): void } | undefined; let resizeDisposable: { dispose(): void } | undefined; const deadline = Date.now() + 15_000;
 		const send = (value: unknown) => { if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(value)); };
 		const connect = (activeTerminal: Terminal) => {
 			if (disposed) return;
 			const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
-			const socket = new WebSocket(`${scheme}//${location.host}/api/ai/sessions/${encodeURIComponent(initial.session.id)}/channel?token=${encodeURIComponent(initial.grant.token)}`);
+			const socket = new WebSocket(`${scheme}//${location.host}/api/ai/sessions/${encodeURIComponent(sessionId)}/channel?token=${encodeURIComponent(grantToken)}`);
 			socketRef.current = socket;
 			socket.onopen = () => { setConnection('connected'); send({ type: 'resize', columns: activeTerminal.cols, rows: activeTerminal.rows }); };
 				socket.onmessage = (event) => {
 				const frame = JSON.parse(String(event.data)) as ServerFrame;
 				if (frame.type === 'output' && frame.data) activeTerminal.write(frame.encoding === 'base64' ? Uint8Array.from(atob(frame.data), (character) => character.charCodeAt(0)) : frame.data);
-				if (frame.type === 'state' && frame.state) { setState(frame.state); setExitCode(frame.exitCode); onStateChange?.(frame.state, frame.exitCode); }
+				if (frame.type === 'state' && frame.state) { stateRef.current = frame.state; setState(frame.state); setExitCode(frame.exitCode); onStateChangeRef.current?.(frame.state, frame.exitCode); }
 				if (frame.type === 'warning') setMessage(frame.message ?? 'Terminal warning');
 			};
-			socket.onclose = () => { if (disposed) return; if (Date.now() < deadline && (state === 'starting' || state === 'running')) { setConnection('reconnecting'); retry = window.setTimeout(() => connect(activeTerminal), 500); } else { setConnection('closed'); setMessage('The terminal connection could not be restored.'); } };
+			socket.onclose = () => { if (disposed) return; if (Date.now() < deadline && (stateRef.current === 'starting' || stateRef.current === 'running')) { setConnection('reconnecting'); retry = window.setTimeout(() => connect(activeTerminal), 500); } else { setConnection('closed'); setMessage('The terminal connection could not be restored.'); } };
 		};
 		void Promise.all([import('@xterm/xterm'), import('@xterm/addon-fit')]).then(([terminalModule, fitModule]) => {
 			if (disposed || !hostRef.current) return;
@@ -55,7 +68,7 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onSt
 			observer = new ResizeObserver(() => fit.fit()); observer.observe(hostRef.current); connect(terminal);
 		}).catch(() => setMessage('The terminal emulator could not be loaded.'));
 		return () => { disposed = true; if (retry) window.clearTimeout(retry); observer?.disconnect(); dataDisposable?.dispose(); resizeDisposable?.dispose(); socketRef.current?.close(); terminal?.dispose(); terminalRef.current = null; fitRef.current = null; };
-	}, [initial]);
+	}, [grantToken, sessionId]);
 
 	useEffect(() => {
 		const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && event.ctrlKey && event.shiftKey) { event.preventDefault(); controlsRef.current?.focus(); } };
@@ -68,7 +81,7 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onSt
 		return () => cancelAnimationFrame(frame);
 	}, [mode, visible]);
 
-	const close = () => { if (cancelOnClose && active && !window.confirm('Cancel the running AI session and close the terminal?')) return; if (cancelOnClose && active) void api.cancelEmbeddedAISession(initial.session.id); onClose(); };
+	const close = () => { if (cancelOnClose && active && !window.confirm('Cancel the running AI session and close the terminal?')) return; if (cancelOnClose && active) void api.cancelEmbeddedAISession(sessionId); onClose(); };
 	const startMove = (event: ReactPointerEvent<HTMLElement>) => {
 		const target = event.target as HTMLElement;
 		if (target.closest('button')) return;
