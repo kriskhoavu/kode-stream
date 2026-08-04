@@ -117,3 +117,12 @@ sourceCount: 0
 - Pages enriched: `wiki/canvas-workflows.md`, `wiki/canvas-reference.md`, and
   `wiki/e2e-testing/cross-domain/terminal-canvas.md` (corrected existing PM-037 behavior; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-04] correction | PM-037 Explicit Session Disclosure And Hidden Placements
+<!-- chunkId: wiki-ingest-log-pm-037-session-disclosure-hidden-placement-correction -->
+<!-- keywords: PM-037, session disclosure, hidden placement, add new nodes -->
+
+- Pages created: none
+- Pages enriched: `wiki/canvas-workflows.md`, `wiki/canvas-reference.md`, and
+  `wiki/e2e-testing/cross-domain/terminal-canvas.md` (corrected existing PM-037 behavior; sourceCount unchanged)
+- Files conformed: 0

@@ -3,7 +3,7 @@ import { AlertTriangle, GitBranch, Play, RefreshCw, TerminalSquare, X } from 'lu
 import { api, ApiError } from '../../lib/api';
 import type { CanvasNode, CanvasProjection, SafeSessionRecord, VerificationJob } from '../../lib/types';
 
-export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, onSelectNode, onPlaceUnplaced, onPlaceSession, onOpenFullView }: { projection: CanvasProjection; selectedNode?: CanvasNode; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceUnplaced: () => Promise<unknown> | void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void }) {
+export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, onSelectNode, onPlaceSession, onOpenFullView }: { projection: CanvasProjection; selectedNode?: CanvasNode; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void }) {
 	const [records, setRecords] = useState<SafeSessionRecord[]>([]);
 	const [launching, setLaunching] = useState(false);
 	const [verifying, setVerifying] = useState(false);
@@ -19,8 +19,8 @@ export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, o
 	};
 	useEffect(() => { void refreshRecords().catch(() => setRecords([])); }, [projection.layout.branchKey, projection.layout.workspaceId, projection.nodes.length]);
 
-	const placedSessionIDs = useMemo(() => new Set(projection.nodes.filter((node) => node.kind === 'session').map((node) => node.entityRef.sessionId)), [projection.nodes]);
-	const unplacedActive = records.filter((record) => record.live && !placedSessionIDs.has(record.id));
+	const unplacedSessionIDs = useMemo(() => new Set(projection.unplaced.filter((ref) => ref.kind === 'session').map((ref) => ref.sessionId)), [projection.unplaced]);
+	const unplacedActive = records.filter((record) => record.live && unplacedSessionIDs.has(record.id));
 	const launchCapability = selectedNode?.plan?.actions['terminal.launch'];
 	const canLaunch = selectedNode?.kind === 'plan' && launchCapability?.state === 'available';
 	const verificationContext = selectedNode?.workspace ?? (selectedNode?.plan ? workspaceNode : undefined);
@@ -87,7 +87,7 @@ export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, o
 		{selectedNode && (selectedNode.workspace || selectedNode.plan) && onOpenFullView && <section className="canvas-workbench-section"><button type="button" onClick={() => onOpenFullView(selectedNode)}>Open full view</button></section>}
 		{mismatch && <section className="canvas-branch-mismatch" role="alert"><AlertTriangle size={17} /><div><strong>Checkout changed</strong><p>Expected <code>{mismatch.expectedBranch || mismatch.branch || mismatch.expectedCommit}</code>; current <code>{mismatch.currentBranch || mismatch.currentCommit}</code>.</p><button type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh Canvas and Git status</button></div></section>}
 		{error && <p className="canvas-workbench-error" role="alert">{error}</p>}
-		{unplacedActive.length > 0 && <section className="canvas-workbench-section canvas-active-unplaced"><h2>Active unplaced sessions</h2>{unplacedActive.map((record) => <button type="button" key={record.id} onClick={() => void Promise.resolve(onPlaceUnplaced()).then(() => onReload()).then(() => onSelectNode(`session:${record.id}`))}><TerminalSquare size={13} /><span>{record.provider}<small>{record.requestedBranch} · {record.state} · place and open</small></span></button>)}</section>}
+		{unplacedActive.length > 0 && <section className="canvas-workbench-section canvas-active-unplaced"><h2>New active sessions</h2>{unplacedActive.map((record) => <button type="button" key={record.id} onClick={() => void Promise.resolve(onPlaceSession(record.id)).then(() => onReload()).then(() => onSelectNode(`session:${record.id}`))}><TerminalSquare size={13} /><span>{record.provider}<small>{record.requestedBranch} · {record.state} · add and open</small></span></button>)}</section>}
 	</aside>;
 }
 

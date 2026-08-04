@@ -71,8 +71,8 @@ whether the plan matches the current checkout.
 ### Session Node
 
 Displays durable provider label, linked plan, requested branch, lifecycle state, and live-binding availability. A
-selected live binding expands the node into an interactive terminal. An ended or interrupted record expands into safe
-lifecycle detail. Session selection does not open the right Workbench.
+top-right disclosure action expands a live binding into an interactive terminal, or an ended/interrupted record into
+safe lifecycle detail. Selecting the session does not change its disclosure state or open the right Workbench.
 
 Removing the node removes only its placement. Stopping a process requires a separate explicit action and confirmation.
 Terminal input, text selection, and scrolling do not initiate Canvas drag or pan gestures; the session summary remains
@@ -92,8 +92,9 @@ hiding, or removing a node changes the underlying relationship.
 
 - First load creates deterministic suggested positions for the workspace, current branch plans, and durable sessions.
 - Existing placements always win over new suggestions.
-- Newly indexed plans and new sessions enter an **Unplaced work** list with a suggested position.
-- **Place new items** accepts suggestions without moving existing nodes.
+- Newly indexed plans and new sessions enter the new-node candidates with a suggested position.
+- **Add new nodes** accepts those suggestions without moving existing nodes.
+- Removed placements remain hidden and never re-enter the new-node candidates for that layout.
 - **Reset layout** shows a preview and requires confirmation before patching positions.
 - Page reload restores node positions. Current entity labels, status, Git state, capabilities, live-binding state, and
   verification freshness are resolved again.
@@ -114,20 +115,20 @@ Viewport saves use the layout metadata version and cannot conflict with placemen
 
 ## Focused Workbench And Inline Sessions
 
-| Selected Node                | PM-037 Content                                                                                                     |
-|------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| Workspace                    | Right Workbench with branch and Git status summary, refresh, and links to existing workspace controls.             |
-| Plan                         | Right Workbench with plan summary, branch context, launch, verification status/action, and **Open full view**.     |
-| Live session                 | Expanded Canvas node with the existing xterm surface, connection state, close, and explicit cancellation controls. |
-| Ended or interrupted session | Expanded Canvas node with safe lifecycle summary and exit or interruption detail.                                  |
-| Stale node                   | Safe explanation, placement removal, and explicit replacement candidate when available.                            |
+| Selected Node                | PM-037 Content                                                                                                  |
+|------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| Workspace                    | Right Workbench with branch and Git status summary, refresh, and links to existing workspace controls.          |
+| Plan                         | Right Workbench with plan summary, branch context, launch, verification status/action, and **Open full view**.  |
+| Live session                 | Canvas node whose top-right action opens the existing xterm surface, connection state, close, and cancellation. |
+| Ended or interrupted session | Canvas node whose top-right action opens safe lifecycle summary and exit or interruption detail.                |
+| Stale node                   | Safe explanation, placement removal, and explicit replacement candidate when available.                         |
 
 PM-037 does not embed Markdown editing, file browsing, diff, Jira, complete Git controls, or full verification artifacts.
 Those remain in their existing authoritative views.
 
-Only one terminal surface is mounted for each session node after the user opens it. Selecting another node hides that
-surface without stopping its process or creating another subscriber or xterm owner. Returning to the session restores
-the same mounted Canvas terminal while the node remains projected; normal grant and reconnect rules apply after reload.
+Only one terminal surface is mounted for each expanded session node. Selection never changes disclosure. The top-right
+action and terminal close action update the persisted `collapsed` placement field without stopping the process or
+creating another subscriber or xterm owner; normal grant and reconnect rules apply after reload.
 
 ## Branch Mismatch UX
 
@@ -155,8 +156,9 @@ creation.
 | `failed`                       | Show safe launch/process failure without command arguments or prompt.             |
 | `interrupted`                  | Explain that metadata survived but the live process did not.                      |
 
-A hidden or unplaced running session remains visible in a compact **Active sessions** indicator so users understand that
-it consumes a process slot.
+A newly discovered unplaced running session remains visible under **New active sessions**. A deliberately removed
+session remains durable and may keep consuming a process slot, but Canvas does not re-offer its hidden placement; users
+manage that process through the existing session lifecycle surface.
 
 ## Git And Verification UX
 
@@ -194,16 +196,17 @@ behavior. Labels may still appear as contextual information when useful.
 
 ## Interaction Design
 
-| Interaction           | Result                                                                                     |
-|-----------------------|--------------------------------------------------------------------------------------------|
-| Single select         | Focus a workspace or plan and update the Workbench; expand a session inside the Canvas.    |
-| Double click or Enter | Open the full entity view, or focus the expanded terminal for a session node.              |
-| Drag node             | Move only selected placement or selected placement set.                                    |
-| Node search           | Filter by current resolved title, identifier, branch, or session state and focus a result. |
-| Fit content           | Fit visible nodes without changing saved positions.                                        |
-| Place new items       | Accept positions for currently unplaced entities without moving saved nodes.               |
-| Reset layout          | Preview deterministic positions and confirm before applying them.                          |
-| Remove node           | Remove placement only after stating that the source entity and process are unchanged.      |
+| Interaction              | Result                                                                                     |
+|--------------------------|--------------------------------------------------------------------------------------------|
+| Single select            | Focus a workspace or plan and update the Workbench; focus a session without disclosing it. |
+| Session top-right action | Expand or collapse the terminal independently from node selection.                         |
+| Double click or Enter    | Open the full entity view, or focus an already expanded terminal for a session node.       |
+| Drag node                | Move only selected placement or selected placement set.                                    |
+| Node search              | Filter by current resolved title, identifier, branch, or session state and focus a result. |
+| Fit content              | Fit visible nodes without changing saved positions.                                        |
+| Add new nodes            | Place newly discovered entities without moving saved or intentionally removed nodes.       |
+| Reset layout             | Preview deterministic positions and confirm before applying them.                          |
+| Remove node              | Remove placement only after stating that the source entity and process are unchanged.      |
 
 There are no connection handles, group drop targets, note editors, edge menus, minimap requirement, or semantic zoom
 modes in PM-037.
@@ -231,7 +234,7 @@ but does not claim touch-first editing support.
 - Lazy-load Canvas and xterm code.
 - Resolve node projections in bounded backend batches.
 - Memoize node components and avoid one request per node.
-- Mount the terminal only for the selected live session.
+- Mount the terminal only for an explicitly expanded live session.
 - Measure first render, drag, save, and selection at 25, 100, and the 300-placement MVP limit.
 - Avoid animated connections and background auto-layout.
 

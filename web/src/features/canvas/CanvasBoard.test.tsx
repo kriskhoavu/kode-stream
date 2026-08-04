@@ -32,22 +32,31 @@ vi.mock('@xyflow/react', async () => {
 describe('CanvasBoard', () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it('expands a live session into an interactive Canvas terminal and keeps the connection when collapsed', async () => {
+	it('uses an explicit disclosure action and keeps expansion independent from selection', async () => {
 		vi.mocked(api.embeddedAISession).mockResolvedValue({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' });
 		vi.mocked(api.embeddedAISessionGrant).mockResolvedValue({ sessionId: 'session-1', token: 'grant', expiresAt: '' });
 		const onSelect = vi.fn();
-		const view = renderBoard(baseProjection(), { selectedId: 'session:session-1', onSelect });
+		const onSetCollapsed = vi.fn();
+		const view = renderBoard(baseProjection(), { selectedId: 'session:session-1', onSelect, onSetCollapsed });
+		expect(screen.queryByTestId('canvas-terminal-session-1')).not.toBeInTheDocument();
+		expect(api.embeddedAISession).not.toHaveBeenCalled();
+		fireEvent.click(screen.getByRole('button', { name: 'Expand session terminal' }));
+		expect(onSetCollapsed).toHaveBeenCalledWith('session:session-1', false);
+		const expanded = baseProjection();
+		expanded.nodes[2] = { ...expanded.nodes[2], collapsed: false };
+		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} selectedId="session:session-1" onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
 		expect(await screen.findByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');
 		fireEvent.change(screen.getByLabelText('Terminal prompt'), { target: { value: 'review this change' } });
-		expect(onSelect).not.toHaveBeenCalled();
-		view.rerender(<CanvasBoard projection={baseProjection()} conflicts={[]} onSelect={onSelect} onMoveNode={vi.fn()} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
-		expect(screen.getByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'false');
+		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
+		expect(screen.getByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');
 		expect(api.embeddedAISessionGrant).toHaveBeenCalledTimes(1);
+		fireEvent.click(screen.getByRole('button', { name: 'Hide terminal' }));
+		expect(onSetCollapsed).toHaveBeenLastCalledWith('session:session-1', true);
 	});
 
 	it('shows interrupted lifecycle details and cancels a live process separately from Canvas placement', async () => {
 		const interrupted = baseProjection();
-		interrupted.nodes[2] = { ...interrupted.nodes[2], session: { record: { ...interrupted.nodes[2].session!.record, state: 'interrupted', live: false, exitCode: 130 } } };
+		interrupted.nodes[2] = { ...interrupted.nodes[2], collapsed: false, session: { record: { ...interrupted.nodes[2].session!.record, state: 'interrupted', live: false, exitCode: 130 } } };
 		const first = renderBoard(interrupted, { selectedId: 'session:session-1' });
 		expect(screen.getByText(/application restarted without this process/i)).toBeInTheDocument();
 		expect(screen.getByText('Exit code 130')).toBeInTheDocument();
@@ -59,7 +68,9 @@ describe('CanvasBoard', () => {
 		vi.mocked(api.cancelEmbeddedAISession).mockResolvedValue({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'cancelled', startedAt: '' });
 		const onReload = vi.fn();
 		const onRemove = vi.fn();
-		renderBoard(baseProjection(), { selectedId: 'session:session-1', onReload, onRemove });
+		const expanded = baseProjection();
+		expanded.nodes[2] = { ...expanded.nodes[2], collapsed: false };
+		renderBoard(expanded, { selectedId: 'session:session-1', onReload, onRemove });
 		fireEvent.click(screen.getByRole('button', { name: 'Cancel process' }));
 		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
 		expect(onReload).toHaveBeenCalled();
@@ -96,7 +107,7 @@ describe('CanvasBoard', () => {
 		fireEvent.click(screen.getByRole('option', { name: /PM-037/ }));
 		expect(onSelect).toHaveBeenCalledWith('plan:item-1');
 		expect(fitView).toHaveBeenCalled();
-		fireEvent.click(screen.getByRole('button', { name: /Place new items/ }));
+		fireEvent.click(screen.getByRole('button', { name: /Add new nodes/ }));
 		fireEvent.click(screen.getByRole('button', { name: /Reset layout/ }));
 		fireEvent.click(screen.getByRole('button', { name: /Remove from Canvas/ }));
 		expect(onPlaceUnplaced).toHaveBeenCalled();
@@ -155,7 +166,7 @@ describe('CanvasBoard', () => {
 });
 
 function renderBoard(projection: CanvasProjection, overrides: Partial<React.ComponentProps<typeof CanvasBoard>> = {}) {
-	return render(<CanvasBoard projection={projection} conflicts={[]} onSelect={vi.fn()} onMoveNode={vi.fn()} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} {...overrides} />);
+	return render(<CanvasBoard projection={projection} conflicts={[]} onSelect={vi.fn()} onMoveNode={vi.fn()} onSetCollapsed={vi.fn()} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} {...overrides} />);
 }
 
 function baseProjection(): CanvasProjection {
@@ -165,7 +176,7 @@ function baseProjection(): CanvasProjection {
 		nodes: [
 			{ id: 'workspace:workspace-1', kind: 'workspace', state: 'resolved', entityRef: { kind: 'workspace', workspaceId: 'workspace-1' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, workspace: { id: 'workspace-1', name: 'Workspace', branch: 'main', providerAxes: { topology: 'local_application', contentProvider: 'local_checkout', executionProvider: 'local_process' }, actions } },
 			{ id: 'plan:item-1', kind: 'plan', state: 'resolved', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'item-1', itemPath: 'plans/platform/PM-037', identifier: 'PM-037', branchKey: 'main' }, position: { x: 360, y: 0 }, collapsed: false, revision: 1, plan: { itemId: 'item-1', identifier: 'PM-037', title: 'Focused Canvas', service: 'platform', status: 'in_progress', branch: 'main', editable: true, actions } },
-			{ id: 'session:session-1', kind: 'session', state: 'resolved', entityRef: { kind: 'session', workspaceId: 'workspace-1', sessionId: 'session-1', branchKey: 'main' }, position: { x: 680, y: 420 }, collapsed: false, revision: 1, session: { record: { id: 'session-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', requestedBranch: 'main', state: 'running', startedAt: '', lastKnownAt: '', live: true } } }
+			{ id: 'session:session-1', kind: 'session', state: 'resolved', entityRef: { kind: 'session', workspaceId: 'workspace-1', sessionId: 'session-1', branchKey: 'main' }, position: { x: 680, y: 420 }, collapsed: true, revision: 1, session: { record: { id: 'session-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', requestedBranch: 'main', state: 'running', startedAt: '', lastKnownAt: '', live: true } } }
 		],
 		connections: [{ id: 'one', source: 'workspace:workspace-1', target: 'plan:item-1', kind: 'repository_contains', sourceOfTruth: 'derived' }, { id: 'two', source: 'plan:item-1', target: 'session:session-1', kind: 'session_launched_from', sourceOfTruth: 'derived' }],
 		unplaced: []

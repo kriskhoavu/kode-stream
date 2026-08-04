@@ -91,6 +91,24 @@ describe('CanvasWorkbench', () => {
 		expect(reload).toHaveBeenCalled();
 		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalled());
 	});
+
+	it('offers only newly discovered active sessions and never re-places a removed session', async () => {
+		const newRecord = sessionRecord();
+		const removedRecord = { ...sessionRecord(), id: 'session-removed' };
+		vi.mocked(api.aiSessionRecords).mockResolvedValue([newRecord, removedRecord]);
+		const projection = {
+			...baseProjection([planNode()]),
+			unplaced: [{ kind: 'session' as const, workspaceId: 'workspace-1', sessionId: newRecord.id, branchKey: 'main' }]
+		};
+		const placeSession = vi.fn();
+		const selectNode = vi.fn();
+		render(<CanvasWorkbench {...defaultProps(projection, planNode())} onPlaceSession={placeSession} onSelectNode={selectNode} />);
+		await screen.findByText('New active sessions');
+		expect(screen.getAllByText(/add and open/)).toHaveLength(1);
+		fireEvent.click(screen.getByRole('button', { name: /codex/ }));
+		await waitFor(() => expect(placeSession).toHaveBeenCalledWith(newRecord.id));
+		expect(selectNode).toHaveBeenCalledWith(`session:${newRecord.id}`);
+	});
 });
 
 function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.ComponentProps<typeof CanvasWorkbench>> = {}) {
@@ -99,7 +117,7 @@ function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.Comp
 }
 
 function defaultProps(projection: CanvasProjection, selectedNode?: CanvasNode): React.ComponentProps<typeof CanvasWorkbench> {
-	return { projection, selectedNode, onClose: vi.fn(), onReload: vi.fn(), onSelectNode: vi.fn(), onPlaceUnplaced: vi.fn(), onPlaceSession: vi.fn() };
+	return { projection, selectedNode, onClose: vi.fn(), onReload: vi.fn(), onSelectNode: vi.fn(), onPlaceSession: vi.fn() };
 }
 
 function baseProjection(nodes: CanvasNode[] = [planNode()]): CanvasProjection {

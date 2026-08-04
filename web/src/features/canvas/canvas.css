@@ -28,7 +28,10 @@
 .canvas-semantic-node.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent), 0 10px 28px rgb(0 0 0 / .12); }
 .canvas-semantic-node.conflicted { border-style: dashed; border-color: var(--danger); }
 .canvas-node-select-target > header { display: flex; align-items: center; gap: 7px; padding: 9px 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.canvas-semantic-node.kind-session .canvas-node-select-target > header { padding-right: 48px; }
 .canvas-node-select-target > header em { margin-left: auto; color: var(--danger); font-style: normal; }
+.canvas-node-action { position: absolute; z-index: 3; top: 5px; right: 7px; width: 28px; height: 28px; border-color: transparent; background: transparent; color: var(--muted); }
+.canvas-node-action:hover { border-color: var(--line); background: var(--panel-soft); color: var(--text); }
 .canvas-node-summary { display: grid; gap: 6px; padding: 11px 12px; }
 .canvas-node-summary strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-node-summary span { display: flex; align-items: center; gap: 5px; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }

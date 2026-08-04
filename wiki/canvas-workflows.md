@@ -18,8 +18,9 @@ lastTicket: PM-038
 Open **Canvas** for the active workspace checkout. Canvas resolves Git before loading or seeding the branch-scoped
 layout; it has no independent branch selector. Drag a workspace, plan, or session node independently, or
 focus it and use an arrow key to move 12 pixels; Shift plus an arrow moves one pixel. Wait for **Saved** before reloading.
-**Place new items** accepts deterministic positions without moving saved nodes. **Reset layout** previews and confirms a
-presentation-only reset. **Remove from Canvas** removes only the placement.
+**Add new nodes** accepts deterministic positions for newly discovered plans and sessions without moving saved nodes.
+**Reset layout** previews and confirms a presentation-only reset. **Remove from Canvas** keeps the referenced entity but
+hides its placement for this layout, so **Add new nodes** does not bring it back.
 
 Use **Search Canvas nodes** to find a title, identifier, branch, or session state. **Fit view** recovers off-screen nodes.
 Closing the Workbench returns focus to the selected node.
@@ -37,9 +38,10 @@ Canvas shows **Checkout changed** with expected/current context and offers **Ref
 switches branches automatically.
 
 A successful launch creates one safe durable record and one live process, places only that new session when needed,
-and expands its Canvas node into the interactive terminal. Selecting another node hides the terminal without cancelling
-or relaunching it; returning to the session restores the same live surface. Closing the terminal only collapses the
-session node. **Cancel process** remains separate from closing the terminal and from **Remove from Canvas**. After an
+and explicitly opens its Canvas node into the interactive terminal. Later selection does not expand or collapse a
+session. Use the top-right disclosure action to control the terminal; that choice is saved with the placement. Closing
+the terminal only collapses the session node. **Cancel process** remains separate from closing the terminal and from
+**Remove from Canvas**. After an
 application restart, an orphaned running record becomes interrupted and expands into lifecycle detail instead of
 offering a false reconnect. See [[platform-terminal-canvas-reference]].
 

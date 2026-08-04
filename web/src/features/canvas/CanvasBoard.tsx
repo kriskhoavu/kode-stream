@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
 import type { Edge, Node as XYNode, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
-import { Box, ChevronDown, GitBranch, Play, Search, Square, TerminalSquare, Trash2, Workflow } from 'lucide-react';
+import { Box, ChevronDown, GitBranch, Maximize2, Minimize2, Play, Search, Square, TerminalSquare, Trash2, Workflow } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasViewport, EmbeddedAISessionResult, EmbeddedAISessionState, GitStatus, SafeSessionRecord } from '../../lib/types';
 import { EmbeddedTerminal } from '../ai-session/EmbeddedTerminal';
@@ -13,6 +13,7 @@ interface CanvasNodeData extends Record<string, unknown> {
 	conflicted: boolean;
 	onSelect: (id?: string) => void;
 	onKeyboardMove: (node: DomainNode, position: CanvasPosition) => void;
+	onSetCollapsed: (id: string, collapsed: boolean) => void;
 	onReload: () => Promise<unknown> | void;
 	layoutAvailable: boolean;
 }
@@ -21,12 +22,13 @@ type CanvasFlowNode = XYNode<CanvasNodeData>;
 
 const nodeTypes = { workspace: memo(WorkspaceCanvasNode), plan: memo(PlanCanvasNode), session: memo(SessionCanvasNode) };
 
-export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMoveNode, onArrange, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onPlaceUnplaced, onReset, onRemove }: {
+export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMoveNode, onSetCollapsed, onArrange, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onPlaceUnplaced, onReset, onRemove }: {
 	projection: CanvasProjection;
 	conflicts: string[];
 	selectedId?: string;
 	onSelect: (id?: string) => void;
 	onMoveNode: (id: string, position: CanvasPosition) => void;
+	onSetCollapsed: (id: string, collapsed: boolean) => void;
 	onArrange: (grouping: 'status' | 'service' | 'service_status') => void;
 	onSaveViewport: (viewport: CanvasViewport) => void;
 	onReload: () => Promise<unknown> | void;
@@ -52,8 +54,8 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 		position: node.position,
 		draggable: canMove(node, layoutAvailable),
 		selectable: true,
-		data: { node, selected: node.id === selectedId, conflicted: conflicts.includes(node.id), onSelect: (id) => onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), onReload, layoutAvailable }
-	})), [conflicts, layoutAvailable, onMoveNode, onReload, onSelect, selectedId, visibleDomainNodes]);
+		data: { node, selected: node.id === selectedId, conflicted: conflicts.includes(node.id), onSelect: (id) => onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), onSetCollapsed, onReload, layoutAvailable }
+	})), [conflicts, layoutAvailable, onMoveNode, onReload, onSelect, onSetCollapsed, selectedId, visibleDomainNodes]);
 	const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNode>(modelNodes);
 	useEffect(() => setNodes(modelNodes), [modelNodes, setNodes]);
 	const edges = useMemo(() => projection.connections.filter((connection) => visibleIDs.has(connection.source) && visibleIDs.has(connection.target)).map((connection): Edge => ({ id: connection.id, source: connection.source, target: connection.target, selectable: false, focusable: false, className: `canvas-edge canvas-edge-${connection.kind}` })), [projection.connections, visibleIDs]);
@@ -66,7 +68,7 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 			<div className="canvas-board-toolbar">
 				<CanvasSearch nodes={visibleDomainNodes} onSelect={onSelect} />
 				<button className="secondary" type="button" onClick={onReset} disabled={!layoutAvailable || projection.nodes.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Workflow size={15} /> Reset layout</button>
-				<button className="primary" type="button" onClick={onPlaceUnplaced} disabled={!layoutAvailable || projection.unplaced.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Box size={15} /> Place new items ({projection.unplaced.length})</button>
+				<button className="primary" type="button" onClick={onPlaceUnplaced} disabled={!layoutAvailable || projection.unplaced.length === 0} title={!layoutAvailable ? layoutCapability?.message : 'Add newly discovered plans and sessions to this Canvas.'}><Box size={15} /> Add new nodes ({projection.unplaced.length})</button>
 				{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
 			</div>
 			<div className="canvas-facet-row">
@@ -113,14 +115,16 @@ function PlanCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 
 function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	const record = data.node.session?.record;
-	return <NodeFrame data={data} eyebrow="Session" icon={<TerminalSquare size={15} />} expanded={Boolean(record && data.selected)} addon={record ? <CanvasSessionTerminal record={record} visible={data.selected} onClose={() => data.onSelect(undefined)} onReload={data.onReload} /> : undefined}>
+	const expanded = Boolean(record && !data.node.collapsed);
+	const disclosure = record ? <button className="icon-button canvas-node-action nodrag nopan" type="button" aria-label={expanded ? 'Collapse session terminal' : 'Expand session terminal'} title={expanded ? 'Collapse terminal' : 'Expand terminal'} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); data.onSetCollapsed(data.node.id, expanded); }}>{expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button> : undefined;
+	return <NodeFrame data={data} eyebrow="Session" icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => data.onSetCollapsed(data.node.id, true)} onReload={data.onReload} /> : undefined}>
 		<strong>{record?.provider || 'Unavailable session'}</strong>
 		<span className={`canvas-session-state state-${record?.state || 'stale'}`}><Play size={11} /> {record?.state || stateLabel(data.node)}</span>
 		<span>{record?.requestedBranch || data.node.entityRef.branchKey}</span>
 	</NodeFrame>;
 }
 
-function NodeFrame({ data, eyebrow, icon, children, addon, expanded = false }: { data: CanvasNodeData; eyebrow: string; icon: React.ReactNode; children: React.ReactNode; addon?: React.ReactNode; expanded?: boolean }) {
+function NodeFrame({ data, eyebrow, icon, children, addon, action, expanded = false }: { data: CanvasNodeData; eyebrow: string; icon: React.ReactNode; children: React.ReactNode; addon?: React.ReactNode; action?: React.ReactNode; expanded?: boolean }) {
 	return <div className={`canvas-semantic-node kind-${data.node.kind} state-${data.node.state}${data.selected ? ' selected' : ''}${data.conflicted ? ' conflicted' : ''}${expanded ? ' expanded' : ''}`}>
 		<Handle className="canvas-derived-handle" type="target" position={Position.Left} isConnectable={false} />
 		<div data-canvas-node-id={data.node.id} className="canvas-node-select-target" role="button" tabIndex={0} aria-label={`${eyebrow}: ${nodeSearchText(data.node)}`} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); }} onKeyDown={(event) => {
@@ -138,6 +142,7 @@ function NodeFrame({ data, eyebrow, icon, children, addon, expanded = false }: {
 		<header>{icon}<span>{eyebrow}</span>{data.node.state !== 'resolved' && <em>{data.node.state}</em>}</header>
 		<div className="canvas-node-summary">{children}</div>
 		</div>
+		{action}
 		{addon}
 		<Handle className="canvas-derived-handle" type="source" position={Position.Right} isConnectable={false} />
 	</div>;

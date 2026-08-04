@@ -77,9 +77,9 @@
 
 1. A repository scan discovers a new plan.
 2. The new plan appears under **Unplaced work** without moving saved nodes.
-3. User chooses **Place new items** and accepts its suggested placement.
+3. User chooses **Add new nodes** and accepts its suggested placement.
 4. User removes a plan placement.
-5. The plan remains in the repository and can appear as unplaced work again.
+5. The plan remains in the repository, while its hidden placement prevents it from being offered as new work again.
 
 ### Flow 1.3: Placement Conflict
 
@@ -119,7 +119,7 @@
 4. Backend creates a durable session record.
 5. Backend starts one ephemeral process binding.
 6. Canvas places only the new session at a deterministic position when it is not already placed.
-7. Canvas selects the session and expands its node into the granted terminal channel.
+7. Canvas selects the new session and explicitly opens its node into the granted terminal channel.
 
 ### Flow 2.2: Double Submission
 
@@ -149,13 +149,15 @@
 
 > Restore honest session history without treating an in-memory terminal process as durable.
 
-### Flow 3.1: Select Away And Return
+### Flow 3.1: Select Independently From Terminal Disclosure
 
 1. User launches a session and receives a running durable record plus live binding.
-2. User selects the workspace or plan node.
+2. User selects the workspace or plan node; the expanded terminal remains unchanged.
 3. The process continues under existing terminal lifecycle rules.
-4. User returns to the session node.
-5. Canvas attaches to the same session; it does not relaunch or create another terminal owner.
+4. User selects the session node; selection alone neither expands nor collapses it.
+5. User chooses the session's top-right expand or collapse action.
+6. Canvas persists the disclosure state and reuses the same session; it does not relaunch or create another terminal
+   owner.
 
 ### Flow 3.2: Page Reload
 
@@ -262,7 +264,8 @@
 
 1. User tabs to **Search nodes**.
 2. User filters by plan identifier, title, branch, or session state.
-3. Selecting a result focuses the node, opening the Workbench for a workspace or plan and expanding a session inline.
+3. Selecting a result focuses the node, opening the Workbench for a workspace or plan without changing session
+   disclosure state.
 4. Documented keyboard controls move the node by a bounded increment.
 5. Save status is announced.
 6. Closing the Workbench or inline terminal returns focus to the selected node or search result.
@@ -270,7 +273,8 @@
 ### Flow 6.2: Narrow Window
 
 1. User opens Canvas in a narrow desktop window.
-2. A plan or workspace Workbench opens as an overlay; a session terminal expands within the Canvas.
+2. A plan or workspace Workbench opens as an overlay; the session's top-right action expands its terminal within the
+   Canvas.
 3. User closes the inspector or terminal through its explicit close action.
 4. Search and **Fit content** recover nodes that are outside the current viewport.
 

@@ -26,7 +26,7 @@ PM-037.
 | F4    | Git, verification, capability, and accessibility UX   | Frontend   | Complete |
 | F5    | Interactive terminal session nodes                    | Frontend   | Complete |
 | F6    | Stable embedded terminal channel lifecycle            | Frontend   | Complete |
-| F7    | Explicit session terminal disclosure                  | Frontend   | Pending  |
+| F7    | Explicit session terminal disclosure                  | Frontend   | Complete |
 | I1    | Browser journey, documentation, and final integration | Full stack | Complete |
 
 ## Backend Phases
@@ -124,7 +124,7 @@ PM-037.
 **Deliverables:**
 
 - [x] Retain a hidden placement tombstone when a node is removed from Canvas.
-- [x] Exclude hidden placements from rendered nodes and from **Place new items** candidates.
+- [x] Exclude hidden placements from rendered nodes and from **Add new nodes** candidates.
 - [x] Persist hidden placement state in data-dir snapshots and the SQL datastore.
 - [x] Add the SQL migration and repository, service, and API regression tests.
 
@@ -178,7 +178,7 @@ PM-037.
 - [x] Add memoized workspace, plan, and session node renderers only.
 - [x] Make all three node kinds draggable and prove that moving the workspace does not move other nodes.
 - [x] Render repository and application connections without handles or edit/delete controls.
-- [x] Implement deterministic first placement, restored saved positions, **Unplaced work**, and **Place new items**.
+- [x] Implement deterministic first placement, restored saved positions, new-node candidates, and **Add new nodes**.
 - [x] Implement reset-layout preview and confirmation.
 - [x] Add node search and focus by title, identifier, branch, and session state.
 - [x] Implement placement removal with explicit entity/process isolation messaging.
@@ -202,7 +202,7 @@ PM-037.
 - [x] Show expected/current branch and recovery actions for `terminal_branch_mismatch`.
 - [x] Add a new session to unplaced work or accept its deterministic position near the plan.
 - [x] Preserve the live process when selecting another node; follow existing reconnect rules on return.
-- [x] Show active unplaced sessions so hidden processes remain discoverable.
+- [x] Show newly discovered active sessions without re-offering sessions deliberately removed from the layout.
 - [x] Separate **Remove from Canvas** from **Cancel process** and retain confirmations.
 - [x] Add matching-branch, mismatch, double-submit, selection switch, reload, interruption, cancellation, and isolation tests.
 
@@ -237,8 +237,8 @@ PM-037.
 
 **Deliverables:**
 
-- [x] Expand a selected live session node into an interactive terminal without opening the right Workbench.
-- [x] Keep one terminal connection owner and preserve the live process when the node is collapsed or another node is selected.
+- [x] Expand a newly launched live session node into an interactive terminal without opening the right Workbench.
+- [x] Keep one terminal connection owner and preserve the live process when the node is collapsed or selection changes.
 - [x] Restrict Canvas dragging to the session summary while terminal input, selection, and scrolling remain interactive.
 - [x] Show durable ended or interrupted session details inside the selected session node.
 - [x] Keep **Cancel process** distinct from closing or removing the Canvas node.
@@ -270,12 +270,12 @@ PM-037.
 
 **Deliverables:**
 
-- [ ] Select a session without changing whether its terminal is expanded.
-- [ ] Add an explicit top-right session action to expand or collapse the terminal.
-- [ ] Persist disclosure state through the existing placement `collapsed` field.
-- [ ] Keep terminal controls isolated from Canvas selection and dragging.
-- [ ] Rename the placement action so it clearly applies only to newly discovered nodes.
-- [ ] Add selection, disclosure, persistence, and restored-layout tests.
+- [x] Select a session without changing whether its terminal is expanded.
+- [x] Add an explicit top-right session action to expand or collapse the terminal.
+- [x] Persist disclosure state through the existing placement `collapsed` field.
+- [x] Keep terminal controls isolated from Canvas selection and dragging.
+- [x] Rename the placement action so it clearly applies only to newly discovered nodes.
+- [x] Add selection, disclosure, persistence, restored-layout, and removed-session exclusion tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
 

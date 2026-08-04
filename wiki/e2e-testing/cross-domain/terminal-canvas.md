@@ -42,9 +42,10 @@ restored layouts without terminal content.
 2. Wait for the new session node to be placed and expanded; assert its interactive terminal is inside the Canvas and the
    right Workbench is closed.
 3. While **Launching…** is visible, activate again only if enabled; assert at most one record and process.
-4. Select away and return; assert the same terminal remains and no relaunch occurs. Interacting with terminal input and
-   scrolling must not drag the session node.
-5. Close the terminal and assert the node collapses without cancellation; reopen it, then use the explicit
+4. Select another node and return; assert selection does not change terminal disclosure and no relaunch occurs. Use the
+   session's top-right action to collapse and expand it. Interacting with terminal input and scrolling must not drag the
+   session node.
+5. Close the terminal and assert the node collapses without cancellation; reopen it with the top-right action, then use the explicit
    **Cancel process** control and assert the placement remains.
 6. Use the supplied mismatch fixture, attempt the intentionally stale action, and assert **Checkout changed** appears
    with expected/current context and no new session.
@@ -62,7 +63,8 @@ first failed assertion and follow the documented cleanup.
 2. Run smoke verification from the plan and assert result, freshness, and abbreviated revisions are separate.
 3. Apply the supplied reversible mutation; wait for refresh and assert the previous pass becomes stale and historical.
 4. Use **Search Canvas nodes**, focus the plan, press an arrow key, and assert only it moves and **Saved** is announced.
-5. Remove the session placement without cancellation, cancel a reset preview, and revisit with reduced motion enabled.
+5. Remove the session placement without cancellation, assert **Add new nodes** does not restore it, cancel a reset
+   preview, and revisit with reduced motion enabled.
 
 Capture current/stale verification and visible keyboard focus. Diagnostics may use Chrome DevTools only after Playwright
 execution; Chrome is never the execution provider.

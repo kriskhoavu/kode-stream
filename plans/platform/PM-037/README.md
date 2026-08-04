@@ -138,6 +138,8 @@ revalidates every action at execution time; frontend capability state is advisor
 - A workspace node is a semantic anchor, not a spatial parent. Moving it never moves plan or session nodes.
 - Repository containment does not create drag parenting.
 - Removing a placement never deletes or mutates the referenced entity or live process.
+- A removed placement remains hidden for that layout and is not offered by **Add new nodes**; only entities discovered
+  after the layout was last resolved are candidates.
 - Reset layout previews a deterministic placement set before replacing saved positions.
 - Future groups will be explicit visual frames: moving a group applies a delta to members, deleting it leaves members in
   place, and overlap alone never creates membership.
@@ -157,7 +159,8 @@ hiding or removing a placement does not mutate the relationship source.
 
 > Canvas route -> resolve workspace and branch context -> load placements -> resolve workspace, plan, session, Git, and
 > verification projections -> attach current action capabilities -> render nodes -> select node -> open the focused
-> workspace/plan panel, expand the session terminal in place, or open an existing full view.
+> workspace/plan panel, select a session without changing its presentation, or use the session's top-right action to
+> expand its terminal in place.
 
 > Drag end -> update affected placement locally -> debounced placement patch with expected placement revision -> Canvas
 > repository -> saved state.
