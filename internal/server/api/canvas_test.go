@@ -49,8 +49,8 @@ func TestCanvasAPIDefaultProjectionPlacementConflictAndViewportIndependence(t *t
 	}
 	items := itemindex.New(filepath.Join(dataDir, "items.yaml"))
 	details := []models.ItemDetail{
-		{ItemSummary: models.ItemSummary{ID: "main-item", WorkspaceID: workspaceConfig.ID, Branch: "main", Editable: true, Identifier: "PM-001", Title: "Main", ItemPath: "plans/PM-001"}},
-		{ItemSummary: models.ItemSummary{ID: "other-item", WorkspaceID: workspaceConfig.ID, Branch: "other", Editable: true, Identifier: "PM-002", Title: "Other", ItemPath: "plans/PM-002"}},
+		{ItemSummary: models.ItemSummary{ID: "main-item", WorkspaceID: workspaceConfig.ID, Branch: "main", Editable: true, Scope: "platform", Identifier: "PM-001", Title: "Main", Status: models.StatusDraft, ItemPath: "plans/platform/PM-001"}},
+		{ItemSummary: models.ItemSummary{ID: "other-item", WorkspaceID: workspaceConfig.ID, Branch: "other", Editable: true, Scope: "platform", Identifier: "PM-002", Title: "Other", Status: models.StatusDraft, ItemPath: "plans/platform/PM-002"}},
 	}
 	if err := items.ReplaceWorkspace(workspaceConfig.ID, details, nil, time.Now()); err != nil {
 		t.Fatal(err)

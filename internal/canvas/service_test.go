@@ -60,7 +60,7 @@ func TestCanvasServiceSeedsProjectsAndKeepsPlacementIndependent(t *testing.T) {
 		t.Fatal("viewport save changed placement revision")
 	}
 
-	newItem := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-3", WorkspaceID: workspaceConfig.ID, WorkspaceName: workspaceConfig.Name, Branch: "main", Commit: initialItems[0].Commit, SourceMode: "working_tree", Editable: true, Identifier: "PM-003", Title: "New plan", ItemPath: "plans/PM-003"}}
+	newItem := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-3", WorkspaceID: workspaceConfig.ID, WorkspaceName: workspaceConfig.Name, Branch: "main", Commit: initialItems[0].Commit, SourceMode: "working_tree", Editable: true, Scope: "platform", Identifier: "PM-003", Title: "New plan", Status: models.StatusDraft, ItemPath: "plans/platform/PM-003"}}
 	all := append(append([]models.ItemDetail(nil), initialItems...), newItem)
 	if err := items.ReplaceWorkspace(workspaceConfig.ID, all, nil, time.Now()); err != nil {
 		t.Fatal(err)
@@ -83,6 +83,31 @@ func TestCanvasServiceSeedsProjectsAndKeepsPlacementIndependent(t *testing.T) {
 	stale := findProjectedNode(t, projection, planNodeID(initialItems[1].ID))
 	if stale.State != NodeStale || stale.Plan != nil {
 		t.Fatalf("stale node=%#v", stale)
+	}
+}
+
+func TestCanvasServiceOnlyProjectsPlanTicketRoots(t *testing.T) {
+	repository, reg, items, git, workspaceConfig, initialItems, _ := canvasServiceFixture(t)
+	wiki := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "wiki-offer", WorkspaceID: workspaceConfig.ID, Branch: "main", Identifier: "offer", Title: "Offer wiki", Status: models.StatusDraft, ItemPath: "wiki/offer"}}
+	nested := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "nested", WorkspaceID: workspaceConfig.ID, Branch: "main", Identifier: "README", Title: "Nested plan document", Status: models.StatusDraft, ItemPath: "plans/platform/PM-001/README.md"}}
+	if err := items.ReplaceWorkspace(workspaceConfig.ID, append(initialItems, wiki, nested), nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
+	projection, err := service.ResolveDefault("", workspaceConfig.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projection.Nodes) != 3 { // workspace plus two tickets
+		t.Fatalf("nodes=%#v", projection.Nodes)
+	}
+	for _, node := range projection.Nodes {
+		if node.Plan != nil && (node.Plan.Service != "platform" || node.Plan.Status != models.StatusInProgress) {
+			t.Fatalf("plan=%#v", node.Plan)
+		}
+		if node.EntityRef.ItemID == wiki.ID || node.EntityRef.ItemID == nested.ID {
+			t.Fatalf("non-ticket item projected: %#v", node)
+		}
 	}
 }
 
@@ -131,8 +156,8 @@ func canvasServiceFixture(t *testing.T) (*FileRepository, *registry.Registry, *i
 	}
 	items := itemindex.New(filepath.Join(dataDir, "items.yaml"))
 	details := []models.ItemDetail{
-		{ItemSummary: models.ItemSummary{ID: "item-1", WorkspaceID: workspaceConfig.ID, WorkspaceName: workspaceConfig.Name, Branch: "main", Commit: commit, SourceMode: "working_tree", Editable: true, Identifier: "PM-001", Title: "First", ItemPath: "plans/PM-001"}},
-		{ItemSummary: models.ItemSummary{ID: "item-2", WorkspaceID: workspaceConfig.ID, WorkspaceName: workspaceConfig.Name, Branch: "main", Commit: commit, SourceMode: "working_tree", Editable: true, Identifier: "PM-002", Title: "Second", ItemPath: "plans/PM-002"}},
+		{ItemSummary: models.ItemSummary{ID: "item-1", WorkspaceID: workspaceConfig.ID, WorkspaceName: workspaceConfig.Name, Branch: "main", Commit: commit, SourceMode: "working_tree", Editable: true, Scope: "platform", Identifier: "PM-001", Title: "First", Status: models.StatusInProgress, ItemPath: "plans/platform/PM-001"}},
+		{ItemSummary: models.ItemSummary{ID: "item-2", WorkspaceID: workspaceConfig.ID, WorkspaceName: workspaceConfig.Name, Branch: "main", Commit: commit, SourceMode: "working_tree", Editable: true, Scope: "platform", Identifier: "PM-002", Title: "Second", Status: models.StatusInProgress, ItemPath: "plans/platform/PM-002"}},
 	}
 	if err := items.ReplaceWorkspace(workspaceConfig.ID, details, nil, time.Now()); err != nil {
 		t.Fatal(err)

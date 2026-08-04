@@ -551,7 +551,7 @@ export interface CanvasPlacementPatch { nodeId: string; entityRef: CanvasEntityR
 export interface SafeSessionPlanRef { itemId: string; itemPath: string; identifier?: string; branchKey: string; observedCommit?: string; }
 export interface SafeSessionRecord { id: string; workspaceId: string; planRef?: SafeSessionPlanRef; provider: string; intent: string; requestedBranch: string; observedCommit?: string; state: EmbeddedAISessionState | 'interrupted'; startedAt: string; endedAt?: string; exitCode?: number; lastKnownAt: string; live?: boolean; }
 export interface CanvasWorkspaceNode { id: string; name?: string; branch?: string; commit?: string; git?: GitStatus; providerAxes: WorkspaceProviderAxes; actions: Partial<Record<WorkspaceAction, ActionCapability>>; verification?: VerificationJob; }
-export interface CanvasPlanNode { itemId: string; identifier?: string; title?: string; branch?: string; commit?: string; editable: boolean; actions: Partial<Record<WorkspaceAction, ActionCapability>>; }
+export interface CanvasPlanNode { itemId: string; identifier?: string; title?: string; service?: string; status: ItemStatus; branch?: string; commit?: string; editable: boolean; actions: Partial<Record<WorkspaceAction, ActionCapability>>; }
 export interface CanvasSessionNode { record: SafeSessionRecord; }
 export interface CanvasNode { id: string; kind: CanvasEntityKind; state: 'resolved' | 'stale' | 'forbidden'; entityRef: CanvasEntityRef; position: CanvasPosition; collapsed: boolean; revision: number; workspace?: CanvasWorkspaceNode; plan?: CanvasPlanNode; session?: CanvasSessionNode; }
 export interface CanvasConnection { id: string; source: string; target: string; kind: 'repository_contains' | 'session_launched_from' | string; sourceOfTruth: 'derived'; }

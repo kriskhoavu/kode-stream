@@ -37,6 +37,8 @@ type PlanNode struct {
 	ItemID     string                                             `json:"itemId"`
 	Identifier string                                             `json:"identifier,omitempty"`
 	Title      string                                             `json:"title,omitempty"`
+	Service    string                                             `json:"service,omitempty"`
+	Status     models.ItemStatus                                  `json:"status"`
 	Branch     string                                             `json:"branch,omitempty"`
 	Commit     string                                             `json:"commit,omitempty"`
 	Editable   bool                                               `json:"editable"`
@@ -167,6 +169,7 @@ func (s *Service) Project(ownerUserID, layoutID string) (Projection, error) {
 	if err != nil {
 		return Projection{}, err
 	}
+	items = canvasPlanItems(items)
 	sessions := []ai.SessionRecordView{}
 	if s.sessions != nil {
 		sessions, err = s.sessions.SessionRecords(layout.WorkspaceID, layout.BranchKey)
@@ -227,6 +230,7 @@ func (s *Service) seedInitialPlacements(layout Layout) error {
 	if err != nil {
 		return err
 	}
+	items = canvasPlanItems(items)
 	sessions := []ai.SessionRecordView{}
 	if s.sessions != nil {
 		sessions, err = s.sessions.SessionRecords(layout.WorkspaceID, layout.BranchKey)
@@ -311,13 +315,19 @@ func (s *Service) project(layout Layout, workspaceConfig models.WorkspaceConfig,
 		case EntityPlan:
 			item, ok := itemByID[placement.EntityRef.ItemID]
 			if !ok {
+				// Canvas only projects ticket roots under plans/{service}/{ticket}.
+				// Ignore placements left behind by older versions that treated every
+				// indexed item (including wiki folders) as a plan.
+				if canvasPlanServiceFromPath(placement.EntityRef.ItemPath) == "" {
+					continue
+				}
 				node.State = NodeStale
 				break
 			}
 			if placement.EntityRef.ObservedCommit != "" && item.Commit != "" && placement.EntityRef.ObservedCommit != item.Commit {
 				node.State = NodeStale
 			}
-			node.Plan = &PlanNode{ItemID: item.ID, Identifier: item.Identifier, Title: item.Title, Branch: item.Branch, Commit: item.Commit, Editable: item.Editable, Actions: actions}
+			node.Plan = &PlanNode{ItemID: item.ID, Identifier: item.Identifier, Title: item.Title, Service: canvasPlanService(item), Status: item.Status, Branch: item.Branch, Commit: item.Commit, Editable: item.Editable, Actions: actions}
 		case EntitySession:
 			session, ok := sessionByID[placement.EntityRef.SessionID]
 			if !ok {
@@ -346,6 +356,28 @@ func (s *Service) project(layout Layout, workspaceConfig models.WorkspaceConfig,
 	}
 	connections := derivedConnections(nodes)
 	return Projection{Layout: layout, Nodes: nodes, Connections: connections, Unplaced: unplaced}
+}
+
+func canvasPlanItems(items []models.ItemSummary) []models.ItemSummary {
+	result := make([]models.ItemSummary, 0, len(items))
+	for _, item := range items {
+		if canvasPlanService(item) != "" {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func canvasPlanService(item models.ItemSummary) string {
+	return canvasPlanServiceFromPath(item.ItemPath)
+}
+
+func canvasPlanServiceFromPath(itemPath string) string {
+	parts := strings.Split(strings.Trim(strings.ReplaceAll(itemPath, `\`, "/"), "/"), "/")
+	if len(parts) != 3 || parts[0] != "plans" || strings.TrimSpace(parts[1]) == "" || strings.TrimSpace(parts[2]) == "" {
+		return ""
+	}
+	return parts[1]
 }
 
 func derivedConnections(nodes []ProjectedNode) []Connection {

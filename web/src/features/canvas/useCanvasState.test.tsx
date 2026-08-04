@@ -11,7 +11,7 @@ vi.mock('../../lib/api', async () => {
 
 const projection = (revision = 1): CanvasProjection => ({
 	layout: { id: 'layout-1', workspaceId: 'workspace-1', branchKey: 'main', viewport: { x: 0, y: 0, zoom: 1 }, version: 1, createdAt: '', updatedAt: '' },
-	nodes: [{ id: 'plan:item-1', kind: 'plan', state: 'resolved', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'item-1', itemPath: 'plans/one', branchKey: 'main' }, position: { x: 10, y: 20 }, collapsed: false, revision, plan: { itemId: 'item-1', title: 'One', branch: 'main', editable: true, actions: {} } }],
+	nodes: [{ id: 'plan:item-1', kind: 'plan', state: 'resolved', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'item-1', itemPath: 'plans/platform/one', branchKey: 'main' }, position: { x: 10, y: 20 }, collapsed: false, revision, plan: { itemId: 'item-1', title: 'One', service: 'platform', status: 'draft', branch: 'main', editable: true, actions: {} } }],
 	connections: [], unplaced: []
 });
 

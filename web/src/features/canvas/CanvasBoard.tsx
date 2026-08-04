@@ -1,7 +1,7 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
-import type { Edge, Node, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
-import { Box, GitBranch, Play, Search, TerminalSquare, Trash2, Workflow } from 'lucide-react';
+import type { Edge, Node as XYNode, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
+import { Box, ChevronDown, GitBranch, Play, Search, TerminalSquare, Trash2, Workflow } from 'lucide-react';
 import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasViewport, GitStatus } from '../../lib/types';
 import '@xyflow/react/dist/style.css';
 
@@ -14,16 +14,17 @@ interface CanvasNodeData extends Record<string, unknown> {
 	layoutAvailable: boolean;
 }
 
-type CanvasFlowNode = Node<CanvasNodeData>;
+type CanvasFlowNode = XYNode<CanvasNodeData>;
 
 const nodeTypes = { workspace: memo(WorkspaceCanvasNode), plan: memo(PlanCanvasNode), session: memo(SessionCanvasNode) };
 
-export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMoveNode, onSaveViewport, onReloadPosition, onReapplyPosition, onPlaceUnplaced, onReset, onRemove }: {
+export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMoveNode, onArrange, onSaveViewport, onReloadPosition, onReapplyPosition, onPlaceUnplaced, onReset, onRemove }: {
 	projection: CanvasProjection;
 	conflicts: string[];
 	selectedId?: string;
 	onSelect: (id?: string) => void;
 	onMoveNode: (id: string, position: CanvasPosition) => void;
+	onArrange: (grouping: 'status' | 'service' | 'service_status') => void;
 	onSaveViewport: (viewport: CanvasViewport) => void;
 	onReloadPosition: (id: string) => void;
 	onReapplyPosition: (id: string) => void;
@@ -31,29 +32,47 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 	onReset: () => void;
 	onRemove: (node: DomainNode) => void;
 }) {
+	const [statusFilters, setStatusFilters] = useState<string[]>([]);
+	const [serviceFilters, setServiceFilters] = useState<string[]>([]);
+	const [openMenu, setOpenMenu] = useState('');
 	const layoutCapability = projection.nodes.find((node) => node.workspace)?.workspace?.actions['layout.move'];
 	const layoutAvailable = layoutCapability?.state === 'available';
-	const modelNodes = useMemo(() => projection.nodes.map((node): CanvasFlowNode => ({
+	const statuses = useMemo(() => Array.from(new Set(projection.nodes.flatMap((node) => node.plan ? [node.plan.status] : []))), [projection.nodes]);
+	const services = useMemo(() => Array.from(new Set(projection.nodes.flatMap((node) => node.plan?.service ? [node.plan.service] : []))).sort(), [projection.nodes]);
+	const visibleDomainNodes = useMemo(() => projection.nodes.filter((node) => !node.plan || ((statusFilters.length === 0 || statusFilters.includes(node.plan.status)) && (serviceFilters.length === 0 || serviceFilters.includes(node.plan.service ?? '')))), [projection.nodes, serviceFilters, statusFilters]);
+	const visibleIDs = useMemo(() => new Set(visibleDomainNodes.map((node) => node.id)), [visibleDomainNodes]);
+	const hiddenCount = projection.nodes.length - visibleDomainNodes.length;
+	const modelNodes = useMemo(() => visibleDomainNodes.map((node): CanvasFlowNode => ({
 		id: node.id,
 		type: node.kind,
 		position: node.position,
 		draggable: canMove(node, layoutAvailable),
 		selectable: true,
 		data: { node, selected: node.id === selectedId, conflicted: conflicts.includes(node.id), onSelect: (id) => onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), layoutAvailable }
-	})), [conflicts, layoutAvailable, onMoveNode, onSelect, projection.nodes, selectedId]);
+	})), [conflicts, layoutAvailable, onMoveNode, onSelect, selectedId, visibleDomainNodes]);
 	const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNode>(modelNodes);
 	useEffect(() => setNodes(modelNodes), [modelNodes, setNodes]);
-	const edges = useMemo(() => projection.connections.map((connection): Edge => ({ id: connection.id, source: connection.source, target: connection.target, selectable: false, focusable: false, className: `canvas-edge canvas-edge-${connection.kind}` })), [projection.connections]);
+	const edges = useMemo(() => projection.connections.filter((connection) => visibleIDs.has(connection.source) && visibleIDs.has(connection.target)).map((connection): Edge => ({ id: connection.id, source: connection.source, target: connection.target, selectable: false, focusable: false, className: `canvas-edge canvas-edge-${connection.kind}` })), [projection.connections, visibleIDs]);
 	const onDragStop: OnNodeDrag<CanvasFlowNode> = (_, node) => onMoveNode(node.id, node.position);
 	const onMoveEnd: OnMoveEnd = (_, viewport) => onSaveViewport(viewport);
 	const selected = projection.nodes.find((node) => node.id === selectedId);
 
 	return <ReactFlowProvider><div className="canvas-board-shell">
 		<div className="canvas-toolbar" aria-label="Canvas tools">
-			<CanvasSearch nodes={projection.nodes} onSelect={onSelect} />
-			<button type="button" onClick={onPlaceUnplaced} disabled={!layoutAvailable || projection.unplaced.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Box size={14} /> Place new items ({projection.unplaced.length})</button>
-			<button type="button" onClick={onReset} disabled={!layoutAvailable || projection.nodes.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Workflow size={14} /> Reset layout</button>
-			{selected && <button type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={14} /> Remove from Canvas</button>}
+			<div className="canvas-board-toolbar">
+				<CanvasSearch nodes={visibleDomainNodes} onSelect={onSelect} />
+				<button className="secondary" type="button" onClick={onReset} disabled={!layoutAvailable || projection.nodes.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Workflow size={15} /> Reset layout</button>
+				<button className="primary" type="button" onClick={onPlaceUnplaced} disabled={!layoutAvailable || projection.unplaced.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Box size={15} /> Place new items ({projection.unplaced.length})</button>
+				{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
+			</div>
+			<div className="canvas-facet-row">
+				<div className="facet-bar">
+					<CanvasFacetMenu title="Status" options={statuses.map((value) => ({ value, label: formatFacet(value) }))} selected={statusFilters} open={openMenu === 'status'} onOpen={() => setOpenMenu(openMenu === 'status' ? '' : 'status')} onClose={() => setOpenMenu('')} onToggle={(value) => setStatusFilters((current) => toggleValue(current, value))} onClear={() => setStatusFilters([])} />
+					<CanvasFacetMenu title="Service" options={services.map((value) => ({ value, label: value }))} selected={serviceFilters} open={openMenu === 'service'} onOpen={() => setOpenMenu(openMenu === 'service' ? '' : 'service')} onClose={() => setOpenMenu('')} onToggle={(value) => setServiceFilters((current) => toggleValue(current, value))} onClear={() => setServiceFilters([])} />
+					<CanvasArrangeMenu open={openMenu === 'group'} disabled={!layoutAvailable} onOpen={() => setOpenMenu(openMenu === 'group' ? '' : 'group')} onClose={() => setOpenMenu('')} onArrange={onArrange} />
+				</div>
+				<span className="filter-summary">{visibleDomainNodes.length} of {projection.nodes.length} nodes{hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}</span>
+			</div>
 			{selected && conflicts.includes(selected.id) && <span className="canvas-conflict-actions" role="alert"><span>Position conflict</span><button type="button" onClick={() => onReloadPosition(selected.id)}>Reload position</button><button type="button" onClick={() => onReapplyPosition(selected.id)}>Reapply my move</button></span>}
 		</div>
 		<div className="sr-only" role="status" aria-live="polite">{selected ? `Selected ${nodeSearchText(selected)}` : 'No Canvas node selected'}</div>
@@ -83,6 +102,7 @@ function PlanCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	return <NodeFrame data={data} eyebrow="Plan" icon={<Box size={15} />}>
 		<strong>{node.plan?.identifier || node.entityRef.identifier || 'Unavailable plan'}</strong>
 		<span>{node.plan?.title || stateLabel(node)}</span>
+		{node.plan && <span>{node.plan.service || 'Other'} · {formatFacet(node.plan.status)}</span>}
 		<span><GitBranch size={12} /> {node.plan?.branch || node.entityRef.branchKey}</span>
 	</NodeFrame>;
 }
@@ -132,7 +152,35 @@ function CanvasSearch({ nodes, onSelect }: { nodes: DomainNode[]; onSelect: (id?
 		if (target) void fitView({ nodes: [target], padding: 0.8, maxZoom: 1.25, duration: 180 });
 		requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-canvas-node-id="${node.id.replaceAll('"', '\\"')}"]`)?.focus());
 	};
-	return <div className="canvas-search"><Search size={14} /><input aria-label="Search Canvas nodes" value={query} onChange={(event) => search(event.target.value)} placeholder="Search plans and sessions" />{matches.length > 0 && <div className="canvas-search-results" role="listbox">{matches.map((node) => <button key={node.id} type="button" role="option" onClick={() => focus(node)}>{nodeSearchText(node)}</button>)}</div>}</div>;
+	return <label className="filter-input plan-search canvas-search"><Search size={15} /><input aria-label="Search Canvas nodes" value={query} onChange={(event) => search(event.target.value)} placeholder="Search items..." />{matches.length > 0 && <div className="canvas-search-results" role="listbox">{matches.map((node) => <button key={node.id} type="button" role="option" onClick={() => focus(node)}>{nodeSearchText(node)}</button>)}</div>}</label>;
+}
+
+function CanvasFacetMenu({ title, options, selected, open, onOpen, onClose, onToggle, onClear }: { title: string; options: Array<{ value: string; label: string }>; selected: string[]; open: boolean; onOpen: () => void; onClose: () => void; onToggle: (value: string) => void; onClear: () => void }) {
+	const menuRef = useRef<HTMLElement>(null);
+	useEffect(() => {
+		if (!open) return;
+		const outside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) onClose(); };
+		const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+		document.addEventListener('pointerdown', outside);
+		document.addEventListener('keydown', escape);
+		return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+	}, [onClose, open]);
+	if (options.length === 0) return null;
+	return <section className="facet-menu" ref={menuRef}><button type="button" className={selected.length ? 'facet-trigger active' : 'facet-trigger'} aria-expanded={open} onClick={onOpen}><span>{title}</span><span className="facet-trigger-right">{selected.length > 0 && <strong>{selected.length}</strong>}<ChevronDown className={open ? 'facet-chevron open' : 'facet-chevron'} size={15} /></span></button>{open && <div className="facet-popover"><div className="facet-popover-header"><strong>{title}</strong><button type="button" onClick={onClear} disabled={selected.length === 0}>Clear</button></div><div className="facet-option-list">{options.map((option) => <label className="facet-option" key={option.value}><input type="checkbox" checked={selected.includes(option.value)} onChange={() => onToggle(option.value)} /><span>{option.label}</span></label>)}</div></div>}</section>;
+}
+
+function CanvasArrangeMenu({ open, disabled, onOpen, onClose, onArrange }: { open: boolean; disabled: boolean; onOpen: () => void; onClose: () => void; onArrange: (grouping: 'status' | 'service' | 'service_status') => void }) {
+	const menuRef = useRef<HTMLElement>(null);
+	useEffect(() => {
+		if (!open) return;
+		const outside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) onClose(); };
+		const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+		document.addEventListener('pointerdown', outside);
+		document.addEventListener('keydown', escape);
+		return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+	}, [onClose, open]);
+	const choose = (value: 'status' | 'service' | 'service_status') => { onArrange(value); onClose(); };
+	return <section className="facet-menu canvas-arrange-menu" ref={menuRef}><button type="button" className="facet-trigger" aria-expanded={open} disabled={disabled} onClick={onOpen}><span>Group</span><ChevronDown className={open ? 'facet-chevron open' : 'facet-chevron'} size={15} /></button>{open && <div className="facet-popover"><div className="facet-popover-header"><strong>Arrange plans by</strong></div><div className="facet-option-list"><button type="button" onClick={() => choose('status')}>Status</button><button type="button" onClick={() => choose('service')}>Service</button><button type="button" onClick={() => choose('service_status')}>Service + status</button></div></div>}</section>;
 }
 
 function canMove(node: DomainNode, workspaceLayoutAvailable = false) {
@@ -148,6 +196,8 @@ function nodeSearchText(node: DomainNode) {
 }
 
 function stateLabel(node: DomainNode) { return node.state === 'forbidden' ? 'Access restricted' : 'Reference unavailable'; }
+function formatFacet(value: string) { return value.replaceAll('_', ' ').replace(/^./, (character) => character.toUpperCase()); }
+function toggleValue(values: string[], value: string) { return values.includes(value) ? values.filter((candidate) => candidate !== value) : [...values, value]; }
 function gitSummary(status?: GitStatus) {
 	if (!status) return 'Git status unavailable';
 	if (status.conflicted) return `${status.changes.length} changes · conflicted`;

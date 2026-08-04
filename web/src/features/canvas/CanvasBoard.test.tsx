@@ -62,6 +62,23 @@ describe('CanvasBoard', () => {
 		expect(onRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 'plan:item-1' }));
 	});
 
+	it('filters plans without removing other node kinds and can persist a grouped arrangement', () => {
+		const onArrange = vi.fn();
+		const projection = baseProjection();
+		const plan = projection.nodes[1];
+		projection.nodes.push({ ...plan, id: 'plan:item-2', entityRef: { ...plan.entityRef, itemId: 'item-2' }, plan: { ...plan.plan!, itemId: 'item-2', identifier: 'PM-038', status: 'draft' } });
+		renderBoard(projection, { onArrange });
+		fireEvent.click(screen.getByRole('button', { name: 'Status' }));
+		fireEvent.click(screen.getByLabelText('Draft'));
+		expect(screen.queryByLabelText('Plan: PM-037 Focused Canvas main')).not.toBeInTheDocument();
+		expect(screen.getByLabelText('Workspace: Workspace main')).toBeInTheDocument();
+		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
+		expect(screen.getByText(/1 hidden/)).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Group' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Service + status' }));
+		expect(onArrange).toHaveBeenCalledWith('service_status');
+	});
+
 	it('moves nodes by keyboard and disables every layout action from capabilities', () => {
 		const onMoveNode = vi.fn();
 		const projection = baseProjection();
@@ -96,7 +113,7 @@ describe('CanvasBoard', () => {
 });
 
 function renderBoard(projection: CanvasProjection, overrides: Partial<React.ComponentProps<typeof CanvasBoard>> = {}) {
-	return render(<CanvasBoard projection={projection} conflicts={[]} onSelect={vi.fn()} onMoveNode={vi.fn()} onSaveViewport={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} {...overrides} />);
+	return render(<CanvasBoard projection={projection} conflicts={[]} onSelect={vi.fn()} onMoveNode={vi.fn()} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} {...overrides} />);
 }
 
 function baseProjection(): CanvasProjection {
@@ -105,7 +122,7 @@ function baseProjection(): CanvasProjection {
 		layout: { id: 'layout-1', workspaceId: 'workspace-1', branchKey: 'main', viewport: { x: 0, y: 0, zoom: 1 }, version: 1, createdAt: '', updatedAt: '' },
 		nodes: [
 			{ id: 'workspace:workspace-1', kind: 'workspace', state: 'resolved', entityRef: { kind: 'workspace', workspaceId: 'workspace-1' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, workspace: { id: 'workspace-1', name: 'Workspace', branch: 'main', providerAxes: { topology: 'local_application', contentProvider: 'local_checkout', executionProvider: 'local_process' }, actions } },
-			{ id: 'plan:item-1', kind: 'plan', state: 'resolved', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'item-1', itemPath: 'plans/PM-037', identifier: 'PM-037', branchKey: 'main' }, position: { x: 360, y: 0 }, collapsed: false, revision: 1, plan: { itemId: 'item-1', identifier: 'PM-037', title: 'Focused Canvas', branch: 'main', editable: true, actions } },
+			{ id: 'plan:item-1', kind: 'plan', state: 'resolved', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'item-1', itemPath: 'plans/platform/PM-037', identifier: 'PM-037', branchKey: 'main' }, position: { x: 360, y: 0 }, collapsed: false, revision: 1, plan: { itemId: 'item-1', identifier: 'PM-037', title: 'Focused Canvas', service: 'platform', status: 'in_progress', branch: 'main', editable: true, actions } },
 			{ id: 'session:session-1', kind: 'session', state: 'resolved', entityRef: { kind: 'session', workspaceId: 'workspace-1', sessionId: 'session-1', branchKey: 'main' }, position: { x: 680, y: 420 }, collapsed: false, revision: 1, session: { record: { id: 'session-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', requestedBranch: 'main', state: 'running', startedAt: '', lastKnownAt: '', live: true } } }
 		],
 		connections: [{ id: 'one', source: 'workspace:workspace-1', target: 'plan:item-1', kind: 'repository_contains', sourceOfTruth: 'derived' }, { id: 'two', source: 'plan:item-1', target: 'session:session-1', kind: 'session_launched_from', sourceOfTruth: 'derived' }],

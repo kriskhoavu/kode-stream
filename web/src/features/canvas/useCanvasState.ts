@@ -220,7 +220,36 @@ export function useCanvasState(workspaceId?: string) {
 		for (const [index, node] of ordered.entries()) moveNode(node.id, deterministicPosition(index, node.kind));
 	}, [moveNode]);
 
-	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, saveViewport, reloadPosition, reapplyPosition, placeUnplaced, removeNode, resetPositions, reload: load, refresh };
+	const arrangePlans = useCallback((grouping: 'status' | 'service' | 'service_status') => {
+		const current = projectionRef.current;
+		if (!current) return;
+		const statusOrder = new Map(['unsorted', 'draft', 'in_progress', 'review', 'done'].map((status, index) => [status, index]));
+		const plans = current.nodes.filter((node) => node.plan).sort((left, right) => {
+			const leftPlan = left.plan!;
+			const rightPlan = right.plan!;
+			const byStatus = (statusOrder.get(leftPlan.status) ?? 99) - (statusOrder.get(rightPlan.status) ?? 99);
+			const byService = (leftPlan.service ?? '').localeCompare(rightPlan.service ?? '');
+			const byIdentifier = (leftPlan.identifier ?? left.id).localeCompare(rightPlan.identifier ?? right.id);
+			if (grouping === 'status') return byStatus || byService || byIdentifier;
+			if (grouping === 'service') return byService || byStatus || byIdentifier;
+			return byService || byStatus || byIdentifier;
+		});
+		const groupKey = (node: CanvasNode) => {
+			if (grouping === 'status') return node.plan!.status;
+			if (grouping === 'service') return node.plan!.service || 'other';
+			return `${node.plan!.service || 'other'}:${node.plan!.status}`;
+		};
+		const groups = Array.from(new Set(plans.map(groupKey)));
+		const rowByGroup = new Map<string, number>();
+		for (const node of plans) {
+			const key = groupKey(node);
+			const row = rowByGroup.get(key) ?? 0;
+			moveNode(node.id, { x: 360 + groups.indexOf(key) * 320, y: row * 190 });
+			rowByGroup.set(key, row + 1);
+		}
+	}, [moveNode]);
+
+	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, arrangePlans, saveViewport, reloadPosition, reapplyPosition, placeUnplaced, removeNode, resetPositions, reload: load, refresh };
 }
 
 function overlayDirty(projection: CanvasProjection, dirty: Map<string, DirtyPlacement>): CanvasProjection {
