@@ -38,7 +38,7 @@
 | 3   | Record the positions of one workspace node and one plan node, then move the workspace node. | Save status changes from **Saving** to **Saved**.          | Only the workspace position changes; the plan position is unchanged.                                                      | Safe write  |
 | 4   | Move the supplied plan node to a distinct position.                                         | Save status becomes **Saved**.                             | The plan moves without changing the workspace position or repository data.                                                | Safe write  |
 | 5   | Reload the page and reopen Canvas for the same workspace and branch.                        | Entity resolution and placement loading finish.            | Workspace and plan positions are restored while labels, Git state, and capabilities reflect current state.                | Read-only   |
-| 6   | If the new-node count is nonzero, choose **Add new nodes**.                                 | Placement save finishes.                                   | Newly discovered nodes receive positions without moving saved or intentionally removed nodes.                             | Safe write  |
+| 6   | Trigger the supplied safe plan scan and refresh Canvas.                                     | The new plan node becomes visible.                         | Canvas places it silently without moving saved nodes or showing an action, count, or notification.                        | Safe write  |
 
 ## Section B: Launch One Branch-Safe Session
 
@@ -72,13 +72,13 @@ the repository is dirty or conflicted unless the supplied setup explicitly makes
 
 ## Section E: Removal, Keyboard, And Recovery
 
-| #   | Agent Action                                                                              | Wait Condition                                     | Expected Result                                                                                                 | Write Class |
-|-----|-------------------------------------------------------------------------------------------|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|-------------|
-| 1   | Use **Search Canvas nodes** to focus the supplied plan without pointer selection.         | The plan node and Workbench receive visible focus. | The accessible state includes kind, title, branch, status, and blocked state where applicable.                  | Read-only   |
-| 2   | Press an arrow key on the focused plan; use Shift plus an arrow for a one-pixel move.     | Save status is announced as **Saved**.             | The plan moves by 12 pixels, or one pixel with Shift, and other node positions remain unchanged.                | Safe write  |
-| 3   | Select the session node and choose **Remove from Canvas** without cancelling the process. | Removal confirmation and save finish.              | The placement disappears and **Add new nodes** does not restore it; the session record/process remains durable. | Safe write  |
-| 4   | Use **Reset layout**, inspect the preview, and cancel it.                                 | Preview closes.                                    | Saved positions remain unchanged.                                                                               | Read-only   |
-| 5   | Enable reduced motion and revisit Canvas.                                                 | Canvas finishes rendering.                         | Status remains understandable without smooth viewport transitions or animated connections.                      | Read-only   |
+| #   | Agent Action                                                                              | Wait Condition                                     | Expected Result                                                                                              | Write Class |
+|-----|-------------------------------------------------------------------------------------------|----------------------------------------------------|--------------------------------------------------------------------------------------------------------------|-------------|
+| 1   | Use **Search Canvas nodes** to focus the supplied plan without pointer selection.         | The plan node and Workbench receive visible focus. | The accessible state includes kind, title, branch, status, and blocked state where applicable.               | Read-only   |
+| 2   | Press an arrow key on the focused plan; use Shift plus an arrow for a one-pixel move.     | Save status is announced as **Saved**.             | The plan moves by 12 pixels, or one pixel with Shift, and other node positions remain unchanged.             | Safe write  |
+| 3   | Select the session node and choose **Remove from Canvas** without cancelling the process. | Removal confirmation and save finish.              | The placement disappears and later refreshes do not recreate it; the session record/process remains durable. | Safe write  |
+| 4   | Use **Reset layout**, inspect the preview, and cancel it.                                 | Preview closes.                                    | Saved positions remain unchanged.                                                                            | Read-only   |
+| 5   | Enable reduced motion and revisit Canvas.                                                 | Canvas finishes rendering.                         | Status remains understandable without smooth viewport transitions or animated connections.                   | Read-only   |
 
 ## Evidence
 

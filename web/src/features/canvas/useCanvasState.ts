@@ -19,6 +19,7 @@ export function useCanvasState(workspaceId?: string) {
 	const dirtyRef = useRef(new Map<string, DirtyPlacement>());
 	const mutationRef = useRef(0);
 	const viewportTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const automaticPlacementRef = useRef<Promise<CanvasProjection> | undefined>(undefined);
 
 	const setProjection = useCallback((next: CanvasProjection | undefined) => {
 		if (next) {
@@ -26,6 +27,33 @@ export function useCanvasState(workspaceId?: string) {
 		}
 		projectionRef.current = next;
 		setProjectionState(next);
+	}, []);
+
+	const placeNewNodes = useCallback(async (projection: CanvasProjection) => {
+		if (projection.unplaced.length === 0) return projection;
+		const capability = projection.nodes.find((node) => node.workspace)?.workspace?.actions['layout.move'];
+		if (capability && capability.state !== 'available') return projection;
+		if (automaticPlacementRef.current) {
+			await automaticPlacementRef.current;
+			return api.canvasLayout(projection.layout.id);
+		}
+		const operation = (async () => {
+			let current = projection;
+			while (current.unplaced.length > 0) {
+				const refs = current.unplaced.slice(0, 50);
+				const patches = refs.map((entityRef, index) => ({ nodeId: nodeID(entityRef), entityRef, position: deterministicPosition(current.nodes.length + index, entityRef.kind), collapsed: entityRef.kind === 'session', expectedRevision: 0 }));
+				current = await api.patchCanvasPlacements(current.layout.id, patches);
+				const remaining = new Set(current.unplaced.map(nodeID));
+				if (refs.some((ref) => remaining.has(nodeID(ref)))) throw new Error('Canvas could not place newly discovered nodes.');
+			}
+			return current;
+		})();
+		automaticPlacementRef.current = operation;
+		try {
+			return await operation;
+		} finally {
+			if (automaticPlacementRef.current === operation) automaticPlacementRef.current = undefined;
+		}
 	}, []);
 
 	const load = useCallback(async () => {
@@ -36,7 +64,7 @@ export function useCanvasState(workspaceId?: string) {
 		setLoading(true);
 		setError('');
 		try {
-			const next = await api.resolveDefaultCanvas(workspaceId);
+			const next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId));
 			dirtyRef.current.clear();
 			setConflicts([]);
 			setProjection(next);
@@ -45,18 +73,18 @@ export function useCanvasState(workspaceId?: string) {
 		} finally {
 			setLoading(false);
 		}
-	}, [setProjection, workspaceId]);
+	}, [placeNewNodes, setProjection, workspaceId]);
 
 	const refresh = useCallback(async () => {
 		const current = projectionRef.current;
 		if (!current) return;
 		try {
-			setProjection(await api.canvasLayout(current.layout.id));
+			setProjection(await placeNewNodes(await api.canvasLayout(current.layout.id)));
 			setError('');
 		} catch (caught) {
 			setError(messageFrom(caught));
 		}
-	}, [setProjection]);
+	}, [placeNewNodes, setProjection]);
 
 	useEffect(() => {
 		void load();
@@ -183,35 +211,21 @@ export function useCanvasState(workspaceId?: string) {
 		}
 	}, [setProjection]);
 
-	const placeUnplaced = useCallback(async () => {
-		let current = projectionRef.current;
-		if (!current || current.unplaced.length === 0) return;
-		setError('');
-		try {
-			for (let start = 0; start < current.unplaced.length; start += 50) {
-				const refs = current.unplaced.slice(start, start + 50);
-				const patches = refs.map((entityRef, index) => ({ nodeId: nodeID(entityRef), entityRef, position: deterministicPosition(current!.nodes.length + start + index, entityRef.kind), collapsed: entityRef.kind === 'session', expectedRevision: 0 }));
-				current = await api.patchCanvasPlacements(current.layout.id, patches);
-			}
-			setProjection(current);
-		} catch (caught) {
-			setError(messageFrom(caught));
-		}
-	}, [setProjection]);
-
 	const placeSession = useCallback(async (sessionId: string) => {
 		const current = projectionRef.current;
-		if (!current || current.nodes.some((node) => node.entityRef.sessionId === sessionId)) return;
+		if (!current) return;
+		const existing = current.nodes.find((node) => node.entityRef.sessionId === sessionId);
+		if (existing && !existing.collapsed) return;
 		const entityRef = current.unplaced.find((candidate) => candidate.kind === 'session' && candidate.sessionId === sessionId);
-		if (!entityRef) return;
+		if (!existing && !entityRef) return;
 		setError('');
 		try {
 			setProjection(await api.patchCanvasPlacements(current.layout.id, [{
-				nodeId: nodeID(entityRef),
-				entityRef,
-				position: deterministicPosition(current.nodes.length, 'session'),
+				nodeId: existing?.id ?? nodeID(entityRef!),
+				entityRef: existing?.entityRef ?? entityRef!,
+				position: existing?.position ?? deterministicPosition(current.nodes.length, 'session'),
 				collapsed: false,
-				expectedRevision: 0
+				expectedRevision: existing?.revision ?? 0
 			}]));
 		} catch (caught) {
 			setError(messageFrom(caught));
@@ -280,7 +294,7 @@ export function useCanvasState(workspaceId?: string) {
 		}
 	}, [moveNode]);
 
-	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, setNodeCollapsed, arrangePlans, saveViewport, reloadPosition, reapplyPosition, placeUnplaced, placeSession, removeNode, resetPositions, reload: load, refresh };
+	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, setNodeCollapsed, arrangePlans, saveViewport, reloadPosition, reapplyPosition, placeSession, removeNode, resetPositions, reload: load, refresh };
 }
 
 function overlayDirty(projection: CanvasProjection, dirty: Map<string, DirtyPlacement>): CanvasProjection {

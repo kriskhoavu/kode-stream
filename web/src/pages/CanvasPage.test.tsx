@@ -4,7 +4,7 @@ import type { CanvasProjection, WorkspaceConfig } from '../lib/types';
 import { CanvasPage } from './CanvasPage';
 
 const canvasState = vi.hoisted(() => ({ projection: undefined as CanvasProjection | undefined }));
-vi.mock('../features/canvas/useCanvasState', () => ({ useCanvasState: () => ({ projection: canvasState.projection, loading: false, error: '', conflicts: [], dirtyCount: 0, saveStatus: 'saved', hasUnsavedChanges: false, moveNode: vi.fn(), setNodeCollapsed: vi.fn(), saveViewport: vi.fn(), reloadPosition: vi.fn(), reapplyPosition: vi.fn(), placeUnplaced: vi.fn(), placeSession: vi.fn(), removeNode: vi.fn(), resetPositions: vi.fn(), reload: vi.fn(), refresh: vi.fn() }) }));
+vi.mock('../features/canvas/useCanvasState', () => ({ useCanvasState: () => ({ projection: canvasState.projection, loading: false, error: '', conflicts: [], dirtyCount: 0, saveStatus: 'saved', hasUnsavedChanges: false, moveNode: vi.fn(), setNodeCollapsed: vi.fn(), saveViewport: vi.fn(), reloadPosition: vi.fn(), reapplyPosition: vi.fn(), placeSession: vi.fn(), removeNode: vi.fn(), resetPositions: vi.fn(), reload: vi.fn(), refresh: vi.fn() }) }));
 vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, onSelect }: { projection: CanvasProjection; onSelect: (id?: string) => void }) => <>{projection.nodes.map((node) => <button key={node.id} data-canvas-node-id={node.id} aria-label={node.session ? `Session: ${node.session.record.provider}` : 'Plan: PM-037 Canvas main'} type="button" onClick={() => onSelect(node.id)}>{node.session ? 'Session node' : 'Plan node'}</button>)}</> }));
 vi.mock('../features/canvas/CanvasWorkbench', () => ({ CanvasWorkbench: ({ selectedNode, onClose }: { selectedNode?: unknown; onClose: () => void }) => selectedNode ? <aside aria-label="Canvas Workbench"><button type="button" onClick={onClose}>Close Workbench</button></aside> : null }));
 
@@ -22,7 +22,7 @@ describe('CanvasPage', () => {
 		canvasState.projection = projection();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
 		await waitFor(() => expect(screen.getByLabelText('Checkout: main')).toBeInTheDocument());
-		expect(screen.getByTestId('canvas-ready')).toHaveTextContent('1 placed');
+		expect(screen.getByTestId('canvas-ready')).toHaveTextContent('1 node');
 		expect(screen.getByRole('status')).toHaveTextContent('Saved');
 	});
 

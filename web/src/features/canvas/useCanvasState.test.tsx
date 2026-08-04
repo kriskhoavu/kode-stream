@@ -81,20 +81,31 @@ describe('useCanvasState', () => {
 		expect(result.current.dirtyCount).toBe(0);
 	});
 
-	it('places unplaced entities, resets deterministically, and removes only the placement', async () => {
+	it('places newly discovered entities automatically, resets deterministically, and preserves removal', async () => {
 		const unplaced = { ...projection(), nodes: [], unplaced: [projection().nodes[0].entityRef] };
 		vi.mocked(api.resolveDefaultCanvas).mockResolvedValue(unplaced);
 		vi.mocked(api.patchCanvasPlacements).mockResolvedValue(projection());
 		const { result } = renderHook(() => useCanvasState('workspace-1'));
 		await act(async () => { await vi.runAllTimersAsync(); });
-		await act(async () => { await result.current.placeUnplaced(); });
 		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', expectedRevision: 0 })]);
+		expect(result.current.projection?.unplaced).toHaveLength(0);
 		act(() => result.current.resetPositions());
 		expect(result.current.projection?.nodes[0].position).toEqual({ x: 360, y: 0 });
 		await act(async () => { await result.current.removeNode('plan:item-1'); });
 		expect(api.removeCanvasPlacement).toHaveBeenCalledWith('layout-1', 'plan:item-1', 1);
 		expect(result.current.projection?.nodes).toHaveLength(0);
 		expect(result.current.projection?.unplaced).toHaveLength(0);
+	});
+
+	it('places newly discovered entities silently during refresh', async () => {
+		const unplaced = { ...projection(2), unplaced: [{ ...projection().nodes[0].entityRef, itemId: 'item-2' }] };
+		vi.mocked(api.canvasLayout).mockResolvedValue(unplaced);
+		vi.mocked(api.patchCanvasPlacements).mockResolvedValue({ ...projection(3), nodes: [...projection().nodes, { ...projection().nodes[0], id: 'plan:item-2', entityRef: unplaced.unplaced[0], revision: 1 }], unplaced: [] });
+		const { result } = renderHook(() => useCanvasState('workspace-1'));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		await act(async () => { await result.current.refresh(); });
+		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-2', expectedRevision: 0 })]);
+		expect(result.current.projection?.nodes).toHaveLength(2);
 	});
 
 	it('persists session disclosure independently from selection and position', async () => {
@@ -109,14 +120,17 @@ describe('useCanvasState', () => {
 		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: session.id, collapsed: false, position: { x: 30, y: 40 }, expectedRevision: 1 })]);
 	});
 
-	it('places only the newly launched session', async () => {
+	it('opens a newly launched session when automatic placement observed it first', async () => {
 		const sessionRef = { kind: 'session' as const, workspaceId: 'workspace-1', sessionId: 'session-1', branchKey: 'main' };
 		vi.mocked(api.resolveDefaultCanvas).mockResolvedValue({ ...projection(), unplaced: [sessionRef, { ...projection().nodes[0].entityRef, itemId: 'item-2' }] });
-		vi.mocked(api.patchCanvasPlacements).mockResolvedValue(projection());
+		const sessionNode = { id: 'session:session-1', kind: 'session' as const, state: 'resolved' as const, entityRef: sessionRef, position: { x: 680, y: 420 }, collapsed: true, revision: 1, session: { record: { id: 'session-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', requestedBranch: 'main', state: 'running' as const, startedAt: '', lastKnownAt: '', live: true } } };
+		const automaticallyPlaced = { ...projection(), nodes: [...projection().nodes, sessionNode], unplaced: [] };
+		vi.mocked(api.patchCanvasPlacements).mockResolvedValueOnce(automaticallyPlaced).mockResolvedValueOnce({ ...automaticallyPlaced, nodes: [projection().nodes[0], { ...sessionNode, collapsed: false, revision: 2 }] });
 		const { result } = renderHook(() => useCanvasState('workspace-1'));
 		await act(async () => { await vi.runAllTimersAsync(); });
+		expect(vi.mocked(api.patchCanvasPlacements).mock.calls[0][1]).toHaveLength(2);
 		await act(async () => { await result.current.placeSession('session-1'); });
-		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'session:session-1', entityRef: sessionRef, collapsed: false, expectedRevision: 0 })]);
-		expect(vi.mocked(api.patchCanvasPlacements).mock.calls[0][1]).toHaveLength(1);
+		expect(api.patchCanvasPlacements).toHaveBeenLastCalledWith('layout-1', [expect.objectContaining({ nodeId: 'session:session-1', entityRef: sessionRef, collapsed: false, expectedRevision: 1 })]);
+		expect(result.current.projection?.nodes.find((node) => node.id === sessionNode.id)?.collapsed).toBe(false);
 	});
 });

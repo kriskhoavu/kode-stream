@@ -138,8 +138,8 @@ revalidates every action at execution time; frontend capability state is advisor
 - A workspace node is a semantic anchor, not a spatial parent. Moving it never moves plan or session nodes.
 - Repository containment does not create drag parenting.
 - Removing a placement never deletes or mutates the referenced entity or live process.
-- A removed placement remains hidden for that layout and is not offered by **Add new nodes**; only entities discovered
-  after the layout was last resolved are candidates.
+- A removed placement remains hidden for that layout and is never recreated by automatic placement.
+- Newly discovered entities receive deterministic positions silently without moving saved nodes or showing a prompt.
 - Reset layout previews a deterministic placement set before replacing saved positions.
 - Future groups will be explicit visual frames: moving a group applies a delta to members, deleting it leaves members in
   place, and overlap alone never creates membership.

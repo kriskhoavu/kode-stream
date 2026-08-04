@@ -18,9 +18,10 @@ lastTicket: PM-038
 Open **Canvas** for the active workspace checkout. Canvas resolves Git before loading or seeding the branch-scoped
 layout; it has no independent branch selector. Drag a workspace, plan, or session node independently, or
 focus it and use an arrow key to move 12 pixels; Shift plus an arrow moves one pixel. Wait for **Saved** before reloading.
-**Add new nodes** accepts deterministic positions for newly discovered plans and sessions without moving saved nodes.
-**Reset layout** previews and confirms a presentation-only reset. **Remove from Canvas** keeps the referenced entity but
-hides its placement for this layout, so **Add new nodes** does not bring it back.
+Canvas silently gives newly discovered plans and sessions deterministic positions without moving saved nodes or showing
+an action, count, or notification. **Reset layout** previews and confirms a presentation-only reset. **Remove from
+Canvas** keeps the referenced entity but hides its placement for this layout, so automatic placement does not bring it
+back.
 
 Use **Search Canvas nodes** to find a title, identifier, branch, or session state. **Fit view** recovers off-screen nodes.
 Closing the Workbench returns focus to the selected node.

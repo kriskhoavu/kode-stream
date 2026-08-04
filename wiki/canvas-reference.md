@@ -43,8 +43,8 @@ A launch includes expected workspace, branch, observed commit, and idempotency k
 at most one process. Durable records retain bounded identity and lifecycle fields only. Live bindings, channel grants,
 and xterm instances remain in memory; startup reconciliation marks records without bindings interrupted. Selection and
 terminal disclosure are independent: a top-right action persists the placement's collapsed state, while terminal input,
-selection, and scrolling are excluded from node drag and Canvas pan handling. Removed placements remain hidden and are
-not returned as new-node candidates. See
+selection, and scrolling are excluded from node drag and Canvas pan handling. Newly discovered entities are placed
+silently during load or refresh; removed placements remain hidden and are excluded from that automatic placement. See
 [[platform-terminal-canvas-workflows]].
 
 ## Verification Freshness

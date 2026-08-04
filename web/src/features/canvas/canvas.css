@@ -68,9 +68,6 @@
 .canvas-reference-warning { border-left: 4px solid var(--danger); }
 .canvas-verification .verification-summary.freshness-stale, .canvas-verification .verification-summary.freshness-inconclusive { padding: 9px; border: 1px dashed var(--line); border-radius: 8px; background: var(--panel-soft); }
 .canvas-verification .verification-summary.freshness-fresh.result-passed { padding: 9px; border: 1px solid color-mix(in srgb, var(--green) 40%, var(--line)); border-radius: 8px; }
-.canvas-active-unplaced button { display: flex; width: 100%; align-items: center; gap: 8px; text-align: left; }
-.canvas-active-unplaced button span { display: grid; }
-.canvas-active-unplaced button small { color: var(--muted); }
 .canvas-session-terminal { border-top: 1px solid var(--line); background: var(--panel); cursor: default; }
 .canvas-session-terminal[hidden] { display: none; }
 .canvas-session-terminal .embedded-terminal-panel.active { height: 430px; }

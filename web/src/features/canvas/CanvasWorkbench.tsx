@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, GitBranch, Play, RefreshCw, TerminalSquare, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { AlertTriangle, GitBranch, Play, RefreshCw, X } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
-import type { CanvasNode, CanvasProjection, SafeSessionRecord, VerificationJob } from '../../lib/types';
+import type { CanvasNode, CanvasProjection, VerificationJob } from '../../lib/types';
 
 export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, onSelectNode, onPlaceSession, onOpenFullView }: { projection: CanvasProjection; selectedNode?: CanvasNode; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void }) {
-	const [records, setRecords] = useState<SafeSessionRecord[]>([]);
 	const [launching, setLaunching] = useState(false);
 	const [verifying, setVerifying] = useState(false);
 	const [error, setError] = useState('');
@@ -12,15 +11,6 @@ export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, o
 	const pendingKey = useRef('');
 	const workspaceNode = projection.nodes.find((node) => node.kind === 'workspace')?.workspace;
 
-	const refreshRecords = async () => {
-		const next = await api.aiSessionRecords(projection.layout.workspaceId, projection.layout.branchKey);
-		setRecords(next);
-		return next;
-	};
-	useEffect(() => { void refreshRecords().catch(() => setRecords([])); }, [projection.layout.branchKey, projection.layout.workspaceId, projection.nodes.length]);
-
-	const unplacedSessionIDs = useMemo(() => new Set(projection.unplaced.filter((ref) => ref.kind === 'session').map((ref) => ref.sessionId)), [projection.unplaced]);
-	const unplacedActive = records.filter((record) => record.live && unplacedSessionIDs.has(record.id));
 	const launchCapability = selectedNode?.plan?.actions['terminal.launch'];
 	const canLaunch = selectedNode?.kind === 'plan' && launchCapability?.state === 'available';
 	const verificationContext = selectedNode?.workspace ?? (selectedNode?.plan ? workspaceNode : undefined);
@@ -46,7 +36,7 @@ export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, o
 				columns: 80,
 				rows: 24
 			});
-			await Promise.all([Promise.resolve(onReload()), refreshRecords()]);
+			await Promise.resolve(onReload());
 			await Promise.resolve(onPlaceSession(result.session.id));
 			onSelectNode(`session:${result.session.id}`);
 		} catch (caught) {
@@ -87,7 +77,6 @@ export function CanvasWorkbench({ projection, selectedNode, onClose, onReload, o
 		{selectedNode && (selectedNode.workspace || selectedNode.plan) && onOpenFullView && <section className="canvas-workbench-section"><button type="button" onClick={() => onOpenFullView(selectedNode)}>Open full view</button></section>}
 		{mismatch && <section className="canvas-branch-mismatch" role="alert"><AlertTriangle size={17} /><div><strong>Checkout changed</strong><p>Expected <code>{mismatch.expectedBranch || mismatch.branch || mismatch.expectedCommit}</code>; current <code>{mismatch.currentBranch || mismatch.currentCommit}</code>.</p><button type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh Canvas and Git status</button></div></section>}
 		{error && <p className="canvas-workbench-error" role="alert">{error}</p>}
-		{unplacedActive.length > 0 && <section className="canvas-workbench-section canvas-active-unplaced"><h2>New active sessions</h2>{unplacedActive.map((record) => <button type="button" key={record.id} onClick={() => void Promise.resolve(onPlaceSession(record.id)).then(() => onReload()).then(() => onSelectNode(`session:${record.id}`))}><TerminalSquare size={13} /><span>{record.provider}<small>{record.requestedBranch} · {record.state} · add and open</small></span></button>)}</section>}
 	</aside>;
 }
 

@@ -76,10 +76,10 @@
 ### Flow 1.2: New And Removed Work
 
 1. A repository scan discovers a new plan.
-2. The new plan appears under **Unplaced work** without moving saved nodes.
-3. User chooses **Add new nodes** and accepts its suggested placement.
+2. Canvas silently persists a deterministic position for the new plan without moving saved nodes.
+3. No placement action, new-node count, or notification is shown.
 4. User removes a plan placement.
-5. The plan remains in the repository, while its hidden placement prevents it from being offered as new work again.
+5. The plan remains in the repository, while its hidden placement prevents automatic placement from recreating it.
 
 ### Flow 1.3: Placement Conflict
 

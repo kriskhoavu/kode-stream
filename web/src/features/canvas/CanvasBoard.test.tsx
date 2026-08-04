@@ -44,10 +44,10 @@ describe('CanvasBoard', () => {
 		expect(onSetCollapsed).toHaveBeenCalledWith('session:session-1', false);
 		const expanded = baseProjection();
 		expanded.nodes[2] = { ...expanded.nodes[2], collapsed: false };
-		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} selectedId="session:session-1" onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
+		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} selectedId="session:session-1" onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
 		expect(await screen.findByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');
 		fireEvent.change(screen.getByLabelText('Terminal prompt'), { target: { value: 'review this change' } });
-		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
+		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
 		expect(screen.getByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');
 		expect(api.embeddedAISessionGrant).toHaveBeenCalledTimes(1);
 		fireEvent.click(screen.getByRole('button', { name: 'Hide terminal' }));
@@ -97,20 +97,18 @@ describe('CanvasBoard', () => {
 		expect(onMoveNode).toHaveBeenCalledTimes(1);
 	});
 
-	it('searches and focuses by identifier, exposes unplaced work, reset, and isolated removal', () => {
+	it('searches and focuses by identifier, resets, and removes a placement in isolation', () => {
 		const onSelect = vi.fn();
-		const onPlaceUnplaced = vi.fn();
 		const onReset = vi.fn();
 		const onRemove = vi.fn();
-		renderBoard({ ...baseProjection(), unplaced: [{ kind: 'plan', workspaceId: 'workspace-1', itemId: 'new', itemPath: 'plans/new', identifier: 'PM-038', branchKey: 'main' }] }, { selectedId: 'plan:item-1', onSelect, onPlaceUnplaced, onReset, onRemove });
+		renderBoard(baseProjection(), { selectedId: 'plan:item-1', onSelect, onReset, onRemove });
 		fireEvent.change(screen.getByLabelText('Search Canvas nodes'), { target: { value: 'PM-037' } });
 		fireEvent.click(screen.getByRole('option', { name: /PM-037/ }));
 		expect(onSelect).toHaveBeenCalledWith('plan:item-1');
 		expect(fitView).toHaveBeenCalled();
-		fireEvent.click(screen.getByRole('button', { name: /Add new nodes/ }));
+		expect(screen.queryByRole('button', { name: /Add new nodes/ })).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: /Reset layout/ }));
 		fireEvent.click(screen.getByRole('button', { name: /Remove from Canvas/ }));
-		expect(onPlaceUnplaced).toHaveBeenCalled();
 		expect(onReset).toHaveBeenCalled();
 		expect(onRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 'plan:item-1' }));
 	});
@@ -166,7 +164,7 @@ describe('CanvasBoard', () => {
 });
 
 function renderBoard(projection: CanvasProjection, overrides: Partial<React.ComponentProps<typeof CanvasBoard>> = {}) {
-	return render(<CanvasBoard projection={projection} conflicts={[]} onSelect={vi.fn()} onMoveNode={vi.fn()} onSetCollapsed={vi.fn()} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} {...overrides} />);
+	return render(<CanvasBoard projection={projection} conflicts={[]} onSelect={vi.fn()} onMoveNode={vi.fn()} onSetCollapsed={vi.fn()} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} {...overrides} />);
 }
 
 function baseProjection(): CanvasProjection {

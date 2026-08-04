@@ -6,12 +6,11 @@ import { CanvasWorkbench } from './CanvasWorkbench';
 
 vi.mock('../../lib/api', async () => {
 	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
-	return { ...actual, api: { aiSessionRecords: vi.fn(), aiSettings: vi.fn(), startEmbeddedAISession: vi.fn(), embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn() } };
+	return { ...actual, api: { aiSettings: vi.fn(), startEmbeddedAISession: vi.fn(), embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn() } };
 });
 describe('CanvasWorkbench', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(api.aiSessionRecords).mockResolvedValue([]);
 		vi.mocked(api.aiSettings).mockResolvedValue({ defaultProvider: 'codex', defaultTerminal: '', providers: {}, terminals: {} });
 		vi.mocked(api.startEmbeddedAISession).mockResolvedValue(sessionResult());
 		vi.mocked(api.embeddedAISession).mockResolvedValue(sessionResult().session);
@@ -20,10 +19,9 @@ describe('CanvasWorkbench', () => {
 		vi.spyOn(window, 'confirm').mockReturnValue(true);
 	});
 
-	it('does not expose a closed Workbench when no workspace or plan is selected', async () => {
+	it('does not expose a closed Workbench when no workspace or plan is selected', () => {
 		render(<CanvasWorkbench {...defaultProps(baseProjection(), undefined)} />);
 		expect(screen.queryByLabelText('Canvas Workbench')).not.toBeInTheDocument();
-		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalled());
 	});
 
 	it('launches one branch-safe process for a double submission', async () => {
@@ -65,7 +63,6 @@ describe('CanvasWorkbench', () => {
 		expect(screen.getByText('11111111')).toBeInTheDocument();
 		expect(screen.getAllByText('22222222')).toHaveLength(2);
 		expect(screen.getByRole('button', { name: /Run smoke verification/ })).toBeDisabled();
-		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalled());
 	});
 
 	it('runs verification and opens the full view from a plan', async () => {
@@ -89,25 +86,6 @@ describe('CanvasWorkbench', () => {
 		expect(screen.queryByText('SECRET-TITLE')).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: /Refresh reference/ }));
 		expect(reload).toHaveBeenCalled();
-		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalled());
-	});
-
-	it('offers only newly discovered active sessions and never re-places a removed session', async () => {
-		const newRecord = sessionRecord();
-		const removedRecord = { ...sessionRecord(), id: 'session-removed' };
-		vi.mocked(api.aiSessionRecords).mockResolvedValue([newRecord, removedRecord]);
-		const projection = {
-			...baseProjection([planNode()]),
-			unplaced: [{ kind: 'session' as const, workspaceId: 'workspace-1', sessionId: newRecord.id, branchKey: 'main' }]
-		};
-		const placeSession = vi.fn();
-		const selectNode = vi.fn();
-		render(<CanvasWorkbench {...defaultProps(projection, planNode())} onPlaceSession={placeSession} onSelectNode={selectNode} />);
-		await screen.findByText('New active sessions');
-		expect(screen.getAllByText(/add and open/)).toHaveLength(1);
-		fireEvent.click(screen.getByRole('button', { name: /codex/ }));
-		await waitFor(() => expect(placeSession).toHaveBeenCalledWith(newRecord.id));
-		expect(selectNode).toHaveBeenCalledWith(`session:${newRecord.id}`);
 	});
 });
 

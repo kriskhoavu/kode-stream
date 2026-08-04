@@ -92,9 +92,9 @@ hiding, or removing a node changes the underlying relationship.
 
 - First load creates deterministic suggested positions for the workspace, current branch plans, and durable sessions.
 - Existing placements always win over new suggestions.
-- Newly indexed plans and new sessions enter the new-node candidates with a suggested position.
-- **Add new nodes** accepts those suggestions without moving existing nodes.
-- Removed placements remain hidden and never re-enter the new-node candidates for that layout.
+- Newly indexed plans and sessions receive deterministic positions automatically during load or refresh.
+- Automatic placement is silent and never moves existing nodes.
+- Removed placements remain hidden and never re-enter automatic placement for that layout.
 - **Reset layout** shows a preview and requires confirmation before patching positions.
 - Page reload restores node positions. Current entity labels, status, Git state, capabilities, live-binding state, and
   verification freshness are resolved again.
@@ -156,9 +156,9 @@ creation.
 | `failed`                       | Show safe launch/process failure without command arguments or prompt.             |
 | `interrupted`                  | Explain that metadata survived but the live process did not.                      |
 
-A newly discovered unplaced running session remains visible under **New active sessions**. A deliberately removed
-session remains durable and may keep consuming a process slot, but Canvas does not re-offer its hidden placement; users
-manage that process through the existing session lifecycle surface.
+A newly discovered running session is placed silently in collapsed presentation. A deliberately removed session remains
+durable and may keep consuming a process slot, but Canvas does not recreate its hidden placement; users manage that
+process through the existing session lifecycle surface.
 
 ## Git And Verification UX
 
@@ -204,7 +204,6 @@ behavior. Labels may still appear as contextual information when useful.
 | Drag node                | Move only selected placement or selected placement set.                                    |
 | Node search              | Filter by current resolved title, identifier, branch, or session state and focus a result. |
 | Fit content              | Fit visible nodes without changing saved positions.                                        |
-| Add new nodes            | Place newly discovered entities without moving saved or intentionally removed nodes.       |
 | Reset layout             | Preview deterministic positions and confirm before applying them.                          |
 | Remove node              | Remove placement only after stating that the source entity and process are unchanged.      |
 

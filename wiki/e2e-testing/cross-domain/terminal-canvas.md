@@ -28,7 +28,9 @@ never record credentials or terminal content.
 1. Open **Canvas** for the supplied workspace and branch; wait for **Fit view**.
 2. Move the workspace; wait for **Saved** and assert the plan stayed fixed.
 3. Move the plan, reload, and assert both positions restore with current labels and Git state.
-4. After launch, move the session, reload without restarting the backend, and assert its placement and lifecycle restore.
+4. Trigger the supplied safe plan scan, refresh Canvas, and assert the new plan appears without moving saved nodes or
+   showing a placement action, count, or notification.
+5. After launch, move the session, reload without restarting the backend, and assert its placement and lifecycle restore.
 
 These placement operations are isolated safe writes and never mutate repository entities. Capture initial, moved, and
 restored layouts without terminal content.
@@ -63,8 +65,8 @@ first failed assertion and follow the documented cleanup.
 2. Run smoke verification from the plan and assert result, freshness, and abbreviated revisions are separate.
 3. Apply the supplied reversible mutation; wait for refresh and assert the previous pass becomes stale and historical.
 4. Use **Search Canvas nodes**, focus the plan, press an arrow key, and assert only it moves and **Saved** is announced.
-5. Remove the session placement without cancellation, assert **Add new nodes** does not restore it, cancel a reset
-   preview, and revisit with reduced motion enabled.
+5. Remove the session placement without cancellation, refresh and assert it stays hidden, cancel a reset preview, and
+   revisit with reduced motion enabled.
 
 Capture current/stale verification and visible keyboard focus. Diagnostics may use Chrome DevTools only after Playwright
 execution; Chrome is never the execution provider.

@@ -22,7 +22,7 @@ type CanvasFlowNode = XYNode<CanvasNodeData>;
 
 const nodeTypes = { workspace: memo(WorkspaceCanvasNode), plan: memo(PlanCanvasNode), session: memo(SessionCanvasNode) };
 
-export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMoveNode, onSetCollapsed, onArrange, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onPlaceUnplaced, onReset, onRemove }: {
+export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMoveNode, onSetCollapsed, onArrange, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove }: {
 	projection: CanvasProjection;
 	conflicts: string[];
 	selectedId?: string;
@@ -34,7 +34,6 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 	onReload: () => Promise<unknown> | void;
 	onReloadPosition: (id: string) => void;
 	onReapplyPosition: (id: string) => void;
-	onPlaceUnplaced: () => void;
 	onReset: () => void;
 	onRemove: (node: DomainNode) => void;
 }) {
@@ -68,7 +67,6 @@ export function CanvasBoard({ projection, conflicts, selectedId, onSelect, onMov
 			<div className="canvas-board-toolbar">
 				<CanvasSearch nodes={visibleDomainNodes} onSelect={onSelect} />
 				<button className="secondary" type="button" onClick={onReset} disabled={!layoutAvailable || projection.nodes.length === 0} title={!layoutAvailable ? layoutCapability?.message : undefined}><Workflow size={15} /> Reset layout</button>
-				<button className="primary" type="button" onClick={onPlaceUnplaced} disabled={!layoutAvailable || projection.unplaced.length === 0} title={!layoutAvailable ? layoutCapability?.message : 'Add newly discovered plans and sessions to this Canvas.'}><Box size={15} /> Add new nodes ({projection.unplaced.length})</button>
 				{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
 			</div>
 			<div className="canvas-facet-row">

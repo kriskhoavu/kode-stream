@@ -27,6 +27,7 @@ PM-037.
 | F5    | Interactive terminal session nodes                    | Frontend   | Complete |
 | F6    | Stable embedded terminal channel lifecycle            | Frontend   | Complete |
 | F7    | Explicit session terminal disclosure                  | Frontend   | Complete |
+| F8    | Silent automatic placement of new nodes               | Frontend   | Complete |
 | I1    | Browser journey, documentation, and final integration | Full stack | Complete |
 
 ## Backend Phases
@@ -124,7 +125,7 @@ PM-037.
 **Deliverables:**
 
 - [x] Retain a hidden placement tombstone when a node is removed from Canvas.
-- [x] Exclude hidden placements from rendered nodes and from **Add new nodes** candidates.
+- [x] Exclude hidden placements from rendered nodes and automatic placement candidates.
 - [x] Persist hidden placement state in data-dir snapshots and the SQL datastore.
 - [x] Add the SQL migration and repository, service, and API regression tests.
 
@@ -178,7 +179,7 @@ PM-037.
 - [x] Add memoized workspace, plan, and session node renderers only.
 - [x] Make all three node kinds draggable and prove that moving the workspace does not move other nodes.
 - [x] Render repository and application connections without handles or edit/delete controls.
-- [x] Implement deterministic first placement, restored saved positions, new-node candidates, and **Add new nodes**.
+- [x] Implement deterministic first placement, restored saved positions, and new-node candidates.
 - [x] Implement reset-layout preview and confirmation.
 - [x] Add node search and focus by title, identifier, branch, and session state.
 - [x] Implement placement removal with explicit entity/process isolation messaging.
@@ -274,12 +275,28 @@ PM-037.
 - [x] Add an explicit top-right session action to expand or collapse the terminal.
 - [x] Persist disclosure state through the existing placement `collapsed` field.
 - [x] Keep terminal controls isolated from Canvas selection and dragging.
-- [x] Rename the placement action so it clearly applies only to newly discovered nodes.
+- [x] Keep intentionally removed nodes excluded from new-node candidates in frontend state.
 - [x] Add selection, disclosure, persistence, restored-layout, and removed-session exclusion tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
 
 **Commit:** `PM-037: Add explicit session terminal disclosure`
+
+---
+
+### Phase F8: Silent Automatic Placement Of New Nodes
+
+**Deliverables:**
+
+- [x] Automatically persist deterministic placements for newly discovered plans and sessions during load and refresh.
+- [x] Preserve all saved positions and hidden placement tombstones.
+- [x] Keep an explicitly launched session open even when automatic placement observes it first.
+- [x] Remove the **Add new nodes** action, new-node count, and active-new-session prompt.
+- [x] Add automatic placement, refresh, explicit launch, and removed-node regression tests.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
+
+**Commit:** `PM-037: Place new Canvas nodes automatically`
 
 ## Integration Phase
 
