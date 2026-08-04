@@ -1536,7 +1536,7 @@ func (a *API) record(workspaceID, itemID, operation, message string, paths []str
 		status = models.AuditStatusFailed
 		errorMessage = opErr.Error()
 		message = "Operation failed."
-		if recoveryHint(errorMessage) != "" {
+		if errors.Is(opErr, appitem.ErrSnapshotReadOnly) || recoveryHint(errorMessage) != "" {
 			status = models.AuditStatusBlocked
 			message = "Operation blocked."
 		}

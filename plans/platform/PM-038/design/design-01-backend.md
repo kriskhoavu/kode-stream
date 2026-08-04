@@ -68,7 +68,8 @@ coverage without an expected-commit contract and is therefore operational-only.
 - Preserve unrelated dirty checkout content and never call reset, clean, stash, checkout, or switch.
 - Refresh the checkout index after copying and return the imported checkout item.
 - Resolve audit identity for blocked mutations directly from the raw item index so snapshot file, metadata, and status
-  failures remain visible in workspace-scoped history without weakening operational detail isolation.
+  failures remain visible in workspace-scoped history without weakening operational detail isolation. Classify these
+  expected read-only rejections as blocked rather than failed audit outcomes.
 
 ## Operational Refresh
 

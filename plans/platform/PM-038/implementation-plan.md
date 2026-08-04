@@ -25,6 +25,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | R8    | Operational snapshot query isolation            | Backend    | Complete |
 | R9    | Operational item detail isolation               | Full stack | Complete |
 | R10   | Snapshot runbook and audit isolation            | Backend    | Complete |
+| R11   | Blocked snapshot audit classification           | Backend    | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -239,3 +240,14 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./internal/item ./internal/server/api && go test ./...`
 
 **Commit:** `PM-038: Isolate snapshot runbooks and mutation audits`
+
+## Phase R11: Blocked Snapshot Audit Classification
+
+**Deliverables:**
+
+- [x] Classify snapshot read-only mutation errors as blocked audit outcomes.
+- [x] Assert blocked status for rejected snapshot file, metadata, and status mutations.
+
+**Verification:** `go test ./internal/server/api && go test ./...`
+
+**Commit:** `PM-038: Classify snapshot mutation audits as blocked`

@@ -144,6 +144,9 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 		if event.WorkspaceID != workspace.ID || event.ItemID != result.Items[0].ID {
 			t.Fatalf("unscoped snapshot mutation audit event = %#v", event)
 		}
+		if event.Status != models.AuditStatusBlocked {
+			t.Fatalf("snapshot mutation audit status = %q, want blocked: %#v", event.Status, event)
+		}
 	}
 	input, _ := json.Marshal(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: result.Commit, ExpectedCheckoutBranch: "main", ItemID: result.Items[0].ID})
 	wrongWorkspace := branchReviewRequest(t, handler, http.MethodPost, "/api/workspaces/"+otherWorkspace.ID+"/reviews/import", string(input))
