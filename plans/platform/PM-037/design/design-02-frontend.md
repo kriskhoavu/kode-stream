@@ -46,7 +46,7 @@ cross-workspace routing.
 | Optimistic positions and dirty node IDs     | Canvas state hook               | Memory until acknowledged                |
 | Selected node                               | Canvas page                     | Memory                                   |
 | Node search query                           | Search control                  | Memory                                   |
-| Workbench width and open state              | Existing UI preference pattern  | Local preference where appropriate       |
+| Inspector open state                        | Canvas page                     | Memory                                   |
 | Terminal channel, grant, and xterm instance | Existing terminal-session layer | Memory only                              |
 | Current capabilities and freshness          | Query projection                | Refetched; never written with placements |
 
@@ -71,9 +71,12 @@ whether the plan matches the current checkout.
 ### Session Node
 
 Displays durable provider label, linked plan, requested branch, lifecycle state, and live-binding availability. A
-running live binding opens the terminal. An ended or interrupted record opens lifecycle detail and a relaunch action.
+selected live binding expands the node into an interactive terminal. An ended or interrupted record expands into safe
+lifecycle detail. Session selection does not open the right Workbench.
 
 Removing the node removes only its placement. Stopping a process requires a separate explicit action and confirmation.
+Terminal input, text selection, and scrolling do not initiate Canvas drag or pan gestures; the session summary remains
+the node drag target.
 
 ## Derived Connections
 
@@ -109,22 +112,22 @@ hiding, or removing a node changes the underlying relationship.
 
 Viewport saves use the layout metadata version and cannot conflict with placement revisions.
 
-## Focused Workbench
+## Focused Workbench And Inline Sessions
 
-| Selected Node                | PM-037 Content                                                                                           |
-|------------------------------|----------------------------------------------------------------------------------------------------------|
-| Workspace                    | Branch and Git status summary, refresh, and links to existing workspace controls.                        |
-| Plan                         | Plan summary, branch context, terminal or AI launch, verification action/status, and **Open full view**. |
-| Live session                 | Existing xterm surface and lifecycle controls.                                                           |
-| Ended or interrupted session | Safe lifecycle summary, remove placement, and relaunch from linked plan.                                 |
-| Stale node                   | Explanation, remove placement, and explicit replacement candidate when available.                        |
+| Selected Node                | PM-037 Content                                                                                                     |
+|------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| Workspace                    | Right Workbench with branch and Git status summary, refresh, and links to existing workspace controls.             |
+| Plan                         | Right Workbench with plan summary, branch context, launch, verification status/action, and **Open full view**.     |
+| Live session                 | Expanded Canvas node with the existing xterm surface, connection state, close, and explicit cancellation controls. |
+| Ended or interrupted session | Expanded Canvas node with safe lifecycle summary and exit or interruption detail.                                  |
+| Stale node                   | Safe explanation, placement removal, and explicit replacement candidate when available.                            |
 
 PM-037 does not embed Markdown editing, file browsing, diff, Jira, complete Git controls, or full verification artifacts.
 Those remain in their existing authoritative views.
 
-Only one full terminal surface is mounted in the Canvas Workbench. Selecting another node must not stop its process,
-but the terminal presentation may detach under existing reconnect rules. The implementation must not create a second
-subscriber or xterm owner for the same session when switching between existing terminal UI and Canvas.
+Only one terminal surface is mounted for each session node after the user opens it. Selecting another node hides that
+surface without stopping its process or creating another subscriber or xterm owner. Returning to the session restores
+the same mounted Canvas terminal while the node remains projected; normal grant and reconnect rules apply after reload.
 
 ## Branch Mismatch UX
 
@@ -193,8 +196,8 @@ behavior. Labels may still appear as contextual information when useful.
 
 | Interaction           | Result                                                                                     |
 |-----------------------|--------------------------------------------------------------------------------------------|
-| Single select         | Focus node and open or update the Workbench.                                               |
-| Double click or Enter | Open the full entity view, or focus a live terminal for a session node.                    |
+| Single select         | Focus a workspace or plan and update the Workbench; expand a session inside the Canvas.    |
+| Double click or Enter | Open the full entity view, or focus the expanded terminal for a session node.              |
 | Drag node             | Move only selected placement or selected placement set.                                    |
 | Node search           | Filter by current resolved title, identifier, branch, or session state and focus a result. |
 | Fit content           | Fit visible nodes without changing saved positions.                                        |
@@ -207,10 +210,10 @@ modes in PM-037.
 
 ## Accessibility
 
-- Provide a normal toolbar, node search/list, Workbench, and status regions outside the graphical viewport.
+- Provide a normal toolbar, node search/list, plan/workspace Workbench, and status regions outside the viewport.
 - Give every node an accessible name with kind, title, branch, lifecycle/status, and blocked state.
 - Support keyboard node selection and bounded keyboard movement with an announced save result.
-- Return focus predictably between a node, its Workbench, and dialogs.
+- Return focus predictably between a node, its inline terminal, the Workbench, and dialogs.
 - Announce load, selection, save, conflict, branch mismatch, session lifecycle, and verification freshness changes.
 - Provide visible zoom and fit controls; do not require precise drag gestures for essential navigation.
 - Use text and icon cues in addition to color.
@@ -219,9 +222,9 @@ modes in PM-037.
 
 ## Responsive Behavior
 
-PM-037 targets desktop engineering workflows. On narrow windows, the Workbench becomes an overlay with an explicit
-return-to-node action. The Canvas remains recoverable through search and fit controls but does not claim touch-first
-editing support.
+PM-037 targets desktop engineering workflows. On narrow windows, the plan/workspace Workbench becomes an overlay and
+the expanded terminal node uses a smaller bounded width. The Canvas remains recoverable through search and fit controls
+but does not claim touch-first editing support.
 
 ## Performance
 

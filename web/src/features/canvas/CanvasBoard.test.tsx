@@ -1,10 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import type { CanvasNode, CanvasProjection } from '../../lib/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { api } from '../../lib/api';
+import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult } from '../../lib/types';
 import { CanvasBoard } from './CanvasBoard';
 
 const fitView = vi.fn();
+vi.mock('../../lib/api', async () => {
+	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
+	return { ...actual, api: { ...actual.api, embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn() } };
+});
+vi.mock('../ai-session/EmbeddedTerminal', () => ({ EmbeddedTerminal: ({ initial, visible, onClose }: { initial: EmbeddedAISessionResult; visible: boolean; onClose: () => void }) => <section data-testid={`canvas-terminal-${initial.session.id}`} data-visible={String(visible)}><button type="button" onClick={onClose}>Hide terminal</button><input aria-label="Terminal prompt" /></section> }));
 vi.mock('@xyflow/react', async () => {
 	const React = await import('react');
 	const FlowContext = React.createContext(false);
@@ -24,6 +30,42 @@ vi.mock('@xyflow/react', async () => {
 });
 
 describe('CanvasBoard', () => {
+	beforeEach(() => vi.clearAllMocks());
+
+	it('expands a live session into an interactive Canvas terminal and keeps the connection when collapsed', async () => {
+		vi.mocked(api.embeddedAISession).mockResolvedValue({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' });
+		vi.mocked(api.embeddedAISessionGrant).mockResolvedValue({ sessionId: 'session-1', token: 'grant', expiresAt: '' });
+		const onSelect = vi.fn();
+		const view = renderBoard(baseProjection(), { selectedId: 'session:session-1', onSelect });
+		expect(await screen.findByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');
+		fireEvent.change(screen.getByLabelText('Terminal prompt'), { target: { value: 'review this change' } });
+		expect(onSelect).not.toHaveBeenCalled();
+		view.rerender(<CanvasBoard projection={baseProjection()} conflicts={[]} onSelect={onSelect} onMoveNode={vi.fn()} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
+		expect(screen.getByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'false');
+		expect(api.embeddedAISessionGrant).toHaveBeenCalledTimes(1);
+	});
+
+	it('shows interrupted lifecycle details and cancels a live process separately from Canvas placement', async () => {
+		const interrupted = baseProjection();
+		interrupted.nodes[2] = { ...interrupted.nodes[2], session: { record: { ...interrupted.nodes[2].session!.record, state: 'interrupted', live: false, exitCode: 130 } } };
+		const first = renderBoard(interrupted, { selectedId: 'session:session-1' });
+		expect(screen.getByText(/application restarted without this process/i)).toBeInTheDocument();
+		expect(screen.getByText('Exit code 130')).toBeInTheDocument();
+		first.unmount();
+
+		vi.spyOn(window, 'confirm').mockReturnValue(true);
+		vi.mocked(api.embeddedAISession).mockResolvedValue({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' });
+		vi.mocked(api.embeddedAISessionGrant).mockResolvedValue({ sessionId: 'session-1', token: 'grant', expiresAt: '' });
+		vi.mocked(api.cancelEmbeddedAISession).mockResolvedValue({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'cancelled', startedAt: '' });
+		const onReload = vi.fn();
+		const onRemove = vi.fn();
+		renderBoard(baseProjection(), { selectedId: 'session:session-1', onReload, onRemove });
+		fireEvent.click(screen.getByRole('button', { name: 'Cancel process' }));
+		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
+		expect(onReload).toHaveBeenCalled();
+		expect(onRemove).not.toHaveBeenCalled();
+	});
+
 	it('provides React Flow context to toolbar search', () => {
 		expect(() => renderBoard(baseProjection())).not.toThrow();
 		expect(screen.getByLabelText('Search Canvas nodes')).toBeInTheDocument();
@@ -113,7 +155,7 @@ describe('CanvasBoard', () => {
 });
 
 function renderBoard(projection: CanvasProjection, overrides: Partial<React.ComponentProps<typeof CanvasBoard>> = {}) {
-	return render(<CanvasBoard projection={projection} conflicts={[]} onSelect={vi.fn()} onMoveNode={vi.fn()} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} {...overrides} />);
+	return render(<CanvasBoard projection={projection} conflicts={[]} onSelect={vi.fn()} onMoveNode={vi.fn()} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onPlaceUnplaced={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} {...overrides} />);
 }
 
 function baseProjection(): CanvasProjection {

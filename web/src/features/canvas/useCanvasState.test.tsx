@@ -95,4 +95,15 @@ describe('useCanvasState', () => {
 		expect(api.removeCanvasPlacement).toHaveBeenCalledWith('layout-1', 'plan:item-1', 1);
 		expect(result.current.projection?.nodes).toHaveLength(0);
 	});
+
+	it('places only the newly launched session', async () => {
+		const sessionRef = { kind: 'session' as const, workspaceId: 'workspace-1', sessionId: 'session-1', branchKey: 'main' };
+		vi.mocked(api.resolveDefaultCanvas).mockResolvedValue({ ...projection(), unplaced: [sessionRef, { ...projection().nodes[0].entityRef, itemId: 'item-2' }] });
+		vi.mocked(api.patchCanvasPlacements).mockResolvedValue(projection());
+		const { result } = renderHook(() => useCanvasState('workspace-1'));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		await act(async () => { await result.current.placeSession('session-1'); });
+		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'session:session-1', entityRef: sessionRef, expectedRevision: 0 })]);
+		expect(vi.mocked(api.patchCanvasPlacements).mock.calls[0][1]).toHaveLength(1);
+	});
 });

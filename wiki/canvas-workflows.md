@@ -36,9 +36,12 @@ plan, expected branch, observed commit, provider, authorization, and limits agai
 Canvas shows **Checkout changed** with expected/current context and offers **Refresh Canvas and Git status**; it never
 switches branches automatically.
 
-A successful launch creates one safe durable record and one live process. Selecting another node does not cancel or
-relaunch it. **Cancel process** is separate from placement removal. After an application restart, an orphaned running
-record becomes interrupted and cannot falsely reconnect. See [[platform-terminal-canvas-reference]].
+A successful launch creates one safe durable record and one live process, places only that new session when needed,
+and expands its Canvas node into the interactive terminal. Selecting another node hides the terminal without cancelling
+or relaunching it; returning to the session restores the same live surface. Closing the terminal only collapses the
+session node. **Cancel process** remains separate from closing the terminal and from **Remove from Canvas**. After an
+application restart, an orphaned running record becomes interrupted and expands into lifecycle detail instead of
+offering a false reconnect. See [[platform-terminal-canvas-reference]].
 
 ## Inspect Git And Verification
 <!-- chunkId: platform-terminal-canvas-workflows-verify -->

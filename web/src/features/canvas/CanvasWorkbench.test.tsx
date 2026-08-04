@@ -8,8 +8,6 @@ vi.mock('../../lib/api', async () => {
 	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
 	return { ...actual, api: { aiSessionRecords: vi.fn(), aiSettings: vi.fn(), startEmbeddedAISession: vi.fn(), embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn() } };
 });
-vi.mock('../ai-session/EmbeddedTerminal', () => ({ EmbeddedTerminal: ({ initial, visible }: { initial: EmbeddedAISessionResult; visible: boolean }) => <div data-testid={`terminal-${initial.session.id}`} data-visible={String(visible)}>terminal</div> }));
-
 describe('CanvasWorkbench', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -22,11 +20,19 @@ describe('CanvasWorkbench', () => {
 		vi.spyOn(window, 'confirm').mockReturnValue(true);
 	});
 
+	it('does not expose a closed Workbench when no workspace or plan is selected', async () => {
+		render(<CanvasWorkbench {...defaultProps(baseProjection(), undefined)} />);
+		expect(screen.queryByLabelText('Canvas Workbench')).not.toBeInTheDocument();
+		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalled());
+	});
+
 	it('launches one branch-safe process for a double submission', async () => {
 		let resolveSettings!: (value: Awaited<ReturnType<typeof api.aiSettings>>) => void;
 		vi.mocked(api.aiSettings).mockReturnValue(new Promise((resolve) => { resolveSettings = resolve; }));
 		const reload = vi.fn();
-		renderWorkbench(planNode(), { onReload: reload });
+		const placeSession = vi.fn();
+		const selectNode = vi.fn();
+		renderWorkbench(planNode(), { onReload: reload, onPlaceSession: placeSession, onSelectNode: selectNode });
 		const launch = screen.getByRole('button', { name: 'Launch terminal' });
 		fireEvent.click(launch);
 		fireEvent.click(launch);
@@ -34,7 +40,8 @@ describe('CanvasWorkbench', () => {
 		resolveSettings({ defaultProvider: 'codex', defaultTerminal: '', providers: {}, terminals: {} });
 		await waitFor(() => expect(api.startEmbeddedAISession).toHaveBeenCalledTimes(1));
 		expect(api.startEmbeddedAISession).toHaveBeenCalledWith('item-1', expect.objectContaining({ expectedWorkspaceId: 'workspace-1', expectedBranch: 'main', observedCommit: 'abc123', idempotencyKey: expect.any(String) }));
-		await waitFor(() => expect(screen.getByTestId('terminal-session-1')).toHaveAttribute('data-visible', 'true'));
+		await waitFor(() => expect(placeSession).toHaveBeenCalledWith('session-1'));
+		expect(selectNode).toHaveBeenCalledWith('session:session-1');
 		expect(reload).toHaveBeenCalled();
 	});
 
@@ -48,30 +55,6 @@ describe('CanvasWorkbench', () => {
 		expect(screen.getByText('other')).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: /Refresh Canvas/ }));
 		expect(reload).toHaveBeenCalled();
-		expect(screen.queryByTestId(/terminal-/)).not.toBeInTheDocument();
-	});
-
-	it('reattaches one live terminal and preserves it while selection changes', async () => {
-		const session = sessionNode({ ...sessionRecord(), live: true });
-		const projection = baseProjection([planNode(), session]);
-		const props = defaultProps(projection, session);
-		const view = render(<CanvasWorkbench {...props} />);
-		await waitFor(() => expect(screen.getByTestId('terminal-session-1')).toHaveAttribute('data-visible', 'true'));
-		const otherPlan = { ...planNode(), id: 'plan:item-2', plan: { ...planNode().plan!, itemId: 'item-2' }, entityRef: { ...planNode().entityRef, itemId: 'item-2' } };
-		view.rerender(<CanvasWorkbench {...props} selectedNode={otherPlan} />);
-		expect(screen.getByTestId('terminal-session-1')).toHaveAttribute('data-visible', 'false');
-		view.rerender(<CanvasWorkbench {...props} selectedNode={session} />);
-		expect(screen.getByTestId('terminal-session-1')).toHaveAttribute('data-visible', 'true');
-		expect(api.embeddedAISessionGrant).toHaveBeenCalledTimes(1);
-	});
-
-	it('explains interrupted sessions and cancels a process without removing placement', async () => {
-		const interrupted = sessionNode({ ...sessionRecord(), state: 'interrupted', live: false });
-		const view = renderWorkbench(interrupted);
-		expect(screen.getByText(/application restarted without this process/i)).toBeInTheDocument();
-		view.rerender(<CanvasWorkbench {...defaultProps(baseProjection([sessionNode(sessionRecord())]), sessionNode(sessionRecord()))} />);
-		fireEvent.click(await screen.findByRole('button', { name: 'Cancel process' }));
-		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
 	});
 
 	it('separates verification result from freshness and removes stale success emphasis', async () => {
@@ -116,7 +99,7 @@ function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.Comp
 }
 
 function defaultProps(projection: CanvasProjection, selectedNode?: CanvasNode): React.ComponentProps<typeof CanvasWorkbench> {
-	return { projection, selectedNode, onClose: vi.fn(), onReload: vi.fn(), onSelectNode: vi.fn(), onPlaceUnplaced: vi.fn() };
+	return { projection, selectedNode, onClose: vi.fn(), onReload: vi.fn(), onSelectNode: vi.fn(), onPlaceUnplaced: vi.fn(), onPlaceSession: vi.fn() };
 }
 
 function baseProjection(nodes: CanvasNode[] = [planNode()]): CanvasProjection {
@@ -125,10 +108,6 @@ function baseProjection(nodes: CanvasNode[] = [planNode()]): CanvasProjection {
 
 function planNode(): CanvasNode {
 	return { id: 'plan:item-1', kind: 'plan', state: 'resolved', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'item-1', itemPath: 'plans/platform/PM-037', branchKey: 'main', observedCommit: 'abc123' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, plan: { itemId: 'item-1', identifier: 'PM-037', title: 'Canvas', service: 'platform', status: 'in_progress', branch: 'main', commit: 'abc123', editable: true, actions: { 'terminal.launch': { action: 'terminal.launch', state: 'available', recoveryActions: [] } } } };
-}
-
-function sessionNode(record: SafeSessionRecord): CanvasNode {
-	return { id: `session:${record.id}`, kind: 'session', state: 'resolved', entityRef: { kind: 'session', workspaceId: record.workspaceId, sessionId: record.id, branchKey: record.requestedBranch }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, session: { record } };
 }
 
 function sessionRecord(): SafeSessionRecord {

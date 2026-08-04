@@ -39,11 +39,17 @@ restored layouts without terminal content.
 
 1. Select the plan, confirm **Launch terminal**, **Run smoke verification**, and **Open full view** are present as
    capabilities allow, then choose **Launch terminal**.
-2. While **Launching…** is visible, activate again only if enabled; assert at most one record and process.
-3. Select away and return; assert the same terminal remains and no relaunch occurs.
-4. Use the supplied mismatch fixture, attempt the intentionally stale action, and assert **Checkout changed** appears
+2. Wait for the new session node to be placed and expanded; assert its interactive terminal is inside the Canvas and the
+   right Workbench is closed.
+3. While **Launching…** is visible, activate again only if enabled; assert at most one record and process.
+4. Select away and return; assert the same terminal remains and no relaunch occurs. Interacting with terminal input and
+   scrolling must not drag the session node.
+5. Close the terminal and assert the node collapses without cancellation; reopen it, then use the explicit
+   **Cancel process** control and assert the placement remains.
+6. Use the supplied mismatch fixture, attempt the intentionally stale action, and assert **Checkout changed** appears
    with expected/current context and no new session.
-5. Verify an application restart changes an orphaned running record to interrupted and offers no false reconnect.
+7. Verify an application restart changes an orphaned running record to interrupted and expands into lifecycle detail
+   without a false reconnect.
 
 Branch manipulation and process launch are safe writes only in the supplied isolated fixture. Stop this section at the
 first failed assertion and follow the documented cleanup.

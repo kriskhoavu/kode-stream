@@ -118,8 +118,8 @@
    limits.
 4. Backend creates a durable session record.
 5. Backend starts one ephemeral process binding.
-6. Canvas adds the new session as unplaced work or accepts a deterministic position near the plan.
-7. Workbench attaches to the granted terminal channel.
+6. Canvas places only the new session at a deterministic position when it is not already placed.
+7. Canvas selects the session and expands its node into the granted terminal channel.
 
 ### Flow 2.2: Double Submission
 
@@ -262,16 +262,16 @@
 
 1. User tabs to **Search nodes**.
 2. User filters by plan identifier, title, branch, or session state.
-3. Selecting a result focuses the node and opens its Workbench.
+3. Selecting a result focuses the node, opening the Workbench for a workspace or plan and expanding a session inline.
 4. Documented keyboard controls move the node by a bounded increment.
 5. Save status is announced.
-6. Escape returns focus from Workbench to the selected node or search result.
+6. Closing the Workbench or inline terminal returns focus to the selected node or search result.
 
 ### Flow 6.2: Narrow Window
 
 1. User opens Canvas in a narrow desktop window.
-2. Workbench opens as an overlay.
-3. User closes it through an explicit **Return to Canvas** action.
+2. A plan or workspace Workbench opens as an overlay; a session terminal expands within the Canvas.
+3. User closes the inspector or terminal through its explicit close action.
 4. Search and **Fit content** recover nodes that are outside the current viewport.
 
 ### Acceptance Notes

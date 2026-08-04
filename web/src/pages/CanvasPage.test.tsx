@@ -4,8 +4,8 @@ import type { CanvasProjection, WorkspaceConfig } from '../lib/types';
 import { CanvasPage } from './CanvasPage';
 
 const canvasState = vi.hoisted(() => ({ projection: undefined as CanvasProjection | undefined }));
-vi.mock('../features/canvas/useCanvasState', () => ({ useCanvasState: () => ({ projection: canvasState.projection, loading: false, error: '', conflicts: [], dirtyCount: 0, saveStatus: 'saved', hasUnsavedChanges: false, moveNode: vi.fn(), saveViewport: vi.fn(), reloadPosition: vi.fn(), reapplyPosition: vi.fn(), placeUnplaced: vi.fn(), removeNode: vi.fn(), resetPositions: vi.fn(), reload: vi.fn(), refresh: vi.fn() }) }));
-vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ onSelect }: { onSelect: (id?: string) => void }) => <button data-canvas-node-id="plan:item-1" aria-label="Plan: PM-037 Canvas main" type="button" onClick={() => onSelect('plan:item-1')}>Plan node</button> }));
+vi.mock('../features/canvas/useCanvasState', () => ({ useCanvasState: () => ({ projection: canvasState.projection, loading: false, error: '', conflicts: [], dirtyCount: 0, saveStatus: 'saved', hasUnsavedChanges: false, moveNode: vi.fn(), saveViewport: vi.fn(), reloadPosition: vi.fn(), reapplyPosition: vi.fn(), placeUnplaced: vi.fn(), placeSession: vi.fn(), removeNode: vi.fn(), resetPositions: vi.fn(), reload: vi.fn(), refresh: vi.fn() }) }));
+vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, onSelect }: { projection: CanvasProjection; onSelect: (id?: string) => void }) => <>{projection.nodes.map((node) => <button key={node.id} data-canvas-node-id={node.id} aria-label={node.session ? `Session: ${node.session.record.provider}` : 'Plan: PM-037 Canvas main'} type="button" onClick={() => onSelect(node.id)}>{node.session ? 'Session node' : 'Plan node'}</button>)}</> }));
 vi.mock('../features/canvas/CanvasWorkbench', () => ({ CanvasWorkbench: ({ selectedNode, onClose }: { selectedNode?: unknown; onClose: () => void }) => selectedNode ? <aside aria-label="Canvas Workbench"><button type="button" onClick={onClose}>Close Workbench</button></aside> : null }));
 
 describe('CanvasPage', () => {
@@ -25,9 +25,20 @@ describe('CanvasPage', () => {
 		expect(screen.getByTestId('canvas-ready')).toHaveTextContent('1 placed');
 		expect(screen.getByRole('status')).toHaveTextContent('Saved');
 	});
+
+	it('keeps a selected terminal session in the Canvas instead of opening the Workbench', () => {
+		canvasState.projection = sessionProjection();
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Session: codex' }));
+		expect(screen.queryByLabelText('Canvas Workbench')).not.toBeInTheDocument();
+	});
 });
 
 const workspace: WorkspaceConfig = { id: 'workspace-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '' };
 function projection(): CanvasProjection {
 	return { layout: { id: 'layout', workspaceId: workspace.id, branchKey: 'main', viewport: { x: 0, y: 0, zoom: 1 }, version: 1, createdAt: '', updatedAt: '' }, nodes: [{ id: 'plan:item-1', kind: 'plan', state: 'resolved', entityRef: { kind: 'plan', workspaceId: workspace.id, itemId: 'item-1', itemPath: 'plans/platform/PM-037', identifier: 'PM-037', branchKey: 'main' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, plan: { itemId: 'item-1', identifier: 'PM-037', title: 'Canvas', service: 'platform', status: 'in_progress', branch: 'main', editable: true, actions: {} } }], connections: [], unplaced: [] };
+}
+
+function sessionProjection(): CanvasProjection {
+	return { ...projection(), nodes: [{ id: 'session:session-1', kind: 'session', state: 'resolved', entityRef: { kind: 'session', workspaceId: workspace.id, sessionId: 'session-1', branchKey: 'main' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, session: { record: { id: 'session-1', workspaceId: workspace.id, provider: 'codex', intent: 'card_context', requestedBranch: 'main', state: 'running', startedAt: '', lastKnownAt: '', live: true } } }] };
 }

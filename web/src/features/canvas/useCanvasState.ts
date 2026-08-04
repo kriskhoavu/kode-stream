@@ -199,6 +199,25 @@ export function useCanvasState(workspaceId?: string) {
 		}
 	}, [setProjection]);
 
+	const placeSession = useCallback(async (sessionId: string) => {
+		const current = projectionRef.current;
+		if (!current || current.nodes.some((node) => node.entityRef.sessionId === sessionId)) return;
+		const entityRef = current.unplaced.find((candidate) => candidate.kind === 'session' && candidate.sessionId === sessionId);
+		if (!entityRef) return;
+		setError('');
+		try {
+			setProjection(await api.patchCanvasPlacements(current.layout.id, [{
+				nodeId: nodeID(entityRef),
+				entityRef,
+				position: deterministicPosition(current.nodes.length, 'session'),
+				collapsed: false,
+				expectedRevision: 0
+			}]));
+		} catch (caught) {
+			setError(messageFrom(caught));
+		}
+	}, [setProjection]);
+
 	const removeNode = useCallback(async (nodeId: string) => {
 		const current = projectionRef.current;
 		const node = current?.nodes.find((candidate) => candidate.id === nodeId);
@@ -249,7 +268,7 @@ export function useCanvasState(workspaceId?: string) {
 		}
 	}, [moveNode]);
 
-	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, arrangePlans, saveViewport, reloadPosition, reapplyPosition, placeUnplaced, removeNode, resetPositions, reload: load, refresh };
+	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, arrangePlans, saveViewport, reloadPosition, reapplyPosition, placeUnplaced, placeSession, removeNode, resetPositions, reload: load, refresh };
 }
 
 function overlayDirty(projection: CanvasProjection, dirty: Map<string, DirtyPlacement>): CanvasProjection {

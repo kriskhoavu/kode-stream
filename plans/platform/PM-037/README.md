@@ -156,8 +156,8 @@ hiding or removing a placement does not mutate the relationship source.
 ## Data Flow
 
 > Canvas route -> resolve workspace and branch context -> load placements -> resolve workspace, plan, session, Git, and
-> verification projections -> attach current action capabilities -> render nodes -> select node -> open focused panel or
-> existing full view.
+> verification projections -> attach current action capabilities -> render nodes -> select node -> open the focused
+> workspace/plan panel, expand the session terminal in place, or open an existing full view.
 
 > Drag end -> update affected placement locally -> debounced placement patch with expected placement revision -> Canvas
 > repository -> saved state.

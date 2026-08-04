@@ -40,8 +40,11 @@ cannot cross workspaces or silently rebind stale plans. See [[platform-branch-co
 <!-- keywords: session, metadata, process, branch, idempotency -->
 
 A launch includes expected workspace, branch, observed commit, and idempotency key. Repeated requests with one key start
-at most one process. Durable records retain bounded identity and lifecycle fields only. Live bindings remain in memory;
-startup reconciliation marks records without bindings interrupted. See [[platform-terminal-canvas-workflows]].
+at most one process. Durable records retain bounded identity and lifecycle fields only. Live bindings, channel grants,
+and xterm instances remain in memory; startup reconciliation marks records without bindings interrupted. A selected
+live session expands at its independently persisted Canvas position. Terminal input, selection, and scrolling are
+excluded from node drag and Canvas pan handling, while the session summary remains draggable. See
+[[platform-terminal-canvas-workflows]].
 
 ## Verification Freshness
 <!-- chunkId: platform-terminal-canvas-reference-verification -->

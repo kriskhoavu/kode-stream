@@ -108,3 +108,12 @@ sourceCount: 0
 - Pages created: none
 - Pages enriched: `wiki/branch-context-reference.md` (corrected existing PM-038 contract; sourceCount unchanged)
 - Files conformed: 0
+
+## [2026-08-04] correction | PM-037 Interactive Canvas Terminal Nodes
+<!-- chunkId: wiki-ingest-log-pm-037-interactive-terminal-node-correction -->
+<!-- keywords: PM-037, canvas, terminal node, workbench, session placement -->
+
+- Pages created: none
+- Pages enriched: `wiki/canvas-workflows.md`, `wiki/canvas-reference.md`, and
+  `wiki/e2e-testing/cross-domain/terminal-canvas.md` (corrected existing PM-037 behavior; sourceCount unchanged)
+- Files conformed: 0

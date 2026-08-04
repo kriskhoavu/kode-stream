@@ -22,6 +22,7 @@ PM-037.
 | F2    | Draggable semantic nodes and restored layout          | Frontend   | Complete |
 | F3    | Focused Workbench and session terminal                | Frontend   | Complete |
 | F4    | Git, verification, capability, and accessibility UX   | Frontend   | Complete |
+| F5    | Interactive terminal session nodes                    | Frontend   | Complete |
 | I1    | Browser journey, documentation, and final integration | Full stack | Complete |
 
 ## Backend Phases
@@ -195,6 +196,24 @@ PM-037.
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
 
 **Commit:** `PM-037: Complete Canvas status and accessible UX`
+
+---
+
+### Phase F5: Interactive Terminal Session Nodes
+
+**Deliverables:**
+
+- [x] Expand a selected live session node into an interactive terminal without opening the right Workbench.
+- [x] Keep one terminal connection owner and preserve the live process when the node is collapsed or another node is selected.
+- [x] Restrict Canvas dragging to the session summary while terminal input, selection, and scrolling remain interactive.
+- [x] Show durable ended or interrupted session details inside the selected session node.
+- [x] Keep **Cancel process** distinct from closing or removing the Canvas node.
+- [x] Place and select only the newly launched session instead of placing every unplaced Canvas entity.
+- [x] Add expansion, reattachment, cancellation, launch placement, and Workbench-isolation tests.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
+
+**Commit:** `PM-037: Embed terminal sessions in Canvas nodes`
 
 ## Integration Phase
 
