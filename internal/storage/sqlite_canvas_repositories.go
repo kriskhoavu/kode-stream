@@ -78,7 +78,7 @@ func (r *SQLiteCanvasRepository) Placements(layoutID string) ([]canvas.Placement
 	} else if !ok {
 		return nil, canvas.ErrNotFound
 	}
-	rows, err := querySQL(r.db, r.driver, `SELECT layout_id, node_id, entity_ref_json, x, y, collapsed, revision, updated_at FROM canvas_placements WHERE layout_id = ? ORDER BY node_id`, layoutID)
+	rows, err := querySQL(r.db, r.driver, `SELECT layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at FROM canvas_placements WHERE layout_id = ? ORDER BY node_id`, layoutID)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 		}
 		refJSON, _ := json.Marshal(placement.EntityRef)
 		if exists {
-			result, err := execTx(tx, r.driver, `UPDATE canvas_placements SET entity_ref_json = ?, x = ?, y = ?, collapsed = ?, revision = ?, updated_at = ? WHERE layout_id = ? AND node_id = ? AND revision = ?`, string(refJSON), placement.Position.X, placement.Position.Y, boolInt(placement.Collapsed), placement.Revision, formatTime(placement.UpdatedAt), layoutID, patch.NodeID, patch.ExpectedRevision)
+			result, err := execTx(tx, r.driver, `UPDATE canvas_placements SET entity_ref_json = ?, x = ?, y = ?, collapsed = ?, hidden = ?, revision = ?, updated_at = ? WHERE layout_id = ? AND node_id = ? AND revision = ?`, string(refJSON), placement.Position.X, placement.Position.Y, boolInt(placement.Collapsed), boolInt(placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt), layoutID, patch.NodeID, patch.ExpectedRevision)
 			if err != nil {
 				return nil, err
 			}
@@ -153,7 +153,7 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 				return nil, &canvas.PlacementConflictError{NodeIDs: []string{patch.NodeID}}
 			}
 		} else {
-			_, err := execTx(tx, r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, layoutID, patch.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, boolInt(placement.Collapsed), placement.Revision, formatTime(placement.UpdatedAt))
+			_, err := execTx(tx, r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, layoutID, patch.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, boolInt(placement.Collapsed), boolInt(placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt))
 			if err != nil {
 				return nil, err
 			}
@@ -170,7 +170,7 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 }
 
 func (r *SQLiteCanvasRepository) RemovePlacement(layoutID, nodeID string, expectedRevision int64) error {
-	result, err := execSQL(r.db, r.driver, `DELETE FROM canvas_placements WHERE layout_id = ? AND node_id = ? AND revision = ?`, layoutID, nodeID, expectedRevision)
+	result, err := execSQL(r.db, r.driver, `UPDATE canvas_placements SET hidden = ?, revision = revision + 1, updated_at = ? WHERE layout_id = ? AND node_id = ? AND revision = ?`, boolInt(true), formatTime(r.now().UTC()), layoutID, nodeID, expectedRevision)
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func (r *SQLiteCanvasRepository) ReplaceAll(snapshot canvas.Snapshot) error {
 	}
 	for _, placement := range snapshot.Placements {
 		refJSON, _ := json.Marshal(placement.EntityRef)
-		if _, err := execTx(tx, r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, placement.LayoutID, placement.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, boolInt(placement.Collapsed), placement.Revision, formatTime(placement.UpdatedAt)); err != nil {
+		if _, err := execTx(tx, r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, placement.LayoutID, placement.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, boolInt(placement.Collapsed), boolInt(placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt)); err != nil {
 			return err
 		}
 	}
@@ -267,8 +267,8 @@ func scanCanvasLayout(row sqlRow) (canvas.Layout, error) {
 func scanCanvasPlacement(row sqlRow) (canvas.Placement, error) {
 	var placement canvas.Placement
 	var refJSON, updatedAt string
-	var collapsed any
-	err := row.Scan(&placement.LayoutID, &placement.NodeID, &refJSON, &placement.Position.X, &placement.Position.Y, &collapsed, &placement.Revision, &updatedAt)
+	var collapsed, hidden any
+	err := row.Scan(&placement.LayoutID, &placement.NodeID, &refJSON, &placement.Position.X, &placement.Position.Y, &collapsed, &hidden, &placement.Revision, &updatedAt)
 	if err != nil {
 		return canvas.Placement{}, err
 	}
@@ -276,12 +276,13 @@ func scanCanvasPlacement(row sqlRow) (canvas.Placement, error) {
 		return canvas.Placement{}, err
 	}
 	placement.Collapsed = databaseBool(collapsed)
+	placement.Hidden = databaseBool(hidden)
 	placement.UpdatedAt = parseTime(updatedAt)
 	return placement, nil
 }
 
 func getPlacementTx(tx *sql.Tx, driver, layoutID, nodeID string) (canvas.Placement, bool, error) {
-	row := tx.QueryRow(rebindSQL(driver, `SELECT layout_id, node_id, entity_ref_json, x, y, collapsed, revision, updated_at FROM canvas_placements WHERE layout_id = ? AND node_id = ?`), layoutID, nodeID)
+	row := tx.QueryRow(rebindSQL(driver, `SELECT layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at FROM canvas_placements WHERE layout_id = ? AND node_id = ?`), layoutID, nodeID)
 	placement, err := scanCanvasPlacement(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return canvas.Placement{}, false, nil

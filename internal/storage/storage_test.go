@@ -112,8 +112,8 @@ func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 	if !health.OK {
 		t.Fatalf("health = %#v", health)
 	}
-	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 2 {
-		t.Fatalf("health = %#v, want sqlite version 2", health)
+	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 3 {
+		t.Fatalf("health = %#v, want sqlite version 3", health)
 	}
 	for _, table := range []string{"workspaces", "branch_scans", "indexed_items", "import_status", "canvas_layouts", "canvas_placements", "ai_session_records"} {
 		var name string
@@ -121,6 +121,10 @@ func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("table %s was not created: %v", table, err)
 		}
+	}
+	var hiddenColumn string
+	if err := state.SQLStore.db.QueryRow(`SELECT name FROM pragma_table_info('canvas_placements') WHERE name = 'hidden'`).Scan(&hiddenColumn); err != nil || hiddenColumn != "hidden" {
+		t.Fatalf("canvas placement hidden column was not created: %q %v", hiddenColumn, err)
 	}
 }
 

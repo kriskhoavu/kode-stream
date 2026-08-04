@@ -59,6 +59,21 @@ func TestCanvasServiceSeedsProjectsAndKeepsPlacementIndependent(t *testing.T) {
 	if findProjectedNode(t, projection, planNode.ID).Revision != planRevision {
 		t.Fatal("viewport save changed placement revision")
 	}
+	sessionNode := findProjectedNode(t, projection, sessionNodeID(session.ID))
+	projection, err = service.RemovePlacement("", projection.Layout.ID, sessionNode.ID, sessionNode.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range projection.Nodes {
+		if node.ID == sessionNode.ID {
+			t.Fatal("removed session remained projected")
+		}
+	}
+	for _, ref := range projection.Unplaced {
+		if ref.SessionID == session.ID {
+			t.Fatal("removed session returned as unplaced")
+		}
+	}
 
 	newItem := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-3", WorkspaceID: workspaceConfig.ID, WorkspaceName: workspaceConfig.Name, Branch: "main", Commit: initialItems[0].Commit, SourceMode: "working_tree", Editable: true, Scope: "platform", Identifier: "PM-003", Title: "New plan", Status: models.StatusDraft, ItemPath: "plans/platform/PM-003"}}
 	all := append(append([]models.ItemDetail(nil), initialItems...), newItem)

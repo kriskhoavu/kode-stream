@@ -127,7 +127,9 @@ func (r *FileRepository) RemovePlacement(layoutID, nodeID string, expectedRevisi
 			if placement.Revision != expectedRevision {
 				return &PlacementConflictError{NodeIDs: []string{nodeID}}
 			}
-			state.Placements = append(state.Placements[:i], state.Placements[i+1:]...)
+			state.Placements[i].Hidden = true
+			state.Placements[i].Revision++
+			state.Placements[i].UpdatedAt = r.now().UTC()
 			return r.save(state)
 		}
 	}

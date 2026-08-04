@@ -18,12 +18,14 @@ PM-037.
 | B2    | Layout, placement, and session repositories           | Backend    | Complete |
 | B3    | Durable session lifecycle and branch-safe launch      | Backend    | Complete |
 | B4    | Verification freshness and Canvas API                 | Backend    | Complete |
+| B5    | Durable hidden placement semantics                    | Backend    | Complete |
 | F1    | Canvas route and placement state                      | Frontend   | Complete |
 | F2    | Draggable semantic nodes and restored layout          | Frontend   | Complete |
 | F3    | Focused Workbench and session terminal                | Frontend   | Complete |
 | F4    | Git, verification, capability, and accessibility UX   | Frontend   | Complete |
 | F5    | Interactive terminal session nodes                    | Frontend   | Complete |
 | F6    | Stable embedded terminal channel lifecycle            | Frontend   | Complete |
+| F7    | Explicit session terminal disclosure                  | Frontend   | Pending  |
 | I1    | Browser journey, documentation, and final integration | Full stack | Complete |
 
 ## Backend Phases
@@ -113,6 +115,21 @@ PM-037.
 **Verification:** `go test ./internal/canvas ./internal/verification ./internal/git ./internal/server/api`
 
 **Commit:** `PM-037: Resolve Canvas state and verification freshness`
+
+---
+
+### Phase B5: Durable Hidden Placement Semantics
+
+**Deliverables:**
+
+- [x] Retain a hidden placement tombstone when a node is removed from Canvas.
+- [x] Exclude hidden placements from rendered nodes and from **Place new items** candidates.
+- [x] Persist hidden placement state in data-dir snapshots and the SQL datastore.
+- [x] Add the SQL migration and repository, service, and API regression tests.
+
+**Verification:** `go test ./internal/canvas ./internal/storage ./internal/server/api`
+
+**Commit:** `PM-037: Preserve removed Canvas placements`
 
 ## Frontend Phases
 
@@ -230,6 +247,23 @@ PM-037.
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-session web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
 
 **Commit:** `PM-037: Stabilize embedded terminal channels`
+
+---
+
+### Phase F7: Explicit Session Terminal Disclosure
+
+**Deliverables:**
+
+- [ ] Select a session without changing whether its terminal is expanded.
+- [ ] Add an explicit top-right session action to expand or collapse the terminal.
+- [ ] Persist disclosure state through the existing placement `collapsed` field.
+- [ ] Keep terminal controls isolated from Canvas selection and dragging.
+- [ ] Rename the placement action so it clearly applies only to newly discovered nodes.
+- [ ] Add selection, disclosure, persistence, and restored-layout tests.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx`
+
+**Commit:** `PM-037: Add explicit session terminal disclosure`
 
 ## Integration Phase
 

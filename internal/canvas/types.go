@@ -49,6 +49,7 @@ type Placement struct {
 	EntityRef EntityRef `json:"entityRef" yaml:"entityRef"`
 	Position  Position  `json:"position" yaml:"position"`
 	Collapsed bool      `json:"collapsed" yaml:"collapsed"`
+	Hidden    bool      `json:"hidden,omitempty" yaml:"hidden,omitempty"`
 	Revision  int64     `json:"revision" yaml:"revision"`
 	UpdatedAt time.Time `json:"updatedAt" yaml:"updatedAt"`
 }

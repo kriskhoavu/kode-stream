@@ -104,6 +104,24 @@ func TestCanvasAPIDefaultProjectionPlacementConflictAndViewportIndependence(t *t
 	if after.Layout.Version != projection.Layout.Version+1 || after.Nodes[0].Revision != projection.Nodes[0].Revision {
 		t.Fatalf("before=%#v after=%#v", projection, after)
 	}
+	var planNode appcanvas.ProjectedNode
+	for _, node := range after.Nodes {
+		if node.Kind == appcanvas.EntityPlan {
+			planNode = node
+		}
+	}
+	removed := httptest.NewRecorder()
+	handler.ServeHTTP(removed, httptest.NewRequest(http.MethodDelete, "/api/canvas/layouts/"+projection.Layout.ID+"/placements/"+planNode.ID+"?expectedRevision=1", nil))
+	if removed.Code != http.StatusOK {
+		t.Fatalf("remove status=%d body=%s", removed.Code, removed.Body.String())
+	}
+	var hidden appcanvas.Projection
+	if err := json.Unmarshal(removed.Body.Bytes(), &hidden); err != nil {
+		t.Fatal(err)
+	}
+	if len(hidden.Nodes) != 1 || len(hidden.Unplaced) != 0 {
+		t.Fatalf("removed placement returned to projection: %#v", hidden)
+	}
 }
 
 func apiCanvasGit(t *testing.T, root string, args ...string) {

@@ -295,6 +295,9 @@ func (s *Service) project(layout Layout, workspaceConfig models.WorkspaceConfig,
 	nodes := make([]ProjectedNode, 0, len(placements))
 	for _, placement := range placements {
 		placed[placement.NodeID] = true
+		if placement.Hidden {
+			continue
+		}
 		node := ProjectedNode{ID: placement.NodeID, Kind: placement.EntityRef.Kind, State: NodeResolved, EntityRef: placement.EntityRef, Position: placement.Position, Collapsed: placement.Collapsed, Revision: placement.Revision}
 		if readForbidden {
 			node.State = NodeForbidden

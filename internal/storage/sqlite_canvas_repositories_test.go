@@ -32,6 +32,13 @@ func TestSQLiteCanvasAndSessionRepositoryContract(t *testing.T) {
 	if !errors.As(err, &conflict) {
 		t.Fatalf("error = %v, want placement conflict", err)
 	}
+	if err := state.Canvas.RemovePlacement(layout.ID, "workspace", 1); err != nil {
+		t.Fatal(err)
+	}
+	placements, err = state.Canvas.Placements(layout.ID)
+	if err != nil || len(placements) != 1 || !placements[0].Hidden || placements[0].Revision != 2 {
+		t.Fatalf("hidden placements = %#v err=%v", placements, err)
+	}
 	updatedLayout, err := state.Canvas.SaveViewport(layout.ID, layout.Version, canvas.Viewport{X: 1, Y: 2, Zoom: 1.25})
 	if err != nil || updatedLayout.Version != 2 {
 		t.Fatalf("layout = %#v err=%v", updatedLayout, err)

@@ -35,6 +35,13 @@ func TestFileRepositoryResolvesAndPatchesIndependentPlacements(t *testing.T) {
 	if err != nil || len(placements) != 2 || placements[1].Position.X != 50 || placements[0].Position.X != 30 {
 		t.Fatalf("placements = %#v err=%v", placements, err)
 	}
+	if err := repository.RemovePlacement(layout.ID, "plan", 1); err != nil {
+		t.Fatal(err)
+	}
+	placements, err = repository.Placements(layout.ID)
+	if err != nil || len(placements) != 2 || !placements[0].Hidden || placements[0].Revision != 2 {
+		t.Fatalf("hidden placements = %#v err=%v", placements, err)
+	}
 }
 
 func TestFileRepositoryRejectsConflictsAndInvalidReferences(t *testing.T) {

@@ -511,6 +511,10 @@ exit_code INTEGER,
 last_known_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ai_session_records_workspace_idempotency ON ai_session_records (workspace_id, idempotency_key) WHERE idempotency_key <> '';`,
+	}, {
+		Version: 3,
+		Name:    "hidden_canvas_placements",
+		SQL:     `ALTER TABLE canvas_placements ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;`,
 	}}
 }
 
@@ -530,6 +534,7 @@ func postgresMigrations() []Migration {
 			"clone_path_managed INTEGER", "clone_path_managed BOOLEAN",
 			"editable INTEGER", "editable BOOLEAN",
 			"collapsed INTEGER", "collapsed BOOLEAN",
+			"hidden INTEGER", "hidden BOOLEAN",
 		).Replace(migrations[index].SQL)
 	}
 	return migrations
