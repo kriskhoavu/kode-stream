@@ -110,7 +110,8 @@ are not implementation deliverables.
 - [x] Add Canvas default resolve, get, placement patch, and viewport patch handlers.
 - [x] Resolve workspace, branch plan, durable session, live-binding, Git, and verification projections in bounded batches.
 - [x] Add deterministic initial placements plus unplaced projections for new plans and sessions.
-- [x] Render repository and application relationships as response-only derived connections.
+- [x] Render plan-to-session application relationships as response-only derived connections; workspace containment
+  remains a section affordance rather than a non-renderable edge.
 - [x] Return stale and forbidden references without deleting placements or leaking former titles.
 - [x] Add API tests for branch scoping, per-placement conflicts, viewport independence, new unplaced work, stale references,
   capability states, safe sessions, and verification freshness.
@@ -157,7 +158,7 @@ are not implementation deliverables.
 
 - [x] Add Canvas, placement, branch-aware entity reference, action capability, safe session, and verification freshness
   API types.
-- [x] Add lazy-loaded `/canvas` routing for the active workspace and selected branch.
+- [x] Add lazy-loaded `/canvas` routing for the active workspace and current checkout branch.
 - [x] Add **Workbench** navigation for Canvas outside the Chrome extension surface.
 - [x] Implement default resolve/load and branch-context switching.
 - [x] Implement optimistic node positions, dirty-node tracking, debounced placement patches, and bounded retry.
@@ -179,7 +180,7 @@ are not implementation deliverables.
 - [x] Add the React Flow viewport with visible pan, zoom, fit, selection, and reset controls.
 - [x] Add memoized plan and session node renderers plus non-node workspace/service section frames.
 - [x] Make plan and session nodes draggable; make section movement explicitly translate only its member placements.
-- [x] Render repository and application connections without handles or edit/delete controls.
+- [x] Render plan-to-session application connections without handles or edit/delete controls.
 - [x] Implement deterministic first placement, restored saved positions, and new-node candidates.
 - [x] Implement reset-layout preview and confirmation.
 - [x] Add node search and focus by title, identifier, branch, and session state.

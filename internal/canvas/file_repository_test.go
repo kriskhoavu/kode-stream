@@ -15,12 +15,12 @@ func TestFileRepositoryResolvesAndPatchesIndependentPlacements(t *testing.T) {
 	repository := NewFileRepository(filepath.Join(t.TempDir(), "canvases.yaml"))
 	now := time.Date(2026, 8, 3, 10, 0, 0, 0, time.UTC)
 	repository.now = func() time.Time { return now }
-	layout, err := repository.ResolveDefault("", "workspace-1", "main")
-	if err != nil {
+	layout, createdDefault, err := repository.ResolveDefault("", "workspace-1", "main")
+	if err != nil || !createdDefault {
 		t.Fatal(err)
 	}
-	again, err := repository.ResolveDefault("", "workspace-1", "main")
-	if err != nil || again.ID != layout.ID {
+	again, createdAgain, err := repository.ResolveDefault("", "workspace-1", "main")
+	if err != nil || createdAgain || again.ID != layout.ID {
 		t.Fatalf("resolved layout = %#v err=%v", again, err)
 	}
 	created, err := repository.PatchPlacements(layout.ID, []PlacementPatch{
@@ -41,8 +41,12 @@ func TestFileRepositoryResolvesAndPatchesIndependentPlacements(t *testing.T) {
 	if err := repository.RemovePlacement(layout.ID, "plan", 1); err != nil {
 		t.Fatal(err)
 	}
+	patched, err := repository.PatchPlacements(layout.ID, []PlacementPatch{{NodeID: "plan", EntityRef: EntityRef{Kind: EntityWorkspace, WorkspaceID: "workspace-1"}, Position: Position{X: 70, Y: 80}, ExpectedRevision: 2}})
+	if err != nil || len(patched) != 1 || patched[0].EntityRef.Kind != EntityPlan || !patched[0].Hidden {
+		t.Fatalf("patched hidden placement = %#v err=%v", patched, err)
+	}
 	placements, err = repository.Placements(layout.ID)
-	if err != nil || len(placements) != 2 || !placements[0].Hidden || placements[0].Revision != 2 {
+	if err != nil || len(placements) != 2 || !placements[0].Hidden || placements[0].Revision != 3 {
 		t.Fatalf("hidden placements = %#v err=%v", placements, err)
 	}
 }
@@ -78,7 +82,7 @@ func TestFileRepositoryMigratesLegacySessionsToCollapsedOnce(t *testing.T) {
 
 func TestFileRepositoryRejectsConflictsAndInvalidReferences(t *testing.T) {
 	repository := NewFileRepository(filepath.Join(t.TempDir(), "canvases.yaml"))
-	layout, err := repository.ResolveDefault("", "workspace-1", "main")
+	layout, _, err := repository.ResolveDefault("", "workspace-1", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +103,7 @@ func TestFileRepositoryRejectsConflictsAndInvalidReferences(t *testing.T) {
 
 func TestFileRepositoryKeepsViewportVersionIndependent(t *testing.T) {
 	repository := NewFileRepository(filepath.Join(t.TempDir(), "canvases.yaml"))
-	layout, err := repository.ResolveDefault("", "workspace-1", "main")
+	layout, _, err := repository.ResolveDefault("", "workspace-1", "main")
 	if err != nil {
 		t.Fatal(err)
 	}

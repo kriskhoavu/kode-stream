@@ -21,24 +21,24 @@ func NewFileRepository(path string) *FileRepository {
 	return &FileRepository{path: path, now: time.Now}
 }
 
-func (r *FileRepository) ResolveDefault(ownerUserID, workspaceID, branchKey string) (Layout, error) {
+func (r *FileRepository) ResolveDefault(ownerUserID, workspaceID, branchKey string) (Layout, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	state, err := r.load()
 	if err != nil {
-		return Layout{}, err
+		return Layout{}, false, err
 	}
 	for _, layout := range state.Layouts {
 		if layout.OwnerUserID == ownerUserID && layout.WorkspaceID == workspaceID && layout.BranchKey == branchKey {
-			return layout, nil
+			return layout, false, nil
 		}
 	}
 	layout, err := NewLayout(ownerUserID, workspaceID, branchKey, r.now().UTC())
 	if err != nil {
-		return Layout{}, err
+		return Layout{}, false, err
 	}
 	state.Layouts = append(state.Layouts, layout)
-	return layout, r.save(state)
+	return layout, true, r.save(state)
 }
 
 func (r *FileRepository) GetLayout(id string) (Layout, bool, error) {
@@ -266,9 +266,8 @@ func applyPlacementPatches(state Snapshot, layout Layout, patches []PlacementPat
 		if index, ok := existing[patch.NodeID]; ok {
 			current := state.Placements[index]
 			placement.Revision = current.Revision + 1
-			if placement.EntityRef.Kind == "" {
-				placement.EntityRef = current.EntityRef
-			}
+			placement.EntityRef = current.EntityRef
+			placement.Hidden = current.Hidden
 			if err := validatePlacement(layout, placement); err != nil {
 				return nil, state, err
 			}

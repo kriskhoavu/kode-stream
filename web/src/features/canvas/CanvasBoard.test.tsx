@@ -166,6 +166,13 @@ describe('CanvasBoard', () => {
 		expect(second.getByRole('button', { name: /Remove from Canvas/ })).toBeDisabled();
 	});
 
+	it('moves sections by keyboard', () => {
+		const onMoveSection = vi.fn();
+		renderBoard(baseProjection(), { sections: [{ id: 'section-1', title: 'Assistant work', position: { x: 320, y: -30 }, width: 620, height: 360, nodeIds: ['plan:item-1'] }], onMoveSection });
+		fireEvent.keyDown(screen.getByRole('button', { name: 'Move section Assistant work' }), { key: 'ArrowRight' });
+		expect(onMoveSection).toHaveBeenCalledWith('section-1', { x: 332, y: -30 }, { x: 12, y: 0 });
+	});
+
 	it.each([25, 100, 300])('keeps %i placements virtualized', (count) => {
 		const template = baseProjection().nodes[1];
 		const nodes = Array.from({ length: count }, (_, index): CanvasNode => ({ ...template, id: `plan:${index}`, entityRef: { ...template.entityRef, itemId: String(index) }, position: { x: index * 10, y: index * 5 }, plan: { ...template.plan!, itemId: String(index), identifier: `PM-${index}` } }));

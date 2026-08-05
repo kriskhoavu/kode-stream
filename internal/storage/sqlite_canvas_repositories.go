@@ -24,17 +24,22 @@ type SQLiteSessionRecordRepository struct {
 	driver string
 }
 
-func (r *SQLiteCanvasRepository) ResolveDefault(ownerUserID, workspaceID, branchKey string) (canvas.Layout, error) {
+func (r *SQLiteCanvasRepository) ResolveDefault(ownerUserID, workspaceID, branchKey string) (canvas.Layout, bool, error) {
 	created, err := canvas.NewLayout(ownerUserID, workspaceID, branchKey, r.now().UTC())
 	if err != nil {
-		return canvas.Layout{}, err
+		return canvas.Layout{}, false, err
 	}
 	viewportJSON, _ := json.Marshal(created.Viewport)
-	_, err = execSQL(r.db, r.driver, `INSERT INTO canvas_layouts (id, owner_user_id, workspace_id, branch_key, viewport_json, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, workspace_id, branch_key) DO NOTHING`, created.ID, created.OwnerUserID, created.WorkspaceID, created.BranchKey, string(viewportJSON), created.Version, formatTime(created.CreatedAt), formatTime(created.UpdatedAt))
+	result, err := execSQL(r.db, r.driver, `INSERT INTO canvas_layouts (id, owner_user_id, workspace_id, branch_key, viewport_json, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, workspace_id, branch_key) DO NOTHING`, created.ID, created.OwnerUserID, created.WorkspaceID, created.BranchKey, string(viewportJSON), created.Version, formatTime(created.CreatedAt), formatTime(created.UpdatedAt))
 	if err != nil {
-		return canvas.Layout{}, err
+		return canvas.Layout{}, false, err
 	}
-	return r.getDefault(ownerUserID, workspaceID, branchKey)
+	layout, err := r.getDefault(ownerUserID, workspaceID, branchKey)
+	if err != nil {
+		return canvas.Layout{}, false, err
+	}
+	rows, err := result.RowsAffected()
+	return layout, err == nil && rows == 1, err
 }
 
 func (r *SQLiteCanvasRepository) getDefault(ownerUserID, workspaceID, branchKey string) (canvas.Layout, error) {
@@ -131,9 +136,8 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 		placement := canvas.Placement{LayoutID: layoutID, NodeID: patch.NodeID, EntityRef: patch.EntityRef, Position: patch.Position, Collapsed: patch.Collapsed, Revision: 1, UpdatedAt: r.now().UTC()}
 		if exists {
 			placement.Revision = current.Revision + 1
-			if placement.EntityRef.Kind == "" {
-				placement.EntityRef = current.EntityRef
-			}
+			placement.EntityRef = current.EntityRef
+			placement.Hidden = current.Hidden
 		} else {
 			count++
 			if count > canvas.MaxPlacements {

@@ -1,5 +1,5 @@
 plan:
-  status: review
+  status: done
   wiki_enriched: true
   e2e-runbook: true
 automation-test:

@@ -30,7 +30,6 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 			const defaultSectionVersion = '3';
 			if (localStorage.getItem(initializedKey) !== defaultSectionVersion) {
 				setSections([...defaultServiceGroups.sections, ...existing.filter((section) => !isDefaultSection(section))]);
-				defaultServiceGroups.positions.forEach(({ id, position }) => canvas.moveNode(id, position));
 			} else {
 				setSections(existing);
 			}

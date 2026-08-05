@@ -19,6 +19,7 @@ export function useCanvasState(workspaceId?: string) {
 	const dirtyRef = useRef(new Map<string, DirtyPlacement>());
 	const mutationRef = useRef(0);
 	const viewportTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const placementTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const automaticPlacementRef = useRef<Promise<CanvasProjection> | undefined>(undefined);
 
 	const setProjection = useCallback((next: CanvasProjection | undefined) => {
@@ -27,6 +28,18 @@ export function useCanvasState(workspaceId?: string) {
 		}
 		projectionRef.current = next;
 		setProjectionState(next);
+	}, []);
+	const discardPendingChangesFor = useCallback((next: CanvasProjection) => {
+		const current = projectionRef.current;
+		if (!current || current.layout.id === next.layout.id) return false;
+		const discarded = dirtyRef.current.size > 0;
+		dirtyRef.current.clear();
+		if (placementTimer.current) clearTimeout(placementTimer.current);
+		if (viewportTimer.current) clearTimeout(viewportTimer.current);
+		setConflicts([]);
+		setSaveStatus('idle');
+		setDirtyVersion((version) => version + 1);
+		return discarded;
 	}, []);
 
 	const placeNewNodes = useCallback(async (projection: CanvasProjection) => {
@@ -65,6 +78,7 @@ export function useCanvasState(workspaceId?: string) {
 		setError('');
 		try {
 			const next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId));
+			discardPendingChangesFor(next);
 			dirtyRef.current.clear();
 			setConflicts([]);
 			setProjection(next);
@@ -73,23 +87,26 @@ export function useCanvasState(workspaceId?: string) {
 		} finally {
 			setLoading(false);
 		}
-	}, [placeNewNodes, setProjection, workspaceId]);
+	}, [discardPendingChangesFor, placeNewNodes, setProjection, workspaceId]);
 
 	const refresh = useCallback(async () => {
-		const current = projectionRef.current;
-		if (!current) return;
+		if (!workspaceId) return;
 		try {
-			setProjection(await placeNewNodes(await api.canvasLayout(current.layout.id)));
-			setError('');
+			// Re-resolve the default layout because a checkout can change between refreshes.
+			const next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId));
+			const discarded = discardPendingChangesFor(next);
+			setProjection(next);
+			setError(discarded ? 'Unsaved Canvas moves were discarded after the checkout changed.' : '');
 		} catch (caught) {
 			setError(messageFrom(caught));
 		}
-	}, [placeNewNodes, setProjection]);
+	}, [discardPendingChangesFor, placeNewNodes, setProjection, workspaceId]);
 
 	useEffect(() => {
 		void load();
 		return () => {
 			if (viewportTimer.current) clearTimeout(viewportTimer.current);
+			if (placementTimer.current) clearTimeout(placementTimer.current);
 		};
 	}, [load]);
 
@@ -146,8 +163,10 @@ export function useCanvasState(workspaceId?: string) {
 
 	useEffect(() => {
 		if (!projection?.layout.id || dirtyRef.current.size === 0) return;
-		const timer = setTimeout(() => void flushPlacements(), 350);
-		return () => clearTimeout(timer);
+		placementTimer.current = setTimeout(() => void flushPlacements(), 350);
+		return () => {
+			if (placementTimer.current) clearTimeout(placementTimer.current);
+		};
 	}, [dirtyVersion, flushPlacements, projection?.layout.id]);
 
 	const dirtyCount = dirtyRef.current.size;

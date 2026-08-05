@@ -33,7 +33,7 @@ func TestCanvasServiceSeedsProjectsAndKeepsPlacementIndependent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(projection.Nodes) != 4 || len(projection.Connections) != 3 || len(projection.Unplaced) != 0 {
+	if len(projection.Nodes) != 4 || len(projection.Connections) != 1 || len(projection.Unplaced) != 0 {
 		t.Fatalf("projection=%#v", projection)
 	}
 	for _, connection := range projection.Connections {
@@ -48,6 +48,9 @@ func TestCanvasServiceSeedsProjectsAndKeepsPlacementIndependent(t *testing.T) {
 		t.Fatal("new session placement was not collapsed")
 	}
 	planPosition := planNode.Position
+	if _, err := service.PatchPlacements("", projection.Layout.ID, []PlacementPatch{{NodeID: "plan:bogus", EntityRef: EntityRef{Kind: EntityPlan, WorkspaceID: workspaceConfig.ID, ItemID: "bogus", ItemPath: "plans/platform/bogus", BranchKey: "main"}, Position: Position{X: 1, Y: 2}}}); err == nil {
+		t.Fatal("accepted a non-resolving plan placement")
+	}
 	projection, err = service.PatchPlacements("", projection.Layout.ID, []PlacementPatch{{NodeID: workspaceNode.ID, EntityRef: workspaceNode.EntityRef, Position: Position{X: 99, Y: 77}, ExpectedRevision: workspaceNode.Revision}})
 	if err != nil {
 		t.Fatal(err)

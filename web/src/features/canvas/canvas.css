@@ -35,6 +35,9 @@
 .canvas-section-boundary span { font-size: 11px; white-space: nowrap; }
 .canvas-section-boundary button { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted); }
 .canvas-section-boundary button:hover { background: var(--panel-soft); color: var(--danger); }
+.canvas-section-boundary .canvas-section-move-handle { display: flex; align-items: center; gap: 8px; width: auto; height: auto; padding: 0; color: var(--muted); cursor: grab; }
+.canvas-section-boundary .canvas-section-move-handle:hover, .canvas-section-boundary .canvas-section-move-handle:focus-visible { background: transparent; color: var(--muted); outline: 2px solid var(--focus); outline-offset: 3px; }
+.canvas-section-boundary .canvas-section-move-handle:active { cursor: grabbing; }
 .canvas-semantic-node.expanded.kind-session { display: flex; flex-direction: column; width: 660px; min-height: 500px; }
 .canvas-node-select-target { cursor: grab; }
 .canvas-node-select-target:active { cursor: grabbing; }

@@ -16,6 +16,7 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 	const [e2eRunbooks, setE2ERunbooks] = useState<{ runbooks: E2ERunbook[]; diagnostic?: string }>({ runbooks: [] });
 	const [error, setError] = useState('');
 	const pendingKey = useRef('');
+	const verificationPollRef = useRef(0);
 	const workbenchRef = useRef<HTMLElement>(null);
 	const workspaceNode = projection.nodes.find((node) => node.kind === 'workspace')?.workspace;
 
@@ -37,11 +38,25 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 	}, [itemId]);
 
 	useEffect(() => {
+		verificationPollRef.current += 1;
 		setRightPanelTab('info');
 		setCollapsed(false);
 		setVerificationJob(undefined);
 		void refreshE2ERunbooks();
+		return () => { verificationPollRef.current += 1; };
 	}, [itemId, refreshE2ERunbooks]);
+
+	const waitForVerification = async (job: VerificationJob, pollID: number) => {
+		let current = job;
+		for (let attempt = 0; attempt < 60 && (current.status === 'queued' || current.status === 'running'); attempt += 1) {
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+			if (verificationPollRef.current !== pollID) return;
+			current = await api.verificationJob(verificationContext!.id, current.id);
+			if (verificationPollRef.current !== pollID) return;
+			setVerificationJob(current);
+			await Promise.resolve(onReload());
+		}
+	};
 
 	const completeEmbeddedLaunch = async (result: EmbeddedAISessionResult) => {
 		if (pendingKey.current) return;
@@ -69,19 +84,16 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 		if (!verificationContext || verificationCapability?.state !== 'available' || verifying) return;
 		setVerifying(true);
 		setError('');
+		const pollID = ++verificationPollRef.current;
 		try {
 			let job = await api.createVerificationJob(verificationContext.id, { profile, trigger: 'manual_checkpoint', terminalMode: 'embedded' });
 			setVerificationJob(job);
 			await Promise.resolve(onReload());
-			for (let attempt = 0; attempt < 60 && (job.status === 'queued' || job.status === 'running'); attempt += 1) {
-				await new Promise((resolve) => setTimeout(resolve, 1000));
-				job = await api.verificationJob(verificationContext.id, job.id);
-				await Promise.resolve(onReload());
-			}
+			await waitForVerification(job, pollID);
 		} catch (caught) {
 			setError(caught instanceof Error ? caught.message : 'Verification could not run.');
 		} finally {
-			setVerifying(false);
+			if (verificationPollRef.current === pollID) setVerifying(false);
 		}
 	};
 	const rerunVerification = async () => {
@@ -89,27 +101,32 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 		if (!verificationContext || !job || verifying) return;
 		setVerifying(true);
 		setError('');
+		const pollID = ++verificationPollRef.current;
 		try {
-			setVerificationJob(await api.rerunVerificationJob(verificationContext.id, job.id));
+			const next = await api.rerunVerificationJob(verificationContext.id, job.id);
+			setVerificationJob(next);
 			await Promise.resolve(onReload());
+			await waitForVerification(next, pollID);
 		} catch (caught) {
 			setError(caught instanceof Error ? caught.message : 'Verification could not be rerun.');
 		} finally {
-			setVerifying(false);
+			if (verificationPollRef.current === pollID) setVerifying(false);
 		}
 	};
 	const runAutomationVerification = async (input: { environment: string; displayMode: AutomationDisplayMode; selectedSpecs: string[] }) => {
 		if (!verificationContext || verificationCapability?.state !== 'available' || verifying || input.selectedSpecs.length === 0) return;
 		setVerifying(true);
 		setError('');
+		const pollID = ++verificationPollRef.current;
 		try {
 			const job = await api.createVerificationJob(verificationContext.id, { mode: 'automation', ...input, trigger: 'manual_checkpoint', terminalMode: 'embedded' });
 			setVerificationJob(job);
 			await Promise.resolve(onReload());
+			await waitForVerification(job, pollID);
 		} catch (caught) {
 			setError(caught instanceof Error ? caught.message : 'Automation verification could not run.');
 		} finally {
-			setVerifying(false);
+			if (verificationPollRef.current === pollID) setVerifying(false);
 		}
 	};
 	const startResize = (event: React.PointerEvent<HTMLButtonElement>) => {

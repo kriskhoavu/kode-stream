@@ -19,7 +19,7 @@ func TestSQLiteCanvasAndSessionRepositoryContract(t *testing.T) {
 	}
 	defer state.SQLStore.Close()
 
-	layout, err := state.Canvas.ResolveDefault("", "workspace-1", "main")
+	layout, _, err := state.Canvas.ResolveDefault("", "workspace-1", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,8 +35,12 @@ func TestSQLiteCanvasAndSessionRepositoryContract(t *testing.T) {
 	if err := state.Canvas.RemovePlacement(layout.ID, "workspace", 1); err != nil {
 		t.Fatal(err)
 	}
+	patched, err := state.Canvas.PatchPlacements(layout.ID, []canvas.PlacementPatch{{NodeID: "workspace", EntityRef: canvas.EntityRef{Kind: canvas.EntityPlan, WorkspaceID: "workspace-1", ItemID: "item-1", ItemPath: "plans/one", BranchKey: "main"}, Position: canvas.Position{X: 56, Y: 78}, ExpectedRevision: 2}})
+	if err != nil || len(patched) != 1 || patched[0].EntityRef.Kind != canvas.EntityWorkspace || !patched[0].Hidden {
+		t.Fatalf("patched hidden placement = %#v err=%v", patched, err)
+	}
 	placements, err = state.Canvas.Placements(layout.ID)
-	if err != nil || len(placements) != 1 || !placements[0].Hidden || placements[0].Revision != 2 {
+	if err != nil || len(placements) != 1 || !placements[0].Hidden || placements[0].Revision != 3 {
 		t.Fatalf("hidden placements = %#v err=%v", placements, err)
 	}
 	updatedLayout, err := state.Canvas.SaveViewport(layout.ID, layout.Version, canvas.Viewport{X: 1, Y: 2, Zoom: 1.25})

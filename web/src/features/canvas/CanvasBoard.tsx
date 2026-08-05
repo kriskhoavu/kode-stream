@@ -188,7 +188,8 @@ function CanvasSearchViewport({ query }: { query: string }) {
 	useEffect(() => {
 		if (previousQuery.current === query) return;
 		previousQuery.current = query;
-		const frame = requestAnimationFrame(() => void fitView({ padding: 0.22, maxZoom: 1.15, duration: 180 }));
+		const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		const frame = requestAnimationFrame(() => void fitView({ padding: 0.22, maxZoom: 1.15, duration: reduceMotion ? 0 : 180 }));
 		return () => cancelAnimationFrame(frame);
 	}, [fitView, query]);
 	return null;
@@ -216,7 +217,18 @@ function CanvasSectionNode({ data }: NodeProps<CanvasFlowNode>) {
 		window.addEventListener('pointerup', finish);
 	};
 	const sectionKind = section.id === 'workspace-group' ? 'workspace' : section.id.startsWith('service-') ? 'service' : 'custom';
-	return <section className={`canvas-section-boundary ${sectionKind}`} aria-label={`Section: ${section.title}`}><header className="nodrag nopan" onPointerDown={startMove}><strong className={`canvas-section-title ${sectionKind}`}>{section.title}</strong><span>{section.nodeIds.length} nodes</span><button className="nodrag nopan" type="button" aria-label={`Remove section ${section.title}`} onClick={() => data.onRemoveSection?.(section.id)}><X size={13} /></button></header></section>;
+	const moveByKeyboard = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+		if (!data.layoutAvailable || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+		event.preventDefault();
+		const step = event.shiftKey ? 1 : 12;
+		const position = { ...section.position };
+		if (event.key === 'ArrowLeft') position.x -= step;
+		if (event.key === 'ArrowRight') position.x += step;
+		if (event.key === 'ArrowUp') position.y -= step;
+		if (event.key === 'ArrowDown') position.y += step;
+		data.onMoveSection?.(section.id, position, { x: position.x - section.position.x, y: position.y - section.position.y });
+	};
+	return <section className={`canvas-section-boundary ${sectionKind}`} aria-label={`Section: ${section.title}`}><header className="nodrag nopan"><button className="canvas-section-move-handle nodrag nopan" type="button" aria-label={`Move section ${section.title}`} onPointerDown={startMove} onKeyDown={moveByKeyboard}><strong className={`canvas-section-title ${sectionKind}`}>{section.title}</strong><span>{section.nodeIds.length} nodes</span></button><button className="nodrag nopan" type="button" aria-label={`Remove section ${section.title}`} onClick={() => data.onRemoveSection?.(section.id)}><X size={13} /></button></header></section>;
 }
 
 function CanvasGraphControls({ layoutAvailable, layoutMessage, onArrange, serviceGridColumns, onReset, isFullscreen, onToggleFullscreen }: { layoutAvailable: boolean; layoutMessage?: string; onArrange: (grouping: 'status' | 'service' | 'service_status' | 'service_grid') => void; serviceGridColumns: number; onReset: () => void; isFullscreen: boolean; onToggleFullscreen: () => void }) {

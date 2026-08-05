@@ -127,22 +127,11 @@ func (s *Service) ResolveDefault(ownerUserID, workspaceID, branchKey string) (Pr
 			branchKey = workspaceConfig.BaselineBranch
 		}
 	}
-	existed := false
-	layouts, err := s.repository.Layouts()
+	layout, created, err := s.repository.ResolveDefault(ownerUserID, workspaceID, branchKey)
 	if err != nil {
 		return Projection{}, err
 	}
-	for _, layout := range layouts {
-		if layout.OwnerUserID == ownerUserID && layout.WorkspaceID == workspaceID && layout.BranchKey == branchKey {
-			existed = true
-			break
-		}
-	}
-	layout, err := s.repository.ResolveDefault(ownerUserID, workspaceID, branchKey)
-	if err != nil {
-		return Projection{}, err
-	}
-	if !existed {
+	if created {
 		if err := s.seedInitialPlacements(layout); err != nil {
 			return Projection{}, err
 		}
@@ -185,13 +174,84 @@ func (s *Service) Project(ownerUserID, layoutID string) (Projection, error) {
 }
 
 func (s *Service) PatchPlacements(ownerUserID, layoutID string, patches []PlacementPatch) (Projection, error) {
-	if _, err := s.ownedLayout(ownerUserID, layoutID); err != nil {
+	layout, err := s.ownedLayout(ownerUserID, layoutID)
+	if err != nil {
+		return Projection{}, err
+	}
+	patches, err = s.canonicalizeNewPlacementPatches(layout, patches)
+	if err != nil {
 		return Projection{}, err
 	}
 	if _, err := s.repository.PatchPlacements(layoutID, patches); err != nil {
 		return Projection{}, err
 	}
 	return s.Project(ownerUserID, layoutID)
+}
+
+func (s *Service) canonicalizeNewPlacementPatches(layout Layout, patches []PlacementPatch) ([]PlacementPatch, error) {
+	placements, err := s.repository.Placements(layout.ID)
+	if err != nil {
+		return nil, err
+	}
+	existing := make(map[string]bool, len(placements))
+	for _, placement := range placements {
+		existing[placement.NodeID] = true
+	}
+	result := append([]PlacementPatch(nil), patches...)
+	for i := range result {
+		patch := &result[i]
+		if existing[patch.NodeID] {
+			continue
+		}
+		if patch.ExpectedRevision != 0 {
+			continue // The repository reports the concurrency conflict.
+		}
+		switch patch.EntityRef.Kind {
+		case EntityWorkspace:
+			if patch.NodeID != workspaceNodeID(layout.WorkspaceID) || patch.EntityRef.WorkspaceID != layout.WorkspaceID {
+				return nil, errors.New("canvas workspace placement identity is invalid")
+			}
+			patch.EntityRef = EntityRef{Kind: EntityWorkspace, WorkspaceID: layout.WorkspaceID}
+		case EntityPlan:
+			items, err := s.items.BranchItems(layout.WorkspaceID, layout.BranchKey)
+			if err != nil {
+				return nil, err
+			}
+			found := false
+			for _, item := range canvasPlanItems(items) {
+				if item.ID == patch.EntityRef.ItemID && patch.NodeID == planNodeID(item.ID) {
+					patch.EntityRef = planRef(item)
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, errors.New("canvas plan placement does not resolve on this branch")
+			}
+		case EntitySession:
+			if s.sessions == nil {
+				return nil, errors.New("canvas session placement does not resolve")
+			}
+			sessions, err := s.sessions.SessionRecords(layout.WorkspaceID, layout.BranchKey)
+			if err != nil {
+				return nil, err
+			}
+			found := false
+			for _, session := range sessions {
+				if session.ID == patch.EntityRef.SessionID && patch.NodeID == sessionNodeID(session.ID) {
+					patch.EntityRef = sessionRef(session)
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, errors.New("canvas session placement does not resolve on this branch")
+			}
+		default:
+			return nil, errors.New("canvas placement entity kind is invalid")
+		}
+	}
+	return result, nil
 }
 
 func (s *Service) SaveViewport(ownerUserID, layoutID string, expectedVersion int64, viewport Viewport) (Projection, error) {
@@ -385,27 +445,24 @@ func canvasPlanServiceFromPath(itemPath string) string {
 
 func derivedConnections(nodes []ProjectedNode) []Connection {
 	placed := map[string]ProjectedNode{}
-	workspaceID := ""
 	for _, node := range nodes {
 		placed[node.ID] = node
-		if node.Kind == EntityWorkspace && node.State != NodeForbidden {
-			workspaceID = node.ID
-		}
 	}
 	connections := []Connection{}
 	for _, node := range nodes {
 		if node.State == NodeForbidden {
 			continue
 		}
-		source := workspaceID
-		kind := "repository_contains"
-		if node.Kind == EntitySession && node.Session != nil && node.Session.Record.PlanRef != nil {
-			candidate := planNodeID(node.Session.Record.PlanRef.ItemID)
-			if _, ok := placed[candidate]; ok {
-				source, kind = candidate, "session_launched_from"
-			}
+		if node.Kind != EntitySession || node.Session == nil || node.Session.Record.PlanRef == nil {
+			continue
 		}
-		if source == "" || source == node.ID || (node.Kind != EntityPlan && node.Kind != EntitySession) {
+		source := ""
+		kind := "session_launched_from"
+		candidate := planNodeID(node.Session.Record.PlanRef.ItemID)
+		if _, ok := placed[candidate]; ok {
+			source = candidate
+		}
+		if source == "" || source == node.ID {
 			continue
 		}
 		connections = append(connections, Connection{ID: fmt.Sprintf("%s:%s:%s", kind, source, node.ID), Source: source, Target: node.ID, Kind: kind, SourceOfTruth: "derived"})

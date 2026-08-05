@@ -266,7 +266,7 @@ func TestStorageSyncDataDirToDatabaseCreatesBackupAndCopiesState(t *testing.T) {
 	if _, err := source.List(); err != nil {
 		t.Fatal(err)
 	}
-	layout, err := canvas.NewFileRepository(paths.CanvasFile).ResolveDefault("", workspace.ID, "main")
+	layout, _, err := canvas.NewFileRepository(paths.CanvasFile).ResolveDefault("", workspace.ID, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func TestStorageSyncDatabaseToDataDirCreatesBackupAndCopiesState(t *testing.T) {
 	if err := state.Items.ReplaceWorkspaceBranch(workspace.ID, "main", []models.ItemDetail{item}, models.BranchScanMetadata{WorkspaceID: workspace.ID, Branch: "main", SourceMode: "working_tree", Editable: true, ScannedAt: time.Now().UTC()}); err != nil {
 		t.Fatal(err)
 	}
-	layout, err := state.Canvas.ResolveDefault("", workspace.ID, "main")
+	layout, _, err := state.Canvas.ResolveDefault("", workspace.ID, "main")
 	if err != nil {
 		t.Fatal(err)
 	}

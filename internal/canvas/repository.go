@@ -30,7 +30,7 @@ func (e *PlacementConflictError) Error() string {
 }
 
 type Repository interface {
-	ResolveDefault(ownerUserID, workspaceID, branchKey string) (Layout, error)
+	ResolveDefault(ownerUserID, workspaceID, branchKey string) (Layout, bool, error)
 	GetLayout(id string) (Layout, bool, error)
 	Layouts() ([]Layout, error)
 	Placements(layoutID string) ([]Placement, error)

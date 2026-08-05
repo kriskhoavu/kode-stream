@@ -98,13 +98,28 @@ describe('useCanvasState', () => {
 
 	it('places newly discovered entities silently during refresh', async () => {
 		const unplaced = { ...projection(2), unplaced: [{ ...projection().nodes[0].entityRef, itemId: 'item-2' }] };
-		vi.mocked(api.canvasLayout).mockResolvedValue(unplaced);
+		vi.mocked(api.resolveDefaultCanvas).mockResolvedValueOnce(projection()).mockResolvedValueOnce(unplaced);
 		vi.mocked(api.patchCanvasPlacements).mockResolvedValue({ ...projection(3), nodes: [...projection().nodes, { ...projection().nodes[0], id: 'plan:item-2', entityRef: unplaced.unplaced[0], revision: 1 }], unplaced: [] });
 		const { result } = renderHook(() => useCanvasState('workspace-1'));
 		await act(async () => { await vi.runAllTimersAsync(); });
 		await act(async () => { await result.current.refresh(); });
+		expect(api.resolveDefaultCanvas).toHaveBeenLastCalledWith('workspace-1');
 		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-2', expectedRevision: 0 })]);
 		expect(result.current.projection?.nodes).toHaveLength(2);
+	});
+
+	it('discards unsaved moves when refresh resolves a different checkout layout', async () => {
+		const feature = { ...projection(1), layout: { ...projection().layout, id: 'layout-feature', branchKey: 'feature' }, nodes: [{ ...projection().nodes[0], position: { x: 30, y: 40 }, entityRef: { ...projection().nodes[0].entityRef, branchKey: 'feature' }, plan: { ...projection().nodes[0].plan!, branch: 'feature' } }] };
+		vi.mocked(api.resolveDefaultCanvas).mockResolvedValueOnce(projection()).mockResolvedValueOnce(feature);
+		const { result } = renderHook(() => useCanvasState('workspace-1'));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		act(() => result.current.moveNode('plan:item-1', { x: 90, y: 80 }));
+		await act(async () => { await result.current.refresh(); });
+		expect(result.current.projection?.layout.id).toBe('layout-feature');
+		expect(result.current.projection?.nodes[0].position).toEqual({ x: 30, y: 40 });
+		expect(result.current.error).toMatch(/Unsaved Canvas moves were discarded/);
+		await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+		expect(api.patchCanvasPlacements).not.toHaveBeenCalled();
 	});
 
 	it('persists session disclosure independently from selection and position', async () => {
