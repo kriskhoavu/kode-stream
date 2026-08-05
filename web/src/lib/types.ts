@@ -554,6 +554,7 @@ export interface CanvasWorkspaceNode { id: string; name?: string; branch?: strin
 export interface CanvasPlanNode { itemId: string; identifier?: string; title?: string; service?: string; status: ItemStatus; branch?: string; commit?: string; editable: boolean; actions: Partial<Record<WorkspaceAction, ActionCapability>>; }
 export interface CanvasSessionNode { record: SafeSessionRecord; }
 export interface CanvasNode { id: string; kind: CanvasEntityKind; state: 'resolved' | 'stale' | 'forbidden'; entityRef: CanvasEntityRef; position: CanvasPosition; collapsed: boolean; revision: number; workspace?: CanvasWorkspaceNode; plan?: CanvasPlanNode; session?: CanvasSessionNode; }
+export interface CanvasSection { id: string; title: string; position: CanvasPosition; width: number; height: number; nodeIds: string[]; }
 export interface CanvasConnection { id: string; source: string; target: string; kind: 'repository_contains' | 'session_launched_from' | string; sourceOfTruth: 'derived'; }
 export interface CanvasProjection { layout: CanvasLayout; nodes: CanvasNode[]; connections: CanvasConnection[]; unplaced: CanvasEntityRef[]; }
 

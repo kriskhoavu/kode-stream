@@ -22,7 +22,7 @@ describe('CanvasPage', () => {
 		canvasState.projection = projection();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
 		await waitFor(() => expect(screen.getByLabelText('Checkout: main')).toBeInTheDocument());
-		expect(screen.getByTestId('canvas-ready')).toHaveTextContent('1 node');
+		expect(screen.queryByTestId('canvas-ready')).not.toBeInTheDocument();
 		expect(screen.getByRole('status')).toHaveTextContent('Saved');
 	});
 

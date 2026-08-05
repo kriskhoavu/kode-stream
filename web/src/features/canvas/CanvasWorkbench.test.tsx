@@ -77,6 +77,12 @@ describe('CanvasWorkbench', () => {
 		expect(openFullView).toHaveBeenCalledWith(plan);
 	});
 
+	it('provides the same left-edge resize control as the Workstream item panel', async () => {
+		renderWorkbench(planNode());
+		expect(screen.getByRole('button', { name: 'Resize Workbench panel' })).toBeInTheDocument();
+		await screen.findByText('Item details unavailable in this test.');
+	});
+
 	it('hides cached details for forbidden references and offers safe refresh', async () => {
 		const forbidden: CanvasNode = { id: 'plan:gone', kind: 'plan', state: 'forbidden', entityRef: { kind: 'plan', workspaceId: 'workspace-1', itemId: 'gone', itemPath: 'private/Secret', identifier: 'SECRET-TITLE', branchKey: 'main' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1 };
 		const reload = vi.fn();

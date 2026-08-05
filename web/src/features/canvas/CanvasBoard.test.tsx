@@ -114,6 +114,22 @@ describe('CanvasBoard', () => {
 		expect(onRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 'plan:item-1' }));
 	});
 
+	it('filters plans and terminal sessions by node type while retaining the workspace anchor', () => {
+		renderBoard(baseProjection());
+		fireEvent.click(screen.getByRole('button', { name: 'Node type' }));
+		fireEvent.click(screen.getByLabelText('Plans'));
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '2');
+		expect(screen.queryByLabelText('Session: codex main running')).not.toBeInTheDocument();
+	});
+
+	it('renders a movable section boundary and lets it be removed independently of nodes', () => {
+		const onRemoveSection = vi.fn();
+		renderBoard(baseProjection(), { sections: [{ id: 'section-1', title: 'Assistant work', position: { x: 320, y: -30 }, width: 620, height: 360, nodeIds: ['plan:item-1', 'session:session-1'] }], onRemoveSection });
+		expect(screen.getByLabelText('Section: Assistant work')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Remove section Assistant work' }));
+		expect(onRemoveSection).toHaveBeenCalledWith('section-1');
+	});
+
 	it('filters plans without removing other node kinds and can persist a grouped arrangement', () => {
 		const onArrange = vi.fn();
 		const projection = baseProjection();

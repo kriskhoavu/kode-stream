@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GitCompare, Info, PanelRightClose, PanelRightOpen, Play, RefreshCw, Ticket } from 'lucide-react';
+import { GitCompare, GripVertical, Info, PanelRightClose, PanelRightOpen, Play, RefreshCw, Ticket } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { AISessionLaunchResult, AutomationDisplayMode, CanvasNode, CanvasProjection, E2ERunbook, EmbeddedAISessionResult, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile } from '../../lib/types';
 import { AISessionLaunchDialog } from '../ai-session/AISessionLaunchDialog';
@@ -10,11 +10,13 @@ import { StatusMenu } from '../../components/StatusMenu';
 export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen = false, onAISessionDialogOpenChange, onClose, onReload, onSelectNode, onPlaceSession, onOpenFullView }: { projection: CanvasProjection; selectedNode?: CanvasNode; aiSessionDialogOpen?: boolean; onAISessionDialogOpenChange?: (open: boolean) => void; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void }) {
 	const [rightPanelTab, setRightPanelTab] = useState<'info' | 'jira' | 'quality'>('info');
 	const [collapsed, setCollapsed] = useState(false);
+	const [panelWidth, setPanelWidth] = useState(410);
 	const [verifying, setVerifying] = useState(false);
 	const [verificationJob, setVerificationJob] = useState<VerificationJob>();
 	const [e2eRunbooks, setE2ERunbooks] = useState<{ runbooks: E2ERunbook[]; diagnostic?: string }>({ runbooks: [] });
 	const [error, setError] = useState('');
 	const pendingKey = useRef('');
+	const workbenchRef = useRef<HTMLElement>(null);
 	const workspaceNode = projection.nodes.find((node) => node.kind === 'workspace')?.workspace;
 
 	const launchCapability = selectedNode?.plan?.actions['terminal.launch'] ?? selectedNode?.workspace?.actions['terminal.launch'];
@@ -110,17 +112,37 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 			setVerifying(false);
 		}
 	};
+	const startResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+		event.preventDefault();
+		const startX = event.clientX;
+		const startingWidth = panelWidth;
+		let latestWidth = startingWidth;
+		const onPointerMove = (moveEvent: PointerEvent) => {
+			const nextWidth = Math.min(520, Math.max(220, startingWidth - (moveEvent.clientX - startX)));
+			latestWidth = nextWidth;
+			workbenchRef.current?.style.setProperty('--canvas-workbench-width', `${nextWidth}px`);
+		};
+		const onPointerUp = () => {
+			document.body.classList.remove('is-resizing-panel');
+			window.removeEventListener('pointermove', onPointerMove);
+			window.removeEventListener('pointerup', onPointerUp);
+			setPanelWidth(latestWidth);
+		};
+		document.body.classList.add('is-resizing-panel');
+		window.addEventListener('pointermove', onPointerMove);
+		window.addEventListener('pointerup', onPointerUp);
+	};
 	if (!selectedNode) return null;
 
-	return <aside className={collapsed ? 'canvas-workbench open collapsed' : 'canvas-workbench open'} aria-label="Canvas Workbench">
-		<header className="panel-header"><h2><Info size={16} /> Workbench</h2><button type="button" className="icon-button" aria-label={collapsed ? 'Expand workbench' : 'Collapse workbench'} title={collapsed ? 'Expand workbench' : 'Collapse workbench'} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button></header>
+	return <aside ref={workbenchRef} className={collapsed ? 'canvas-workbench open collapsed' : 'canvas-workbench open'} style={{ '--canvas-workbench-width': `${panelWidth}px` } as React.CSSProperties} aria-label="Canvas Workbench">
+		<header className="panel-header"><h2><Info size={16} /> Workbench</h2><div className="canvas-workbench-header-actions">{!collapsed && selectedNode && (selectedNode.workspace || selectedNode.plan) && onOpenFullView && <button className="primary canvas-workbench-view-details" type="button" onClick={() => onOpenFullView(selectedNode)}>View details</button>}<button type="button" className="icon-button" aria-label={collapsed ? 'Expand workbench' : 'Collapse workbench'} title={collapsed ? 'Expand workbench' : 'Collapse workbench'} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button></div></header>
 		{!collapsed && <>
 		{selectedNode && selectedNode.state !== 'resolved' && <section className="canvas-workbench-section canvas-reference-warning" role="status"><h2>{selectedNode.state === 'forbidden' ? 'Access restricted' : 'Reference unavailable'}</h2><p>{selectedNode.state === 'forbidden' ? 'You no longer have permission to view this entity. Cached titles are hidden.' : 'The entity no longer resolves on this workspace branch. Its placement is retained for recovery.'}</p><button type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh reference</button></section>}
 		{selectedNode?.workspace && <section className="canvas-workbench-section"><h2>Git summary</h2><dl><dt>Branch</dt><dd>{selectedNode.workspace.branch || 'Unavailable'}</dd><dt>HEAD</dt><dd><code>{shortSHA(selectedNode.workspace.commit)}</code></dd><dt>Working tree</dt><dd>{selectedNode.workspace.git?.conflicted ? 'Conflicted' : selectedNode.workspace.git?.dirty ? `${selectedNode.workspace.git.changes.length} changed files` : 'Clean'}</dd></dl><button className="secondary" type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh Git status</button>{launchCapability && launchCapability.state !== 'available' && <p className="canvas-capability-message">{launchCapability.message}</p>}</section>}
 		{selectedNode?.workspace && verificationContext && <section className="canvas-workbench-section canvas-verification"><h2>Verification</h2>{verificationJob ?? verificationContext.verification ? <VerificationSummary job={verificationJob ?? verificationContext.verification!} /> : <p>No verification result in this application run.</p>}<button className="primary" type="button" disabled={verificationCapability?.state !== 'available' || verifying} title={verificationCapability?.state !== 'available' ? verificationCapability?.message : undefined} onClick={() => void runVerification('smoke')}><Play size={14} /> {verifying ? 'Verifying…' : 'Run smoke verification'}</button></section>}
 		{selectedNode?.plan && <section className="canvas-item-panel" aria-label="Workbench"><div className="side-panel-tabs" role="tablist" aria-label="Workbench tabs"><button type="button" className={rightPanelTab === 'info' ? 'active' : ''} aria-selected={rightPanelTab === 'info'} onClick={() => setRightPanelTab('info')}><Info size={14} /> Info</button><button type="button" className={rightPanelTab === 'jira' ? 'active' : ''} aria-selected={rightPanelTab === 'jira'} onClick={() => setRightPanelTab('jira')}><Ticket size={14} /> Jira</button><button type="button" className={rightPanelTab === 'quality' ? 'active' : ''} aria-selected={rightPanelTab === 'quality'} onClick={() => setRightPanelTab('quality')}><GitCompare size={14} /> Quality</button></div>{rightPanelTab === 'info' && <CanvasItemInfo itemId={selectedNode.plan.itemId} node={selectedNode} workspace={verificationContext} onSaved={() => void onReload()} />}{rightPanelTab === 'jira' && <JiraItemPanel itemId={selectedNode.plan.itemId} />}{rightPanelTab === 'quality' && <CanvasQualityPanel itemId={selectedNode.plan.itemId} workspaceId={verificationContext?.id} capability={verificationCapability} job={verificationJob ?? verificationContext?.verification} verifying={verifying} runbooks={e2eRunbooks} onRun={runVerification} onRunAutomation={runAutomationVerification} onRerun={rerunVerification} onRefresh={() => void refreshE2ERunbooks()} />}</section>}
-		{selectedNode && (selectedNode.workspace || selectedNode.plan) && onOpenFullView && <section className="canvas-workbench-section canvas-view-details"><button className="secondary" type="button" onClick={() => onOpenFullView(selectedNode)}>View details</button></section>}
 		{error && <p className="canvas-workbench-error" role="alert">{error}</p>}
+		<button className="panel-resize-handle panel-resize-handle-right canvas-workbench-resize-handle" type="button" aria-label="Resize Workbench panel" onPointerDown={startResize}><GripVertical size={16} /></button>
 		</>}
 		{aiSessionDialogOpen && (selectedNode.plan || selectedNode.workspace) && <AISessionLaunchDialog itemId={selectedNode.plan?.itemId} workspaceTarget={selectedNode.workspace ? { workspaceId: selectedNode.workspace.id } : undefined} embeddedLaunchGuards={{ expectedWorkspaceId: projection.layout.workspaceId, expectedBranch: selectedNode.plan?.branch || selectedNode.workspace?.branch || projection.layout.branchKey, observedCommit: selectedNode.plan?.commit || selectedNode.workspace?.commit || selectedNode.entityRef.observedCommit, idempotencyKey: newIdempotencyKey() }} onClose={() => onAISessionDialogOpenChange?.(false)} onLaunched={sessionLaunched} />}
 	</aside>;

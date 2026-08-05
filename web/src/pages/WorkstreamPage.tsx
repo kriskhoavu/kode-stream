@@ -248,7 +248,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const authors = useMemo(() => unique(items.map((plan) => plan.author || plan.owner || 'Unknown')), [items]);
   const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
     { key: 'sources', title: 'Source', options: sourceOptions },
-    { key: 'scopes', title: labels.scope, options: services.map((scope) => ({ value: scope, label: scope })) },
+    { key: 'scopes', title: 'Service', options: services.map((scope) => ({ value: scope, label: scope })) },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
     { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) }
   ];
