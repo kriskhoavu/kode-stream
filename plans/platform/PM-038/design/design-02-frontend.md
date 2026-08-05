@@ -51,3 +51,9 @@ review and opens Workstream.
 - An item missing after checkout returns to Workstream with a concise message instead of showing another branch's item.
 - Item Workspace clears the prior plan when its route identity changes and waits for operational item detail before
   loading files or diff. A rejected snapshot identity renders only the error and Back action, never checkout controls.
+
+## Checkout Picker
+
+- Workstream, Canvas, Knowledge, Item Workspace, Explorer, and Branch Review use the shared checkout picker.
+- The picker keeps the existing branch-chip colors, icons, search menu, keyboard support, and suggestion order: `main`, `master`, current checkout, then alphabetical local branches.
+- Dirty selection opens a dialog with an editable stash message and only enables carry when the server confirms that local content cannot be overwritten.

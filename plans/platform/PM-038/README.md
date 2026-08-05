@@ -18,6 +18,8 @@ surface retains commit-pinned snapshot reading without letting a review ref beco
 - Provide a dedicated, shareable, read-only review route for plans and committed plan files on another branch.
 - Replace edit-triggered snapshot materialization with an explicit plan import into the checkout.
 - Refresh operational surfaces after guarded in-app checkout and detected external checkout changes.
+- Provide the checkout branch picker on every operational surface with searchable local-branch suggestions.
+- Preserve local tracked and untracked work through an explicit carry-or-stash decision before a dirty checkout.
 - Preserve branch-scoped indexes, Canvas layouts, and provider snapshot infrastructure.
 
 ## Non-Goals
@@ -25,7 +27,7 @@ surface retains commit-pinned snapshot reading without letting a review ref beco
 - Snapshot-backed Knowledge graphs or arbitrary repository browsing.
 - Editing, terminal launch, verification, or Git mutation inside Branch Review.
 - Merge, overwrite, rename, or automatic conflict resolution during import.
-- Automatic stash, reset, clean, or worktree creation.
+- Reset, clean, automatic stash selection, or worktree creation.
 - Removing Agentless Remote Snapshot provider contracts.
 
 ## Glossary

@@ -26,6 +26,7 @@ read-only review route, and make cross-branch plan copying explicit.
 | R9    | Operational item detail isolation               | Full stack | Complete |
 | R10   | Snapshot runbook and audit isolation            | Backend    | Complete |
 | R11   | Blocked snapshot audit classification           | Backend    | Complete |
+| R12   | Checkout picker and local-work safety           | Full stack | Complete |
 
 ## Phase P1: Feature Contract And Browser Playbook
 
@@ -251,6 +252,19 @@ read-only review route, and make cross-branch plan copying explicit.
 **Verification:** `go test ./internal/server/api && go test ./...`
 
 **Commit:** `PM-038: Classify snapshot mutation audits as blocked`
+
+## Phase R12: Checkout Picker And Local-Work Safety
+
+**Deliverables:**
+
+- [x] Restore the searchable branch picker appearance and ordering for checkout selection.
+- [x] Add carry-or-stash handling for tracked and untracked local content.
+- [x] Keep carry unavailable for target-path collisions and retain the stash reference after a failed checkout.
+- [x] Cover Git safety behavior and operational picker integration.
+
+**Verification:** `go test ./internal/git ./internal/server/api && npm run typecheck`
+
+**Commit:** `PM-038: Add safe checkout branch picker`
 
 ## Final Verification Summary
 

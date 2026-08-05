@@ -44,6 +44,8 @@ import { JiraItemPanel } from '../features/jira/JiraItemPanel';
 import { WorkstreamExplorer } from './WorkstreamExplorer';
 import type { ExplorerLocation } from '../features/workstream-explorer/types';
 import { E2EQualityPanel } from '../features/e2e-testing/E2EQualityPanel';
+import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
+import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'jira' | 'quality';
@@ -441,6 +443,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const visibleWarnings = useMemo(() => visibleItemWarnings(plan), [plan]);
   const fileStateByPath = useMemo(() => buildFileStateMap(plan, gitStatus, file, dirtyFile), [plan, gitStatus, file, dirtyFile]);
   const explorerWorkspaces = useMemo(() => workspaceConfig ? [workspaceConfig] : [], [workspaceConfig]);
+	const checkoutBranches = useWorkspaceBranches(explorerWorkspaces);
   const currentCheckoutBranch = gitStatus?.branch || plan?.branch || workspaceConfig?.baselineBranch || '';
   const gridStyle = {
     '--left-panel-width': `${leftCollapsed ? 44 : leftWidth}px`,
@@ -1107,7 +1110,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           <div className="workspace-item-path" aria-label="Item location">
             <span className="workspace-item-path-segment">{plan?.scope ?? '...'}</span>
             <span className="workspace-item-path-separator">/</span>
-            <span className="workspace-item-path-segment">Checkout: {currentCheckoutBranch || '...'}</span>
+            {workspaceConfig ? <><span className="sr-only">Checkout: {currentCheckoutBranch || workspaceConfig.baselineBranch}</span><BranchCheckoutPicker workspaceId={workspaceConfig.id} currentCheckoutBranch={currentCheckoutBranch || workspaceConfig.baselineBranch} branches={checkoutBranches.states[workspaceConfig.id]?.branches ?? []} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await onContentChanged?.(); }} /></> : <span className="workspace-item-path-segment">Checkout: {currentCheckoutBranch || '...'}</span>}
             <span className="workspace-item-path-separator">/</span>
             <span className="workspace-item-path-segment">{plan?.identifier ?? '...'}</span>
           </div>

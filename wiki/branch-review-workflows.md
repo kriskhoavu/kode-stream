@@ -34,10 +34,11 @@ shows the conflict; Kode Stream never merges or overwrites automatically.
 <!-- chunkId: platform-branch-review-workflows-activate -->
 <!-- keywords: switch workspace, dirty tree, confirmation, refresh -->
 
-Choose **Switch workspace to this branch** only when the reviewed branch should become the operational checkout. The
-normal guarded switch asks for confirmation when local changes need acknowledgement. After Git switches successfully,
+Choose the **Checkout** branch picker only when the reviewed branch should become the operational checkout. For local
+tracked or untracked content, choose **Move changes and switch** when it is available, or enter a stash message and
+choose **Stash and switch**. After Git switches successfully,
 Workstream opens on the new checkout and Canvas, Knowledge, and item routes refresh from that same context. Kode Stream
-does not reset, clean, stash, or silently discard files.
+does not reset, clean, or silently discard files.
 
 ## Handle Empty Or Stale Review State
 <!-- chunkId: platform-branch-review-workflows-recovery -->

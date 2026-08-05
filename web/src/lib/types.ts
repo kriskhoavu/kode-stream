@@ -930,6 +930,11 @@ export interface WorkspaceBranches {
   branches: string[];
 }
 
+export interface GitStashEntry {
+	ref: string;
+	message: string;
+}
+
 export interface GitCommitInput {
   message: string;
   paths: string[];
@@ -948,6 +953,14 @@ export interface BranchCreateInput {
 export interface BranchSwitchInput {
   name: string;
   confirm?: boolean;
+  strategy?: 'carry' | 'stash';
+  stashMessage?: string;
+}
+
+export interface BranchSwitchDecision {
+  sourceBranch: string;
+  targetBranch: string;
+  canCarryChanges: boolean;
 }
 
 export interface GitOperationResult {
@@ -955,4 +968,8 @@ export interface GitOperationResult {
   message?: string;
   recoveryHint?: string;
   status: GitStatus;
+	code?: string;
+	decision?: BranchSwitchDecision;
+	stashRef?: string;
+	stashMessage?: string;
 }

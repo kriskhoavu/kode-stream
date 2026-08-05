@@ -3,6 +3,7 @@ import { ArrowLeft, Download, FileText, GitBranch, RefreshCw } from 'lucide-reac
 import type { ReviewLocation } from '../app/router';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
+import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
 import { api } from '../lib/api';
 import type { FileContent, FileNode, ItemSummary, WorkspaceConfig, WorkstreamBranchLoadResult } from '../lib/types';
 import { isDocumentationMetadataSource } from '../lib/vocabulary';
@@ -142,10 +143,6 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
     }
   };
 
-  const switchCheckout = async () => {
-    if (!workspace || !review) return;
-    await branchState.switchBranch(workspace, review.branch);
-  };
 
   if (!workspace) {
     return <section className="empty-state"><h1>Branch Review</h1><p>Select a workspace before reviewing another branch.</p><button type="button" onClick={onExit}>Back to Workstream</button></section>;
@@ -160,7 +157,7 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
           <p>Read-only committed snapshot. Operational pages remain on the current checkout.</p>
         </div>
         <div className="branch-review-context">
-          <span className="branch-context-chip"><GitBranch size={14} /><span>Checkout</span><strong>{workspaceState?.current ?? workspace.baselineBranch}</strong></span>
+          <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={workspaceState?.current ?? workspace.baselineBranch} branches={workspaceState?.branches ?? []} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" disabled={loading} onSwitched={onCheckoutSwitched} />
           {review && <span className="branch-context-chip review"><span>Review</span><strong>{review.branch}</strong><code>{shortCommit(review.commit)}</code></span>}
         </div>
       </header>
@@ -173,7 +170,6 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
           </select>
         </label>
         {review && <button className="secondary" type="button" disabled={loading} onClick={() => void loadReview(true)}><RefreshCw size={15} /> Refresh snapshot</button>}
-        {review && <button className="secondary" type="button" disabled={loading || workspaceState?.switching} onClick={() => void switchCheckout()}><GitBranch size={15} /> {workspaceState?.switching ? 'Switching…' : 'Switch workspace to this branch'}</button>}
         {review && <button className="primary" type="button" disabled={!canImportSelected || importing} title={selectedItem && !canImportSelected ? 'Only structured plans can be imported' : undefined} onClick={() => void importPlan()}><Download size={15} /> {importing ? 'Importing…' : 'Import selected plan'}</button>}
       </div>
 

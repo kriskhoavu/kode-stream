@@ -12,6 +12,7 @@ commit that produced its index.
 | Method | Endpoint                                   | Request                                                              | Response                       |
 |--------|--------------------------------------------|----------------------------------------------------------------------|--------------------------------|
 | POST   | `/api/workspaces/{id}/workstream/checkout` | optional `force`                                                     | checkout branch load result    |
+| POST   | `/api/workspaces/{id}/git/switch`          | `name`, optional `strategy`, optional `stashMessage`                 | Git result or switch decision  |
 | POST   | `/api/workspaces/{id}/reviews/branch`      | `branch`, optional `force`                                           | read-only branch review result |
 | POST   | `/api/workspaces/{id}/reviews/import`      | `sourceBranch`, `expectedCommit`, `expectedCheckoutBranch`, `itemId` | imported checkout item         |
 | GET    | `/api/items/{id}`                          | working-tree item ID                                                 | operational item detail        |
@@ -81,6 +82,13 @@ coverage without an expected-commit contract and is therefore operational-only.
 - Canvas derives layout branch identity from the loader result.
 - Knowledge stores checkout branch and commit metadata and rebuilds when either differs.
 - A completed Git switch reports refresh warnings without pretending the switch failed or rolling Git back.
+
+## Dirty Checkout Safety
+
+- A dirty checkout returns `branch_switch_decision_required` with source, target, and `canCarryChanges` until the user chooses `carry` or `stash`.
+- Carry is available only when the target cannot touch a tracked local path or collide with an untracked path.
+- Stash uses `git stash push --include-untracked --message` under the workspace mutation lock.
+- Conflicted worktrees reject both choices. A failed checkout after a stash preserves its stash reference for recovery.
 
 ## Compatibility
 

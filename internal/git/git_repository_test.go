@@ -3,6 +3,7 @@ package git
 // Git infrastructure contract tests.
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,6 +42,40 @@ func TestSwitchBranchWaitsForWorkspaceMutation(t *testing.T) {
 	close(release)
 	if err := <-done; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSwitchBranchSafelyCarriesOrStashesLocalChanges(t *testing.T) {
+	root := newGitRepo(t)
+	writeGitFile(t, root, "shared.md", "main\n")
+	gitCommit(t, root, "main")
+	gitRun(t, root, "branch", "safe")
+	gitRun(t, root, "switch", "-c", "overlap")
+	writeGitFile(t, root, "shared.md", "overlap\n")
+	gitCommit(t, root, "overlap")
+	gitRun(t, root, "switch", "main")
+	writeGitFile(t, root, "local.md", "local\n")
+	adapter := New()
+	if _, err := adapter.SwitchBranchSafely(root, "safe", "carry", ""); err != nil {
+		t.Fatalf("carry safe changes: %v", err)
+	}
+	if current, _ := adapter.CurrentBranch(root); current != "safe" {
+		t.Fatalf("branch = %q", current)
+	}
+	if _, err := os.Stat(filepath.Join(root, "local.md")); err != nil {
+		t.Fatalf("local file was not carried: %v", err)
+	}
+	gitRun(t, root, "switch", "main")
+	writeGitFile(t, root, "shared.md", "local main\n")
+	if _, err := adapter.SwitchBranchSafely(root, "overlap", "carry", ""); !errors.Is(err, ErrCarryChangesUnsafe) {
+		t.Fatalf("unsafe carry error = %v", err)
+	}
+	ref, err := adapter.SwitchBranchSafely(root, "overlap", "stash", "Kode Stream: stash main before switching to overlap")
+	if err != nil {
+		t.Fatalf("stash switch: %v", err)
+	}
+	if ref == "" {
+		t.Fatal("expected stash ref")
 	}
 }
 

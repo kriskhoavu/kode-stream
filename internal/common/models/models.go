@@ -887,6 +887,11 @@ type WorkspaceBranches struct {
 	Branches    []string `json:"branches" yaml:"branches"`
 }
 
+type GitStashEntry struct {
+	Ref     string `json:"ref" yaml:"ref"`
+	Message string `json:"message" yaml:"message"`
+}
+
 type GitCommitInput struct {
 	Message string   `json:"message" yaml:"message"`
 	Paths   []string `json:"paths" yaml:"paths"`
@@ -903,13 +908,26 @@ type BranchCreateInput struct {
 }
 
 type BranchSwitchInput struct {
-	Name    string `json:"name" yaml:"name"`
-	Confirm bool   `json:"confirm,omitempty" yaml:"confirm,omitempty"`
+	Name         string `json:"name" yaml:"name"`
+	Confirm      bool   `json:"confirm,omitempty" yaml:"confirm,omitempty"`
+	Strategy     string `json:"strategy,omitempty" yaml:"strategy,omitempty"`
+	StashMessage string `json:"stashMessage,omitempty" yaml:"stashMessage,omitempty"`
+}
+
+type BranchSwitchDecision struct {
+	SourceBranch    string `json:"sourceBranch" yaml:"sourceBranch"`
+	TargetBranch    string `json:"targetBranch" yaml:"targetBranch"`
+	CanCarryChanges bool   `json:"canCarryChanges" yaml:"canCarryChanges"`
 }
 
 type GitOperationResult struct {
-	OK           bool      `json:"ok" yaml:"ok"`
-	Message      string    `json:"message,omitempty" yaml:"message,omitempty"`
-	RecoveryHint string    `json:"recoveryHint,omitempty" yaml:"recoveryHint,omitempty"`
-	Status       GitStatus `json:"status" yaml:"status"`
+	OK           bool                  `json:"ok" yaml:"ok"`
+	Message      string                `json:"message,omitempty" yaml:"message,omitempty"`
+	RecoveryHint string                `json:"recoveryHint,omitempty" yaml:"recoveryHint,omitempty"`
+	Status       GitStatus             `json:"status" yaml:"status"`
+	Code         string                `json:"code,omitempty" yaml:"code,omitempty"`
+	Details      map[string]string     `json:"details,omitempty" yaml:"details,omitempty"`
+	Decision     *BranchSwitchDecision `json:"decision,omitempty" yaml:"decision,omitempty"`
+	StashRef     string                `json:"stashRef,omitempty" yaml:"stashRef,omitempty"`
+	StashMessage string                `json:"stashMessage,omitempty" yaml:"stashMessage,omitempty"`
 }

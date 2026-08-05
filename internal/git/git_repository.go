@@ -28,6 +28,11 @@ type GitAdapter struct {
 	mutations    sync.Map
 }
 
+var (
+	ErrBranchSwitchDecisionRequired = errors.New("branch switch decision required")
+	ErrCarryChangesUnsafe           = errors.New("local changes could be overwritten by the target branch")
+)
+
 type TreeEntry struct {
 	Name    string
 	Path    string
@@ -100,6 +105,29 @@ func (g *GitAdapter) ListBranches(workspacePath string) ([]string, error) {
 		}
 	}
 	return branches, nil
+}
+
+func (g *GitAdapter) ListStashes(workspacePath string) ([]models.GitStashEntry, error) {
+	out, err := g.run(workspacePath, "stash", "list", "--format=%gd%x1f%s")
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]models.GitStashEntry, 0)
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		parts := strings.SplitN(line, "\x1f", 2)
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
+			continue
+		}
+		entries = append(entries, models.GitStashEntry{Ref: strings.TrimSpace(parts[0]), Message: strings.TrimSpace(parts[1])})
+	}
+	return entries, nil
+}
+
+func (g *GitAdapter) ApplyStash(workspacePath, ref string) error {
+	if !regexp.MustCompile(`^stash@\{[0-9]+\}$`).MatchString(strings.TrimSpace(ref)) {
+		return fmt.Errorf("invalid stash reference")
+	}
+	return g.WithWorkspaceMutation(workspacePath, func() error { _, err := g.run(workspacePath, "stash", "apply", "--index", ref); return err })
 }
 
 func (g *GitAdapter) LastAuthor(workspacePath, relPath string) string {
@@ -319,10 +347,94 @@ func (g *GitAdapter) CreateBranch(workspacePath, name, startPoint string, checko
 }
 
 func (g *GitAdapter) SwitchBranch(workspacePath, name string) error {
-	return g.WithWorkspaceMutation(workspacePath, func() error {
-		_, err := g.run(workspacePath, "switch", name)
+	_, err := g.SwitchBranchSafely(workspacePath, name, "carry", "")
+	return err
+}
+
+// SwitchBranchSafely serializes the decision, optional stash, and checkout so a
+// branch can never be switched using a stale dirty-tree assessment.
+func (g *GitAdapter) SwitchBranchSafely(workspacePath, name, strategy, stashMessage string) (string, error) {
+	var stashRef string
+	err := g.WithWorkspaceMutation(workspacePath, func() error {
+		status, err := g.Status("", workspacePath)
+		if err != nil {
+			return err
+		}
+		if status.Conflicted {
+			return fmt.Errorf("working tree has conflicts; resolve or abort the current Git operation before switching branches")
+		}
+		if status.Dirty {
+			switch strategy {
+			case "stash":
+				if strings.TrimSpace(stashMessage) == "" {
+					return fmt.Errorf("stash message is required before switching branches")
+				}
+				if _, err := g.run(workspacePath, "stash", "push", "--include-untracked", "--message", stashMessage); err != nil {
+					return err
+				}
+				ref, err := g.run(workspacePath, "stash", "list", "-1", "--format=%gd")
+				if err != nil {
+					return err
+				}
+				stashRef = strings.TrimSpace(ref)
+			case "carry":
+				ok, err := g.CanCarryChanges(workspacePath, name, status)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return ErrCarryChangesUnsafe
+				}
+			default:
+				return ErrBranchSwitchDecisionRequired
+			}
+		}
+		_, err = g.run(workspacePath, "switch", name)
 		return err
 	})
+	return stashRef, err
+}
+
+// CanCarryChanges is deliberately conservative.  It permits a normal checkout
+// only when the target does not touch a tracked local path and cannot collide
+// with an untracked path.
+func (g *GitAdapter) CanCarryChanges(workspacePath, target string, status models.GitStatus) (bool, error) {
+	changed, err := g.run(workspacePath, "diff", "--name-only", "HEAD", target, "--")
+	if err != nil {
+		return false, err
+	}
+	targetChanged := strings.Fields(changed)
+	tree, err := g.run(workspacePath, "ls-tree", "-r", "--name-only", target)
+	if err != nil {
+		return false, err
+	}
+	targetPaths := strings.Fields(tree)
+	for _, change := range status.Changes {
+		paths := []string{change.Path, change.OldPath}
+		for _, local := range paths {
+			if local == "" {
+				continue
+			}
+			if change.Status == models.GitChangeUntracked {
+				for _, remote := range targetPaths {
+					if pathsOverlap(local, remote) {
+						return false, nil
+					}
+				}
+				continue
+			}
+			for _, remote := range targetChanged {
+				if pathsOverlap(local, remote) {
+					return false, nil
+				}
+			}
+		}
+	}
+	return true, nil
+}
+
+func pathsOverlap(a, b string) bool {
+	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
 }
 
 func (g *GitAdapter) WithWorkspaceMutation(workspacePath string, action func() error) error {

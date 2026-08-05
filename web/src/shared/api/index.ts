@@ -32,6 +32,7 @@ import type {
   GitOperationInput,
   GitOperationResult,
   GitStatus,
+	GitStashEntry,
   JiraConnection,
   JiraConnectionTest,
   JiraIssueState,
@@ -432,7 +433,9 @@ export const api = {
   createBranch: (workspaceId: string, input: BranchCreateInput) =>
     request<GitOperationResult>(`/api/workspaces/${workspaceId}/git/branches`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
   switchBranch: (workspaceId: string, input: BranchSwitchInput) =>
-    request<GitOperationResult>(`/api/workspaces/${workspaceId}/git/switch`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult)
+    request<GitOperationResult>(`/api/workspaces/${workspaceId}/git/switch`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
+  stashes: (workspaceId: string) => request<GitStashEntry[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/stashes`),
+  applyStash: (workspaceId: string, ref: string) => request<GitOperationResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/stashes/${encodeURIComponent(ref)}/apply`, { method: 'POST' }).then(normalizeGitResult)
 };
 
 function knowledgeURL(workspaceId: string, root: string, resource: 'pages' | 'graph' | 'rescan'): string {

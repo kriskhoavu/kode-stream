@@ -12,6 +12,14 @@
   gap: 16px;
 }
 
+.knowledge-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
 .knowledge-title h1,
 .knowledge-title p {
   margin: 0;

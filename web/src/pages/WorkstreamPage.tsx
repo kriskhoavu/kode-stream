@@ -31,6 +31,7 @@ import { isDocumentationMetadataSource, labels, metadataSourceLabel as genericMe
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/workstream/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
+import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
 import { inferCompatibilityFields, lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
@@ -572,7 +573,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         </div>
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
-            <span className="branch-context-chip"><GitBranch size={14} /><span>Checkout</span><strong>{currentBranch}</strong></span>
+            <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await loadCheckout(true); await onWorkspacesChanged(); }} />
             {onOpenReview && <button className="secondary" type="button" onClick={onOpenReview}>Review branch</button>}
             {workspace.sources.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>

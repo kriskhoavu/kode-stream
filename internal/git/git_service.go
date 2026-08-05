@@ -1,8 +1,10 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	apperrors "kode-stream/internal/common"
@@ -24,6 +26,8 @@ type GitRepository interface {
 	Activity(string, string, int) ([]models.GitActivityEntry, error)
 	CurrentBranch(string) (string, error)
 	ListBranches(string) ([]string, error)
+	ListStashes(string) ([]models.GitStashEntry, error)
+	ApplyStash(string, string) error
 	Fetch(string) error
 	Pull(string) error
 	Push(string) error
@@ -66,6 +70,25 @@ func (s *Service) Branches(workspaceID string) (models.WorkspaceBranches, error)
 		return models.WorkspaceBranches{}, err
 	}
 	return normalizeWorkspaceBranches(workspace.ID, current, branches), nil
+}
+
+func (s *Service) Stashes(workspaceID string) ([]models.GitStashEntry, error) {
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return s.git.ListStashes(workspace.Path)
+}
+
+func (s *Service) ApplyStash(workspaceID, ref string) models.GitOperationResult {
+	workspace, err := s.workspace(workspaceID)
+	if err == nil {
+		err = s.git.ApplyStash(workspace.Path, ref)
+	}
+	if err == nil {
+		_, err = s.writer.RefreshWorkspace(workspace)
+	}
+	return s.result(workspace, err)
 }
 
 func (s *Service) Activity(workspaceID, relPath string, limit int) ([]models.GitActivityEntry, error) {
@@ -163,22 +186,37 @@ func (s *Service) CreateBranch(workspaceID string, input models.BranchCreateInpu
 
 func (s *Service) SwitchBranch(workspaceID string, input models.BranchSwitchInput) models.GitOperationResult {
 	workspace, err := s.workspace(workspaceID)
+	var stashRef string
 	if err == nil {
 		if err = writeguard.ValidateBranchName(input.Name); err == nil {
-			var status models.GitStatus
-			status, err = s.git.Status(workspace.ID, workspace.Path)
-			if err == nil && (status.Dirty || status.Conflicted) && !input.Confirm {
-				err = fmt.Errorf("working tree has local changes; confirm to switch branches")
+			if adapter, ok := s.git.(*GitAdapter); ok {
+				stashRef, err = adapter.SwitchBranchSafely(workspace.Path, input.Name, input.Strategy, input.StashMessage)
+			} else {
+				err = s.git.SwitchBranch(workspace.Path, input.Name)
 			}
-		}
-		if err == nil {
-			err = s.git.SwitchBranch(workspace.Path, input.Name)
 		}
 		if err == nil {
 			_, err = s.writer.RefreshWorkspace(workspace)
 		}
 	}
-	return s.result(workspace, err)
+	result := s.result(workspace, err)
+	result.StashRef, result.StashMessage = stashRef, input.StashMessage
+	if errors.Is(err, ErrBranchSwitchDecisionRequired) || errors.Is(err, ErrCarryChangesUnsafe) {
+		result.Code = "branch_switch_decision_required"
+		status, statusErr := s.git.Status(workspace.ID, workspace.Path)
+		if statusErr == nil {
+			canCarry := false
+			if adapter, ok := s.git.(*GitAdapter); ok {
+				canCarry, _ = adapter.CanCarryChanges(workspace.Path, input.Name, status)
+			}
+			result.Decision = &models.BranchSwitchDecision{SourceBranch: status.Branch, TargetBranch: input.Name, CanCarryChanges: canCarry}
+			result.Details = map[string]string{"sourceBranch": status.Branch, "targetBranch": input.Name, "canCarryChanges": strconv.FormatBool(canCarry)}
+		}
+	}
+	if stashRef != "" && err != nil {
+		result.RecoveryHint = "Your local changes were stashed as " + stashRef + ". Apply it manually when ready."
+	}
+	return result
 }
 
 func (s *Service) workspace(workspaceID string) (models.WorkspaceConfig, error) {

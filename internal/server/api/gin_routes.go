@@ -165,6 +165,8 @@ func (a *API) registerGitRoutes(api *gin.RouterGroup) {
 	api.GET("/workspaces/:id/git/status", ginHTTPHandler(a.gitStatus))
 	api.GET("/workspaces/:id/git/activity", ginHTTPHandler(a.gitActivity))
 	api.GET("/workspaces/:id/git/branches", ginHTTPHandler(a.gitBranches))
+	api.GET("/workspaces/:id/git/stashes", ginHTTPHandler(a.gitStashes))
+	api.POST("/workspaces/:id/git/stashes/:ref/apply", ginHTTPHandler(a.gitApplyStash))
 	api.POST("/workspaces/:id/git/fetch", ginHTTPHandler(a.gitFetch))
 	api.POST("/workspaces/:id/git/pull", ginHTTPHandler(a.gitPull))
 	api.POST("/workspaces/:id/git/push", ginHTTPHandler(a.gitPush))

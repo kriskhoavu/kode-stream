@@ -1459,6 +1459,22 @@ func (a *API) gitBranches(w http.ResponseWriter, r *http.Request) {
 	respond(w, branches, err)
 }
 
+func (a *API) gitStashes(w http.ResponseWriter, r *http.Request) {
+	stashes, err := a.gitOps.Stashes(r.PathValue("id"))
+	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+	respond(w, stashes, err)
+}
+
+func (a *API) gitApplyStash(w http.ResponseWriter, r *http.Request) {
+	started := time.Now()
+	result := withRecoveryHint(a.gitOps.ApplyStash(r.PathValue("id"), r.PathValue("ref")))
+	a.recordGit(r.PathValue("id"), "git_apply_stash", nil, started, result)
+	respondGitResult(w, result)
+}
+
 func (a *API) gitFetch(w http.ResponseWriter, r *http.Request) {
 	a.gitOperation(w, r, "git_fetch", a.gitOps.Fetch)
 }

@@ -6,6 +6,8 @@ import { KnowledgeBrowser } from '../features/knowledge/KnowledgeBrowser';
 import { KnowledgeReader } from '../features/knowledge/KnowledgeReader';
 import { KnowledgeE2ESidePanel } from '../features/e2e-testing/KnowledgeE2ESidePanel';
 import { useKnowledgeController } from '../features/knowledge/useKnowledgeController';
+import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
+import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import type { KnowledgeActionResult, WorkspaceConfig } from '../lib/types';
 import '../features/knowledge/knowledge.css';
 
@@ -13,10 +15,12 @@ const KnowledgeGraph = lazy(() => import('../features/knowledge/KnowledgeGraph')
 
 export function KnowledgePage({ workspaces, activeWorkspace, location, onLocationChange }: { workspaces: WorkspaceConfig[]; activeWorkspace?: WorkspaceConfig; location?: KnowledgeLocation; onLocationChange: (location: KnowledgeLocation) => void }) {
 	const controller = useKnowledgeController(activeWorkspace ? [activeWorkspace] : workspaces, location, onLocationChange);
+	const branchState = useWorkspaceBranches(controller.workspace ? [controller.workspace] : []);
+	const branches = controller.workspace ? branchState.states[controller.workspace.id] : undefined;
 	if (!workspaces.length) return <section className="empty-state"><h1>Knowledge</h1><p>Add a workspace to discover structured Markdown Wikis.</p></section>;
 	return <section className="knowledge-page">
 		<header className="knowledge-header">
-			<div className="knowledge-title"><h1>Knowledge</h1><p>Browse structured documentation, follow relationships, and inspect the Wiki graph.</p></div>
+			<div className="knowledge-heading-row"><div className="knowledge-title"><h1>Knowledge</h1><p>Browse structured documentation, follow relationships, and inspect the Wiki graph.</p></div>{controller.workspace && <BranchCheckoutPicker workspaceId={controller.workspace.id} currentCheckoutBranch={branches?.current ?? controller.workspace.baselineBranch} branches={branches?.branches ?? []} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={controller.reload} />}</div>
 			<div className="knowledge-toolbar">
 			<label className="knowledge-field"><span>Wiki</span><select aria-label="Knowledge Wiki" value={controller.wiki?.root ?? ''} disabled={!controller.wikis.length} onChange={(event) => controller.updateLocation({ root: event.target.value, slug: undefined, view: 'browse' })}>{controller.wikis.map((wiki) => <option key={wiki.root} value={wiki.root}>{wiki.displayName}</option>)}</select></label>
 			<div className="knowledge-views" aria-label="Knowledge view"><button type="button" className={location?.view !== 'graph' ? 'active' : ''} onClick={() => controller.updateLocation({ view: controller.page ? 'read' : 'browse' })}>Pages</button><button type="button" className={location?.view === 'graph' ? 'active' : ''} disabled={!controller.pages.length} onClick={() => controller.updateLocation({ view: 'graph' })}>Graph</button></div>

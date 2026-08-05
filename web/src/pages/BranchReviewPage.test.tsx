@@ -8,7 +8,7 @@ import { BranchReviewPage } from './BranchReviewPage';
 const mocks = vi.hoisted(() => ({
   loadBranchReview: vi.fn(), files: vi.fn(), file: vi.fn(), importReviewedPlan: vi.fn(), switchBranch: vi.fn()
 }));
-vi.mock('../lib/api', () => ({ api: { loadBranchReview: mocks.loadBranchReview, files: mocks.files, file: mocks.file, importReviewedPlan: mocks.importReviewedPlan } }));
+vi.mock('../lib/api', () => ({ api: { loadBranchReview: mocks.loadBranchReview, files: mocks.files, file: mocks.file, importReviewedPlan: mocks.importReviewedPlan, switchBranch: mocks.switchBranch } }));
 vi.mock('../features/workstream-explorer/useWorkspaceBranches', () => ({
   useWorkspaceBranches: () => ({ states: { 'ws-1': { workspaceId: 'ws-1', current: 'main', branches: ['main', 'feature/review', 'feature/slow', 'feature/fast'], loading: false, switching: false, error: '', recoveryHint: '' } }, switchBranch: mocks.switchBranch })
 }));
@@ -48,10 +48,12 @@ describe('BranchReviewPage', () => {
     expect(mocks.importReviewedPlan).toHaveBeenCalledWith('ws-1', { sourceBranch: 'feature/review', expectedCommit: 'abcdef123456', expectedCheckoutBranch: 'main', itemId: 'snapshot-1' });
   });
 
-  it('uses the guarded workspace switch action for the reviewed branch', async () => {
+  it('uses the checkout picker for the reviewed branch', async () => {
+		mocks.switchBranch.mockResolvedValue({ ok: true, status: { branch: 'feature/review' } });
     renderReview();
-    fireEvent.click(await screen.findByRole('button', { name: 'Switch workspace to this branch' }));
-    await waitFor(() => expect(mocks.switchBranch).toHaveBeenCalledWith(workspace, 'feature/review'));
+		fireEvent.click(await screen.findByRole('button', { name: 'Select checkout branch' }));
+		fireEvent.click(screen.getByRole('listbox', { name: 'Checkout branches' }).querySelector('[role="option"]:nth-of-type(3)') as HTMLElement);
+    await waitFor(() => expect(mocks.switchBranch).toHaveBeenCalledWith('ws-1', { name: 'feature/review', strategy: undefined, stashMessage: undefined }));
   });
 
   it('disables checkout switching while refreshing the snapshot', async () => {
@@ -60,7 +62,7 @@ describe('BranchReviewPage', () => {
       .mockResolvedValueOnce(reviewResult())
       .mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
     renderReview();
-    const switchButton = await screen.findByRole('button', { name: 'Switch workspace to this branch' });
+		const switchButton = await screen.findByRole('button', { name: 'Select checkout branch' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh snapshot' }));
 

@@ -4,6 +4,8 @@ import { useCanvasState } from '../features/canvas/useCanvasState';
 import { CanvasBoard } from '../features/canvas/CanvasBoard';
 import { CanvasWorkbench } from '../features/canvas/CanvasWorkbench';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
+import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import type { CanvasNode, CanvasSection, WorkspaceConfig } from '../lib/types';
 import { FolderGit2, Workflow } from 'lucide-react';
 import '../features/canvas/canvas.css';
@@ -11,6 +13,8 @@ import '../features/canvas/canvas.css';
 export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, onOpenWorkspaces }: { workspace?: WorkspaceConfig; location?: CanvasLocation; onLocationChange: (location: CanvasLocation) => void; onOpenItem?: (itemId: string) => void; onOpenWorkspaces?: () => void }) {
 	const workspaceId = location?.workspaceId ?? workspace?.id;
 	const canvas = useCanvasState(workspaceId);
+	const branchState = useWorkspaceBranches(workspace ? [workspace] : []);
+	const branches = workspace ? branchState.states[workspace.id] : undefined;
 	const [selectedId, setSelectedId] = useState<string>();
 	const [confirmation, setConfirmation] = useState<'reset' | 'remove'>();
 	const [aiSessionDialogOpen, setAISessionDialogOpen] = useState(false);
@@ -85,7 +89,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		<section className="canvas-page" aria-label="Workspace Canvas">
 			<header className="page-title workstream-title canvas-page-header">
 				<div className="workstream-heading"><div><h1><Workflow size={22} /> Workbench</h1><span><FolderGit2 size={15} /> {title}</span></div></div>
-				<span className="branch-context-chip" aria-label={`Checkout: ${canvas.projection?.layout.branchKey ?? 'Loading'}`}><span>Checkout</span><strong>{canvas.projection?.layout.branchKey ?? 'Loading…'}</strong></span>
+				{workspace && <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={branches?.current ?? canvas.projection?.layout.branchKey ?? workspace.baselineBranch} branches={branches?.branches ?? []} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" disabled={canvas.loading} onSwitched={async () => { setSelectedId(undefined); await canvas.reload(); }} />}
 			</header>
 			{canvas.loading && <div className="canvas-state" role="status">Loading Canvas…</div>}
 			{canvas.error && <div className="canvas-state error" role="alert">{canvas.error}<button type="button" onClick={() => void canvas.reload()}>Retry</button></div>}

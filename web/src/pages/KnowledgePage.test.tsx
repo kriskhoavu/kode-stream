@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { KnowledgePage } from './KnowledgePage';
 
 vi.mock('../lib/api', () => ({
+	ApiError: class ApiError extends Error {},
 	api: {
 		knowledgeWikis: vi.fn(),
 		knowledgePages: vi.fn(),
@@ -12,7 +13,9 @@ vi.mock('../lib/api', () => ({
 		rescanKnowledge: vi.fn(),
 		syncKnowledge: vi.fn(),
 		enrichKnowledge: vi.fn(),
-		gitStatus: vi.fn()
+		gitStatus: vi.fn(),
+		workspaceBranches: vi.fn(),
+		switchBranch: vi.fn()
 	}
 }));
 
@@ -23,6 +26,7 @@ describe('KnowledgePage layout', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		vi.mocked(api.knowledgeWikis).mockResolvedValue([{ workspaceId: 'discovery', root: 'docs', displayName: 'Docs', pages: [], warnings: [], indexedAt: '' }]);
+		vi.mocked(api.workspaceBranches).mockResolvedValue({ workspaceId: 'discovery', current: 'main', branches: ['main'] });
 		vi.mocked(api.knowledgePages).mockResolvedValue({ pages: [page], warnings: Array.from({ length: 26 }, (_, index) => ({ path: `page-${index}.md`, code: 'invalid_front_matter', message: 'Missing YAML front matter' })) });
 		vi.mocked(api.knowledgePage).mockResolvedValue({ ...page, warnings: [], content: { id: 'overview', path: 'offer/overview.md', content: '# Offer Overview\n\nFull document content.', language: 'markdown', hash: 'hash', kind: 'markdown', sizeBytes: 48, editable: false } });
 	});

@@ -2083,7 +2083,7 @@ select {
 }
 
 .branch-picker-trigger {
-  width: auto;
+  width: 100%;
   max-width: 100%;
   min-height: 24px;
   border: 0;
@@ -2095,7 +2095,7 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  justify-content: flex-start;
+  justify-content: space-between;
   min-width: 0;
   overflow: hidden;
 }
@@ -2190,7 +2190,7 @@ select {
   font-size: 13px;
   font-weight: 650;
   display: grid;
-  grid-template-columns: 14px 14px minmax(0, 1fr);
+  grid-template-columns: 14px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
 }
@@ -2235,6 +2235,70 @@ select {
 .branch-option-checkout {
   flex: 0 0 auto;
   color: var(--green);
+}
+
+.branch-switch-error { color: var(--red); font-size: 13px; }
+.branch-checkout-control { display: inline-flex; align-items: stretch; gap: 0; min-width: 0; }
+.branch-checkout-control .branch-context-chip { border-radius: 999px 0 0 999px; }
+.branch-stashes-button { min-height: 32px; min-width: 36px; margin-left: -1px; padding: 0 9px; border: 1px solid var(--line); border-radius: 0 999px 999px 0; color: var(--muted); background: var(--panel); }
+.branch-stashes-button:hover { color: var(--text); border-color: color-mix(in srgb, var(--blue) 42%, var(--line)); }
+.stash-dialog { width: min(680px, 100%); max-width: none; }
+.stash-entry { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.stash-entry > div { min-width: 0; display: grid; gap: 5px; }
+.stash-entry code { color: var(--blue); }
+.stash-entry span { overflow-wrap: anywhere; }
+.branch-context-chip:has(.branch-selector-wrap) {
+  grid-template-columns: auto auto minmax(0, 1fr);
+  width: min(520px, 46vw);
+  min-width: 240px;
+}
+
+.branch-context-chip:has(.branch-selector-wrap) .branch-selector-wrap {
+  width: 100%;
+  max-width: none;
+}
+
+.branch-stash-message {
+  display: grid;
+  gap: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.branch-stash-message input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 0 12px;
+  font: inherit;
+  font-weight: 500;
+  outline: none;
+}
+
+.branch-stash-message input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent);
+}
+
+.confirm-dialog.branch-switch-dialog {
+  width: min(760px, 100%);
+  max-width: none;
+  padding: 24px;
+  gap: 18px;
+}
+
+.branch-switch-dialog h2 { font-size: 24px; }
+.branch-switch-dialog footer { flex-wrap: wrap; }
+
+@media (max-width: 680px) {
+  .branch-context-chip:has(.branch-selector-wrap) {
+    width: min(100%, calc(100vw - 48px));
+    min-width: 0;
+  }
 }
 
 .branch-context-chip:hover,
