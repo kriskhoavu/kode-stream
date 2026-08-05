@@ -42,17 +42,16 @@ describe('useCanvasState', () => {
 		expect(result.current.saveStatus).toBe('saved');
 	});
 
-	it('keeps a conflicting position dirty and supports reload recovery', async () => {
+	it('silently refreshes a conflicting position without exposing a warning', async () => {
 		vi.mocked(api.patchCanvasPlacements).mockRejectedValue(new ApiError('conflict', undefined, undefined, { code: 'placement_conflict', nodeIds: ['plan:item-1'], status: 409 }));
 		const { result } = renderHook(() => useCanvasState('workspace-1'));
 		await act(async () => { await vi.runAllTimersAsync(); });
 		act(() => result.current.moveNode('plan:item-1', { x: 50, y: 60 }));
 		await act(async () => { await vi.advanceTimersByTimeAsync(351); });
-		expect(result.current.conflicts).toEqual(['plan:item-1']);
-		expect(result.current.dirtyCount).toBe(1);
-		await act(async () => { await result.current.reloadPosition('plan:item-1'); });
 		expect(result.current.conflicts).toEqual([]);
 		expect(result.current.dirtyCount).toBe(0);
+		expect(result.current.error).toBe('');
+		expect(api.canvasLayout).toHaveBeenCalledWith('layout-1');
 		expect(result.current.projection?.nodes[0].revision).toBe(2);
 	});
 

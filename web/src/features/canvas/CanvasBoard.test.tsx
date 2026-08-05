@@ -84,19 +84,22 @@ describe('CanvasBoard', () => {
 		expect(screen.getByLabelText('Search Canvas nodes')).toBeInTheDocument();
 	});
 
-	it('renders all semantic nodes as independent draggable placements with derived edges', () => {
+	it('renders plans and terminal sessions without a separate workspace card', () => {
 		const onMoveNode = vi.fn();
 		renderBoard(baseProjection(), { onMoveNode });
-		expect(screen.getByLabelText('Workspace: Workspace main')).toBeInTheDocument();
+		expect(screen.queryByLabelText('Workspace: Workspace main')).not.toBeInTheDocument();
 		expect(screen.getByLabelText('Plan: PM-037 Focused Canvas main')).toBeInTheDocument();
 		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
-		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '2');
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '1');
 		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-visible-only', 'true');
-		expect(document.querySelectorAll('[data-draggable-node="true"]')).toHaveLength(3);
-		expect(screen.getAllByText(/^drag /)).toHaveLength(3);
-		fireEvent.click(screen.getByText('drag workspace:workspace-1'));
-		expect(onMoveNode).toHaveBeenCalledWith('workspace:workspace-1', { x: 999, y: 888 });
-		expect(onMoveNode).toHaveBeenCalledTimes(1);
+		expect(document.querySelectorAll('[data-draggable-node="true"]')).toHaveLength(2);
+		expect(screen.getAllByText(/^drag /)).toHaveLength(2);
+		fireEvent.click(screen.getByText('drag plan:item-1'));
+		expect(onMoveNode).toHaveBeenCalledWith('plan:item-1', { x: 999, y: 888 });
+		expect(screen.getByLabelText('Node type legend')).toHaveTextContent('Workspace group');
+		expect(screen.getByLabelText('Node type legend')).toHaveTextContent('Service group');
+		expect(screen.getByLabelText('Node type legend')).toHaveTextContent('Plan');
+		expect(screen.getByLabelText('Node type legend')).toHaveTextContent('Terminal session');
 	});
 
 	it('filters Canvas nodes by identifier without showing autocomplete results', () => {
@@ -105,7 +108,8 @@ describe('CanvasBoard', () => {
 		const onRemove = vi.fn();
 		renderBoard(baseProjection(), { selectedId: 'plan:item-1', onSelect, onReset, onRemove });
 		fireEvent.change(screen.getByLabelText('Search Canvas nodes'), { target: { value: 'PM-037' } });
-		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '1');
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '2');
+		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
 		expect(screen.queryByRole('option')).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Add new nodes/ })).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: /Reset layout/ }));
@@ -114,11 +118,11 @@ describe('CanvasBoard', () => {
 		expect(onRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 'plan:item-1' }));
 	});
 
-	it('filters plans and terminal sessions by node type while retaining the workspace anchor', () => {
+	it('filters plans and terminal sessions by node type', () => {
 		renderBoard(baseProjection());
 		fireEvent.click(screen.getByRole('button', { name: 'Node type' }));
 		fireEvent.click(screen.getByLabelText('Plans'));
-		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '2');
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '1');
 		expect(screen.queryByLabelText('Session: codex main running')).not.toBeInTheDocument();
 	});
 
@@ -139,7 +143,7 @@ describe('CanvasBoard', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Status' }));
 		fireEvent.click(screen.getByLabelText('Draft'));
 		expect(screen.queryByLabelText('Plan: PM-037 Focused Canvas main')).not.toBeInTheDocument();
-		expect(screen.getByLabelText('Workspace: Workspace main')).toBeInTheDocument();
+		expect(screen.queryByLabelText('Workspace: Workspace main')).not.toBeInTheDocument();
 		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
 		expect(screen.getByText(/1 hidden/)).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Group' }));
@@ -160,15 +164,6 @@ describe('CanvasBoard', () => {
 		const second = renderBoard(unavailable, { selectedId: 'plan:item-1' });
 		expect(second.getByRole('button', { name: /Reset layout/ })).toBeDisabled();
 		expect(second.getByRole('button', { name: /Remove from Canvas/ })).toBeDisabled();
-	});
-
-	it('shows Git HEAD and verification result separately from stale freshness', () => {
-		const projection = baseProjection();
-		projection.nodes[0] = { ...projection.nodes[0], workspace: { ...projection.nodes[0].workspace!, commit: 'abcdef123456', verification: { id: 'verify-1', workspaceId: 'workspace-1', profile: 'smoke', status: 'passed', exitCode: 0, steps: [], artifacts: [], freshness: 'stale' } } };
-		renderBoard(projection);
-		expect(screen.getByText('HEAD abcdef12')).toBeInTheDocument();
-		expect(screen.getByText('passed')).toBeInTheDocument();
-		expect(screen.getByText('Freshness: stale')).toBeInTheDocument();
 	});
 
 	it.each([25, 100, 300])('keeps %i placements virtualized', (count) => {

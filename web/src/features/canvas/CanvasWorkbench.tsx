@@ -132,7 +132,7 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 		window.addEventListener('pointermove', onPointerMove);
 		window.addEventListener('pointerup', onPointerUp);
 	};
-	if (!selectedNode) return null;
+	if (!selectedNode) return aiSessionDialogOpen && workspaceNode ? <AISessionLaunchDialog workspaceTarget={{ workspaceId: workspaceNode.id }} embeddedLaunchGuards={{ expectedWorkspaceId: projection.layout.workspaceId, expectedBranch: workspaceNode.branch || projection.layout.branchKey, observedCommit: workspaceNode.commit, idempotencyKey: newIdempotencyKey() }} onClose={() => onAISessionDialogOpenChange?.(false)} onLaunched={sessionLaunched} /> : null;
 
 	return <aside ref={workbenchRef} className={collapsed ? 'canvas-workbench open collapsed' : 'canvas-workbench open'} style={{ '--canvas-workbench-width': `${panelWidth}px` } as React.CSSProperties} aria-label="Canvas Workbench">
 		<header className="panel-header"><h2><Info size={16} /> Workbench</h2><div className="canvas-workbench-header-actions">{!collapsed && selectedNode && (selectedNode.workspace || selectedNode.plan) && onOpenFullView && <button className="primary canvas-workbench-view-details" type="button" onClick={() => onOpenFullView(selectedNode)}>View details</button>}<button type="button" className="icon-button" aria-label={collapsed ? 'Expand workbench' : 'Collapse workbench'} title={collapsed ? 'Expand workbench' : 'Collapse workbench'} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button></div></header>

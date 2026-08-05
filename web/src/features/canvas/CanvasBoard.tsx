@@ -19,13 +19,14 @@ interface CanvasNodeData extends Record<string, unknown> {
 	layoutAvailable: boolean;
 	section?: CanvasSection;
 	onRemoveSection?: (id: string) => void;
+	onMoveSection?: (id: string, position: CanvasPosition, delta: CanvasPosition) => void;
 }
 
 type CanvasFlowNode = XYNode<CanvasNodeData>;
 
 const nodeTypes = { workspace: memo(WorkspaceCanvasNode), plan: memo(PlanCanvasNode), session: memo(SessionCanvasNode), section: memo(CanvasSectionNode) };
 
-export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onMoveNode, onSetCollapsed, onArrange, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onOpenAISession, aiSessionDisabled = true }: {
+export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onMoveNode, onSetCollapsed, onArrange, serviceGridColumns = 1, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onOpenAISession, aiSessionDisabled = true }: {
 	projection: CanvasProjection;
 	sections?: CanvasSection[];
 	conflicts: string[];
@@ -33,7 +34,8 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	onSelect: (id?: string) => void;
 	onMoveNode: (id: string, position: CanvasPosition) => void;
 	onSetCollapsed: (id: string, collapsed: boolean) => void;
-	onArrange: (grouping: 'status' | 'service' | 'service_status') => void;
+	onArrange: (grouping: 'status' | 'service' | 'service_status' | 'service_grid') => void;
+	serviceGridColumns?: number;
 	onSaveViewport: (viewport: CanvasViewport) => void;
 	onReload: () => Promise<unknown> | void;
 	onReloadPosition: (id: string) => void;
@@ -57,25 +59,60 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	const boxSelectingRef = useRef(false);
 	const layoutCapability = projection.nodes.find((node) => node.workspace)?.workspace?.actions['layout.move'];
 	const layoutAvailable = layoutCapability?.state === 'available';
-	const statuses = useMemo(() => Array.from(new Set(projection.nodes.flatMap((node) => node.plan ? [node.plan.status] : []))), [projection.nodes]);
-	const services = useMemo(() => Array.from(new Set(projection.nodes.flatMap((node) => node.plan?.service ? [node.plan.service] : []))).sort(), [projection.nodes]);
+	const canvasNodes = useMemo(() => projection.nodes.filter((node) => node.kind !== 'workspace'), [projection.nodes]);
+	const statuses = useMemo(() => Array.from(new Set(canvasNodes.flatMap((node) => node.plan ? [node.plan.status] : []))), [canvasNodes]);
+	const services = useMemo(() => Array.from(new Set(canvasNodes.flatMap((node) => node.plan?.service ? [node.plan.service] : []))).sort(), [canvasNodes]);
 	const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-	const visibleDomainNodes = useMemo(() => projection.nodes.filter((node) => {
+	const visibleDomainNodes = useMemo(() => {
+		const baseMatches = (node: DomainNode) => {
 		const planMatches = !node.plan || ((statusFilters.length === 0 || statusFilters.includes(node.plan.status)) && (serviceFilters.length === 0 || serviceFilters.includes(node.plan.service ?? '')));
 		const typeMatches = node.kind === 'workspace' || nodeTypeFilters.length === 0 || nodeTypeFilters.includes(node.kind);
-		const searchMatches = !normalizedSearchQuery || nodeSearchText(node).toLowerCase().includes(normalizedSearchQuery);
-		return planMatches && typeMatches && searchMatches;
-	}), [nodeTypeFilters, normalizedSearchQuery, projection.nodes, serviceFilters, statusFilters]);
+		return planMatches && typeMatches;
+		};
+		const directMatches = canvasNodes.filter((node) => baseMatches(node) && (!normalizedSearchQuery || nodeSearchText(node).toLowerCase().includes(normalizedSearchQuery)));
+		if (!normalizedSearchQuery) return directMatches;
+		const matchingIDs = new Set(directMatches.map((node) => node.id));
+		const linkedSessionIDs = new Set(projection.connections.flatMap((connection) => {
+			if (matchingIDs.has(connection.source)) return [connection.target];
+			if (matchingIDs.has(connection.target)) return [connection.source];
+			return [];
+		}).filter((id) => canvasNodes.some((node) => node.id === id && node.kind === 'session')));
+		return canvasNodes.filter((node) => baseMatches(node) && (matchingIDs.has(node.id) || linkedSessionIDs.has(node.id)));
+	}, [canvasNodes, nodeTypeFilters, normalizedSearchQuery, projection.connections, serviceFilters, statusFilters]);
 	const visibleIDs = useMemo(() => new Set(visibleDomainNodes.map((node) => node.id)), [visibleDomainNodes]);
-	const hiddenCount = projection.nodes.length - visibleDomainNodes.length;
-	const modelNodes = useMemo(() => [...sections.map((section): CanvasFlowNode => ({
+	const hiddenCount = canvasNodes.length - visibleDomainNodes.length;
+	const visibleSections = useMemo(() => {
+		const filtered = sections.filter((section) => section.id === 'workspace-group' ? visibleDomainNodes.length > 0 : section.nodeIds.some((id) => visibleIDs.has(id)));
+		const filtersActive = Boolean(normalizedSearchQuery || statusFilters.length || serviceFilters.length || nodeTypeFilters.length);
+		const tightened = !filtersActive ? filtered : filtered.map((section) => {
+			if (section.id === 'workspace-group') return section;
+			const members = visibleDomainNodes.filter((node) => section.nodeIds.includes(node.id));
+			if (members.length === 0) return section;
+			const left = Math.min(...members.map((node) => node.position.x));
+			const top = Math.min(...members.map((node) => node.position.y));
+			const right = Math.max(...members.map((node) => node.position.x + (node.session && !node.collapsed ? 660 : 245)));
+			const bottom = Math.max(...members.map((node) => node.position.y + (node.session && !node.collapsed ? 500 : 116)));
+			return { ...section, position: { x: left - 28, y: top - 32 }, width: Math.max(301, right - left + 56), height: bottom - top + 64 };
+		});
+		const enclosed = [
+			...tightened.filter((section) => section.id !== 'workspace-group').map((section) => ({ left: section.position.x, top: section.position.y, right: section.position.x + section.width, bottom: section.position.y + section.height })),
+			...visibleDomainNodes.map((node) => ({ left: node.position.x, top: node.position.y, right: node.position.x + (node.session && !node.collapsed ? 660 : 245), bottom: node.position.y + (node.session && !node.collapsed ? 500 : 116) }))
+		];
+		if (enclosed.length === 0) return tightened;
+		const left = Math.min(...enclosed.map((bounds) => bounds.left));
+		const top = Math.min(...enclosed.map((bounds) => bounds.top));
+		const right = Math.max(...enclosed.map((bounds) => bounds.right));
+		const bottom = Math.max(...enclosed.map((bounds) => bounds.bottom));
+		return tightened.map((section) => section.id === 'workspace-group' ? { ...section, position: { x: left - 52, y: top - 82 }, width: right - left + 104, height: bottom - top + 126 } : section);
+	}, [nodeTypeFilters.length, normalizedSearchQuery, sections, serviceFilters.length, statusFilters.length, visibleDomainNodes, visibleIDs]);
+	const modelNodes = useMemo(() => [...visibleSections.map((section): CanvasFlowNode => ({
 		id: `section:${section.id}`,
 		type: 'section',
 		position: section.position,
-		draggable: layoutAvailable,
+		draggable: false,
 		selectable: false,
-		style: { width: section.width, height: section.height, zIndex: -1 },
-		data: { node: {} as DomainNode, section, selected: false, conflicted: false, onSelect: () => {}, onKeyboardMove: () => {}, onSetCollapsed: () => {}, onReload, layoutAvailable, onRemoveSection }
+		style: { width: section.width, height: section.height, zIndex: 0, pointerEvents: 'none' },
+		data: { node: {} as DomainNode, section, selected: false, conflicted: false, onSelect: () => {}, onKeyboardMove: () => {}, onSetCollapsed: () => {}, onReload, layoutAvailable, onRemoveSection, onMoveSection }
 	})), ...visibleDomainNodes.map((node): CanvasFlowNode => ({
 		id: node.id,
 		type: node.kind,
@@ -83,7 +120,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 		draggable: canMove(node, layoutAvailable),
 		selectable: true,
 		data: { node, selected: node.id === selectedId, sectionSelected: sectionSelection.includes(node.id), conflicted: conflicts.includes(node.id), onSelect: (id, additive) => additive && id ? toggleSectionSelection(id) : onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), onSetCollapsed, onReload, layoutAvailable }
-	}))], [conflicts, layoutAvailable, onMoveNode, onReload, onRemoveSection, onSelect, onSetCollapsed, sections, sectionSelection, selectedId, visibleDomainNodes]);
+	}))], [conflicts, layoutAvailable, onMoveNode, onReload, onRemoveSection, onSelect, onSetCollapsed, sectionSelection, selectedId, visibleDomainNodes, visibleSections]);
 	const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNode>(modelNodes);
 	useEffect(() => setNodes(modelNodes), [modelNodes, setNodes]);
 	const edges = useMemo(() => projection.connections.filter((connection) => visibleIDs.has(connection.source) && visibleIDs.has(connection.target)).map((connection): Edge => ({ id: connection.id, source: connection.source, target: connection.target, selectable: false, focusable: false, className: `canvas-edge canvas-edge-${connection.kind}` })), [projection.connections, visibleIDs]);
@@ -129,27 +166,60 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 					<CanvasArrangeMenu open={openMenu === 'group'} disabled={!layoutAvailable} onOpen={() => setOpenMenu(openMenu === 'group' ? '' : 'group')} onClose={() => setOpenMenu('')} onArrange={onArrange} />
 					<CanvasFacetMenu title="Node type" options={[{ value: 'plan', label: 'Plans' }, { value: 'session', label: 'Terminal sessions' }]} selected={nodeTypeFilters} open={openMenu === 'nodeType'} onOpen={() => setOpenMenu(openMenu === 'nodeType' ? '' : 'nodeType')} onClose={() => setOpenMenu('')} onToggle={(value) => setNodeTypeFilters((current) => toggleValue(current, value))} onClear={() => setNodeTypeFilters([])} />
 				</div>
-				<span className="filter-summary">{visibleDomainNodes.length} of {projection.nodes.length} nodes{hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}</span>
+				<span className="filter-summary">{visibleDomainNodes.length} of {canvasNodes.length} nodes{hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}</span>
 			</div>
+			<CanvasNodeLegend />
 			{selected && conflicts.includes(selected.id) && <span className="canvas-conflict-actions" role="alert"><span>Position conflict</span><button type="button" onClick={() => onReloadPosition(selected.id)}>Reload position</button><button type="button" onClick={() => onReapplyPosition(selected.id)}>Reapply my move</button></span>}
 		</div>
 		<div className="sr-only" role="status" aria-live="polite">{selected ? `Selected ${nodeSearchText(selected)}` : 'No Canvas node selected'}</div>
 		<div className="canvas-board" data-node-count={nodes.length}>
 			<ReactFlow key={projection.layout.id} nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onNodeDragStop={onDragStop} onNodeClick={(event, node) => { if (node.type === 'section' || event.metaKey || event.ctrlKey) return; onSelect(node.id); }} onSelectionStart={() => { boxSelectingRef.current = true; }} onSelectionEnd={() => { requestAnimationFrame(() => { boxSelectingRef.current = false; }); }} onSelectionChange={updateSectionSelection} onPaneClick={() => onSelect(undefined)} onMoveEnd={onMoveEnd} defaultViewport={projection.layout.viewport} minZoom={0.1} maxZoom={2} onlyRenderVisibleElements nodesDraggable elementsSelectable selectionOnDrag edgesFocusable={false} fitView={false}>
 				<Background color="var(--line)" gap={24} />
-				<CanvasGraphControls layoutAvailable={layoutAvailable} layoutMessage={layoutCapability?.message} onArrange={onArrange} onReset={onReset} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
+				<CanvasSearchViewport query={normalizedSearchQuery} />
+				<CanvasGraphControls layoutAvailable={layoutAvailable} layoutMessage={layoutCapability?.message} onArrange={onArrange} serviceGridColumns={serviceGridColumns} onReset={onReset} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
 			</ReactFlow>
 		</div>
 	</div></ReactFlowProvider>;
 }
 
-function CanvasSectionNode({ data }: NodeProps<CanvasFlowNode>) {
-	const section = data.section;
-	if (!section) return null;
-	return <section className="canvas-section-boundary" aria-label={`Section: ${section.title}`}><header><strong>{section.title}</strong><span>{section.nodeIds.length} nodes</span><button className="nodrag nopan" type="button" aria-label={`Remove section ${section.title}`} onClick={() => data.onRemoveSection?.(section.id)}><X size={13} /></button></header></section>;
+function CanvasSearchViewport({ query }: { query: string }) {
+	const { fitView } = useReactFlow();
+	const previousQuery = useRef(query);
+	useEffect(() => {
+		if (previousQuery.current === query) return;
+		previousQuery.current = query;
+		const frame = requestAnimationFrame(() => void fitView({ padding: 0.22, maxZoom: 1.15, duration: 180 }));
+		return () => cancelAnimationFrame(frame);
+	}, [fitView, query]);
+	return null;
 }
 
-function CanvasGraphControls({ layoutAvailable, layoutMessage, onArrange, onReset, isFullscreen, onToggleFullscreen }: { layoutAvailable: boolean; layoutMessage?: string; onArrange: (grouping: 'status' | 'service' | 'service_status') => void; onReset: () => void; isFullscreen: boolean; onToggleFullscreen: () => void }) {
+function CanvasNodeLegend() {
+	return <aside className="canvas-node-legend" aria-label="Node type legend"><span className="workspace"><i />Workspace group</span><span className="service"><i />Service group</span><span className="plan"><i />Plan</span><span className="session"><i />Terminal session</span></aside>;
+}
+
+function CanvasSectionNode({ data }: NodeProps<CanvasFlowNode>) {
+	const section = data.section;
+	const { screenToFlowPosition } = useReactFlow();
+	if (!section) return null;
+	const startMove = (event: React.PointerEvent<HTMLElement>) => {
+		if (!data.layoutAvailable || (event.target as HTMLElement).closest('button')) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const start = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+		const finish = (upEvent: PointerEvent) => {
+			const end = screenToFlowPosition({ x: upEvent.clientX, y: upEvent.clientY });
+			const delta = { x: end.x - start.x, y: end.y - start.y };
+			if (delta.x || delta.y) data.onMoveSection?.(section.id, { x: section.position.x + delta.x, y: section.position.y + delta.y }, delta);
+			window.removeEventListener('pointerup', finish);
+		};
+		window.addEventListener('pointerup', finish);
+	};
+	const sectionKind = section.id === 'workspace-group' ? 'workspace' : section.id.startsWith('service-') ? 'service' : 'custom';
+	return <section className={`canvas-section-boundary ${sectionKind}`} aria-label={`Section: ${section.title}`}><header className="nodrag nopan" onPointerDown={startMove}><strong className={`canvas-section-title ${sectionKind}`}>{section.title}</strong><span>{section.nodeIds.length} nodes</span><button className="nodrag nopan" type="button" aria-label={`Remove section ${section.title}`} onClick={() => data.onRemoveSection?.(section.id)}><X size={13} /></button></header></section>;
+}
+
+function CanvasGraphControls({ layoutAvailable, layoutMessage, onArrange, serviceGridColumns, onReset, isFullscreen, onToggleFullscreen }: { layoutAvailable: boolean; layoutMessage?: string; onArrange: (grouping: 'status' | 'service' | 'service_status' | 'service_grid') => void; serviceGridColumns: number; onReset: () => void; isFullscreen: boolean; onToggleFullscreen: () => void }) {
 	const { fitView, zoomIn, zoomOut } = useReactFlow();
 	const unavailableTitle = !layoutAvailable ? layoutMessage : undefined;
 	return <div className="canvas-graph-controls-panel" aria-label="Canvas graph controls">
@@ -158,7 +228,7 @@ function CanvasGraphControls({ layoutAvailable, layoutMessage, onArrange, onRese
 		<button type="button" className="canvas-graph-control-button" aria-label="Fit Canvas to view" title="Fit Canvas to view" onClick={() => void fitView({ padding: 0.08, maxZoom: 1.35 })}><Maximize size={15} /></button>
 		<button type="button" className="canvas-graph-control-button" aria-label={isFullscreen ? 'Exit fullscreen Canvas' : 'Open fullscreen Canvas'} title={isFullscreen ? 'Exit fullscreen' : 'Open fullscreen'} onClick={onToggleFullscreen}>{isFullscreen ? <Minimize2 size={15} /> : <Expand size={15} />}</button>
 		<button type="button" className="canvas-graph-control-button" aria-label="Beautify Canvas layout" title="Beautify Canvas layout" disabled={!layoutAvailable} onClick={() => onArrange('status')}><WandSparkles size={15} /></button>
-		<button type="button" className="canvas-graph-control-button" aria-label="Auto arrange Canvas" title="Auto arrange Canvas" disabled={!layoutAvailable} onClick={() => onArrange('service_status')}><LayoutGrid size={15} /></button>
+		<button type="button" className="canvas-graph-control-button" aria-label={`Arrange service plans in ${serviceGridColumns === 4 ? 1 : serviceGridColumns + 1} columns`} title={`Cycle service grid: ${serviceGridColumns === 4 ? 1 : serviceGridColumns + 1} columns`} disabled={!layoutAvailable} onClick={() => onArrange('service_grid')}><LayoutGrid size={15} /></button>
 		<button type="button" className="canvas-graph-control-button" aria-label="Reset layout" title={unavailableTitle || 'Reset layout'} disabled={!layoutAvailable} onClick={onReset}><RotateCcw size={15} /></button>
 	</div>;
 }

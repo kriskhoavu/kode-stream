@@ -120,8 +120,16 @@ export function useCanvasState(workspaceId?: string) {
 			setSaveStatus('saving');
 			if (caught instanceof ApiError && caught.code === 'placement_conflict') {
 				const affected = caught.nodeIds?.length ? caught.nodeIds : batch.map((entry) => entry.patch.nodeId);
-				setConflicts((previous) => Array.from(new Set([...previous, ...affected])));
-				setError('A node position changed elsewhere. Reload its position or reapply your move.');
+				affected.forEach((nodeId) => dirtyRef.current.delete(nodeId));
+				setConflicts((previous) => previous.filter((id) => !affected.includes(id)));
+				try {
+					setProjection(await api.canvasLayout(current.layout.id));
+				} catch {
+					// The next normal refresh will reconcile the layout; conflicts stay unobtrusive.
+				}
+				setError('');
+				setSaveStatus(dirtyRef.current.size > 0 ? 'saving' : 'saved');
+				if (dirtyRef.current.size > 0) setDirtyVersion((version) => version + 1);
 				return;
 			}
 			let retry = false;
