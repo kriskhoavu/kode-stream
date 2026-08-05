@@ -18,9 +18,9 @@ branch-safe terminal launch, placement restoration, and visible verification fre
 
 ## Playbooks
 
-| Playbook                                                                                      | Covers                                                                                                                      | Status |
-|-----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|--------|
-| [Scenario 01 — Operate the focused Terminal Canvas](scenario-01-orchestrate-plan-terminal.md) | Arrange and restore nodes, branch-safe launch, session lifecycle, Git state, verification staleness, and keyboard recovery. | Ready  |
+| Playbook                                                                                      | Covers                                                                                                                                                               | Status |
+|-----------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------|
+| [Scenario 01 — Operate the focused Terminal Canvas](scenario-01-orchestrate-plan-terminal.md) | Arrange and restore nodes and sections, branch-safe launch, session lifecycle, Workbench quality controls, Git state, verification staleness, and keyboard recovery. | Ready  |
 
 ## Latest Result
 

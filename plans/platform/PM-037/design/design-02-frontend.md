@@ -2,9 +2,9 @@
 
 ## Overview
 
-Add a lazy-loaded `/canvas` route that renders one branch-scoped workspace Canvas with draggable workspace, plan, and
-session nodes. The page uses the existing `@xyflow/react` dependency and Knowledge Graph interaction patterns, but it is
-not a general graph editor. It presents current workspace state, launches branch-safe sessions, shows Git and
+Add a lazy-loaded `/canvas` route that renders one branch-scoped workspace Canvas with draggable plan and session nodes
+inside workspace context. The page uses the existing `@xyflow/react` dependency and Knowledge Graph interaction patterns,
+but it is not a general graph editor. It presents current workspace state, launches branch-safe sessions, shows Git and
 verification freshness, and links to existing detailed pages.
 
 The frontend never derives support from deployment or workspace mode names. It renders the current action capability
@@ -12,13 +12,13 @@ state returned for each resolved entity and handles capability changes without d
 
 ## Route And Context
 
-| Route or Control                 | Behavior                                                                                     |
-|----------------------------------|----------------------------------------------------------------------------------------------|
-| `/canvas`                        | Resolve the default layout for the active workspace and selected branch.                     |
-| Workspace navigation: **Canvas** | Open Canvas without changing workspace or branch selection.                                  |
-| Branch control                   | Use the existing selected branch context; changing branch resolves a different layout.       |
-| **Open full view**               | Navigate to the existing Workspace, Workstream, Item Workspace, or verification destination. |
-| Node search                      | Find and focus a visible workspace, plan, or session node.                                   |
+| Route or Control                    | Behavior                                                                                 |
+|-------------------------------------|------------------------------------------------------------------------------------------|
+| `/canvas`                           | Resolve the default layout for the active workspace and selected branch.                 |
+| Workspace navigation: **Workbench** | Open the Canvas workbench without changing workspace or branch selection.                |
+| Branch control                      | Use the existing selected branch context; changing branch resolves a different layout.   |
+| **View details**                    | Navigate to the existing Workspace or Item Workspace destination.                        |
+| Node search                         | Find and focus a visible plan or session node; matching plans retain connected sessions. |
 
 PM-037 does not add Canvas to the Chrome extension surface. It does not introduce canvas IDs, copies, lists, or
 cross-workspace routing.
@@ -47,18 +47,17 @@ cross-workspace routing.
 | Selected node                               | Canvas page                     | Memory                                   |
 | Node search query                           | Search control                  | Memory                                   |
 | Inspector open state                        | Canvas page                     | Memory                                   |
+| Section definitions and service-grid choice | Canvas page                     | Browser local storage, per Canvas layout |
 | Terminal channel, grant, and xterm instance | Existing terminal-session layer | Memory only                              |
 | Current capabilities and freshness          | Query projection                | Refetched; never written with placements |
 
 ## Node Types
 
-### Workspace Node
+### Workspace Context Section
 
-Displays workspace name, selected branch, HEAD summary, dirty/conflict status, and the most important action
-capabilities. Selecting it opens the Workspace panel with Git status and links to full workspace controls.
-
-Dragging a Workspace node moves only that node. It does not translate plan or session nodes and does not change
-workspace membership, branch selection, or repository state.
+The backend projects workspace state, but the board does not render it as a standalone selectable node. Instead, a
+workspace section labels and encloses the visible plan and session work. The section can move its member placements as a
+presentation operation; it does not change workspace membership, branch selection, or repository state.
 
 ### Plan Node
 
@@ -77,6 +76,13 @@ safe lifecycle detail. Selecting the session does not change its disclosure stat
 Removing the node removes only its placement. Stopping a process requires a separate explicit action and confirmation.
 Terminal input, text selection, and scrolling do not initiate Canvas drag or pan gestures; the session summary remains
 the node drag target.
+
+### Visual Sections
+
+The Canvas renders a workspace frame around visible work and a service frame around each plan service. Users can
+multi-select at least two nodes to create a named section. Section headers move their member placements by the same
+delta; removing a section leaves every member in place. Sections are stored in browser local storage for the resolved
+layout, rather than in the Canvas repository, and are not entity nodes, parent relationships, or custom edges.
 
 ## Derived Connections
 
@@ -98,7 +104,7 @@ hiding, or removing a node changes the underlying relationship.
 - **Reset layout** shows a preview and requires confirmation before patching positions.
 - Page reload restores node positions. Current entity labels, status, Git state, capabilities, live-binding state, and
   verification freshness are resolved again.
-- Viewport restoration must never hide the selected workspace with no obvious **Fit content** recovery control.
+- Viewport restoration must never hide visible work with no obvious **Fit Canvas to view** recovery control.
 
 ## Placement Save Behavior
 
@@ -115,16 +121,16 @@ Viewport saves use the layout metadata version and cannot conflict with placemen
 
 ## Focused Workbench And Inline Sessions
 
-| Selected Node                | PM-037 Content                                                                                                  |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| Workspace                    | Right Workbench with branch and Git status summary, refresh, and links to existing workspace controls.          |
-| Plan                         | Right Workbench with plan summary, branch context, launch, verification status/action, and **Open full view**.  |
-| Live session                 | Canvas node whose top-right action opens the existing xterm surface, connection state, close, and cancellation. |
-| Ended or interrupted session | Canvas node whose top-right action opens safe lifecycle summary and exit or interruption detail.                |
-| Stale node                   | Safe explanation, placement removal, and explicit replacement candidate when available.                         |
+| Selected Node                | PM-037 Content                                                                                                                                                                                              |
+|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Plan                         | Right Workbench with **Info**, **Jira**, and **Quality** tabs plus **View details**. Info can edit item metadata; Jira reuses item context; Quality runs verification and configures/runs automation specs. |
+| Live session                 | Canvas node whose top-right action opens the existing xterm surface, connection state, close, and cancellation.                                                                                             |
+| Ended or interrupted session | Canvas node whose top-right action opens safe lifecycle summary and exit or interruption detail.                                                                                                            |
+| Stale node                   | Safe explanation, placement removal, and explicit replacement candidate when available.                                                                                                                     |
 
-PM-037 does not embed Markdown editing, file browsing, diff, Jira, complete Git controls, or full verification artifacts.
-Those remain in their existing authoritative views.
+PM-037 does not embed Markdown editing, file browsing, diff, complete Git controls, or a complete Item Workspace.
+Those remain in their existing authoritative views. The Workbench does embed the existing Jira item panel, editable item
+metadata, verification summary, automation-spec selection, and the reusable E2E quality panel.
 
 Only one terminal surface is mounted for each expanded session node. Selection never changes disclosure. The top-right
 action and terminal close action update the persisted `collapsed` placement field without stopping the process or
@@ -164,7 +170,7 @@ process through the existing session lifecycle surface.
 
 ### Git
 
-The Workspace node and panel show current branch, clean/dirty/conflicted status, and changed-file count. Detailed file
+The workspace context section and plan Quality tab expose current branch and verification state. Detailed Git file
 operations remain in the existing Git UI.
 
 ### Verification
@@ -198,16 +204,18 @@ behavior. Labels may still appear as contextual information when useful.
 
 | Interaction              | Result                                                                                     |
 |--------------------------|--------------------------------------------------------------------------------------------|
-| Single select            | Focus a workspace or plan and update the Workbench; focus a session without disclosing it. |
+| Single select            | Focus a plan and update the Workbench; focus a session without disclosing it.              |
 | Session top-right action | Expand or collapse the terminal independently from node selection.                         |
 | Double click or Enter    | Open the full entity view, or focus an already expanded terminal for a session node.       |
 | Drag node                | Move only selected placement or selected placement set.                                    |
+| Move section             | Translate every section member while keeping membership presentation-only.                 |
+| Create/remove section    | Create a named frame around a multi-selection, or remove its frame without moving members. |
 | Node search              | Filter by current resolved title, identifier, branch, or session state and focus a result. |
 | Fit content              | Fit visible nodes without changing saved positions.                                        |
 | Reset layout             | Preview deterministic positions and confirm before applying them.                          |
 | Remove node              | Remove placement only after stating that the source entity and process are unchanged.      |
 
-There are no connection handles, group drop targets, note editors, edge menus, minimap requirement, or semantic zoom
+There are no connection handles, section drop targets, note editors, edge menus, minimap requirement, or semantic zoom
 modes in PM-037.
 
 ## Accessibility

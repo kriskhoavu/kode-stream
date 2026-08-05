@@ -6,9 +6,9 @@ Implement a polished Local Canvas MVP for the workspace -> plan -> session loop.
 branch-aware references, placement persistence, durable safe session metadata, and verification freshness before adding
 the viewport and Workbench. Every phase preserves existing terminal, Git, item, verification, and storage ownership.
 
-The broader Canvas vision remains in the README roadmap. Groups, notes, artifacts, custom edges, multiple canvases,
-Cloud Agent execution, Remote Snapshot UX, worktrees, and collaboration are not implementation deliverables for
-PM-037.
+The broader Canvas vision remains in the README roadmap. PM-037 delivers bounded presentation sections, but notes,
+artifacts, custom edges, multiple canvases, Cloud Agent execution, Remote Snapshot UX, worktrees, and collaboration
+are not implementation deliverables.
 
 ## Phases Summary
 
@@ -28,6 +28,7 @@ PM-037.
 | F6    | Stable embedded terminal channel lifecycle            | Frontend   | Complete |
 | F7    | Explicit session terminal disclosure                  | Frontend   | Complete |
 | F8    | Silent automatic placement of new nodes               | Frontend   | Complete |
+| F9    | Workbench sections and plan-detail surface            | Frontend   | Complete |
 | I1    | Browser journey, documentation, and final integration | Full stack | Complete |
 
 ## Backend Phases
@@ -157,7 +158,7 @@ PM-037.
 - [x] Add Canvas, placement, branch-aware entity reference, action capability, safe session, and verification freshness
   API types.
 - [x] Add lazy-loaded `/canvas` routing for the active workspace and selected branch.
-- [x] Add **Canvas** to Workspace navigation outside the Chrome extension surface.
+- [x] Add **Workbench** navigation for Canvas outside the Chrome extension surface.
 - [x] Implement default resolve/load and branch-context switching.
 - [x] Implement optimistic node positions, dirty-node tracking, debounced placement patches, and bounded retry.
 - [x] Keep viewport saves independent from placement revisions.
@@ -176,8 +177,8 @@ PM-037.
 **Deliverables:**
 
 - [x] Add the React Flow viewport with visible pan, zoom, fit, selection, and reset controls.
-- [x] Add memoized workspace, plan, and session node renderers only.
-- [x] Make all three node kinds draggable and prove that moving the workspace does not move other nodes.
+- [x] Add memoized plan and session node renderers plus non-node workspace/service section frames.
+- [x] Make plan and session nodes draggable; make section movement explicitly translate only its member placements.
 - [x] Render repository and application connections without handles or edit/delete controls.
 - [x] Implement deterministic first placement, restored saved positions, and new-node candidates.
 - [x] Implement reset-layout preview and confirmation.
@@ -217,7 +218,7 @@ PM-037.
 
 **Deliverables:**
 
-- [x] Show branch, HEAD summary, clean/dirty/conflicted state, and changed-file count on the workspace node and panel.
+- [x] Show workspace branch context and verification state without rendering a standalone workspace node.
 - [x] Show verification result status separately from current/stale/inconclusive freshness.
 - [x] Remove current-success emphasis from stale passed results and show verified/current revision summaries.
 - [x] Refresh freshness after branch, commit, staged, unstaged, untracked, or verification configuration changes.
@@ -298,6 +299,27 @@ PM-037.
 
 **Commit:** `PM-037: Place new Canvas nodes automatically`
 
+---
+
+### Phase F9: Workbench Sections And Plan-Detail Surface
+
+**Deliverables:**
+
+- [x] Add generated workspace and service sections, user-created named sections, section movement, service-grid cycling,
+  filtering-aware bounds, and browser-local section persistence.
+- [x] Keep section membership presentation-only: section movement patches member placements, while deletion leaves
+  member nodes in place.
+- [x] Rename the Workspace navigation label to **Workbench** and add Canvas legend, search viewport fitting, and
+  fullscreen/layout controls.
+- [x] Add **Info**, **Jira**, and **Quality** tabs for selected plans; reuse item metadata, Jira, verification,
+  automation-spec, and E2E runbook authorities rather than duplicating their state in Canvas.
+- [x] Add toolbar and Workbench AI-session entry points with existing guarded embedded-launch semantics.
+- [x] Add section, grouping, Workbench-panel, metadata, Jira, quality, and terminal-session regression coverage.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/canvas web/src/pages/CanvasPage.test.tsx web/src/features/ai-session`
+
+**Commit:** `Improve Canvas workbench and AI sessions`; `Enhance Canvas workbench controls and sections`; `Refine Workbench canvas grouping`
+
 ## Integration Phase
 
 ### Phase I1: Browser Journey, Documentation, And Final Integration
@@ -306,14 +328,15 @@ PM-037.
 
 - [x] Update the PM-037 playbook to match implemented labels and selectors.
 - [x] Run the Local journey in a fresh Playwright MCP context when runtime inputs are supplied.
-- [x] Verify independent workspace, plan, and session movement plus restored layout.
+- [x] Verify plan/session movement, section-member translation, and restored layout.
 - [x] Verify matching-branch launch, double-submit protection, branch-mismatch rejection, and session interruption semantics.
 - [x] Verify Git state and passed-result staleness after a controlled repository mutation.
 - [x] Record passed, failed, blocked, and skipped steps in `automation/results/latest.md` with safe evidence references.
 - [x] Run `wiki-enrich` and verify the durable Canvas journey documents delivered Local behavior and future capability
   boundaries accurately.
 - [x] Update architecture, storage, terminal, verification, and user-facing README documentation with delivered behavior.
-- [x] Confirm deferred graph, Cloud Agent, and Remote Snapshot features are not described as implemented.
+- [x] Confirm bounded visual sections are described as delivered, while custom graph authoring, Cloud Agent, and Remote
+  Snapshot features remain deferred.
 - [x] Run full backend tests, frontend tests, production build, Markdown formatting, and plan consistency checks.
 
 **Verification:** `go test ./... && npm run build && npm test -- --run`
@@ -324,7 +347,7 @@ PM-037.
 
 - [x] Every phase is verified and committed separately with its listed PM-037 subject.
 - [x] Canvas stores placements and presentation only, never copied entity state.
-- [x] Workspace, plan, and session nodes are all draggable; moving a workspace moves no other node.
+- [x] Plan and session nodes are draggable; moving a section translates only its explicit member placements.
 - [x] Placement conflicts are scoped to affected nodes and viewport saves are independent.
 - [x] Current branch is revalidated on the server immediately before terminal process start.
 - [x] Repeated launch submissions start at most one process.
@@ -335,7 +358,7 @@ PM-037.
   change.
 - [x] Action behavior uses capability states and reason codes, not mode or datastore checks.
 - [x] Layout removal and reset never mutate workspaces, plans, sessions, processes, Git, or verification entities.
-- [x] Groups, notes, artifacts, custom edges, multiple canvases, Agent execution, snapshot UX, and collaboration remain
-  deferred.
+- [x] Browser-local presentation sections are delivered; notes, artifacts, custom edges, multiple canvases, Agent
+  execution, snapshot UX, and collaboration remain deferred.
 - [x] Existing Workstream, Item Workspace, terminal dock, Git, and verification workflows still pass.
 - [x] `plan.e2e-runbook` remains true and durable wiki journey coverage is verified before final handoff.

@@ -8,9 +8,9 @@ and return to the same layout. Canvas remains a projection of real workspace sta
 only, while repositories, Git, verification, session metadata, and live process managers remain authoritative for their
 domains.
 
-PM-037 establishes the foundation for a larger Canvas product without shipping a general graph editor in the first
-release. Groups, notes, artifacts, custom edges, multiple canvases, snapshots, and collaborative layouts remain explicit
-follow-up investments.
+PM-037 establishes the foundation for a larger Canvas product without shipping an arbitrary graph editor. It delivers
+workspace and service visual sections plus user-created presentation sections; notes, artifacts, custom edges, multiple
+canvases, snapshots, and collaborative layouts remain explicit follow-up investments.
 
 > **Branch-context follow-up:** [PM-038](../PM-038/README.md) makes Canvas resolve the current checkout itself before
 > indexing and seeding plan nodes. Canvas no longer accepts a page-selected snapshot branch; non-checkout plans are
@@ -20,7 +20,7 @@ follow-up investments.
 
 A successful first release proves this loop:
 
-> Open a workspace Canvas -> arrange workspace, plan, and session nodes -> launch a terminal on the correct branch ->
+> Open a workspace Canvas -> arrange plan and session nodes within workspace context -> launch a terminal on the correct branch ->
 > inspect Git state -> run verification -> see verification become stale after repository change -> reload and restore
 > the saved arrangement.
 
@@ -29,7 +29,9 @@ A successful first release proves this loop:
 ### Goals
 
 - Add one default Canvas for each workspace and branch context.
-- Make workspace, plan, and durable session nodes draggable.
+- Make plan and durable session nodes draggable within the rendered workspace context.
+- Organize plans in movable workspace and service sections, and let users create, move, and remove presentation-only
+  sections.
 - Persist node placements independently from the entities they reference.
 - Restore saved placements while resolving titles, status, capabilities, Git state, verification freshness, and live
   process availability from their authoritative services.
@@ -39,17 +41,20 @@ A successful first release proves this loop:
 - Derive actions from current workspace capabilities instead of deployment or access-mode names.
 - Support the current Local data-dir and SQLite app-state stores through one Canvas repository boundary.
 - Provide clear keyboard access, save state, reset-layout recovery, stale-reference handling, and non-color status cues.
+- Give a selected plan an in-place Workbench with editable item metadata, Jira context, verification controls, and
+  automation-spec selection.
 
 ### Non-Goals For PM-037
 
-- No group, note, or artifact nodes.
+- No note or artifact nodes.
 - No user-authored edges or arbitrary relationship editing.
 - No multiple canvases, canvas copies, or collaborative layout merging.
 - No cross-workspace or multi-branch Canvas.
 - No automatic branch switching or worktree creation.
 - No Agent-Backed Cloud execution delivery; the contracts must allow it without mode branching.
 - No Agentless Remote Snapshot Canvas UX; snapshot-backed content is a separate provider capability phase.
-- No full Item Workspace, Workstream, Jira, file editor, or diff UI embedded in Canvas.
+- No file editor, file browser, diff UI, or complete Item Workspace embedded in Canvas; **View details** still opens the
+  authoritative full view.
 - No transcript persistence, replay, or search.
 - No unattended agent queue or autonomous multi-agent scheduler.
 - No repository-side Canvas file.
@@ -82,9 +87,10 @@ deployment-specific branches to Canvas components.
 
 | Term                   | Meaning                                                                           | Maps To                              |
 |------------------------|-----------------------------------------------------------------------------------|--------------------------------------|
-| Terminal Canvas        | Spatial workbench for workspace, plan, and session orchestration.                 | `CanvasPage`                         |
+| Terminal Canvas        | Spatial workbench for workspace context, plan, and session orchestration.         | `CanvasPage`                         |
 | Canvas Layout          | App-owned identity and branch-scoped collection of placements.                    | `canvas.Layout`                      |
 | Placement              | Canvas-local position and presentation for an entity reference.                   | `canvas.Placement`                   |
+| Canvas Section         | Presentation-only frame around workspace, service, or user-selected node sets.    | Browser-local `CanvasSection`        |
 | Entity Reference       | Branch-aware pointer to an existing workspace, plan, or durable session.          | `canvas.EntityRef`                   |
 | Workspace Context      | Workspace plus branch/ref and observed repository revision used by the Canvas.    | `canvas.WorkspaceContext`            |
 | Action Capability      | Current action state with availability and a machine-readable denial reason.      | `workspace.ActionCapability`         |
@@ -130,19 +136,23 @@ revalidates every action at execution time; frontend capability state is advisor
 | Safe session lifecycle metadata                       | Session record repository | Reference only                   |
 | PTY, process, grants, output, prompt, arguments       | Live process manager      | Never                            |
 | Node position and collapsed presentation              | Canvas repository         | Yes                              |
+| Section frames, labels, and membership                | Browser-local Canvas view | Yes, in browser local storage    |
 | Current resolved labels and capabilities              | Resolver                  | Never                            |
 
 ## Node Movement Semantics
 
-- Moving any workspace, plan, or session node changes only that node's placement.
-- A workspace node is a semantic anchor, not a spatial parent. Moving it never moves plan or session nodes.
+- The board renders plan and session nodes; workspace context is represented by a visual workspace section rather than
+  a standalone selectable node.
+- Moving a plan or session node changes only that node's placement.
+- Moving a workspace or custom section applies a delta to its member plan and session placements.
 - Repository containment does not create drag parenting.
 - Removing a placement never deletes or mutates the referenced entity or live process.
 - A removed placement remains hidden for that layout and is never recreated by automatic placement.
 - Newly discovered entities receive deterministic positions silently without moving saved nodes or showing a prompt.
 - Reset layout previews a deterministic placement set before replacing saved positions.
-- Future groups will be explicit visual frames: moving a group applies a delta to members, deleting it leaves members in
-  place, and overlap alone never creates membership.
+- Workspace and service sections are generated presentation frames. Users can create named sections around selected
+  nodes; moving a section applies its delta to member placements, deleting it leaves members in place, and overlap alone
+  never creates membership. Section definitions are browser-local and do not mutate Canvas repository entities.
 
 ## Relationship Provenance
 
@@ -183,7 +193,7 @@ hiding or removing a placement does not mutate the relationship source.
 | Block branch-mismatched launch                             | Silently launch or switch checkout              | Protects user trust and repository safety.                                               |
 | Separate session records from process bindings             | Treat in-memory terminal sessions as durable    | Restores honest lifecycle metadata without persisting terminal secrets.                  |
 | Fingerprint verification inputs                            | Keep the last result green until rerun          | Prevents stale verification from appearing current.                                      |
-| Defer groups and custom edges                              | Ship generic spatial authoring immediately      | Avoids ambiguous movement and relationship semantics.                                    |
+| Deliver bounded sections; defer custom edges               | Ship generic spatial authoring immediately      | Supports work grouping without arbitrary relationship editing or server-side graph data. |
 | Treat snapshots as provider composition                    | Treat Agentless as a restricted deployment mode | Allows future read and execution capability combinations independently.                  |
 
 ## Documents

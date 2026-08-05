@@ -2,7 +2,7 @@
 
 ## Goal
 
-> Validate that a user can arrange and restore workspace, plan, and session nodes; launch one terminal on the correct
+> Validate that a user can arrange and restore plan and session nodes within workspace context; launch one terminal on the correct
 > branch; inspect Git state; and see verification become stale after a repository change.
 
 ## Preconditions
@@ -31,24 +31,25 @@
 
 ## Section A: Arrange And Restore The Canvas
 
-| #   | Agent Action                                                                                | Wait Condition                                             | Expected Result                                                                                                           | Write Class |
-|-----|---------------------------------------------------------------------------------------------|------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|-------------|
-| 1   | Navigate to Kode Stream and select the supplied Local workspace and matching branch.        | Workspace and branch are visible in the application shell. | The workspace loads without an error.                                                                                     | Read-only   |
-| 2   | Choose **Canvas** from Workspace navigation.                                                | Canvas loading finishes and **Fit view** is available.     | One workspace node and current branch plan nodes are visible; no group, note, artifact, or editable edge controls appear. | Safe write  |
-| 3   | Record the positions of one workspace node and one plan node, then move the workspace node. | Save status changes from **Saving** to **Saved**.          | Only the workspace position changes; the plan position is unchanged.                                                      | Safe write  |
-| 4   | Move the supplied plan node to a distinct position.                                         | Save status becomes **Saved**.                             | The plan moves without changing the workspace position or repository data.                                                | Safe write  |
-| 5   | Reload the page and reopen Canvas for the same workspace and branch.                        | Entity resolution and placement loading finish.            | Workspace and plan positions are restored while labels, Git state, and capabilities reflect current state.                | Read-only   |
-| 6   | Trigger the supplied safe plan scan and refresh Canvas.                                     | The new plan node becomes visible.                         | Canvas places it silently without moving saved nodes or showing an action, count, or notification.                        | Safe write  |
+| #   | Agent Action                                                                             | Wait Condition                                                   | Expected Result                                                                                                                   | Write Class |
+|-----|------------------------------------------------------------------------------------------|------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|-------------|
+| 1   | Navigate to Kode Stream and select the supplied Local workspace and matching branch.     | Workspace and branch are visible in the application shell.       | The workspace loads without an error.                                                                                             | Read-only   |
+| 2   | Choose **Workbench** from Workspace navigation.                                          | Canvas loading finishes and **Fit Canvas to view** is available. | Current-branch plan nodes are visible inside workspace and service sections; no note, artifact, or editable-edge controls appear. | Safe write  |
+| 3   | Record one plan position, then move the plan to a distinct position.                     | Save status changes from **Saving** to **Saved**.                | The plan moves without changing repository data or the surrounding workspace context.                                             | Safe write  |
+| 4   | Drag the workspace section header.                                                       | Save status becomes **Saved**.                                   | The section moves its member placements together without changing repository data.                                                | Safe write  |
+| 5   | Reload the page and reopen Workbench for the same workspace and branch.                  | Entity resolution and placement loading finish.                  | Plan and session positions are restored while labels, Git state, and capabilities reflect current state.                          | Read-only   |
+| 6   | Trigger the supplied safe plan scan and refresh Canvas.                                  | The new plan node becomes visible.                               | Canvas places it silently without moving saved nodes or showing an action, count, or notification.                                | Safe write  |
+| 7   | Cmd/Ctrl-click or box-select two nodes, create a named section, then move and remove it. | Each placement save finishes.                                    | Moving the section moves its member nodes; removing it leaves those node positions unchanged.                                     | Safe write  |
 
 ## Section B: Launch One Branch-Safe Session
 
-| #   | Agent Action                                                                                | Wait Condition                                          | Expected Result                                                                                                                       | Write Class |
-|-----|---------------------------------------------------------------------------------------------|---------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|-------------|
-| 1   | Select the supplied plan node.                                                              | The Plan Workbench is visible.                          | The plan identifier, matching branch, terminal action, verification action, and **Open full view** are visible as capabilities allow. | Read-only   |
-| 2   | Choose **Launch terminal** using the default provider configured in Settings.               | **Launching…** clears and the new session node expands. | One durable session is created, only that session is placed, and its live terminal appears inside the Canvas node.                    | Safe write  |
-| 3   | While submission is pending, activate the launch control again if it remains enabled.       | The original request settles.                           | At most one session and one process exist for the submission; no duplicate terminal appears.                                          | Safe write  |
-| 4   | Select the workspace and session nodes, then use the session's top-right disclosure action. | Selection and disclosure updates finish.                | Selection alone does not change the terminal; the action collapses or expands the same process without relaunching it.                | Safe write  |
-| 5   | Move the session node and reload the browser page without restarting the backend.           | Canvas and session state reload.                        | Session placement is restored; the record remains visible and reconnect follows existing grant/lease behavior.                        | Safe write  |
+| #   | Agent Action                                                                                  | Wait Condition                                          | Expected Result                                                                                                                     | Write Class |
+|-----|-----------------------------------------------------------------------------------------------|---------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| 1   | Select the supplied plan node.                                                                | The Plan Workbench is visible.                          | **Info**, **Jira**, and **Quality** tabs plus **View details** are visible; terminal and verification controls follow capabilities. | Read-only   |
+| 2   | Choose **Launch terminal** using the default provider configured in Settings.                 | **Launching…** clears and the new session node expands. | One durable session is created, only that session is placed, and its live terminal appears inside the Canvas node.                  | Safe write  |
+| 3   | While submission is pending, activate the launch control again if it remains enabled.         | The original request settles.                           | At most one session and one process exist for the submission; no duplicate terminal appears.                                        | Safe write  |
+| 4   | Select another plan and the session node, then use the session's top-right disclosure action. | Selection and disclosure updates finish.                | Selection alone does not change the terminal; the action collapses or expands the same process without relaunching it.              | Safe write  |
+| 5   | Move the session node and reload the browser page without restarting the backend.             | Canvas and session state reload.                        | Session placement is restored; the record remains visible and reconnect follows existing grant/lease behavior.                      | Safe write  |
 
 ## Section C: Reject A Branch Mismatch
 
@@ -63,12 +64,13 @@ the repository is dirty or conflicted unless the supplied setup explicitly makes
 
 ## Section D: Git And Verification Freshness
 
-| #   | Agent Action                                                                            | Wait Condition                                          | Expected Result                                                                                                        | Write Class |
-|-----|-----------------------------------------------------------------------------------------|---------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|-------------|
-| 1   | Return to the matching branch and select the workspace node.                            | Git status finishes loading.                            | Current branch plus clean, dirty, or conflicted status and changed-file count are visible.                             | Read-only   |
-| 2   | Select the supplied plan and run the supplied verification profile.                     | Verification reaches a final state.                     | A completed result shows command outcome separately from freshness and includes a safe abbreviated verified revision.  | Safe write  |
-| 3   | If the result passed and is current, apply the supplied reversible repository mutation. | Git state refreshes and verification freshness updates. | Git becomes dirty or changes revision, and the previous result becomes **stale** without moving the plan node.         | Safe write  |
-| 4   | Rerun verification after the mutation when permitted.                                   | Verification reaches a final state.                     | The new result is associated with the changed repository fingerprint; the previous result is not presented as current. | Safe write  |
+| #   | Agent Action                                                                                | Wait Condition                                          | Expected Result                                                                                                                       | Write Class |
+|-----|---------------------------------------------------------------------------------------------|---------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| 1   | Return to the matching branch and inspect the Workbench checkout context.                   | Git status finishes loading.                            | Current branch plus available Git and verification context are visible.                                                               | Read-only   |
+| 2   | Select the supplied plan and run the supplied verification profile.                         | Verification reaches a final state.                     | A completed result shows command outcome separately from freshness and includes a safe abbreviated verified revision.                 | Safe write  |
+| 3   | If the result passed and is current, apply the supplied reversible repository mutation.     | Git state refreshes and verification freshness updates. | Git becomes dirty or changes revision, and the previous result becomes **stale** without moving the plan node.                        | Safe write  |
+| 4   | Rerun verification after the mutation when permitted.                                       | Verification reaches a final state.                     | The new result is associated with the changed repository fingerprint; the previous result is not presented as current.                | Safe write  |
+| 5   | Open **Quality**, select a suggested or supplied automation spec, and inspect the run mode. | Quality settings load.                                  | Suggested specs identify their `automation-test` source; selected specs, environment, and silent/visible mode controls are available. | Safe write  |
 
 ## Section E: Removal, Keyboard, And Recovery
 
@@ -82,7 +84,7 @@ the repository is dirty or conflicted unless the supplied setup explicitly makes
 
 ## Evidence
 
-- Capture the initial Canvas and the independently moved workspace and plan positions.
+- Capture the initial Canvas, a moved plan, and the workspace section after its member placements move.
 - Capture the restored layout after reload.
 - Capture one plan-linked session without recording terminal content, prompts, arguments, or credentials.
 - Capture branch-mismatch guidance when the controlled setup is available.

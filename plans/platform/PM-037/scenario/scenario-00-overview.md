@@ -2,15 +2,15 @@
 
 ## Scenario List
 
-| #   | Title                                   | Description                                                                        |
-|-----|-----------------------------------------|------------------------------------------------------------------------------------|
-| 0   | First branch-scoped Canvas              | Resolve one default layout and place current workspace and plans.                  |
-| 1   | Arrange and restore work                | Move workspace, plan, and session nodes independently and restore their positions. |
-| 2   | Branch-safe plan launch                 | Launch once on a matching checkout and block launch after branch mismatch.         |
-| 3   | Durable session and live process        | Keep safe session history distinct from reconnectable terminal state.              |
-| 4   | Git and verification freshness          | Show current Git state and invalidate verification after repository change.        |
-| 5   | Capability and stale-reference recovery | Explain unavailable actions and missing entities without mode-specific UI.         |
-| 6   | Keyboard and narrow-window operation    | Operate essential Canvas actions without precise pointer input.                    |
+| #   | Title                                   | Description                                                                 |
+|-----|-----------------------------------------|-----------------------------------------------------------------------------|
+| 0   | First branch-scoped Canvas              | Resolve one default layout and render current plans in workspace context.   |
+| 1   | Arrange and restore work                | Move plan and session nodes, then restore their positions.                  |
+| 2   | Branch-safe plan launch                 | Launch once on a matching checkout and block launch after branch mismatch.  |
+| 3   | Durable session and live process        | Keep safe session history distinct from reconnectable terminal state.       |
+| 4   | Git and verification freshness          | Show current Git state and invalidate verification after repository change. |
+| 5   | Capability and stale-reference recovery | Explain unavailable actions and missing entities without mode-specific UI.  |
+| 6   | Keyboard and narrow-window operation    | Operate essential Canvas actions without precise pointer input.             |
 
 ## Scenario 0: First Branch-Scoped Canvas
 
@@ -30,7 +30,7 @@
 
 ### Flow 0.1: Resolve Default Layout
 
-1. User opens **Canvas** from Workspace navigation.
+1. User opens **Workbench** from Workspace navigation.
 2. Backend resolves the selected workspace and branch context.
 3. Backend creates one default layout when none exists.
 4. Resolver projects the workspace and current branch plans with capabilities and current state.
@@ -39,12 +39,12 @@
 
 ### Expected State
 
-> One workspace node and current branch plan nodes are visible. There are no group, note, artifact, or editable edge
-> controls.
+> Current-branch plan nodes are visible inside workspace and service presentation sections. There are no note,
+> artifact, or editable-edge controls.
 
 ### Edge Cases
 
-- With no plans, show the workspace node and existing scan/source guidance.
+- With no plans, show existing scan/source guidance within the workspace context.
 - A failure to read Git state does not delete or rearrange placements.
 - A user without layout permission receives a read-only projected layout.
 - Changing the selected branch resolves another branch-scoped layout instead of mixing plans into the current layout.
@@ -65,13 +65,11 @@
 
 ### Flow 1.1: Move Every Relevant Node Kind
 
-1. User moves the workspace node.
-2. Only the workspace placement changes; plan and session coordinates remain unchanged.
-3. User moves a plan node and then a session node.
-4. Frontend patches only the changed placements with expected revisions.
-5. Save state changes from **Saving** to **Saved**.
-6. User reloads the page.
-7. Backend resolves current entity state while frontend restores the saved coordinates.
+1. User moves a plan node and then a session node.
+2. Frontend patches only the changed placements with expected revisions.
+3. Save state changes from **Saving** to **Saved**.
+4. User reloads the page.
+5. Backend resolves current entity state while frontend restores the saved coordinates.
 
 ### Flow 1.2: New And Removed Work
 
@@ -95,6 +93,20 @@
 - Removing a running session placement does not cancel its process.
 - Reset layout shows a preview and requires confirmation.
 - Background refresh never runs auto-layout over saved positions.
+
+## Scenario 1.4: Organize Work With Presentation Sections
+
+1. Canvas generates a workspace section and service sections from the resolved plan set.
+2. User can group plans by service and cycle the service grid between one and four columns.
+3. User Cmd/Ctrl-clicks or box-selects at least two nodes, chooses **Create section**, and supplies a name.
+4. Dragging the section header moves all of its member placements by the same delta.
+5. Removing the section removes only the browser-local frame; its member placements remain where they are.
+
+### Acceptance Notes
+
+- Section definitions are browser-local presentation state for the Canvas layout.
+- Sections do not create hierarchy, entity ownership, or persisted Canvas relationships.
+- Filtering and search can tighten visible section bounds without modifying saved node positions.
 
 ## Scenario 2: Branch-Safe Plan Launch
 
@@ -152,7 +164,7 @@
 ### Flow 3.1: Select Independently From Terminal Disclosure
 
 1. User launches a session and receives a running durable record plus live binding.
-2. User selects the workspace or plan node; the expanded terminal remains unchanged.
+2. User selects another plan node; the expanded terminal remains unchanged.
 3. The process continues under existing terminal lifecycle rules.
 4. User selects the session node; selection alone neither expands nor collapses it.
 5. User chooses the session's top-right expand or collapse action.
@@ -226,6 +238,22 @@
 - Node position remains unchanged while Git and verification projections refresh.
 - Application restart does not restore verification jobs in PM-037; durable verification lineage is follow-up scope.
 
+## Scenario 4.4: Plan Workbench Details And Quality
+
+1. User selects a plan node and opens the **Info**, **Jira**, or **Quality** tab in the Workbench.
+2. **Info** loads current item details and may save title, source, item identifier, status, owner, and tags through the
+   existing item metadata authority.
+3. **Jira** reuses the existing item Jira panel.
+4. **Quality** can run smoke or critical verification, rerun the latest result, select automation specs, and run selected
+   automation with its saved environment and display mode.
+5. Suggested automation specs come from `automation-test` entries in the plan metadata; the Workbench also presents
+   existing E2E runbook coverage.
+
+### Acceptance Notes
+
+- Item metadata, Jira data, verification jobs, automation selections, and E2E runbooks retain their existing owners.
+- The Workbench refreshes the Canvas projection after an item metadata save or verification action.
+
 ## Scenario 5: Capability And Stale-Reference Recovery
 
 ### Goal
@@ -264,7 +292,7 @@
 
 1. User tabs to **Search nodes**.
 2. User filters by plan identifier, title, branch, or session state.
-3. Selecting a result focuses the node, opening the Workbench for a workspace or plan without changing session
+3. Selecting a result focuses the node, opening the Workbench for a plan without changing session
    disclosure state.
 4. Documented keyboard controls move the node by a bounded increment.
 5. Save status is announced.
