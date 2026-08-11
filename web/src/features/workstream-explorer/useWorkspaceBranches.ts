@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ApiError, api } from '../../lib/api';
+import { ApiError, api } from '../../shared/api';
 import type { WorkspaceBranches, WorkspaceConfig } from '../../lib/types';
 
 export interface WorkspaceBranchState extends WorkspaceBranches {

@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -13,6 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	appagent "kode-stream/internal/agent"
+	"kode-stream/internal/cloudstate"
 	"kode-stream/internal/common/models"
 )
 
@@ -28,32 +31,59 @@ type agentConnectToken struct {
 }
 
 type cloudAgentStore struct {
-	mu     sync.RWMutex
-	now    func() time.Time
-	agents map[string]map[string]models.CloudAgent
+	mu          sync.RWMutex
+	now         func() time.Time
+	agents      map[string]map[string]models.CloudAgent
+	persistence cloudstate.Repository
 }
 
-func newCloudAgentStore(now func() time.Time) *cloudAgentStore {
-	return &cloudAgentStore{now: now, agents: map[string]map[string]models.CloudAgent{}}
+func newCloudAgentStore(now func() time.Time, persistence ...cloudstate.Repository) *cloudAgentStore {
+	var repository cloudstate.Repository
+	if len(persistence) > 0 {
+		repository = persistence[0]
+	}
+	return &cloudAgentStore{now: now, agents: map[string]map[string]models.CloudAgent{}, persistence: repository}
 }
 
-func (s *cloudAgentStore) Upsert(agent models.CloudAgent) models.CloudAgent {
+func (s *cloudAgentStore) Upsert(ctx context.Context, agent models.CloudAgent) (models.CloudAgent, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	agent.LastSeenAt = s.now().UTC()
+	if s.persistence != nil {
+		persisted, err := s.persistence.UpsertAgent(ctx, agent.UserID, agent)
+		if err != nil {
+			return models.CloudAgent{}, err
+		}
+		agent = persisted
+	}
 	if s.agents[agent.UserID] == nil {
 		s.agents[agent.UserID] = map[string]models.CloudAgent{}
 	}
-	agent.LastSeenAt = s.now().UTC()
 	s.agents[agent.UserID][agent.ID] = agent
-	return agent
+	return agent, nil
 }
 
-func (s *cloudAgentStore) List(userID string) []models.CloudAgent {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *cloudAgentStore) List(ctx context.Context, userID string) ([]models.CloudAgent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.persistence != nil {
+		persisted, err := s.persistence.ListAgents(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		for index := range persisted {
+			live, ok := s.agents[userID][persisted[index].ID]
+			if ok && live.Status == "connected" && s.now().Sub(live.LastSeenAt) <= 2*time.Minute {
+				persisted[index] = live
+			} else if persisted[index].Status == "connected" {
+				persisted[index].Status = "offline"
+			}
+		}
+		return persisted, nil
+	}
 	owned := s.agents[userID]
 	if len(owned) == 0 {
-		return []models.CloudAgent{}
+		return []models.CloudAgent{}, nil
 	}
 	result := make([]models.CloudAgent, 0, len(owned))
 	for _, agent := range owned {
@@ -62,7 +92,7 @@ func (s *cloudAgentStore) List(userID string) []models.CloudAgent {
 		}
 		result = append(result, agent)
 	}
-	return result
+	return result, nil
 }
 
 func (s *cloudAgentStore) HasConnected(userID, agentID string) bool {
@@ -72,7 +102,7 @@ func (s *cloudAgentStore) HasConnected(userID, agentID string) bool {
 	return ok && agent.Status == "connected" && s.now().Sub(agent.LastSeenAt) <= 2*time.Minute
 }
 
-func (a *API) cloudAgentConnectToken(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudAgentConnectToken(w http.ResponseWriter, r *http.Request) {
 	session, ok := cloudSessionFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "Cloud session is required")
@@ -102,16 +132,21 @@ func (a *API) cloudAgentConnectToken(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (a *API) cloudAgents(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudAgents(w http.ResponseWriter, r *http.Request) {
 	session, ok := cloudSessionFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "Cloud session is required")
 		return
 	}
-	writeJSON(w, http.StatusOK, a.agentStore.List(session.User.ID))
+	agents, err := a.agents.List(r.Context(), session.User.ID)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "Cloud agent persistence is unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, agents)
 }
 
-func (a *API) cloudAgentChannel(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudAgentChannel(w http.ResponseWriter, r *http.Request) {
 	token, ok := a.verifyAgentToken(r.URL.Query().Get("token"))
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "invalid agent connect token")
@@ -123,22 +158,32 @@ func (a *API) cloudAgentChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer connection.Close()
-	agent := a.agentStore.Upsert(models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "connected"})
+	agent, err := a.agents.Upsert(r.Context(), models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "connected"})
+	if err != nil {
+		_ = connection.WriteJSON(appagent.Frame{Type: "error", Error: "Cloud agent persistence is unavailable"})
+		return
+	}
 	_ = connection.WriteJSON(appagent.Frame{Type: appagent.FrameConnected, Agent: agent})
 	for {
 		var frame appagent.Frame
 		if err := connection.ReadJSON(&frame); err != nil {
-			a.agentStore.Upsert(models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "offline"})
+			if _, persistErr := a.agents.Upsert(context.Background(), models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "offline"}); persistErr != nil {
+				log.Printf("cloud_agent_persistence_failure operation=%q owner_user_id=%q agent_id=%q error=%q", "disconnect", token.UserID, token.AgentID, persistErr)
+			}
 			return
 		}
 		if frame.Type == appagent.FrameHeartbeat {
-			agent = a.agentStore.Upsert(models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "connected"})
+			agent, err = a.agents.Upsert(r.Context(), models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "connected"})
+			if err != nil {
+				_ = connection.WriteJSON(appagent.Frame{Type: "error", Error: "Cloud agent persistence is unavailable"})
+				return
+			}
 			_ = connection.WriteJSON(appagent.Frame{Type: appagent.FrameHeartbeatAck, Agent: agent})
 		}
 	}
 }
 
-func (a *API) signAgentToken(token agentConnectToken) string {
+func (a *cloudController) signAgentToken(token agentConnectToken) string {
 	data, _ := json.Marshal(token)
 	payload := base64.RawURLEncoding.EncodeToString(data)
 	mac := hmac.New(sha256.New, []byte(a.runtimeConfig.CookieSecret))
@@ -147,7 +192,7 @@ func (a *API) signAgentToken(token agentConnectToken) string {
 	return payload + "." + signature
 }
 
-func (a *API) verifyAgentToken(value string) (agentConnectToken, bool) {
+func (a *cloudController) verifyAgentToken(value string) (agentConnectToken, bool) {
 	payload, signature, ok := strings.Cut(value, ".")
 	if !ok || a.runtimeConfig.CookieSecret == "" {
 		return agentConnectToken{}, false

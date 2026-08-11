@@ -86,12 +86,12 @@ func actionCapabilityHTTPStatus(state models.ActionCapabilityState) int {
 	}
 }
 
-func (a *API) workspaceAccessAdapter(workspace models.WorkspaceConfig) (workspaceAccessAdapter, int, string) {
+func (a *cloudController) workspaceAccessAdapter(workspace models.WorkspaceConfig) (workspaceAccessAdapter, int, string) {
 	switch workspace.AccessMode {
 	case "", models.WorkspaceAccessModeAgentBacked:
-		return agentAccessAdapter{agents: a.agentStore}, http.StatusOK, ""
+		return agentAccessAdapter{agents: a.agents}, http.StatusOK, ""
 	case models.WorkspaceAccessModeRemoteSnapshot:
-		return remoteSnapshotAdapter{providers: a.cloudProviders}, http.StatusOK, ""
+		return remoteSnapshotAdapter{providers: a.providers}, http.StatusOK, ""
 	default:
 		return nil, http.StatusBadRequest, "unsupported workspace access mode"
 	}

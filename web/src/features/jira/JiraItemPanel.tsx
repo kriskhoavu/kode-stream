@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, ExternalLink, FileDown, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { useJiraIssue } from './useJiraIssue';
 
 export function JiraItemPanel({ itemId }: { itemId: string }) {

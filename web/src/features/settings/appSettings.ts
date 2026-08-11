@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { statusOrder } from '../../lib/api';
+import { statusOrder } from '../../shared/api';
 import type { ItemStatus } from '../../lib/types';
 
 const storageKey = 'planManager.appSettings';

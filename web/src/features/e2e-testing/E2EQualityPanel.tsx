@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Bot, ChevronDown, ChevronRight, ExternalLink, RefreshCw, Search, X } from 'lucide-react';
 import type { E2ERunbook, FileContent } from '../../lib/types';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { ContentViewer } from '../content-viewer/ContentViewer';
 import { AISessionLaunchDialog } from '../ai-session/AISessionLaunchDialog';
 

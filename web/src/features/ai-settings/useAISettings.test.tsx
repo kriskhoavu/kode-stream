@@ -1,10 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { AISettings } from '../../lib/types';
 import { useAISettings } from './useAISettings';
 
-vi.mock('../../lib/api', () => ({
+vi.mock('../../shared/api', () => ({
   api: { aiSettings: vi.fn(), aiCapabilities: vi.fn(), saveAISettings: vi.fn() }
 }));
 

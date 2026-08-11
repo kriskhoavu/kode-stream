@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AISessionLaunchResult } from '../../lib/types';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { AISessionLaunchControl } from './AISessionLaunchControl';
 
-vi.mock('../../lib/api', () => ({ api: { launchAISession: vi.fn(), startEmbeddedAISession: vi.fn(), cancelEmbeddedAISession: vi.fn() } }));
+vi.mock('../../shared/api', () => ({ api: { launchAISession: vi.fn(), startEmbeddedAISession: vi.fn(), cancelEmbeddedAISession: vi.fn() } }));
 vi.mock('./AISessionLaunchDialog', () => ({
 	AISessionLaunchDialog: ({ onLaunched }: { onLaunched: (result: AISessionLaunchResult, input: AISessionLaunchResult) => void }) => <button onClick={() => onLaunched({ accepted: true, provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only', startedAt: '2026-07-02T00:00:00Z' }, { accepted: true, provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only', surface: 'external', startedAt: '2026-07-02T00:00:00Z' })}>Save test choice</button>
 }));

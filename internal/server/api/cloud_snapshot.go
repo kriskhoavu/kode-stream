@@ -17,19 +17,22 @@ type remoteSnapshotView struct {
 	Actions      map[models.WorkspaceAction]models.ActionCapability `json:"actions"`
 }
 
-func (a *API) remoteSnapshot(r *http.Request) (remoteSnapshotAdapter, cloudSession, models.WorkspaceConfig, int, string) {
+func (a *cloudController) remoteSnapshot(r *http.Request) (remoteSnapshotAdapter, cloudSession, models.WorkspaceConfig, int, string) {
 	session, ok := cloudSessionFromContext(r.Context())
 	if !ok {
 		return remoteSnapshotAdapter{}, cloudSession{}, models.WorkspaceConfig{}, http.StatusUnauthorized, "Cloud session is required"
 	}
-	workspace, ok := a.cloudWorkspaces.Get(session.User.ID, r.PathValue("id"))
+	workspace, ok, err := a.workspaces.Get(r.Context(), session.User.ID, r.PathValue("id"))
+	if err != nil {
+		return remoteSnapshotAdapter{}, cloudSession{}, models.WorkspaceConfig{}, http.StatusServiceUnavailable, "Cloud workspace persistence is unavailable"
+	}
 	if !ok {
 		return remoteSnapshotAdapter{}, cloudSession{}, models.WorkspaceConfig{}, http.StatusNotFound, "workspace not found"
 	}
 	if workspace.AccessMode != models.WorkspaceAccessModeRemoteSnapshot {
 		return remoteSnapshotAdapter{}, cloudSession{}, models.WorkspaceConfig{}, http.StatusConflict, "workspace is not a remote snapshot"
 	}
-	return remoteSnapshotAdapter{providers: a.cloudProviders}, session, workspace, 0, ""
+	return remoteSnapshotAdapter{providers: a.providers}, session, workspace, 0, ""
 }
 
 func snapshotCapabilities() map[string]bool {
@@ -46,7 +49,7 @@ func snapshotActionCapabilities(role models.CloudRole, workspace models.Workspac
 	})
 }
 
-func (a *API) cloudSnapshotInfo(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudSnapshotInfo(w http.ResponseWriter, r *http.Request) {
 	adapter, session, workspace, status, message := a.remoteSnapshot(r)
 	if message != "" {
 		writeError(w, status, message)
@@ -57,11 +60,14 @@ func (a *API) cloudSnapshotInfo(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "remote snapshot is unavailable")
 		return
 	}
-	a.cloudWorkspaces.Upsert(resolved)
+	if _, err := a.workspaces.Upsert(r.Context(), resolved); err != nil {
+		writeError(w, http.StatusServiceUnavailable, "Cloud workspace persistence is unavailable")
+		return
+	}
 	writeJSON(w, http.StatusOK, remoteSnapshotView{Workspace: resolved, Capabilities: snapshotCapabilities(), Actions: snapshotActionCapabilities(session.User.Role, resolved)})
 }
 
-func (a *API) cloudSnapshotTree(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudSnapshotTree(w http.ResponseWriter, r *http.Request) {
 	adapter, session, workspace, status, message := a.remoteSnapshot(r)
 	if message != "" {
 		writeError(w, status, message)
@@ -81,7 +87,7 @@ func (a *API) cloudSnapshotTree(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"workspaceId": resolved.ID, "commitSha": resolved.ResolvedCommitSHA, "entries": entries})
 }
 
-func (a *API) cloudSnapshotFile(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudSnapshotFile(w http.ResponseWriter, r *http.Request) {
 	adapter, session, workspace, status, message := a.remoteSnapshot(r)
 	if message != "" {
 		writeError(w, status, message)

@@ -1,7 +1,7 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, ChevronDown, ChevronRight, FolderTree, Globe2, Search, Ticket, X } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type {
 	AICapability,
 	AICapabilityDescriptor,

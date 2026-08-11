@@ -34,7 +34,7 @@ func TestKnowledgeErrorMapping(t *testing.T) {
 		{knowledgeindex.ErrUnsafePath, http.StatusBadRequest},
 		{knowledgeindex.ErrKnowledgeDisabled, http.StatusConflict},
 	}
-	api := &API{}
+	api := &knowledgeController{}
 	for _, test := range tests {
 		response := httptest.NewRecorder()
 		api.respondKnowledge(response, nil, test.err)
@@ -45,7 +45,7 @@ func TestKnowledgeErrorMapping(t *testing.T) {
 }
 
 func TestKnowledgeActionStatusMapping(t *testing.T) {
-	api := &API{}
+	api := &knowledgeController{}
 	tests := []struct {
 		result knowledgeindex.KnowledgeActionResult
 		err    error
@@ -85,7 +85,7 @@ func TestKnowledgeHTTPContractsReturnListsAndMissingResources(t *testing.T) {
 	if err := store.ReplaceWorkspace("ws", []knowledgeindex.KnowledgeWiki{{Root: "docs", DisplayName: "Docs", Pages: []knowledgeindex.KnowledgePage{page}, Warnings: []knowledgeindex.KnowledgeWarning{}}}); err != nil {
 		t.Fatal(err)
 	}
-	handler := (&API{}).WithKnowledge(knowledgeindex.NewService(reg, store)).Routes()
+	handler := New(Dependencies{WorkspaceRepository: reg, Knowledge: knowledgeindex.NewService(reg, store)}).Routes()
 
 	for _, request := range []struct {
 		path     string

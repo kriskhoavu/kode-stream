@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { JiraItemPanel } from './JiraItemPanel';
 
-vi.mock('../../lib/api', () => ({ api: { jiraIssue: vi.fn(), refreshJiraIssue: vi.fn(), jiraAttachmentURL: (itemId:string,id:string)=>`/api/items/${itemId}/jira/attachments/${id}` } }));
+vi.mock('../../shared/api', () => ({ api: { jiraIssue: vi.fn(), refreshJiraIssue: vi.fn(), jiraAttachmentURL: (itemId:string,id:string)=>`/api/items/${itemId}/jira/attachments/${id}` } }));
 
 describe('JiraItemPanel', () => {
   afterEach(() => vi.clearAllMocks());

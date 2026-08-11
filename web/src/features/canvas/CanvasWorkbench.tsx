@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GitCompare, GripVertical, Info, PanelRightClose, PanelRightOpen, Play, RefreshCw, Ticket } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { AISessionLaunchResult, AutomationDisplayMode, CanvasNode, CanvasProjection, E2ERunbook, EmbeddedAISessionResult, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile } from '../../lib/types';
 import { AISessionLaunchDialog } from '../ai-session/AISessionLaunchDialog';
 import { E2EQualityPanel } from '../e2e-testing/E2EQualityPanel';

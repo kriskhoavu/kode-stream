@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { EmbeddedTerminal } from './EmbeddedTerminal';
 
 const write = vi.fn();
@@ -15,7 +15,7 @@ vi.mock('@xterm/xterm', () => ({ Terminal: class {
 	onResize() { return { dispose() {} }; }
 } }));
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit = fit; } }));
-vi.mock('../../lib/api', () => ({ api: { cancelEmbeddedAISession: vi.fn() } }));
+vi.mock('../../shared/api', () => ({ api: { cancelEmbeddedAISession: vi.fn() } }));
 
 class TestSocket {
 	static OPEN = 1;

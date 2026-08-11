@@ -1,5 +1,5 @@
 import { RotateCw, Sparkles, GitPullRequest } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { KnowledgeSettings } from '../../lib/types';
 
 export function KnowledgeActions({ workspaceId, settings, root, busy, onRun }: { workspaceId: string; settings?: KnowledgeSettings; root?: string; busy: boolean; onRun: (operation: 'rescan' | 'sync' | 'enrich', confirm?: boolean) => Promise<unknown> }) {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"kode-stream/internal/audit"
 	"kode-stream/internal/common/models"
 )
 
@@ -35,6 +37,14 @@ func TestCloudCommandRoutesToOwnerAgentAndRedactsLog(t *testing.T) {
 	if strings.Contains(result.Log, "abc123") || strings.Contains(result.Log, "hunter2") || !strings.Contains(result.Log, "[REDACTED]") {
 		t.Fatalf("log not redacted: %q", result.Log)
 	}
+	events, err := apiHandler.cloud.audit.QueryContext(context.Background(), audit.Query{OwnerUserID: stableCloudUserID("editor"), WorkspaceID: workspaceID, Limit: 1})
+	if err != nil || len(events) != 1 || events[0].ActorUserID != stableCloudUserID("editor") || events[0].Status != models.AuditStatusSuccess {
+		t.Fatalf("command audit = %#v, %v", events, err)
+	}
+	raw, _ := json.Marshal(events[0])
+	if strings.Contains(string(raw), "abc123") || strings.Contains(string(raw), "hunter2") || strings.Contains(string(raw), `\"op\"`) {
+		t.Fatalf("audit disclosed command data: %s", raw)
+	}
 }
 
 func TestCloudCommandRejectsOfflineAgent(t *testing.T) {
@@ -50,6 +60,10 @@ func TestCloudCommandRejectsOfflineAgent(t *testing.T) {
 
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	events, err := apiHandler.cloud.audit.QueryContext(context.Background(), audit.Query{OwnerUserID: stableCloudUserID("editor"), WorkspaceID: workspaceID, Limit: 1})
+	if err != nil || len(events) != 1 || events[0].Status != models.AuditStatusFailed {
+		t.Fatalf("failed command audit = %#v, %v", events, err)
 	}
 }
 
@@ -72,7 +86,7 @@ func TestCloudCommandRejectsViewerWriteCapability(t *testing.T) {
 func TestCloudCommandRejectsRemoteSnapshotExecutionWithoutProviderCall(t *testing.T) {
 	apiHandler, _ := cloudCommandTestAPI(t, true)
 	userID := stableCloudUserID("editor")
-	workspace := apiHandler.cloudWorkspaces.Upsert(models.WorkspaceConfig{
+	workspace, err := apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{
 		ID:                 "ws-snapshot",
 		Name:               "Snapshot",
 		OwnerUserID:        userID,
@@ -83,6 +97,9 @@ func TestCloudCommandRejectsRemoteSnapshotExecutionWithoutProviderCall(t *testin
 		SelectedRef:        "main",
 		Sources:            []string{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	handler := apiHandler.Routes()
 
 	response := httptest.NewRecorder()
@@ -116,14 +133,18 @@ func TestCloudDeniesHostedExecutionRoutes(t *testing.T) {
 func cloudCommandTestAPI(t *testing.T, connected bool) (*API, string) {
 	t.Helper()
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	apiHandler = apiHandler.WithRuntimeConfig(testCloudRuntimeConfig())
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
 	userID := stableCloudUserID("editor")
 	workspace := models.WorkspaceConfig{ID: "ws-command", Name: "Command", OwnerUserID: userID, AgentID: "agent-1", Location: models.WorkspaceLocationCloudAgent, Sources: []string{}}
-	apiHandler.cloudWorkspaces.Upsert(workspace)
+	if _, err := apiHandler.cloud.workspaces.Upsert(context.Background(), workspace); err != nil {
+		t.Fatal(err)
+	}
 	status := "offline"
 	if connected {
 		status = "connected"
 	}
-	apiHandler.agentStore.Upsert(models.CloudAgent{ID: "agent-1", UserID: userID, Name: "MacBook", Status: status, LastSeenAt: time.Now().UTC()})
+	if _, err := apiHandler.cloud.agents.Upsert(context.Background(), models.CloudAgent{ID: "agent-1", UserID: userID, Name: "MacBook", Status: status, LastSeenAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
 	return apiHandler, workspace.ID
 }

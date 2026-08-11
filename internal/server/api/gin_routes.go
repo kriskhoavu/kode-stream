@@ -1,226 +1,255 @@
 package api
 
 import (
-	"context"
-	"strconv"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 
-	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
-	"kode-stream/internal/navigation"
-	"kode-stream/internal/system"
 )
 
-type auditEventReader interface {
-	RecentContext(context.Context, int) ([]models.AuditEvent, error)
+type routeAccess string
+
+const (
+	publicRoute    routeAccess = "public"
+	protectedRoute routeAccess = "protected"
+)
+
+type routeSpec struct {
+	method  string
+	path    string
+	owner   string
+	access  routeAccess
+	handler gin.HandlerFunc
+}
+
+type routePolicy struct {
+	capability models.Capability
+	csrf       bool
 }
 
 func (a *API) registerGinRoutes(api *gin.RouterGroup) {
-	api.GET("/health", a.ginHealth)
-	a.registerCloudAuthRoutes(api)
-	api.GET("/agents/channel", ginHTTPHandler(a.cloudAgentChannel))
-	api.POST("/workspaces/from-agent", ginHTTPHandler(a.registerCloudWorkspaceFromAgent))
-	api.Use(a.cloudAuthMiddleware())
-	api.GET("/audit-events", a.ginAuditEvents)
-	a.registerNavigationRoutes(api)
-	a.registerSystemRoutes(api)
-	a.registerStorageRoutes(api)
-	a.registerCanvasRoutes(api)
-	a.registerStateSearchAIRoutes(api)
-	a.registerCloudAgentRoutes(api)
-	a.registerWorkspaceReadRoutes(api)
-	a.registerItemReadRoutes(api)
-	a.registerWorkspaceItemWriteRoutes(api)
-	a.registerKnowledgeVerificationRoutes(api)
-	a.registerGitRoutes(api)
-	a.registerStreamingRoutes(api)
-}
-
-func (a *API) registerCanvasRoutes(api *gin.RouterGroup) {
-	api.POST("/canvas/default", ginHTTPHandler(a.resolveDefaultCanvas))
-	api.GET("/canvas/layouts/:id", ginHTTPHandler(a.canvasLayout))
-	api.PATCH("/canvas/layouts/:id/placements", ginHTTPHandler(a.patchCanvasPlacements))
-	api.PATCH("/canvas/layouts/:id/viewport", ginHTTPHandler(a.patchCanvasViewport))
-	api.DELETE("/canvas/layouts/:id/placements/:nodeId", ginHTTPHandler(a.removeCanvasPlacement))
-}
-
-func (a *API) registerStorageRoutes(api *gin.RouterGroup) {
-	api.GET("/storage/status", ginHTTPHandler(a.storageStatusRoute))
-	api.PUT("/storage/option", ginHTTPHandler(a.storageOptionRoute))
-	api.POST("/storage/sync", ginHTTPHandler(a.storageSyncRoute))
-}
-
-func (a *API) registerCloudAgentRoutes(api *gin.RouterGroup) {
-	api.POST("/agents/connect-token", ginHTTPHandler(a.cloudAgentConnectToken))
-	api.GET("/agents", ginHTTPHandler(a.cloudAgents))
-	api.POST("/workspaces/:id/commands", ginHTTPHandler(a.cloudWorkspaceCommand))
-	api.GET("/workspaces/:id/snapshot", ginHTTPHandler(a.cloudSnapshotInfo))
-	api.GET("/workspaces/:id/snapshot/tree", ginHTTPHandler(a.cloudSnapshotTree))
-	api.GET("/workspaces/:id/snapshot/files", ginHTTPHandler(a.cloudSnapshotFile))
-}
-
-func (a *API) registerNavigationRoutes(api *gin.RouterGroup) {
-	controller := navigation.NewController(a.navigation, a.items)
-	api.GET("/saved-filters", ginHTTPHandler(controller.Filters))
-	api.POST("/saved-filters", ginHTTPHandler(controller.SaveFilter))
-	api.DELETE("/saved-filters/:id", ginHTTPHandler(controller.DeleteFilter))
-	api.GET("/recent-items", ginHTTPHandler(controller.Recents))
-	api.POST("/recent-items", ginHTTPHandler(controller.RecordRecent))
-}
-
-func (a *API) registerSystemRoutes(api *gin.RouterGroup) {
-	controller := system.NewController(a.dialog)
-	api.POST("/system/select-directory", ginHTTPHandler(controller.SelectDirectory))
-	api.POST("/system/select-file", ginHTTPHandler(controller.SelectFile))
-	api.POST("/system/open-path", ginHTTPHandler(controller.OpenPath))
-	api.GET("/system/config-paths", ginHTTPHandler(controller.ConfigPaths))
-	api.PUT("/system/config-paths", ginHTTPHandler(controller.UpdateConfigPaths))
-}
-
-func (a *API) registerStateSearchAIRoutes(api *gin.RouterGroup) {
-	api.GET("/state", ginHTTPHandler(a.state))
-	api.GET("/search", ginHTTPHandler(a.searchItems))
-	api.GET("/ai/capabilities", ginHTTPHandler(a.aiCapabilities))
-	api.GET("/ai/presets", ginHTTPHandler(a.aiPresets))
-	api.GET("/ai/providers/:id/capabilities", ginHTTPHandler(a.aiProviderCapabilities))
-	api.GET("/ai/settings", ginHTTPHandler(a.aiSettings))
-	api.PUT("/ai/settings", ginHTTPHandler(a.saveAISettings))
-}
-
-func (a *API) registerWorkspaceReadRoutes(api *gin.RouterGroup) {
-	api.GET("/workspaces", ginHTTPHandler(a.listWorkspaces))
-	api.GET("/workspaces/files/search", ginHTTPHandler(a.workspacePathSearch))
-	api.GET("/workspaces/files/content-search", ginHTTPHandler(a.workspaceContentSearch))
-	api.GET("/workspaces/:id/runtime", ginHTTPHandler(a.workspaceRuntime))
-	api.GET("/workspaces/:id/health", ginHTTPHandler(a.workspaceHealth))
-	api.GET("/workspaces/:id/source-structure", ginHTTPHandler(a.getSourceStructure))
-	api.GET("/workspaces/:id/tree", ginHTTPHandler(a.workspaceTree))
-	api.GET("/workspaces/:id/files", ginHTTPHandler(a.workspaceFile))
-	api.GET("/workspaces/:id/files/diff", ginHTTPHandler(a.workspaceFileDiff))
-	api.GET("/workspaces/:id/git/path-status", ginHTTPHandler(a.workspacePathGitStates))
-}
-
-func (a *API) registerItemReadRoutes(api *gin.RouterGroup) {
-	api.GET("/items", ginHTTPHandler(a.listItems))
-	api.GET("/items/:id", ginHTTPHandler(a.itemDetail))
-	api.GET("/items/:id/ai-session-eligibility", ginHTTPHandler(a.aiSessionEligibility))
-	api.GET("/items/:id/jira", ginHTTPHandler(a.jiraIssue))
-	api.GET("/items/:id/jira/attachments/:attachmentId", ginHTTPHandler(a.jiraAttachment))
-	api.GET("/items/:id/verification-tests", ginHTTPHandler(a.itemVerificationTests))
-	api.GET("/items/:id/e2e-runbooks", ginHTTPHandler(a.itemE2ERunbooks))
-	api.GET("/items/:id/files", ginHTTPHandler(a.itemFiles))
-	api.GET("/items/:id/content-search", ginHTTPHandler(a.itemContentSearch))
-	api.GET("/items/:id/files/:fileID", ginHTTPHandler(a.itemFileContent))
-	api.GET("/items/:id/diff", ginHTTPHandler(a.itemDiff))
-	api.GET("/workspaces/:id/jira/issues/:issueKey", ginHTTPHandler(a.workspaceJiraIssue))
-}
-
-func (a *API) registerWorkspaceItemWriteRoutes(api *gin.RouterGroup) {
-	api.POST("/workspaces", ginHTTPHandler(a.createWorkspace))
-	api.POST("/workspaces/import-preview", ginHTTPHandler(a.previewWorkspaceImport))
-	api.POST("/workspaces/import", ginHTTPHandler(a.importWorkspaces))
-	api.PUT("/workspaces/:id", ginHTTPHandler(a.updateWorkspace))
-	api.DELETE("/workspaces/:id", ginHTTPHandler(a.deleteWorkspace))
-	api.POST("/workspaces/:id/scan", ginHTTPHandler(a.scanWorkspace))
-	api.POST("/workspaces/:id/jira/test", ginHTTPHandler(a.testJiraConnection))
-	api.PUT("/workspaces/:id/runtime", ginHTTPHandler(a.saveWorkspaceRuntime))
-	api.POST("/workspaces/:id/workstream/branch", ginHTTPHandler(a.loadWorkstreamBranch))
-	api.POST("/workspaces/:id/workstream/checkout", ginHTTPHandler(a.loadWorkstreamCheckout))
-	api.POST("/workspaces/:id/reviews/branch", ginHTTPHandler(a.loadBranchReview))
-	api.POST("/workspaces/:id/reviews/import", ginHTTPHandler(a.importReviewedPlan))
-	api.PUT("/workspaces/:id/source-structure", ginHTTPHandler(a.saveSourceStructure))
-	api.DELETE("/workspaces/:id/source-structure", ginHTTPHandler(a.resetSourceStructure))
-	api.PUT("/workspaces/:id/files", ginHTTPHandler(a.saveWorkspaceFile))
-	api.POST("/workspaces/:id/files", ginHTTPHandler(a.createWorkspaceFile))
-	api.POST("/workspaces/:id/directories", ginHTTPHandler(a.createWorkspaceDirectory))
-	api.POST("/workspaces/:id/paths/rename", ginHTTPHandler(a.renameWorkspacePath))
-	api.POST("/workspaces/:id/files/revert", ginHTTPHandler(a.revertWorkspaceFile))
-	api.POST("/items/:id/jira/refresh", ginHTTPHandler(a.refreshJiraIssue))
-	api.PUT("/items/:id/verification-tests", ginHTTPHandler(a.saveItemVerificationTests))
-	api.POST("/items/:id/files/:fileID", ginHTTPHandler(a.saveItemFile))
-	api.POST("/items/:id/files/:fileID/revert", ginHTTPHandler(a.revertItemFile))
-	api.PATCH("/items/:id/metadata", ginHTTPHandler(a.saveItemMetadata))
-	api.PATCH("/items/:id/status", ginHTTPHandler(a.updateItemStatus))
-	api.POST("/items", ginHTTPHandler(a.createItem))
-}
-
-func (a *API) registerKnowledgeVerificationRoutes(api *gin.RouterGroup) {
-	api.GET("/knowledge/wikis", ginHTTPHandler(a.knowledgeWikis))
-	api.GET("/knowledge/wikis/:workspaceID/:root/pages", ginHTTPHandler(a.knowledgePages))
-	api.GET("/knowledge/wikis/:workspaceID/:root/pages/:slug", ginHTTPHandler(a.knowledgePage))
-	api.GET("/knowledge/wikis/:workspaceID/:root/pages/:slug/e2e-runbook", ginHTTPHandler(a.knowledgeE2ERunbook))
-	api.GET("/knowledge/wikis/:workspaceID/:root/graph", ginHTTPHandler(a.knowledgeGraph))
-	api.POST("/knowledge/wikis/:workspaceID/:root/rescan", ginHTTPHandler(a.knowledgeRescan))
-	api.POST("/knowledge/workspaces/:workspaceID/sync", ginHTTPHandler(a.knowledgeSync))
-	api.POST("/knowledge/workspaces/:workspaceID/enrich", ginHTTPHandler(a.knowledgeEnrich))
-	api.POST("/workspaces/:id/verification-jobs", ginHTTPHandler(a.createVerificationJob))
-	api.POST("/workspaces/:id/verification-checkpoints", ginHTTPHandler(a.ingestVerificationCheckpoint))
-	api.GET("/workspaces/:id/verification-jobs/:jobId", ginHTTPHandler(a.verificationJob))
-	api.GET("/workspaces/:id/verification-jobs/:jobId/artifacts", ginHTTPHandler(a.verificationArtifacts))
-	api.POST("/workspaces/:id/verification-jobs/:jobId/rerun", ginHTTPHandler(a.rerunVerificationJob))
-}
-
-func (a *API) registerGitRoutes(api *gin.RouterGroup) {
-	api.GET("/workspaces/:id/git/status", ginHTTPHandler(a.gitStatus))
-	api.GET("/workspaces/:id/git/activity", ginHTTPHandler(a.gitActivity))
-	api.GET("/workspaces/:id/git/branches", ginHTTPHandler(a.gitBranches))
-	api.GET("/workspaces/:id/git/stashes", ginHTTPHandler(a.gitStashes))
-	api.POST("/workspaces/:id/git/stashes/:ref/apply", ginHTTPHandler(a.gitApplyStash))
-	api.POST("/workspaces/:id/git/fetch", ginHTTPHandler(a.gitFetch))
-	api.POST("/workspaces/:id/git/pull", ginHTTPHandler(a.gitPull))
-	api.POST("/workspaces/:id/git/push", ginHTTPHandler(a.gitPush))
-	api.POST("/workspaces/:id/git/commit", ginHTTPHandler(a.gitCommit))
-	api.POST("/workspaces/:id/git/branches", ginHTTPHandler(a.gitCreateBranch))
-	api.POST("/workspaces/:id/git/switch", ginHTTPHandler(a.gitSwitchBranch))
-}
-
-func (a *API) registerStreamingRoutes(api *gin.RouterGroup) {
-	api.POST("/workspaces/stream-create", ginHTTPHandler(a.createWorkspaceStream))
-	api.GET("/ai/session-records", ginHTTPHandler(a.aiSessionRecords))
-	api.POST("/items/:id/ai-sessions", ginHTTPHandler(a.launchAISession))
-	api.POST("/items/:id/ai-sessions/embedded", ginHTTPHandler(a.startEmbeddedAISession))
-	api.POST("/workspaces/:id/ai-sessions", ginHTTPHandler(a.launchWorkspaceAISession))
-	api.POST("/workspaces/:id/ai-sessions/embedded", ginHTTPHandler(a.startEmbeddedWorkspaceAISession))
-	api.GET("/ai/sessions/:sessionId", ginHTTPHandler(a.embeddedAISession))
-	api.POST("/ai/sessions/:sessionId/grant", ginHTTPHandler(a.embeddedAISessionGrant))
-	api.DELETE("/ai/sessions/:sessionId", ginHTTPHandler(a.cancelEmbeddedAISession))
-	api.GET("/ai/sessions/:sessionId/channel", ginHTTPHandler(a.embeddedAISessionChannel))
-}
-
-func (a *API) ginHealth(c *gin.Context) {
-	payload, status := a.healthPayload(c.Request.Context())
-	ginJSON(c, status, payload)
-}
-
-func (a *API) ginAuditEvents(c *gin.Context) {
-	if a.auditReader == nil {
-		ginJSON(c, 200, []models.AuditEvent{})
-		return
-	}
-	limit, _ := strconv.Atoi(c.Query("limit"))
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
-	events, err := a.auditReader.RecentContext(c.Request.Context(), limit*2)
-	if err != nil {
-		ginAppError(c, apperrors.Infra(err.Error(), err))
-		return
-	}
-	workspaceID := c.Query("workspaceId")
-	if workspaceID != "" {
-		filtered := make([]models.AuditEvent, 0, limit)
-		for _, event := range events {
-			if event.WorkspaceID == workspaceID {
-				filtered = append(filtered, event)
-				if len(filtered) == limit {
-					break
-				}
-			}
+	routes := routeManifest(a)
+	for _, route := range routes {
+		if route.access == publicRoute {
+			api.Handle(route.method, route.path, route.handler)
 		}
-		events = filtered
-	} else if len(events) > limit {
-		events = events[:limit]
 	}
-	ginJSON(c, 200, events)
+	for _, route := range routes {
+		if route.access == protectedRoute {
+			policy, ok := policyForRoute(route)
+			if !ok {
+				panic("protected API route has no authorization policy: " + route.method + " " + route.path)
+			}
+			api.Handle(route.method, route.path, a.cloud.cloudAuthMiddleware(policy), route.handler)
+		}
+	}
+}
+
+// policyForRoute is the capability inventory for protected route families.
+// New owners cannot inherit access merely because they use GET: registration
+// fails until their policy is declared here.
+func policyForRoute(route routeSpec) (routePolicy, bool) {
+	policy := routePolicy{capability: models.CapabilityRead, csrf: isMutatingMethod(route.method)}
+	switch route.owner {
+	case "system", "storage":
+		policy.capability = models.CapabilitySystem
+	case "ai":
+		if isMutatingMethod(route.method) {
+			policy.capability = models.CapabilityAI
+		}
+	case "verification":
+		if isMutatingMethod(route.method) {
+			policy.capability = models.CapabilityVerification
+		}
+	case "git":
+		policy.capability = models.CapabilityGit
+	case "cloud-agent":
+		// Authenticated users may mint a connect token and list their own agents.
+		policy.capability = models.CapabilityRead
+	case "audit", "navigation", "canvas", "state", "search", "cloud-command", "cloud-snapshot", "workspace", "workspace-files", "workspace-search", "workspace-health", "item", "item-search", "jira", "knowledge", "workspace-stream":
+		if isMutatingMethod(route.method) {
+			policy.capability = models.CapabilityWrite
+		}
+	default:
+		return routePolicy{}, false
+	}
+	return policy, true
+}
+
+// routeManifest is the single route inventory used by registration and tests.
+// Ownership and auth grouping therefore cannot drift from the running router.
+func routeManifest(a *API) []routeSpec {
+	return []routeSpec{
+		{http.MethodGet, "/health", "health", publicRoute, ginHTTPHandler(a.health.health)},
+		{http.MethodGet, "/auth/login", "cloud-auth", publicRoute, a.cloud.route(a.cloud.cloudLogin)},
+		{http.MethodGet, "/auth/callback", "cloud-auth", publicRoute, a.cloud.route(a.cloud.cloudCallback)},
+		{http.MethodPost, "/auth/logout", "cloud-auth", publicRoute, a.cloud.route(a.cloud.cloudLogout)},
+		{http.MethodGet, "/agents/channel", "cloud-agent", publicRoute, a.cloud.route(a.cloud.cloudAgentChannel)},
+		{http.MethodPost, "/workspaces/from-agent", "cloud-workspace", publicRoute, a.cloud.route(a.cloud.registerCloudWorkspaceFromAgent)},
+
+		{http.MethodGet, "/audit-events", "audit", protectedRoute, ginHTTPHandler(a.audit.auditEvents)},
+		{http.MethodGet, "/saved-filters", "navigation", protectedRoute, ginHTTPHandler(a.navigation.Filters)},
+		{http.MethodPost, "/saved-filters", "navigation", protectedRoute, ginHTTPHandler(a.navigation.SaveFilter)},
+		{http.MethodDelete, "/saved-filters/:id", "navigation", protectedRoute, ginHTTPHandler(a.navigation.DeleteFilter)},
+		{http.MethodGet, "/recent-items", "navigation", protectedRoute, ginHTTPHandler(a.navigation.Recents)},
+		{http.MethodPost, "/recent-items", "navigation", protectedRoute, ginHTTPHandler(a.navigation.RecordRecent)},
+		{http.MethodPost, "/system/select-directory", "system", protectedRoute, ginHTTPHandler(a.system.SelectDirectory)},
+		{http.MethodPost, "/system/select-file", "system", protectedRoute, ginHTTPHandler(a.system.SelectFile)},
+		{http.MethodPost, "/system/open-path", "system", protectedRoute, ginHTTPHandler(a.system.OpenPath)},
+		{http.MethodGet, "/system/config-paths", "system", protectedRoute, ginHTTPHandler(a.system.ConfigPaths)},
+		{http.MethodPut, "/system/config-paths", "system", protectedRoute, ginHTTPHandler(a.system.UpdateConfigPaths)},
+		{http.MethodGet, "/storage/status", "storage", protectedRoute, ginHTTPHandler(a.storage.storageStatusRoute)},
+		{http.MethodPut, "/storage/option", "storage", protectedRoute, ginHTTPHandler(a.storage.storageOptionRoute)},
+		{http.MethodPost, "/storage/sync", "storage", protectedRoute, ginHTTPHandler(a.storage.storageSyncRoute)},
+		{http.MethodPost, "/canvas/default", "canvas", protectedRoute, ginHTTPHandler(a.canvas.resolveDefaultCanvas)},
+		{http.MethodGet, "/canvas/layouts/:id", "canvas", protectedRoute, ginHTTPHandler(a.canvas.canvasLayout)},
+		{http.MethodPatch, "/canvas/layouts/:id/placements", "canvas", protectedRoute, ginHTTPHandler(a.canvas.patchCanvasPlacements)},
+		{http.MethodPatch, "/canvas/layouts/:id/viewport", "canvas", protectedRoute, ginHTTPHandler(a.canvas.patchCanvasViewport)},
+		{http.MethodDelete, "/canvas/layouts/:id/placements/:nodeId", "canvas", protectedRoute, ginHTTPHandler(a.canvas.removeCanvasPlacement)},
+		{http.MethodGet, "/state", "state", protectedRoute, a.state.route(a.state.state)},
+		{http.MethodGet, "/search", "search", protectedRoute, ginHTTPHandler(a.search.searchItems)},
+		{http.MethodGet, "/ai/capabilities", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.aiCapabilities)},
+		{http.MethodGet, "/ai/presets", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.aiPresets)},
+		{http.MethodGet, "/ai/providers/:id/capabilities", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.aiProviderCapabilities)},
+		{http.MethodGet, "/ai/settings", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.aiSettings)},
+		{http.MethodPut, "/ai/settings", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.saveAISettings)},
+		{http.MethodPost, "/agents/connect-token", "cloud-agent", protectedRoute, a.cloud.route(a.cloud.cloudAgentConnectToken)},
+		{http.MethodGet, "/agents", "cloud-agent", protectedRoute, a.cloud.route(a.cloud.cloudAgents)},
+		{http.MethodPost, "/workspaces/:id/commands", "cloud-command", protectedRoute, a.cloud.route(a.cloud.cloudWorkspaceCommand)},
+		{http.MethodGet, "/workspaces/:id/snapshot", "cloud-snapshot", protectedRoute, a.cloud.route(a.cloud.cloudSnapshotInfo)},
+		{http.MethodGet, "/workspaces/:id/snapshot/tree", "cloud-snapshot", protectedRoute, a.cloud.route(a.cloud.cloudSnapshotTree)},
+		{http.MethodGet, "/workspaces/:id/snapshot/files", "cloud-snapshot", protectedRoute, a.cloud.route(a.cloud.cloudSnapshotFile)},
+		{http.MethodGet, "/workspaces", "workspace", protectedRoute, a.workspace.route(a.workspace.listWorkspaces)},
+		{http.MethodGet, "/workspaces/files/search", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.workspacePathSearch)},
+		{http.MethodGet, "/workspaces/files/content-search", "workspace-search", protectedRoute, a.workspace.searchRoute(a.workspace.workspaceContentSearch)},
+		{http.MethodGet, "/workspaces/:id/runtime", "verification", protectedRoute, ginHTTPHandler(a.verification.workspaceRuntime)},
+		{http.MethodGet, "/workspaces/:id/health", "workspace-health", protectedRoute, a.workspace.healthRoute(a.workspace.workspaceHealth)},
+		{http.MethodGet, "/workspaces/:id/source-structure", "workspace", protectedRoute, a.workspace.route(a.workspace.getSourceStructure)},
+		{http.MethodGet, "/workspaces/:id/tree", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.workspaceTree)},
+		{http.MethodGet, "/workspaces/:id/files", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.workspaceFile)},
+		{http.MethodGet, "/workspaces/:id/files/diff", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.workspaceFileDiff)},
+		{http.MethodGet, "/workspaces/:id/git/path-status", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.workspacePathGitStates)},
+		{http.MethodGet, "/items", "item", protectedRoute, a.item.route(a.item.listItems)},
+		{http.MethodGet, "/items/:id", "item", protectedRoute, a.item.route(a.item.itemDetail)},
+		{http.MethodGet, "/items/:id/ai-session-eligibility", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.aiSessionEligibility)},
+		{http.MethodGet, "/items/:id/jira", "jira", protectedRoute, ginHTTPHandler(a.jira.jiraIssue)},
+		{http.MethodGet, "/items/:id/jira/attachments/:attachmentId", "jira", protectedRoute, ginHTTPHandler(a.jira.jiraAttachment)},
+		{http.MethodGet, "/items/:id/verification-tests", "item", protectedRoute, a.item.route(a.item.itemVerificationTests)},
+		{http.MethodGet, "/items/:id/e2e-runbooks", "item", protectedRoute, a.item.route(a.item.itemE2ERunbooks)},
+		{http.MethodGet, "/items/:id/files", "item", protectedRoute, a.item.route(a.item.itemFiles)},
+		{http.MethodGet, "/items/:id/content-search", "item-search", protectedRoute, a.item.searchRoute(a.item.itemContentSearch)},
+		{http.MethodGet, "/items/:id/files/:fileID", "item", protectedRoute, a.item.route(a.item.itemFileContent)},
+		{http.MethodGet, "/items/:id/diff", "item", protectedRoute, a.item.route(a.item.itemDiff)},
+		{http.MethodGet, "/workspaces/:id/jira/issues/:issueKey", "jira", protectedRoute, ginHTTPHandler(a.jira.workspaceJiraIssue)},
+		{http.MethodPost, "/workspaces", "workspace", protectedRoute, a.workspace.route(a.workspace.createWorkspace)},
+		{http.MethodPost, "/workspaces/import-preview", "workspace", protectedRoute, a.workspace.route(a.workspace.previewWorkspaceImport)},
+		{http.MethodPost, "/workspaces/import", "workspace", protectedRoute, a.workspace.route(a.workspace.importWorkspaces)},
+		{http.MethodPut, "/workspaces/:id", "workspace", protectedRoute, a.workspace.route(a.workspace.updateWorkspace)},
+		{http.MethodDelete, "/workspaces/:id", "workspace", protectedRoute, a.workspace.route(a.workspace.deleteWorkspace)},
+		{http.MethodPost, "/workspaces/:id/scan", "workspace", protectedRoute, a.workspace.route(a.workspace.scanWorkspace)},
+		{http.MethodPost, "/workspaces/:id/jira/test", "jira", protectedRoute, ginHTTPHandler(a.jira.testJiraConnection)},
+		{http.MethodPut, "/workspaces/:id/runtime", "verification", protectedRoute, ginHTTPHandler(a.verification.saveWorkspaceRuntime)},
+		{http.MethodPost, "/workspaces/:id/workstream/branch", "workspace", protectedRoute, a.workspace.workstreamRoute(a.workspace.loadWorkstreamBranch)},
+		{http.MethodPost, "/workspaces/:id/workstream/checkout", "workspace", protectedRoute, a.workspace.workstreamRoute(a.workspace.loadWorkstreamCheckout)},
+		{http.MethodPost, "/workspaces/:id/reviews/branch", "workspace", protectedRoute, a.workspace.workstreamRoute(a.workspace.loadBranchReview)},
+		{http.MethodPost, "/workspaces/:id/reviews/import", "item", protectedRoute, a.item.route(a.item.importReviewedPlan)},
+		{http.MethodPut, "/workspaces/:id/source-structure", "workspace", protectedRoute, a.workspace.route(a.workspace.saveSourceStructure)},
+		{http.MethodDelete, "/workspaces/:id/source-structure", "workspace", protectedRoute, a.workspace.route(a.workspace.resetSourceStructure)},
+		{http.MethodPut, "/workspaces/:id/files", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.saveWorkspaceFile)},
+		{http.MethodPost, "/workspaces/:id/files", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.createWorkspaceFile)},
+		{http.MethodPost, "/workspaces/:id/directories", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.createWorkspaceDirectory)},
+		{http.MethodPost, "/workspaces/:id/paths/rename", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.renameWorkspacePath)},
+		{http.MethodPost, "/workspaces/:id/files/revert", "workspace-files", protectedRoute, a.workspace.filesRoute(a.workspace.revertWorkspaceFile)},
+		{http.MethodPost, "/items/:id/jira/refresh", "jira", protectedRoute, ginHTTPHandler(a.jira.refreshJiraIssue)},
+		{http.MethodPut, "/items/:id/verification-tests", "item", protectedRoute, a.item.route(a.item.saveItemVerificationTests)},
+		{http.MethodPost, "/items/:id/files/:fileID", "item", protectedRoute, a.item.route(a.item.saveItemFile)},
+		{http.MethodPost, "/items/:id/files/:fileID/revert", "item", protectedRoute, a.item.route(a.item.revertItemFile)},
+		{http.MethodPatch, "/items/:id/metadata", "item", protectedRoute, a.item.route(a.item.saveItemMetadata)},
+		{http.MethodPatch, "/items/:id/status", "item", protectedRoute, a.item.route(a.item.updateItemStatus)},
+		{http.MethodPost, "/items", "item", protectedRoute, a.item.route(a.item.createItem)},
+		{http.MethodGet, "/knowledge/wikis", "knowledge", protectedRoute, ginHTTPHandler(a.knowledge.knowledgeWikis)},
+		{http.MethodGet, "/knowledge/wikis/:workspaceID/:root/pages", "knowledge", protectedRoute, ginHTTPHandler(a.knowledge.knowledgePages)},
+		{http.MethodGet, "/knowledge/wikis/:workspaceID/:root/pages/:slug", "knowledge", protectedRoute, ginHTTPHandler(a.knowledge.knowledgePage)},
+		{http.MethodGet, "/knowledge/wikis/:workspaceID/:root/pages/:slug/e2e-runbook", "knowledge", protectedRoute, ginHTTPHandler(a.knowledge.knowledgeE2ERunbook)},
+		{http.MethodGet, "/knowledge/wikis/:workspaceID/:root/graph", "knowledge", protectedRoute, ginHTTPHandler(a.knowledge.knowledgeGraph)},
+		{http.MethodPost, "/knowledge/wikis/:workspaceID/:root/rescan", "knowledge", protectedRoute, ginHTTPHandler(a.knowledge.knowledgeRescan)},
+		{http.MethodPost, "/knowledge/workspaces/:workspaceID/sync", "knowledge", protectedRoute, ginHTTPHandler(a.knowledge.knowledgeSync)},
+		{http.MethodPost, "/knowledge/workspaces/:workspaceID/enrich", "knowledge", protectedRoute, ginHTTPHandler(a.knowledge.knowledgeEnrich)},
+		{http.MethodPost, "/workspaces/:id/verification-jobs", "verification", protectedRoute, ginHTTPHandler(a.verification.createVerificationJob)},
+		{http.MethodPost, "/workspaces/:id/verification-checkpoints", "verification", protectedRoute, ginHTTPHandler(a.verification.ingestVerificationCheckpoint)},
+		{http.MethodGet, "/workspaces/:id/verification-jobs/:jobId", "verification", protectedRoute, ginHTTPHandler(a.verification.verificationJob)},
+		{http.MethodGet, "/workspaces/:id/verification-jobs/:jobId/artifacts", "verification", protectedRoute, ginHTTPHandler(a.verification.verificationArtifacts)},
+		{http.MethodPost, "/workspaces/:id/verification-jobs/:jobId/rerun", "verification", protectedRoute, ginHTTPHandler(a.verification.rerunVerificationJob)},
+		{http.MethodGet, "/workspaces/:id/git/status", "git", protectedRoute, a.git.route(a.git.gitStatus)},
+		{http.MethodGet, "/workspaces/:id/git/activity", "git", protectedRoute, a.git.route(a.git.gitActivity)},
+		{http.MethodGet, "/workspaces/:id/git/branches", "git", protectedRoute, a.git.route(a.git.gitBranches)},
+		{http.MethodGet, "/workspaces/:id/git/stashes", "git", protectedRoute, a.git.route(a.git.gitStashes)},
+		{http.MethodPost, "/workspaces/:id/git/stashes/:ref/apply", "git", protectedRoute, a.git.route(a.git.gitApplyStash)},
+		{http.MethodPost, "/workspaces/:id/git/fetch", "git", protectedRoute, a.git.route(a.git.gitFetch)},
+		{http.MethodPost, "/workspaces/:id/git/pull", "git", protectedRoute, a.git.route(a.git.gitPull)},
+		{http.MethodPost, "/workspaces/:id/git/push", "git", protectedRoute, a.git.route(a.git.gitPush)},
+		{http.MethodPost, "/workspaces/:id/git/commit", "git", protectedRoute, a.git.route(a.git.gitCommit)},
+		{http.MethodPost, "/workspaces/:id/git/branches", "git", protectedRoute, a.git.route(a.git.gitCreateBranch)},
+		{http.MethodPost, "/workspaces/:id/git/switch", "git", protectedRoute, a.git.route(a.git.gitSwitchBranch)},
+		{http.MethodPost, "/workspaces/stream-create", "workspace-stream", protectedRoute, a.workspace.route(a.workspace.createWorkspaceStream)},
+		{http.MethodGet, "/ai/session-records", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.aiSessionRecords)},
+		{http.MethodPost, "/items/:id/ai-sessions", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.launchAISession)},
+		{http.MethodPost, "/items/:id/ai-sessions/embedded", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.startEmbeddedAISession)},
+		{http.MethodPost, "/workspaces/:id/ai-sessions", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.launchWorkspaceAISession)},
+		{http.MethodPost, "/workspaces/:id/ai-sessions/embedded", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.startEmbeddedWorkspaceAISession)},
+		{http.MethodGet, "/ai/sessions/:sessionId", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.embeddedAISession)},
+		{http.MethodPost, "/ai/sessions/:sessionId/grant", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.embeddedAISessionGrant)},
+		{http.MethodDelete, "/ai/sessions/:sessionId", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.cancelEmbeddedAISession)},
+		{http.MethodGet, "/ai/sessions/:sessionId/channel", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.embeddedAISessionChannel)},
+	}
+}
+
+func guardedHTTPHandler(available bool, message string, handler http.HandlerFunc) gin.HandlerFunc {
+	if available {
+		return ginHTTPHandler(handler)
+	}
+	return ginHTTPHandler(func(w http.ResponseWriter, _ *http.Request) {
+		writeError(w, http.StatusServiceUnavailable, message)
+	})
+}
+
+func (a *workspaceController) route(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.workspaces != nil, "workspace service is unavailable", handler)
+}
+
+func (a *workspaceController) filesRoute(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.files != nil, "workspace files are unavailable", handler)
+}
+
+func (a *workspaceController) searchRoute(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.contentSearch != nil, "workspace content search is unavailable", handler)
+}
+
+func (a *workspaceController) healthRoute(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.health != nil, "workspace health is unavailable", handler)
+}
+
+func (a *workspaceController) workstreamRoute(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.workstream != nil, "workstream service is unavailable", handler)
+}
+
+func (a *itemController) route(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.items != nil, "item service is unavailable", handler)
+}
+
+func (a *itemController) searchRoute(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.contentSearch != nil, "item content search is unavailable", handler)
+}
+
+func (a *gitController) route(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.gitOps != nil, "Git service is unavailable", handler)
+}
+
+func (a *cloudController) route(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.available, "Cloud transport is unavailable", handler)
+}
+
+func (a *stateController) route(handler http.HandlerFunc) gin.HandlerFunc {
+	return guardedHTTPHandler(a.workspaces != nil, "workspace state is unavailable", handler)
 }

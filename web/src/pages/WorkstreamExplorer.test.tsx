@@ -9,7 +9,7 @@ const apiMock = vi.hoisted(() => ({
 	searchWorkspacePaths: vi.fn(), searchWorkspaceContent: vi.fn(), searchItemContent: vi.fn(), workspacePathGitStates: vi.fn(), workspaceBranches: vi.fn(), switchBranch: vi.fn(), createWorkspaceFile: vi.fn(), createWorkspaceDirectory: vi.fn(), renameWorkspacePath: vi.fn()
 }));
 
-vi.mock('../lib/api', () => ({
+vi.mock('../shared/api', () => ({
   api: apiMock,
   ApiError: class ApiError extends Error { recoveryHint?: string }
 }));

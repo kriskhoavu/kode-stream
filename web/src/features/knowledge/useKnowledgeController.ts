@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KnowledgeLocation } from '../../app/router';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { KnowledgeActionResult, KnowledgeGraph, KnowledgePage, KnowledgePageDetail, KnowledgeWarning, KnowledgeWiki, WorkspaceConfig } from '../../lib/types';
 
 export function useKnowledgeController(workspaces: WorkspaceConfig[], location: KnowledgeLocation | undefined, onLocationChange: (location: KnowledgeLocation) => void) {

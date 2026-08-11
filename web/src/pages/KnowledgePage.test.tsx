@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../lib/api';
+import { api } from '../shared/api';
 import { KnowledgePage } from './KnowledgePage';
 
-vi.mock('../lib/api', () => ({
+vi.mock('../shared/api', () => ({
 	ApiError: class ApiError extends Error {},
 	api: {
 		knowledgeWikis: vi.fn(),

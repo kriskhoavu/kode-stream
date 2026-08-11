@@ -9,9 +9,15 @@ import (
 	"kode-stream/internal/common/models"
 	appruntime "kode-stream/internal/runtime"
 	appverification "kode-stream/internal/verification"
+	appworkspace "kode-stream/internal/workspace"
 )
 
-func (a *API) workspaceRuntime(w http.ResponseWriter, r *http.Request) {
+type verificationController struct {
+	workspaces   *appworkspace.Service
+	verification *appverification.Service
+}
+
+func (a *verificationController) workspaceRuntime(w http.ResponseWriter, r *http.Request) {
 	if a.workspaces == nil {
 		writeError(w, http.StatusServiceUnavailable, "workspace service unavailable")
 		return
@@ -32,7 +38,7 @@ func (a *API) workspaceRuntime(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, runtimeConfig)
 }
 
-func (a *API) saveWorkspaceRuntime(w http.ResponseWriter, r *http.Request) {
+func (a *verificationController) saveWorkspaceRuntime(w http.ResponseWriter, r *http.Request) {
 	if a.workspaces == nil {
 		writeError(w, http.StatusServiceUnavailable, "workspace service unavailable")
 		return
@@ -56,7 +62,7 @@ func (a *API) saveWorkspaceRuntime(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, runtimeConfig)
 }
 
-func (a *API) createVerificationJob(w http.ResponseWriter, r *http.Request) {
+func (a *verificationController) createVerificationJob(w http.ResponseWriter, r *http.Request) {
 	if a.verification == nil {
 		writeError(w, http.StatusServiceUnavailable, "verification service unavailable")
 		return
@@ -83,7 +89,7 @@ func (a *API) createVerificationJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, job)
 }
 
-func (a *API) verificationJob(w http.ResponseWriter, r *http.Request) {
+func (a *verificationController) verificationJob(w http.ResponseWriter, r *http.Request) {
 	if a.verification == nil {
 		writeError(w, http.StatusServiceUnavailable, "verification service unavailable")
 		return
@@ -96,7 +102,7 @@ func (a *API) verificationJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, job)
 }
 
-func (a *API) verificationArtifacts(w http.ResponseWriter, r *http.Request) {
+func (a *verificationController) verificationArtifacts(w http.ResponseWriter, r *http.Request) {
 	if a.verification == nil {
 		writeError(w, http.StatusServiceUnavailable, "verification service unavailable")
 		return
@@ -109,7 +115,7 @@ func (a *API) verificationArtifacts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, artifacts)
 }
 
-func (a *API) rerunVerificationJob(w http.ResponseWriter, r *http.Request) {
+func (a *verificationController) rerunVerificationJob(w http.ResponseWriter, r *http.Request) {
 	if a.verification == nil {
 		writeError(w, http.StatusServiceUnavailable, "verification service unavailable")
 		return
@@ -131,7 +137,7 @@ func (a *API) rerunVerificationJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, job)
 }
 
-func (a *API) ingestVerificationCheckpoint(w http.ResponseWriter, r *http.Request) {
+func (a *verificationController) ingestVerificationCheckpoint(w http.ResponseWriter, r *http.Request) {
 	if a.verification == nil {
 		writeError(w, http.StatusServiceUnavailable, "verification service unavailable")
 		return

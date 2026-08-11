@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Bot, Settings2 } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { AISessionLaunchInput, AISessionLaunchResult, EmbeddedAISessionResult } from '../../lib/types';
 import { AISessionLaunchDialog } from './AISessionLaunchDialog';
 import { appendJiraDescriptionPrompt } from './jiraPrompt';

@@ -6,7 +6,7 @@ import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { JiraItemPanel } from '../features/jira/JiraItemPanel';
-import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
+import { ApiError, api, statusLabels, statusOrder } from '../shared/api';
 import type {
   WorkstreamBranchLoadResult,
   FileContent,

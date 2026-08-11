@@ -1,9 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { notifyReliabilityChanged, useAuditEvents, useWorkspaceHealth } from './hooks';
 
-vi.mock('../../lib/api', () => ({
+vi.mock('../../shared/api', () => ({
   api: {
     workspaceHealth: vi.fn(),
     auditEvents: vi.fn()

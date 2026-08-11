@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { AISessionLaunchDialog } from './AISessionLaunchDialog';
 
-vi.mock('../../lib/api', () => ({ api: {
+vi.mock('../../shared/api', () => ({ api: {
   aiSettings: vi.fn(), aiCapabilities: vi.fn(), aiProviderCapabilities: vi.fn(), aiPresets: vi.fn(), aiSessionEligibility: vi.fn(), launchAISession: vi.fn(), launchWorkspaceAISession: vi.fn(), startEmbeddedAISession: vi.fn(), startEmbeddedWorkspaceAISession: vi.fn(), jiraIssue: vi.fn()
 } }));
 

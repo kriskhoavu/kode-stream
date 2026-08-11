@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { ChevronDown, GitBranch, GitCommitHorizontal, Search, ArchiveRestore } from 'lucide-react';
-import { ApiError, api } from '../../lib/api';
+import { ApiError, api } from '../../shared/api';
 import type { GitStashEntry } from '../../lib/types';
 
 export function BranchCheckoutPicker({ workspaceId, currentCheckoutBranch, branches, disabled = false, ariaLabel, listboxLabel, onSwitched }: {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { AICapability, AISettings } from '../../lib/types';
 
 export function useAISettings() {

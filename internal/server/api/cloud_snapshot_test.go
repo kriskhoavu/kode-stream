@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -31,15 +32,18 @@ func TestCloudSnapshotReadsCommitPinnedProviderContent(t *testing.T) {
 	defer providerServer.Close()
 
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	apiHandler = apiHandler.WithRuntimeConfig(testCloudRuntimeConfig())
-	if err := apiHandler.cloudProviders.registry.Upsert(provider.Instance{ID: "github", Name: "GitHub", Kind: "github", BaseURL: providerServer.URL}); err != nil {
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
+	if err := apiHandler.cloud.providers.registry.Upsert(provider.Instance{ID: "github", Name: "GitHub", Kind: "github", BaseURL: providerServer.URL}); err != nil {
 		t.Fatal(err)
 	}
 	userID := stableCloudUserID("editor")
-	if err := apiHandler.cloudProviders.connections.Save(userID, "github", "read-token"); err != nil {
+	if err := apiHandler.cloud.providers.connections.Save(userID, "github", "read-token"); err != nil {
 		t.Fatal(err)
 	}
-	workspace := apiHandler.cloudWorkspaces.Upsert(models.WorkspaceConfig{ID: "snapshot", Name: "Snapshot", OwnerUserID: userID, AccessMode: models.WorkspaceAccessModeRemoteSnapshot, Provider: "github", ProviderInstanceID: "github", ProviderRepository: "acme/repo", SelectedRef: "main", Sources: []string{}})
+	workspace, err := apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "snapshot", Name: "Snapshot", OwnerUserID: userID, AccessMode: models.WorkspaceAccessModeRemoteSnapshot, Provider: "github", ProviderInstanceID: "github", ProviderRepository: "acme/repo", SelectedRef: "main", Sources: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	handler := apiHandler.Routes()
 
 	for _, endpoint := range []string{"/api/workspaces/" + workspace.ID + "/snapshot", "/api/workspaces/" + workspace.ID + "/snapshot/tree", "/api/workspaces/" + workspace.ID + "/snapshot/files?path=README.md"} {
@@ -87,12 +91,12 @@ func TestCloudRegistersRemoteSnapshotWithoutAgent(t *testing.T) {
 		}
 	}))
 	defer providerServer.Close()
-	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	apiHandler = apiHandler.WithRuntimeConfig(testCloudRuntimeConfig())
-	if err := apiHandler.cloudProviders.registry.Upsert(provider.Instance{ID: "github", Name: "GitHub", Kind: "github", BaseURL: providerServer.URL}); err != nil {
+	apiHandler, _, _, auditStore := reliabilityTestAPI(t)
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
+	if err := apiHandler.cloud.providers.registry.Upsert(provider.Instance{ID: "github", Name: "GitHub", Kind: "github", BaseURL: providerServer.URL}); err != nil {
 		t.Fatal(err)
 	}
-	if err := apiHandler.cloudProviders.connections.Save(stableCloudUserID("editor"), "github", "read-token"); err != nil {
+	if err := apiHandler.cloud.providers.connections.Save(stableCloudUserID("editor"), "github", "read-token"); err != nil {
 		t.Fatal(err)
 	}
 	response := httptest.NewRecorder()
@@ -103,5 +107,10 @@ func TestCloudRegistersRemoteSnapshotWithoutAgent(t *testing.T) {
 	apiHandler.Routes().ServeHTTP(response, request)
 	if response.Code != http.StatusCreated || !strings.Contains(response.Body.String(), "commit-1") || strings.Contains(response.Body.String(), "agentId") {
 		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	events, err := auditStore.Recent(1)
+	owner := stableCloudUserID("editor")
+	if err != nil || len(events) != 1 || events[0].Operation != "cloud_snapshot_create" || events[0].OwnerUserID != owner || events[0].ActorUserID != owner {
+		t.Fatalf("snapshot audit=%#v err=%v", events, err)
 	}
 }

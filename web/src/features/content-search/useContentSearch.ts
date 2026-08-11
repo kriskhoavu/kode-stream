@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { ExplorerTreeMode, WorkspaceContentSearchResult } from '../../lib/types';
 
 type ContentSearchTarget =

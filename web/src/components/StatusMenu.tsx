@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { editableStatusOrder, statusLabels } from '../lib/api';
+import { editableStatusOrder, statusLabels } from '../shared/api';
 import type { ItemStatus } from '../lib/types';
 
 export function StatusMenu({ value, onChange, ariaLabel = 'Change item status' }: { value: ItemStatus; onChange: (status: ItemStatus) => void; ariaLabel?: string }) {

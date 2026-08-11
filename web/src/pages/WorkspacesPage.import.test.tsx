@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../lib/api';
+import { api } from '../shared/api';
 import { WorkspacesPage } from './WorkspacesPage';
 
 afterEach(() => {

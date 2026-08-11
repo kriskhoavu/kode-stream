@@ -2,7 +2,7 @@ import { type DragEvent, type Dispatch, type FormEvent, type ReactNode, type Set
 import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, FolderOpen, HardDrive, Link2, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
-import { ApiError, api } from '../lib/api';
+import { ApiError, api } from '../shared/api';
 import type { JiraConnection, KnowledgeSettings, RuntimeContext, RuntimeType, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';

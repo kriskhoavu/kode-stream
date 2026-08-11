@@ -8,7 +8,7 @@ import { WorkstreamPage } from './pages/WorkstreamPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { api, isExtensionSurface, localAPIOrigin } from './lib/api';
+import { api, isExtensionSurface, localAPIOrigin } from './shared/api';
 import { ActivityPanel } from './components/ReliabilityPanels';
 import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';

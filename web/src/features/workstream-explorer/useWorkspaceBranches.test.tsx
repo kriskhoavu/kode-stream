@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError } from '../../shared/api';
 import type { WorkspaceConfig } from '../../lib/types';
 import { useWorkspaceBranches } from './useWorkspaceBranches';
 

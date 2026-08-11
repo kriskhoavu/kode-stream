@@ -1,6 +1,6 @@
 import { Clock3, FileText, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '../lib/api';
+import { api } from '../shared/api';
 import type { RecentItem, SearchResult } from '../lib/types';
 import { useGlobalSearch } from '../features/search/hooks';
 

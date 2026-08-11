@@ -6,7 +6,7 @@ const apiMock = vi.hoisted(() => ({
 	item: vi.fn(), files: vi.fn(), file: vi.fn(), diff: vi.fn(), gitStatus: vi.fn(), workspaceBranches: vi.fn(), switchBranch: vi.fn()
 }));
 
-vi.mock('../lib/api', () => ({
+vi.mock('../shared/api', () => ({
 	api: apiMock,
 	statusLabels: {},
 	ApiError: class ApiError extends Error { recoveryHint?: string }

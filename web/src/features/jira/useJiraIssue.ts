@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { JiraIssueState } from '../../lib/types';
 
 export function useJiraIssue(itemId: string) {

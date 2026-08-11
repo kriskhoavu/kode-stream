@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"net/http"
@@ -38,6 +39,41 @@ type fakeAuditEventReader struct {
 	err    error
 }
 
+type failingStorageSync struct{ err error }
+
+func (s failingStorageSync) Sync(context.Context, storage.StorageSyncRequest) (storage.StorageSyncResult, error) {
+	return storage.StorageSyncResult{}, s.err
+}
+
+func TestStorageSyncHTTPMapsTypedFailures(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"validation", &storage.SyncError{Kind: storage.SyncErrorValidation, Err: errors.New("invalid")}, http.StatusBadRequest},
+		{"conflict", &storage.SyncError{Kind: storage.SyncErrorConflict, Err: errors.New("busy")}, http.StatusConflict},
+		{"infrastructure", &storage.SyncError{Kind: storage.SyncErrorInfrastructure, Err: errors.New("disk")}, http.StatusInternalServerError},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			New(Dependencies{StorageSync: failingStorageSync{err: test.err}}).Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/storage/sync", strings.NewReader(`{"direction":"database_to_datadir","confirm":true}`)))
+			if response.Code != test.want {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func withTestRuntime(api *API, config system.RuntimeConfig) *API {
+	api.runtimeConfig = config
+	api.cloud.runtimeConfig = config
+	api.workspace.runtimeConfig = config
+	api.state.runtimeConfig = config
+	api.aiSessions.runtimeConfig = config
+	return api
+}
+
 func TestAISessionRecordsRouteReturnsDurableSafeMetadata(t *testing.T) {
 	dataDir := t.TempDir()
 	repository := appaisession.NewFileSessionRecordRepository(filepath.Join(dataDir, "session-records.yaml"))
@@ -49,7 +85,7 @@ func TestAISessionRecordsRouteReturnsDurableSafeMetadata(t *testing.T) {
 	manager := appaisession.NewTerminalManager(appaisession.Config{})
 	t.Cleanup(func() { _ = manager.Close() })
 	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(dataDir, "ai-settings.yaml"))).ConfigureEmbedded(manager).ConfigureSessionRecords(repository, nil)
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+	handler := New(Dependencies{AISessions: service}).Routes()
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/ai/session-records?workspaceId=workspace-1&branch=main", nil))
@@ -68,7 +104,7 @@ func TestEmbeddedSessionGrantRouteReattachesOnlyLiveProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(appaisession.New(nil).ConfigureEmbedded(manager)).Routes()
+	handler := New(Dependencies{AISessions: appaisession.New(nil).ConfigureEmbedded(manager)}).Routes()
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/ai/sessions/"+session.ID+"/grant", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"sessionId":"session-live"`) || !strings.Contains(response.Body.String(), `"token":`) {
@@ -88,9 +124,26 @@ func (f fakeAuditEventReader) RecentContext(context.Context, int) ([]models.Audi
 	return f.events, f.err
 }
 
+func (f fakeAuditEventReader) QueryContext(_ context.Context, query audit.Query) ([]models.AuditEvent, error) {
+	result := make([]models.AuditEvent, 0, len(f.events))
+	for _, event := range f.events {
+		if query.OwnerUserID != "" && event.OwnerUserID != query.OwnerUserID {
+			continue
+		}
+		if query.WorkspaceID != "" && event.WorkspaceID != query.WorkspaceID {
+			continue
+		}
+		result = append(result, event)
+		if query.Limit > 0 && len(result) == query.Limit {
+			break
+		}
+	}
+	return result, f.err
+}
+
 func TestAISettingsRoutesReadValidateAndPersist(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ai-settings.yaml")
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(appaisession.New(appaisession.NewSettingsRepository(path))).Routes()
+	handler := New(Dependencies{AISessions: appaisession.New(appaisession.NewSettingsRepository(path))}).Routes()
 
 	get := httptest.NewRecorder()
 	handler.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/ai/settings", nil))
@@ -129,7 +182,7 @@ func TestAISettingsRoutesReadValidateAndPersist(t *testing.T) {
 
 func TestAICapabilitiesRouteReturnsStableShape(t *testing.T) {
 	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(t.TempDir(), "ai-settings.yaml")))
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+	handler := New(Dependencies{AISessions: service}).Routes()
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/ai/capabilities", nil))
 	if response.Code != http.StatusOK {
@@ -159,7 +212,7 @@ func TestAIProviderCapabilitiesRouteReturnsCatalog(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(t.TempDir(), "ai-settings.yaml")))
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+	handler := New(Dependencies{AISessions: service}).Routes()
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/ai/providers/codex/capabilities", nil))
 	if response.Code != http.StatusOK {
@@ -219,7 +272,7 @@ func TestWorkspaceAISessionRoutesUseWorkspaceCapabilitiesAndValidateContext(t *t
 		audit.New(filepath.Join(dataDir, "audit.jsonl")),
 		filepath.Join(dataDir, "wrappers"),
 	)
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+	handler := New(Dependencies{AISessions: service}).Routes()
 
 	capabilities := httptest.NewRecorder()
 	handler.ServeHTTP(capabilities, httptest.NewRequest(http.MethodGet, "/api/ai/providers/test-ai/capabilities?workspaceId="+workspace.ID, nil))
@@ -303,9 +356,7 @@ func TestE2ERunbookReadRoutesReturnLocalAndCanonicalCoverage(t *testing.T) {
 	if err := store.ReplaceWorkspace(workspace.ID, []knowledgeindex.KnowledgeWiki{{Root: "wiki", Pages: []knowledgeindex.KnowledgePage{page}}}); err != nil {
 		t.Fatal(err)
 	}
-	handler := New(reg, idx, nil, nil, nil, gitadapter.New(), nil).
-		WithKnowledge(knowledgeindex.NewService(reg, store)).
-		Routes()
+	handler := New(Dependencies{WorkspaceRepository: reg, ItemRepository: idx, Git: gitadapter.New(), Knowledge: knowledgeindex.NewService(reg, store)}).Routes()
 
 	itemResponse := httptest.NewRecorder()
 	handler.ServeHTTP(itemResponse, httptest.NewRequest(http.MethodGet, "/api/items/"+item.ID+"/e2e-runbooks", nil))
@@ -336,7 +387,7 @@ func TestE2ERunbookReadRoutesReturnLocalAndCanonicalCoverage(t *testing.T) {
 }
 
 func TestAIRoutesAreUnavailableWithoutService(t *testing.T) {
-	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
+	handler := New(Dependencies{}).Routes()
 	for _, endpoint := range []string{"/api/ai/settings", "/api/ai/capabilities"} {
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, endpoint, nil))
@@ -347,7 +398,7 @@ func TestAIRoutesAreUnavailableWithoutService(t *testing.T) {
 }
 
 func TestGinTransportOwnsPreviouslyLegacyRoutes(t *testing.T) {
-	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
+	handler := New(Dependencies{}).Routes()
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/ai/settings", nil)
 	request.Header.Set(requestIDHeader, "request-1")
@@ -366,7 +417,7 @@ func TestGinTransportOwnsPreviouslyLegacyRoutes(t *testing.T) {
 }
 
 func TestGinHealthRoutePreservesContract(t *testing.T) {
-	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
+	handler := New(Dependencies{}).Routes()
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
@@ -387,7 +438,7 @@ func TestGinHealthRoutePreservesContract(t *testing.T) {
 }
 
 func TestLocalModeAllowsChromeExtensionPreflight(t *testing.T) {
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithRuntimeConfig(system.RuntimeConfig{Mode: models.RuntimeModeLocal}).Routes()
+	handler := New(Dependencies{RuntimeConfig: system.RuntimeConfig{Mode: models.RuntimeModeLocal}}).Routes()
 	request := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
 	request.Header.Set("Origin", "chrome-extension://extension-id")
 	response := httptest.NewRecorder()
@@ -403,7 +454,7 @@ func TestLocalModeAllowsChromeExtensionPreflight(t *testing.T) {
 }
 
 func TestCloudModeDoesNotAllowChromeExtensionCORS(t *testing.T) {
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithRuntimeConfig(system.RuntimeConfig{Mode: models.RuntimeModeCloud}).Routes()
+	handler := New(Dependencies{RuntimeConfig: system.RuntimeConfig{Mode: models.RuntimeModeCloud}}).Routes()
 	request := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
 	request.Header.Set("Origin", "chrome-extension://extension-id")
 	response := httptest.NewRecorder()
@@ -416,11 +467,11 @@ func TestCloudModeDoesNotAllowChromeExtensionCORS(t *testing.T) {
 }
 
 func TestGinHealthRouteIncludesDatabaseReadiness(t *testing.T) {
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithDatabaseHealth(fakeDatabaseHealth{health: storage.DatabaseHealth{
+	handler := New(Dependencies{DatabaseHealth: fakeDatabaseHealth{health: storage.DatabaseHealth{
 		Driver:           storage.StorageDriverSQLite,
 		OK:               true,
 		MigrationVersion: 1,
-	}}).Routes()
+	}}}).Routes()
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
@@ -441,9 +492,9 @@ func TestGinHealthRouteIncludesDatabaseReadiness(t *testing.T) {
 }
 
 func TestGinAuditRouteUsesReaderSeam(t *testing.T) {
-	handler := (&API{auditReader: fakeAuditEventReader{events: []models.AuditEvent{
+	handler := (&API{audit: &auditController{reader: fakeAuditEventReader{events: []models.AuditEvent{
 		{WorkspaceID: "workspace-a", Operation: "scan", Status: models.AuditStatusSuccess, Message: "scan"},
-	}}}).Routes()
+	}}}}).Routes()
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/audit-events?workspaceId=workspace-a&limit=1", nil))
@@ -461,7 +512,7 @@ func TestGinAuditRouteUsesReaderSeam(t *testing.T) {
 }
 
 func BenchmarkGinHealthRoute(b *testing.B) {
-	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
+	handler := New(Dependencies{}).Routes()
 	request := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 
 	b.ReportAllocs()
@@ -579,7 +630,7 @@ func BenchmarkGinItemDetailRoute(b *testing.B) {
 
 func TestAILaunchRouteValidatesBodyAndReportsUnavailableLauncher(t *testing.T) {
 	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(t.TempDir(), "ai-settings.yaml")))
-	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+	handler := New(Dependencies{AISessions: service}).Routes()
 
 	invalid := httptest.NewRecorder()
 	handler.ServeHTTP(invalid, httptest.NewRequest(http.MethodPost, "/api/items/item-1/ai-sessions", strings.NewReader(`{"contextMode":`)))
@@ -689,7 +740,7 @@ func TestRoutesListItemsPreservesJSONShape(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/items?workspaceId=workspace-1&q=architecture", nil)
 	res := httptest.NewRecorder()
-	New(nil, idx, nil, nil, nil, nil, nil).Routes().ServeHTTP(res, req)
+	New(Dependencies{ItemRepository: idx}).Routes().ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
@@ -733,7 +784,7 @@ func TestItemVerificationTestsRoutesPersistSelection(t *testing.T) {
 	}}, nil, updatedAt); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apiHandler.items.Detail(itemID); err != nil {
+	if _, err := apiHandler.item.items.Detail(itemID); err != nil {
 		t.Fatalf("fixture item detail: %v", err)
 	}
 
@@ -821,7 +872,7 @@ func TestRoutesMissingItemReturnsNotFoundJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/items/missing", nil)
 	res := httptest.NewRecorder()
 
-	New(nil, idx, nil, nil, nil, nil, nil).Routes().ServeHTTP(res, req)
+	New(Dependencies{ItemRepository: idx}).Routes().ServeHTTP(res, req)
 
 	if res.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
@@ -837,7 +888,7 @@ func TestRoutesMissingItemReturnsNotFoundJSON(t *testing.T) {
 
 func TestJiraConnectionRouteRequiresServiceAndValidBody(t *testing.T) {
 	unavailable := httptest.NewRecorder()
-	New(nil, nil, nil, nil, nil, nil, nil).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodPost, "/api/workspaces/w1/jira/test", strings.NewReader(`{}`)))
+	New(Dependencies{}).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodPost, "/api/workspaces/w1/jira/test", strings.NewReader(`{}`)))
 	if unavailable.Code != http.StatusServiceUnavailable {
 		t.Fatalf("unavailable status = %d", unavailable.Code)
 	}
@@ -845,15 +896,81 @@ func TestJiraConnectionRouteRequiresServiceAndValidBody(t *testing.T) {
 
 func TestWorkspaceJiraIssueRouteRequiresService(t *testing.T) {
 	unavailable := httptest.NewRecorder()
-	New(nil, nil, nil, nil, nil, nil, nil).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodGet, "/api/workspaces/w1/jira/issues/DI-1", nil))
+	New(Dependencies{}).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodGet, "/api/workspaces/w1/jira/issues/DI-1", nil))
 	if unavailable.Code != http.StatusServiceUnavailable {
 		t.Fatalf("unavailable status = %d", unavailable.Code)
 	}
 }
 
+func TestItemJiraRoutesRequireService(t *testing.T) {
+	handler := (&API{}).Routes()
+	for _, path := range []string{"/api/items/item-1/jira", "/api/items/item-1/jira/attachments/attachment-1"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		if response.Code != http.StatusServiceUnavailable {
+			t.Fatalf("path=%s status=%d body=%s", path, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestZeroValueAPIRoutesReturnUnavailableForExtractedControllers(t *testing.T) {
+	routes := []struct {
+		name   string
+		owner  string
+		method string
+		path   string
+		body   string
+		status int
+	}{
+		{name: "Health", owner: "health", method: http.MethodGet, path: "/api/health", status: http.StatusOK},
+		{name: "Cloud auth", owner: "cloud-auth", method: http.MethodGet, path: "/api/auth/login", status: http.StatusServiceUnavailable},
+		{name: "Cloud agent", owner: "cloud-agent", method: http.MethodGet, path: "/api/agents", status: http.StatusServiceUnavailable},
+		{name: "Cloud workspace", owner: "cloud-workspace", method: http.MethodPost, path: "/api/workspaces/from-agent", body: `{}`, status: http.StatusServiceUnavailable},
+		{name: "Cloud command", owner: "cloud-command", method: http.MethodPost, path: "/api/workspaces/ws/commands", body: `{}`, status: http.StatusServiceUnavailable},
+		{name: "Cloud snapshot", owner: "cloud-snapshot", method: http.MethodGet, path: "/api/workspaces/ws/snapshot", status: http.StatusServiceUnavailable},
+		{name: "Audit", owner: "audit", method: http.MethodGet, path: "/api/audit-events", status: http.StatusOK},
+		{name: "Navigation", owner: "navigation", method: http.MethodPost, path: "/api/saved-filters", body: `{}`, status: http.StatusServiceUnavailable},
+		{name: "System", owner: "system", method: http.MethodPost, path: "/api/system/select-directory", body: `{}`, status: http.StatusServiceUnavailable},
+		{name: "Storage", owner: "storage", method: http.MethodGet, path: "/api/storage/status", status: http.StatusServiceUnavailable},
+		{name: "AI", owner: "ai", method: http.MethodGet, path: "/api/ai/capabilities", status: http.StatusServiceUnavailable},
+		{name: "Jira", owner: "jira", method: http.MethodGet, path: "/api/items/item-1/jira", status: http.StatusServiceUnavailable},
+		{name: "Knowledge", owner: "knowledge", method: http.MethodGet, path: "/api/knowledge/wikis?workspaceId=ws", status: http.StatusServiceUnavailable},
+		{name: "Verification", owner: "verification", method: http.MethodPost, path: "/api/workspaces/ws/verification-jobs", body: `{}`, status: http.StatusServiceUnavailable},
+		{name: "Canvas", owner: "canvas", method: http.MethodGet, path: "/api/canvas/layouts/layout-1", status: http.StatusServiceUnavailable},
+		{name: "Workspace", owner: "workspace", method: http.MethodGet, path: "/api/workspaces", status: http.StatusServiceUnavailable},
+		{name: "Workspace files", owner: "workspace-files", method: http.MethodGet, path: "/api/workspaces/ws/tree", status: http.StatusServiceUnavailable},
+		{name: "Workspace search", owner: "workspace-search", method: http.MethodGet, path: "/api/workspaces/files/content-search?q=x", status: http.StatusServiceUnavailable},
+		{name: "Workspace health", owner: "workspace-health", method: http.MethodGet, path: "/api/workspaces/ws/health", status: http.StatusServiceUnavailable},
+		{name: "Item", owner: "item", method: http.MethodGet, path: "/api/items/item-1", status: http.StatusServiceUnavailable},
+		{name: "Item search", owner: "item-search", method: http.MethodGet, path: "/api/items/item-1/content-search?q=x", status: http.StatusServiceUnavailable},
+		{name: "Git", owner: "git", method: http.MethodGet, path: "/api/workspaces/ws/git/status", status: http.StatusServiceUnavailable},
+		{name: "State", owner: "state", method: http.MethodGet, path: "/api/state", status: http.StatusServiceUnavailable},
+		{name: "Search", owner: "search", method: http.MethodGet, path: "/api/search?q=x", status: http.StatusOK},
+		{name: "Workspace stream", owner: "workspace-stream", method: http.MethodPost, path: "/api/workspaces/stream-create", body: `{}`, status: http.StatusServiceUnavailable},
+	}
+	covered := map[string]bool{}
+	for _, route := range routes {
+		covered[route.owner] = true
+		t.Run(route.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			(&API{}).Routes().ServeHTTP(response, httptest.NewRequest(route.method, route.path, strings.NewReader(route.body)))
+			if response.Code != route.status {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+	apiHandler := &API{}
+	apiHandler.initializeControllers()
+	for _, route := range routeManifest(apiHandler) {
+		if !covered[route.owner] {
+			t.Errorf("manifest owner %q has no zero-value behavior case", route.owner)
+		}
+	}
+}
+
 func TestAIPresetsRouteRequiresService(t *testing.T) {
 	unavailable := httptest.NewRecorder()
-	New(nil, nil, nil, nil, nil, nil, nil).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodGet, "/api/ai/presets", nil))
+	New(Dependencies{}).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodGet, "/api/ai/presets", nil))
 	if unavailable.Code != http.StatusServiceUnavailable {
 		t.Fatalf("unavailable status = %d", unavailable.Code)
 	}
@@ -891,7 +1008,7 @@ func TestCreateWorkspaceSupportsRemoteClonePayload(t *testing.T) {
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(t.TempDir(), "workspaces.yaml"), git)
 	idx := itemindex.New(filepath.Join(t.TempDir(), "item-index.yaml"))
-	handler := New(reg, idx, nil, nil, nil, git, nil)
+	handler := New(Dependencies{WorkspaceRepository: reg, ItemRepository: idx, Git: git})
 	cloneRoot := t.TempDir()
 	body := `{"name":"Remote","registrationMode":"remote_clone","remoteUrl":"file://` + remote + `","cloneRoot":"` + cloneRoot + `","baselineBranch":"main","sources":["plans"]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", strings.NewReader(body))
@@ -942,7 +1059,7 @@ func TestWorkspaceImportPreviewEndpointReturnsCandidatesWithoutWriting(t *testin
 	registryPath := filepath.Join(dataDir, "workspaces.yaml")
 	git := gitadapter.New()
 	reg := registry.New(registryPath, git)
-	handler := New(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, nil, nil, git, nil).Routes()
+	handler := New(Dependencies{WorkspaceRepository: reg, ItemRepository: itemindex.New(filepath.Join(dataDir, "items.yaml")), Git: git}).Routes()
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/workspaces/import-preview", strings.NewReader(`{"sourcePath":"`+source+`"}`)))
 	if response.Code != http.StatusOK {
@@ -1010,6 +1127,28 @@ func TestReliabilityEndpointsReturnWorkspaceHealthAndRecentAuditEvents(t *testin
 	}
 	if auditResponse.Code != http.StatusOK || len(events) != 1 || events[0].Operation != "scan" {
 		t.Fatalf("audit status = %d, events = %#v", auditResponse.Code, events)
+	}
+}
+
+func TestAuditHTTPFiltersBeforeLimitWithInterleavedWorkspaces(t *testing.T) {
+	store := audit.New(filepath.Join(t.TempDir(), "audit.jsonl"))
+	for index := 0; index < 30; index++ {
+		workspaceID := "other"
+		if index == 0 || index == 4 {
+			workspaceID = "wanted"
+		}
+		if _, err := store.Append(models.AuditEvent{WorkspaceID: workspaceID, Operation: fmt.Sprintf("event-%d", index)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	response := httptest.NewRecorder()
+	New(Dependencies{Audit: store}).Routes().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/audit-events?workspaceId=wanted&limit=2", nil))
+	var events []models.AuditEvent
+	if err := json.Unmarshal(response.Body.Bytes(), &events); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusOK || len(events) != 2 {
+		t.Fatalf("status=%d events=%#v", response.Code, events)
 	}
 }
 
@@ -1332,7 +1471,7 @@ func TestSearchEndpointSupportsAllAndWorkspaceScopedQueries(t *testing.T) {
 	if err := idx.ReplaceWorkspace("other", []models.ItemDetail{{ItemSummary: models.ItemSummary{ID: "two", WorkspaceID: "other", Identifier: "PM-005", Title: "Other search"}}}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	apiHandler.search = appsearch.New(idx)
+	apiHandler.search.search = appsearch.New(idx)
 
 	for _, test := range []struct {
 		path string
@@ -1354,7 +1493,7 @@ func TestSearchEndpointSupportsAllAndWorkspaceScopedQueries(t *testing.T) {
 func TestSavedFilterEndpointsValidateCreateListAndDelete(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
 	dir := t.TempDir()
-	apiHandler.navigation = navigation.New(filepath.Join(dir, "filters.yaml"), filepath.Join(dir, "recents.yaml"))
+	apiHandler.navigation = navigation.NewController(navigation.New(filepath.Join(dir, "filters.yaml"), filepath.Join(dir, "recents.yaml")), apiHandler.item.items)
 
 	invalid := httptest.NewRecorder()
 	apiHandler.Routes().ServeHTTP(invalid, httptest.NewRequest(http.MethodPost, "/api/saved-filters", strings.NewReader(`{"name":"","route":"https://example.com"}`)))
@@ -1384,7 +1523,7 @@ func TestSavedFilterEndpointsValidateCreateListAndDelete(t *testing.T) {
 func TestRecentItemEndpointOrdersLatestOpenFirst(t *testing.T) {
 	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
 	dir := t.TempDir()
-	apiHandler.navigation = navigation.New(filepath.Join(dir, "filters.yaml"), filepath.Join(dir, "recents.yaml"))
+	apiHandler.navigation = navigation.NewController(navigation.New(filepath.Join(dir, "filters.yaml"), filepath.Join(dir, "recents.yaml")), apiHandler.item.items)
 	items := []models.ItemDetail{
 		{ItemSummary: models.ItemSummary{ID: "one", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name, Identifier: "PM-001", Title: "One", ItemPath: "plans/one"}},
 		{ItemSummary: models.ItemSummary{ID: "two", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name, Identifier: "PM-002", Title: "Two", ItemPath: "plans/two"}},
@@ -1441,7 +1580,7 @@ func reliabilityTestAPI(t testing.TB) (*API, models.WorkspaceConfig, *itemindex.
 	files := fileaccess.New()
 	scan := scanner.New(git)
 	itemWriter := itemwriter.New(files, scan, idx, reg)
-	return NewWithReliability(reg, idx, scan, files, itemWriter, git, nil, auditStore, healthService), workspace, idx, auditStore
+	return New(Dependencies{WorkspaceRepository: reg, ItemRepository: idx, Scanner: scan, FileAccess: files, ItemWriter: itemWriter, Git: git, Audit: auditStore, WorkspaceHealth: healthService}), workspace, idx, auditStore
 }
 
 func writeAPITestFile(t *testing.T, root, rel, content string) {

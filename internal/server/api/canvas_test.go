@@ -57,7 +57,7 @@ func TestCanvasAPIDefaultProjectionPlacementConflictAndViewportIndependence(t *t
 	}
 	repository := appcanvas.NewFileRepository(filepath.Join(dataDir, "canvas.yaml"))
 	service := appcanvas.NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
-	handler := New(reg, items, scanner.New(git), nil, nil, git, nil).WithCanvas(service).Routes()
+	handler := New(Dependencies{WorkspaceRepository: reg, ItemRepository: items, Scanner: scanner.New(git), Git: git, Canvas: service}).Routes()
 
 	body, _ := json.Marshal(map[string]string{"workspaceId": workspaceConfig.ID, "branchKey": "main"})
 	response := httptest.NewRecorder()

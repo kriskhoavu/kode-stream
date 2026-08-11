@@ -18,7 +18,7 @@ import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspa
 import type { WorkspaceBranchState } from '../features/workstream-explorer/useWorkspaceBranches';
 import { useWorkspacePathSearch } from '../features/workstream-explorer/useWorkspacePathSearch';
 import { useWorkspacePathMutations } from '../features/workstream-explorer/useWorkspacePathMutations';
-import { ApiError, api } from '../lib/api';
+import { ApiError, api } from '../shared/api';
 import type { GitActivityEntry, GitStatus, ItemSummary, WorkspaceConfig, WorkspaceHealth, WorkspacePathGitState, WorkspacePathSearchResult } from '../lib/types';
 import { parseGitDiff } from '../shared/domain/diff';
 import { ContentSearchResultRow, PathSearchResultRow } from '../features/content-search/ContentSearch';

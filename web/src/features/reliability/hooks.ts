@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { AuditEvent, WorkspaceHealth } from '../../lib/types';
 
 const reliabilityChangedEvent = 'kode-stream:reliability-changed';

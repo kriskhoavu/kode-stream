@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -10,16 +11,21 @@ import (
 	"kode-stream/internal/system"
 )
 
-func (a *API) storageStatusRoute(w http.ResponseWriter, r *http.Request) {
-	if a.storageStatus == nil {
+type storageController struct {
+	status storageStatusService
+	sync   storageSyncService
+}
+
+func (a *storageController) storageStatusRoute(w http.ResponseWriter, r *http.Request) {
+	if a.status == nil {
 		writeError(w, http.StatusServiceUnavailable, "storage status is unavailable")
 		return
 	}
-	writeJSON(w, http.StatusOK, a.storageStatus.Status(r.Context()))
+	writeJSON(w, http.StatusOK, a.status.Status(r.Context()))
 }
 
-func (a *API) storageSyncRoute(w http.ResponseWriter, r *http.Request) {
-	if a.storageSync == nil {
+func (a *storageController) storageSyncRoute(w http.ResponseWriter, r *http.Request) {
+	if a.sync == nil {
 		writeError(w, http.StatusServiceUnavailable, "storage sync is unavailable")
 		return
 	}
@@ -30,20 +36,30 @@ func (a *API) storageSyncRoute(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	result, err := a.storageSync.Sync(r.Context(), input)
+	result, err := a.sync.Sync(r.Context(), input)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		var syncErr *storage.SyncError
+		if errors.As(err, &syncErr) {
+			switch syncErr.Kind {
+			case storage.SyncErrorValidation:
+				status = http.StatusBadRequest
+			case storage.SyncErrorConflict:
+				status = http.StatusConflict
+			}
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
 }
 
-func (a *API) storageOptionRoute(w http.ResponseWriter, r *http.Request) {
-	if a.storageStatus == nil {
+func (a *storageController) storageOptionRoute(w http.ResponseWriter, r *http.Request) {
+	if a.status == nil {
 		writeError(w, http.StatusServiceUnavailable, "storage status is unavailable")
 		return
 	}
-	status := a.storageStatus.Status(r.Context())
+	status := a.status.Status(r.Context())
 	if status.EnvironmentLocked {
 		writeError(w, http.StatusBadRequest, "storage option is controlled by environment variables")
 		return

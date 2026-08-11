@@ -29,13 +29,7 @@ type cloudSession struct {
 
 type cloudSessionContextKey struct{}
 
-func (a *API) registerCloudAuthRoutes(api *gin.RouterGroup) {
-	api.GET("/auth/login", ginHTTPHandler(a.cloudLogin))
-	api.GET("/auth/callback", ginHTTPHandler(a.cloudCallback))
-	api.POST("/auth/logout", ginHTTPHandler(a.cloudLogout))
-}
-
-func (a *API) cloudAuthMiddleware() gin.HandlerFunc {
+func (a *cloudController) cloudAuthMiddleware(policy routePolicy) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if a.runtimeConfig.Mode != models.RuntimeModeCloud {
 			c.Next()
@@ -47,12 +41,18 @@ func (a *API) cloudAuthMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if a.runtimeConfig.AuthMode != "oauth2_proxy" && isMutatingMethod(c.Request.Method) && c.GetHeader(csrfHeader) != session.CSRFToken {
+		if a.runtimeConfig.AuthMode != "oauth2_proxy" && policy.csrf && c.GetHeader(csrfHeader) != session.CSRFToken {
+			if strings.HasSuffix(c.FullPath(), "/commands") {
+				a.recordCloudCommand(session, c.Param("id"), "unknown", models.AuditStatusBlocked, "Cloud command was blocked")
+			}
 			ginJSON(c, http.StatusForbidden, map[string]string{"error": "CSRF token is required", "code": "forbidden"})
 			c.Abort()
 			return
 		}
-		if !roleCanAccess(session.User.Role, c.Request.Method, c.FullPath()) {
+		if !roleCanAccess(session.User.Role, policy) {
+			if strings.HasSuffix(c.FullPath(), "/commands") {
+				a.recordCloudCommand(session, c.Param("id"), "unknown", models.AuditStatusBlocked, "Cloud command was blocked")
+			}
 			ginJSON(c, http.StatusForbidden, map[string]string{"error": "role cannot access this route", "code": "forbidden"})
 			c.Abort()
 			return
@@ -67,7 +67,7 @@ func (a *API) cloudAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-func (a *API) cloudLogin(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudLogin(w http.ResponseWriter, r *http.Request) {
 	if a.runtimeConfig.AuthMode == "oauth2_proxy" {
 		writeError(w, http.StatusUnauthorized, "login is handled by oauth2-proxy")
 		return
@@ -81,7 +81,7 @@ func (a *API) cloudLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": session.User, "csrfToken": session.CSRFToken})
 }
 
-func (a *API) cloudCallback(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudCallback(w http.ResponseWriter, r *http.Request) {
 	if a.runtimeConfig.AuthMode == "oauth2_proxy" {
 		writeError(w, http.StatusUnauthorized, "callback is handled by oauth2-proxy")
 		return
@@ -95,7 +95,7 @@ func (a *API) cloudCallback(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": session.User, "csrfToken": session.CSRFToken})
 }
 
-func (a *API) cloudLogout(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudLogout(w http.ResponseWriter, r *http.Request) {
 	if a.runtimeConfig.AuthMode == "oauth2_proxy" {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "logoutUrl": "/oauth2/sign_out"})
 		return
@@ -109,7 +109,7 @@ func (a *API) cloudLogout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-func (a *API) sessionFromTrustedHeaders(r *http.Request) (cloudSession, bool) {
+func (a *cloudController) sessionFromTrustedHeaders(r *http.Request) (cloudSession, bool) {
 	subject := firstHeader(r,
 		"X-Kode-Stream-Subject",
 		"X-Auth-Request-User",
@@ -153,12 +153,12 @@ func firstHeader(r *http.Request, names ...string) string {
 	return ""
 }
 
-func (a *API) writeCloudSession(w http.ResponseWriter, session cloudSession) {
+func (a *cloudController) writeCloudSession(w http.ResponseWriter, session cloudSession) {
 	value := a.signCloudSession(session)
 	http.SetCookie(w, &http.Cookie{Name: cloudSessionCookie, Value: value, Path: "/", Expires: session.ExpiresAt, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 }
 
-func (a *API) readCloudSession(r *http.Request) (cloudSession, bool) {
+func (a *cloudController) readCloudSession(r *http.Request) (cloudSession, bool) {
 	if session, ok := a.sessionFromTrustedHeaders(r); ok {
 		return session, true
 	}
@@ -169,7 +169,7 @@ func (a *API) readCloudSession(r *http.Request) (cloudSession, bool) {
 	return a.verifyCloudSession(cookie.Value)
 }
 
-func (a *API) signCloudSession(session cloudSession) string {
+func (a *cloudController) signCloudSession(session cloudSession) string {
 	data, _ := json.Marshal(session)
 	payload := base64.RawURLEncoding.EncodeToString(data)
 	mac := hmac.New(sha256.New, []byte(a.runtimeConfig.CookieSecret))
@@ -178,7 +178,7 @@ func (a *API) signCloudSession(session cloudSession) string {
 	return payload + "." + signature
 }
 
-func (a *API) verifyCloudSession(value string) (cloudSession, bool) {
+func (a *cloudController) verifyCloudSession(value string) (cloudSession, bool) {
 	payload, signature, ok := strings.Cut(value, ".")
 	if !ok || payload == "" || signature == "" || a.runtimeConfig.CookieSecret == "" {
 		return cloudSession{}, false
@@ -214,20 +214,8 @@ func isMutatingMethod(method string) bool {
 	return method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
 }
 
-func roleCanAccess(role models.CloudRole, method, path string) bool {
-	if role == models.CloudRoleAdmin {
-		return true
-	}
-	if !isMutatingMethod(method) {
-		return true
-	}
-	if strings.HasSuffix(path, "/agents/connect-token") {
-		return true
-	}
-	if role == models.CloudRoleViewer {
-		return false
-	}
-	return !strings.Contains(path, "/system/") && !strings.Contains(path, "/ai/settings") && !strings.Contains(path, "/config-paths")
+func roleCanAccess(role models.CloudRole, policy routePolicy) bool {
+	return roleCapabilities(role)[policy.capability]
 }
 
 func roleCapabilities(role models.CloudRole) map[models.Capability]bool {

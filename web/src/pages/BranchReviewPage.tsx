@@ -4,7 +4,7 @@ import type { ReviewLocation } from '../app/router';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
-import { api } from '../lib/api';
+import { api } from '../shared/api';
 import type { FileContent, FileNode, ItemSummary, WorkspaceConfig, WorkstreamBranchLoadResult } from '../lib/types';
 import { isDocumentationMetadataSource } from '../lib/vocabulary';
 

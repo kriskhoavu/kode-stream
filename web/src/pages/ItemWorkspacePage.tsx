@@ -27,7 +27,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
-import { ApiError, api, statusLabels } from '../lib/api';
+import { ApiError, api, statusLabels } from '../shared/api';
 import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile, WorkspaceConfig, WorkspaceTreeEntry } from '../lib/types';
 import { isDocumentationMetadataSource, labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';

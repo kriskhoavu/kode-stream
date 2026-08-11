@@ -58,7 +58,7 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	files := fileaccess.New()
 	writer := itemwriter.New(files, scan, idx, reg)
 	auditStore := audit.New(filepath.Join(dataDir, "audit.jsonl"))
-	handler := NewWithReliability(reg, idx, scan, files, writer, git, nil, auditStore, nil).Routes()
+	handler := New(Dependencies{WorkspaceRepository: reg, ItemRepository: idx, Scanner: scan, FileAccess: files, ItemWriter: writer, Git: git, Audit: auditStore}).Routes()
 
 	checkout := branchReviewRequest(t, handler, http.MethodPost, "/api/workspaces/"+workspace.ID+"/workstream/checkout", `{}`)
 	if checkout.Code != http.StatusOK || !bytes.Contains(checkout.Body.Bytes(), []byte(`"sourceMode":"working_tree"`)) {

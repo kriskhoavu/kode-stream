@@ -1,5 +1,5 @@
 import { RefreshCw, Save, Settings as SettingsIcon } from 'lucide-react';
-import { statusLabels, statusOrder } from '../lib/api';
+import { statusLabels, statusOrder } from '../shared/api';
 import type { ItemStatus } from '../lib/types';
 import type { AppSettings } from '../features/settings/appSettings';
 import { useAISettings } from '../features/ai-settings/useAISettings';

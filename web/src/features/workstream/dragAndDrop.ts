@@ -1,4 +1,4 @@
-import { editableStatusOrder } from '../../lib/api';
+import { editableStatusOrder } from '../../shared/api';
 import type { ItemStatus, ItemSummary } from '../../lib/types';
 import { isDocumentationMetadataSource } from '../../lib/vocabulary';
 

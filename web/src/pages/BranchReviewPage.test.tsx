@@ -8,7 +8,7 @@ import { BranchReviewPage } from './BranchReviewPage';
 const mocks = vi.hoisted(() => ({
   loadBranchReview: vi.fn(), files: vi.fn(), file: vi.fn(), importReviewedPlan: vi.fn(), switchBranch: vi.fn()
 }));
-vi.mock('../lib/api', () => ({ api: { loadBranchReview: mocks.loadBranchReview, files: mocks.files, file: mocks.file, importReviewedPlan: mocks.importReviewedPlan, switchBranch: mocks.switchBranch } }));
+vi.mock('../shared/api', () => ({ api: { loadBranchReview: mocks.loadBranchReview, files: mocks.files, file: mocks.file, importReviewedPlan: mocks.importReviewedPlan, switchBranch: mocks.switchBranch } }));
 vi.mock('../features/workstream-explorer/useWorkspaceBranches', () => ({
   useWorkspaceBranches: () => ({ states: { 'ws-1': { workspaceId: 'ws-1', current: 'main', branches: ['main', 'feature/review', 'feature/slow', 'feature/fast'], loading: false, switching: false, error: '', recoveryHint: '' } }, switchBranch: mocks.switchBranch })
 }));

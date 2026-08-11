@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { E2EQualityPanel } from './E2EQualityPanel';
 
-vi.mock('../../lib/api', () => ({ api: { workspaceFile: vi.fn() } }));
+vi.mock('../../shared/api', () => ({ api: { workspaceFile: vi.fn() } }));
 vi.mock('../content-viewer/ContentViewer', () => ({ ContentViewer: ({ file }: { file: { path: string } }) => <div>Previewing {file.path}</div> }));
 vi.mock('../ai-session/AISessionLaunchDialog', () => ({ AISessionLaunchDialog: () => <div>AI dialog</div> }));
 

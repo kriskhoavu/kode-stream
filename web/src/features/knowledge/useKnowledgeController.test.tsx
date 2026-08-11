@@ -1,10 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { KnowledgeWiki, WorkspaceConfig } from '../../lib/types';
 import { useKnowledgeController } from './useKnowledgeController';
 
-vi.mock('../../lib/api', () => ({ api: { knowledgeWikis: vi.fn(), knowledgePages: vi.fn(), knowledgePage: vi.fn(), knowledgeGraph: vi.fn(), rescanKnowledge: vi.fn(), syncKnowledge: vi.fn(), enrichKnowledge: vi.fn() } }));
+vi.mock('../../shared/api', () => ({ api: { knowledgeWikis: vi.fn(), knowledgePages: vi.fn(), knowledgePage: vi.fn(), knowledgeGraph: vi.fn(), rescanKnowledge: vi.fn(), syncKnowledge: vi.fn(), enrichKnowledge: vi.fn() } }));
 
 const workspaces: WorkspaceConfig[] = [
 	{ id: 'one', name: 'One', path: '/one', baselineBranch: 'main', sources: ['docs'], createdAt: '' },

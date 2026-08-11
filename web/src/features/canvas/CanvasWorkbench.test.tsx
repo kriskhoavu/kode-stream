@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult, SafeSessionRecord } from '../../lib/types';
 import { CanvasWorkbench } from './CanvasWorkbench';
 
-vi.mock('../../lib/api', async () => {
-	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
+vi.mock('../../shared/api', async () => {
+	const actual = await vi.importActual<typeof import('../../shared/api')>('../../shared/api');
 	return { ...actual, api: { embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn(), itemE2ERunbooks: vi.fn(), item: vi.fn(), saveMetadata: vi.fn() } };
 });
 vi.mock('../ai-session/AISessionLaunchDialog', () => ({

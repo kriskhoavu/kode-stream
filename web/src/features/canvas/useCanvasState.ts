@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError } from '../../shared/api';
 import type { CanvasNode, CanvasPlacementPatch, CanvasPosition, CanvasProjection, CanvasViewport } from '../../lib/types';
 
 interface DirtyPlacement {

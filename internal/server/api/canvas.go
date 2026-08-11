@@ -8,9 +8,15 @@ import (
 	"strings"
 
 	appcanvas "kode-stream/internal/canvas"
+	appworkstream "kode-stream/internal/workstream"
 )
 
-func (a *API) resolveDefaultCanvas(w http.ResponseWriter, r *http.Request) {
+type canvasController struct {
+	canvas     *appcanvas.Service
+	workstream *appworkstream.Service
+}
+
+func (a *canvasController) resolveDefaultCanvas(w http.ResponseWriter, r *http.Request) {
 	if a.canvas == nil {
 		writeError(w, http.StatusServiceUnavailable, "Canvas is unavailable")
 		return
@@ -38,7 +44,7 @@ func (a *API) resolveDefaultCanvas(w http.ResponseWriter, r *http.Request) {
 	a.respondCanvas(w, projection, err)
 }
 
-func (a *API) canvasLayout(w http.ResponseWriter, r *http.Request) {
+func (a *canvasController) canvasLayout(w http.ResponseWriter, r *http.Request) {
 	if a.canvas == nil {
 		writeError(w, http.StatusServiceUnavailable, "Canvas is unavailable")
 		return
@@ -47,7 +53,7 @@ func (a *API) canvasLayout(w http.ResponseWriter, r *http.Request) {
 	a.respondCanvas(w, projection, err)
 }
 
-func (a *API) patchCanvasPlacements(w http.ResponseWriter, r *http.Request) {
+func (a *canvasController) patchCanvasPlacements(w http.ResponseWriter, r *http.Request) {
 	if a.canvas == nil {
 		writeError(w, http.StatusServiceUnavailable, "Canvas is unavailable")
 		return
@@ -65,7 +71,7 @@ func (a *API) patchCanvasPlacements(w http.ResponseWriter, r *http.Request) {
 	a.respondCanvas(w, projection, err)
 }
 
-func (a *API) patchCanvasViewport(w http.ResponseWriter, r *http.Request) {
+func (a *canvasController) patchCanvasViewport(w http.ResponseWriter, r *http.Request) {
 	if a.canvas == nil {
 		writeError(w, http.StatusServiceUnavailable, "Canvas is unavailable")
 		return
@@ -84,7 +90,7 @@ func (a *API) patchCanvasViewport(w http.ResponseWriter, r *http.Request) {
 	a.respondCanvas(w, projection, err)
 }
 
-func (a *API) removeCanvasPlacement(w http.ResponseWriter, r *http.Request) {
+func (a *canvasController) removeCanvasPlacement(w http.ResponseWriter, r *http.Request) {
 	if a.canvas == nil {
 		writeError(w, http.StatusServiceUnavailable, "Canvas is unavailable")
 		return
@@ -98,14 +104,14 @@ func (a *API) removeCanvasPlacement(w http.ResponseWriter, r *http.Request) {
 	a.respondCanvas(w, projection, err)
 }
 
-func (a *API) canvasOwner(r *http.Request) string {
+func (a *canvasController) canvasOwner(r *http.Request) string {
 	if session, ok := cloudSessionFromContext(r.Context()); ok {
 		return session.User.ID
 	}
 	return ""
 }
 
-func (a *API) respondCanvas(w http.ResponseWriter, projection appcanvas.Projection, err error) {
+func (a *canvasController) respondCanvas(w http.ResponseWriter, projection appcanvas.Projection, err error) {
 	if err == nil {
 		writeJSON(w, http.StatusOK, projection)
 		return

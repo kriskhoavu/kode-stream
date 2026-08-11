@@ -5,19 +5,24 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"kode-stream/internal/common/models"
 )
 
 var secretPattern = regexp.MustCompile(`(?i)(token|secret|password|key)=(\S+)`)
 
-func (a *API) cloudWorkspaceCommand(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) cloudWorkspaceCommand(w http.ResponseWriter, r *http.Request) {
 	session, ok := cloudSessionFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "Cloud session is required")
 		return
 	}
-	workspace, ok := a.cloudWorkspaces.Get(session.User.ID, r.PathValue("id"))
+	workspace, ok, err := a.workspaces.Get(r.Context(), session.User.ID, r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "Cloud workspace persistence is unavailable")
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
@@ -26,11 +31,13 @@ func (a *API) cloudWorkspaceCommand(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&input); err != nil {
+		a.recordCloudCommand(session, r.PathValue("id"), "unknown", models.AuditStatusBlocked, "invalid command request")
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 	adapter, status, message := a.workspaceAccessAdapter(workspace)
 	if message != "" {
+		a.recordCloudCommand(session, workspace.ID, input.Type, models.AuditStatusBlocked, "Cloud command was blocked")
 		writeError(w, status, message)
 		return
 	}
@@ -39,10 +46,19 @@ func (a *API) cloudWorkspaceCommand(w http.ResponseWriter, r *http.Request) {
 		if status == 0 {
 			status = http.StatusConflict
 		}
+		a.recordCloudCommand(session, workspace.ID, input.Type, models.AuditStatusFailed, "Cloud command failed")
 		writeError(w, status, message)
 		return
 	}
+	a.recordCloudCommand(session, workspace.ID, input.Type, models.AuditStatusSuccess, "Cloud command accepted")
 	writeJSON(w, status, result)
+}
+
+func (a *cloudController) recordCloudCommand(session cloudSession, workspaceID, commandType string, status models.AuditStatus, message string) {
+	if a.audit == nil {
+		return
+	}
+	_, _ = a.audit.Append(models.AuditEvent{OwnerUserID: session.User.ID, ActorUserID: session.User.ID, WorkspaceID: workspaceID, Operation: "cloud_command_" + strings.TrimSpace(commandType), Status: status, Message: message, Time: time.Now().UTC(), Paths: []string{}})
 }
 
 func capabilityForCommandType(commandType string) models.Capability {

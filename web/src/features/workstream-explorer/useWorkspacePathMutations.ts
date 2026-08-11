@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { WorkspaceDirectoryCreateInput, WorkspaceFileCreateInput, WorkspacePathMutationResult, WorkspacePathRenameInput } from '../../lib/types';
 
 export function useWorkspacePathMutations(onSuccess: (result: WorkspacePathMutationResult) => void | Promise<void>) {

@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { WorkspacesPage } from '../../pages/WorkspacesPage';
 
-vi.mock('../../lib/api', () => ({
+vi.mock('../../shared/api', () => ({
   api: { systemConfigPaths: vi.fn(), workspaceHealth: vi.fn() },
   ApiError: class ApiError extends Error { recoveryHint?: string }
 }));

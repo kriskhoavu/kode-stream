@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '../lib/api';
+import { api } from '../shared/api';
 import type { AppState, RuntimeContext, WorkspaceConfig } from '../lib/types';
 import { pathForRoute, routeFromLocation } from './router';
 import type { Route } from './router';

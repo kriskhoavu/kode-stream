@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { KnowledgeActions } from './KnowledgeActions';
 
-vi.mock('../../lib/api', () => ({ api: { gitStatus: vi.fn() } }));
+vi.mock('../../shared/api', () => ({ api: { gitStatus: vi.fn() } }));
 
 describe('KnowledgeActions', () => {
 	beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.gitStatus).mockResolvedValue({ workspaceId: 'ws', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }); });

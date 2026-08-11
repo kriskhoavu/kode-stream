@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,10 +13,10 @@ import (
 )
 
 func TestCloudWorkspaceRegistrationFromAgentStoresMetadata(t *testing.T) {
-	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	apiHandler = apiHandler.WithRuntimeConfig(testCloudRuntimeConfig())
+	apiHandler, _, _, auditStore := reliabilityTestAPI(t)
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
 	handler := apiHandler.Routes()
-	token := apiHandler.signAgentToken(agentConnectToken{UserID: "user-1", AgentID: "agent-1", Name: "MacBook", ExpiresAt: time.Now().UTC().Add(time.Minute)})
+	token := apiHandler.cloud.signAgentToken(agentConnectToken{UserID: "user-1", AgentID: "agent-1", Name: "MacBook", ExpiresAt: time.Now().UTC().Add(time.Minute)})
 
 	create := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/from-agent", strings.NewReader(`{"name":"Platform","baselineBranch":"main","sources":["plans"],"remoteUrl":"git@example.com:repo.git","localRootLabel":"/Users/kdvu/src/repo","publishedSummary":true}`))
@@ -34,11 +35,18 @@ func TestCloudWorkspaceRegistrationFromAgentStoresMetadata(t *testing.T) {
 	if workspace.AccessMode != models.WorkspaceAccessModeAgentBacked {
 		t.Fatalf("access mode = %q", workspace.AccessMode)
 	}
+	events, err := auditStore.Recent(1)
+	if err != nil || len(events) != 1 || events[0].Operation != "cloud_workspace_register" || events[0].OwnerUserID != "user-1" || events[0].ActorUserID != "user-1" {
+		t.Fatalf("registration audit=%#v err=%v", events, err)
+	}
 }
 
 func TestCloudWorkspaceStoreMigratesLegacyAgentWorkspaceAccessMode(t *testing.T) {
 	store := newCloudWorkspaceStore()
-	workspace := store.Upsert(models.WorkspaceConfig{ID: "legacy", OwnerUserID: "user", AgentID: "agent", Location: models.WorkspaceLocationCloudAgent})
+	workspace, err := store.Upsert(context.Background(), models.WorkspaceConfig{ID: "legacy", OwnerUserID: "user", AgentID: "agent", Location: models.WorkspaceLocationCloudAgent})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if workspace.AccessMode != models.WorkspaceAccessModeAgentBacked {
 		t.Fatalf("access mode = %q", workspace.AccessMode)
 	}
@@ -49,9 +57,9 @@ func TestCloudWorkspaceStoreMigratesLegacyAgentWorkspaceAccessMode(t *testing.T)
 
 func TestCloudWorkspacesAreScopedToSessionUser(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	apiHandler = apiHandler.WithRuntimeConfig(testCloudRuntimeConfig())
-	apiHandler.cloudWorkspaces.Upsert(models.WorkspaceConfig{ID: "ws-a", Name: "A", OwnerUserID: stableCloudUserID("user-a"), Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-a", Sources: []string{}})
-	apiHandler.cloudWorkspaces.Upsert(models.WorkspaceConfig{ID: "ws-b", Name: "B", OwnerUserID: stableCloudUserID("user-b"), Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-b", Sources: []string{}})
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
+	_, _ = apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "ws-a", Name: "A", OwnerUserID: stableCloudUserID("user-a"), Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-a", Sources: []string{}})
+	_, _ = apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "ws-b", Name: "B", OwnerUserID: stableCloudUserID("user-b"), Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-b", Sources: []string{}})
 	handler := apiHandler.Routes()
 
 	response := httptest.NewRecorder()
@@ -73,7 +81,7 @@ func TestCloudWorkspacesAreScopedToSessionUser(t *testing.T) {
 
 func TestCloudRejectsBrowserLocalPathAndRemoteClone(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+	handler := withTestRuntime(apiHandler, testCloudRuntimeConfig()).Routes()
 
 	for _, body := range []string{
 		`{"name":"Direct","path":"/tmp/repo","baselineBranch":"main","sources":["plans"]}`,
@@ -93,9 +101,9 @@ func TestCloudRejectsBrowserLocalPathAndRemoteClone(t *testing.T) {
 
 func TestCloudWorkspaceListShowsOfflineAgentMetadata(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	apiHandler = apiHandler.WithRuntimeConfig(testCloudRuntimeConfig())
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
 	userID := stableCloudUserID("viewer")
-	apiHandler.cloudWorkspaces.Upsert(models.WorkspaceConfig{ID: "ws-offline", Name: "Offline", OwnerUserID: userID, Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-offline", ScanStatus: "offline", Sources: []string{}})
+	_, _ = apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "ws-offline", Name: "Offline", OwnerUserID: userID, Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-offline", ScanStatus: "offline", Sources: []string{}})
 	handler := apiHandler.Routes()
 
 	response := httptest.NewRecorder()

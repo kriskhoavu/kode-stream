@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { WorkspacePathSearchResult } from '../../lib/types';
 
 export function useWorkspacePathSearch({ workspaceId, includeIgnored, debounceMs = 250 }: { workspaceId?: string; includeIgnored: boolean; debounceMs?: number }) {

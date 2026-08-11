@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { GitCompare } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { E2ERunbookList, KnowledgePageDetail } from '../../lib/types';
 import { E2EQualityPanel } from './E2EQualityPanel';
 

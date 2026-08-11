@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Maximize2 } from 'lucide-react';
 import type { EmbeddedAISessionResult, WorkspaceConfig } from '../../lib/types';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { EmbeddedTerminal } from './EmbeddedTerminal';
 import { embeddedSessionStartedEvent } from './terminalSessions';
 

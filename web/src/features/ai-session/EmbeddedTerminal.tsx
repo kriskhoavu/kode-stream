@@ -4,7 +4,7 @@ import { Columns2, Copy, Minus, PanelRight, Square, SquareTerminal, X } from 'lu
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { EmbeddedAISessionResult, EmbeddedAISessionState } from '../../lib/types';
 
 type ServerFrame = { type: 'output' | 'state' | 'warning' | 'exit'; data?: string; encoding?: string; state?: EmbeddedAISessionState; exitCode?: number; message?: string };

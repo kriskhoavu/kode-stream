@@ -1,54 +1,70 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"kode-stream/internal/cloudstate"
 	"kode-stream/internal/common/models"
 )
 
 type cloudWorkspaceStore struct {
-	mu         sync.RWMutex
-	workspaces map[string]map[string]models.WorkspaceConfig
+	mu          sync.RWMutex
+	workspaces  map[string]map[string]models.WorkspaceConfig
+	persistence cloudstate.Repository
 }
 
-func newCloudWorkspaceStore() *cloudWorkspaceStore {
-	return &cloudWorkspaceStore{workspaces: map[string]map[string]models.WorkspaceConfig{}}
+func newCloudWorkspaceStore(persistence ...cloudstate.Repository) *cloudWorkspaceStore {
+	var repository cloudstate.Repository
+	if len(persistence) > 0 {
+		repository = persistence[0]
+	}
+	return &cloudWorkspaceStore{workspaces: map[string]map[string]models.WorkspaceConfig{}, persistence: repository}
 }
 
-func (s *cloudWorkspaceStore) List(userID string) []models.WorkspaceConfig {
+func (s *cloudWorkspaceStore) List(ctx context.Context, userID string) ([]models.WorkspaceConfig, error) {
+	if s.persistence != nil {
+		return s.persistence.ListWorkspaces(ctx, userID)
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	owned := s.workspaces[userID]
 	if len(owned) == 0 {
-		return []models.WorkspaceConfig{}
+		return []models.WorkspaceConfig{}, nil
 	}
 	result := make([]models.WorkspaceConfig, 0, len(owned))
 	for _, workspace := range owned {
 		result = append(result, workspace)
 	}
-	return result
+	return result, nil
 }
 
-func (s *cloudWorkspaceStore) Get(userID, workspaceID string) (models.WorkspaceConfig, bool) {
+func (s *cloudWorkspaceStore) Get(ctx context.Context, userID, workspaceID string) (models.WorkspaceConfig, bool, error) {
+	if s.persistence != nil {
+		return s.persistence.GetWorkspace(ctx, userID, workspaceID)
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	workspace, ok := s.workspaces[userID][workspaceID]
-	return workspace, ok
+	return workspace, ok, nil
 }
 
-func (s *cloudWorkspaceStore) Upsert(workspace models.WorkspaceConfig) models.WorkspaceConfig {
+func (s *cloudWorkspaceStore) Upsert(ctx context.Context, workspace models.WorkspaceConfig) (models.WorkspaceConfig, error) {
 	workspace = normalizeCloudWorkspaceAccess(workspace)
+	if s.persistence != nil {
+		return s.persistence.UpsertWorkspace(ctx, workspace.OwnerUserID, workspace)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.workspaces[workspace.OwnerUserID] == nil {
 		s.workspaces[workspace.OwnerUserID] = map[string]models.WorkspaceConfig{}
 	}
 	s.workspaces[workspace.OwnerUserID][workspace.ID] = workspace
-	return workspace
+	return workspace, nil
 }
 
 func normalizeCloudWorkspaceAccess(workspace models.WorkspaceConfig) models.WorkspaceConfig {
@@ -68,7 +84,7 @@ func normalizeCloudWorkspaceAccess(workspace models.WorkspaceConfig) models.Work
 	return workspace
 }
 
-func (a *API) registerCloudWorkspaceFromAgent(w http.ResponseWriter, r *http.Request) {
+func (a *cloudController) registerCloudWorkspaceFromAgent(w http.ResponseWriter, r *http.Request) {
 	token, ok := a.verifyAgentToken(r.Header.Get("Authorization"))
 	if !ok {
 		token, ok = a.verifyAgentToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
@@ -123,7 +139,15 @@ func (a *API) registerCloudWorkspaceFromAgent(w http.ResponseWriter, r *http.Req
 	if workspace.ScanStatus == "" {
 		workspace.ScanStatus = "published"
 	}
-	writeJSON(w, http.StatusCreated, a.cloudWorkspaces.Upsert(workspace))
+	created, err := a.workspaces.Upsert(r.Context(), workspace)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "Cloud workspace persistence is unavailable")
+		return
+	}
+	if a.audit != nil {
+		_, _ = a.audit.Append(models.AuditEvent{OwnerUserID: token.UserID, ActorUserID: token.UserID, WorkspaceID: created.ID, Operation: "cloud_workspace_register", Status: models.AuditStatusSuccess, Message: "Cloud Agent workspace registered", Time: time.Now().UTC(), Paths: []string{}})
+	}
+	writeJSON(w, http.StatusCreated, created)
 }
 
 func normalizeCloudSources(sources []string) []string {
@@ -152,7 +176,7 @@ func redactRootLabel(label string) string {
 	return ".../" + parts[len(parts)-1]
 }
 
-func (a *API) rejectCloudBrowserWorkspaceRegistration(w http.ResponseWriter, input models.WorkspaceInput) bool {
+func (a *workspaceController) rejectCloudBrowserWorkspaceRegistration(w http.ResponseWriter, input models.WorkspaceInput) bool {
 	if a.runtimeConfig.Mode != models.RuntimeModeCloud {
 		return false
 	}
@@ -168,7 +192,7 @@ func (a *API) rejectCloudBrowserWorkspaceRegistration(w http.ResponseWriter, inp
 	return true
 }
 
-func (a *API) createCloudRemoteSnapshotWorkspace(w http.ResponseWriter, r *http.Request, input models.WorkspaceInput) {
+func (a *workspaceController) createCloudRemoteSnapshotWorkspace(w http.ResponseWriter, r *http.Request, input models.WorkspaceInput) {
 	session, ok := cloudSessionFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "Cloud session is required")
@@ -190,5 +214,11 @@ func (a *API) createCloudRemoteSnapshotWorkspace(w http.ResponseWriter, r *http.
 		writeError(w, http.StatusBadRequest, "provider repository or ref is not available")
 		return
 	}
-	writeJSON(w, http.StatusCreated, a.cloudWorkspaces.Upsert(resolved))
+	created, err := a.cloudWorkspaces.Upsert(r.Context(), resolved)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "Cloud workspace persistence is unavailable")
+		return
+	}
+	a.audit.recordOwned(session.User.ID, session.User.ID, created.ID, "cloud_snapshot_create", "Remote snapshot workspace created")
+	writeJSON(w, http.StatusCreated, created)
 }

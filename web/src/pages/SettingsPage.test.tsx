@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../lib/api';
+import { api } from '../shared/api';
 import { defaultAppSettings } from '../features/settings/appSettings';
 import { SettingsPage } from './SettingsPage';
 
-vi.mock('../lib/api', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../lib/api')>();
+vi.mock('../shared/api', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../shared/api')>();
   return { ...original, api: { ...original.api, aiSettings: vi.fn(), aiCapabilities: vi.fn(), saveAISettings: vi.fn() } };
 });
 

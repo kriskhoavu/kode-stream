@@ -1,11 +1,11 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, api } from '../../lib/api';
+import { ApiError, api } from '../../shared/api';
 import type { CanvasProjection } from '../../lib/types';
 import { useCanvasState } from './useCanvasState';
 
-vi.mock('../../lib/api', async () => {
-	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
+vi.mock('../../shared/api', async () => {
+	const actual = await vi.importActual<typeof import('../../shared/api')>('../../shared/api');
 	return { ...actual, api: { resolveDefaultCanvas: vi.fn(), canvasLayout: vi.fn(), patchCanvasPlacements: vi.fn(), patchCanvasViewport: vi.fn(), removeCanvasPlacement: vi.fn() } };
 });
 

@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Background, Handle, NodeResizer, Position, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
 import type { Edge, Node as XYNode, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
 import { Bot, Box, ChevronDown, Expand, GitBranch, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Play, Plus, RotateCcw, Search, Square, TerminalSquare, Trash2, WandSparkles, Workflow, X } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasSection, CanvasViewport, EmbeddedAISessionResult, EmbeddedAISessionState, GitStatus, SafeSessionRecord } from '../../lib/types';
 import { EmbeddedTerminal } from '../ai-session/EmbeddedTerminal';
 import '@xyflow/react/dist/style.css';

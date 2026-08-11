@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult } from '../../lib/types';
 import { CanvasBoard } from './CanvasBoard';
 
 const fitView = vi.fn();
-vi.mock('../../lib/api', async () => {
-	const actual = await vi.importActual<typeof import('../../lib/api')>('../../lib/api');
+vi.mock('../../shared/api', async () => {
+	const actual = await vi.importActual<typeof import('../../shared/api')>('../../shared/api');
 	return { ...actual, api: { ...actual.api, embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn() } };
 });
 vi.mock('../ai-session/EmbeddedTerminal', () => ({ EmbeddedTerminal: ({ initial, visible, onClose }: { initial: EmbeddedAISessionResult; visible: boolean; onClose: () => void }) => <section data-testid={`canvas-terminal-${initial.session.id}`} data-visible={String(visible)}><button type="button" onClick={onClose}>Hide terminal</button><input aria-label="Terminal prompt" /></section> }));

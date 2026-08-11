@@ -1,19 +1,21 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"kode-stream/internal/audit"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/system"
 )
 
 func TestCloudModeRequiresSessionOutsideHealthAndAuth(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+	handler := withTestRuntime(apiHandler, testCloudRuntimeConfig()).Routes()
 
 	health := httptest.NewRecorder()
 	handler.ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/api/health", nil))
@@ -28,9 +30,35 @@ func TestCloudModeRequiresSessionOutsideHealthAndAuth(t *testing.T) {
 	}
 }
 
+func TestCloudAuditReadsAreTenantScoped(t *testing.T) {
+	apiHandler, _, _, store := reliabilityTestAPI(t)
+	owner := stableCloudUserID("editor")
+	for _, eventOwner := range []string{owner, stableCloudUserID("other"), ""} {
+		if _, err := store.Append(models.AuditEvent{OwnerUserID: eventOwner, WorkspaceID: "workspace", Operation: "scan", Status: models.AuditStatusSuccess}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/audit-events?limit=10", nil)
+	request.Header.Set("X-Kode-Stream-Subject", "editor")
+	request.Header.Set("X-Kode-Stream-Role", "editor")
+	apiHandler.Routes().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var events []models.AuditEvent
+	if err := json.Unmarshal(response.Body.Bytes(), &events); err != nil || len(events) != 1 || events[0].OwnerUserID != owner {
+		t.Fatalf("events=%#v err=%v", events, err)
+	}
+	if queried, err := store.QueryContext(context.Background(), audit.Query{OwnerUserID: owner}); err != nil || len(queried) != 1 {
+		t.Fatalf("repository query=%#v err=%v", queried, err)
+	}
+}
+
 func TestCloudCallbackBootstrapsAdminFromAllowlist(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testAppOIDCRuntimeConfig()).Routes()
+	handler := withTestRuntime(apiHandler, testAppOIDCRuntimeConfig()).Routes()
 
 	callback := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/callback", nil)
@@ -66,7 +94,7 @@ func TestCloudCallbackBootstrapsAdminFromAllowlist(t *testing.T) {
 
 func TestCloudViewerCannotMutateRoutes(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testAppOIDCRuntimeConfig()).Routes()
+	handler := withTestRuntime(apiHandler, testAppOIDCRuntimeConfig()).Routes()
 
 	request := httptest.NewRequest(http.MethodPost, "/api/workspaces", strings.NewReader(`{}`))
 	request.Header.Set("X-Kode-Stream-Subject", "viewer")
@@ -81,9 +109,78 @@ func TestCloudViewerCannotMutateRoutes(t *testing.T) {
 	}
 }
 
+func TestCloudSystemAndStorageRoutesRequireSystemCapabilityForReads(t *testing.T) {
+	apiHandler := &API{}
+	apiHandler.initializeControllers()
+	for _, route := range routeManifest(apiHandler) {
+		if route.access != protectedRoute {
+			continue
+		}
+		policy, ok := policyForRoute(route)
+		if !ok {
+			t.Fatalf("%s %s has no explicit policy", route.method, route.path)
+		}
+		if route.owner == "system" || route.owner == "storage" {
+			if policy.capability != models.CapabilitySystem {
+				t.Fatalf("%s %s policy = %#v", route.method, route.path, policy)
+			}
+			for _, role := range []models.CloudRole{models.CloudRoleViewer, models.CloudRoleEditor} {
+				if roleCanAccess(role, policy) {
+					t.Fatalf("role %q unexpectedly accesses %s %s", role, route.method, route.path)
+				}
+			}
+			if !roleCanAccess(models.CloudRoleAdmin, policy) {
+				t.Fatalf("admin lost System capability for %s %s", route.method, route.path)
+			}
+		}
+	}
+}
+
+func TestDomain02SystemStorageRouteHTTPRoleMatrix(t *testing.T) {
+	cloudAPI, _, _, _ := reliabilityTestAPI(t)
+	cloudHandler := withTestRuntime(cloudAPI, testAppOIDCRuntimeConfig()).Routes()
+	localHandler := (&API{}).Routes()
+	for _, route := range routeManifest(cloudAPI) {
+		if route.owner != "system" && route.owner != "storage" {
+			continue
+		}
+		path := "/api" + route.path
+		for _, role := range []models.CloudRole{models.CloudRoleViewer, models.CloudRoleEditor} {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(route.method, path, strings.NewReader(`{}`))
+			request.Header.Set("X-Kode-Stream-Subject", string(role))
+			request.Header.Set("X-Kode-Stream-Role", string(role))
+			if isMutatingMethod(route.method) {
+				request.Header.Set(csrfHeader, stableCloudUserID(string(role)+":csrf"))
+			}
+			cloudHandler.ServeHTTP(response, request)
+			if response.Code != http.StatusForbidden {
+				t.Errorf("%s %s role=%s status=%d body=%s", route.method, path, role, response.Code, response.Body.String())
+			}
+		}
+		admin := httptest.NewRecorder()
+		adminRequest := httptest.NewRequest(route.method, path, strings.NewReader(`{}`))
+		adminRequest.Header.Set("X-Kode-Stream-Subject", "admin")
+		adminRequest.Header.Set("X-Kode-Stream-Role", "admin")
+		if isMutatingMethod(route.method) {
+			adminRequest.Header.Set(csrfHeader, stableCloudUserID("admin:csrf"))
+		}
+		cloudHandler.ServeHTTP(admin, adminRequest)
+		if admin.Code == http.StatusForbidden || admin.Code == http.StatusUnauthorized {
+			t.Errorf("admin denied %s %s: %d %s", route.method, path, admin.Code, admin.Body.String())
+		}
+
+		local := httptest.NewRecorder()
+		localHandler.ServeHTTP(local, httptest.NewRequest(route.method, path, strings.NewReader(`{}`)))
+		if local.Code == http.StatusForbidden || local.Code == http.StatusUnauthorized {
+			t.Errorf("local denied %s %s: %d %s", route.method, path, local.Code, local.Body.String())
+		}
+	}
+}
+
 func TestCloudEditorMutationsRequireCSRF(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testAppOIDCRuntimeConfig()).Routes()
+	handler := withTestRuntime(apiHandler, testAppOIDCRuntimeConfig()).Routes()
 
 	request := httptest.NewRequest(http.MethodPost, "/api/workspaces", strings.NewReader(`{}`))
 	request.Header.Set("X-Kode-Stream-Subject", "editor")
@@ -107,7 +204,7 @@ func TestCloudEditorMutationsRequireCSRF(t *testing.T) {
 
 func TestCloudLogoutClearsSessionWithCSRF(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testAppOIDCRuntimeConfig()).Routes()
+	handler := withTestRuntime(apiHandler, testAppOIDCRuntimeConfig()).Routes()
 
 	login := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/callback", nil)
@@ -132,7 +229,7 @@ func TestCloudLogoutClearsSessionWithCSRF(t *testing.T) {
 
 func TestCloudOauth2ProxyHeadersAuthenticateWithoutAppSession(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+	handler := withTestRuntime(apiHandler, testCloudRuntimeConfig()).Routes()
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/state", nil)
@@ -159,7 +256,7 @@ func TestCloudOauth2ProxyHeadersAuthenticateWithoutAppSession(t *testing.T) {
 
 func TestCloudOauth2ProxyMutationsRelyOnProxyCsrf(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := apiHandler.WithRuntimeConfig(testCloudRuntimeConfig()).Routes()
+	handler := withTestRuntime(apiHandler, testCloudRuntimeConfig()).Routes()
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/agents/connect-token", strings.NewReader(`{}`))

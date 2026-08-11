@@ -5,12 +5,12 @@ import (
 	"net/http"
 )
 
-func (a *API) healthPayload(ctx context.Context) (map[string]any, int) {
+func (a *healthController) healthPayload(ctx context.Context) (map[string]any, int) {
 	payload := map[string]any{"ok": true}
-	if a.databaseHealth == nil {
+	if a.database == nil {
 		return payload, http.StatusOK
 	}
-	database := a.databaseHealth.Health(ctx)
+	database := a.database.Health(ctx)
 	payload["database"] = database
 	if !database.OK {
 		payload["ok"] = false
