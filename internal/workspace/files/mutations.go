@@ -1,7 +1,5 @@
 package workspacefiles
 
-// Package workspacefiles provides Workspace-owned file operations.
-
 // Package workspacefiles provides bounded workspace file operations.
 
 import (
@@ -12,6 +10,8 @@ import (
 	"strings"
 
 	"kode-stream/internal/common/models"
+	fileaccess "kode-stream/internal/filesystem/content"
+	"kode-stream/internal/filesystem/guardedwrite"
 )
 
 var (
@@ -22,6 +22,9 @@ var (
 )
 
 func (a *Access) CreateFile(workspace models.WorkspaceConfig, input models.WorkspaceFileCreateInput) (models.WorkspacePathMutationResult, error) {
+	if int64(len(input.Content)) > fileaccess.MaxTextResponseBytes {
+		return models.WorkspacePathMutationResult{}, guardedwrite.ErrTooLarge
+	}
 	name, err := validateEntryName(input.Name)
 	if err != nil {
 		return models.WorkspacePathMutationResult{}, err
@@ -55,6 +58,9 @@ func (a *Access) CreateFile(workspace models.WorkspaceConfig, input models.Works
 	if err := file.Close(); err != nil {
 		return models.WorkspacePathMutationResult{}, err
 	}
+	if err := syncDirectory(parent); err != nil {
+		return models.WorkspacePathMutationResult{}, err
+	}
 	complete = true
 	return mutationResult(workspace.ID, path, "file", parentPath), nil
 }
@@ -72,6 +78,9 @@ func (a *Access) CreateDirectory(workspace models.WorkspaceConfig, input models.
 	if err := os.Mkdir(filepath.Join(parent, name), 0o755); errors.Is(err, os.ErrExist) {
 		return models.WorkspacePathMutationResult{}, ErrDestinationExists
 	} else if err != nil {
+		return models.WorkspacePathMutationResult{}, err
+	}
+	if err := syncDirectory(parent); err != nil {
 		return models.WorkspacePathMutationResult{}, err
 	}
 	return mutationResult(workspace.ID, path, "directory", parentPath), nil
@@ -92,11 +101,31 @@ func (a *Access) Rename(workspace models.WorkspaceConfig, input models.Workspace
 	if err := os.Rename(source, destination); err != nil {
 		return models.WorkspacePathMutationResult{}, err
 	}
+	if err := syncDirectory(filepath.Dir(source)); err != nil {
+		return models.WorkspacePathMutationResult{}, err
+	}
+	if filepath.Dir(destination) != filepath.Dir(source) {
+		if err := syncDirectory(filepath.Dir(destination)); err != nil {
+			return models.WorkspacePathMutationResult{}, err
+		}
+	}
 	typeName := "file"
 	if info.IsDir() {
 		typeName = "directory"
 	}
 	return mutationResult(workspace.ID, destinationPath, typeName, parentRelative(sourcePath), parentRelative(destinationPath)), nil
+}
+
+func syncDirectory(path string) error {
+	directory, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	if err := directory.Sync(); err != nil {
+		_ = directory.Close()
+		return err
+	}
+	return directory.Close()
 }
 
 func validateEntryName(name string) (string, error) {

@@ -18,7 +18,10 @@ import (
 	"unicode/utf8"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/fileid"
+	"kode-stream/internal/filesystem/guardedwrite"
 	"kode-stream/internal/filesystem/pathguard"
+	"kode-stream/internal/filesystem/sourceguard"
 )
 
 type Access struct{}
@@ -34,7 +37,8 @@ func (a *Access) Tree(workspace models.WorkspaceConfig, item models.ItemDetail) 
 	if err != nil {
 		return nil, err
 	}
-	return buildTreeFromDir(root, "")
+	budget := treeBudget{remaining: 10000, maxDepth: 64}
+	return buildTreeFromDir(root, "", 0, &budget)
 }
 
 func (a *Access) Read(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) (models.FileContent, error) {
@@ -50,6 +54,9 @@ func (a *Access) Read(workspace models.WorkspaceConfig, item models.ItemDetail, 
 }
 
 func (a *Access) WriteMarkdown(workspace models.WorkspaceConfig, item models.ItemDetail, input models.FileSaveInput) (models.FileContent, error) {
+	if strings.TrimSpace(input.ExpectedHash) == "" {
+		return models.FileContent{}, guardedwrite.ErrHashRequired
+	}
 	root, err := a.safeItemPath(workspace, item)
 	if err != nil {
 		return models.FileContent{}, err
@@ -58,20 +65,13 @@ func (a *Access) WriteMarkdown(workspace models.WorkspaceConfig, item models.Ite
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	current, err := os.ReadFile(full)
-	if err != nil {
+	if err := ValidateEditableContent(nil, []byte(input.Content)); err != nil {
 		return models.FileContent{}, err
 	}
-	if err := ValidateEditableContent(current, []byte(input.Content)); err != nil {
+	if _, err := guardedwrite.ReplaceExisting(root, relPath, []byte(input.Content), input.ExpectedHash, MaxTextResponseBytes); err != nil {
 		return models.FileContent{}, err
 	}
-	if input.ExpectedHash != "" && input.ExpectedHash != contentHash(current) {
-		return models.FileContent{}, fmt.Errorf("file content changed since it was loaded")
-	}
-	if err := os.WriteFile(full, []byte(input.Content), 0o644); err != nil {
-		return models.FileContent{}, err
-	}
-	return fileContent(relPath, []byte(input.Content)), nil
+	return readFileContent(relPath, full)
 }
 
 func (a *Access) RelativePath(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) (string, error) {
@@ -92,13 +92,13 @@ func (a *Access) safeItemPath(workspace models.WorkspaceConfig, item models.Item
 	if err != nil {
 		return "", err
 	}
+	sources, err := sourceguard.ResolveAll(workspace.Path, workspace.Sources)
+	if err != nil {
+		return "", fmt.Errorf("configured source boundary is unsafe: %w", err)
+	}
 	allowed := false
-	for _, dir := range workspace.Sources {
-		allowedRoot, err := filepath.EvalSymlinks(filepath.Join(workspace.Path, filepath.FromSlash(dir)))
-		if err != nil {
-			continue
-		}
-		if realRoot == allowedRoot || strings.HasPrefix(realRoot, allowedRoot+string(filepath.Separator)) {
+	for _, source := range sources {
+		if sourceguard.Contains(source.RealPath, realRoot) {
 			allowed = true
 			break
 		}
@@ -110,23 +110,9 @@ func (a *Access) safeItemPath(workspace models.WorkspaceConfig, item models.Item
 }
 
 func (a *Access) resolveFile(workspace models.WorkspaceConfig, item models.ItemDetail, root, fileID string) (string, string, error) {
-	relPath := ""
-	for _, node := range flattenTreeMust(a.Tree(workspace, item)) {
-		if node.ID == fileID {
-			relPath = node.Path
-			break
-		}
-	}
-	if relPath == "" {
-		for _, doc := range item.Documents {
-			if fileIDForPath(doc.Path) == fileID {
-				relPath = doc.Path
-				break
-			}
-		}
-	}
-	if relPath == "" {
-		return "", "", fmt.Errorf("file not found")
+	relPath, err := fileid.Decode(fileID)
+	if err != nil {
+		return "", "", fmt.Errorf("file not found: %w", err)
 	}
 	full, err := safeJoin(root, relPath)
 	if err != nil {
@@ -146,22 +132,9 @@ func safeJoin(root, rel string) (string, error) {
 	return pathguard.SafeJoin(root, rel)
 }
 
-func flattenTreeMust(nodes []models.FileNode, _ error) []models.FileNode {
-	var out []models.FileNode
-	var walk func([]models.FileNode)
-	walk = func(in []models.FileNode) {
-		for _, node := range in {
-			if node.Type == "file" {
-				out = append(out, node)
-			}
-			walk(node.Children)
-		}
-	}
-	walk(nodes)
-	return out
-}
+type treeBudget struct{ remaining, maxDepth int }
 
-func buildTreeFromDir(root, relDir string) ([]models.FileNode, error) {
+func buildTreeFromDir(root, relDir string, depth int, budget *treeBudget) ([]models.FileNode, error) {
 	fullDir := root
 	if relDir != "" {
 		fullDir = filepath.Join(root, filepath.FromSlash(relDir))
@@ -179,15 +152,26 @@ func buildTreeFromDir(root, relDir string) ([]models.FileNode, error) {
 
 	nodes := make([]models.FileNode, 0, len(entries))
 	for _, entry := range entries {
+		if budget.remaining <= 0 {
+			break
+		}
+		budget.remaining--
 		path := filepath.ToSlash(filepath.Join(relDir, entry.Name()))
-		node := models.FileNode{ID: fileIDForPath(path), Name: entry.Name(), Path: path, Type: "file"}
+		node := models.FileNode{ID: fileid.Encode(path), Name: entry.Name(), Path: path, Type: "file"}
 		if entry.IsDir() {
-			children, err := buildTreeFromDir(root, path)
-			if err != nil {
-				return nil, err
-			}
 			node.Type = "directory"
-			node.Children = children
+			if depth >= budget.maxDepth || budget.remaining <= 0 {
+				node.Truncated = true
+			} else {
+				children, err := buildTreeFromDir(root, path, depth+1, budget)
+				if err != nil {
+					return nil, err
+				}
+				node.Children = children
+				if budget.remaining <= 0 {
+					node.Truncated = true
+				}
+			}
 		}
 		nodes = append(nodes, node)
 	}
@@ -237,10 +221,6 @@ func naturalParts(input string) []naturalPart {
 	return parts
 }
 
-func fileIDForPath(path string) string {
-	return strings.NewReplacer("/", "__", ".", "_").Replace(path)
-}
-
 func fileContent(relPath string, data []byte) models.FileContent {
 	classification := ClassifyPath(relPath)
 	content := string(data)
@@ -248,7 +228,7 @@ func fileContent(relPath string, data []byte) models.FileContent {
 		content = "data:" + classification.Language + ";base64," + base64.StdEncoding.EncodeToString(data)
 	}
 	return models.FileContent{
-		ID:        fileIDForPath(relPath),
+		ID:        fileid.Encode(relPath),
 		Path:      relPath,
 		Content:   content,
 		Language:  classification.Language,

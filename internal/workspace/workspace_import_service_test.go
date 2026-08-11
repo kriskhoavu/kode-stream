@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,7 +25,7 @@ func TestPreviewImportValidatesCandidatesAndDetectsDuplicates(t *testing.T) {
 		t.Fatal(err)
 	}
 	indexPath := filepath.Join(dataDir, "items.yaml")
-	service := New(reg, itemindex.New(indexPath), nil, nil)
+	service := New(ServiceDependencies{Registry: reg, Index: itemindex.New(indexPath)})
 	source := filepath.Join(t.TempDir(), "workspaces.yaml")
 	contents := fmt.Sprintf(`
 - id: ignored-source-id
@@ -82,7 +83,7 @@ func TestPreviewImportValidatesCandidatesAndDetectsDuplicates(t *testing.T) {
 }
 
 func TestPreviewImportRejectsUnsafeOrRemovedSchema(t *testing.T) {
-	service := New(registry.New(filepath.Join(t.TempDir(), "registry.yaml"), gitadapter.New()), itemindex.New(filepath.Join(t.TempDir(), "items.yaml")), nil, nil)
+	service := New(ServiceDependencies{Registry: registry.New(filepath.Join(t.TempDir(), "registry.yaml"), gitadapter.New()), Index: itemindex.New(filepath.Join(t.TempDir(), "items.yaml"))})
 	tests := map[string]string{
 		"unknown field": "- name: Test\n  path: /tmp/test\n  baselineBranch: main\n  sources: [plans]\n  planDirectories: [plans]\n",
 		"alias":         "- &workspace\n  name: Test\n  path: /tmp/test\n  baselineBranch: main\n  sources: [plans]\n- *workspace\n",
@@ -102,7 +103,7 @@ func TestPreviewImportRejectsUnsafeOrRemovedSchema(t *testing.T) {
 }
 
 func TestPreviewImportEnforcesPathExtensionSizeAndEntryLimits(t *testing.T) {
-	service := New(registry.New(filepath.Join(t.TempDir(), "registry.yaml"), gitadapter.New()), itemindex.New(filepath.Join(t.TempDir(), "items.yaml")), nil, nil)
+	service := New(ServiceDependencies{Registry: registry.New(filepath.Join(t.TempDir(), "registry.yaml"), gitadapter.New()), Index: itemindex.New(filepath.Join(t.TempDir(), "items.yaml"))})
 	if _, err := service.PreviewImport("relative.yaml"); err == nil || !strings.Contains(err.Error(), "absolute") {
 		t.Fatalf("relative path error = %v", err)
 	}
@@ -134,7 +135,7 @@ func TestExistingWorkspaceDeletionNeverRemovesDirectory(t *testing.T) {
 	dataDir := t.TempDir()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
 	idx := itemindex.New(filepath.Join(dataDir, "items.yaml"))
-	service := New(reg, idx, nil, nil)
+	service := New(ServiceDependencies{Registry: reg, Index: idx})
 	created, err := reg.Create(models.WorkspaceInput{Name: "Imported", Path: root, BaselineBranch: "main", Sources: []string{"plans"}, RegistrationMode: models.WorkspaceRegistrationModeExisting})
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +157,7 @@ func TestImportRegistersBatchAndContinuesAfterScanFailure(t *testing.T) {
 	dataDir := t.TempDir()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
 	audits := &importAuditRecorder{}
-	service := New(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, nil).ConfigureAudit(audits)
+	service := New(ServiceDependencies{Registry: reg, Index: itemindex.New(filepath.Join(dataDir, "items.yaml")), Audit: audits})
 	scanCalls := 0
 	service.importScan = func(workspaceID string) (models.ScanResult, error) {
 		scanCalls++
@@ -175,7 +176,7 @@ func TestImportRegistersBatchAndContinuesAfterScanFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	results, err := service.Import(models.WorkspaceImportRequest{SourcePath: source, CandidateKeys: []string{preview.Candidates[0].CandidateKey, preview.Candidates[1].CandidateKey}})
+	results, err := service.Import(models.WorkspaceImportRequest{SourcePath: source, SourceFingerprint: preview.SourceFingerprint, CandidateKeys: []string{preview.Candidates[0].CandidateKey, preview.Candidates[1].CandidateKey}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +212,7 @@ func TestImportRereadsSourceAndSkipsChangedCandidateKey(t *testing.T) {
 	root := importGitRepo(t)
 	dataDir := t.TempDir()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
-	service := New(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, nil)
+	service := New(ServiceDependencies{Registry: reg, Index: itemindex.New(filepath.Join(dataDir, "items.yaml"))})
 	source := filepath.Join(t.TempDir(), "workspaces.yaml")
 	writeImportSource(t, source, root)
 	preview, err := service.PreviewImport(source)
@@ -222,12 +223,9 @@ func TestImportRereadsSourceAndSkipsChangedCandidateKey(t *testing.T) {
 	if err := os.WriteFile(source, []byte(changed), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	results, err := service.Import(models.WorkspaceImportRequest{SourcePath: source, CandidateKeys: []string{preview.Candidates[0].CandidateKey}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(results) != 1 || results[0].Status != "skipped" || !strings.Contains(results[0].Message, "no longer exists") {
-		t.Fatalf("results = %+v", results)
+	results, err := service.Import(models.WorkspaceImportRequest{SourcePath: source, SourceFingerprint: preview.SourceFingerprint, CandidateKeys: []string{preview.Candidates[0].CandidateKey}})
+	if !errors.Is(err, ErrStaleImportPreview) || results != nil {
+		t.Fatalf("results=%+v err=%v", results, err)
 	}
 	listed, err := reg.List()
 	if err != nil || len(listed) != 0 {
@@ -240,7 +238,7 @@ func TestImportReportsRegistryWriteFailureWithoutScanning(t *testing.T) {
 	dataDir := t.TempDir()
 	path := filepath.Join(dataDir, "workspaces.yaml")
 	reg := registry.New(path, gitadapter.New())
-	service := New(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, nil)
+	service := New(ServiceDependencies{Registry: reg, Index: itemindex.New(filepath.Join(dataDir, "items.yaml"))})
 	service.importScan = func(string) (models.ScanResult, error) { t.Fatal("scan must not run"); return models.ScanResult{}, nil }
 	source := filepath.Join(t.TempDir(), "workspaces.yaml")
 	writeImportSource(t, source, root)
@@ -251,7 +249,7 @@ func TestImportReportsRegistryWriteFailureWithoutScanning(t *testing.T) {
 	if err := os.Mkdir(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	results, err := service.Import(models.WorkspaceImportRequest{SourcePath: source, CandidateKeys: []string{preview.Candidates[0].CandidateKey}})
+	results, err := service.Import(models.WorkspaceImportRequest{SourcePath: source, SourceFingerprint: preview.SourceFingerprint, CandidateKeys: []string{preview.Candidates[0].CandidateKey}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -93,6 +93,7 @@ type Dependencies struct {
 	StorageStatus       storageStatusService
 	StorageSync         storageSyncService
 	CloudPersistence    cloudstate.Repository
+	WorkspaceCloner     appworkspace.ClonePort
 }
 
 type databaseHealthChecker interface {
@@ -121,14 +122,15 @@ func New(deps Dependencies) *API {
 		}
 	}
 	workspaceFileAccess := workspaceaccess.New()
-	workspaceService := appworkspace.New(deps.WorkspaceRepository, deps.ItemRepository, deps.Scanner, deps.ItemWriter, deps.Git)
+	workspaceCloner := deps.WorkspaceCloner
+	if workspaceCloner == nil {
+		workspaceCloner = deps.Git
+	}
+	workspaceService := appworkspace.New(appworkspace.ServiceDependencies{Registry: deps.WorkspaceRepository, Index: deps.ItemRepository, Scanner: deps.Scanner, Writer: deps.ItemWriter, Cloner: workspaceCloner, Audit: deps.Audit})
 	runtimeService := appruntime.NewService()
 	runtimeConfig := deps.RuntimeConfig
 	if runtimeConfig.Mode == "" {
 		runtimeConfig, _ = system.ResolveRuntimeConfigFromEnv(func(string) string { return "" })
-	}
-	if deps.Audit != nil {
-		workspaceService.ConfigureAudit(deps.Audit)
 	}
 	verificationService := deps.Verification
 	if verificationService == nil {

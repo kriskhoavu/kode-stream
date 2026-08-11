@@ -55,6 +55,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   const [tab, setTab] = useState<EditorTab>('preview');
   const [diff, setDiff] = useState('');
   const [error, setError] = useState('');
+  const [refreshWarning, setRefreshWarning] = useState('');
   const [recoveryHint, setRecoveryHint] = useState('');
   const [revertOpen, setRevertOpen] = useState(false);
   const [reverting, setReverting] = useState(false);
@@ -86,12 +87,16 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
 		...contentSearch.results.slice(0, 15).map((result) => ({ kind: 'content' as const, result }))
 	], [contentSearch.results, pathSearch.results]);
   const mutations = useWorkspacePathMutations(async (result) => {
+    setRefreshWarning(result.refreshRequired ? (result.refreshError || 'The file change was saved, but workspace refresh is required.') : '');
     await explorer.invalidateDirectories(result.workspaceId, result.invalidatedPaths);
     await explorer.expandToPath(result.workspaceId, result.path, result.type);
   });
 
   const editor = useFileEditorSession({
-    save: (file, content) => api.saveWorkspaceFile(location?.workspaceId ?? '', { path: file.path, content, expectedHash: file.hash }).then((result) => result.file),
+    save: (file, content) => api.saveWorkspaceFile(location?.workspaceId ?? '', { path: file.path, content, expectedHash: file.hash }).then((result) => {
+      setRefreshWarning(result.refreshRequired ? (result.refreshError || 'The file was saved, but workspace refresh is required.') : '');
+      return result.file;
+    }),
     onSaved: () => void loadDiff(),
     onError: (caught) => showError(caught, 'File save failed')
   });
@@ -274,6 +279,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     setReverting(true);
     try {
       const result = await api.revertWorkspaceFile(location.workspaceId, { path: editor.file.path });
+      setRefreshWarning(result.refreshRequired ? (result.refreshError || 'The file was reverted, but workspace refresh is required.') : '');
       editor.open(result.file);
       await loadDiff();
       setError('');
@@ -424,6 +430,10 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
           </div>
 		  {matchContext && <div className="content-match-context">Line {matchContext.lineNumber}, columns {matchContext.columnStart}–{matchContext.columnEnd}</div>}
           {error && <div className="operation-error"><p className="error">{error}</p>{recoveryHint && <p>{recoveryHint}</p>}<button className="secondary" onClick={() => void loadFile()}>Reload file</button></div>}
+          {refreshWarning && <div className="operation-error" role="status"><p>{refreshWarning}</p><button className="secondary" onClick={() => {
+            if (!location?.workspaceId) return;
+            void api.scan(location.workspaceId).then(() => { setRefreshWarning(''); explorer.refresh(); }).catch((caught) => showError(caught, 'Workspace refresh failed'));
+          }}>Retry workspace refresh</button></div>}
           {tab === 'preview' && (editor.file ? <ContentViewer file={editor.file} content={editor.content} /> : <ExplorerEmpty row={selectedRow} />)}
           {tab === 'raw' && <textarea className="raw-editor" value={editor.file ? editor.content : 'Select a file.'} disabled={!editor.file?.editable} onChange={(event) => editor.setContent(event.target.value)} spellCheck={false} />}
           {tab === 'diff' && <ExplorerDiff diff={diff} onRevert={() => setRevertOpen(true)} disabled={!editor.file || reverting} />}

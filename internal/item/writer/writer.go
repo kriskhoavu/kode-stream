@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
+	"kode-stream/internal/filesystem/fileid"
 	"kode-stream/internal/filesystem/pathguard"
 	"kode-stream/internal/filesystem/writeguard"
 	gitadapter "kode-stream/internal/git"
@@ -679,16 +680,16 @@ func isDocumentationRoot(item models.ItemDetail) bool {
 }
 
 func materializeRelativeFile(item models.ItemDetail, fileID string) string {
+	path, err := fileid.Decode(fileID)
+	if err != nil {
+		return ""
+	}
 	for _, doc := range item.Documents {
-		if fileIDForPath(doc.Path) == fileID {
-			return doc.Path
+		if filepath.ToSlash(filepath.Clean(doc.Path)) == path {
+			return path
 		}
 	}
 	return ""
-}
-
-func fileIDForPath(path string) string {
-	return strings.NewReplacer("/", "__", ".", "_").Replace(path)
 }
 
 func cleanTags(tags []string) []string {

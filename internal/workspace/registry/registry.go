@@ -15,6 +15,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/sourceguard"
 	gitadapter "kode-stream/internal/git"
 	appruntime "kode-stream/internal/runtime"
 )
@@ -25,6 +26,15 @@ type Registry struct {
 	git     *gitadapter.GitAdapter
 	records []models.WorkspaceConfig
 	loaded  bool
+	hooks   persistenceHooks
+}
+
+type persistenceHooks struct {
+	afterWrite         func() error
+	afterSync          func() error
+	afterClose         func() error
+	afterRename        func() error
+	afterDirectorySync func() error
 }
 
 type Repository interface {
@@ -96,8 +106,11 @@ func (r *Registry) Create(input models.WorkspaceInput) (models.WorkspaceConfig, 
 			return models.WorkspaceConfig{}, fmt.Errorf("workspace already registered")
 		}
 	}
-	r.records = append(r.records, workspace)
-	return normalizeWorkspace(workspace), r.saveLocked()
+	next := append(append([]models.WorkspaceConfig(nil), r.records...), workspace)
+	if err := r.commitLocked(next); err != nil {
+		return models.WorkspaceConfig{}, err
+	}
+	return normalizeWorkspace(workspace), nil
 }
 
 // Validate checks and normalizes a workspace without changing the registry.
@@ -150,10 +163,9 @@ func (r *Registry) BatchCreate(inputs []models.WorkspaceInput) ([]BatchCreateRes
 	if len(accepted) == len(r.records) {
 		return results, nil
 	}
-	if err := r.saveRecordsLocked(accepted); err != nil {
+	if err := r.commitLocked(accepted); err != nil {
 		return results, err
 	}
-	r.records = accepted
 	return results, nil
 }
 
@@ -205,8 +217,22 @@ func (r *Registry) Update(id string, input models.WorkspaceInput) (models.Worksp
 			workspace.CreatedAt = existing.CreatedAt
 			workspace.LastScannedAt = existing.LastScannedAt
 			workspace.LastSelectedBranch = existing.LastSelectedBranch
-			r.records[i] = workspace
-			return normalizeWorkspace(workspace), r.saveLocked()
+			if existing.ClonePathManaged {
+				if !samePath(existing.Path, workspace.Path) {
+					return models.WorkspaceConfig{}, errors.New("managed clone path is immutable")
+				}
+				workspace.ClonePathManaged = existing.ClonePathManaged
+				workspace.ManagedCloneRoot = existing.ManagedCloneRoot
+				workspace.ManagedCloneID = existing.ManagedCloneID
+				workspace.ManagedCloneVerified = existing.ManagedCloneVerified
+				workspace.ManagedCloneCleanupPending = existing.ManagedCloneCleanupPending
+			}
+			next := append([]models.WorkspaceConfig(nil), r.records...)
+			next[i] = workspace
+			if err := r.commitLocked(next); err != nil {
+				return models.WorkspaceConfig{}, err
+			}
+			return normalizeWorkspace(workspace), nil
 		}
 	}
 	return models.WorkspaceConfig{}, fmt.Errorf("workspace not found")
@@ -220,13 +246,9 @@ func (r *Registry) Delete(id string) error {
 	defer r.mu.Unlock()
 	for i := range r.records {
 		if r.records[i].ID == id {
-			previous := append([]models.WorkspaceConfig(nil), r.records...)
-			r.records = append(r.records[:i], r.records[i+1:]...)
-			if err := r.saveLocked(); err != nil {
-				r.records = previous
-				return err
-			}
-			return nil
+			next := append([]models.WorkspaceConfig(nil), r.records[:i]...)
+			next = append(next, r.records[i+1:]...)
+			return r.commitLocked(next)
 		}
 	}
 	return fmt.Errorf("workspace not found")
@@ -240,8 +262,9 @@ func (r *Registry) TouchScanned(id string, scannedAt time.Time) error {
 	defer r.mu.Unlock()
 	for i := range r.records {
 		if r.records[i].ID == id {
-			r.records[i].LastScannedAt = scannedAt
-			return r.saveLocked()
+			next := append([]models.WorkspaceConfig(nil), r.records...)
+			next[i].LastScannedAt = scannedAt
+			return r.commitLocked(next)
 		}
 	}
 	return fmt.Errorf("workspace not found")
@@ -255,8 +278,9 @@ func (r *Registry) SetLastSelectedBranch(id, branch string) error {
 	defer r.mu.Unlock()
 	for i := range r.records {
 		if r.records[i].ID == id {
-			r.records[i].LastSelectedBranch = strings.TrimSpace(branch)
-			return r.saveLocked()
+			next := append([]models.WorkspaceConfig(nil), r.records...)
+			next[i].LastSelectedBranch = strings.TrimSpace(branch)
+			return r.commitLocked(next)
 		}
 	}
 	return fmt.Errorf("workspace not found")
@@ -274,14 +298,31 @@ func (r *Registry) SetRuntime(id string, runtimeConfig *models.WorkspaceRuntimeC
 	defer r.mu.Unlock()
 	for i := range r.records {
 		if r.records[i].ID == id {
-			r.records[i].Runtime = normalized
-			if err := r.saveLocked(); err != nil {
+			next := append([]models.WorkspaceConfig(nil), r.records...)
+			next[i].Runtime = normalized
+			if err := r.commitLocked(next); err != nil {
 				return models.WorkspaceConfig{}, err
 			}
-			return normalizeWorkspace(r.records[i]), nil
+			return normalizeWorkspace(next[i]), nil
 		}
 	}
 	return models.WorkspaceConfig{}, fmt.Errorf("workspace not found")
+}
+
+func (r *Registry) MarkManagedCloneCleanup(id string) error {
+	if err := r.load(); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.records {
+		if r.records[i].ID == id {
+			next := append([]models.WorkspaceConfig(nil), r.records...)
+			next[i].ManagedCloneCleanupPending = true
+			return r.commitLocked(next)
+		}
+	}
+	return fmt.Errorf("workspace not found")
 }
 
 func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
@@ -322,18 +363,13 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 	if len(dirs) == 0 {
 		return models.WorkspaceConfig{}, errors.New("at least one workspace source is required")
 	}
-	cleanDirs := make([]string, 0, len(dirs))
-	for _, dir := range dirs {
-		clean := filepath.Clean(strings.TrimSpace(dir))
-		if clean == "." || clean == "" || strings.HasPrefix(clean, "..") || filepath.IsAbs(clean) {
-			return models.WorkspaceConfig{}, fmt.Errorf("source %q must be relative", dir)
-		}
-		full := filepath.Join(root, clean)
-		stat, err := os.Stat(full)
-		if err != nil || !stat.IsDir() {
-			return models.WorkspaceConfig{}, fmt.Errorf("source %q does not exist", clean)
-		}
-		cleanDirs = append(cleanDirs, filepath.ToSlash(clean))
+	validatedSources, err := sourceguard.ResolveAll(root, dirs)
+	if err != nil {
+		return models.WorkspaceConfig{}, err
+	}
+	cleanDirs := make([]string, 0, len(validatedSources))
+	for _, source := range validatedSources {
+		cleanDirs = append(cleanDirs, source.Relative)
 	}
 	jira, err := ValidateJiraConnection(input.Jira)
 	if err != nil {
@@ -345,19 +381,22 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 	}
 
 	return models.WorkspaceConfig{
-		ID:               slug(name) + "-" + shortHash(root),
-		Name:             name,
-		Path:             root,
-		Location:         models.WorkspaceLocationLocalPath,
-		BaselineBranch:   branch,
-		RegistrationMode: mode,
-		RemoteURL:        strings.TrimSpace(input.RemoteURL),
-		ClonePathManaged: mode == models.WorkspaceRegistrationModeRemoteClone,
-		Sources:          cleanDirs,
-		CreatedAt:        time.Now().UTC(),
-		Jira:             jira,
-		Knowledge:        normalizeKnowledgeSettings(input.Knowledge),
-		Runtime:          runtimeConfig,
+		ID:                   slug(name) + "-" + shortHash(root),
+		Name:                 name,
+		Path:                 root,
+		Location:             models.WorkspaceLocationLocalPath,
+		BaselineBranch:       branch,
+		RegistrationMode:     mode,
+		RemoteURL:            strings.TrimSpace(input.RemoteURL),
+		ClonePathManaged:     mode == models.WorkspaceRegistrationModeRemoteClone && input.ManagedCloneRoot != "" && input.ManagedCloneID != "",
+		ManagedCloneRoot:     input.ManagedCloneRoot,
+		ManagedCloneID:       input.ManagedCloneID,
+		ManagedCloneVerified: mode == models.WorkspaceRegistrationModeRemoteClone && input.ManagedCloneRoot != "" && input.ManagedCloneID != "",
+		Sources:              cleanDirs,
+		CreatedAt:            time.Now().UTC(),
+		Jira:                 jira,
+		Knowledge:            normalizeKnowledgeSettings(input.Knowledge),
+		Runtime:              runtimeConfig,
 	}, nil
 }
 
@@ -411,6 +450,12 @@ func normalizeWorkspace(workspace models.WorkspaceConfig) models.WorkspaceConfig
 	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone {
 		workspace.RemoteURL = ""
 		workspace.ClonePathManaged = false
+		workspace.ManagedCloneRoot = ""
+		workspace.ManagedCloneID = ""
+		workspace.ManagedCloneVerified = false
+	} else if workspace.ManagedCloneRoot == "" || workspace.ManagedCloneID == "" {
+		// Legacy managed flags are not proof of ownership.
+		workspace.ManagedCloneVerified = false
 	}
 	workspace.Knowledge = normalizeKnowledgeSettings(workspace.Knowledge)
 	if normalized, err := appruntime.NormalizeRuntimeConfig(workspace.Runtime); err == nil {
@@ -468,8 +513,12 @@ func (r *Registry) load() error {
 	return nil
 }
 
-func (r *Registry) saveLocked() error {
-	return r.saveRecordsLocked(r.records)
+func (r *Registry) commitLocked(records []models.WorkspaceConfig) error {
+	if err := r.saveRecordsLocked(records); err != nil {
+		return err
+	}
+	r.records = records
+	return nil
 }
 
 func (r *Registry) saveRecordsLocked(records []models.WorkspaceConfig) error {
@@ -479,6 +528,16 @@ func (r *Registry) saveRecordsLocked(records []models.WorkspaceConfig) error {
 	data, err := yaml.Marshal(records)
 	if err != nil {
 		return err
+	}
+	previous, readErr := os.ReadFile(r.path)
+	previousMode := os.FileMode(0o600)
+	previousExists := readErr == nil
+	if previousExists {
+		if info, statErr := os.Stat(r.path); statErr == nil {
+			previousMode = info.Mode().Perm()
+		}
+	} else if !errors.Is(readErr, os.ErrNotExist) {
+		return readErr
 	}
 	temporary, err := os.CreateTemp(filepath.Dir(r.path), ".workspaces-*.tmp")
 	if err != nil {
@@ -494,14 +553,101 @@ func (r *Registry) saveRecordsLocked(records []models.WorkspaceConfig) error {
 		temporary.Close()
 		return err
 	}
+	if r.hooks.afterWrite != nil {
+		if err := r.hooks.afterWrite(); err != nil {
+			_ = temporary.Close()
+			return err
+		}
+	}
 	if err := temporary.Sync(); err != nil {
 		temporary.Close()
 		return err
 	}
+	if r.hooks.afterSync != nil {
+		if err := r.hooks.afterSync(); err != nil {
+			_ = temporary.Close()
+			return err
+		}
+	}
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temporaryPath, r.path)
+	if r.hooks.afterClose != nil {
+		if err := r.hooks.afterClose(); err != nil {
+			return err
+		}
+	}
+	if err := os.Rename(temporaryPath, r.path); err != nil {
+		return err
+	}
+	rollback := func(cause error) error {
+		if restoreErr := restoreRegistryGeneration(r.path, previous, previousMode, previousExists); restoreErr != nil {
+			return fmt.Errorf("registry persistence failed: %v; previous generation restoration failed: %w", cause, restoreErr)
+		}
+		return cause
+	}
+	if r.hooks.afterRename != nil {
+		if err := r.hooks.afterRename(); err != nil {
+			return rollback(err)
+		}
+	}
+	directory, err := os.Open(filepath.Dir(r.path))
+	if err != nil {
+		return rollback(err)
+	}
+	if err := directory.Sync(); err != nil {
+		_ = directory.Close()
+		return rollback(err)
+	}
+	if r.hooks.afterDirectorySync != nil {
+		if err := r.hooks.afterDirectorySync(); err != nil {
+			_ = directory.Close()
+			return rollback(err)
+		}
+	}
+	if err := directory.Close(); err != nil {
+		return rollback(err)
+	}
+	return nil
+}
+
+func restoreRegistryGeneration(path string, data []byte, mode os.FileMode, existed bool) error {
+	if !existed {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	} else {
+		temporary, err := os.CreateTemp(filepath.Dir(path), ".workspaces-restore-*.tmp")
+		if err != nil {
+			return err
+		}
+		temporaryPath := temporary.Name()
+		defer os.Remove(temporaryPath)
+		if err := temporary.Chmod(mode); err != nil {
+			_ = temporary.Close()
+			return err
+		}
+		if _, err := temporary.Write(data); err != nil {
+			_ = temporary.Close()
+			return err
+		}
+		if err := temporary.Sync(); err != nil {
+			_ = temporary.Close()
+			return err
+		}
+		if err := temporary.Close(); err != nil {
+			return err
+		}
+		if err := os.Rename(temporaryPath, path); err != nil {
+			return err
+		}
+	}
+	directory, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
 }
 
 func expandHome(path string) string {

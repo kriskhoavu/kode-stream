@@ -239,6 +239,16 @@ func (r *SQLiteWorkspaceRepository) Update(id string, input models.WorkspaceInpu
 	workspace.CreatedAt = existing.CreatedAt
 	workspace.LastScannedAt = existing.LastScannedAt
 	workspace.LastSelectedBranch = existing.LastSelectedBranch
+	if existing.ClonePathManaged {
+		if !sameWorkspacePath(existing.Path, workspace.Path) {
+			return models.WorkspaceConfig{}, fmt.Errorf("managed clone path is immutable")
+		}
+		workspace.ClonePathManaged = existing.ClonePathManaged
+		workspace.ManagedCloneRoot = existing.ManagedCloneRoot
+		workspace.ManagedCloneID = existing.ManagedCloneID
+		workspace.ManagedCloneVerified = existing.ManagedCloneVerified
+		workspace.ManagedCloneCleanupPending = existing.ManagedCloneCleanupPending
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	workspaces, err := r.List()
@@ -314,6 +324,10 @@ func (r *SQLiteWorkspaceRepository) SetRuntime(id string, runtimeConfig *models.
 		out = *workspace
 	})
 	return out, err
+}
+
+func (r *SQLiteWorkspaceRepository) MarkManagedCloneCleanup(id string) error {
+	return r.patch(id, func(workspace *models.WorkspaceConfig) { workspace.ManagedCloneCleanupPending = true })
 }
 
 func (r *SQLiteWorkspaceRepository) patch(id string, apply func(*models.WorkspaceConfig)) error {

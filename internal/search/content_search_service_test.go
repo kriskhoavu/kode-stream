@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/fileid"
 	appitem "kode-stream/internal/item"
 	"kode-stream/internal/workspace/files"
 )
@@ -52,7 +53,7 @@ func TestSearchItemUsesOnlyTheItemRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(response.Results) != 1 || response.Results[0].Path != "plans/PM-1/readme.md" || response.Results[0].ItemID != "item-1" || response.Results[0].FileID != "readme_md" {
+	if len(response.Results) != 1 || response.Results[0].Path != "plans/PM-1/readme.md" || response.Results[0].ItemID != "item-1" || response.Results[0].FileID != fileid.Encode("readme.md") {
 		t.Fatalf("response = %#v", response)
 	}
 }

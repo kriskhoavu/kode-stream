@@ -108,32 +108,36 @@ const (
 var StatusOrder = []ItemStatus{StatusUnsorted, StatusDraft, StatusInProgress, StatusReview, StatusDone}
 
 type WorkspaceConfig struct {
-	ID                 string                    `json:"id" yaml:"id"`
-	Name               string                    `json:"name" yaml:"name"`
-	Path               string                    `json:"path" yaml:"path"`
-	Location           WorkspaceLocation         `json:"location,omitempty" yaml:"location,omitempty"`
-	AccessMode         WorkspaceAccessMode       `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
-	OwnerUserID        string                    `json:"ownerUserId,omitempty" yaml:"ownerUserId,omitempty"`
-	AgentID            string                    `json:"agentId,omitempty" yaml:"agentId,omitempty"`
-	Provider           string                    `json:"provider,omitempty" yaml:"provider,omitempty"`
-	ProviderInstanceID string                    `json:"providerInstanceId,omitempty" yaml:"providerInstanceId,omitempty"`
-	ProviderRepository string                    `json:"providerRepository,omitempty" yaml:"providerRepository,omitempty"`
-	SelectedRef        string                    `json:"selectedRef,omitempty" yaml:"selectedRef,omitempty"`
-	ResolvedCommitSHA  string                    `json:"resolvedCommitSha,omitempty" yaml:"resolvedCommitSha,omitempty"`
-	LocalRootLabel     string                    `json:"localRootLabel,omitempty" yaml:"localRootLabel,omitempty"`
-	PublishedSummary   bool                      `json:"publishedSummary,omitempty" yaml:"publishedSummary,omitempty"`
-	ScanStatus         string                    `json:"scanStatus,omitempty" yaml:"scanStatus,omitempty"`
-	BaselineBranch     string                    `json:"baselineBranch" yaml:"baselineBranch"`
-	RegistrationMode   WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
-	RemoteURL          string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
-	ClonePathManaged   bool                      `json:"clonePathManaged,omitempty" yaml:"clonePathManaged,omitempty"`
-	LastSelectedBranch string                    `json:"lastSelectedBranch,omitempty" yaml:"lastSelectedBranch,omitempty"`
-	Sources            []string                  `json:"sources" yaml:"sources"`
-	CreatedAt          time.Time                 `json:"createdAt" yaml:"createdAt"`
-	LastScannedAt      time.Time                 `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
-	Jira               *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
-	Knowledge          *KnowledgeSettings        `json:"knowledge,omitempty" yaml:"knowledge,omitempty"`
-	Runtime            *WorkspaceRuntimeConfig   `json:"runtime,omitempty" yaml:"runtime,omitempty"`
+	ID                         string                    `json:"id" yaml:"id"`
+	Name                       string                    `json:"name" yaml:"name"`
+	Path                       string                    `json:"path" yaml:"path"`
+	Location                   WorkspaceLocation         `json:"location,omitempty" yaml:"location,omitempty"`
+	AccessMode                 WorkspaceAccessMode       `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
+	OwnerUserID                string                    `json:"ownerUserId,omitempty" yaml:"ownerUserId,omitempty"`
+	AgentID                    string                    `json:"agentId,omitempty" yaml:"agentId,omitempty"`
+	Provider                   string                    `json:"provider,omitempty" yaml:"provider,omitempty"`
+	ProviderInstanceID         string                    `json:"providerInstanceId,omitempty" yaml:"providerInstanceId,omitempty"`
+	ProviderRepository         string                    `json:"providerRepository,omitempty" yaml:"providerRepository,omitempty"`
+	SelectedRef                string                    `json:"selectedRef,omitempty" yaml:"selectedRef,omitempty"`
+	ResolvedCommitSHA          string                    `json:"resolvedCommitSha,omitempty" yaml:"resolvedCommitSha,omitempty"`
+	LocalRootLabel             string                    `json:"localRootLabel,omitempty" yaml:"localRootLabel,omitempty"`
+	PublishedSummary           bool                      `json:"publishedSummary,omitempty" yaml:"publishedSummary,omitempty"`
+	ScanStatus                 string                    `json:"scanStatus,omitempty" yaml:"scanStatus,omitempty"`
+	BaselineBranch             string                    `json:"baselineBranch" yaml:"baselineBranch"`
+	RegistrationMode           WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
+	RemoteURL                  string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
+	ClonePathManaged           bool                      `json:"clonePathManaged,omitempty" yaml:"clonePathManaged,omitempty"`
+	ManagedCloneRoot           string                    `json:"managedCloneRoot,omitempty" yaml:"managedCloneRoot,omitempty"`
+	ManagedCloneID             string                    `json:"managedCloneId,omitempty" yaml:"managedCloneId,omitempty"`
+	ManagedCloneVerified       bool                      `json:"managedCloneVerified,omitempty" yaml:"managedCloneVerified,omitempty"`
+	ManagedCloneCleanupPending bool                      `json:"managedCloneCleanupPending,omitempty" yaml:"managedCloneCleanupPending,omitempty"`
+	LastSelectedBranch         string                    `json:"lastSelectedBranch,omitempty" yaml:"lastSelectedBranch,omitempty"`
+	Sources                    []string                  `json:"sources" yaml:"sources"`
+	CreatedAt                  time.Time                 `json:"createdAt" yaml:"createdAt"`
+	LastScannedAt              time.Time                 `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
+	Jira                       *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
+	Knowledge                  *KnowledgeSettings        `json:"knowledge,omitempty" yaml:"knowledge,omitempty"`
+	Runtime                    *WorkspaceRuntimeConfig   `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 }
 
 type RuntimeType string
@@ -416,8 +420,9 @@ type WorkspaceImportPreview struct {
 }
 
 type WorkspaceImportRequest struct {
-	SourcePath    string   `json:"sourcePath" yaml:"sourcePath"`
-	CandidateKeys []string `json:"candidateKeys" yaml:"candidateKeys"`
+	SourcePath        string   `json:"sourcePath" yaml:"sourcePath"`
+	SourceFingerprint string   `json:"sourceFingerprint" yaml:"sourceFingerprint"`
+	CandidateKeys     []string `json:"candidateKeys" yaml:"candidateKeys"`
 }
 
 type WorkspaceImportResult struct {
@@ -457,6 +462,8 @@ type WorkspaceInput struct {
 	Jira               *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
 	Knowledge          *KnowledgeSettings        `json:"knowledge,omitempty" yaml:"knowledge,omitempty"`
 	Runtime            *WorkspaceRuntimeConfig   `json:"runtime,omitempty" yaml:"runtime,omitempty"`
+	ManagedCloneRoot   string                    `json:"-" yaml:"-"`
+	ManagedCloneID     string                    `json:"-" yaml:"-"`
 }
 
 type SourceStructureSettings struct {
@@ -553,11 +560,12 @@ type ItemDocument struct {
 }
 
 type FileNode struct {
-	ID       string     `json:"id" yaml:"id"`
-	Name     string     `json:"name" yaml:"name"`
-	Path     string     `json:"path" yaml:"path"`
-	Type     string     `json:"type" yaml:"type"`
-	Children []FileNode `json:"children,omitempty" yaml:"children,omitempty"`
+	ID        string     `json:"id" yaml:"id"`
+	Name      string     `json:"name" yaml:"name"`
+	Path      string     `json:"path" yaml:"path"`
+	Type      string     `json:"type" yaml:"type"`
+	Children  []FileNode `json:"children,omitempty" yaml:"children,omitempty"`
+	Truncated bool       `json:"truncated,omitempty" yaml:"truncated,omitempty"`
 }
 
 type FileKind string
@@ -617,8 +625,11 @@ type WorkspaceFileRevertInput struct {
 }
 
 type WorkspaceFileWriteResult struct {
-	File      FileContent `json:"file" yaml:"file"`
-	Refreshed bool        `json:"refreshed" yaml:"refreshed"`
+	File            FileContent `json:"file" yaml:"file"`
+	Refreshed       bool        `json:"refreshed" yaml:"refreshed"`
+	Committed       bool        `json:"committed" yaml:"committed"`
+	RefreshRequired bool        `json:"refreshRequired,omitempty" yaml:"refreshRequired,omitempty"`
+	RefreshError    string      `json:"refreshError,omitempty" yaml:"refreshError,omitempty"`
 }
 
 type WorkspaceFileCreateInput struct {
@@ -643,6 +654,9 @@ type WorkspacePathMutationResult struct {
 	Type             string   `json:"type" yaml:"type"`
 	InvalidatedPaths []string `json:"invalidatedPaths" yaml:"invalidatedPaths"`
 	Refreshed        bool     `json:"refreshed" yaml:"refreshed"`
+	Committed        bool     `json:"committed" yaml:"committed"`
+	RefreshRequired  bool     `json:"refreshRequired,omitempty" yaml:"refreshRequired,omitempty"`
+	RefreshError     string   `json:"refreshError,omitempty" yaml:"refreshError,omitempty"`
 }
 
 type WorkspacePathSearchResult struct {

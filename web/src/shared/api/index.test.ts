@@ -58,11 +58,15 @@ describe('shared api facade', () => {
         name: 'Workspace',
         path: '/repo',
         location: 'local_path',
+		accessMode: undefined,
         baselineBranch: 'main',
         createdAt: '2026-06-20T00:00:00Z',
         registrationMode: 'local_path',
         remoteUrl: '',
         clonePathManaged: false,
+		managedCloneRoot: '',
+		managedCloneId: '',
+		managedCloneVerified: false,
         sources: [],
         runtime: undefined
       }
@@ -130,11 +134,11 @@ describe('shared api facade', () => {
 			candidates: [{ candidateKey: 'one', selected: true, issues: [], workspace: { registrationMode: 'existing_workspace', sources: [] } }],
 			summary: { valid: 1, invalid: 0, duplicate: 0, alreadyRegistered: 0 }
 		});
-		await expect(api.importWorkspaces({ sourcePath: '/source/workspaces.yaml', candidateKeys: ['one'] })).resolves.toMatchObject([
+		await expect(api.importWorkspaces({ sourcePath: '/source/workspaces.yaml', sourceFingerprint: 'abc', candidateKeys: ['one'] })).resolves.toMatchObject([
 			{ candidateKey: 'one', status: 'indexed', workspace: { registrationMode: 'existing_workspace', sources: [] }, scan: { warnings: [] }, message: '' }
 		]);
 		expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/workspaces/import-preview', expect.objectContaining({ method: 'POST', body: JSON.stringify({ sourcePath: '/source/workspaces.yaml' }) }));
-		expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/workspaces/import', expect.objectContaining({ method: 'POST', body: JSON.stringify({ sourcePath: '/source/workspaces.yaml', candidateKeys: ['one'] }) }));
+		expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/workspaces/import', expect.objectContaining({ method: 'POST', body: JSON.stringify({ sourcePath: '/source/workspaces.yaml', sourceFingerprint: 'abc', candidateKeys: ['one'] }) }));
 	});
 
 	it('treats file picker cancellation as an empty path response', async () => {

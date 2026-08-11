@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kode-stream/internal/common/models"
@@ -42,11 +43,14 @@ func (f *fakeAudit) Append(event models.AuditEvent) (models.AuditEvent, error) {
 	return event, nil
 }
 
-type fakeRefresher struct{ calls int }
+type fakeRefresher struct {
+	calls int
+	err   error
+}
 
 func (f *fakeRefresher) RefreshWorkspace(models.WorkspaceConfig) (models.ScanResult, error) {
 	f.calls++
-	return models.ScanResult{}, nil
+	return models.ScanResult{}, f.err
 }
 
 func TestSavePreservesPermissionsAuditsAndRefreshesSources(t *testing.T) {
@@ -87,6 +91,22 @@ func TestSaveRejectsMissingAndStaleHashes(t *testing.T) {
 	}
 	if len(audit.events) != 2 || audit.events[0].Status != models.AuditStatusFailed {
 		t.Fatalf("failed saves were not audited: %#v", audit.events)
+	}
+}
+
+func TestSaveReportsCommittedMutationWhenRefreshFails(t *testing.T) {
+	service, workspace, audit, refresher := newTestService(t)
+	refresher.err = errors.New("index unavailable")
+	data, _ := os.ReadFile(filepath.Join(workspace.Path, "plans", "item.md"))
+	result, err := service.Save(workspace.ID, models.WorkspaceFileSaveInput{Path: "plans/item.md", Content: "committed", ExpectedHash: fileaccess.ContentHash(data)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Committed || !result.RefreshRequired || result.RefreshError == "" || result.File.Content != "committed" {
+		t.Fatalf("result=%+v", result)
+	}
+	if len(audit.events) != 1 || audit.events[0].Status != models.AuditStatusSuccess || !strings.Contains(audit.events[0].Message, "refresh is required") {
+		t.Fatalf("audit=%+v", audit.events)
 	}
 }
 

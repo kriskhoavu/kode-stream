@@ -3,11 +3,13 @@ package fileaccess
 // Package fileaccess provides bounded content access.
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/fileid"
 )
 
 func TestSafeJoinRejectsTraversal(t *testing.T) {
@@ -28,7 +30,7 @@ func TestReadStaysInsidePlanDirectory(t *testing.T) {
 	access := New()
 	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
-	content, err := access.Read(workspace, item, "README_md")
+	content, err := access.Read(workspace, item, fileid.Encode("README.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +55,7 @@ func TestWriteMarkdownRejectsStaleHash(t *testing.T) {
 	access := New()
 	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
-	if _, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: "README_md", Content: "changed", ExpectedHash: "stale"}); err == nil {
+	if _, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: fileid.Encode("README.md"), Content: "changed", ExpectedHash: "stale"}); err == nil {
 		t.Fatal("expected stale hash to be rejected")
 	}
 }
@@ -73,7 +75,7 @@ func TestWriteMarkdownUpdatesTextFile(t *testing.T) {
 	access := New()
 	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
-	content, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: "main_go", Content: "package planmanager\n", ExpectedHash: contentHash(original)})
+	content, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: fileid.Encode("main.go"), Content: "package planmanager\n", ExpectedHash: contentHash(original)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,8 +101,74 @@ func TestWriteMarkdownRejectsSymlinkEscape(t *testing.T) {
 	access := New()
 	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
-	if _, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: "escape_md", Content: "changed"}); err == nil {
+	if _, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: fileid.Encode("escape.md"), Content: "changed"}); err == nil {
 		t.Fatal("expected symlink escape to be rejected")
+	}
+}
+
+func TestItemAccessRejectsStoredSourceSymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	insideSource := filepath.Join(root, "items")
+	itemRoot := filepath.Join(insideSource, "platform", "PM-001")
+	if err := os.MkdirAll(itemRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outsideSource := t.TempDir()
+	outsideItem := filepath.Join(outsideSource, "platform", "PM-001")
+	if err := os.MkdirAll(outsideItem, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	original := []byte("outside secret")
+	outsideFile := filepath.Join(outsideItem, "README.md")
+	if err := os.WriteFile(outsideFile, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(insideSource); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outsideSource, insideSource); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	access := New()
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
+	if _, err := access.Read(workspace, item, fileid.Encode("README.md")); err == nil {
+		t.Fatal("expected escaped source read to be rejected")
+	}
+	if _, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: fileid.Encode("README.md"), Content: "changed", ExpectedHash: ContentHash(original)}); err == nil {
+		t.Fatal("expected escaped source write to be rejected")
+	}
+	after, err := os.ReadFile(outsideFile)
+	if err != nil || string(after) != string(original) {
+		t.Fatalf("outside file changed: %q err=%v", after, err)
+	}
+}
+
+func TestCollidingLegacyNamesResolveByExactCanonicalID(t *testing.T) {
+	root := t.TempDir()
+	itemRoot := filepath.Join(root, "items", "platform", "PM-1")
+	if err := os.MkdirAll(filepath.Join(itemRoot, "a"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(itemRoot, "a", "b.md"), []byte("nested"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(itemRoot, "a__b.md"), []byte("flat"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	access := New()
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-1"}}
+	nested, err := access.Read(workspace, item, fileid.Encode("a/b.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	flat, err := access.Read(workspace, item, fileid.Encode("a__b.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nested.Content != "nested" || flat.Content != "flat" || nested.ID == flat.ID {
+		t.Fatalf("nested=%+v flat=%+v", nested, flat)
 	}
 }
 
@@ -143,6 +211,36 @@ func TestTreeSortsDirectoriesFirstWithNaturalNames(t *testing.T) {
 	gotDesign := nodeNames(design.Children)
 	if gotDesign[0] != "design-2.md" || gotDesign[1] != "design-10.md" {
 		t.Fatalf("design children = %#v", gotDesign)
+	}
+}
+
+func TestTreeMarksDepthTruncationWithoutRecursingPastBudget(t *testing.T) {
+	root := t.TempDir()
+	itemRoot := filepath.Join(root, "items", "platform", "PM-001")
+	deep := itemRoot
+	for index := 0; index < 70; index++ {
+		deep = filepath.Join(deep, fmt.Sprintf("d%02d", index))
+	}
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	access := New()
+	tree, err := access.Tree(
+		models.WorkspaceConfig{Path: root, Sources: []string{"items"}},
+		models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current := tree[0]
+	for !current.Truncated {
+		if len(current.Children) != 1 {
+			t.Fatalf("expected one bounded child at %s: %#v", current.Path, current.Children)
+		}
+		current = current.Children[0]
+	}
+	if len(current.Children) != 0 {
+		t.Fatalf("truncated node contains children: %#v", current)
 	}
 }
 

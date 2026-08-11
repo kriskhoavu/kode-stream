@@ -30,7 +30,7 @@ func TestProductionAuditProducersUseSharedRecorderBoundary(t *testing.T) {
 		t.Errorf("raw audit repository escapes recorder construction: %d references", strings.Count(serverText, "state.Audit"))
 	}
 	for _, producer := range []string{
-		"workspaceService.ConfigureAudit(deps.Audit)",
+		"Audit: deps.Audit",
 		"NewWorkspaceFileService(deps.WorkspaceRepository, workspaceFileAccess, deps.Git, deps.Audit, refresher)",
 		"gitController{gitOps:",
 		"itemController{items:",

@@ -21,6 +21,8 @@ const (
 	maxWorkspaceImportEntries = 500
 )
 
+var ErrStaleImportPreview = errors.New("workspace import source changed after preview")
+
 func (s *Service) PreviewImport(sourcePath string) (models.WorkspaceImportPreview, error) {
 	source, data, records, err := readWorkspaceImport(sourcePath)
 	if err != nil {
@@ -64,7 +66,10 @@ func (s *Service) PreviewImport(sourcePath string) (models.WorkspaceImportPrevie
 		candidate.Workspace = models.WorkspaceInput{
 			Name: normalized.Name, Path: normalized.Path, BaselineBranch: normalized.BaselineBranch,
 			Sources: normalized.Sources, RegistrationMode: models.WorkspaceRegistrationModeExisting,
-			RemoteURL: strings.TrimSpace(record.RemoteURL), Jira: normalized.Jira, Knowledge: normalized.Knowledge,
+			Jira: normalized.Jira, Knowledge: normalized.Knowledge, Runtime: normalized.Runtime,
+		}
+		if record.RegistrationMode == models.WorkspaceRegistrationModeRemoteClone || record.RemoteURL != "" || record.ClonePathManaged {
+			candidate.Issues = append(candidate.Issues, models.WorkspaceImportIssue{Field: "registrationMode", Code: "converted_to_existing", Message: "managed clone ownership and remote URL are intentionally not imported"})
 		}
 		candidate.CandidateKey = candidateKey(index+1, candidate.Workspace)
 		pathKey := canonicalPathKey(normalized.Path)
@@ -91,6 +96,9 @@ func (s *Service) Import(request models.WorkspaceImportRequest) ([]models.Worksp
 	preview, err := s.PreviewImport(request.SourcePath)
 	if err != nil {
 		return nil, err
+	}
+	if strings.TrimSpace(request.SourceFingerprint) == "" || request.SourceFingerprint != preview.SourceFingerprint {
+		return nil, ErrStaleImportPreview
 	}
 	selected := make([]string, 0, len(request.CandidateKeys))
 	selectedSet := map[string]struct{}{}
@@ -153,7 +161,7 @@ func (s *Service) Import(request models.WorkspaceImportRequest) ([]models.Worksp
 		workspace := outcome.Workspace
 		results[index].Workspace = &workspace
 		s.recordImportAudit(workspace.ID, models.AuditStatusSuccess, "Workspace imported.")
-		if s.importScan == nil && (s.scanner == nil || s.index == nil) {
+		if s.importScan == nil && (s.scans == nil || s.scans.scanner == nil || s.index == nil) {
 			results[index].Status = "scan_failed"
 			results[index].Message = "workspace was registered but indexing is unavailable"
 			s.recordScanAudit(workspace.ID, models.AuditStatusFailed, "Imported workspace indexing failed.")
@@ -275,7 +283,7 @@ func importInput(record models.WorkspaceConfig) models.WorkspaceInput {
 		Name: strings.TrimSpace(record.Name), Path: strings.TrimSpace(record.Path),
 		BaselineBranch: strings.TrimSpace(record.BaselineBranch), Sources: append([]string(nil), record.Sources...),
 		RegistrationMode: models.WorkspaceRegistrationModeExisting, RemoteURL: strings.TrimSpace(record.RemoteURL),
-		Jira: record.Jira, Knowledge: record.Knowledge,
+		Jira: record.Jira, Knowledge: record.Knowledge, Runtime: record.Runtime,
 	}
 }
 

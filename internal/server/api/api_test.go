@@ -21,6 +21,7 @@ import (
 	"kode-stream/internal/audit"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
+	"kode-stream/internal/filesystem/fileid"
 	gitadapter "kode-stream/internal/git"
 	"kode-stream/internal/item/index"
 	"kode-stream/internal/item/writer"
@@ -33,6 +34,19 @@ import (
 	"kode-stream/internal/workspace/registry"
 	"kode-stream/internal/workspace/scanner"
 )
+
+type localClonePort struct{ source string }
+
+func (c localClonePort) CloneWithProgress(_ string, destination string, progress func(string)) error {
+	output, err := exec.Command("git", "clone", c.source, destination).CombinedOutput()
+	if progress != nil {
+		progress(string(output))
+	}
+	if err != nil {
+		return fmt.Errorf("git clone: %w", err)
+	}
+	return nil
+}
 
 type fakeAuditEventReader struct {
 	events []models.AuditEvent
@@ -1008,9 +1022,9 @@ func TestCreateWorkspaceSupportsRemoteClonePayload(t *testing.T) {
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(t.TempDir(), "workspaces.yaml"), git)
 	idx := itemindex.New(filepath.Join(t.TempDir(), "item-index.yaml"))
-	handler := New(Dependencies{WorkspaceRepository: reg, ItemRepository: idx, Git: git})
+	handler := New(Dependencies{WorkspaceRepository: reg, ItemRepository: idx, Git: git, WorkspaceCloner: localClonePort{source: remote}})
 	cloneRoot := t.TempDir()
-	body := `{"name":"Remote","registrationMode":"remote_clone","remoteUrl":"file://` + remote + `","cloneRoot":"` + cloneRoot + `","baselineBranch":"main","sources":["plans"]}`
+	body := `{"name":"Remote","registrationMode":"remote_clone","remoteUrl":"https://example.com/org/remote.git","cloneRoot":"` + cloneRoot + `","baselineBranch":"main","sources":["plans"]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", strings.NewReader(body))
 	res := httptest.NewRecorder()
 	handler.Routes().ServeHTTP(res, req)
@@ -1025,7 +1039,7 @@ func TestCreateWorkspaceSupportsRemoteClonePayload(t *testing.T) {
 		t.Fatal(err)
 	}
 	workspace := payload.Workspace
-	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone || workspace.RemoteURL != "file://"+remote || !workspace.ClonePathManaged {
+	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone || workspace.RemoteURL != "https://example.com/org/remote.git" || !workspace.ClonePathManaged {
 		t.Fatalf("workspace = %+v", workspace)
 	}
 	if strings.TrimSpace(payload.OperationLog) == "" {
@@ -1076,7 +1090,7 @@ func TestWorkspaceImportPreviewEndpointReturnsCandidatesWithoutWriting(t *testin
 		t.Fatalf("preview wrote registry: %v", err)
 	}
 	importResponse := httptest.NewRecorder()
-	importBody, err := json.Marshal(models.WorkspaceImportRequest{SourcePath: source, CandidateKeys: []string{preview.Candidates[0].CandidateKey}})
+	importBody, err := json.Marshal(models.WorkspaceImportRequest{SourcePath: source, SourceFingerprint: preview.SourceFingerprint, CandidateKeys: []string{preview.Candidates[0].CandidateKey}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1165,7 +1179,7 @@ func TestSaveFileStaleHashReturnsRecoveryHintAndAuditEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := strings.NewReader(`{"content":"# Changed\n","expectedHash":"stale"}`)
-	request := httptest.NewRequest(http.MethodPost, "/api/items/item-1/files/README_md", body)
+	request := httptest.NewRequest(http.MethodPost, "/api/items/item-1/files/"+fileid.Encode("README.md"), body)
 	response := httptest.NewRecorder()
 	apiHandler.Routes().ServeHTTP(response, request)
 
@@ -1173,12 +1187,39 @@ func TestSaveFileStaleHashReturnsRecoveryHintAndAuditEvent(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if response.Code != http.StatusBadRequest || payload["recoveryHint"] == "" {
+	if response.Code != http.StatusConflict || payload["recoveryHint"] == "" {
 		t.Fatalf("status = %d, payload = %#v", response.Code, payload)
 	}
 	events, err := auditStore.Recent(1)
 	if err != nil || len(events) != 1 || events[0].Status != models.AuditStatusBlocked {
 		t.Fatalf("events = %#v, err = %v", events, err)
+	}
+}
+
+func TestSaveFileRejectsOversizedRequestWithoutMutation(t *testing.T) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
+	itemPath := "plans/platform/PM-004"
+	itemRoot := filepath.Join(workspace.Path, itemPath)
+	if err := os.MkdirAll(itemRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	original := []byte("# Current\n")
+	filePath := filepath.Join(itemRoot, "README.md")
+	if err := os.WriteFile(filePath, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{{ItemSummary: models.ItemSummary{ID: "item-1", WorkspaceID: workspace.ID, ItemPath: itemPath, Title: "PM-004", Identifier: "PM-004", Scope: "platform"}}}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"content":"` + strings.Repeat("x", int(maxWorkspaceMutationBodyBytes)) + `","expectedHash":"irrelevant"}`
+	response := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/items/item-1/files/"+fileid.Encode("README.md"), strings.NewReader(body)))
+	if response.Code != http.StatusRequestEntityTooLarge || !strings.Contains(response.Body.String(), "request_too_large") {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	after, err := os.ReadFile(filePath)
+	if err != nil || string(after) != string(original) {
+		t.Fatalf("file changed: %q err=%v", after, err)
 	}
 }
 
@@ -1201,7 +1242,7 @@ func TestFileContentRouteReturnsViewerMetadataAndRejectsBinary(t *testing.T) {
 	}
 
 	markdownResponse := httptest.NewRecorder()
-	apiHandler.Routes().ServeHTTP(markdownResponse, httptest.NewRequest(http.MethodGet, "/api/items/item-viewer/files/README_md", nil))
+	apiHandler.Routes().ServeHTTP(markdownResponse, httptest.NewRequest(http.MethodGet, "/api/items/item-viewer/files/"+fileid.Encode("README.md"), nil))
 	var content models.FileContent
 	if err := json.Unmarshal(markdownResponse.Body.Bytes(), &content); err != nil {
 		t.Fatal(err)
@@ -1211,7 +1252,7 @@ func TestFileContentRouteReturnsViewerMetadataAndRejectsBinary(t *testing.T) {
 	}
 
 	binaryResponse := httptest.NewRecorder()
-	apiHandler.Routes().ServeHTTP(binaryResponse, httptest.NewRequest(http.MethodGet, "/api/items/item-viewer/files/image_bin", nil))
+	apiHandler.Routes().ServeHTTP(binaryResponse, httptest.NewRequest(http.MethodGet, "/api/items/item-viewer/files/"+fileid.Encode("image.bin"), nil))
 	var payload map[string]string
 	if err := json.Unmarshal(binaryResponse.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
@@ -1339,6 +1380,75 @@ func TestWorkspaceProductivityRoutes(t *testing.T) {
 	events, err := auditStore.Recent(10)
 	if err != nil || len(events) < 3 {
 		t.Fatalf("audit events=%#v err=%v", events, err)
+	}
+}
+
+func TestWorkspacePathMutationRoutesRejectOversizedBodiesWithoutMutation(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	request := func(path, body string) *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, strings.NewReader(body)))
+		return response
+	}
+	tooLarge := strings.Repeat("x", int(maxWorkspaceMutationBodyBytes))
+	directory := request("/api/workspaces/"+workspace.ID+"/directories", `{"parentPath":"plans","name":"`+tooLarge+`"}`)
+	if directory.Code != http.StatusRequestEntityTooLarge || !strings.Contains(directory.Body.String(), "request_too_large") {
+		t.Fatalf("directory status=%d body=%s", directory.Code, directory.Body.String())
+	}
+	entries, err := os.ReadDir(filepath.Join(workspace.Path, "plans"))
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("oversized directory body mutated workspace: entries=%#v err=%v", entries, err)
+	}
+	oldPath := filepath.Join(workspace.Path, "plans", "old.md")
+	if err := os.WriteFile(oldPath, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rename := request("/api/workspaces/"+workspace.ID+"/paths/rename", `{"path":"plans/old.md","destinationPath":"plans/`+tooLarge+`.md"}`)
+	if rename.Code != http.StatusRequestEntityTooLarge || !strings.Contains(rename.Body.String(), "request_too_large") {
+		t.Fatalf("rename status=%d body=%s", rename.Code, rename.Body.String())
+	}
+	if _, err := os.Stat(oldPath); err != nil {
+		t.Fatalf("oversized rename body changed source path: %v", err)
+	}
+}
+
+func TestItemFileRoutesRejectStoredSourceSymlinkEscape(t *testing.T) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
+	insideSource := filepath.Join(workspace.Path, "plans")
+	outsideSource := t.TempDir()
+	outsideItem := filepath.Join(outsideSource, "platform", "PM-escape")
+	if err := os.MkdirAll(outsideItem, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	original := []byte("outside secret")
+	outsideFile := filepath.Join(outsideItem, "README.md")
+	if err := os.WriteFile(outsideFile, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(insideSource); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outsideSource, insideSource); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-escape", WorkspaceID: workspace.ID, ItemPath: "plans/platform/PM-escape"}}
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	read := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(read, httptest.NewRequest(http.MethodGet, "/api/items/item-escape/files/"+fileid.Encode("README.md"), nil))
+	if read.Code == http.StatusOK {
+		t.Fatalf("escaped source read succeeded: %s", read.Body.String())
+	}
+	write := httptest.NewRecorder()
+	body := `{"content":"changed","expectedHash":"` + fileaccess.ContentHash(original) + `"}`
+	apiHandler.Routes().ServeHTTP(write, httptest.NewRequest(http.MethodPost, "/api/items/item-escape/files/"+fileid.Encode("README.md"), strings.NewReader(body)))
+	if write.Code == http.StatusOK {
+		t.Fatalf("escaped source write succeeded: %s", write.Body.String())
+	}
+	after, err := os.ReadFile(outsideFile)
+	if err != nil || string(after) != string(original) {
+		t.Fatalf("outside file changed: %q err=%v", after, err)
 	}
 }
 

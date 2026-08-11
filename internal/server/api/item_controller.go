@@ -9,6 +9,7 @@ import (
 
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/guardedwrite"
 	appitem "kode-stream/internal/item"
 	knowledgeindex "kode-stream/internal/knowledge"
 	appsearch "kode-stream/internal/search"
@@ -136,8 +137,7 @@ func (a *itemController) saveItemFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input models.FileSaveInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	started := time.Now()
@@ -264,6 +264,14 @@ func (a *itemController) updateItemStatus(w http.ResponseWriter, r *http.Request
 }
 
 func respondItemMutation(w http.ResponseWriter, result any, err error) {
+	if errors.Is(err, guardedwrite.ErrHashRequired) || errors.Is(err, guardedwrite.ErrStale) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "stale_file_content", "recoveryHint": "Reload the file and retry your edit."})
+		return
+	}
+	if errors.Is(err, guardedwrite.ErrTooLarge) {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"error": err.Error(), "code": "file_too_large"})
+		return
+	}
 	if errors.Is(err, appitem.ErrSnapshotReadOnly) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "snapshot_read_only"})
 		return

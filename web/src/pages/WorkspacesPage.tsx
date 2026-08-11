@@ -5,14 +5,15 @@ import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../shared/api';
 import type { JiraConnection, KnowledgeSettings, RuntimeContext, RuntimeType, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
-import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
+import { applySegmentRole, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
+import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
 
-export { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parseSources, previewPathSegments };
+export { applySegmentRole, normalizeDroppedPath, parseSources, previewPathSegments };
 
 const DEFAULT_SOURCES = ['wiki', 'plans'];
-const UNSORTED_SELECTION_ID = 'unsorted';
+const UNSORTED_SELECTION_ID = UNSORTED_SOURCE_SELECTION_ID;
 const emptyJiraConnection = (): JiraConnection => ({ deploymentType: 'cloud', baseUrl: '', projectKey: '', accountEmail: '', tokenEnvVar: 'JIRA_API_TOKEN' });
 const defaultRuntimeConfig = (): WorkspaceRuntimeConfig => ({
   type: 'docker-compose',
@@ -46,17 +47,8 @@ type WorkspaceNotice = {
   title: string;
   details?: string[];
 };
-type SettingsEditorState = {
+type SettingsEditorState = SourceSettingsEditorModel & {
   repo: WorkspaceConfig;
-  directory: string;
-  exists: boolean;
-  mode?: string;
-  card: SourceStructureCard;
-  warnings: string[];
-  proposals: SourceStructureProposal[];
-  selectedProposalId?: string;
-  unsortedPreview: SourceStructurePreview[];
-  preview: SourceStructurePreview[];
 };
 type WorkspaceDetailTab = 'overview' | 'health' | 'integrations';
 type WorkspaceEditSection = 'general' | 'sources' | 'jira' | 'knowledge' | 'runtime' | '';
@@ -347,7 +339,7 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
 		setImportState('importing');
 		setImportError('');
 		try {
-			const results = await api.importWorkspaces({ sourcePath: importPreview.sourcePath, candidateKeys: importSelection });
+			const results = await api.importWorkspaces({ sourcePath: importPreview.sourcePath, sourceFingerprint: importPreview.sourceFingerprint, candidateKeys: importSelection });
 			setImportResults(results);
 			setImportState('complete');
 			if (results.some((result) => result.workspace)) await onChanged();
@@ -569,7 +561,7 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
       }
       const settings: SourceStructureSettings = {
         version: 1,
-        cards: [withInferredCompatibilityFields(settingsEditor.card, settingsEditor.directory)]
+        cards: [canonicalSourceSettingsCard(settingsEditor.card), ...settingsEditor.cards.slice(1).map(canonicalSourceSettingsCard)]
       };
       const result = await api.saveSourceStructure(settingsEditor.repo.id, settingsEditor.directory, settings);
       notifyReliabilityChanged();
@@ -718,7 +710,7 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
                     {editingId === repo.id && editingSection === 'general' ? <>
                       <div className="repo-edit-form">
                         <label className="repo-field">Workspace Name<input value={editDraft.name} onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })} /></label>
-                        <label className="repo-field">Local Path<input value={editDraft.path} onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })} /></label>
+						<label className="repo-field">Local Path<input value={editDraft.path} disabled={Boolean(repo.clonePathManaged)} onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })} />{repo.clonePathManaged && <small>Managed clone paths are immutable; remove and register the workspace again to use another checkout.</small>}</label>
                         <BranchField value={editDraft.baselineBranch} onChange={(value) => setEditDraft({ ...editDraft, baselineBranch: value })} />
                       </div>
                       <div className="repo-row-actions">
@@ -1584,9 +1576,9 @@ export function workspaceRemovalMessage(workspaces: WorkspaceConfig[]): string {
   if (workspaces.length === 0) return 'No workspaces selected.';
   if (workspaces.length === 1) {
     const [workspace] = workspaces;
-    return `Remove ${workspace.name}? Cached items will be removed from the board${workspace.clonePathManaged ? ', and the managed cloned repository folder will be deleted.' : '.'}`;
+		return `Remove ${workspace.name}? Cached items will be removed from the board${workspace.clonePathManaged && workspace.managedCloneVerified ? ', and the server-verified managed cloned repository folder will be deleted.' : '.'}`;
   }
-  const managedCloneCount = workspaces.filter((workspace) => workspace.clonePathManaged).length;
+	const managedCloneCount = workspaces.filter((workspace) => workspace.clonePathManaged && workspace.managedCloneVerified).length;
   return `Remove ${workspaces.length} selected workspaces? Cached items will be removed from the board${managedCloneCount > 0 ? `, and ${managedCloneCount} managed cloned repository folder${managedCloneCount === 1 ? '' : 's'} will be deleted.` : '.'}`;
 }
 
@@ -1611,73 +1603,7 @@ function toggleSource(value: string, directory: string): string {
 }
 
 export function settingsEditorFromResult(repo: WorkspaceConfig, directory: string, result: SourceSettingsResult): SettingsEditorState {
-  const proposals = result.proposals ?? [];
-  const selectedProposal = !result.exists && proposals.length > 0 ? proposals[0] : undefined;
-  const unsortedPreview = [unsortedSourcePreview(directory)];
-  const selectedProposalId = selectedProposal?.id ?? (!result.exists ? UNSORTED_SELECTION_ID : undefined);
-  return {
-    repo,
-    directory,
-    exists: result.exists,
-    mode: result.mode,
-    card: normalizeSettingsCard(selectedProposal?.card ?? result.settings?.cards?.[0], directory),
-    warnings: (result.warnings ?? []).map((warning) => warning.message),
-    proposals,
-    selectedProposalId,
-    unsortedPreview,
-    preview: selectedProposal?.preview ?? (!result.exists ? unsortedPreview : result.preview ?? [])
-  };
-}
-
-function unsortedSourcePreview(directory: string): SourceStructurePreview {
-  const sourceName = lastPathSegment(directory) || 'source';
-  return {
-    path: directory,
-    source: sourceName,
-    item: sourceName,
-    scope: sourceName,
-    identifier: sourceName,
-    title: sourceName,
-    status: 'unsorted',
-    tags: [sourceName]
-  };
-}
-
-function normalizeSettingsCard(card?: SourceStructureCard, directory = 'source'): SourceStructureCard {
-  const legacyFields = card?.fields as SourceStructureCard['fields'] & { service?: string; ticket?: string } | undefined;
-  return withInferredCompatibilityFields({
-    pathPattern: genericTemplate(card?.pathPattern || '{folder}/feature/{item}'),
-    fields: {
-      source: genericTemplate(legacyFields?.source || legacyFields?.scope || legacyFields?.service || directory),
-      item: genericTemplate(legacyFields?.item || legacyFields?.identifier || legacyFields?.ticket || '{item}'),
-      scope: genericTemplate(legacyFields?.source || legacyFields?.scope || legacyFields?.service || directory),
-      identifier: genericTemplate(legacyFields?.item || legacyFields?.identifier || legacyFields?.ticket || '{item}'),
-      title: card?.fields?.title || 'readme_heading',
-      status: card?.fields?.status || 'draft',
-      owner: card?.fields?.owner || '',
-      tags: Array.isArray(card?.fields?.tags) ? card.fields.tags : [lastPathSegment(directory) || 'source']
-    }
-  }, directory);
-}
-
-function genericTemplate(value: string): string {
-  return value
-    .replaceAll('{service}', '{folder}')
-    .replaceAll('{scope}', '{folder}')
-    .replaceAll('{ticket}', '{item}')
-    .replaceAll('{identifier}', '{item}');
-}
-
-function withInferredCompatibilityFields(card: SourceStructureCard, directory: string): SourceStructureCard {
-  return {
-    ...card,
-    fields: {
-      ...card.fields,
-      source: inferCompatibilityFields(card.pathPattern, directory).scope,
-      item: inferCompatibilityFields(card.pathPattern, directory).identifier,
-      ...inferCompatibilityFields(card.pathPattern, directory)
-    }
-  };
+  return { repo, ...sourceSettingsEditorFromResult(directory, result) };
 }
 
 function applySettingsProposal(
@@ -1688,7 +1614,8 @@ function applySettingsProposal(
     if (!current) return current;
     return {
       ...current,
-      card: normalizeSettingsCard(proposal.card, current.directory),
+      card: normalizeSourceSettingsCard(proposal.card, current.directory),
+      cards: [normalizeSourceSettingsCard(proposal.card, current.directory), ...current.cards.slice(1)],
       selectedProposalId: proposal.id,
       preview: proposal.preview
     };
@@ -1724,11 +1651,9 @@ function updateSettingsPreviewField(
     }));
     if (field === 'item') {
       nextCard.fields.item = normalized;
-      nextCard.fields.identifier = normalized;
       const suggestedTemplate = suggestTemplateFromValue(current.directory, current.card.pathPattern, path, normalized, true);
       if (suggestedTemplate) {
         nextCard.fields.item = suggestedTemplate;
-        nextCard.fields.identifier = suggestedTemplate;
         nextPreview = current.preview.map((row): SourceStructurePreview => {
           const captures = pathPatternCaptures(current.directory, current.card.pathPattern, row.path);
           const rendered = captures ? renderTemplateWithCaptures(suggestedTemplate, captures) : '';

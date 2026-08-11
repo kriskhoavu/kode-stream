@@ -467,6 +467,9 @@ function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
 		registrationMode: workspace.registrationMode === 'remote_clone' || workspace.registrationMode === 'existing_workspace' ? workspace.registrationMode : 'local_path',
     remoteUrl: workspace.remoteUrl ?? '',
     clonePathManaged: Boolean(workspace.clonePathManaged),
+    managedCloneRoot: workspace.managedCloneRoot ?? '',
+    managedCloneId: workspace.managedCloneId ?? '',
+    managedCloneVerified: Boolean(workspace.managedCloneVerified),
     sources: Array.isArray(workspace.sources) ? workspace.sources : [],
     runtime: workspace.runtime ? {
       ...workspace.runtime,

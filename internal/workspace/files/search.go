@@ -1,7 +1,5 @@
 package workspacefiles
 
-// Package workspacefiles provides Workspace-owned file operations.
-
 // Package workspacefiles provides bounded workspace file operations.
 
 import (
@@ -12,6 +10,7 @@ import (
 	"strings"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/fileid"
 )
 
 const (
@@ -79,7 +78,7 @@ func (a *Access) Search(workspace models.WorkspaceConfig, query string, includeI
 			}
 			if strings.Contains(strings.ToLower(entry.Name()), lowerQuery) || strings.Contains(strings.ToLower(path), lowerQuery) {
 				response.Results = append(response.Results, models.WorkspacePathSearchResult{
-					ID: workspace.ID + ":" + workspaceFileID(path), WorkspaceID: workspace.ID, WorkspaceName: workspace.Name,
+					ID: workspace.ID + ":" + fileid.Encode(path), WorkspaceID: workspace.ID, WorkspaceName: workspace.Name,
 					Name: entry.Name(), Path: path, Type: node.Type, Ignored: isIgnored, Context: parentRelative(path),
 				})
 				if len(response.Results) == resultLimit {

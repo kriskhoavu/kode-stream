@@ -3,6 +3,7 @@ package registry
 // Package registry persists registered Workspace definitions.
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -130,6 +131,92 @@ func TestCreateRemoteCloneRequiresRemoteURL(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "remote URL") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestValidateRejectsSourceSymlinkEscapeAliasAndOverlap(t *testing.T) {
+	root := newRegistryGitRepo(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Skip(err)
+	}
+	repository := New(filepath.Join(t.TempDir(), "workspaces.yaml"), gitadapter.New())
+	if _, err := repository.Validate(models.WorkspaceInput{Name: "Escape", Path: root, BaselineBranch: "main", Sources: []string{"escape"}}); err == nil {
+		t.Fatal("expected source escape rejection")
+	}
+	if err := os.MkdirAll(filepath.Join(root, "plans", "nested"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Validate(models.WorkspaceInput{Name: "Overlap", Path: root, BaselineBranch: "main", Sources: []string{"plans", "plans/nested"}}); err == nil {
+		t.Fatal("expected nested source rejection")
+	}
+	if err := os.Symlink(filepath.Join(root, "plans"), filepath.Join(root, "alias")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Validate(models.WorkspaceInput{Name: "Alias", Path: root, BaselineBranch: "main", Sources: []string{"plans", "alias"}}); err == nil {
+		t.Fatal("expected source alias rejection")
+	}
+}
+
+func TestCreatePersistenceFailureDoesNotPublishMemory(t *testing.T) {
+	root := newRegistryGitRepo(t)
+	state := t.TempDir()
+	path := filepath.Join(state, "workspaces.yaml")
+	repository := New(path, gitadapter.New())
+	if _, err := repository.List(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}); err == nil {
+		t.Fatal("expected write failure")
+	}
+	listed, err := repository.List()
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("failed create leaked into memory: %+v %v", listed, err)
+	}
+}
+
+func TestPersistencePhaseFailuresPreserveMemoryAndDurableGeneration(t *testing.T) {
+	failure := errors.New("injected persistence failure")
+	phaseHooks := map[string]persistenceHooks{
+		"write":          {afterWrite: func() error { return failure }},
+		"sync":           {afterSync: func() error { return failure }},
+		"close":          {afterClose: func() error { return failure }},
+		"rename":         {afterRename: func() error { return failure }},
+		"directory sync": {afterDirectorySync: func() error { return failure }},
+	}
+	for name, hooks := range phaseHooks {
+		t.Run(name, func(t *testing.T) {
+			firstRoot := newRegistryGitRepo(t)
+			secondRoot := newRegistryGitRepo(t)
+			path := filepath.Join(t.TempDir(), "workspaces.yaml")
+			registry := New(path, gitadapter.New())
+			if _, err := registry.Create(models.WorkspaceInput{Name: "First", Path: firstRoot, BaselineBranch: "main", Sources: []string{"plans"}}); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			registry.hooks = hooks
+			if _, err := registry.Create(models.WorkspaceInput{Name: "Second", Path: secondRoot, BaselineBranch: "main", Sources: []string{"plans"}}); !errors.Is(err, failure) {
+				t.Fatalf("error=%v", err)
+			}
+			listed, err := registry.List()
+			if err != nil || len(listed) != 1 || listed[0].Name != "First" {
+				t.Fatalf("list=%+v err=%v", listed, err)
+			}
+			after, err := os.ReadFile(path)
+			if err != nil || string(after) != string(before) {
+				t.Fatalf("durable generation changed: %q err=%v", after, err)
+			}
+			registry.hooks = persistenceHooks{}
+			if _, err := registry.Create(models.WorkspaceInput{Name: "Second", Path: secondRoot, BaselineBranch: "main", Sources: []string{"plans"}}); err != nil {
+				t.Fatalf("retry: %v", err)
+			}
+		})
 	}
 }
 

@@ -3,6 +3,8 @@ package scanner
 // Package scanner discovers and parses Workspace sources.
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +13,22 @@ import (
 	"kode-stream/internal/common/models"
 	gitadapter "kode-stream/internal/git"
 )
+
+func TestScanContextHonorsCancellationAndFileBudget(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "plans/platform/PM-1/README.md", strings.Repeat("x", 64))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	service := New(gitadapter.New())
+	if _, err := service.ScanContext(ctx, models.WorkspaceConfig{ID: "w", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}, DefaultScanBudget()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancel error=%v", err)
+	}
+	budget := DefaultScanBudget()
+	budget.MaxFileBytes = 8
+	if _, err := service.ScanContext(context.Background(), models.WorkspaceConfig{ID: "w", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}, budget); !errors.Is(err, ErrScanLimit) {
+		t.Fatalf("budget error=%v", err)
+	}
+}
 
 func TestNormalizeStatus(t *testing.T) {
 	cases := map[string]models.ItemStatus{
@@ -344,8 +362,8 @@ func TestSourceStructureSettingsDoNotOverridePlanYAML(t *testing.T) {
 cards:
   - pathPattern: "{scope}/feature/{identifier}"
     fields:
-      scope: "{scope}"
-      identifier: "{identifier}"
+      source: "{scope}"
+      item: "{identifier}"
       title: "Configured"
       status: done
       tags: [docs]

@@ -100,6 +100,7 @@ func NewServer(port int) (*Server, error) {
 		StorageStatus:       state.StatusService,
 		StorageSync:         state.SyncService,
 		CloudPersistence:    state.Cloud,
+		WorkspaceCloner:     git,
 	})
 
 	mux := http.NewServeMux()

@@ -154,7 +154,7 @@ describe('existing workspace import state', () => {
 		for (const label of ['Indexed', 'Scan failed', 'Skipped', 'Failed']) {
 			expect(screen.getByText(label)).toBeInTheDocument();
 		}
-		expect(api.importWorkspaces).toHaveBeenCalledWith({ sourcePath: '/source/workspaces.yaml', candidateKeys: ['one', 'two'] });
+		expect(api.importWorkspaces).toHaveBeenCalledWith({ sourcePath: '/source/workspaces.yaml', sourceFingerprint: 'hash', candidateKeys: ['one', 'two'] });
 		expect(onChanged).toHaveBeenCalledOnce();
 	});
 });

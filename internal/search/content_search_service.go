@@ -9,6 +9,7 @@ import (
 
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/fileid"
 	appitem "kode-stream/internal/item"
 	workspaceaccess "kode-stream/internal/workspace/files"
 )
@@ -75,7 +76,7 @@ func (s *Service) SearchItem(ctx context.Context, itemID string, request models.
 	for i := range response.Results {
 		response.Results[i].ItemID = item.ID
 		itemPath := strings.TrimPrefix(response.Results[i].Path, itemPrefix+"/")
-		response.Results[i].FileID = itemFileID(itemPath)
+		response.Results[i].FileID = fileid.Encode(itemPath)
 	}
 	return response, nil
 }
@@ -193,8 +194,6 @@ func canonicalRoots(workspace models.WorkspaceConfig, paths []string, skipMissin
 	}
 	return result, nil
 }
-
-func itemFileID(path string) string { return strings.NewReplacer("/", "__", ".", "_").Replace(path) }
 
 func emptyResponse() models.WorkspaceContentSearchResponse {
 	return models.WorkspaceContentSearchResponse{Results: []models.WorkspaceContentSearchResult{}}

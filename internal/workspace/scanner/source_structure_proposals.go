@@ -47,8 +47,8 @@ func PreviewSourceStructureCard(reader SourceReader, root string, card models.So
 	}
 	rows := make([]models.SourceStructurePreview, 0, len(matches))
 	for _, match := range matches {
-		source := strings.TrimSpace(renderSettingsTemplate(firstNonEmpty(card.Fields.Source, card.Fields.Scope), match.captures))
-		item := strings.TrimSpace(renderSettingsTemplate(firstNonEmpty(card.Fields.Item, card.Fields.Identifier), match.captures))
+		source := strings.TrimSpace(renderSettingsTemplate(card.Fields.Source, match.captures))
+		item := strings.TrimSpace(renderSettingsTemplate(card.Fields.Item, match.captures))
 		if source == "" || item == "" {
 			continue
 		}

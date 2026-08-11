@@ -57,6 +57,10 @@ func (a *workspaceController) importWorkspaces(w http.ResponseWriter, r *http.Re
 	}
 	results, err := a.workspaces.Import(input)
 	if err != nil {
+		if errors.Is(err, appworkspace.ErrStaleImportPreview) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "stale_import_preview"})
+			return
+		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -181,7 +185,7 @@ func (a *workspaceController) deleteWorkspace(w http.ResponseWriter, r *http.Req
 
 func (a *workspaceController) scanWorkspace(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
-	result, err := a.workspaces.Scan(r.PathValue("id"))
+	result, err := a.workspaces.ScanContext(r.Context(), r.PathValue("id"))
 	a.audit.record(r.PathValue("id"), "", "scan", "Workspace scan completed.", nil, started, err)
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
@@ -263,8 +267,7 @@ func (a *workspaceController) getSourceStructure(w http.ResponseWriter, r *http.
 
 func (a *workspaceController) saveSourceStructure(w http.ResponseWriter, r *http.Request) {
 	var settings models.SourceStructureSettings
-	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &settings, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	result, err := a.workspaces.SaveSourceStructure(r.PathValue("id"), r.URL.Query().Get("directory"), settings)
@@ -312,8 +315,7 @@ func (a *workspaceController) workspaceFile(w http.ResponseWriter, r *http.Reque
 
 func (a *workspaceController) saveWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 	var input models.WorkspaceFileSaveInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	result, err := a.files.Save(r.PathValue("id"), input)
@@ -322,8 +324,7 @@ func (a *workspaceController) saveWorkspaceFile(w http.ResponseWriter, r *http.R
 
 func (a *workspaceController) createWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 	var input models.WorkspaceFileCreateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	result, err := a.files.CreateFile(r.PathValue("id"), input)
@@ -332,8 +333,7 @@ func (a *workspaceController) createWorkspaceFile(w http.ResponseWriter, r *http
 
 func (a *workspaceController) createWorkspaceDirectory(w http.ResponseWriter, r *http.Request) {
 	var input models.WorkspaceDirectoryCreateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	result, err := a.files.CreateDirectory(r.PathValue("id"), input)
@@ -342,8 +342,7 @@ func (a *workspaceController) createWorkspaceDirectory(w http.ResponseWriter, r 
 
 func (a *workspaceController) renameWorkspacePath(w http.ResponseWriter, r *http.Request) {
 	var input models.WorkspacePathRenameInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	result, err := a.files.Rename(r.PathValue("id"), input)
@@ -366,8 +365,7 @@ func (a *workspaceController) workspaceFileDiff(w http.ResponseWriter, r *http.R
 
 func (a *workspaceController) revertWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 	var input models.WorkspaceFileRevertInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	result, err := a.files.Revert(r.PathValue("id"), input)

@@ -83,6 +83,9 @@ export interface WorkspaceConfig {
   registrationMode?: WorkspaceRegistrationMode;
   remoteUrl?: string;
   clonePathManaged?: boolean;
+  managedCloneRoot?: string;
+  managedCloneId?: string;
+  managedCloneVerified?: boolean;
   lastSelectedBranch?: string;
   sources: string[];
   createdAt: string;
@@ -376,6 +379,7 @@ export interface WorkspaceImportPreview {
 
 export interface WorkspaceImportRequest {
   sourcePath: string;
+  sourceFingerprint: string;
   candidateKeys: string[];
 }
 
@@ -574,8 +578,6 @@ export interface SourceStructureCard {
 export interface SourceStructureFields {
   source?: string;
   item?: string;
-  scope: string;
-  identifier: string;
   title?: string;
   status?: string;
   owner?: string;
@@ -656,6 +658,7 @@ export interface FileNode {
   path: string;
   type: 'file' | 'directory';
   children?: FileNode[];
+  truncated?: boolean;
 }
 
 export type FileKind = 'markdown' | 'html' | 'json' | 'yaml' | 'code' | 'text' | 'image' | 'unsupported';
@@ -749,6 +752,9 @@ export interface WorkspaceFileRevertInput {
 export interface WorkspaceFileWriteResult {
   file: FileContent;
   refreshed: boolean;
+  committed: boolean;
+  refreshRequired?: boolean;
+  refreshError?: string;
 }
 
 export interface WorkspacePathSearchResult {
@@ -834,6 +840,9 @@ export interface WorkspacePathMutationResult {
   type: 'file' | 'directory';
   invalidatedPaths: string[];
   refreshed: boolean;
+  committed: boolean;
+  refreshRequired?: boolean;
+  refreshError?: string;
 }
 
 export interface ItemMetadataUpdateInput {

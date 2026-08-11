@@ -3,6 +3,7 @@ package workspace
 // Workspace service contract tests.
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v3"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
 	gitadapter "kode-stream/internal/git"
@@ -19,13 +21,26 @@ import (
 	"kode-stream/internal/workspace/scanner"
 )
 
+type localClonePort struct{ source string }
+
+func (c localClonePort) CloneWithProgress(_ string, destination string, progress func(string)) error {
+	output, err := exec.Command("git", "clone", c.source, destination).CombinedOutput()
+	if progress != nil {
+		progress(string(output))
+	}
+	if err != nil {
+		return fmt.Errorf("git clone: %w", err)
+	}
+	return nil
+}
+
 func TestStateReflectsWorkspaceAndItemChanges(t *testing.T) {
 	dir := t.TempDir()
 	registryPath := filepath.Join(dir, "workspaces.yaml")
 	indexPath := filepath.Join(dir, "item-index.yaml")
 	reg := registry.New(registryPath, gitadapter.New())
 	idx := itemindex.New(indexPath)
-	service := New(reg, idx, nil, nil)
+	service := New(ServiceDependencies{Registry: reg, Index: idx})
 
 	first, err := service.State()
 	if err != nil {
@@ -82,7 +97,7 @@ func TestSourceStructureIncludesProposalsAndPreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), nil, git)
+	service := New(ServiceDependencies{Registry: reg, Index: itemindex.New(filepath.Join(dir, "items.yaml")), Scanner: scanner.New(git), Cloner: git})
 
 	result, err := service.SourceStructure(workspace.ID, "docs")
 	if err != nil {
@@ -96,6 +111,36 @@ func TestSourceStructureIncludesProposalsAndPreview(t *testing.T) {
 	}
 }
 
+func TestSourceStructureSaveRevalidatesSymlinkBoundaryAtUseTime(t *testing.T) {
+	root := newWorkspaceGitRepo(t)
+	writeWorkspaceGitFile(t, root, "docs/item/README.md", "# Item\n")
+	workspaceGitCommit(t, root, "add source")
+	dataDir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"docs"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	if err := os.RemoveAll(filepath.Join(root, "docs")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "docs")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	idx := itemindex.New(filepath.Join(dataDir, "items.yaml"))
+	scan := scanner.New(git)
+	service := New(ServiceDependencies{Registry: reg, Index: idx, Scanner: scan, Writer: itemwriter.New(fileaccess.New(), scan, idx, reg), Cloner: git})
+	_, err = service.SaveSourceStructure(workspace.ID, "docs", scanner.DefaultSourceStructureSettings("docs"))
+	if err == nil || !strings.Contains(err.Error(), "boundary") {
+		t.Fatalf("error=%v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(outside, scanner.SourceStructureSettingsFile)); !os.IsNotExist(statErr) {
+		t.Fatalf("outside settings were written: %v", statErr)
+	}
+}
+
 func TestCreateRemoteCloneWorkspace(t *testing.T) {
 	remote := newWorkspaceGitRepo(t)
 	writeWorkspaceGitFile(t, remote, "plans/platform/PM-101/README.md", "# PM-101\n")
@@ -105,12 +150,12 @@ func TestCreateRemoteCloneWorkspace(t *testing.T) {
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), nil, git)
+	service := New(ServiceDependencies{Registry: reg, Index: itemindex.New(filepath.Join(dir, "items.yaml")), Scanner: scanner.New(git), Cloner: localClonePort{source: remote}})
 
 	workspace, err := service.Create(models.WorkspaceInput{
 		Name:             "Remote Workspace",
 		RegistrationMode: models.WorkspaceRegistrationModeRemoteClone,
-		RemoteURL:        "file://" + remote,
+		RemoteURL:        "https://example.com/org/remote.git",
 		CloneRoot:        cloneRoot,
 		BaselineBranch:   "main",
 		Sources:          []string{"plans"},
@@ -118,7 +163,7 @@ func TestCreateRemoteCloneWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone || workspace.RemoteURL != "file://"+remote || !workspace.ClonePathManaged {
+	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone || workspace.RemoteURL != "https://example.com/org/remote.git" || !workspace.ClonePathManaged || !workspace.ManagedCloneVerified {
 		t.Fatalf("workspace mode metadata = %+v", workspace)
 	}
 	resolvedCloneRoot, _ := filepath.EvalSymlinks(cloneRoot)
@@ -129,13 +174,19 @@ func TestCreateRemoteCloneWorkspace(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(workspace.Path, ".git")); err != nil {
 		t.Fatalf("expected clone to include .git directory: %v", err)
 	}
+	if err := service.Delete(workspace.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(workspace.Path); !os.IsNotExist(err) {
+		t.Fatalf("managed clone was not deleted: %v", err)
+	}
 }
 
 func TestCreateRemoteCloneWorkspaceRejectsInvalidURL(t *testing.T) {
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), nil, git)
+	service := New(ServiceDependencies{Registry: reg, Index: itemindex.New(filepath.Join(dir, "items.yaml")), Scanner: scanner.New(git), Cloner: git})
 
 	_, err := service.Create(models.WorkspaceInput{
 		Name:             "Remote Workspace",
@@ -150,7 +201,7 @@ func TestCreateRemoteCloneWorkspaceRejectsInvalidURL(t *testing.T) {
 	}
 }
 
-func TestDeleteRemovesManagedCloneWorkspacePath(t *testing.T) {
+func TestDeleteRefusesLegacyManagedCloneWithoutOwnershipProof(t *testing.T) {
 	managedRoot := t.TempDir()
 	managedRepo := filepath.Join(managedRoot, "managed-clone")
 	if output, err := exec.Command("git", "init", "-b", "main", managedRepo).CombinedOutput(); err != nil {
@@ -170,7 +221,8 @@ func TestDeleteRemovesManagedCloneWorkspacePath(t *testing.T) {
 
 	root := t.TempDir()
 	git := gitadapter.New()
-	reg := registry.New(filepath.Join(root, "workspaces.yaml"), git)
+	registryPath := filepath.Join(root, "workspaces.yaml")
+	reg := registry.New(registryPath, git)
 	workspace, err := reg.Create(models.WorkspaceInput{
 		Name:             "Managed",
 		Path:             managedRepo,
@@ -182,14 +234,23 @@ func TestDeleteRemovesManagedCloneWorkspacePath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	idx := itemindex.New(filepath.Join(root, "item-index.yaml"))
-	service := New(reg, idx, scanner.New(git), nil, git)
-
-	if err := service.Delete(workspace.ID); err != nil {
+	workspace.ClonePathManaged = true
+	legacyData, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(managedRepo); !os.IsNotExist(err) {
-		t.Fatalf("expected managed clone path to be deleted, stat err: %v", err)
+	if err := os.WriteFile(registryPath, legacyData, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reg = registry.New(registryPath, git)
+	idx := itemindex.New(filepath.Join(root, "item-index.yaml"))
+	service := New(ServiceDependencies{Registry: reg, Index: idx, Scanner: scanner.New(git), Cloner: git})
+
+	if err := service.Delete(workspace.ID); err == nil {
+		t.Fatal("expected unproven managed clone deletion to be refused")
+	}
+	if _, err := os.Stat(managedRepo); err != nil {
+		t.Fatalf("legacy path must remain: %v", err)
 	}
 }
 
@@ -225,7 +286,7 @@ func TestFileWorkspaceDeleteRegistryFailureLeavesRecoverableRegisteredWorkspace(
 	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{{ItemSummary: models.ItemSummary{ID: "item", WorkspaceID: workspace.ID, Title: "Item"}}}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	service := New(reg, idx, nil, nil, git)
+	service := New(ServiceDependencies{Registry: reg, Index: idx, Cloner: git})
 	backupDir := filepath.Join(base, "state-backup")
 	if err := os.Rename(stateDir, backupDir); err != nil {
 		t.Fatal(err)
@@ -260,8 +321,8 @@ func TestResetSourceStructureRemovesSettingsAndRescans(t *testing.T) {
 cards:
   - pathPattern: "{scope}/feature/{identifier}"
     fields:
-      scope: "{scope}"
-      identifier: "{identifier}"
+      source: "{scope}"
+      item: "{identifier}"
       title: readme_heading
       status: draft
       tags: [docs]
@@ -278,7 +339,7 @@ cards:
 	idx := itemindex.New(filepath.Join(dir, "items.yaml"))
 	scan := scanner.New(git)
 	writer := itemwriter.New(fileaccess.New(), scan, idx, reg)
-	service := New(reg, idx, scan, writer, git)
+	service := New(ServiceDependencies{Registry: reg, Index: idx, Scanner: scan, Writer: writer, Cloner: git})
 
 	result, err := service.ResetSourceStructure(workspace.ID, "docs")
 	if err != nil {

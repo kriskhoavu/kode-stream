@@ -145,8 +145,15 @@ func (s *WorkspaceFileService) mutate(workspaceID, operation string, auditPaths 
 	paths := append([]string(nil), auditPaths...)
 	refreshed, err := s.refreshIfAnySource(workspace, paths)
 	result.Refreshed = refreshed
-	s.record(workspace.ID, operation, auditPaths, started, err)
-	return result, err
+	result.Committed = true
+	if err != nil {
+		result.RefreshRequired = true
+		result.RefreshError = err.Error()
+		s.recordCommittedRefreshFailure(workspace.ID, operation, auditPaths, started, err)
+		return result, nil
+	}
+	s.record(workspace.ID, operation, auditPaths, started, nil)
+	return result, nil
 }
 
 func (s *WorkspaceFileService) Save(workspaceID string, input models.WorkspaceFileSaveInput) (models.WorkspaceFileWriteResult, error) {
@@ -161,11 +168,15 @@ func (s *WorkspaceFileService) Save(workspaceID string, input models.WorkspaceFi
 		return models.WorkspaceFileWriteResult{}, err
 	}
 	refreshed, err := s.refreshIfSource(workspace, file.Path)
-	s.record(workspace.ID, "workspace_file_save", []string{file.Path}, started, err)
+	result := models.WorkspaceFileWriteResult{File: file, Refreshed: refreshed, Committed: true}
 	if err != nil {
-		return models.WorkspaceFileWriteResult{}, err
+		result.RefreshRequired = true
+		result.RefreshError = err.Error()
+		s.recordCommittedRefreshFailure(workspace.ID, "workspace_file_save", []string{file.Path}, started, err)
+		return result, nil
 	}
-	return models.WorkspaceFileWriteResult{File: file, Refreshed: refreshed}, nil
+	s.record(workspace.ID, "workspace_file_save", []string{file.Path}, started, nil)
+	return result, nil
 }
 
 func (s *WorkspaceFileService) Diff(workspaceID, path string) (string, error) {
@@ -204,11 +215,15 @@ func (s *WorkspaceFileService) Revert(workspaceID string, input models.Workspace
 		return models.WorkspaceFileWriteResult{}, err
 	}
 	refreshed, err := s.refreshIfSource(workspace, clean)
-	s.record(workspace.ID, "workspace_file_revert", []string{clean}, started, err)
+	result := models.WorkspaceFileWriteResult{File: file, Refreshed: refreshed, Committed: true}
 	if err != nil {
-		return models.WorkspaceFileWriteResult{}, err
+		result.RefreshRequired = true
+		result.RefreshError = err.Error()
+		s.recordCommittedRefreshFailure(workspace.ID, "workspace_file_revert", []string{clean}, started, err)
+		return result, nil
 	}
-	return models.WorkspaceFileWriteResult{File: file, Refreshed: refreshed}, nil
+	s.record(workspace.ID, "workspace_file_revert", []string{clean}, started, nil)
+	return result, nil
 }
 
 func (s *WorkspaceFileService) workspace(id string) (models.WorkspaceConfig, error) {
@@ -275,6 +290,17 @@ func (s *WorkspaceFileService) record(workspaceID, operation string, paths []str
 		event.Error = opErr.Error()
 	}
 	_, _ = s.audit.Append(event)
+}
+
+func (s *WorkspaceFileService) recordCommittedRefreshFailure(workspaceID, operation string, paths []string, started time.Time, refreshErr error) {
+	if s.audit == nil {
+		return
+	}
+	_, _ = s.audit.Append(models.AuditEvent{
+		WorkspaceID: workspaceID, Operation: operation, Status: models.AuditStatusSuccess,
+		Message: operation + " committed; derived index refresh is required", Paths: paths,
+		Error: refreshErr.Error(), DurationMS: time.Since(started).Milliseconds(),
+	})
 }
 
 func isBlockedMutation(err error) bool {

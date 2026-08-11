@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySegmentRole, buildWorkspaceInput, defaultWorkspaceImportSelection, inferCompatibilityFields, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, normalizeKnowledgeSettings, parseSources, previewPathSegments, settingsEditorFromResult, workspaceRemovalMessage } from './WorkspacesPage';
+import { applySegmentRole, buildWorkspaceInput, defaultWorkspaceImportSelection, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, normalizeKnowledgeSettings, parseSources, previewPathSegments, settingsEditorFromResult, workspaceRemovalMessage } from './WorkspacesPage';
 
 describe('normalizeDroppedPath', () => {
   it('decodes file URLs dropped onto the path field', () => {
@@ -97,29 +97,6 @@ describe('inferWorkspaceNameFromRemoteURL', () => {
   });
 });
 
-describe('inferCompatibilityFields', () => {
-  it('maps the source root and item variable from the path pattern', () => {
-    expect(inferCompatibilityFields('{folder}/feature/{item}', 'docs')).toEqual({
-      scope: 'docs',
-      identifier: '{item}'
-    });
-  });
-
-  it('uses the source name when only an item variable exists', () => {
-    expect(inferCompatibilityFields('{item}', 'docs')).toEqual({
-      scope: 'docs',
-      identifier: '{item}'
-    });
-  });
-
-  it('keeps legacy service and ticket variables compatible', () => {
-    expect(inferCompatibilityFields('{service}/{ticket}', 'plans')).toEqual({
-      scope: 'plans',
-      identifier: '{ticket}'
-    });
-  });
-});
-
 describe('source item path helpers', () => {
   it('returns preview path segments relative to the source directory', () => {
     expect(previewPathSegments('docs/api/feature/DI-101', 'docs')).toEqual(['api', 'feature', 'DI-101']);
@@ -143,7 +120,7 @@ describe('settingsEditorFromResult', () => {
         version: 1,
         cards: [{
           pathPattern: '{folder}/feature/{item}',
-          fields: { source: 'docs', item: '{item}', scope: 'docs', identifier: '{item}', title: 'readme_heading', status: 'draft', tags: ['docs'] }
+          fields: { source: 'docs', item: '{item}', title: 'readme_heading', status: 'draft', tags: ['docs'] }
         }]
       },
       warnings: [],
@@ -154,7 +131,7 @@ describe('settingsEditorFromResult', () => {
         confidence: 'high',
         card: {
           pathPattern: '{item}',
-          fields: { source: 'docs', item: '{item}', scope: 'docs', identifier: '{item}', title: 'readme_heading', status: 'draft', tags: ['docs'] }
+          fields: { source: 'docs', item: '{item}', title: 'readme_heading', status: 'draft', tags: ['docs'] }
         },
         preview: [{ path: 'docs/a12', source: 'docs', item: 'a12', scope: 'docs', identifier: 'a12', title: 'A12', status: 'draft', tags: ['docs'] }]
       }],
@@ -189,6 +166,18 @@ describe('settingsEditorFromResult', () => {
       tags: ['docs']
     }]);
   });
+
+  it('preserves every canonical card and multi-segment identity mapping', () => {
+    const cards = [
+      { pathPattern: '{source}/{area}/{item}', fields: { source: '{source}', item: '{area}-{item}', title: 'readme_heading', status: 'draft', owner: 'team', tags: ['one'] } },
+      { pathPattern: 'archive/{item}', fields: { source: 'archive', item: '{item}', title: 'dirname', status: 'done', owner: 'archive', tags: ['two'] } }
+    ];
+    const editor = settingsEditorFromResult(workspace, 'docs', {
+      directory: 'docs', exists: true, settings: { version: 1, cards }, warnings: [], proposals: [], preview: []
+    });
+    expect(editor.cards).toEqual(cards);
+    expect(editor.card.fields.item).toBe('{area}-{item}');
+  });
 });
 
 describe('workspaceRemovalMessage', () => {
@@ -200,7 +189,7 @@ describe('workspaceRemovalMessage', () => {
 
   it('mentions managed clone folders for multi-delete', () => {
     expect(workspaceRemovalMessage([
-      { id: 'w1', name: 'Workspace A', path: '/repo-a', baselineBranch: 'main', sources: ['docs'], createdAt: '', clonePathManaged: true },
+			{ id: 'w1', name: 'Workspace A', path: '/repo-a', baselineBranch: 'main', sources: ['docs'], createdAt: '', clonePathManaged: true, managedCloneVerified: true },
       { id: 'w2', name: 'Workspace B', path: '/repo-b', baselineBranch: 'main', sources: ['docs'], createdAt: '', clonePathManaged: false }
     ])).toContain('and 1 managed cloned repository folder will be deleted');
   });

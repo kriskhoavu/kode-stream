@@ -12,6 +12,7 @@ import (
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
+	"kode-stream/internal/filesystem/fileid"
 	gitadapter "kode-stream/internal/git"
 	"kode-stream/internal/item/index"
 	"kode-stream/internal/item/writer"
@@ -632,7 +633,7 @@ func insertFileNodeWithPrefix(nodes []models.FileNode, relPath, prefix string) [
 		currentPath = filepath.ToSlash(filepath.Join(prefix, name))
 	}
 	if len(parts) == 1 {
-		return append(nodes, models.FileNode{ID: fileIDForPath(currentPath), Name: name, Path: currentPath, Type: "file"})
+		return append(nodes, models.FileNode{ID: fileid.Encode(currentPath), Name: name, Path: currentPath, Type: "file"})
 	}
 	remaining := strings.Join(parts[1:], "/")
 	for i := range nodes {
@@ -642,7 +643,7 @@ func insertFileNodeWithPrefix(nodes []models.FileNode, relPath, prefix string) [
 		}
 	}
 	children := insertFileNodeWithPrefix(nil, remaining, currentPath)
-	return append(nodes, models.FileNode{ID: fileIDForPath(currentPath), Name: name, Path: currentPath, Type: "directory", Children: children})
+	return append(nodes, models.FileNode{ID: fileid.Encode(currentPath), Name: name, Path: currentPath, Type: "directory", Children: children})
 }
 
 func sortFileNodes(nodes []models.FileNode) {
@@ -673,16 +674,16 @@ func flattenFileNodes(nodes []models.FileNode) []models.FileNode {
 }
 
 func fileIDToRelativePath(item models.ItemDetail, fileID string) string {
+	path, err := fileid.Decode(fileID)
+	if err != nil {
+		return ""
+	}
 	for _, doc := range item.Documents {
-		if fileIDForPath(doc.Path) == fileID {
-			return doc.Path
+		if filepath.ToSlash(filepath.Clean(doc.Path)) == path {
+			return path
 		}
 	}
 	return ""
-}
-
-func fileIDForPath(path string) string {
-	return strings.NewReplacer("/", "__", ".", "_").Replace(path)
 }
 
 func FullReadmeDescription(workspace models.WorkspaceConfig, item models.ItemDetail) string {

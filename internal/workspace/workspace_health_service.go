@@ -10,6 +10,7 @@ import (
 
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/sourceguard"
 	"kode-stream/internal/item/index"
 )
 
@@ -68,11 +69,8 @@ func (s *HealthService) sourcesCheck(workspace models.WorkspaceConfig) models.He
 	if len(workspace.Sources) == 0 {
 		return warning("sources", "No sources are configured.", "Add at least one source to scan items.")
 	}
-	for _, source := range workspace.Sources {
-		info, err := os.Stat(filepath.Join(workspace.Path, filepath.FromSlash(source)))
-		if err != nil || !info.IsDir() {
-			return failed("sources", fmt.Sprintf("Source %q is not available.", source), "Restore the source directory or update workspace sources.")
-		}
+	if _, err := sourceguard.ResolveAll(workspace.Path, workspace.Sources); err != nil {
+		return failed("sources", "Configured source boundary is unsafe: "+err.Error(), "Restore the source inside the workspace or update workspace sources.")
 	}
 	return ok("sources", "All configured sources are available.")
 }

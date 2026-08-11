@@ -14,6 +14,7 @@ import (
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
+	"kode-stream/internal/filesystem/fileid"
 	gitadapter "kode-stream/internal/git"
 	"kode-stream/internal/item/index"
 	"kode-stream/internal/item/writer"
@@ -657,7 +658,7 @@ func TestSnapshotFileContentResolvesNestedDocsPath(t *testing.T) {
 	if len(tree) != 1 || tree[0].Path != "a12" || len(tree[0].Children) != 2 {
 		t.Fatalf("unexpected tree: %#v", tree)
 	}
-	if tree[0].Children[0].ID != "a12__a12-challenges-in-discovery-epsap_md" {
+	if tree[0].Children[0].ID != fileid.Encode("a12/a12-challenges-in-discovery-epsap.md") {
 		t.Fatalf("unexpected file id: %q", tree[0].Children[0].ID)
 	}
 	content, err := service.FileContent("snapshot-docs", tree[0].Children[0].ID, commit)

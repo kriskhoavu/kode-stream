@@ -3,6 +3,7 @@ package scanner
 // Package scanner discovers and parses Workspace sources.
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -68,7 +69,9 @@ func ReadSourceStructureSettingsFromReader(reader SourceReader, root string) (mo
 		return DefaultSourceStructureSettings(root), false, []models.ScanWarning{{ItemPath: filepath.ToSlash(path), Message: err.Error()}}
 	}
 	var settings models.SourceStructureSettings
-	if err := yaml.Unmarshal(data, &settings); err != nil {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&settings); err != nil {
 		return DefaultSourceStructureSettings(root), true, []models.ScanWarning{{ItemPath: SourceStructureSettingsFile, Message: "invalid workspace settings: " + err.Error()}}
 	}
 	warnings := ValidateSourceStructureSettings(settings)
@@ -94,7 +97,6 @@ func SourceSettingsModeFromReader(reader SourceReader, root string) string {
 }
 
 func WriteSourceStructureSettings(root string, settings models.SourceStructureSettings) error {
-	settings = normalizeSourceStructureSettingsForWrite(settings)
 	if warnings := ValidateSourceStructureSettings(settings); len(warnings) > 0 {
 		return errors.New(warnings[0].Message)
 	}
@@ -102,18 +104,76 @@ func WriteSourceStructureSettings(root string, settings models.SourceStructureSe
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(root, SourceStructureSettingsFile), data, 0o644)
+	return atomicWriteSettings(filepath.Join(root, SourceStructureSettingsFile), data)
 }
 
-func normalizeSourceStructureSettingsForWrite(settings models.SourceStructureSettings) models.SourceStructureSettings {
-	for i := range settings.Cards {
-		fields := &settings.Cards[i].Fields
-		fields.Source = firstNonEmpty(fields.Source, fields.Scope)
-		fields.Item = firstNonEmpty(fields.Item, fields.Identifier)
-		fields.Scope = ""
-		fields.Identifier = ""
+func atomicWriteSettings(target string, data []byte) error {
+	info, err := os.Lstat(target)
+	mode := os.FileMode(0o644)
+	if err == nil {
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return errors.New("workspace settings must be a regular file")
+		}
+		mode = info.Mode().Perm()
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
-	return settings
+	temporary, err := os.CreateTemp(filepath.Dir(target), ".workspace-settings-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(mode); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(temporaryPath, target); err != nil {
+		return err
+	}
+	directory, err := os.Open(filepath.Dir(target))
+	if err != nil {
+		return err
+	}
+	if err := directory.Sync(); err != nil {
+		_ = directory.Close()
+		return err
+	}
+	return directory.Close()
+}
+
+func ReadSourceStructureSettingsFile(root string) ([]byte, os.FileMode, bool, error) {
+	path := filepath.Join(root, SourceStructureSettingsFile)
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, 0, false, nil
+	}
+	if err != nil {
+		return nil, 0, false, err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, 0, false, errors.New("workspace settings must be a regular file")
+	}
+	data, err := os.ReadFile(path)
+	return data, info.Mode().Perm(), true, err
+}
+
+func RestoreSourceStructureSettings(root string, data []byte, existed bool) error {
+	if !existed {
+		return RemoveSourceStructureSettings(root)
+	}
+	return atomicWriteSettings(filepath.Join(root, SourceStructureSettingsFile), data)
 }
 
 func RemoveSourceStructureSettings(root string) error {
@@ -149,8 +209,12 @@ func ValidateSourceStructureSettings(settings models.SourceStructureSettings) []
 				variableNames[segment.variable] = true
 			}
 		}
-		sourceField := firstNonEmpty(card.Fields.Source, card.Fields.Scope)
-		itemField := firstNonEmpty(card.Fields.Item, card.Fields.Identifier)
+		if strings.TrimSpace(card.Fields.Scope) != "" || strings.TrimSpace(card.Fields.Identifier) != "" {
+			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " uses legacy fields.scope/fields.identifier; convert them explicitly to fields.source/fields.item"})
+			continue
+		}
+		sourceField := card.Fields.Source
+		itemField := card.Fields.Item
 		if strings.TrimSpace(sourceField) == "" {
 			warnings = append(warnings, models.ScanWarning{ItemPath: SourceStructureSettingsFile, Message: prefix + " fields.source is required"})
 		} else if unknown := unknownTemplateVariable(sourceField, variableNames); unknown != "" {

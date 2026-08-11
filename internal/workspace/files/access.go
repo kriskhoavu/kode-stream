@@ -1,7 +1,5 @@
 package workspacefiles
 
-// Package workspacefiles provides Workspace-owned file operations.
-
 // Package workspacefiles provides bounded workspace file operations.
 
 import (
@@ -18,6 +16,8 @@ import (
 
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
+	"kode-stream/internal/filesystem/fileid"
+	"kode-stream/internal/filesystem/guardedwrite"
 )
 
 var (
@@ -116,42 +116,13 @@ func (a *Access) WriteMarkdown(workspace models.WorkspaceConfig, input models.Wo
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	current, err := os.ReadFile(full)
-	if err != nil {
+	if err := fileaccess.ValidateEditableContent(nil, []byte(input.Content)); err != nil {
 		return models.FileContent{}, err
 	}
-	if err := fileaccess.ValidateEditableContent(current, []byte(input.Content)); err != nil {
-		return models.FileContent{}, err
-	}
-	if fileaccess.ContentHash(current) != input.ExpectedHash {
-		return models.FileContent{}, ErrStaleContent
-	}
-	info, err := os.Stat(full)
-	if err != nil {
-		return models.FileContent{}, err
-	}
-	temp, err := os.CreateTemp(filepath.Dir(full), ".kode-stream-*")
-	if err != nil {
-		return models.FileContent{}, err
-	}
-	tempName := temp.Name()
-	defer os.Remove(tempName)
-	if err := temp.Chmod(info.Mode().Perm()); err != nil {
-		temp.Close()
-		return models.FileContent{}, err
-	}
-	if _, err := temp.WriteString(input.Content); err != nil {
-		temp.Close()
-		return models.FileContent{}, err
-	}
-	if err := temp.Sync(); err != nil {
-		temp.Close()
-		return models.FileContent{}, err
-	}
-	if err := temp.Close(); err != nil {
-		return models.FileContent{}, err
-	}
-	if err := os.Rename(tempName, full); err != nil {
+	if _, err := guardedwrite.ReplaceExisting(workspace.Path, clean, []byte(input.Content), input.ExpectedHash, fileaccess.MaxTextResponseBytes); err != nil {
+		if errors.Is(err, guardedwrite.ErrStale) {
+			return models.FileContent{}, ErrStaleContent
+		}
 		return models.FileContent{}, err
 	}
 	return fileaccess.ReadFileContent(clean, full)
@@ -167,7 +138,7 @@ func treeEntry(root, relPath string, entry os.DirEntry, ignored bool) (models.Wo
 		return models.WorkspaceTreeEntry{}, false
 	}
 	node := models.WorkspaceTreeEntry{
-		ID:      workspaceFileID(relPath),
+		ID:      fileid.Encode(relPath),
 		Name:    entry.Name(),
 		Path:    relPath,
 		Type:    "file",
@@ -257,10 +228,6 @@ func hasVisibleChild(path string) bool {
 		}
 	}
 	return false
-}
-
-func workspaceFileID(path string) string {
-	return strings.NewReplacer("/", "__", ".", "_").Replace(path)
 }
 
 type gitIgnoreChecker struct{}

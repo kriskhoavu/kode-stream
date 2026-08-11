@@ -3,6 +3,7 @@ package scanner
 // Package scanner discovers and parses Workspace sources.
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -16,6 +17,8 @@ import (
 	"unicode"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/fileid"
+	"kode-stream/internal/filesystem/sourceguard"
 	gitadapter "kode-stream/internal/git"
 )
 
@@ -29,6 +32,8 @@ type ScanData struct {
 }
 
 type ScanRequest struct {
+	Context    context.Context
+	Budget     ScanBudget
 	Workspace  models.WorkspaceConfig
 	Branch     string
 	BranchRef  string
@@ -38,16 +43,39 @@ type ScanRequest struct {
 	Reader     SourceReader
 }
 
+type ScanBudget struct {
+	MaxFileBytes  int64
+	MaxTotalBytes int64
+	MaxEntries    int
+	MaxDepth      int
+	MaxItems      int
+	MaxWarnings   int
+}
+
+var ErrScanLimit = errors.New("workspace scan limit exceeded")
+
+func DefaultScanBudget() ScanBudget {
+	return ScanBudget{MaxFileBytes: 2 << 20, MaxTotalBytes: 64 << 20, MaxEntries: 50000, MaxDepth: 64, MaxItems: 10000, MaxWarnings: 1000}
+}
+
 func New(git *gitadapter.GitAdapter) *Scanner {
 	return &Scanner{git: git}
 }
 
 func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
+	return s.ScanContext(context.Background(), workspace, DefaultScanBudget())
+}
+
+func (s *Scanner) ScanContext(ctx context.Context, workspace models.WorkspaceConfig, budget ScanBudget) (ScanData, error) {
+	if _, err := sourceguard.ResolveAll(workspace.Path, workspace.Sources); err != nil {
+		return ScanData{}, fmt.Errorf("configured source boundary is unsafe: %w", err)
+	}
 	branch, err := s.git.CurrentBranch(workspace.Path)
 	if err != nil {
 		branch = workspace.BaselineBranch
 	}
 	return s.ScanWithRequest(ScanRequest{
+		Context: ctx, Budget: budget,
 		Workspace:  workspace,
 		Branch:     branch,
 		SourceMode: "working_tree",
@@ -57,6 +85,17 @@ func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
 }
 
 func (s *Scanner) ScanWithRequest(request ScanRequest) (ScanData, error) {
+	return s.ScanWithRequestContext(request.Context, request)
+}
+
+func (s *Scanner) ScanWithRequestContext(ctx context.Context, request ScanRequest) (ScanData, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if request.Budget.MaxEntries <= 0 {
+		request.Budget = DefaultScanBudget()
+	}
+	request.Context = ctx
 	workspace := request.Workspace
 	branch := request.Branch
 	if strings.TrimSpace(branch) == "" {
@@ -66,6 +105,8 @@ func (s *Scanner) ScanWithRequest(request ScanRequest) (ScanData, error) {
 	if reader == nil {
 		reader = NewFilesystemSourceReader(workspace.Path)
 	}
+	limited := newBudgetReader(ctx, reader, request.Budget)
+	reader = limited
 	sourceMode := strings.TrimSpace(request.SourceMode)
 	if sourceMode == "" {
 		sourceMode = "working_tree"
@@ -74,9 +115,18 @@ func (s *Scanner) ScanWithRequest(request ScanRequest) (ScanData, error) {
 	request.Branch = branch
 	var out ScanData
 	for _, source := range workspace.Sources {
+		if err := ctx.Err(); err != nil {
+			return ScanData{}, err
+		}
 		items, warnings := s.scanItemDirectory(request, reader, branch, sourceMode, source)
 		out.Items = append(out.Items, items...)
 		out.Warnings = append(out.Warnings, warnings...)
+		if len(out.Items) > request.Budget.MaxItems || len(out.Warnings) > request.Budget.MaxWarnings {
+			return ScanData{}, ErrScanLimit
+		}
+		if err := limited.Err(); err != nil {
+			return ScanData{}, err
+		}
 	}
 	sort.Slice(out.Items, func(i, j int) bool {
 		return out.Items[i].UpdatedAt.After(out.Items[j].UpdatedAt)
@@ -166,8 +216,8 @@ func (s *Scanner) scanConfiguredItemDirectory(request ScanRequest, reader Source
 				continue
 			}
 			seen[match.path] = true
-			scope := renderSettingsTemplate(firstNonEmpty(card.Fields.Source, card.Fields.Scope), match.captures)
-			identifier := renderSettingsTemplate(firstNonEmpty(card.Fields.Item, card.Fields.Identifier), match.captures)
+			scope := renderSettingsTemplate(card.Fields.Source, match.captures)
+			identifier := renderSettingsTemplate(card.Fields.Item, match.captures)
 			if strings.TrimSpace(scope) == "" || strings.TrimSpace(identifier) == "" {
 				warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(match.path), Message: "workspace settings produced an empty scope or identifier"})
 				continue
@@ -509,10 +559,6 @@ func stablePlanID(repoID, branch, relItemPath string) string {
 	return fmt.Sprintf("%s-%08x", repoID, h)
 }
 
-func fileID(path string) string {
-	return strings.NewReplacer("/", "__", ".", "_").Replace(path)
-}
-
 func labelFromPath(path string) string {
 	base := filepath.Base(path)
 	base = strings.TrimSuffix(base, filepath.Ext(base))
@@ -524,7 +570,7 @@ func labelFromPath(path string) string {
 func inferDocument(path string) models.ItemDocument {
 	path = filepath.ToSlash(path)
 	lower := strings.ToLower(path)
-	doc := models.ItemDocument{ID: fileID(path), Role: "other", Path: path, Label: labelFromPath(path)}
+	doc := models.ItemDocument{ID: fileid.Encode(path), Role: "other", Path: path, Label: labelFromPath(path)}
 	switch {
 	case lower == "readme.md":
 		doc.Role = "overview"

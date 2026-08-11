@@ -13,11 +13,32 @@ import (
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/httpx"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/guardedwrite"
 	appgit "kode-stream/internal/git"
 	appitem "kode-stream/internal/item"
 	appworkspace "kode-stream/internal/workspace"
 	workspaceaccess "kode-stream/internal/workspace/files"
 )
+
+const maxWorkspaceMutationBodyBytes int64 = (2 << 20) + (64 << 10)
+
+func decodeLimitedJSON(w http.ResponseWriter, r *http.Request, target any, limit int64, disallowUnknown bool) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
+	decoder := json.NewDecoder(r.Body)
+	if disallowUnknown {
+		decoder.DisallowUnknownFields()
+	}
+	if err := decoder.Decode(target); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body exceeds the write limit", "code": "request_too_large"})
+			return false
+		}
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return false
+	}
+	return true
+}
 
 func nonNilWarnings(warnings []models.ScanWarning) []models.ScanWarning {
 	return appworkspace.NonNilWarnings(warnings)
@@ -78,6 +99,8 @@ func respondWorkspaceFileResult(w http.ResponseWriter, data any, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, workspaceaccess.ErrHashRequired), errors.Is(err, workspaceaccess.ErrStaleContent):
 		writeError(w, http.StatusConflict, workspaceaccess.ErrStaleContent.Error())
+	case errors.Is(err, guardedwrite.ErrTooLarge):
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": err.Error(), "code": "file_too_large"})
 	case errors.Is(err, workspaceaccess.ErrDestinationExists):
 		writeError(w, http.StatusConflict, err.Error())
 	default:

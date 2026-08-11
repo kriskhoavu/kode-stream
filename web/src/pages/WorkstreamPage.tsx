@@ -32,26 +32,18 @@ import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../f
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
-import { inferCompatibilityFields, lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
+import { lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
+import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
 type DrawerSideTab = 'info' | 'git' | 'jira';
 type DrawerFileOption = { id: string; path: string; label: string };
 const DRAG_CLICK_SUPPRESSION_MS = 350;
-const UNSORTED_SELECTION_ID = 'unsorted';
+const UNSORTED_SELECTION_ID = UNSORTED_SOURCE_SELECTION_ID;
 
-type SourceItemsEditorState = {
+type SourceItemsEditorState = SourceSettingsEditorModel & {
   workspace: WorkspaceConfig;
-  directory: string;
-  exists: boolean;
-  mode?: string;
-  card: SourceStructureCard;
-  warnings: string[];
-  proposals: SourceStructureProposal[];
-  selectedProposalId?: string;
-  unsortedPreview: SourceStructurePreview[];
-  preview: SourceStructurePreview[];
 };
 
 type NewItemOrigin = 'blank' | 'jira';
@@ -481,7 +473,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       } else {
         const settings: SourceStructureSettings = {
           version: 1,
-          cards: [withInferredCompatibilityFields(sourceItemsEditor.card, sourceItemsEditor.directory)]
+          cards: [canonicalSourceSettingsCard(sourceItemsEditor.card), ...sourceItemsEditor.cards.slice(1).map(canonicalSourceSettingsCard)]
         };
         await api.saveSourceStructure(sourceItemsEditor.workspace.id, sourceItemsEditor.directory, settings);
         setScanState('Source structure saved');
@@ -1096,73 +1088,7 @@ function buildSourcePreviewTree(preview: SourceStructurePreview[]): PreviewTreeN
 }
 
 function sourceItemsEditorFromResult(workspace: WorkspaceConfig, directory: string, result: SourceSettingsResult): SourceItemsEditorState {
-  const proposals = result.proposals ?? [];
-  const selectedProposal = !result.exists && proposals.length > 0 ? proposals[0] : undefined;
-  const unsortedPreview = [unsortedSourcePreview(directory)];
-  const selectedProposalId = selectedProposal?.id ?? (!result.exists ? UNSORTED_SELECTION_ID : undefined);
-  return {
-    workspace,
-    directory,
-    exists: result.exists,
-    mode: result.mode,
-    card: normalizeSettingsCard(selectedProposal?.card ?? result.settings?.cards?.[0], directory),
-    warnings: (result.warnings ?? []).map((warning) => warning.message),
-    proposals,
-    selectedProposalId,
-    unsortedPreview,
-    preview: selectedProposal?.preview ?? (!result.exists ? unsortedPreview : result.preview ?? [])
-  };
-}
-
-function unsortedSourcePreview(directory: string): SourceStructurePreview {
-  const sourceName = lastPathSegment(directory) || 'source';
-  return {
-    path: directory,
-    source: sourceName,
-    item: sourceName,
-    scope: sourceName,
-    identifier: sourceName,
-    title: sourceName,
-    status: 'unsorted',
-    tags: [sourceName]
-  };
-}
-
-function normalizeSettingsCard(card?: SourceStructureCard, directory = 'source'): SourceStructureCard {
-  const legacyFields = card?.fields as SourceStructureCard['fields'] & { service?: string; ticket?: string } | undefined;
-  return withInferredCompatibilityFields({
-    pathPattern: genericTemplate(card?.pathPattern || '{folder}/feature/{item}'),
-    fields: {
-      source: genericTemplate(legacyFields?.source || legacyFields?.scope || legacyFields?.service || directory),
-      item: genericTemplate(legacyFields?.item || legacyFields?.identifier || legacyFields?.ticket || '{item}'),
-      scope: genericTemplate(legacyFields?.source || legacyFields?.scope || legacyFields?.service || directory),
-      identifier: genericTemplate(legacyFields?.item || legacyFields?.identifier || legacyFields?.ticket || '{item}'),
-      title: card?.fields?.title || 'readme_heading',
-      status: card?.fields?.status || 'draft',
-      owner: card?.fields?.owner || '',
-      tags: Array.isArray(card?.fields?.tags) ? card.fields.tags : ['docs']
-    }
-  }, directory);
-}
-
-function genericTemplate(value: string): string {
-  return value
-    .replaceAll('{service}', '{folder}')
-    .replaceAll('{scope}', '{folder}')
-    .replaceAll('{ticket}', '{item}')
-    .replaceAll('{identifier}', '{item}');
-}
-
-function withInferredCompatibilityFields(card: SourceStructureCard, directory: string): SourceStructureCard {
-  return {
-    ...card,
-    fields: {
-      ...card.fields,
-      source: inferCompatibilityFields(card.pathPattern, directory).scope,
-      item: inferCompatibilityFields(card.pathPattern, directory).identifier,
-      ...inferCompatibilityFields(card.pathPattern, directory)
-    }
-  };
+  return { workspace, ...sourceSettingsEditorFromResult(directory, result) };
 }
 
 function applySourceItemsProposal(
@@ -1173,7 +1099,8 @@ function applySourceItemsProposal(
     if (!current) return current;
     return {
       ...current,
-      card: normalizeSettingsCard(proposal.card, current.directory),
+      card: normalizeSourceSettingsCard(proposal.card, current.directory),
+			cards: [normalizeSourceSettingsCard(proposal.card, current.directory), ...current.cards.slice(1)],
       selectedProposalId: proposal.id,
       preview: proposal.preview
     };
@@ -1209,11 +1136,9 @@ function updateSourceItemsPreviewField(
     }));
     if (field === 'item') {
       nextCard.fields.item = normalized;
-      nextCard.fields.identifier = normalized;
       const suggestedTemplate = suggestTemplateFromValue(current.directory, current.card.pathPattern, path, normalized, true);
       if (suggestedTemplate) {
         nextCard.fields.item = suggestedTemplate;
-        nextCard.fields.identifier = suggestedTemplate;
         nextPreview = current.preview.map((row): SourceStructurePreview => {
           const captures = pathPatternCaptures(current.directory, current.card.pathPattern, row.path);
           const rendered = captures ? renderTemplateWithCaptures(suggestedTemplate, captures) : '';
