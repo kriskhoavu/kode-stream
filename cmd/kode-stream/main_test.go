@@ -25,3 +25,9 @@ func TestRunAgentStartValidatesRequiredConnectionInput(t *testing.T) {
 		t.Fatal("expected start validation error")
 	}
 }
+
+func TestStorageRepairRequiresExplicitConfirmation(t *testing.T) {
+	if err := runStorage([]string{"repair-legacy-items"}); err == nil {
+		t.Fatal("repair ran without --confirm")
+	}
+}

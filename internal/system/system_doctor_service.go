@@ -114,8 +114,9 @@ func (s *DoctorService) Run(opts Options) Result {
 		return result
 	}
 
-	add(s.checkProviderAuth(ctx.remoteURL))
-	add(s.checkRepoReadAccess(ctx.remoteURL))
+	remoteErr := s.git.LSRemote(ctx.remoteURL)
+	add(s.checkProviderAuth(ctx.remoteURL, remoteErr))
+	add(s.checkRepoReadAccess(remoteErr))
 	if opts.Port > 0 {
 		add(s.checkLocalPort(opts.Port))
 	}
@@ -217,15 +218,15 @@ func (s *DoctorService) checkRemoteConfig(remoteURL, provider string) Check {
 	return pass("git.remote-config", true, fmt.Sprintf("remote URL looks valid (%s)", p))
 }
 
-func (s *DoctorService) checkProviderAuth(remoteURL string) Check {
-	if err := s.git.LSRemote(remoteURL); err != nil {
+func (s *DoctorService) checkProviderAuth(remoteURL string, remoteErr error) Check {
+	if remoteErr != nil {
 		return fail("auth.provider", true, fmt.Sprintf("cannot read remote refs from %s", remoteURL), "Configure SSH key or HTTPS credential manager access for this remote.")
 	}
 	return pass("auth.provider", true, "provider authentication works")
 }
 
-func (s *DoctorService) checkRepoReadAccess(remoteURL string) Check {
-	if err := s.git.LSRemote(remoteURL); err != nil {
+func (s *DoctorService) checkRepoReadAccess(remoteErr error) Check {
+	if remoteErr != nil {
 		return fail("repo.read-access", true, "remote repository read access failed", "Verify repository permissions and remote URL ownership.")
 	}
 	return pass("repo.read-access", true, "remote repository access confirmed")

@@ -1,6 +1,6 @@
 import { ArrowLeftRight, Database, ExternalLink, FileText, FolderOpen, Save } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import type { StorageOption, StorageStatus, StorageSyncDirection, StorageSyncResult, SystemConfigPaths } from '../../lib/types';
 
 export function StorageSettings() {
@@ -27,7 +27,7 @@ export function StorageSettings() {
 
   const optionChanged = Boolean(status && selectedOption !== status.storageOption);
   const dataDirChanged = Boolean(config && dataDir.trim() !== config.dataDir);
-  const syncDisabled = pending || !status || status.mode === 'cloud';
+  const syncDisabled = pending || !status || status.mode === 'cloud' || status.storageDriver === 'postgres';
   const databaseLabel = useMemo(() => status?.storageDriver === 'postgres' ? 'Postgres' : 'SQLite', [status?.storageDriver]);
 
   const browse = async () => {
@@ -114,11 +114,12 @@ export function StorageSettings() {
       {optionChanged && <p className="storage-settings-warning">Changing storage option requires an application restart.</p>}
       <label>Data directory
         <div className="storage-settings-path-row">
-          <input value={dataDir} onChange={(event) => { setDataDir(event.target.value); setMessage(''); }} />
-          <button className="secondary" type="button" onClick={() => void browse()} disabled={pending}><FolderOpen size={15} /> Browse</button>
+          <input value={dataDir} disabled={pending || config.dataDirEnvironmentLocked} onChange={(event) => { setDataDir(event.target.value); setMessage(''); }} />
+          <button className="secondary" type="button" onClick={() => void browse()} disabled={pending || config.dataDirEnvironmentLocked}><FolderOpen size={15} /> Browse</button>
           <button className="secondary" type="button" onClick={() => void reveal(dataDir)} disabled={pending || !dataDir.trim()}><ExternalLink size={15} /> Reveal</button>
         </div>
       </label>
+      {config.dataDirEnvironmentLocked && <p className="storage-settings-warning">Data directory is controlled by KODE_STREAM_DATA_DIR.</p>}
       <div className="storage-settings-derived">
         <span>{databaseLabel} store</span>
         <code>{status.databasePath || (status.databaseUrlConfigured ? 'Configured with database URL' : 'Not configured')}</code>
@@ -136,10 +137,11 @@ export function StorageSettings() {
           <p>Each sync creates a target backup before replacement. Runtime writes still go only to the active option.</p>
         </div>
         <div className="storage-sync-actions">
-          <button className="secondary" type="button" onClick={() => void sync('datadir_to_database')} disabled={syncDisabled}><ArrowLeftRight size={15} /> Data-dir to database</button>
-          <button className="secondary" type="button" onClick={() => void sync('database_to_datadir')} disabled={syncDisabled}><ArrowLeftRight size={15} /> Database to data-dir</button>
+          {status.storageOption === 'datadir' && <button className="secondary" type="button" onClick={() => void sync('datadir_to_database')} disabled={syncDisabled}><ArrowLeftRight size={15} /> Data-dir to database</button>}
+          {status.storageOption === 'database' && <button className="secondary" type="button" onClick={() => void sync('database_to_datadir')} disabled={syncDisabled}><ArrowLeftRight size={15} /> Database to data-dir</button>}
         </div>
         {status.mode === 'cloud' && <p className="storage-settings-warning">Manual storage sync is only available in local mode.</p>}
+        {status.mode !== 'cloud' && status.storageDriver === 'postgres' && <p className="storage-settings-warning">Manual storage sync is not supported with Local Postgres.</p>}
         {syncResult && <SyncSummary result={syncResult} />}
       </div>
     </div> : !error && <p className="settings-inline-status" role="status">Loading storage settings...</p>}

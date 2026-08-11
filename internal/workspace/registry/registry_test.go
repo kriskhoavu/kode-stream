@@ -33,6 +33,40 @@ func TestCreateDefaultsRegistrationModeToLocalPath(t *testing.T) {
 	}
 }
 
+func TestDeleteWriteFailureKeepsWorkspaceRecoverableInMemoryAndOnDisk(t *testing.T) {
+	root := newRegistryGitRepo(t)
+	base := t.TempDir()
+	stateDir := filepath.Join(base, "state")
+	path := filepath.Join(stateDir, "workspaces.yaml")
+	repository := New(path, gitadapter.New())
+	workspace, err := repository.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backupDir := filepath.Join(base, "state-backup")
+	if err := os.Rename(stateDir, backupDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stateDir, []byte("blocks directory recreation"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.Delete(workspace.ID); err == nil {
+		t.Fatal("expected persistence failure")
+	}
+	if _, ok, err := repository.Get(workspace.ID); err != nil || !ok {
+		t.Fatalf("in-memory workspace was lost: %v, %v", ok, err)
+	}
+	if err := os.Remove(stateDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(backupDir, stateDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := New(path, gitadapter.New()).Get(workspace.ID); err != nil || !ok {
+		t.Fatalf("on-disk workspace was lost: %v, %v", ok, err)
+	}
+}
+
 func TestKnowledgeSettingsRoundTripAndSurviveUnrelatedUpdate(t *testing.T) {
 	root := newRegistryGitRepo(t)
 	registry := New(filepath.Join(t.TempDir(), "workspaces.yaml"), gitadapter.New())

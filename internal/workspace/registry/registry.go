@@ -220,8 +220,13 @@ func (r *Registry) Delete(id string) error {
 	defer r.mu.Unlock()
 	for i := range r.records {
 		if r.records[i].ID == id {
+			previous := append([]models.WorkspaceConfig(nil), r.records...)
 			r.records = append(r.records[:i], r.records[i+1:]...)
-			return r.saveLocked()
+			if err := r.saveLocked(); err != nil {
+				r.records = previous
+				return err
+			}
+			return nil
 		}
 	}
 	return fmt.Errorf("workspace not found")

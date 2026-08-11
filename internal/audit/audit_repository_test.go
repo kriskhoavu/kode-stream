@@ -3,6 +3,7 @@ package audit
 // Audit repository contract tests.
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -44,6 +45,49 @@ func TestStoreAppendsAndReadsNewestEventsFirst(t *testing.T) {
 	}
 }
 
+func TestQueryFiltersBeforeApplyingLimit(t *testing.T) {
+	store := New(filepath.Join(t.TempDir(), "audit-log.jsonl"))
+	for index := 0; index < 8; index++ {
+		workspace := "other"
+		if index == 0 || index == 3 {
+			workspace = "wanted"
+		}
+		if _, err := store.Append(models.AuditEvent{OwnerUserID: "owner-a", WorkspaceID: workspace, Operation: "scan", Status: models.AuditStatusSuccess, Message: "event"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events, err := store.QueryContext(context.Background(), Query{OwnerUserID: "owner-a", WorkspaceID: "wanted", Limit: 2})
+	if err != nil || len(events) != 2 {
+		t.Fatalf("QueryContext() = %#v, %v; wanted two matches despite newer interleaved events", events, err)
+	}
+}
+
+func TestCachedQueryKeepsWorkspaceAndOwnerInCacheKey(t *testing.T) {
+	store := New(filepath.Join(t.TempDir(), "audit-log.jsonl"))
+	for index := 0; index < 20; index++ {
+		workspace := "other"
+		if index < 3 {
+			workspace = "wanted"
+		}
+		if _, err := store.Append(models.AuditEvent{OwnerUserID: "owner", WorkspaceID: workspace, Operation: "event"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reader := NewCachedEventReader(store, time.Minute, time.Now)
+	wanted, err := reader.QueryContext(context.Background(), Query{OwnerUserID: "owner", WorkspaceID: "wanted", Limit: 2})
+	if err != nil || len(wanted) != 2 {
+		t.Fatalf("wanted=%#v err=%v", wanted, err)
+	}
+	other, err := reader.QueryContext(context.Background(), Query{OwnerUserID: "owner", WorkspaceID: "other", Limit: 2})
+	if err != nil || len(other) != 2 {
+		t.Fatalf("other=%#v err=%v", other, err)
+	}
+	again, err := reader.QueryContext(context.Background(), Query{OwnerUserID: "owner", WorkspaceID: "wanted", Limit: 2})
+	if err != nil || len(again) != 2 || reader.Stats().Hits != 1 {
+		t.Fatalf("cached=%#v stats=%#v err=%v", again, reader.Stats(), err)
+	}
+}
+
 func TestStoreSkipsMalformedLines(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit-log.jsonl")
 	data := "not-json\n{\"id\":\"valid\",\"time\":\"2026-06-20T10:00:00Z\",\"operation\":\"scan\",\"status\":\"success\",\"message\":\"ok\"}\n{broken\n"
@@ -60,6 +104,9 @@ func TestStoreSkipsMalformedLines(t *testing.T) {
 	}
 	if events[0].Paths == nil {
 		t.Fatal("Paths must normalize to an empty array")
+	}
+	if events[0].OwnerUserID != LocalActor || events[0].ActorUserID != LegacyActor {
+		t.Fatalf("legacy identity = owner %q actor %q", events[0].OwnerUserID, events[0].ActorUserID)
 	}
 }
 

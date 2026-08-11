@@ -15,6 +15,8 @@ const (
 type AuditEvent struct {
 	ID          string      `json:"id" yaml:"id"`
 	Time        time.Time   `json:"time" yaml:"time"`
+	OwnerUserID string      `json:"ownerUserId,omitempty" yaml:"ownerUserId,omitempty"`
+	ActorUserID string      `json:"actorUserId,omitempty" yaml:"actorUserId,omitempty"`
 	WorkspaceID string      `json:"workspaceId,omitempty" yaml:"workspaceId,omitempty"`
 	ItemID      string      `json:"itemId,omitempty" yaml:"itemId,omitempty"`
 	Operation   string      `json:"operation" yaml:"operation"`
@@ -74,6 +76,7 @@ type SearchResult struct {
 
 type SavedFilter struct {
 	ID          string         `json:"id" yaml:"id"`
+	OwnerUserID string         `json:"ownerUserId,omitempty" yaml:"ownerUserId,omitempty"`
 	Name        string         `json:"name" yaml:"name"`
 	Route       string         `json:"route" yaml:"route"`
 	WorkspaceID string         `json:"workspaceId,omitempty" yaml:"workspaceId,omitempty"`
@@ -84,6 +87,7 @@ type SavedFilter struct {
 
 type RecentItem struct {
 	ItemID      string    `json:"itemId" yaml:"itemId"`
+	OwnerUserID string    `json:"ownerUserId,omitempty" yaml:"ownerUserId,omitempty"`
 	WorkspaceID string    `json:"workspaceId" yaml:"workspaceId"`
 	Title       string    `json:"title" yaml:"title"`
 	Subtitle    string    `json:"subtitle,omitempty" yaml:"subtitle,omitempty"`

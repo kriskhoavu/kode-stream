@@ -193,6 +193,67 @@ func TestDeleteRemovesManagedCloneWorkspacePath(t *testing.T) {
 	}
 }
 
+func TestFileWorkspaceDeleteRegistryFailureLeavesRecoverableRegisteredWorkspace(t *testing.T) {
+	repositoryPath := t.TempDir()
+	if output, err := exec.Command("git", "init", "-b", "main", repositoryPath).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	if err := os.MkdirAll(filepath.Join(repositoryPath, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repositoryPath, "plans", "README.md"), []byte("# Plans\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", repositoryPath, "add", ".").CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v: %s", err, output)
+	}
+	commit := exec.Command("git", "-C", repositoryPath, "commit", "--allow-empty", "-m", "init")
+	commit.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if output, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v: %s", err, output)
+	}
+	base := t.TempDir()
+	stateDir := filepath.Join(base, "state")
+	registryPath := filepath.Join(stateDir, "workspaces.yaml")
+	git := gitadapter.New()
+	reg := registry.New(registryPath, git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Recoverable", Path: repositoryPath, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(filepath.Join(base, "item-index.yaml"))
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{{ItemSummary: models.ItemSummary{ID: "item", WorkspaceID: workspace.ID, Title: "Item"}}}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	service := New(reg, idx, nil, nil, git)
+	backupDir := filepath.Join(base, "state-backup")
+	if err := os.Rename(stateDir, backupDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stateDir, []byte("block registry directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Delete(workspace.ID); err == nil {
+		t.Fatal("expected registry persistence failure")
+	}
+	if _, ok, err := reg.Get(workspace.ID); err != nil || !ok {
+		t.Fatalf("registered recovery state=%v err=%v", ok, err)
+	}
+	items, err := idx.Query(itemindex.Query{WorkspaceID: workspace.ID})
+	if err != nil || len(items) != 0 {
+		t.Fatalf("derived index should be safely rebuildable: %#v %v", items, err)
+	}
+	if err := os.Remove(stateDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(backupDir, stateDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := registry.New(registryPath, git).Get(workspace.ID); err != nil || !ok {
+		t.Fatalf("persisted registry recovery state=%v err=%v", ok, err)
+	}
+}
+
 func TestResetSourceStructureRemovesSettingsAndRescans(t *testing.T) {
 	root := newWorkspaceGitRepo(t)
 	writeWorkspaceGitFile(t, root, "docs/workspace-settings.yaml", `version: 1

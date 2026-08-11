@@ -257,7 +257,7 @@ describe('shared api facade', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => [{ id: 'event-1', time: '2026-06-20T00:00:00Z', operation: 'scan', status: 'unknown', message: 'done' }]
+        json: async () => [{ id: 'event-1', time: '2026-06-20T00:00:00Z', ownerUserId: 'owner-1', actorUserId: 'actor-1', operation: 'scan', status: 'unknown', message: 'done' }]
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -266,7 +266,7 @@ describe('shared api facade', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(api.auditEvents({ workspaceId: 'w1', limit: 5 })).resolves.toEqual([
-      { id: 'event-1', time: '2026-06-20T00:00:00Z', operation: 'scan', status: 'success', message: 'done', paths: [], durationMs: 0 }
+      { id: 'event-1', time: '2026-06-20T00:00:00Z', ownerUserId: 'owner-1', actorUserId: 'actor-1', operation: 'scan', status: 'success', message: 'done', paths: [], durationMs: 0 }
     ]);
     await expect(api.workspaceHealth('w1')).resolves.toEqual({
       workspaceId: 'w1', checkedAt: '2026-06-20T00:00:00Z', summary: 'ok', checks: []

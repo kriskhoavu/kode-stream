@@ -14,6 +14,7 @@ import (
 	"kode-stream/internal/agent"
 	appgit "kode-stream/internal/git"
 	"kode-stream/internal/server"
+	"kode-stream/internal/storage"
 	"kode-stream/internal/system"
 )
 
@@ -45,10 +46,54 @@ func main() {
 		if err := runAgent(os.Args[2:]); err != nil {
 			log.Fatal(err)
 		}
+	case "storage":
+		if err := runStorage(os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
 	default:
 		usage()
 		os.Exit(2)
 	}
+}
+
+func runStorage(args []string) error {
+	if len(args) == 0 || args[0] != "repair-legacy-items" {
+		return errors.New("storage command is required: repair-legacy-items")
+	}
+	fs := flag.NewFlagSet("storage repair-legacy-items", flag.ContinueOnError)
+	confirm := fs.Bool("confirm", false, "confirm replacement of the SQL item snapshot from the legacy file")
+	source := fs.String("source", "", "legacy item-index.yaml path (defaults to the active data directory)")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if !*confirm {
+		return errors.New("repair-legacy-items requires --confirm")
+	}
+	paths, err := system.ResolvePaths()
+	if err != nil {
+		return err
+	}
+	runtimeConfig, err := system.ResolveRuntimeConfig()
+	if err != nil {
+		return err
+	}
+	state, err := storage.OpenAppOwnedState(paths, runtimeConfig, appgit.New(), os.Getenv)
+	if err != nil {
+		return err
+	}
+	if state.SQLStore == nil {
+		return errors.New("repair-legacy-items requires an active SQL storage backend")
+	}
+	defer state.SQLStore.Close()
+	path := strings.TrimSpace(*source)
+	if path == "" {
+		path = paths.PlanIndexFile
+	}
+	if err := storage.RepairLegacyItemImport(path, state); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stdout, "Repaired legacy item import from %s\n", path)
+	return nil
 }
 
 func runAgent(args []string) error {
@@ -158,4 +203,5 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  kode-stream serve [-port 4317]")
 	fmt.Fprintln(os.Stderr, "  kode-stream doctor [--provider github|bitbucket] [--repo <path-or-url>] [--format text|json] [--strict] [--port <n>]")
 	fmt.Fprintln(os.Stderr, "  kode-stream agent start|status|doctor")
+	fmt.Fprintln(os.Stderr, "  kode-stream storage repair-legacy-items --confirm [--source <item-index.yaml>]")
 }

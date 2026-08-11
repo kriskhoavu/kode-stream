@@ -34,8 +34,8 @@ func NewRegistry(factories ...Factory) *Registry {
 }
 
 func (r *Registry) Upsert(instance Instance) error {
-	if instance.ID == "" || instance.Name == "" || instance.Kind == "" || instance.BaseURL == "" {
-		return fmt.Errorf("provider instance id, name, kind, and base URL are required")
+	if err := ValidateInstance(instance); err != nil {
+		return err
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -43,6 +43,13 @@ func (r *Registry) Upsert(instance Instance) error {
 		return fmt.Errorf("unsupported provider kind %q", instance.Kind)
 	}
 	r.instances[instance.ID] = instance
+	return nil
+}
+
+func ValidateInstance(instance Instance) error {
+	if instance.ID == "" || instance.Name == "" || instance.Kind == "" || instance.BaseURL == "" {
+		return fmt.Errorf("provider instance id, name, kind, and base URL are required")
+	}
 	return nil
 }
 

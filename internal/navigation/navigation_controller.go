@@ -1,6 +1,7 @@
 package navigation
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -18,12 +19,18 @@ type ItemReader interface {
 }
 
 type NavigationController struct {
-	repository Repository
+	repository OwnedRepository
 	items      ItemReader
+	owner      func(context.Context) string
 }
 
-func NewController(repository Repository, items ItemReader) *NavigationController {
-	return &NavigationController{repository: repository, items: items}
+func NewController(repository Repository, items ItemReader, ownerResolver ...func(context.Context) string) *NavigationController {
+	resolver := func(context.Context) string { return LocalOwner }
+	if len(ownerResolver) > 0 && ownerResolver[0] != nil {
+		resolver = ownerResolver[0]
+	}
+	owned, _ := repository.(OwnedRepository)
+	return &NavigationController{repository: owned, items: items, owner: resolver}
 }
 
 func (c *NavigationController) RegisterRoutes(mux *http.ServeMux) {
@@ -54,12 +61,12 @@ func (c *NavigationController) RecordRecent(w http.ResponseWriter, r *http.Reque
 	c.recordRecent(w, r)
 }
 
-func (c *NavigationController) filters(w http.ResponseWriter, _ *http.Request) {
+func (c *NavigationController) filters(w http.ResponseWriter, r *http.Request) {
 	if c.repository == nil {
 		httpx.WriteJSON(w, http.StatusOK, []models.SavedFilter{})
 		return
 	}
-	filters, err := c.repository.Filters()
+	filters, err := c.repository.FiltersForOwner(c.owner(r.Context()))
 	c.respond(w, filters, err)
 }
 
@@ -82,7 +89,7 @@ func (c *NavigationController) saveFilter(w http.ResponseWriter, r *http.Request
 		httpx.WriteError(w, http.StatusBadRequest, "saved filter route is invalid", nil)
 		return
 	}
-	saved, err := c.repository.SaveFilter(filter)
+	saved, err := c.repository.SaveFilterForOwner(c.owner(r.Context()), filter)
 	if err != nil {
 		c.respond(w, nil, err)
 		return
@@ -95,7 +102,7 @@ func (c *NavigationController) deleteFilter(w http.ResponseWriter, r *http.Reque
 		httpx.WriteError(w, http.StatusServiceUnavailable, "saved filters are unavailable", nil)
 		return
 	}
-	deleted, err := c.repository.DeleteFilter(r.PathValue("id"))
+	deleted, err := c.repository.DeleteFilterForOwner(c.owner(r.Context()), r.PathValue("id"))
 	if err != nil {
 		c.respond(w, nil, err)
 		return
@@ -116,7 +123,7 @@ func (c *NavigationController) recents(w http.ResponseWriter, r *http.Request) {
 	if limit <= 0 || limit > 50 {
 		limit = 10
 	}
-	recents, err := c.repository.Recents(limit)
+	recents, err := c.repository.RecentsForOwner(c.owner(r.Context()), limit)
 	c.respond(w, recents, err)
 }
 
@@ -142,7 +149,7 @@ func (c *NavigationController) recordRecent(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	recent := models.RecentItem{ItemID: item.ID, WorkspaceID: item.WorkspaceID, Title: item.Title, Subtitle: strings.Trim(strings.Join([]string{item.WorkspaceName, item.Identifier}, " · "), " ·"), Route: "/items/" + url.PathEscape(item.ID)}
-	if err := c.repository.RecordRecent(recent); err != nil {
+	if err := c.repository.RecordRecentForOwner(c.owner(r.Context()), recent); err != nil {
 		c.respond(w, nil, err)
 		return
 	}

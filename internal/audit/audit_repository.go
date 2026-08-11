@@ -27,20 +27,44 @@ type Repository interface {
 	Append(models.AuditEvent) (models.AuditEvent, error)
 	Recent(int) ([]models.AuditEvent, error)
 	RecentContext(context.Context, int) ([]models.AuditEvent, error)
+	QueryContext(context.Context, Query) ([]models.AuditEvent, error)
+}
+
+type Query struct {
+	OwnerUserID string
+	WorkspaceID string
+	Limit       int
 }
 
 func (s *Store) RecentContext(ctx context.Context, limit int) ([]models.AuditEvent, error) {
+	return s.QueryContext(ctx, Query{Limit: limit})
+}
+
+func (s *Store) QueryContext(ctx context.Context, query Query) ([]models.AuditEvent, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	events, err := s.Recent(limit)
+	events, err := s.Recent(0)
 	if err != nil {
 		return nil, err
 	}
+	filtered := make([]models.AuditEvent, 0, len(events))
+	for _, event := range events {
+		if query.OwnerUserID != "" && event.OwnerUserID != query.OwnerUserID {
+			continue
+		}
+		if query.WorkspaceID != "" && event.WorkspaceID != query.WorkspaceID {
+			continue
+		}
+		filtered = append(filtered, event)
+		if query.Limit > 0 && len(filtered) == query.Limit {
+			break
+		}
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return events, nil
+	return filtered, nil
 }
 
 type Store = AuditRepository
@@ -105,6 +129,7 @@ func (s *Store) Recent(limit int) ([]models.AuditEvent, error) {
 		if event.Paths == nil {
 			event.Paths = []string{}
 		}
+		event = NormalizeLegacyEvent(event)
 		events = append(events, event)
 	}
 	if err := scanner.Err(); err != nil {
@@ -117,6 +142,16 @@ func (s *Store) Recent(limit int) ([]models.AuditEvent, error) {
 		events = events[:limit]
 	}
 	return events, nil
+}
+
+func NormalizeLegacyEvent(event models.AuditEvent) models.AuditEvent {
+	if event.OwnerUserID == "" {
+		event.OwnerUserID = LocalActor
+	}
+	if event.ActorUserID == "" {
+		event.ActorUserID = LegacyActor
+	}
+	return event
 }
 
 func newID() string {

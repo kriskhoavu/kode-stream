@@ -186,15 +186,26 @@ func (s *Service) Delete(id string) error {
 	if !ok {
 		return fmt.Errorf("workspace not found")
 	}
-	if workspace.ClonePathManaged {
-		if err := removeManagedCloneWorkspace(workspace.Path); err != nil {
+	if deleter, ok := s.registry.(interface{ DeleteWorkspaceState(string) error }); ok {
+		if err := deleter.DeleteWorkspaceState(id); err != nil {
+			return err
+		}
+	} else {
+		// File-backed indexes are derived and recoverable. Delete them first so a
+		// registry write failure keeps the workspace registered for a retry.
+		if err := s.index.DeleteWorkspace(id); err != nil {
+			return err
+		}
+		if err := s.registry.Delete(id); err != nil {
 			return err
 		}
 	}
-	if err := s.registry.Delete(id); err != nil {
-		return err
+	if workspace.ClonePathManaged {
+		if err := removeManagedCloneWorkspace(workspace.Path); err != nil {
+			return fmt.Errorf("workspace state was deleted but managed clone cleanup failed: %w", err)
+		}
 	}
-	return s.index.DeleteWorkspace(id)
+	return nil
 }
 
 func (s *Service) Scan(id string) (models.ScanResult, error) {

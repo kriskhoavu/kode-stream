@@ -42,6 +42,10 @@ func (c *SystemController) UpdateConfigPaths(w http.ResponseWriter, r *http.Requ
 }
 
 func (c *SystemController) selectFile(w http.ResponseWriter, _ *http.Request) {
+	if c.repository == nil {
+		httpx.WriteError(w, http.StatusServiceUnavailable, "system dialogs are unavailable", nil)
+		return
+	}
 	path, err := c.repository.SelectYAMLFile()
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error(), nil)
@@ -51,6 +55,10 @@ func (c *SystemController) selectFile(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (c *SystemController) selectDirectory(w http.ResponseWriter, _ *http.Request) {
+	if c.repository == nil {
+		httpx.WriteError(w, http.StatusServiceUnavailable, "system dialogs are unavailable", nil)
+		return
+	}
 	path, err := c.repository.SelectDirectory()
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error(), nil)
@@ -60,6 +68,10 @@ func (c *SystemController) selectDirectory(w http.ResponseWriter, _ *http.Reques
 }
 
 func (c *SystemController) openPath(w http.ResponseWriter, r *http.Request) {
+	if c.repository == nil {
+		httpx.WriteError(w, http.StatusServiceUnavailable, "system dialogs are unavailable", nil)
+		return
+	}
 	var input struct {
 		Path string `json:"path"`
 	}
@@ -80,7 +92,7 @@ func (c *SystemController) configPaths(w http.ResponseWriter, _ *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"dataDir": paths.Dir, "defaultDataDir": paths.DefaultDir, "cloneRootDir": paths.CloneRootDir, "registryFile": paths.RegistryFile})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"dataDir": paths.Dir, "defaultDataDir": paths.DefaultDir, "cloneRootDir": paths.CloneRootDir, "registryFile": paths.RegistryFile, "dataDirEnvironmentLocked": DataDirEnvironmentLocked()})
 }
 
 func (c *SystemController) updateConfigPaths(w http.ResponseWriter, r *http.Request) {
@@ -96,5 +108,5 @@ func (c *SystemController) updateConfigPaths(w http.ResponseWriter, r *http.Requ
 		httpx.WriteError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"dataDir": paths.Dir, "defaultDataDir": paths.DefaultDir, "cloneRootDir": paths.CloneRootDir, "registryFile": paths.RegistryFile, "restartRequired": true})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"dataDir": paths.Dir, "defaultDataDir": paths.DefaultDir, "cloneRootDir": paths.CloneRootDir, "registryFile": paths.RegistryFile, "dataDirEnvironmentLocked": DataDirEnvironmentLocked(), "restartRequired": true})
 }

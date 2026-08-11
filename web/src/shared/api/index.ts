@@ -502,6 +502,7 @@ function normalizeSystemConfigPaths(input: SystemConfigPaths): SystemConfigPaths
     defaultDataDir: input.defaultDataDir ?? '',
     cloneRootDir: input.cloneRootDir ?? '',
 		registryFile: input.registryFile ?? '',
+		dataDirEnvironmentLocked: Boolean(input.dataDirEnvironmentLocked),
     restartRequired: Boolean(input.restartRequired)
   };
 }

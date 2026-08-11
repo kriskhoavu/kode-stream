@@ -6,6 +6,8 @@ export type HealthStatus = 'ok' | 'warning' | 'failed';
 export interface AuditEvent {
   id: string;
   time: string;
+  ownerUserId?: string;
+  actorUserId?: string;
   workspaceId?: string;
   itemId?: string;
   operation: string;
@@ -395,6 +397,7 @@ export interface SystemConfigPaths {
   defaultDataDir: string;
   cloneRootDir: string;
   registryFile?: string;
+  dataDirEnvironmentLocked?: boolean;
   restartRequired?: boolean;
 }
 

@@ -100,7 +100,7 @@ jobs:
           KODE_STREAM_MIGRATIONS: auto
         run: |
           go build -o ./bin/kode-stream ./cmd/kode-stream
-          ./bin/kode-stream &
+          ./bin/kode-stream serve &
           pid=$!
           trap 'kill "$pid" || true' EXIT
           for attempt in $(seq 1 20); do

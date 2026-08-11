@@ -4,10 +4,12 @@ package system
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -21,6 +23,115 @@ func TestResolvePathsIncludesKnowledgeIndexInDataDirectory(t *testing.T) {
 	}
 	if paths.KnowledgeIndexFile != filepath.Join(directory, "knowledge-index.yaml") {
 		t.Fatalf("knowledge index = %q", paths.KnowledgeIndexFile)
+	}
+}
+
+func TestBootstrapUpdatePreservesUnknownFieldsAndComments(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("KODE_STREAM_DATA_DIR", "")
+	defaultDir, err := DefaultDataDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(defaultDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(defaultDir, "bootstrap.yaml")
+	if err := os.WriteFile(path, []byte("# keep this comment\nfutureSetting: enabled\nstorageOption: datadir\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SetDataDir(filepath.Join(home, "custom")); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "# keep this comment") || !strings.Contains(text, "futureSetting: enabled") || !strings.Contains(text, "storageOption: datadir") {
+		t.Fatalf("bootstrap fields/comments were lost: %s", text)
+	}
+}
+
+func TestBootstrapUpdateRejectsMalformedFileWithoutChangingIt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bootstrap.yaml")
+	original := []byte("dataDir: [unterminated\n")
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := updateBootstrapSetting(path, "storageOption", "database"); err == nil || !strings.Contains(err.Error(), "invalid bootstrap settings") {
+		t.Fatalf("error = %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != string(original) {
+		t.Fatalf("malformed file changed: %q, %v", got, err)
+	}
+}
+
+func TestAtomicBootstrapRenameFailureLeavesPreviousFileReadable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bootstrap.yaml")
+	original := []byte("storageOption: datadir\n")
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := atomicWriteFileWithRename(path, []byte("storageOption: database\n"), 0o600, func(string, string) error {
+		return errors.New("injected rename failure")
+	})
+	if err == nil {
+		t.Fatal("expected rename failure")
+	}
+	got, readErr := os.ReadFile(path)
+	if readErr != nil || string(got) != string(original) {
+		t.Fatalf("bootstrap after failure = %q, %v", got, readErr)
+	}
+}
+
+func TestConfigPathAPIReportsMalformedBootstrapWithoutSuccess(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("KODE_STREAM_DATA_DIR", "")
+	defaultDir, err := DefaultDataDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(defaultDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(defaultDir, "bootstrap.yaml")
+	original := []byte("dataDir: [unterminated\n")
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	NewController(nil).RegisterRoutes(mux)
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/api/system/config-paths", strings.NewReader(`{"dataDir":"`+filepath.Join(home, "new")+`"}`)))
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "invalid bootstrap settings") {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != string(original) {
+		t.Fatalf("bootstrap changed=%q err=%v", got, err)
+	}
+}
+
+func TestSetDataDirRejectsEnvironmentLockedConfiguration(t *testing.T) {
+	t.Setenv("KODE_STREAM_DATA_DIR", t.TempDir())
+	if _, err := SetDataDir(t.TempDir()); err == nil {
+		t.Fatal("expected environment lock error")
+	}
+}
+
+func TestNilSystemControllerReturnsUnavailableForDialogRoutes(t *testing.T) {
+	mux := http.NewServeMux()
+	NewController(nil).RegisterRoutes(mux)
+	for _, path := range []string{"/api/system/select-directory", "/api/system/select-file", "/api/system/open-path"} {
+		response := httptest.NewRecorder()
+		mux.ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"path":"/tmp"}`)))
+		if response.Code != http.StatusServiceUnavailable {
+			t.Fatalf("%s status = %d body=%s", path, response.Code, response.Body.String())
+		}
 	}
 }
 

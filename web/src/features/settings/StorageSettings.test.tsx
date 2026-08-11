@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../lib/api';
+import { api } from '../../shared/api';
 import { StorageSettings } from './StorageSettings';
 
-vi.mock('../../lib/api', () => ({ api: {
+vi.mock('../../shared/api', () => ({ api: {
   systemConfigPaths: vi.fn(),
   storageStatus: vi.fn(),
   saveStorageOption: vi.fn(),
@@ -34,6 +34,19 @@ describe('StorageSettings', () => {
     expect(await screen.findByText(/Restart Kode Stream/)).toBeInTheDocument();
   });
 
+  it('reports a bootstrap write failure without claiming restart success', async () => {
+    vi.mocked(api.systemConfigPaths).mockResolvedValue({ dataDir: '/old', defaultDataDir: '/default', cloneRootDir: '/old/clones' });
+    vi.mocked(api.storageStatus).mockResolvedValue(storageStatus());
+    vi.mocked(api.updateSystemConfigPaths).mockRejectedValue(new Error('invalid bootstrap settings'));
+    render(<StorageSettings />);
+
+    fireEvent.change(await screen.findByDisplayValue('/old'), { target: { value: '/new' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save storage settings' }));
+
+    expect(await screen.findByText('invalid bootstrap settings')).toBeInTheDocument();
+    expect(screen.queryByText(/Restart Kode Stream/)).not.toBeInTheDocument();
+  });
+
   it('saves a local storage option for restart', async () => {
     vi.mocked(api.systemConfigPaths).mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones' });
     vi.mocked(api.storageStatus).mockResolvedValue(storageStatus({ storageOption: 'database', environmentLocked: false }));
@@ -53,7 +66,7 @@ describe('StorageSettings', () => {
     vi.mocked(api.storageStatus).mockResolvedValue(storageStatus());
     vi.mocked(api.syncStorage).mockResolvedValue({
       ok: true,
-      direction: 'datadir_to_database',
+      direction: 'database_to_datadir',
       backupPath: '/data/backups/storage-sync/sync',
       summary: { workspaces: 1, items: 2 },
       warnings: [],
@@ -61,11 +74,32 @@ describe('StorageSettings', () => {
     });
     render(<StorageSettings />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Data-dir to database' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Database to data-dir' }));
 
-    await waitFor(() => expect(api.syncStorage).toHaveBeenCalledWith('datadir_to_database'));
+    await waitFor(() => expect(api.syncStorage).toHaveBeenCalledWith('database_to_datadir'));
     expect(await screen.findByText('/data/backups/storage-sync/sync')).toBeInTheDocument();
     expect(screen.getByText(/1 workspaces, 2 items/)).toBeInTheDocument();
+  });
+
+  it('exposes only the active-source sync direction and disables Local Postgres sync', async () => {
+    vi.mocked(api.systemConfigPaths).mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones' });
+    vi.mocked(api.storageStatus).mockResolvedValue(storageStatus({ storageOption: 'datadir', storageDriver: 'postgres' }));
+    render(<StorageSettings />);
+
+    const validDirection = await screen.findByRole('button', { name: 'Data-dir to database' });
+    expect(validDirection).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Database to data-dir' })).not.toBeInTheDocument();
+    expect(screen.getByText(/not supported with Local Postgres/)).toBeInTheDocument();
+  });
+
+  it('disables data-directory editing when the environment owns the setting', async () => {
+    vi.mocked(api.systemConfigPaths).mockResolvedValue({ dataDir: '/locked', defaultDataDir: '/default', cloneRootDir: '/locked/clones', dataDirEnvironmentLocked: true });
+    vi.mocked(api.storageStatus).mockResolvedValue(storageStatus());
+    render(<StorageSettings />);
+
+    expect(await screen.findByDisplayValue('/locked')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Browse' })).toBeDisabled();
+    expect(screen.getByText(/controlled by KODE_STREAM_DATA_DIR/)).toBeInTheDocument();
   });
 });
 

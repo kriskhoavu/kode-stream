@@ -149,7 +149,7 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 		}
 		refJSON, _ := json.Marshal(placement.EntityRef)
 		if exists {
-			result, err := execTx(tx, r.driver, `UPDATE canvas_placements SET entity_ref_json = ?, x = ?, y = ?, collapsed = ?, hidden = ?, revision = ?, updated_at = ? WHERE layout_id = ? AND node_id = ? AND revision = ?`, string(refJSON), placement.Position.X, placement.Position.Y, boolInt(placement.Collapsed), boolInt(placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt), layoutID, patch.NodeID, patch.ExpectedRevision)
+			result, err := execTx(tx, r.driver, `UPDATE canvas_placements SET entity_ref_json = ?, x = ?, y = ?, collapsed = ?, hidden = ?, revision = ?, updated_at = ? WHERE layout_id = ? AND node_id = ? AND revision = ?`, string(refJSON), placement.Position.X, placement.Position.Y, databaseBoolValue(r.driver, placement.Collapsed), databaseBoolValue(r.driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt), layoutID, patch.NodeID, patch.ExpectedRevision)
 			if err != nil {
 				return nil, err
 			}
@@ -157,7 +157,7 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 				return nil, &canvas.PlacementConflictError{NodeIDs: []string{patch.NodeID}}
 			}
 		} else {
-			_, err := execTx(tx, r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, layoutID, patch.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, boolInt(placement.Collapsed), boolInt(placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt))
+			_, err := execTx(tx, r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, layoutID, patch.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, databaseBoolValue(r.driver, placement.Collapsed), databaseBoolValue(r.driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt))
 			if err != nil {
 				return nil, err
 			}
@@ -174,7 +174,7 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 }
 
 func (r *SQLiteCanvasRepository) RemovePlacement(layoutID, nodeID string, expectedRevision int64) error {
-	result, err := execSQL(r.db, r.driver, `UPDATE canvas_placements SET hidden = ?, revision = revision + 1, updated_at = ? WHERE layout_id = ? AND node_id = ? AND revision = ?`, boolInt(true), formatTime(r.now().UTC()), layoutID, nodeID, expectedRevision)
+	result, err := execSQL(r.db, r.driver, `UPDATE canvas_placements SET hidden = ?, revision = revision + 1, updated_at = ? WHERE layout_id = ? AND node_id = ? AND revision = ?`, databaseBoolValue(r.driver, true), formatTime(r.now().UTC()), layoutID, nodeID, expectedRevision)
 	if err != nil {
 		return err
 	}
@@ -234,24 +234,31 @@ func (r *SQLiteCanvasRepository) ReplaceAll(snapshot canvas.Snapshot) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err := replaceCanvasSnapshotTx(tx, r.driver, snapshot); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func replaceCanvasSnapshotTx(tx *sql.Tx, driver string, snapshot canvas.Snapshot) error {
 	for _, table := range []string{"canvas_placements", "canvas_layouts"} {
-		if _, err := execTx(tx, r.driver, "DELETE FROM "+table); err != nil {
+		if _, err := execTx(tx, driver, "DELETE FROM "+table); err != nil {
 			return err
 		}
 	}
 	for _, layout := range snapshot.Layouts {
 		viewportJSON, _ := json.Marshal(layout.Viewport)
-		if _, err := execTx(tx, r.driver, `INSERT INTO canvas_layouts (id, owner_user_id, workspace_id, branch_key, viewport_json, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, layout.ID, layout.OwnerUserID, layout.WorkspaceID, layout.BranchKey, string(viewportJSON), layout.Version, formatTime(layout.CreatedAt), formatTime(layout.UpdatedAt)); err != nil {
+		if _, err := execTx(tx, driver, `INSERT INTO canvas_layouts (id, owner_user_id, workspace_id, branch_key, viewport_json, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, layout.ID, layout.OwnerUserID, layout.WorkspaceID, layout.BranchKey, string(viewportJSON), layout.Version, formatTime(layout.CreatedAt), formatTime(layout.UpdatedAt)); err != nil {
 			return err
 		}
 	}
 	for _, placement := range snapshot.Placements {
 		refJSON, _ := json.Marshal(placement.EntityRef)
-		if _, err := execTx(tx, r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, placement.LayoutID, placement.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, boolInt(placement.Collapsed), boolInt(placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt)); err != nil {
+		if _, err := execTx(tx, driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, placement.LayoutID, placement.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, databaseBoolValue(driver, placement.Collapsed), databaseBoolValue(driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt)); err != nil {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 func scanCanvasLayout(row sqlRow) (canvas.Layout, error) {
@@ -381,7 +388,14 @@ func (r *SQLiteSessionRecordRepository) ReplaceAll(records []ai.SessionRecord) e
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := execTx(tx, r.driver, `DELETE FROM ai_session_records`); err != nil {
+	if err := replaceSessionRecordsTx(tx, r.driver, records); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func replaceSessionRecordsTx(tx *sql.Tx, driver string, records []ai.SessionRecord) error {
+	if _, err := execTx(tx, driver, `DELETE FROM ai_session_records`); err != nil {
 		return err
 	}
 	for _, record := range records {
@@ -394,11 +408,11 @@ func (r *SQLiteSessionRecordRepository) ReplaceAll(records []ai.SessionRecord) e
 		if record.ExitCode != nil {
 			exitCode = *record.ExitCode
 		}
-		if _, err := execTx(tx, r.driver, `INSERT INTO ai_session_records (id, workspace_id, plan_ref_json, provider, intent, requested_branch, observed_commit, idempotency_key, state, started_at, ended_at, exit_code, last_known_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, record.ID, record.WorkspaceID, planJSON, record.Provider, record.Intent, record.RequestedBranch, record.ObservedCommit, record.IdempotencyKey, record.State, formatTime(record.StartedAt), formatTime(record.EndedAt), exitCode, formatTime(record.LastKnownAt)); err != nil {
+		if _, err := execTx(tx, driver, `INSERT INTO ai_session_records (id, workspace_id, plan_ref_json, provider, intent, requested_branch, observed_commit, idempotency_key, state, started_at, ended_at, exit_code, last_known_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, record.ID, record.WorkspaceID, planJSON, record.Provider, record.Intent, record.RequestedBranch, record.ObservedCommit, record.IdempotencyKey, record.State, formatTime(record.StartedAt), formatTime(record.EndedAt), exitCode, formatTime(record.LastKnownAt)); err != nil {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 const sessionRecordSelect = `SELECT id, workspace_id, plan_ref_json, provider, intent, requested_branch, observed_commit, idempotency_key, state, started_at, ended_at, exit_code, last_known_at FROM ai_session_records`

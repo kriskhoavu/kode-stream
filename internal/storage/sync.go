@@ -3,6 +3,7 @@ package storage
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -46,11 +48,29 @@ type StorageSyncResult struct {
 }
 
 type StorageSyncService struct {
-	config  Config
-	paths   system.Paths
-	runtime system.RuntimeConfig
-	git     *appgit.GitAdapter
+	config      Config
+	paths       system.Paths
+	runtime     system.RuntimeConfig
+	git         *appgit.GitAdapter
+	running     atomic.Bool
+	beforePhase func(string) error
 }
+
+type SyncErrorKind string
+
+const (
+	SyncErrorValidation     SyncErrorKind = "validation"
+	SyncErrorConflict       SyncErrorKind = "conflict"
+	SyncErrorInfrastructure SyncErrorKind = "infrastructure"
+)
+
+type SyncError struct {
+	Kind SyncErrorKind
+	Err  error
+}
+
+func (e *SyncError) Error() string { return e.Err.Error() }
+func (e *SyncError) Unwrap() error { return e.Err }
 
 type storageSnapshot struct {
 	Workspaces     []models.WorkspaceConfig
@@ -76,15 +96,29 @@ func NewStorageSyncService(config Config, paths system.Paths, runtime system.Run
 }
 
 func (s *StorageSyncService) Sync(ctx context.Context, request StorageSyncRequest) (StorageSyncResult, error) {
+	if !s.running.CompareAndSwap(false, true) {
+		return StorageSyncResult{}, &SyncError{Kind: SyncErrorConflict, Err: errors.New("storage sync is already in progress")}
+	}
+	defer s.running.Store(false)
 	direction := strings.ToLower(strings.TrimSpace(request.Direction))
 	if direction != SyncDataDirToDatabase && direction != SyncDatabaseToDataDir {
-		return StorageSyncResult{}, fmt.Errorf("direction must be %s or %s", SyncDataDirToDatabase, SyncDatabaseToDataDir)
+		return StorageSyncResult{}, &SyncError{Kind: SyncErrorValidation, Err: fmt.Errorf("direction must be %s or %s", SyncDataDirToDatabase, SyncDatabaseToDataDir)}
 	}
 	if !request.Confirm {
-		return StorageSyncResult{}, errors.New("storage sync requires confirmation")
+		return StorageSyncResult{}, &SyncError{Kind: SyncErrorValidation, Err: errors.New("storage sync requires confirmation")}
 	}
 	if s.runtime.Mode == models.RuntimeModeCloud {
-		return StorageSyncResult{}, errors.New("storage sync is only available in local mode")
+		return StorageSyncResult{}, &SyncError{Kind: SyncErrorValidation, Err: errors.New("storage sync is only available in local mode")}
+	}
+	if s.config.Driver == StorageDriverPostgres {
+		return StorageSyncResult{}, &SyncError{Kind: SyncErrorValidation, Err: errors.New("manual synchronization with Local Postgres is not supported")}
+	}
+	expected := SyncDataDirToDatabase
+	if s.config.StorageOption == StorageOptionDatabase {
+		expected = SyncDatabaseToDataDir
+	}
+	if direction != expected {
+		return StorageSyncResult{}, &SyncError{Kind: SyncErrorConflict, Err: fmt.Errorf("sync target is the active %s backend", s.config.StorageOption)}
 	}
 	if err := ctx.Err(); err != nil {
 		return StorageSyncResult{}, err
@@ -98,27 +132,96 @@ func (s *StorageSyncService) Sync(ctx context.Context, request StorageSyncReques
 		if err != nil {
 			return StorageSyncResult{}, err
 		}
-		result.BackupPath, err = backupDatabaseTarget(s.paths, direction, time.Now().UTC())
-		if err != nil {
+		if err := ctx.Err(); err != nil {
 			return StorageSyncResult{}, err
 		}
-		err = s.writeDatabaseSnapshot(snapshot)
+		target := s.config.SQLitePath
+		if target == "" {
+			target = s.paths.SQLiteDatabaseFile
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+		}
+		stage, stageErr := os.CreateTemp(filepath.Dir(target), ".storage-sync-*.db")
+		if stageErr != nil {
+			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: stageErr}
+		}
+		stagePath := stage.Name()
+		_ = stage.Close()
+		_ = os.Remove(stagePath)
+		defer os.Remove(stagePath)
+		if err = s.writeDatabaseSnapshotAt(snapshot, stagePath); err != nil {
+			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+		}
+		if err := ctx.Err(); err != nil {
+			return StorageSyncResult{}, err
+		}
+		if err := s.phase(ctx, "before_backup"); err != nil {
+			return StorageSyncResult{}, err
+		}
+		result.BackupPath, err = backupDatabaseTarget(s.paths, target, direction, time.Now().UTC())
+		if err != nil {
+			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+		}
+		if err := s.phase(ctx, "before_publish"); err != nil {
+			return StorageSyncResult{}, err
+		}
+		err = os.Rename(stagePath, target)
 	case SyncDatabaseToDataDir:
 		snapshot, err = s.readDatabaseSnapshot()
 		if err != nil {
 			return StorageSyncResult{}, err
 		}
-		result.BackupPath, err = backupDataDirTarget(s.paths, direction, time.Now().UTC())
-		if err != nil {
+		if err := ctx.Err(); err != nil {
 			return StorageSyncResult{}, err
 		}
-		err = writeDataDirSnapshot(s.paths, snapshot)
+		stageDir, stageErr := os.MkdirTemp(s.paths.Dir, ".storage-sync-stage-*")
+		if stageErr != nil {
+			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: stageErr}
+		}
+		defer os.RemoveAll(stageDir)
+		stagePaths := syncStagePaths(s.paths, stageDir)
+		if err = writeDataDirSnapshot(stagePaths, snapshot); err != nil {
+			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+		}
+		if err := s.phase(ctx, "before_backup"); err != nil {
+			return StorageSyncResult{}, err
+		}
+		result.BackupPath, err = backupDataDirTarget(s.paths, direction, time.Now().UTC())
+		if err != nil {
+			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+		}
+		if err := ctx.Err(); err != nil {
+			return StorageSyncResult{}, err
+		}
+		if err := s.phase(ctx, "before_publish"); err != nil {
+			return StorageSyncResult{}, err
+		}
+		err = publishDataDirStage(stagePaths, s.paths, result.BackupPath, func(phase string) error {
+			if strings.HasPrefix(phase, "restore:") {
+				if s.beforePhase != nil {
+					return s.beforePhase(phase)
+				}
+				return nil
+			}
+			return s.phase(ctx, phase)
+		})
 	}
 	if err != nil {
-		return StorageSyncResult{}, err
+		return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
 	}
 	result.Summary = snapshot.summary()
 	return result, nil
+}
+
+func (s *StorageSyncService) phase(ctx context.Context, name string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if s.beforePhase != nil {
+		return s.beforePhase(name)
+	}
+	return nil
 }
 
 func (s storageSnapshot) summary() map[string]int {
@@ -136,13 +239,19 @@ func (s storageSnapshot) summary() map[string]int {
 }
 
 func (s *StorageSyncService) writeDatabaseSnapshot(snapshot storageSnapshot) error {
+	target := s.config.SQLitePath
+	if target == "" {
+		target = s.paths.SQLiteDatabaseFile
+	}
+	return s.writeDatabaseSnapshotAt(snapshot, target)
+}
+
+func (s *StorageSyncService) writeDatabaseSnapshotAt(snapshot storageSnapshot, target string) error {
 	config := s.config
 	config.StorageOption = StorageOptionDatabase
 	config.Driver = StorageDriverSQLite
 	config.DatabaseURL = ""
-	if config.SQLitePath == "" {
-		config.SQLitePath = s.paths.SQLiteDatabaseFile
-	}
+	config.SQLitePath = target
 	store, err := openSQLStore(config)
 	if err != nil {
 		return err
@@ -186,12 +295,12 @@ func (s *StorageSyncService) writeDatabaseSnapshot(snapshot storageSnapshot) err
 	}
 	navigationStore := &SQLiteNavigationRepository{db: store.db, driver: store.driver, now: time.Now}
 	for _, filter := range snapshot.Filters {
-		if _, err := navigationStore.SaveFilter(filter); err != nil {
+		if err := navigationStore.RestoreFilter(filter); err != nil {
 			return err
 		}
 	}
 	for _, recent := range snapshot.Recents {
-		if err := navigationStore.RecordRecent(recent); err != nil {
+		if err := navigationStore.RestoreRecent(recent); err != nil {
 			return err
 		}
 	}
@@ -223,6 +332,27 @@ func (s *StorageSyncService) readDatabaseSnapshot() (storageSnapshot, error) {
 		config.SQLitePath = s.paths.SQLiteDatabaseFile
 	}
 	store, err := openSQLStore(config)
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	snapshotFile, err := os.CreateTemp(filepath.Dir(config.SQLitePath), ".storage-snapshot-*.db")
+	if err != nil {
+		_ = store.Close()
+		return storageSnapshot{}, err
+	}
+	snapshotPath := snapshotFile.Name()
+	_ = snapshotFile.Close()
+	_ = os.Remove(snapshotPath)
+	defer os.Remove(snapshotPath)
+	if _, err := store.db.Exec(`VACUUM INTO ?`, snapshotPath); err != nil {
+		_ = store.Close()
+		return storageSnapshot{}, err
+	}
+	if err := store.Close(); err != nil {
+		return storageSnapshot{}, err
+	}
+	config.SQLitePath = snapshotPath
+	store, err = openSQLStore(config)
 	if err != nil {
 		return storageSnapshot{}, err
 	}
@@ -459,7 +589,28 @@ func writeYAMLFile(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600)
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".storage-write-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
 }
 
 func writeAuditLog(path string, events []models.AuditEvent) error {
@@ -487,13 +638,30 @@ func writeAuditLog(path string, events []models.AuditEvent) error {
 	return file.Sync()
 }
 
-func backupDatabaseTarget(paths system.Paths, direction string, now time.Time) (string, error) {
+func backupDatabaseTarget(paths system.Paths, databasePath, direction string, now time.Time) (string, error) {
 	backupPath := storageBackupPath(paths, direction, now)
 	if err := os.MkdirAll(backupPath, 0o755); err != nil {
 		return "", err
 	}
+	if _, err := os.Stat(databasePath); errors.Is(err, os.ErrNotExist) {
+		return backupPath, nil
+	} else if err != nil {
+		return "", err
+	}
+	backupDatabase := filepath.Join(backupPath, filepath.Base(databasePath))
+	db, err := sql.Open("sqlite", databasePath)
+	if err == nil {
+		_, snapshotErr := db.Exec(`VACUUM INTO ?`, backupDatabase)
+		closeErr := db.Close()
+		if snapshotErr == nil && closeErr == nil {
+			return backupPath, nil
+		}
+		_ = os.Remove(backupDatabase)
+	}
+	// A corrupt/non-SQLite target is still operator data. Preserve its exact
+	// bytes (and journals) so a failed repair remains reversible.
 	for _, suffix := range []string{"", "-wal", "-shm"} {
-		source := paths.SQLiteDatabaseFile + suffix
+		source := databasePath + suffix
 		if err := copyIfExists(source, filepath.Join(backupPath, filepath.Base(source))); err != nil {
 			return "", err
 		}
@@ -515,7 +683,89 @@ func backupDataDirTarget(paths system.Paths, direction string, now time.Time) (s
 }
 
 func storageBackupPath(paths system.Paths, direction string, now time.Time) string {
-	return filepath.Join(paths.Dir, "backups", "storage-sync", now.Format("20060102-150405")+"-"+direction)
+	return filepath.Join(paths.Dir, "backups", "storage-sync", now.Format("20060102-150405.000000000")+"-"+direction)
+}
+
+func syncStagePaths(paths system.Paths, dir string) system.Paths {
+	staged := paths
+	staged.Dir = dir
+	staged.RegistryFile = filepath.Join(dir, filepath.Base(paths.RegistryFile))
+	staged.PlanIndexFile = filepath.Join(dir, filepath.Base(paths.PlanIndexFile))
+	staged.AuditLogFile = filepath.Join(dir, filepath.Base(paths.AuditLogFile))
+	staged.SavedFiltersFile = filepath.Join(dir, filepath.Base(paths.SavedFiltersFile))
+	staged.RecentItemsFile = filepath.Join(dir, filepath.Base(paths.RecentItemsFile))
+	staged.AISettingsFile = filepath.Join(dir, filepath.Base(paths.AISettingsFile))
+	staged.CanvasFile = filepath.Join(dir, filepath.Base(paths.CanvasFile))
+	staged.AISessionRecordsFile = filepath.Join(dir, filepath.Base(paths.AISessionRecordsFile))
+	return staged
+}
+
+func publishDataDirStage(stage, target system.Paths, backup string, before func(string) error) error {
+	pairs := [][2]string{{stage.RegistryFile, target.RegistryFile}, {stage.PlanIndexFile, target.PlanIndexFile}, {stage.AuditLogFile, target.AuditLogFile}, {stage.SavedFiltersFile, target.SavedFiltersFile}, {stage.RecentItemsFile, target.RecentItemsFile}, {stage.AISettingsFile, target.AISettingsFile}, {stage.CanvasFile, target.CanvasFile}, {stage.AISessionRecordsFile, target.AISessionRecordsFile}}
+	for _, pair := range pairs {
+		if before != nil {
+			if err := before("publish:" + filepath.Base(pair[1])); err != nil {
+				return rollbackDataDirPublication(pairs, backup, before, err)
+			}
+		}
+		if err := os.Rename(pair[0], pair[1]); err != nil {
+			return rollbackDataDirPublication(pairs, backup, before, err)
+		}
+	}
+	return nil
+}
+
+func rollbackDataDirPublication(pairs [][2]string, backup string, before func(string) error, publishErr error) error {
+	rollbackErrors := []error{fmt.Errorf("publish target generation: %w", publishErr)}
+	for _, pair := range pairs {
+		target := pair[1]
+		if before != nil {
+			if err := before("restore:" + filepath.Base(target)); err != nil {
+				rollbackErrors = append(rollbackErrors, fmt.Errorf("restore %s: %w", target, err))
+				continue
+			}
+		}
+		backupFile := filepath.Join(backup, filepath.Base(target))
+		if _, statErr := os.Stat(backupFile); statErr == nil {
+			if err := restoreFileAtomically(backupFile, target); err != nil {
+				rollbackErrors = append(rollbackErrors, fmt.Errorf("restore %s: %w", target, err))
+			}
+		} else if errors.Is(statErr, os.ErrNotExist) {
+			if err := os.Remove(target); err != nil && !errors.Is(err, os.ErrNotExist) {
+				rollbackErrors = append(rollbackErrors, fmt.Errorf("remove newly published %s: %w", target, err))
+			}
+		} else {
+			rollbackErrors = append(rollbackErrors, fmt.Errorf("inspect backup %s: %w", backupFile, statErr))
+		}
+	}
+	return errors.Join(rollbackErrors...)
+}
+
+func restoreFileAtomically(source, target string) error {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(target), ".storage-restore-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	in, err := os.Open(source)
+	if err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	_, copyErr := io.Copy(temporary, in)
+	closeInErr := in.Close()
+	if copyErr == nil {
+		copyErr = temporary.Sync()
+	}
+	closeOutErr := temporary.Close()
+	if err := errors.Join(copyErr, closeInErr, closeOutErr); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, target)
 }
 
 func copyIfExists(source, target string) error {

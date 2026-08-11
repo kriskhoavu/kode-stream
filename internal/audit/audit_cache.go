@@ -13,7 +13,7 @@ type CachedEventReader struct {
 	ttl           time.Duration
 	now           func() time.Time
 	mu            sync.Mutex
-	items         map[int]cachedEvents
+	items         map[Query]cachedEvents
 	hits          int
 	misses        int
 	invalidations int
@@ -34,19 +34,26 @@ func NewCachedEventReader(source Repository, ttl time.Duration, now func() time.
 	if now == nil {
 		now = time.Now
 	}
-	return &CachedEventReader{source: source, ttl: ttl, now: now, items: make(map[int]cachedEvents)}
+	return &CachedEventReader{source: source, ttl: ttl, now: now, items: make(map[Query]cachedEvents)}
 }
 
 func (r *CachedEventReader) RecentContext(ctx context.Context, limit int) ([]models.AuditEvent, error) {
-	if r == nil || r.source == nil || r.ttl <= 0 {
-		return r.source.RecentContext(ctx, limit)
+	return r.QueryContext(ctx, Query{Limit: limit})
+}
+
+func (r *CachedEventReader) QueryContext(ctx context.Context, query Query) ([]models.AuditEvent, error) {
+	if r == nil || r.source == nil {
+		return []models.AuditEvent{}, nil
+	}
+	if r.ttl <= 0 {
+		return r.source.QueryContext(ctx, query)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	now := r.now()
 	r.mu.Lock()
-	entry, ok := r.items[limit]
+	entry, ok := r.items[query]
 	if ok && now.Before(entry.expiresAt) {
 		r.hits++
 		events := cloneEvents(entry.events)
@@ -56,12 +63,12 @@ func (r *CachedEventReader) RecentContext(ctx context.Context, limit int) ([]mod
 	r.misses++
 	r.mu.Unlock()
 
-	events, err := r.source.RecentContext(ctx, limit)
+	events, err := r.source.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	r.mu.Lock()
-	r.items[limit] = cachedEvents{expiresAt: now.Add(r.ttl), events: cloneEvents(events)}
+	r.items[query] = cachedEvents{expiresAt: now.Add(r.ttl), events: cloneEvents(events)}
 	r.mu.Unlock()
 	return events, nil
 }
@@ -72,7 +79,7 @@ func (r *CachedEventReader) Invalidate() {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.items = make(map[int]cachedEvents)
+	r.items = make(map[Query]cachedEvents)
 	r.invalidations++
 }
 

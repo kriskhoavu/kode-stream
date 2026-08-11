@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"kode-stream/internal/ai"
+	"kode-stream/internal/audit"
 	"kode-stream/internal/canvas"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
@@ -21,10 +22,12 @@ import (
 	"kode-stream/internal/item/writer"
 	appjira "kode-stream/internal/jira"
 	"kode-stream/internal/knowledge"
+	appruntime "kode-stream/internal/runtime"
 	appsearch "kode-stream/internal/search"
 	"kode-stream/internal/server/api"
 	"kode-stream/internal/storage"
 	"kode-stream/internal/system"
+	"kode-stream/internal/verification"
 	"kode-stream/internal/workspace"
 	"kode-stream/internal/workspace/scanner"
 )
@@ -65,7 +68,7 @@ func NewServer(port int) (*Server, error) {
 	scan := scanner.New(git)
 	files := fileaccess.New()
 	writer := itemwriter.New(files, scan, idx, reg)
-	auditStore := state.Audit
+	auditStore := audit.NewRecorder(state.Audit)
 	healthService := workspace.NewHealthService(reg, idx, git)
 	searchService := appsearch.New(idx)
 	navigationStore := state.Navigation
@@ -73,9 +76,31 @@ func NewServer(port int) (*Server, error) {
 	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager).ConfigureSessionRecords(state.SessionRecords, git)
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore).ConfigureCheckout(git)
-	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, system.New(), auditStore, healthService, searchService, navigationStore).WithRuntimeConfig(runtimeConfig).WithDatabaseHealth(state.SQLStore).WithStorageServices(state.StatusService, state.SyncService).WithAISessions(aiSessionService).WithJira(jiraService).WithKnowledge(knowledgeService)
-	canvasService := canvas.NewService(state.Canvas, reg, idx, git, aiSessionService, apiHandler.VerificationService(), runtimeConfig.Mode, canvasDatastore(state.Config), runtimeConfig.Capabilities)
-	apiHandler.WithCanvas(canvasService)
+	verificationService := verification.NewService(reg, appruntime.NewService())
+	canvasService := canvas.NewService(state.Canvas, reg, idx, git, aiSessionService, verificationService, runtimeConfig.Mode, canvasDatastore(state.Config), runtimeConfig.Capabilities)
+	apiHandler := api.New(api.Dependencies{
+		WorkspaceRepository: reg,
+		ItemRepository:      idx,
+		Scanner:             scan,
+		FileAccess:          files,
+		ItemWriter:          writer,
+		Git:                 git,
+		Dialog:              system.New(),
+		Audit:               auditStore,
+		WorkspaceHealth:     healthService,
+		Search:              searchService,
+		Navigation:          navigationStore,
+		AISessions:          aiSessionService,
+		Jira:                jiraService,
+		Knowledge:           knowledgeService,
+		Verification:        verificationService,
+		Canvas:              canvasService,
+		RuntimeConfig:       runtimeConfig,
+		DatabaseHealth:      state.SQLStore,
+		StorageStatus:       state.StatusService,
+		StorageSync:         state.SyncService,
+		CloudPersistence:    state.Cloud,
+	})
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())
