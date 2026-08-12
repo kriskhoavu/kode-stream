@@ -15,6 +15,7 @@ export function JiraItemPanel({ itemId }: { itemId: string }) {
     <div className="jira-panel-heading"><span className="status-badge">{issue.status}</span><button className="icon-button" type="button" aria-label="Refresh Jira ticket" disabled={jira.refreshing} onClick={() => void jira.refresh()}><RefreshCw size={14} /></button></div>
     <a href={issue.browserUrl} target="_blank" rel="noreferrer"><strong>{issue.key}</strong> <ExternalLink size={13} /></a>
     <h3>{issue.summary}</h3>
+    {issue.truncated && <p className="jira-panel-state" role="status">{issue.warnings?.[0] ?? 'Jira issue content was truncated to safe limits.'}</p>}
     <dl><dt>Type</dt><dd>{issue.issueType || '—'}</dd><dt>Priority</dt><dd>{issue.priority || '—'}</dd><dt>Assignee</dt><dd>{issue.assignee?.displayName || 'Unassigned'}</dd><dt>Reporter</dt><dd>{issue.reporter?.displayName || '—'}</dd><dt>Updated</dt><dd>{formatDate(issue.updatedAt)}</dd></dl>
     {issue.labels.length > 0 && <div className="jira-labels">{issue.labels.map((label) => <span key={label}>{label}</span>)}</div>}
     <section><h4>Description</h4><p className="jira-description">{issue.description || 'No description.'}</p></section>

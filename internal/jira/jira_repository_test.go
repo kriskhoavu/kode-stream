@@ -4,6 +4,7 @@ package jira
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"kode-stream/internal/common/models"
 )
@@ -115,6 +117,46 @@ func TestGetIssueNormalizesCloudADFAndAttachments(t *testing.T) {
 	}
 }
 
+func TestGetIssueBoundsHostileFieldsWithoutBreakingUnicode(t *testing.T) {
+	deep := strings.Repeat(`{"type":"paragraph","content":[`, maxADFDepth+8) + `{"type":"text","text":"` + strings.Repeat("界", 512) + `"}` + strings.Repeat(`]}`, maxADFDepth+8)
+	labels := `[` + strings.Repeat(`"very-long-label",`, maxLabels+10) + `"final"]`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"key":"DI-1","fields":{"summary":"` + strings.Repeat("x", maxScalarBytes+1) + `","description":` + deep + `,"status":{},"issuetype":{},"labels":` + labels + `,"attachment":[]}}`))
+	}))
+	defer server.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	issue, err := client.GetIssue(context.Background(), models.JiraConnection{DeploymentType: "cloud", BaseURL: server.URL, AccountEmail: "a@b.com", TokenEnvVar: "TOKEN"}, "DI-1")
+	if err != nil || !issue.Truncated || len(issue.Description) > maxDescriptionBytes || len(issue.Labels) > maxLabels || !utf8.ValidString(issue.Description) {
+		t.Fatalf("issue=%#v err=%v", issue, err)
+	}
+}
+
+func TestGetIssueMarksEveryClippedScalarAsTruncated(t *testing.T) {
+	for name, fields := range map[string]string{
+		"summary":             `"summary":"` + strings.Repeat("x", maxScalarBytes+1) + `"`,
+		"person":              `"assignee":{"displayName":"` + strings.Repeat("x", maxScalarBytes+1) + `"}`,
+		"attachment metadata": `"attachment":[{"id":"1","filename":"` + strings.Repeat("x", maxScalarBytes+1) + `","content":"https://files/1"}]`,
+		"attachment URL":      `"attachment":[{"id":"1","filename":"a","content":"https://files/` + strings.Repeat("x", maxScalarBytes+1) + `"}]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"key":"DI-1","fields":{` + fields + `,"description":"","status":{},"issuetype":{}}}`))
+			}))
+			defer server.Close()
+			client := New()
+			client.getenv = func(string) string { return "token" }
+			issue, err := client.GetIssue(context.Background(), models.JiraConnection{DeploymentType: "server", BaseURL: server.URL, TokenEnvVar: "TOKEN"}, "DI-1")
+			if err != nil || !issue.Truncated || len(issue.Warnings) == 0 {
+				t.Fatalf("issue=%#v err=%v", issue, err)
+			}
+			if name == "attachment URL" && len(issue.Attachments) != 0 {
+				t.Fatalf("unsafe clipped URL attachment exposed: %#v", issue.Attachments)
+			}
+		})
+	}
+}
+
 func TestGetIssueNormalizesServerTextAndStatusErrors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "missing", http.StatusNotFound) }))
 	defer server.Close()
@@ -154,7 +196,11 @@ func TestGetAttachmentChecksOriginSizeAndContentType(t *testing.T) {
 	client.getenv = func(string) string { return "token" }
 	connection := models.JiraConnection{DeploymentType: "server", BaseURL: server.URL, TokenEnvVar: "TOKEN"}
 	content, err := client.GetAttachment(context.Background(), connection, Attachment{ID: "1", Filename: "image.png", ContentURL: server.URL + "/file"})
-	if err != nil || string(content.Data) != "png" || content.MediaType != "image/png" {
+	data, readErr := io.ReadAll(content.Body)
+	if content.Body != nil {
+		_ = content.Body.Close()
+	}
+	if err != nil || readErr != nil || string(data) != "png" || content.MediaType != "image/png" {
 		t.Fatalf("content=%#v err=%v", content, err)
 	}
 	_, err = client.GetAttachment(context.Background(), connection, Attachment{ContentURL: "https://evil.example/file"})

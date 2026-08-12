@@ -287,7 +287,7 @@ export const api = {
   },
   updateWorkspace: (id: string, input: WorkspaceInput) => request<WorkspaceConfig>(`/api/workspaces/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   testJiraConnection: (workspaceId: string, connection: JiraConnection) => request<JiraConnectionTest>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/test`, { method: 'POST', body: JSON.stringify(connection) }),
-  workspaceJiraIssue: (workspaceId: string, issueKey: string) => request<JiraIssueState>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/issues/${encodeURIComponent(issueKey)}`),
+  workspaceJiraIssue: (workspaceId: string, issueKey: string, signal?: AbortSignal) => request<JiraIssueState>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/issues/${encodeURIComponent(issueKey)}`, { signal }, !signal),
   workspaceRuntime: (workspaceId: string) => request<WorkspaceRuntimeConfig | { runtime: null }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/runtime`).then((payload) => {
     if ('runtime' in payload) return payload.runtime;
     return payload;
@@ -308,8 +308,8 @@ export const api = {
   saveItemVerificationTests: (itemId: string, input: VerificationTestSelection) =>
     request<ItemVerificationTests>(`/api/items/${encodeURIComponent(itemId)}/verification-tests`, { method: 'PUT', body: JSON.stringify(input) }).then(normalizeItemVerificationTests),
 	itemE2ERunbooks: (itemId: string) => request<E2ERunbookList>(`/api/items/${encodeURIComponent(itemId)}/e2e-runbooks`),
-  jiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira`),
-  refreshJiraIssue: (itemId: string) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira/refresh`, { method: 'POST' }),
+  jiraIssue: (itemId: string, signal?: AbortSignal) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira`, { signal }, !signal),
+  refreshJiraIssue: (itemId: string, signal?: AbortSignal) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira/refresh`, { method: 'POST', signal }, false),
   jiraAttachmentURL: (itemId: string, attachmentId: string) => apiURL(`/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`),
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
   scan: (workspaceId: string) => request<ScanResult>(`/api/workspaces/${workspaceId}/scan`, { method: 'POST' }),

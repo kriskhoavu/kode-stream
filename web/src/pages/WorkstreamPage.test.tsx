@@ -133,6 +133,31 @@ describe('WorkstreamPage', () => {
     expect(screen.queryByRole('dialog', { name: 'Create new work item' })).not.toBeInTheDocument();
   });
 
+  it('aborts a pending Jira intake lookup when the dialog closes', async () => {
+    let jiraInit: RequestInit | undefined;
+    let resolveJira: ((value: Response) => void) | undefined;
+    const pendingJira = new Promise<Response>((resolve) => { resolveJira = resolve; });
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/checkout') return Promise.resolve(response(workstreamBranchLoadResult([], 'main')));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      if (url === '/api/workspaces/r1/jira/issues/PM-025') { jiraInit = init; return pendingJira; }
+      return Promise.resolve(response([]));
+    }));
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+    fireEvent.click(await screen.findByRole('button', { name: /\+ New Work Item/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'From Jira' }));
+    fireEvent.change(screen.getByLabelText('Jira key'), { target: { value: 'PM-025' } });
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Jira/i }));
+    await waitFor(() => expect(jiraInit?.signal).toBeDefined());
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(jiraInit?.signal?.aborted).toBe(true);
+    await act(async () => { resolveJira?.(response({ state: 'available', issue: { key: 'PM-025', summary: 'late', status: 'Open', description: '', issueType: 'Story', labels: [], browserUrl: '', attachments: [] } })); });
+    expect(screen.queryByText('PM-025: late')).not.toBeInTheDocument();
+  });
+
   it('does not repeat placeholder docs metadata on docs cards', async () => {
     const docsItem: ItemSummary = {
       id: 'docs',

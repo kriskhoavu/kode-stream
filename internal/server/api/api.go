@@ -126,7 +126,7 @@ func New(deps Dependencies) *API {
 	if workspaceCloner == nil {
 		workspaceCloner = deps.Git
 	}
-	workspaceService := appworkspace.New(appworkspace.ServiceDependencies{Registry: deps.WorkspaceRepository, Index: deps.ItemRepository, Scanner: deps.Scanner, Writer: deps.ItemWriter, Cloner: workspaceCloner, Audit: deps.Audit})
+	workspaceService := appworkspace.New(appworkspace.ServiceDependencies{Registry: deps.WorkspaceRepository, Index: deps.ItemRepository, Scanner: deps.Scanner, Writer: deps.ItemWriter, Cloner: workspaceCloner, Audit: deps.Audit, JiraCache: deps.Jira})
 	runtimeService := appruntime.NewService()
 	runtimeConfig := deps.RuntimeConfig
 	if runtimeConfig.Mode == "" {

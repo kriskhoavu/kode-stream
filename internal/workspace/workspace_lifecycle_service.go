@@ -66,7 +66,11 @@ func (s *Service) Update(id string, input models.WorkspaceInput) (models.Workspa
 }
 
 func (s *LifecycleService) Update(id string, input models.WorkspaceInput) (models.WorkspaceConfig, error) {
-	return s.registry.Update(id, input)
+	workspace, err := s.registry.Update(id, input)
+	if err == nil && s.jiraCache != nil {
+		s.jiraCache.InvalidateWorkspace(id)
+	}
+	return workspace, err
 }
 
 func (s *Service) Delete(id string) error { return s.lifecycle.Delete(id) }
@@ -107,6 +111,9 @@ func (s *LifecycleService) Delete(id string) error {
 		if err := s.registry.Delete(id); err != nil {
 			return err
 		}
+	}
+	if s.jiraCache != nil {
+		s.jiraCache.InvalidateWorkspace(id)
 	}
 	return nil
 }

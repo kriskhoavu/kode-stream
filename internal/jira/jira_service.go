@@ -27,20 +27,50 @@ type cacheEntry struct {
 	expiresAt time.Time
 }
 
+type inFlightIssue struct {
+	done       chan struct{}
+	cancel     context.CancelFunc
+	state      IssueState
+	waiters    int
+	abandoned  bool
+	generation uint64
+}
+
 type JiraService struct {
-	registry registry.Repository
-	index    itemindex.Repository
-	client   *Client
-	mu       sync.Mutex
-	cache    map[string]cacheEntry
-	now      func() time.Time
+	registry   registry.Repository
+	index      itemindex.Repository
+	client     *Client
+	mu         sync.Mutex
+	cache      map[string]cacheEntry
+	inFlight   map[string]*inFlightIssue
+	generation map[string]uint64
+	now        func() time.Time
 }
 
 type Service = JiraService
 
 func NewService(reg registry.Repository, index itemindex.Repository, client *Client) *JiraService {
-	return &JiraService{registry: reg, index: index, client: client, cache: map[string]cacheEntry{}, now: time.Now}
+	return &JiraService{registry: reg, index: index, client: client, cache: map[string]cacheEntry{}, inFlight: map[string]*inFlightIssue{}, generation: map[string]uint64{}, now: time.Now}
 }
+
+// InvalidateWorkspace drops only process-local values after a workspace change
+// was committed. It is deliberately a narrow lifecycle seam, not a registry wrapper.
+func (s *Service) InvalidateWorkspace(workspaceID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key := range s.cache {
+		if strings.HasPrefix(key, workspaceID+"|") {
+			delete(s.cache, key)
+		}
+	}
+	for key := range s.generation {
+		if strings.HasPrefix(key, workspaceID+"|") {
+			s.generation[key]++
+		}
+	}
+}
+
+const maxCacheEntries = 256
 
 func (s *Service) TestConnection(ctx context.Context, workspaceID string, connection *models.JiraConnection) (ConnectionTest, error) {
 	if _, found, err := s.registry.Get(workspaceID); err != nil || !found {
@@ -100,16 +130,80 @@ func (s *Service) issueByKey(ctx context.Context, workspace models.WorkspaceConf
 	if !strings.HasPrefix(key, project+"-") {
 		return IssueState{State: "project_mismatch", Message: fmt.Sprintf("Item belongs to a different Jira project than %s", project)}, nil
 	}
-	cacheKey := workspace.ID + "|" + workspace.Jira.BaseURL + "|" + key
+	cacheKey := jiraCacheKey(workspace.ID, *workspace.Jira, key)
 	if !refresh {
 		s.mu.Lock()
+		s.pruneCacheLocked(s.now())
 		entry, ok := s.cache[cacheKey]
-		s.mu.Unlock()
 		if ok && s.now().Before(entry.expiresAt) {
+			s.mu.Unlock()
 			return entry.state, nil
 		}
+		if flight := s.inFlight[cacheKey]; flight != nil {
+			flight.waiters++
+			s.mu.Unlock()
+			return s.waitForFlight(ctx, cacheKey, flight)
+		}
+		s.generation[cacheKey]++
+		generation := s.generation[cacheKey]
+		fetchCtx, cancel := context.WithCancel(context.Background())
+		flight := &inFlightIssue{done: make(chan struct{}), cancel: cancel, waiters: 1, generation: generation}
+		s.inFlight[cacheKey] = flight
+		s.mu.Unlock()
+		go s.completeFlight(fetchCtx, cacheKey, flight, *workspace.Jira, key)
+		return s.waitForFlight(ctx, cacheKey, flight)
 	}
-	issue, err := s.client.GetIssue(ctx, *workspace.Jira, key)
+	s.mu.Lock()
+	s.generation[cacheKey]++
+	generation := s.generation[cacheKey]
+	s.mu.Unlock()
+	state := s.fetchIssue(ctx, *workspace.Jira, key)
+	if state.State == "available" || state.State == "not_found" {
+		s.mu.Lock()
+		if s.generation[cacheKey] == generation {
+			s.putCacheLocked(cacheKey, state)
+		}
+		s.mu.Unlock()
+	}
+	return state, nil
+}
+
+func (s *Service) waitForFlight(ctx context.Context, cacheKey string, flight *inFlightIssue) (IssueState, error) {
+	select {
+	case <-flight.done:
+		return flight.state, nil
+	case <-ctx.Done():
+		s.mu.Lock()
+		flight.waiters--
+		if flight.waiters == 0 && !flight.abandoned {
+			flight.abandoned = true
+			flight.cancel()
+		}
+		s.mu.Unlock()
+		return IssueState{}, ctx.Err()
+	}
+}
+
+func (s *Service) completeFlight(ctx context.Context, cacheKey string, flight *inFlightIssue, connection models.JiraConnection, key string) {
+	state := s.fetchIssue(ctx, connection, key)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.inFlight[cacheKey] == flight {
+		delete(s.inFlight, cacheKey)
+	}
+	flight.state = state
+	if !flight.abandoned && s.generation[cacheKey] == flight.generation && (state.State == "available" || state.State == "not_found") {
+		s.putCacheLocked(cacheKey, state)
+	}
+	close(flight.done)
+}
+
+func jiraCacheKey(workspaceID string, c models.JiraConnection, issueKey string) string {
+	return strings.Join([]string{workspaceID, strings.ToLower(strings.TrimSpace(c.DeploymentType)), strings.ToLower(strings.TrimSpace(c.BaseURL)), strings.ToUpper(strings.TrimSpace(c.ProjectKey)), strings.TrimSpace(c.AccountEmail), strings.TrimSpace(c.TokenEnvVar), issueKey}, "|")
+}
+
+func (s *Service) fetchIssue(ctx context.Context, connection models.JiraConnection, key string) IssueState {
+	issue, err := s.client.GetIssue(ctx, connection, key)
 	state := IssueState{RefreshedAt: s.now().UTC()}
 	switch {
 	case err == nil:
@@ -131,12 +225,29 @@ func (s *Service) issueByKey(ctx context.Context, workspace models.WorkspaceConf
 		state.Message = err.Error()
 		state.RecoveryHint = "Check Jira availability and the workspace connection settings."
 	}
-	if state.State == "available" || state.State == "not_found" {
-		s.mu.Lock()
-		s.cache[cacheKey] = cacheEntry{state: state, expiresAt: s.now().Add(5 * time.Minute)}
-		s.mu.Unlock()
+	return state
+}
+
+func (s *Service) pruneCacheLocked(now time.Time) {
+	for key, entry := range s.cache {
+		if !now.Before(entry.expiresAt) {
+			delete(s.cache, key)
+		}
 	}
-	return state, nil
+}
+func (s *Service) putCacheLocked(key string, state IssueState) {
+	s.pruneCacheLocked(s.now())
+	if len(s.cache) >= maxCacheEntries {
+		var oldest string
+		var until time.Time
+		for candidate, entry := range s.cache {
+			if oldest == "" || entry.expiresAt.Before(until) {
+				oldest, until = candidate, entry.expiresAt
+			}
+		}
+		delete(s.cache, oldest)
+	}
+	s.cache[key] = cacheEntry{state: state, expiresAt: s.now().Add(5 * time.Minute)}
 }
 
 func (s *Service) Attachment(ctx context.Context, itemID, attachmentID string) (AttachmentContent, error) {

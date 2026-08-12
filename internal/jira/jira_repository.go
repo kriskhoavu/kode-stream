@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"kode-stream/internal/common/models"
 )
@@ -70,15 +71,26 @@ type Issue struct {
 	UpdatedAt   string       `json:"updatedAt,omitempty"`
 	BrowserURL  string       `json:"browserUrl"`
 	Attachments []Attachment `json:"attachments"`
+	Truncated   bool         `json:"truncated,omitempty"`
+	Warnings    []string     `json:"warnings,omitempty"`
 }
 
 type AttachmentContent struct {
-	Data      []byte
-	MediaType string
-	Filename  string
+	Body           io.ReadCloser
+	MediaType      string
+	Filename       string
+	DeclaredLength int64
 }
 
 const MaxAttachmentBytes int64 = 25 * 1024 * 1024
+
+const (
+	maxDescriptionBytes = 64 << 10
+	maxScalarBytes      = 8 << 10
+	maxLabels           = 64
+	maxAttachments      = 100
+	maxADFDepth         = 64
+)
 
 func (c *Client) GetAttachment(ctx context.Context, connection models.JiraConnection, attachment Attachment) (AttachmentContent, error) {
 	target, err := url.Parse(attachment.ContentURL)
@@ -105,22 +117,15 @@ func (c *Client) GetAttachment(ctx context.Context, connection models.JiraConnec
 	if err := responseError(response, errors.New("Jira attachment was not found")); err != nil {
 		return AttachmentContent{}, err
 	}
-	defer response.Body.Close()
 	if response.ContentLength > MaxAttachmentBytes {
-		return AttachmentContent{}, errors.New("Jira attachment exceeds the size limit")
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, MaxAttachmentBytes+1))
-	if err != nil {
-		return AttachmentContent{}, err
-	}
-	if int64(len(data)) > MaxAttachmentBytes {
+		response.Body.Close()
 		return AttachmentContent{}, errors.New("Jira attachment exceeds the size limit")
 	}
 	mediaType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
 	if mediaType == "" {
 		mediaType = attachment.MediaType
 	}
-	return AttachmentContent{Data: data, MediaType: mediaType, Filename: attachment.Filename}, nil
+	return AttachmentContent{Body: response.Body, MediaType: mediaType, Filename: attachment.Filename, DeclaredLength: response.ContentLength}, nil
 }
 
 type jiraIssueResponse struct {
@@ -185,15 +190,54 @@ func (c *Client) GetIssue(ctx context.Context, connection models.JiraConnection,
 	if err := decodeBounded(response, &payload); err != nil {
 		return Issue{}, fmt.Errorf("decode Jira issue: %w", err)
 	}
-	issue := Issue{Key: payload.Key, Summary: payload.Fields.Summary, Status: payload.Fields.Status.Name, Description: normalizeDescription(payload.Fields.Description), IssueType: payload.Fields.IssueType.Name, Assignee: normalizePerson(payload.Fields.Assignee), Reporter: normalizePerson(payload.Fields.Reporter), Labels: payload.Fields.Labels, CreatedAt: payload.Fields.Created, UpdatedAt: payload.Fields.Updated, BrowserURL: connection.BaseURL + "/browse/" + url.PathEscape(payload.Key), Attachments: []Attachment{}}
-	if issue.Labels == nil {
-		issue.Labels = []string{}
-	}
+	description, truncated := normalizeDescription(payload.Fields.Description)
+	keyValue, clipped := boundedString(payload.Key, maxScalarBytes)
+	truncated = truncated || clipped
+	summary, clipped := boundedString(payload.Fields.Summary, maxScalarBytes)
+	truncated = truncated || clipped
+	status, clipped := boundedString(payload.Fields.Status.Name, maxScalarBytes)
+	truncated = truncated || clipped
+	issueType, clipped := boundedString(payload.Fields.IssueType.Name, maxScalarBytes)
+	truncated = truncated || clipped
+	created, clipped := boundedString(payload.Fields.Created, maxScalarBytes)
+	truncated = truncated || clipped
+	updated, clipped := boundedString(payload.Fields.Updated, maxScalarBytes)
+	truncated = truncated || clipped
+	assignee, clipped := normalizePerson(payload.Fields.Assignee)
+	truncated = truncated || clipped
+	reporter, clipped := normalizePerson(payload.Fields.Reporter)
+	truncated = truncated || clipped
+	issue := Issue{Key: keyValue, Summary: summary, Status: status, Description: description, IssueType: issueType, Assignee: assignee, Reporter: reporter, Labels: boundedStrings(payload.Fields.Labels, maxLabels, maxScalarBytes, &truncated), CreatedAt: created, UpdatedAt: updated, BrowserURL: connection.BaseURL + "/browse/" + url.PathEscape(payload.Key), Attachments: []Attachment{}}
 	if payload.Fields.Priority != nil {
-		issue.Priority = payload.Fields.Priority.Name
+		issue.Priority, clipped = boundedString(payload.Fields.Priority.Name, maxScalarBytes)
+		truncated = truncated || clipped
 	}
-	for _, value := range payload.Fields.Attachment {
-		issue.Attachments = append(issue.Attachments, Attachment{ID: value.ID, Filename: value.Filename, MediaType: value.MimeType, SizeBytes: value.Size, CreatedAt: value.Created, ContentURL: value.Content, Author: *normalizePerson(&value.Author)})
+	for i, value := range payload.Fields.Attachment {
+		if i >= maxAttachments {
+			truncated = true
+			break
+		}
+		person, personClipped := normalizePerson(&value.Author)
+		truncated = truncated || personClipped
+		if person == nil {
+			person = &Person{}
+		}
+		id, idClipped := boundedString(value.ID, maxScalarBytes)
+		filename, filenameClipped := boundedString(value.Filename, maxScalarBytes)
+		mediaType, mediaTypeClipped := boundedString(value.MimeType, maxScalarBytes)
+		attachmentCreated, createdClipped := boundedString(value.Created, maxScalarBytes)
+		contentURL, contentClipped := boundedString(value.Content, maxScalarBytes)
+		truncated = truncated || idClipped || filenameClipped || mediaTypeClipped || createdClipped || contentClipped
+		// A clipped proxy URL is not a stable authorization target. Do not expose
+		// that attachment at all.
+		if contentClipped {
+			continue
+		}
+		issue.Attachments = append(issue.Attachments, Attachment{ID: id, Filename: filename, MediaType: mediaType, SizeBytes: value.Size, CreatedAt: attachmentCreated, ContentURL: contentURL, Author: *person})
+	}
+	issue.Truncated = truncated
+	if truncated {
+		issue.Warnings = []string{"Jira issue content was truncated to safe limits."}
 	}
 	return issue, nil
 }
@@ -233,55 +277,111 @@ func responseError(response *http.Response, notFound error) error {
 	}
 }
 
-func normalizePerson(value *jiraPerson) *Person {
+func normalizePerson(value *jiraPerson) (*Person, bool) {
 	if value == nil {
-		return nil
+		return nil, false
 	}
 	id := value.AccountID
 	if id == "" {
 		id = value.Name
 	}
-	return &Person{DisplayName: value.DisplayName, AccountID: id, Email: value.EmailAddress}
+	displayName, displayClipped := boundedString(value.DisplayName, maxScalarBytes)
+	accountID, idClipped := boundedString(id, maxScalarBytes)
+	email, emailClipped := boundedString(value.EmailAddress, maxScalarBytes)
+	return &Person{DisplayName: displayName, AccountID: accountID, Email: email}, displayClipped || idClipped || emailClipped
 }
 
-func normalizeDescription(raw json.RawMessage) string {
+func boundedString(value string, limit int) (string, bool) {
+	if len(value) <= limit {
+		return value, false
+	}
+	cut := limit
+	for cut > 0 && !utf8.RuneStart(value[cut]) {
+		cut--
+	}
+	return value[:cut], true
+}
+
+func boundedStrings(values []string, count, bytes int, truncated *bool) []string {
+	result := make([]string, 0, min(len(values), count))
+	for i, value := range values {
+		if i >= count {
+			*truncated = true
+			break
+		}
+		bounded, clipped := boundedString(value, bytes)
+		if clipped {
+			*truncated = true
+		}
+		result = append(result, bounded)
+	}
+	return result
+}
+
+func normalizeDescription(raw json.RawMessage) (string, bool) {
 	if len(raw) == 0 || string(raw) == "null" {
-		return ""
+		return "", false
 	}
 	var text string
 	if json.Unmarshal(raw, &text) == nil {
-		return text
+		return boundedString(text, maxDescriptionBytes)
 	}
 	var value any
 	if json.Unmarshal(raw, &value) != nil {
-		return ""
+		return "", false
 	}
-	var parts []string
-	var walk func(any)
-	walk = func(node any) {
+	parts := make([]string, 0, 32)
+	used, truncated := 0, false
+	type entry struct {
+		node  any
+		depth int
+	}
+	stack := []entry{{node: value}}
+	for len(stack) > 0 {
+		currentEntry := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if currentEntry.depth > maxADFDepth {
+			truncated = true
+			continue
+		}
+		node := currentEntry.node
 		switch current := node.(type) {
 		case map[string]any:
 			if current["type"] == "text" {
 				if value, ok := current["text"].(string); ok {
-					parts = append(parts, value)
+					remaining := maxDescriptionBytes - used
+					if remaining <= 0 {
+						truncated = true
+						continue
+					}
+					part, clipped := boundedString(value, remaining)
+					parts = append(parts, part)
+					used += len(part)
+					if clipped {
+						truncated = true
+					}
 				}
 			}
 			if content, ok := current["content"].([]any); ok {
-				for _, child := range content {
-					walk(child)
+				for i := len(content) - 1; i >= 0; i-- {
+					stack = append(stack, entry{node: content[i], depth: currentEntry.depth + 1})
 				}
 				if current["type"] == "paragraph" {
-					parts = append(parts, "\n")
+					if used < maxDescriptionBytes {
+						parts = append(parts, "\n")
+						used++
+					} else {
+						truncated = true
+					}
 				}
 			}
 		case []any:
-			for _, child := range current {
-				walk(child)
+			for i := len(current) - 1; i >= 0; i-- {
+				stack = append(stack, entry{node: current[i], depth: currentEntry.depth + 1})
 			}
 		}
 	}
-	walk(value)
-	return strings.TrimSpace(strings.Join(parts, ""))
+	return strings.TrimSpace(strings.Join(parts, "")), truncated
 }
 
 func New() *Client {
@@ -398,10 +498,10 @@ func (c *Client) TestConnection(ctx context.Context, connection models.JiraConne
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64*1024))
 		response.Body.Close()
 		if response.StatusCode == http.StatusUnauthorized {
-			return ConnectionTest{}, errors.New("Jira authentication failed")
+			return ConnectionTest{}, ErrAuthentication
 		}
 		if response.StatusCode == http.StatusForbidden {
-			return ConnectionTest{}, errors.New("Jira access is forbidden")
+			return ConnectionTest{}, ErrForbidden
 		}
 		if response.StatusCode == http.StatusNotFound && strings.HasPrefix(endpoint, "project/") {
 			return ConnectionTest{}, errors.New("Jira project was not found")

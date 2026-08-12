@@ -108,9 +108,10 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 			return;
 		}
 		let active = true;
+		const controller = new AbortController();
 		setJiraPromptLoading(true);
 		setJiraPromptError('');
-		api.jiraIssue(itemId).then((state) => {
+		api.jiraIssue(itemId, controller.signal).then((state) => {
 			if (!active) return;
 			const issue = state.issue;
 			if (state.state !== 'available' || !issue) {
@@ -124,10 +125,10 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 			setPromptDraft((current) => appendJiraDescriptionPrompt(current, issue));
 			setPromptDirty(true);
 		}).catch((caught) => {
-			if (!active) return;
+			if (!active || controller.signal.aborted) return;
 			setJiraPromptError(caught instanceof Error ? caught.message : 'Jira ticket description is unavailable.');
 		}).finally(() => active && setJiraPromptLoading(false));
-		return () => { active = false; };
+		return () => { active = false; controller.abort(); };
 	}, [includeJiraDescription, itemId, presetId, e2eMode]);
 
 	useEffect(() => {

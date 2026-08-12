@@ -122,10 +122,19 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 	// different workspace.
 	const workspaceGenerationRef = useRef(0);
 	const activeWorkspaceRef = useRef<string | undefined>(workspace?.id);
+	const jiraLookupAbortRef = useRef<AbortController | null>(null);
+	const closeNewPlan = () => {
+		jiraLookupAbortRef.current?.abort();
+		jiraLookupAbortRef.current = null;
+		setJiraLookupLoading(false);
+		setNewPlanOpen(false);
+		setJiraLookup(null);
+		setNewPlanError('');
+	};
 	useEffect(() => {
 		activeWorkspaceRef.current = workspace?.id;
 		workspaceGenerationRef.current += 1;
-		return () => { workspaceGenerationRef.current += 1; };
+		return () => { workspaceGenerationRef.current += 1; jiraLookupAbortRef.current?.abort(); };
 	}, [workspace?.id]);
   const text = query;
 
@@ -199,9 +208,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     if (!newPlanOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setNewPlanOpen(false);
-      setJiraLookup(null);
-      setNewPlanError('');
+			closeNewPlan();
     };
     document.addEventListener('keydown', closeOnEscape);
     return () => {
@@ -400,13 +407,16 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   const fetchJiraIssue = async () => {
     if (!workspace || !newPlanDraft.jiraKey.trim()) return;
+		jiraLookupAbortRef.current?.abort();
+		const controller = new AbortController();
+		jiraLookupAbortRef.current = controller;
 		const workspaceID = workspace.id;
 		const generation = workspaceGenerationRef.current;
 		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
     setJiraLookupLoading(true);
     setNewPlanError('');
     try {
-      const result = await api.workspaceJiraIssue(workspace.id, newPlanDraft.jiraKey.trim());
+			const result = await api.workspaceJiraIssue(workspace.id, newPlanDraft.jiraKey.trim(), controller.signal);
 			if (!active()) return;
       setJiraLookup(result);
       if (result.state === 'available' && result.issue) {
@@ -420,7 +430,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           tags: draft.tags.trim() || nextTags
         }));
       }
-    } catch (err) {
+		} catch (err) {
+			if (controller.signal.aborted) return;
 			if (!active()) return;
       setJiraLookup(null);
       setNewPlanError(err instanceof Error ? err.message : 'Jira lookup failed');
@@ -796,9 +807,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
             <header>
               <h2>New Work Item</h2>
               <button type="button" className="icon-button" onClick={() => {
-                setNewPlanOpen(false);
-                setJiraLookup(null);
-                setNewPlanError('');
+				closeNewPlan();
               }}><X size={16} /></button>
             </header>
             <div className={newPlanDraft.origin === 'jira' ? 'metadata-form jira-work-item-form' : 'metadata-form'}>
@@ -807,7 +816,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                   type="button"
                   className={newPlanDraft.origin === 'blank' ? 'active' : ''}
                   onClick={() => {
-                    setNewPlanDraft((draft) => ({ ...emptyNewWorkItemDraft(), source: draft.source, origin: 'blank' }));
+					jiraLookupAbortRef.current?.abort();
+					jiraLookupAbortRef.current = null;
+					setJiraLookupLoading(false);
+					setNewPlanDraft((draft) => ({ ...emptyNewWorkItemDraft(), source: draft.source, origin: 'blank' }));
                     setJiraLookup(null);
                     setNewPlanError('');
                   }}
@@ -906,7 +918,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
             </div>
             {newPlanError && <p className="error">{newPlanError}</p>}
             <footer className="modal-actions">
-              <button type="button" className="ghost" onClick={() => setNewPlanOpen(false)}>Cancel</button>
+				<button type="button" className="ghost" onClick={closeNewPlan}>Cancel</button>
               <button
                 type="button"
                 className="primary"

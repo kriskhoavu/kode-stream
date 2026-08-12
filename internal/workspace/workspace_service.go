@@ -57,6 +57,7 @@ type LifecycleService struct {
 	index     itemindex.Repository
 	cloner    ClonePort
 	removeAll func(string) error
+	jiraCache interface{ InvalidateWorkspace(string) }
 }
 
 // ScanService owns bounded indexing and per-workspace refresh serialization.
@@ -82,19 +83,20 @@ type ClonePort interface {
 }
 
 type ServiceDependencies struct {
-	Registry registry.Repository
-	Index    itemindex.Repository
-	Scanner  *scanner.Scanner
-	Writer   *itemwriter.Writer
-	Cloner   ClonePort
-	Audit    AuditAppender
+	Registry  registry.Repository
+	Index     itemindex.Repository
+	Scanner   *scanner.Scanner
+	Writer    *itemwriter.Writer
+	Cloner    ClonePort
+	Audit     AuditAppender
+	JiraCache interface{ InvalidateWorkspace(string) }
 }
 
 func New(deps ServiceDependencies) *Service {
 	return &Service{
 		registry:  deps.Registry,
 		index:     deps.Index,
-		lifecycle: &LifecycleService{registry: deps.Registry, index: deps.Index, cloner: deps.Cloner, removeAll: os.RemoveAll},
+		lifecycle: &LifecycleService{registry: deps.Registry, index: deps.Index, cloner: deps.Cloner, removeAll: os.RemoveAll, jiraCache: deps.JiraCache},
 		scans:     &ScanService{registry: deps.Registry, index: deps.Index, scanner: deps.Scanner},
 		sources:   &SourceSettingsService{registry: deps.Registry, writer: deps.Writer},
 		audit:     deps.Audit,

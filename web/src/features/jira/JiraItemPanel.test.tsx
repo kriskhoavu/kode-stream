@@ -33,7 +33,7 @@ describe('JiraItemPanel', () => {
     render(<JiraItemPanel itemId="item-1" />);
     expect(await screen.findByText('No Jira ticket')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:/refresh/i}));
-    await waitFor(()=>expect(api.refreshJiraIssue).toHaveBeenCalledWith('item-1'));
+    await waitFor(()=>expect(api.refreshJiraIssue).toHaveBeenCalledWith('item-1', expect.any(AbortSignal)));
     expect(await screen.findByText('Jira offline')).toBeInTheDocument();
   });
   it('isolates request failures', async () => {

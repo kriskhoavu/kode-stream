@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,133 @@ import (
 	"kode-stream/internal/item/index"
 	"kode-stream/internal/workspace/registry"
 )
+
+func TestIssueCoalescesConcurrentReadsAndCancelledWaiter(t *testing.T) {
+	started, release := make(chan struct{}), make(chan struct{})
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		close(started)
+		<-release
+		_, _ = w.Write([]byte(`{"key":"DI-170","fields":{"summary":"Feature","description":"Text","status":{"name":"Open"},"issuetype":{"name":"Story"}}}`))
+	}))
+	defer server.Close()
+	service, item := jiraTestService(t, server.URL, "DI-170")
+	first := make(chan IssueState, 1)
+	go func() { state, _ := service.Issue(context.Background(), item.ID, false); first <- state }()
+	<-started
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := service.Issue(cancelled, item.ID, false); !errors.Is(err, context.Canceled) {
+		t.Fatalf("wait error=%v", err)
+	}
+	close(release)
+	if state := <-first; state.State != "available" || requests != 1 {
+		t.Fatalf("state=%#v requests=%d", state, requests)
+	}
+}
+
+func TestCancelledLeaderDoesNotPoisonCoalescedFollower(t *testing.T) {
+	started, release := make(chan struct{}), make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-release
+		_, _ = w.Write([]byte(`{"key":"DI-170","fields":{"summary":"Feature","description":"Text","status":{"name":"Open"},"issuetype":{"name":"Story"}}}`))
+	}))
+	defer server.Close()
+	service, item := jiraTestService(t, server.URL, "DI-170")
+	leaderContext, cancelLeader := context.WithCancel(context.Background())
+	leader := make(chan error, 1)
+	go func() { _, err := service.Issue(leaderContext, item.ID, false); leader <- err }()
+	<-started
+	follower := make(chan IssueState, 1)
+	go func() {
+		state, err := service.Issue(context.Background(), item.ID, false)
+		if err != nil {
+			t.Errorf("follower error: %v", err)
+		}
+		follower <- state
+	}()
+	deadline := time.After(time.Second)
+	for {
+		service.mu.Lock()
+		waiters := 0
+		for _, flight := range service.inFlight {
+			waiters = flight.waiters
+		}
+		service.mu.Unlock()
+		if waiters == 2 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("follower did not join shared fetch")
+		case <-time.After(time.Millisecond):
+		}
+	}
+	cancelLeader()
+	if err := <-leader; !errors.Is(err, context.Canceled) {
+		t.Fatalf("leader error=%v", err)
+	}
+	close(release)
+	if state := <-follower; state.State != "available" {
+		t.Fatalf("follower state=%#v", state)
+	}
+}
+
+func TestAllCancelledWaitersCancelSharedFetchWithoutCaching(t *testing.T) {
+	started, cancelled := make(chan struct{}), make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+		close(cancelled)
+	}))
+	defer server.Close()
+	service, item := jiraTestService(t, server.URL, "DI-170")
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() { _, err := service.Issue(ctx, item.ID, false); result <- err }()
+	<-started
+	cancel()
+	if err := <-result; !errors.Is(err, context.Canceled) {
+		t.Fatalf("result=%v", err)
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("upstream request was not cancelled")
+	}
+	deadline := time.After(time.Second)
+	for {
+		service.mu.Lock()
+		flights, cached := len(service.inFlight), len(service.cache)
+		service.mu.Unlock()
+		if flights == 0 {
+			if cached != 0 {
+				t.Fatalf("cancelled fetch cached result")
+			}
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("cancelled flight leaked")
+		case <-time.After(time.Millisecond):
+		}
+	}
+}
+
+func TestInvalidateWorkspaceDropsOnlyThatWorkspaceCache(t *testing.T) {
+	service, item := jiraTestService(t, "https://jira.example", "DI-170")
+	service.cache["w1|entry"] = cacheEntry{expiresAt: time.Now().Add(time.Hour)}
+	service.cache[item.WorkspaceID+"|entry"] = cacheEntry{expiresAt: time.Now().Add(time.Hour)}
+	service.InvalidateWorkspace(item.WorkspaceID)
+	if _, ok := service.cache[item.WorkspaceID+"|entry"]; ok {
+		t.Fatal("workspace cache retained")
+	}
+	if _, ok := service.cache["w1|entry"]; !ok {
+		t.Fatal("unrelated cache removed")
+	}
+}
 
 func TestIssueMatchesCachesAndRefreshesExactKey(t *testing.T) {
 	requests := 0
