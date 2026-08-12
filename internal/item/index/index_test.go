@@ -3,6 +3,8 @@ package itemindex
 // Package itemindex persists the Item domain read model.
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,6 +13,19 @@ import (
 
 	"kode-stream/internal/common/models"
 )
+
+func TestVisitContextChecksCancellationBeforeLoadingFileIndex(t *testing.T) {
+	index := New(filepath.Join(t.TempDir(), "items.yaml"))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := index.VisitContext(ctx, Query{}, func(models.ItemSummary) bool { return true })
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v", err)
+	}
+	if index.loaded {
+		t.Fatal("canceled visit loaded the index")
+	}
+}
 
 func TestReplaceWorkspaceBranchRestoresInMemoryStateWhenPersistenceFails(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "items.yaml")

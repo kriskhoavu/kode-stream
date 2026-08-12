@@ -1,6 +1,8 @@
 package search
 
 import (
+	"context"
+	"fmt"
 	"net/url"
 	"sort"
 	"strings"
@@ -9,8 +11,16 @@ import (
 	"kode-stream/internal/item/index"
 )
 
+const (
+	maxSearchQueryRunes = 200
+	maxSearchCandidates = 1000
+)
+
 type itemReader interface {
 	Query(itemindex.Query) ([]models.ItemSummary, error)
+}
+type contextItemVisitor interface {
+	VisitContext(context.Context, itemindex.Query, func(models.ItemSummary) bool) error
 }
 
 type SearchService struct{ items itemReader }
@@ -18,19 +28,25 @@ type SearchService struct{ items itemReader }
 func New(items itemReader) *SearchService { return &SearchService{items: items} }
 
 func (s *SearchService) Search(query models.SearchQuery) ([]models.SearchResult, error) {
+	return s.SearchContext(context.Background(), query)
+}
+
+func (s *SearchService) SearchContext(ctx context.Context, query models.SearchQuery) ([]models.SearchResult, error) {
 	text := strings.ToLower(strings.TrimSpace(query.Text))
 	if text == "" || !includesType(query.Types, "item") {
 		return []models.SearchResult{}, nil
 	}
-	items, err := s.items.Query(itemindex.Query{WorkspaceID: query.WorkspaceID})
-	if err != nil {
+	if len([]rune(text)) > maxSearchQueryRunes {
+		return nil, fmt.Errorf("search query must contain at most %d characters", maxSearchQueryRunes)
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	results := make([]models.SearchResult, 0)
-	for _, item := range items {
+	results := make([]models.SearchResult, 0, maxSearchCandidates)
+	consider := func(item models.ItemSummary) bool {
 		score, context := rank(item, text)
 		if score == 0 {
-			continue
+			return true
 		}
 		results = append(results, models.SearchResult{
 			ID: item.ID, Type: "item", Title: firstNonEmpty(item.Title, item.Identifier),
@@ -38,13 +54,32 @@ func (s *SearchService) Search(query models.SearchQuery) ([]models.SearchResult,
 			Context:  context, WorkspaceID: item.WorkspaceID, ItemID: item.ID,
 			Route: "/items/" + url.PathEscape(item.ID), Score: score,
 		})
-	}
-	sort.SliceStable(results, func(i, j int) bool {
-		if results[i].Score != results[j].Score {
-			return results[i].Score > results[j].Score
+		if len(results) > maxSearchCandidates {
+			sort.SliceStable(results, func(i, j int) bool { return searchResultLess(results[i], results[j]) })
+			results = results[:maxSearchCandidates]
 		}
-		return strings.ToLower(results[i].Title) < strings.ToLower(results[j].Title)
-	})
+		return true
+	}
+	itemQuery := itemindex.Query{WorkspaceID: query.WorkspaceID}
+	if visitor, ok := s.items.(contextItemVisitor); ok {
+		if err := visitor.VisitContext(ctx, itemQuery, consider); err != nil {
+			return nil, err
+		}
+	} else {
+		items, err := s.items.Query(itemQuery)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range items {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			if !consider(item) {
+				break
+			}
+		}
+	}
+	sort.SliceStable(results, func(i, j int) bool { return searchResultLess(results[i], results[j]) })
 	limit := query.Limit
 	if limit <= 0 {
 		limit = 20
@@ -56,6 +91,13 @@ func (s *SearchService) Search(query models.SearchQuery) ([]models.SearchResult,
 		results = results[:limit]
 	}
 	return results, nil
+}
+
+func searchResultLess(left, right models.SearchResult) bool {
+	if left.Score != right.Score {
+		return left.Score > right.Score
+	}
+	return strings.ToLower(left.Title) < strings.ToLower(right.Title)
 }
 
 func rank(item models.ItemSummary, query string) (int, string) {

@@ -207,12 +207,12 @@ export const api = {
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   cloudAgents: async () => ((await request<CloudAgent[] | null>('/api/agents')) ?? []),
   createAgentConnectToken: (input: { name?: string; platform?: string } = {}) => request<AgentConnectToken>('/api/agents/connect-token', { method: 'POST', body: JSON.stringify(input) }),
-  search: async (params: { q: string; workspaceId?: string; types?: string[]; limit?: number }) => {
+  search: async (params: { q: string; workspaceId?: string; types?: string[]; limit?: number; signal?: AbortSignal }) => {
     const query = new URLSearchParams({ q: params.q });
     if (params.workspaceId) query.set('workspaceId', params.workspaceId);
     if (params.types?.length) query.set('types', params.types.join(','));
     if (params.limit) query.set('limit', String(params.limit));
-    return ((await request<SearchResult[] | null>(`/api/search?${query.toString()}`)) ?? []).map(normalizeSearchResult);
+    return ((await request<SearchResult[] | null>(`/api/search?${query.toString()}`, params.signal ? { signal: params.signal } : undefined, !params.signal)) ?? []).map(normalizeSearchResult);
   },
   savedFilters: async () => ((await request<SavedFilter[] | null>('/api/saved-filters')) ?? []).map(normalizeSavedFilter),
   saveFilter: (filter: Pick<SavedFilter, 'name' | 'route' | 'filters'> & Partial<Pick<SavedFilter, 'id' | 'workspaceId'>>) =>
@@ -346,19 +346,19 @@ export const api = {
     const listing = await request<WorkspaceDirectoryListing>(`/api/workspaces/${encodeURIComponent(workspaceId)}/tree?${query.toString()}`);
     return normalizeWorkspaceDirectoryListing(listing);
   },
-  searchWorkspacePaths: async (params: { q: string; workspaceId?: string; includeIgnored?: boolean }) => {
+  searchWorkspacePaths: async (params: { q: string; workspaceId?: string; includeIgnored?: boolean; signal?: AbortSignal }) => {
     const query = new URLSearchParams({ q: params.q });
     if (params.workspaceId) query.set('workspaceId', params.workspaceId);
     if (params.includeIgnored) query.set('includeIgnored', 'true');
-    const response = await request<WorkspacePathSearchResponse>(`/api/workspaces/files/search?${query.toString()}`);
+    const response = await request<WorkspacePathSearchResponse>(`/api/workspaces/files/search?${query.toString()}`, params.signal ? { signal: params.signal } : undefined, !params.signal);
     return { ...response, results: Array.isArray(response.results) ? response.results : [], truncated: Boolean(response.truncated) };
   },
-	searchWorkspaceContent: async (params: { q: string; mode: ExplorerTreeMode; workspaceId?: string; includeIgnored?: boolean; caseSensitive?: boolean }) => {
+	searchWorkspaceContent: async (params: { q: string; mode: ExplorerTreeMode; workspaceId?: string; includeIgnored?: boolean; caseSensitive?: boolean; signal?: AbortSignal }) => {
 		const query = contentSearchQuery(params);
 		query.set('mode', params.mode);
 		if (params.workspaceId) query.set('workspaceId', params.workspaceId);
 		if (params.includeIgnored) query.set('includeIgnored', 'true');
-		return normalizeContentSearchResponse(await request<WorkspaceContentSearchResponse>(`/api/workspaces/files/content-search?${query.toString()}`));
+		return normalizeContentSearchResponse(await request<WorkspaceContentSearchResponse>(`/api/workspaces/files/content-search?${query.toString()}`, params.signal ? { signal: params.signal } : undefined, !params.signal));
 	},
   workspacePathGitStates: async (workspaceId: string) =>
     (await request<WorkspacePathGitState[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/path-status`) ?? []).map(normalizeWorkspacePathGitState),
@@ -393,8 +393,8 @@ export const api = {
 		const query = expectedCommit ? `?expectedCommit=${encodeURIComponent(expectedCommit)}` : '';
 		return (await request<FileNode[] | null>(`/api/items/${encodeURIComponent(id)}/files${query}`)) ?? [];
 	},
-	searchItemContent: async (id: string, params: { q: string; caseSensitive?: boolean }) =>
-		normalizeContentSearchResponse(await request<WorkspaceContentSearchResponse>(`/api/items/${encodeURIComponent(id)}/content-search?${contentSearchQuery(params).toString()}`)),
+	searchItemContent: async (id: string, params: { q: string; caseSensitive?: boolean; signal?: AbortSignal }) =>
+		normalizeContentSearchResponse(await request<WorkspaceContentSearchResponse>(`/api/items/${encodeURIComponent(id)}/content-search?${contentSearchQuery(params).toString()}`, params.signal ? { signal: params.signal } : undefined, !params.signal)),
   file: (id: string, fileId: string, expectedCommit?: string) => {
 		const query = expectedCommit ? `?expectedCommit=${encodeURIComponent(expectedCommit)}` : '';
 		return request<FileContent>(`/api/items/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}${query}`);

@@ -359,6 +359,11 @@
   background: var(--panel-soft);
 }
 
+.source-code-line.selected {
+  background: color-mix(in srgb, var(--button-accent) 20%, transparent);
+  outline: 1px solid var(--button-accent);
+}
+
 .source-line-number {
   width: 54px;
   flex: none;

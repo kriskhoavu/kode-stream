@@ -15,6 +15,7 @@ describe('useWorkspacePathSearch', () => {
     await act(async () => vi.advanceTimersByTimeAsync(10));
     act(() => result.current.setQuery('second'));
     await act(async () => vi.advanceTimersByTimeAsync(10));
+		expect(vi.mocked(api.searchWorkspacePaths).mock.calls[0][0].signal?.aborted).toBe(true);
     await act(async () => requests[0]({ results: [], truncated: false }));
     expect(result.current.loading).toBe(true);
     await act(async () => requests[1]({ results: [], truncated: true }));

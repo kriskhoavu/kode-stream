@@ -170,17 +170,20 @@ func (a *Access) searchContentRoot(ctx context.Context, workspace models.Workspa
 			}
 			budget.BytesRead += int64(len(data))
 			classification := fileaccess.ClassifyPath(path)
-			matches := contentLineMatches(string(data), request.Query, request.CaseSensitive, budget.MaxSnippetLength)
+			matches, exhausted, err := contentLineMatches(ctx, data, request.Query, request.CaseSensitive, budget.MaxSnippetLength, budget.MaxResults-budget.Results)
+			if err != nil {
+				return err
+			}
 			for _, match := range matches {
-				if budget.Results >= budget.MaxResults {
-					response.Truncated = true
-					return nil
-				}
 				match.ID = fmt.Sprintf("%s:%s:%d:%d", workspace.ID, fileid.Encode(path), match.LineNumber, match.ColumnStart)
 				match.WorkspaceID, match.WorkspaceName = workspace.ID, workspace.Name
 				match.Path, match.Name, match.Kind, match.Language, match.Ignored = path, filepath.Base(path), classification.Kind, classification.Language, ignored[path]
 				response.Results = append(response.Results, match)
 				budget.Results++
+			}
+			if exhausted {
+				response.Truncated = true
+				return nil
 			}
 		}
 	}
@@ -205,13 +208,33 @@ func readStableContentFile(path string, before os.FileInfo) ([]byte, bool, error
 	return data, changed, nil
 }
 
-func contentLineMatches(content, query string, caseSensitive bool, maxSnippet int) []models.WorkspaceContentSearchResult {
-	var results []models.WorkspaceContentSearchResult
-	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
+// contentLineMatches never constructs matches beyond remaining. It scans the stable
+// byte copy a line at a time, retaining rune columns without making a second full-file
+// string/slice representation.
+func contentLineMatches(ctx context.Context, content []byte, query string, caseSensitive bool, maxSnippet, remaining int) ([]models.WorkspaceContentSearchResult, bool, error) {
+	if remaining <= 0 {
+		return nil, true, nil
+	}
+	results := make([]models.WorkspaceContentSearchResult, 0, remaining)
 	queryRunes := []rune(query)
-	for lineIndex, line := range lines {
-		lineRunes := []rune(strings.TrimSuffix(line, "\r"))
+	lineNumber := 1
+	for startByte := 0; startByte <= len(content); lineNumber++ {
+		if err := ctx.Err(); err != nil {
+			return nil, false, err
+		}
+		endByte := startByte
+		for endByte < len(content) && content[endByte] != '\n' {
+			endByte++
+		}
+		line := content[startByte:endByte]
+		if len(line) > 0 && line[len(line)-1] == '\r' {
+			line = line[:len(line)-1]
+		}
+		lineRunes := []rune(string(line))
 		for start := 0; start+len(queryRunes) <= len(lineRunes); start++ {
+			if err := ctx.Err(); err != nil {
+				return nil, false, err
+			}
 			candidate := string(lineRunes[start : start+len(queryRunes)])
 			matched := candidate == query
 			if !caseSensitive {
@@ -221,13 +244,20 @@ func contentLineMatches(content, query string, caseSensitive bool, maxSnippet in
 				continue
 			}
 			results = append(results, models.WorkspaceContentSearchResult{
-				LineNumber: lineIndex + 1, ColumnStart: start + 1, ColumnEnd: start + len(queryRunes) + 1,
+				LineNumber: lineNumber, ColumnStart: start + 1, ColumnEnd: start + len(queryRunes) + 1,
 				Snippet: boundedSnippet(lineRunes, start, start+len(queryRunes), maxSnippet),
 			})
+			if len(results) > remaining {
+				return results[:remaining], true, nil
+			}
 			start += len(queryRunes) - 1
 		}
+		if endByte == len(content) {
+			break
+		}
+		startByte = endByte + 1
 	}
-	return results
+	return results, false, nil
 }
 
 func boundedSnippet(line []rune, matchStart, matchEnd, limit int) string {

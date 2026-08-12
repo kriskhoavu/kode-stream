@@ -30,4 +30,17 @@ describe('SourceCodeView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy source' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(source));
   });
+
+	it('renders a bounded window and brings a selected match line into it', async () => {
+		const content = Array.from({ length: 2000 }, (_, index) => `line ${index + 1} ${'wrapped text '.repeat(40)}`).join('\n');
+		render(<SourceCodeView content={content} language="text" selection={{ workspaceId: 'ws', path: 'large.txt', lineNumber: 1800, columnStart: 1, columnEnd: 5 }} />);
+		await waitFor(() => expect(screen.getByText((value) => value.startsWith('line 1800 '))).toBeInTheDocument());
+		expect(document.querySelectorAll('.source-code-line').length).toBeLessThanOrEqual(240);
+		expect(document.querySelector('.source-code-line.selected')).toHaveAttribute('aria-current', 'true');
+		fireEvent.click(screen.getByRole('button', { name: 'Toggle line wrapping' }));
+		expect(document.querySelector('.source-code-view')).toHaveClass('wrap');
+		fireEvent(window, new Event('resize'));
+		await waitFor(() => expect(document.querySelector('.source-code-line.selected')).toHaveAttribute('aria-current', 'true'));
+		expect(document.querySelectorAll('.source-code-line').length).toBeLessThanOrEqual(240);
+	});
 });

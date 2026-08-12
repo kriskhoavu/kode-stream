@@ -1,4 +1,4 @@
-import type { FileContent, FileKind } from '../../lib/types';
+import type { ContentSearchSelection, FileContent, FileKind } from '../../lib/types';
 
 export const richPreviewThresholdBytes = 1 << 20;
 
@@ -7,7 +7,8 @@ export type ViewerMode = 'rendered' | 'structured' | 'source';
 export interface ContentViewerProps {
   file: FileContent;
   content: string;
-  compact?: boolean;
+	compact?: boolean;
+	selection?: ContentSearchSelection | null;
 }
 
 export interface ViewerAdapter {

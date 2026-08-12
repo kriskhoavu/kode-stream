@@ -28,17 +28,21 @@ export function useContentSearch(target: ContentSearchTarget, debounceMs = 250) 
 			setError('');
 			return;
 		}
+		setResults([]);
+		setTruncated(false);
 		setLoading(true);
+		const controller = new AbortController();
 		const timer = window.setTimeout(() => {
 			const request = target.kind === 'item'
-				? api.searchItemContent(target.itemId, { q: normalized, caseSensitive })
-				: api.searchWorkspaceContent({ q: normalized, mode: target.mode, workspaceId: target.workspaceId, includeIgnored: target.includeIgnored, caseSensitive });
+				? api.searchItemContent(target.itemId, { q: normalized, caseSensitive, signal: controller.signal })
+				: api.searchWorkspaceContent({ q: normalized, mode: target.mode, workspaceId: target.workspaceId, includeIgnored: target.includeIgnored, caseSensitive, signal: controller.signal });
 			request.then((response) => {
 				if (requestId.current !== id) return;
 				setResults(response.results);
 				setTruncated(response.truncated);
 				setError('');
 			}).catch((caught: unknown) => {
+				if (controller.signal.aborted) return;
 				if (requestId.current !== id) return;
 				setResults([]);
 				setTruncated(false);
@@ -47,7 +51,7 @@ export function useContentSearch(target: ContentSearchTarget, debounceMs = 250) 
 				if (requestId.current === id) setLoading(false);
 			});
 		}, debounceMs);
-		return () => window.clearTimeout(timer);
+		return () => { window.clearTimeout(timer); controller.abort(); };
 	}, [caseSensitive, debounceMs, query, targetKey]);
 
 	const clear = () => setQuery('');

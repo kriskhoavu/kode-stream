@@ -31,8 +31,23 @@ describe('search hooks', () => {
     act(() => result.current.setQuery('One'));
     await waitFor(() => expect(result.current.results).toHaveLength(1));
     act(() => result.current.onKeyDown({ key: 'Enter', preventDefault: vi.fn() } as unknown as React.KeyboardEvent));
-    expect(api.search).toHaveBeenCalledWith({ q: 'One', workspaceId: 'w1', limit: 30 });
+    expect(api.search).toHaveBeenCalledWith(expect.objectContaining({ q: 'One', workspaceId: 'w1', limit: 30, signal: expect.any(AbortSignal) }));
     expect(navigate).toHaveBeenCalledWith('/items/one', resultItem);
     expect(api.recordRecentItem).toHaveBeenCalledWith('one');
   });
+
+	it('aborts an issued request when the query is replaced or unmounted', async () => {
+		vi.useFakeTimers();
+		vi.mocked(api.search).mockImplementation(() => new Promise(() => undefined));
+		const { result, unmount } = renderHook(() => useGlobalSearch({ allWorkspaces: true, onNavigate: vi.fn() }));
+		act(() => result.current.setQuery('first'));
+		await act(async () => vi.advanceTimersByTimeAsync(180));
+		const first = vi.mocked(api.search).mock.calls[0][0].signal;
+		act(() => result.current.setQuery('second'));
+		expect(first?.aborted).toBe(true);
+		await act(async () => vi.advanceTimersByTimeAsync(180));
+		const second = vi.mocked(api.search).mock.calls[1][0].signal;
+		unmount();
+		expect(second?.aborted).toBe(true);
+	});
 });

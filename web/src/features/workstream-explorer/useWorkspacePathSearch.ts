@@ -21,13 +21,15 @@ export function useWorkspacePathSearch({ workspaceId, includeIgnored, debounceMs
       return;
     }
     setLoading(true);
+		const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      api.searchWorkspacePaths({ q: normalized, workspaceId, includeIgnored }).then((response) => {
+      api.searchWorkspacePaths({ q: normalized, workspaceId, includeIgnored, signal: controller.signal }).then((response) => {
         if (requestID.current !== id) return;
         setResults(response.results);
         setTruncated(response.truncated);
         setError('');
       }).catch((caught: unknown) => {
+			if (controller.signal.aborted) return;
         if (requestID.current !== id) return;
         setResults([]);
         setError(caught instanceof Error ? caught.message : 'Path search failed');
@@ -35,7 +37,7 @@ export function useWorkspacePathSearch({ workspaceId, includeIgnored, debounceMs
         if (requestID.current === id) setLoading(false);
       });
     }, debounceMs);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); controller.abort(); };
   }, [debounceMs, includeIgnored, query, workspaceId]);
 
   return { query, setQuery, results, truncated, loading, error };

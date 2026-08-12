@@ -63,6 +63,22 @@ func TestContentSearchEnforcesBudgetsAndCancellation(t *testing.T) {
 	}
 }
 
+func TestContentSearchDenseFileStopsAtSharedResultBudget(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "dense.txt"), strings.Repeat("xx", 50_000))
+	budget := DefaultContentSearchBudget()
+	budget.MaxResults = 3
+	response, err := NewWithIgnoreChecker(nil).ContentSearch(context.Background(), models.WorkspaceConfig{ID: "ws", Path: root}, []models.WorkspaceContentSearchRoot{{}}, models.WorkspaceContentSearchRequest{Query: "xx"}, &budget)
+	if err != nil || !response.Truncated || len(response.Results) != 3 {
+		t.Fatalf("response = %#v, err = %v", response, err)
+	}
+	for index, result := range response.Results {
+		if result.LineNumber != 1 || result.ColumnStart != index*2+1 {
+			t.Fatalf("result[%d] = %#v", index, result)
+		}
+	}
+}
+
 func TestValidateContentSearchQuery(t *testing.T) {
 	if ValidateContentSearchQuery("x", 200) == nil {
 		t.Fatal("expected short query error")

@@ -42,20 +42,22 @@ export function useGlobalSearch({ workspaceId, allWorkspaces, onNavigate }: {
       return;
     }
     setLoading(true);
+		const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      api.search({ q: text, workspaceId: allWorkspaces ? undefined : workspaceId, limit: 30 })
+      api.search({ q: text, workspaceId: allWorkspaces ? undefined : workspaceId, limit: 30, signal: controller.signal })
         .then((next) => {
           setResults(next);
           setSelectedIndex(0);
           setError('');
         })
         .catch((caught: Error) => {
+					if (controller.signal.aborted) return;
           setResults([]);
           setError(caught.message);
         })
         .finally(() => setLoading(false));
     }, 180);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); controller.abort(); };
   }, [query, workspaceId, allWorkspaces]);
 
   const selectResult = useCallback((result: SearchResult) => {

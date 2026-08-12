@@ -12,7 +12,7 @@ const HtmlPreview = lazy(() => import('./renderers/HtmlPreview').then((module) =
 const StructuredDataView = lazy(() => import('./renderers/StructuredDataView').then((module) => ({ default: module.StructuredDataView })));
 const SourceCodeView = lazy(() => import('./renderers/SourceCodeView').then((module) => ({ default: module.SourceCodeView })));
 
-export const ContentViewer = memo(function ContentViewer({ file, content, compact = false }: ContentViewerProps) {
+export const ContentViewer = memo(function ContentViewer({ file, content, compact = false, selection }: ContentViewerProps) {
   const adapter = viewerAdapter(file.kind);
   const [mode, setMode] = useState<ViewerMode>(adapter.defaultMode);
   const large = file.kind !== 'image' && file.sizeBytes > richPreviewThresholdBytes;
@@ -41,7 +41,7 @@ export const ContentViewer = memo(function ContentViewer({ file, content, compac
           ) : file.kind === 'image' ? (
             <ImagePreview key={file.id} src={content} alt={file.path} />
           ) : mode === 'source' ? (
-            <SourceCodeView content={content} language={file.language} truncated={file.truncated} />
+            <SourceCodeView content={content} language={file.language} truncated={file.truncated} selection={selection?.path === file.path ? selection : null} />
           ) : file.kind === 'markdown' ? (
             <MarkdownPreview content={content} />
           ) : file.kind === 'html' ? (
@@ -49,7 +49,7 @@ export const ContentViewer = memo(function ContentViewer({ file, content, compac
           ) : file.kind === 'json' || file.kind === 'yaml' ? (
             <StructuredDataView content={content} language={file.kind} />
           ) : (
-            <SourceCodeView content={content} language={file.language} truncated={file.truncated} />
+            <SourceCodeView content={content} language={file.language} truncated={file.truncated} selection={selection?.path === file.path ? selection : null} />
           )}
         </Suspense>
       </ViewerErrorBoundary>

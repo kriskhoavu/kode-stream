@@ -19,6 +19,7 @@ describe('useContentSearch', () => {
 		await act(async () => vi.advanceTimersByTimeAsync(10));
 		act(() => result.current.setQuery('second'));
 		await act(async () => vi.advanceTimersByTimeAsync(10));
+		expect(vi.mocked(api.searchWorkspaceContent).mock.calls[0][0].signal?.aborted).toBe(true);
 		await act(async () => requests[0]({ results: [], truncated: true, filesVisited: 1, bytesRead: 1, skippedFiles: 0 }));
 		expect(result.current.loading).toBe(true);
 		await act(async () => requests[1]({ results: [], truncated: false, filesVisited: 1, bytesRead: 1, skippedFiles: 0 }));
@@ -36,6 +37,6 @@ describe('useContentSearch', () => {
 		const { result } = renderHook(() => useContentSearch({ kind: 'item', itemId: 'item-1' }, 10));
 		act(() => result.current.setQuery('needle'));
 		await act(async () => vi.advanceTimersByTimeAsync(10));
-		expect(api.searchItemContent).toHaveBeenCalledWith('item-1', { q: 'needle', caseSensitive: false });
+  expect(api.searchItemContent).toHaveBeenCalledWith('item-1', expect.objectContaining({ q: 'needle', caseSensitive: false, signal: expect.any(AbortSignal) }));
 	});
 });

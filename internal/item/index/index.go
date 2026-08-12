@@ -3,7 +3,9 @@ package itemindex
 // Package itemindex persists the Item domain read model.
 
 import (
+	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -191,6 +193,44 @@ func (i *Index) Query(q Query) ([]models.ItemSummary, error) {
 	return out, nil
 }
 
+// VisitContext streams matching summaries without materializing the index result.
+// Returning false from visit stops traversal successfully.
+func (i *Index) VisitContext(ctx context.Context, q Query, visit func(models.ItemSummary) bool) error {
+	if err := i.loadContext(ctx); err != nil {
+		return err
+	}
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	text := strings.ToLower(strings.TrimSpace(q.Text))
+	for _, detail := range i.state.Items {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if !q.IncludeSnapshots && detail.SourceMode == "snapshot" {
+			continue
+		}
+		if q.WorkspaceID != "" && detail.WorkspaceID != q.WorkspaceID {
+			continue
+		}
+		if q.Branch != "" && detail.Branch != q.Branch {
+			continue
+		}
+		if q.Status != "" && string(detail.Status) != q.Status {
+			continue
+		}
+		if text != "" && !matchesText(detail.ItemSummary, text) {
+			continue
+		}
+		if detail.Tags == nil {
+			detail.Tags = []string{}
+		}
+		if !visit(detail.ItemSummary) {
+			return nil
+		}
+	}
+	return nil
+}
+
 func (i *Index) BranchItems(workspaceID, branch string) ([]models.ItemSummary, error) {
 	return i.Query(Query{WorkspaceID: workspaceID, Branch: branch, IncludeSnapshots: true})
 }
@@ -230,12 +270,19 @@ func matchesText(item models.ItemSummary, text string) bool {
 }
 
 func (i *Index) load() error {
+	return i.loadContext(context.Background())
+}
+
+func (i *Index) loadContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if i.loaded {
 		return nil
 	}
-	data, err := os.ReadFile(i.path)
+	file, err := os.Open(i.path)
 	if errors.Is(err, os.ErrNotExist) {
 		i.state = state{Items: []models.ItemDetail{}, Warnings: []models.ScanWarning{}, Scans: map[string]time.Time{}, BranchScans: map[string]map[string]models.BranchScanMetadata{}}
 		i.loaded = true
@@ -244,7 +291,21 @@ func (i *Index) load() error {
 	if err != nil {
 		return err
 	}
+	data, err := readContext(ctx, file)
+	closeErr := file.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := yaml.Unmarshal(data, &i.state); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if i.state.Scans == nil {
@@ -262,6 +323,26 @@ func (i *Index) load() error {
 	i.migrateBranchScanMetadataLocked()
 	i.loaded = true
 	return nil
+}
+
+func readContext(ctx context.Context, reader io.Reader) ([]byte, error) {
+	buffer := make([]byte, 32<<10)
+	data := make([]byte, 0, len(buffer))
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		count, err := reader.Read(buffer)
+		if count > 0 {
+			data = append(data, buffer[:count]...)
+		}
+		if errors.Is(err, io.EOF) {
+			return data, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
 }
 
 func (i *Index) migrateBranchScanMetadataLocked() {

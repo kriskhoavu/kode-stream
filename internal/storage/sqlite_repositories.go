@@ -488,6 +488,54 @@ func (r *SQLiteItemRepository) Query(q itemindex.Query) ([]models.ItemSummary, e
 	return out, nil
 }
 
+// VisitContext streams item summaries directly from the SQL cursor. Search uses this
+// seam so cancellation does not first allocate every indexed item.
+func (r *SQLiteItemRepository) VisitContext(ctx context.Context, q itemindex.Query, visit func(models.ItemSummary) bool) error {
+	where := []string{"1=1"}
+	args := []any{}
+	if !q.IncludeSnapshots {
+		where, args = append(where, "source_mode != ?"), append(args, "snapshot")
+	}
+	if q.WorkspaceID != "" {
+		where, args = append(where, "workspace_id = ?"), append(args, q.WorkspaceID)
+	}
+	if q.Branch != "" {
+		where, args = append(where, "branch = ?"), append(args, q.Branch)
+	}
+	if q.Status != "" {
+		where, args = append(where, "status = ?"), append(args, q.Status)
+	}
+	rows, err := r.db.QueryContext(ctx, rebindSQL(r.driver, `SELECT metadata_json FROM indexed_items WHERE `+strings.Join(where, " AND ")+` ORDER BY updated_at DESC`), args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	text := strings.ToLower(strings.TrimSpace(q.Text))
+	for rows.Next() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return err
+		}
+		var detail models.ItemDetail
+		if err := json.Unmarshal([]byte(raw), &detail); err != nil {
+			return err
+		}
+		if text != "" && !summaryMatchesText(detail.ItemSummary, text) {
+			continue
+		}
+		if detail.Tags == nil {
+			detail.Tags = []string{}
+		}
+		if !visit(detail.ItemSummary) {
+			return nil
+		}
+	}
+	return rows.Err()
+}
+
 func (r *SQLiteItemRepository) BranchItems(workspaceID, branch string) ([]models.ItemSummary, error) {
 	return r.Query(itemindex.Query{WorkspaceID: workspaceID, Branch: branch, IncludeSnapshots: true})
 }

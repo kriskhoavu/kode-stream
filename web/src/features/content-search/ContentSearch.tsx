@@ -5,13 +5,16 @@ import type { WorkspaceContentSearchResult, WorkspacePathSearchResult } from '..
 const maxVisibleResults = 20;
 const maxVisibleSnippetCharacters = 120;
 
-export function ContentSearchInput({ query, onQueryChange, label }: {
+export function ContentSearchInput({ query, onQueryChange, caseSensitive = false, onCaseSensitiveChange, label }: {
 	query: string;
 	onQueryChange: (query: string) => void;
+	caseSensitive?: boolean;
+	onCaseSensitiveChange?: (value: boolean) => void;
 	label: string;
 }) {
 	return <div className="content-search-input" role="search">
 		<label><Search size={15} /><input aria-label={label} value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={label} /></label>
+		{onCaseSensitiveChange && <button type="button" aria-label="Match case" aria-pressed={caseSensitive} className={caseSensitive ? 'active' : ''} onClick={() => onCaseSensitiveChange(!caseSensitive)}>Aa</button>}
 	</div>;
 }
 

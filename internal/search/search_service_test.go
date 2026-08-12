@@ -3,7 +3,10 @@ package search
 // Search service contract tests.
 
 import (
+	"context"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +17,23 @@ import (
 type itemStub struct {
 	items []models.ItemSummary
 	query *itemindex.Query
+}
+
+type visitingItemStub struct{ items []models.ItemSummary }
+
+func (s visitingItemStub) Query(query itemindex.Query) ([]models.ItemSummary, error) {
+	return itemStub{items: s.items}.Query(query)
+}
+func (s visitingItemStub) VisitContext(ctx context.Context, query itemindex.Query, visit func(models.ItemSummary) bool) error {
+	for _, item := range s.items {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if !visit(item) {
+			return nil
+		}
+	}
+	return nil
 }
 
 func (s itemStub) Query(query itemindex.Query) ([]models.ItemSummary, error) {
@@ -101,5 +121,29 @@ func TestSearchReturnsEmptyForBlankQueryOrExcludedType(t *testing.T) {
 		if err != nil || results == nil || len(results) != 0 {
 			t.Fatalf("Search(%#v) = %#v, %v", query, results, err)
 		}
+	}
+}
+
+func TestSearchRejectsOversizedQueryAndCanceledContext(t *testing.T) {
+	service := New(itemStub{items: []models.ItemSummary{{ID: "1", Title: "Search"}}})
+	if _, err := service.Search(models.SearchQuery{Text: strings.Repeat("x", 201)}); err == nil {
+		t.Fatal("expected oversized query error")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := service.SearchContext(ctx, models.SearchQuery{Text: "search"}); err == nil {
+		t.Fatal("expected cancellation error")
+	}
+}
+
+func TestSearchKeepsLaterBetterMatchesWhenCandidateBudgetIsFull(t *testing.T) {
+	items := make([]models.ItemSummary, 0, maxSearchCandidates+1)
+	for index := 0; index < maxSearchCandidates; index++ {
+		items = append(items, models.ItemSummary{ID: fmt.Sprintf("weak-%d", index), Identifier: fmt.Sprintf("PM-SEARCH-%d", index), Title: fmt.Sprintf("weak %04d", index)})
+	}
+	items = append(items, models.ItemSummary{ID: "exact", Identifier: "PM-SEARCH", Title: "Exact"})
+	results, err := New(visitingItemStub{items: items}).SearchContext(context.Background(), models.SearchQuery{Text: "PM-SEARCH", Limit: 1})
+	if err != nil || len(results) != 1 || results[0].ID != "exact" {
+		t.Fatalf("results = %#v, err = %v", results, err)
 	}
 }

@@ -93,6 +93,6 @@ func (a *searchController) searchItems(w http.ResponseWriter, r *http.Request) {
 	if len(types) == 1 && types[0] == "" {
 		types = nil
 	}
-	results, err := a.search.Search(models.SearchQuery{Text: r.URL.Query().Get("q"), WorkspaceID: r.URL.Query().Get("workspaceId"), Types: types, Limit: limit})
-	respond(w, results, err)
+	results, err := a.search.SearchContext(r.Context(), models.SearchQuery{Text: r.URL.Query().Get("q"), WorkspaceID: r.URL.Query().Get("workspaceId"), Types: types, Limit: limit})
+	respondSearch(w, results, err)
 }
