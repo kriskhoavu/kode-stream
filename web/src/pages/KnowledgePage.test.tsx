@@ -52,7 +52,7 @@ describe('KnowledgePage layout', () => {
 		const onLocationChange = vi.fn();
 		render(<KnowledgePage workspaces={[workspace, activeWorkspace]} activeWorkspace={activeWorkspace} location={{ workspaceId: workspace.id, root: 'docs', view: 'browse' }} onLocationChange={onLocationChange} />);
 
-		await waitFor(() => expect(api.knowledgeWikis).toHaveBeenCalledWith(activeWorkspace.id));
+		await waitFor(() => expect(api.knowledgeWikis).toHaveBeenCalledWith(activeWorkspace.id, expect.any(AbortSignal)));
 		expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: activeWorkspace.id, root: 'wiki', view: 'browse' });
 	});
 
@@ -64,7 +64,7 @@ describe('KnowledgePage layout', () => {
 		expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'read' });
 
 		first.rerender(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'read' }} onLocationChange={onLocationChange} />);
-		await waitFor(() => expect(api.knowledgePage).toHaveBeenCalledWith('discovery', 'docs', 'overview'));
+		await waitFor(() => expect(api.knowledgePage).toHaveBeenCalledWith('discovery', 'docs', 'overview', expect.any(AbortSignal)));
 		expect(await screen.findByText('Full document content.', {}, { timeout: 5_000 })).toBeInTheDocument();
 		expect(screen.getByRole('navigation', { name: 'Knowledge pages' })).toBeInTheDocument();
 		expect(screen.queryByText('Loading page…')).not.toBeInTheDocument();

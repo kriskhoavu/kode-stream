@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -111,7 +112,6 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 	type candidate struct {
 		path string
 		rel  string
-		size int64
 	}
 	candidates := make([]candidate, 0)
 	workspacePaths := make([]string, 0)
@@ -133,7 +133,7 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() || !strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
 			return nil
 		}
-		info, infoErr := entry.Info()
+		_, infoErr := entry.Info()
 		if infoErr != nil {
 			return infoErr
 		}
@@ -145,7 +145,7 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 		if relErr != nil {
 			return relErr
 		}
-		candidates = append(candidates, candidate{path: current, rel: filepath.ToSlash(rel), size: info.Size()})
+		candidates = append(candidates, candidate{path: current, rel: filepath.ToSlash(rel)})
 		workspacePaths = append(workspacePaths, filepath.ToSlash(relWorkspace))
 		if len(candidates) > limits.MaxFiles {
 			return fmt.Errorf("file budget exceeded")
@@ -179,17 +179,22 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 		if files > limits.MaxFiles {
 			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: file budget exceeded", cleanSource)
 		}
-		if file.size > limits.MaxFileBytes {
+		remaining := limits.MaxTotalBytes - totalBytes
+		data, warning, err := readStableBounded(ctx, file.path, min(limits.MaxFileBytes, remaining))
+		if warning != "" {
 			warnings = append(warnings, KnowledgeWarning{WorkspaceID: workspace.ID, WikiRoot: filepath.ToSlash(cleanSource), Path: file.rel, Code: "file_too_large", Message: "file exceeds scan size limit"})
 			continue
 		}
-		totalBytes += file.size
-		if totalBytes > limits.MaxTotalBytes {
-			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: byte budget exceeded", cleanSource)
-		}
-		data, err := os.ReadFile(file.path)
 		if err != nil {
-			return KnowledgeWiki{}, false, err
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", cleanSource, err)
+			}
+			warnings = append(warnings, KnowledgeWarning{WorkspaceID: workspace.ID, WikiRoot: filepath.ToSlash(cleanSource), Path: file.rel, Code: "invalid_metadata", Message: "file changed or could not be read during scan"})
+			continue
+		}
+		totalBytes += int64(len(data))
+		if totalBytes > limits.MaxTotalBytes { // defensive: bounded reader must make this unreachable.
+			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: byte budget exceeded", cleanSource)
 		}
 		page, pageWarnings, err := ParsePage(file.rel, data)
 		for index := range pageWarnings {
@@ -225,6 +230,54 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 		return warnings[i].Path < warnings[j].Path
 	})
 	return KnowledgeWiki{WorkspaceID: workspace.ID, Root: filepath.ToSlash(cleanSource), DisplayName: displayName(cleanSource), Pages: pages, Warnings: warnings, IndexedAt: time.Now().UTC()}, true, nil
+}
+
+// readStableBounded never allocates more than limit bytes.  The path is
+// re-stated before and after reading so a discovery-time size cannot be used
+// to smuggle a later, larger replacement into the parser.
+func readStableBounded(ctx context.Context, path string, limit int64) ([]byte, string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, "", err
+	}
+	if !info.Mode().IsRegular() || info.Size() > limit {
+		return nil, "file_too_large", nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, "", err
+	}
+	defer file.Close()
+	data := make([]byte, 0, info.Size())
+	buffer := make([]byte, 32<<10)
+	for int64(len(data)) < limit {
+		if err := ctx.Err(); err != nil {
+			return nil, "", err
+		}
+		want := min(int64(len(buffer)), limit-int64(len(data)))
+		n, readErr := file.Read(buffer[:want])
+		data = append(data, buffer[:n]...)
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return nil, "", readErr
+		}
+	}
+	after, err := os.Lstat(path)
+	if err != nil {
+		return nil, "", err
+	}
+	if !after.Mode().IsRegular() || after.Size() != int64(len(data)) || after.ModTime() != info.ModTime() {
+		if after.Size() > limit {
+			return nil, "file_too_large", nil
+		}
+		return nil, "", errors.New("file changed during scan")
+	}
+	return data, "", ctx.Err()
 }
 
 func withinPath(root, candidate string) bool {

@@ -106,3 +106,21 @@ func TestKnowledgeHTTPContractsReturnListsAndMissingResources(t *testing.T) {
 		}
 	}
 }
+
+func TestKnowledgeActionRoutesRejectInvalidBodiesBeforeInvocation(t *testing.T) {
+	controller := &knowledgeController{knowledge: knowledgeindex.NewService(nil, nil)}
+	for _, path := range []string{"/api/knowledge/workspaces/ws/sync", "/api/knowledge/workspaces/ws/enrich"} {
+		for _, body := range []string{`{"unknown":true}`, `{"confirm":true}{"confirm":true}`, "{" + strings.Repeat("x", 17<<10) + "}"} {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+			if strings.HasSuffix(path, "/sync") {
+				controller.knowledgeSync(response, request)
+			} else {
+				controller.knowledgeEnrich(response, request)
+			}
+			if response.Code != http.StatusBadRequest && response.Code != http.StatusRequestEntityTooLarge {
+				t.Fatalf("path=%s status=%d body=%s", path, response.Code, response.Body.String())
+			}
+		}
+	}
+}

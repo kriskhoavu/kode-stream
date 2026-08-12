@@ -98,12 +98,14 @@ type KnowledgeGraphEdge struct {
 }
 
 type KnowledgeActionResult struct {
-	OK           bool               `json:"ok" yaml:"ok"`
-	Operation    string             `json:"operation" yaml:"operation"`
-	Message      string             `json:"message,omitempty" yaml:"message,omitempty"`
-	Wikis        []KnowledgeWiki    `json:"wikis" yaml:"wikis"`
-	Warnings     []KnowledgeWarning `json:"warnings" yaml:"warnings"`
-	Log          string             `json:"log,omitempty" yaml:"log,omitempty"`
-	LogTruncated bool               `json:"logTruncated" yaml:"logTruncated"`
-	CompletedAt  time.Time          `json:"completedAt" yaml:"completedAt"`
+	OK              bool               `json:"ok" yaml:"ok"`
+	Operation       string             `json:"operation" yaml:"operation"`
+	Message         string             `json:"message,omitempty" yaml:"message,omitempty"`
+	Committed       bool               `json:"committed,omitempty" yaml:"committed,omitempty"`
+	RefreshRequired bool               `json:"refreshRequired,omitempty" yaml:"refreshRequired,omitempty"`
+	Wikis           []KnowledgeWiki    `json:"wikis" yaml:"wikis"`
+	Warnings        []KnowledgeWarning `json:"warnings" yaml:"warnings"`
+	Log             string             `json:"log,omitempty" yaml:"log,omitempty"`
+	LogTruncated    bool               `json:"logTruncated" yaml:"logTruncated"`
+	CompletedAt     time.Time          `json:"completedAt" yaml:"completedAt"`
 }

@@ -20,7 +20,7 @@ describe('useKnowledgeController', () => {
 		const onLocationChange = vi.fn();
 		const { result } = renderHook(() => useKnowledgeController(workspaces, undefined, onLocationChange));
 		await waitFor(() => expect(result.current.loading).toBe(false));
-		expect(api.knowledgePages).toHaveBeenCalledWith('one', 'docs');
+		expect(api.knowledgePages).toHaveBeenCalledWith('one', 'docs', expect.any(AbortSignal));
 		expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'one', root: 'docs', view: 'browse' });
 	});
 
@@ -30,7 +30,7 @@ describe('useKnowledgeController', () => {
 		const onLocationChange = vi.fn();
 		const { result, rerender } = renderHook(({ workspaceId }) => useKnowledgeController(workspaces, { workspaceId }, onLocationChange), { initialProps: { workspaceId: 'one' } });
 		rerender({ workspaceId: 'two' });
-		await waitFor(() => expect(api.knowledgePages).toHaveBeenCalledWith('two', 'wiki'));
+		await waitFor(() => expect(api.knowledgePages).toHaveBeenCalledWith('two', 'wiki', expect.any(AbortSignal)));
 		await act(async () => resolveFirst([wiki('one', 'docs')]));
 		expect(result.current.wikis.map((item) => item.root)).toEqual(['wiki']);
 	});

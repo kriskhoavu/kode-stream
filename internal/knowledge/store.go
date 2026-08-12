@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,8 +19,17 @@ type persistedIndex struct {
 }
 
 type Store struct {
-	mu   sync.RWMutex
-	path string
+	mu    sync.RWMutex
+	path  string
+	hooks storeHooks
+}
+
+type storeHooks struct {
+	afterWrite         func() error
+	afterSync          func() error
+	afterClose         func() error
+	afterRename        func() error
+	afterDirectorySync func() error
 }
 
 func NewStore(path string) *Store { return &Store{path: path} }
@@ -110,13 +120,25 @@ func (s *Store) save(index persistedIndex) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(s.path), ".knowledge-index-*.tmp")
+	directory := filepath.Dir(s.path)
+	mode := os.FileMode(0o600)
+	previous, readErr := os.ReadFile(s.path)
+	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
+		return readErr
+	}
+	hadPrevious := readErr == nil
+	if info, statErr := os.Stat(s.path); statErr == nil {
+		mode = info.Mode().Perm()
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return statErr
+	}
+	temporary, err := os.CreateTemp(directory, ".knowledge-index-*.tmp")
 	if err != nil {
 		return err
 	}
 	temporaryPath := temporary.Name()
 	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(0o600); err != nil {
+	if err := temporary.Chmod(mode); err != nil {
 		temporary.Close()
 		return err
 	}
@@ -124,14 +146,110 @@ func (s *Store) save(index persistedIndex) error {
 		temporary.Close()
 		return err
 	}
+	if s.hooks.afterWrite != nil {
+		if err := s.hooks.afterWrite(); err != nil {
+			_ = temporary.Close()
+			return err
+		}
+	}
 	if err := temporary.Sync(); err != nil {
 		temporary.Close()
+		return err
+	}
+	if s.hooks.afterSync != nil {
+		if err := s.hooks.afterSync(); err != nil {
+			_ = temporary.Close()
+			return err
+		}
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if s.hooks.afterClose != nil {
+		if err := s.hooks.afterClose(); err != nil {
+			return err
+		}
+	}
+	if err := os.Rename(temporaryPath, s.path); err != nil {
+		return err
+	}
+	rollback := func(cause error) error {
+		if !hadPrevious {
+			if restoreErr := removeIndex(s.path); restoreErr != nil {
+				return fmt.Errorf("knowledge index publication failed: %v; absent-state restoration failed: %w", cause, restoreErr)
+			}
+			return cause
+		}
+		if restoreErr := restoreIndex(s.path, previous, mode); restoreErr != nil {
+			return fmt.Errorf("knowledge index publication failed: %v; original restoration failed: %w", cause, restoreErr)
+		}
+		return cause
+	}
+	if s.hooks.afterRename != nil {
+		if err := s.hooks.afterRename(); err != nil {
+			return rollback(err)
+		}
+	}
+	parent, err := os.Open(directory)
+	if err != nil {
+		return rollback(err)
+	}
+	defer parent.Close()
+	if err := parent.Sync(); err != nil {
+		return rollback(err)
+	}
+	if s.hooks.afterDirectorySync != nil {
+		if err := s.hooks.afterDirectorySync(); err != nil {
+			return rollback(err)
+		}
+	}
+	return nil
+}
+
+func removeIndex(path string) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	parent, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer parent.Close()
+	return parent.Sync()
+}
+
+func restoreIndex(path string, data []byte, mode os.FileMode) error {
+	directory := filepath.Dir(path)
+	temporary, err := os.CreateTemp(directory, ".knowledge-index-restore-*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(mode); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
 		return err
 	}
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temporaryPath, s.path)
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return err
+	}
+	parent, err := os.Open(directory)
+	if err != nil {
+		return err
+	}
+	defer parent.Close()
+	return parent.Sync()
 }
 
 func sortWikis(wikis []KnowledgeWiki) []KnowledgeWiki {

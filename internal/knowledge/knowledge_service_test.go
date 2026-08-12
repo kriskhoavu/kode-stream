@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -220,6 +221,30 @@ func TestKnowledgeRebuildsWhenCheckoutIdentityChanges(t *testing.T) {
 	}
 }
 
+func TestKnowledgeFreshnessCancellationDoesNotPublish(t *testing.T) {
+	directory := t.TempDir()
+	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: directory, Sources: []string{"docs"}}
+	data, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(directory, "workspaces.yaml")
+	if err := os.WriteFile(registryPath, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(filepath.Join(directory, "knowledge-index.yaml"))
+	detector := &stubDetector{err: context.Canceled}
+	checkout := &stubCheckout{branch: "main", commit: "aaa"}
+	service := NewService(registry.New(registryPath, gitadapter.New()), store).ConfigureActions(detector, nil, nil).ConfigureCheckout(checkout)
+	if _, err := service.WikisContext(context.Background(), "ws"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err=%v", err)
+	}
+	wikis, err := store.List("ws")
+	if err != nil || len(wikis) != 0 {
+		t.Fatalf("wikis=%#v err=%v", wikis, err)
+	}
+}
+
 func TestEnrichPassesLiteralArgumentsRescansAndBoundsOutput(t *testing.T) {
 	workspace := t.TempDir()
 	script := filepath.Join(workspace, "enrich.sh")
@@ -278,6 +303,39 @@ func TestEnrichReportsStartExitAndTimeoutFailuresWithoutRescan(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCommittedKnowledgeActionsAuditRecoveryAsSuccessfulMutation(t *testing.T) {
+	failure := errors.New("index refresh failed")
+	t.Run("sync", func(t *testing.T) {
+		service, _ := newActionService(t, "", nil)
+		audits := &stubAudit{}
+		service.ConfigureActions(&stubDetector{err: failure}, &stubPuller{result: models.GitOperationResult{OK: true}}, audits)
+		result, err := service.Sync(context.Background(), "ws", models.GitOperationInput{Confirm: true})
+		if err != nil || !result.Committed || !result.RefreshRequired {
+			t.Fatalf("result=%#v err=%v", result, err)
+		}
+		if len(audits.events) != 1 || audits.events[0].Status != models.AuditStatusSuccess || !strings.Contains(audits.events[0].Message, "refresh failed") {
+			t.Fatalf("audits=%#v", audits.events)
+		}
+	})
+	t.Run("enrich", func(t *testing.T) {
+		workspace := t.TempDir()
+		executable := filepath.Join(workspace, "succeeds.sh")
+		if err := os.WriteFile(executable, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		service, _ := newActionServiceAt(t, workspace, executable, nil)
+		audits := &stubAudit{}
+		service.ConfigureActions(&stubDetector{err: failure}, nil, audits)
+		result, err := service.Enrich(context.Background(), "ws", true)
+		if err != nil || !result.Committed || !result.RefreshRequired {
+			t.Fatalf("result=%#v err=%v", result, err)
+		}
+		if len(audits.events) != 1 || audits.events[0].Status != models.AuditStatusSuccess || !strings.Contains(audits.events[0].Message, "refresh failed") {
+			t.Fatalf("audits=%#v", audits.events)
+		}
+	})
 }
 
 func newKnowledgeService(t *testing.T) (*KnowledgeService, string) {

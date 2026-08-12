@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,6 +66,81 @@ func TestDetectorPreservesPartialPagesForOversizedFiles(t *testing.T) {
 	}
 	if len(wikis) != 1 || len(wikis[0].Warnings) == 0 {
 		t.Fatalf("wikis = %#v", wikis)
+	}
+}
+
+func TestReadStableBoundedRejectsGrowthAndHonorsCancellation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "page.md")
+	if err := os.WriteFile(path, []byte("small"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, warning, err := readStableBounded(context.Background(), path, 4); err != nil || warning != "file_too_large" {
+		t.Fatalf("warning=%q err=%v", warning, err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, _, err := readStableBounded(ctx, path, 1024); err != context.Canceled {
+		t.Fatalf("cancellation err=%v", err)
+	}
+}
+
+func TestStorePublicationPreservesExistingMode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "knowledge-index.yaml")
+	if err := os.WriteFile(path, []byte("version: 1\nwikis: []\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(path)
+	if err := store.ReplaceWorkspace("ws", []KnowledgeWiki{{Root: "docs"}}); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o640 {
+		t.Fatalf("mode=%o", info.Mode().Perm())
+	}
+}
+
+func TestStorePublicationRestoresPreviousGenerationAfterPublicationFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "knowledge-index.yaml")
+	store := NewStore(path)
+	if err := store.ReplaceWorkspace("ws", []KnowledgeWiki{{Root: "old"}}); err != nil {
+		t.Fatal(err)
+	}
+	store.hooks.afterRename = func() error { return errors.New("injected publication failure") }
+	if err := store.ReplaceWorkspace("ws", []KnowledgeWiki{{Root: "new"}}); err == nil {
+		t.Fatal("expected publication failure")
+	}
+	store.hooks = storeHooks{}
+	wikis, err := store.List("ws")
+	if err != nil || len(wikis) != 1 || wikis[0].Root != "old" {
+		t.Fatalf("wikis=%#v err=%v", wikis, err)
+	}
+}
+
+func TestStoreFirstPublicationRollbackRestoresAbsentState(t *testing.T) {
+	for _, hook := range []string{"rename", "directory"} {
+		t.Run(hook, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "knowledge-index.yaml")
+			store := NewStore(path)
+			failure := errors.New("injected publication failure")
+			if hook == "rename" {
+				store.hooks.afterRename = func() error { return failure }
+			} else {
+				store.hooks.afterDirectorySync = func() error { return failure }
+			}
+			if err := store.ReplaceWorkspace("ws", []KnowledgeWiki{{Root: "docs"}}); !errors.Is(err, failure) {
+				t.Fatalf("err=%v", err)
+			}
+			if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("index should be absent after rollback, err=%v", err)
+			}
+			wikis, err := store.List("ws")
+			if err != nil || len(wikis) != 0 {
+				t.Fatalf("wikis=%#v err=%v", wikis, err)
+			}
+		})
 	}
 }
 

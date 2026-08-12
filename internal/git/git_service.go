@@ -48,11 +48,16 @@ type GitService struct {
 
 type Service = GitService
 
+type workspaceMutationContextKey struct{}
+
 func NewService(reg WorkspaceRepository, writer ItemRefresher, git GitRepository) *GitService {
 	return &GitService{registry: reg, writer: writer, git: git}
 }
 
 func (s *Service) withMutation(ctx context.Context, workspacePath string, action func() error) error {
+	if held, _ := ctx.Value(workspaceMutationContextKey{}).(string); held == workspacePath {
+		return action()
+	}
 	if git, ok := s.git.(interface {
 		WithWorkspaceMutationContext(context.Context, string, func() error) error
 	}); ok {
@@ -62,6 +67,20 @@ func (s *Service) withMutation(ctx context.Context, workspacePath string, action
 		return err
 	}
 	return s.git.WithWorkspaceMutation(workspacePath, action)
+}
+
+// WithWorkspaceMutationContext exposes the established workspace mutation
+// boundary to cohesive services that need to perform a multi-step operation.
+// The context passed to action is marked as already holding the lock so the
+// service's own mutation methods can safely participate without re-locking.
+func (s *Service) WithWorkspaceMutationContext(ctx context.Context, workspaceID string, action func(context.Context) error) error {
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return err
+	}
+	return s.withMutation(ctx, workspace.Path, func() error {
+		return action(context.WithValue(ctx, workspaceMutationContextKey{}, workspace.Path))
+	})
 }
 
 func (s *Service) Status(workspaceID string) (models.GitStatus, error) {

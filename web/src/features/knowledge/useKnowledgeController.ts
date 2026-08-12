@@ -19,6 +19,9 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 	const requestVersion = useRef(0);
 	const detailVersion = useRef(0);
 	const graphVersion = useRef(0);
+	const loadAbort = useRef<AbortController | null>(null);
+	const detailAbort = useRef<AbortController | null>(null);
+	const graphAbort = useRef<AbortController | null>(null);
 	const locationRef = useRef(location);
 	const onLocationChangeRef = useRef(onLocationChange);
 	locationRef.current = location;
@@ -34,18 +37,21 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 	}, []);
 
 	const load = useCallback(async () => {
+		loadAbort.current?.abort();
+		const abort = new AbortController();
+		loadAbort.current = abort;
 		const version = ++requestVersion.current;
 		setError(''); setNotice(''); setLoading(true);
 		const selectedWorkspace = workspaceRef.current;
 		if (!selectedWorkspace) { setWikis([]); setPages([]); setWarnings([]); setLoading(false); return; }
 		try {
 			const currentLocation = locationRef.current;
-			const loadedWikis = await api.knowledgeWikis(selectedWorkspace.id);
+			const loadedWikis = await api.knowledgeWikis(selectedWorkspace.id, abort.signal);
 			if (version !== requestVersion.current) return;
 			setWikis(loadedWikis);
 			const selectedWiki = loadedWikis.find((candidate) => candidate.root === currentLocation?.root) ?? loadedWikis[0];
 			if (!selectedWiki) { setPages([]); setWarnings([]); setLoading(false); if (currentLocation?.workspaceId !== selectedWorkspace.id || currentLocation?.root) onLocationChangeRef.current({ workspaceId: selectedWorkspace.id, view: 'browse' }); return; }
-			const response = await api.knowledgePages(selectedWorkspace.id, selectedWiki.root);
+			const response = await api.knowledgePages(selectedWorkspace.id, selectedWiki.root, abort.signal);
 			if (version !== requestVersion.current) return;
 			setPages(response.pages); setWarnings(response.warnings);
 			const selectedPage = response.pages.find((candidate) => candidate.slug === currentLocation?.slug);
@@ -54,32 +60,40 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 			else if (currentLocation?.slug) setNotice('The selected page is no longer available.');
 			if (!sameLocation(currentLocation, next)) onLocationChangeRef.current(next);
 		} catch (requestError) {
+			if (abort.signal.aborted) return;
 			if (version === requestVersion.current) { setError(requestError instanceof Error ? requestError.message : 'Knowledge could not be loaded.'); setPages([]); setWarnings([]); }
 		} finally { if (version === requestVersion.current) setLoading(false); }
 	}, [workspace?.id, location?.workspaceId, location?.root]);
 
-	useEffect(() => { void load(); return () => { requestVersion.current++; }; }, [load]);
+	useEffect(() => { void load(); return () => { requestVersion.current++; loadAbort.current?.abort(); }; }, [load]);
 
 	useEffect(() => {
+		detailAbort.current?.abort();
+		const abort = new AbortController();
+		detailAbort.current = abort;
 		const version = ++detailVersion.current;
 		if (!workspace || !wiki || !location?.slug || (location.view !== 'read' && location.view !== 'graph')) { setDetail(null); setDetailLoading(false); return; }
 		setDetailLoading(true);
-		void api.knowledgePage(workspace.id, wiki.root, location.slug).then((loaded) => {
+		void api.knowledgePage(workspace.id, wiki.root, location.slug, abort.signal).then((loaded) => {
 			if (version === detailVersion.current) setDetail(loaded);
 		}).catch(() => {
+			if (abort.signal.aborted) return;
 			if (version !== detailVersion.current) return;
 			setDetail(null); setNotice('The selected page could not be loaded. It may have been removed.');
 			if (locationRef.current?.view === 'read') onLocationChangeRef.current({ workspaceId: workspace.id, root: wiki.root, view: 'browse' });
 		}).finally(() => { if (version === detailVersion.current) setDetailLoading(false); });
-		return () => { detailVersion.current++; };
+		return () => { detailVersion.current++; abort.abort(); };
 	}, [workspace, wiki, location?.slug, location?.view]);
 
 	useEffect(() => {
+		graphAbort.current?.abort();
+		const abort = new AbortController();
+		graphAbort.current = abort;
 		const version = ++graphVersion.current;
 		if (!workspace || !wiki || location?.view !== 'graph') { setGraph(null); setGraphLoading(false); return; }
 		setGraphLoading(true);
-		void api.knowledgeGraph(workspace.id, wiki.root).then((loaded) => { if (version === graphVersion.current) setGraph(loaded); }).catch(() => { if (version === graphVersion.current) setError('Knowledge graph could not be loaded.'); }).finally(() => { if (version === graphVersion.current) setGraphLoading(false); });
-		return () => { graphVersion.current++; };
+		void api.knowledgeGraph(workspace.id, wiki.root, abort.signal).then((loaded) => { if (version === graphVersion.current) setGraph(loaded); }).catch(() => { if (!abort.signal.aborted && version === graphVersion.current) setError('Knowledge graph could not be loaded.'); }).finally(() => { if (version === graphVersion.current) setGraphLoading(false); });
+		return () => { graphVersion.current++; abort.abort(); };
 	}, [workspace, wiki, location?.view]);
 
 	const runAction = useCallback(async (operation: 'rescan' | 'sync' | 'enrich', confirm = false) => {
