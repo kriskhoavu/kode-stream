@@ -3,6 +3,7 @@ package git
 // Git infrastructure contract tests.
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -177,6 +178,29 @@ func TestTreeReadsBranchSnapshotWithoutCheckout(t *testing.T) {
 	}
 }
 
+func TestBoundedTreeAndBlobReadsHonorLimitsAndContext(t *testing.T) {
+	root := newGitRepo(t)
+	writeGitFile(t, root, "plans/review/README.md", strings.Repeat("x", 2048))
+	writeGitFile(t, root, "plans/review/deep/a/b/c.md", "deep")
+	gitCommit(t, root, "review fixture")
+	adapter := New()
+	_, commit, err := adapter.ResolveBranch(root, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.TreeWalkBounded(context.Background(), root, commit, "plans/review", 100, 1); !errors.Is(err, ErrTreeLimit) {
+		t.Fatalf("depth limit error = %v", err)
+	}
+	if _, _, _, err := adapter.TreeReadFileBounded(context.Background(), root, commit, "plans/review/README.md", 32); !errors.Is(err, ErrBlobLimit) {
+		t.Fatalf("blob limit error = %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := adapter.TreeWalkBounded(ctx, root, commit, "plans/review", 100, 64); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled tree error = %v", err)
+	}
+}
+
 func TestCloneClonesRepositoryIntoDestination(t *testing.T) {
 	remote := newGitRepo(t)
 	writeGitFile(t, remote, "plans/platform/PM-201/README.md", "# PM-201\n")
@@ -204,14 +228,84 @@ func TestParseChangeLine(t *testing.T) {
 		t.Fatalf("change = %#v", change)
 	}
 
-	renamed := parseChangeLine("R  old.md -> new.md")
-	if renamed.Status != models.GitChangeRenamed || renamed.OldPath != "old.md" || renamed.Path != "new.md" || !renamed.Staged {
+	renamed := parseChangeLine("R  literal -> path.md")
+	renamed.OldPath = "old\tname.md"
+	if renamed.Status != models.GitChangeRenamed || renamed.OldPath != "old\tname.md" || renamed.Path != "literal -> path.md" || !renamed.Staged {
 		t.Fatalf("renamed = %#v", renamed)
 	}
 
 	conflicted := parseChangeLine("UU plans/platform/PM-002/README.md")
 	if conflicted.Status != models.GitChangeConflicted || !conflicted.Conflict {
 		t.Fatalf("conflicted = %#v", conflicted)
+	}
+}
+
+func TestNULDelimitedGitParsersPreserveAdversarialPathBytes(t *testing.T) {
+	path := " leading\tname -> literal\n"
+	status := models.GitStatus{Changes: []models.GitChange{parseChangeLine(" M " + path)}}
+	if status.Changes[0].Path != path {
+		t.Fatalf("status path=%q", status.Changes[0].Path)
+	}
+	commit := strings.Repeat("a", 40)
+	out := "\x00" + commit + "\x002026-01-02T03:04:05Z\x00A U Thor\x00message\x00R100\x00old\tname\x00" + path + "\x00"
+	entries, err := parseActivityNUL(out, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || len(entries[0].Paths) != 1 || entries[0].Paths[0].OldPath != "old\tname" || entries[0].Paths[0].Path != path {
+		t.Fatalf("entries=%#v", entries)
+	}
+}
+
+func TestStatusContextPreservesAdversarialGitPaths(t *testing.T) {
+	root := newGitRepo(t)
+	path := " plans/leading\tname -> literal\n.md "
+	writeGitFile(t, root, path, "content")
+	status, err := New().StatusContext(context.Background(), "ws", root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.Changes) != 1 || status.Changes[0].Path != path {
+		t.Fatalf("changes=%#v", status.Changes)
+	}
+}
+
+func TestContextCommandsFailClosedBeforeStarting(t *testing.T) {
+	root := newGitRepo(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := New().StatusContext(ctx, "ws", root); !errors.Is(err, context.Canceled) {
+		t.Fatalf("status cancellation error = %v", err)
+	}
+	if err := New().FetchContext(ctx, root); !errors.Is(err, context.Canceled) {
+		t.Fatalf("fetch cancellation error = %v", err)
+	}
+}
+
+func TestWorkspaceMutationLockHonorsCancellation(t *testing.T) {
+	root := newGitRepo(t)
+	adapter := New()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	go func() {
+		_ = adapter.WithWorkspaceMutation(root, func() error { close(entered); <-release; return nil })
+	}()
+	<-entered
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if err := adapter.WithWorkspaceMutationContext(ctx, root, func() error { t.Fatal("cancelled action ran"); return nil }); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("lock cancellation error = %v", err)
+	}
+	close(release)
+}
+
+func TestLimitedBufferRejectsOversizedOutput(t *testing.T) {
+	buffer := &limitedBuffer{limit: 3}
+	if _, err := buffer.Write([]byte("abcd")); !errors.Is(err, ErrOutputLimit) {
+		t.Fatalf("write error = %v", err)
+	}
+	if got := buffer.String(); got != "" {
+		t.Fatalf("bounded output = %q", got)
 	}
 }
 
@@ -236,6 +330,32 @@ func TestActivityReturnsRecentCommitsForPath(t *testing.T) {
 	}
 	if len(entries[0].Paths) != 1 || entries[0].Paths[0].Path != "docs/guide.md" {
 		t.Fatalf("paths = %#v", entries[0].Paths)
+	}
+}
+
+func TestActivityPreservesRealGitRenamePathBytes(t *testing.T) {
+	root := newGitRepo(t)
+	oldPath := " plans/old\tname -> literal\n.md "
+	newPath := " plans/new\tname -> literal\n.md "
+	writeGitFile(t, root, oldPath, "first")
+	gitCommit(t, root, "add")
+	if err := os.Rename(filepath.Join(root, oldPath), filepath.Join(root, newPath)); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, root, "add", "-A")
+	gitCommit(t, root, "rename")
+	entries, err := New().Activity(root, "", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 || len(entries[0].Paths) != 1 || entries[0].Paths[0].OldPath != oldPath || entries[0].Paths[0].Path != newPath {
+		t.Fatalf("activity=%#v", entries)
+	}
+}
+
+func TestParseActivityNULFailsClosedOnMalformedRecord(t *testing.T) {
+	if _, err := parseActivityNUL("\x00"+strings.Repeat("a", 40)+"\x002026-01-02T03:04:05Z\x00author\x00message\x00R100\x00old\x00", 1); err == nil {
+		t.Fatal("malformed rename was accepted")
 	}
 }
 

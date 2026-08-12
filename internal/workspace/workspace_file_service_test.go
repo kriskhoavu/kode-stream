@@ -27,6 +27,8 @@ type fakeGit struct {
 	reverted []string
 }
 
+func (f *fakeGit) WithWorkspaceMutation(_ string, action func() error) error { return action() }
+
 func (f *fakeGit) Diff(_, _ string) (string, error) { return f.diff, nil }
 func (f *fakeGit) RevertPaths(_ string, paths []string) error {
 	f.reverted = append([]string(nil), paths...)

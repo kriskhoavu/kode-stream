@@ -197,6 +197,8 @@ export type VerificationFreshness = 'fresh' | 'stale' | 'inconclusive';
 export interface RepositoryFingerprint { value: string; branch: string; commit: string; }
 
 export interface VerificationTestSelection {
+	 expectedRevision?: string;
+	 revision?: string;
   selectedSpecs: string[];
   environment?: string;
   displayMode?: AutomationDisplayMode;
@@ -635,6 +637,7 @@ export interface ItemSummary {
   description?: string;
   metadataSource: string;
   itemPath?: string;
+	metadataRevision?: string;
 }
 
 export interface ItemDocument {
@@ -673,12 +676,14 @@ export interface FileContent {
   sizeBytes: number;
   truncated?: boolean;
   editable: boolean;
+	committed?: boolean;
+	refreshRequired?: boolean;
+	refreshError?: string;
 }
 
 export interface FileSaveInput {
   content: string;
   expectedHash?: string;
-  materializeConfirmed?: boolean;
 }
 
 export type SourceMode = 'working_tree' | 'snapshot';
@@ -846,18 +851,18 @@ export interface WorkspacePathMutationResult {
 }
 
 export interface ItemMetadataUpdateInput {
+	expectedRevision?: string;
   title?: string;
   scope?: string;
   identifier?: string;
   status?: ItemStatus;
   owner?: string;
   tags?: string[];
-  materializeConfirmed?: boolean;
 }
 
 export interface ItemStatusUpdateInput {
+  expectedRevision?: string;
   status: ItemStatus;
-  materializeConfirmed?: boolean;
 }
 
 export interface NewItemInput {
@@ -876,6 +881,9 @@ export interface NewItemInput {
 export interface WriteResult {
   item: ItemDetail;
   scannedAt: string;
+	committed: boolean;
+	refreshRequired?: boolean;
+	refreshError?: string;
 }
 
 export interface ScanResult {
@@ -953,7 +961,6 @@ export interface GitCommitInput {
 }
 
 export interface GitOperationInput {
-  confirm?: boolean;
 }
 
 export interface BranchCreateInput {
@@ -964,7 +971,6 @@ export interface BranchCreateInput {
 
 export interface BranchSwitchInput {
   name: string;
-  confirm?: boolean;
   strategy?: 'carry' | 'stash';
   stashMessage?: string;
 }
@@ -977,6 +983,9 @@ export interface BranchSwitchDecision {
 
 export interface GitOperationResult {
   ok: boolean;
+	committed?: boolean;
+	refreshRequired?: boolean;
+	refreshError?: string;
   message?: string;
   recoveryHint?: string;
   status: GitStatus;

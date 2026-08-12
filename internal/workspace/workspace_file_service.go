@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -27,11 +28,20 @@ type Access interface {
 	CreateDirectory(workspace models.WorkspaceConfig, input models.WorkspaceDirectoryCreateInput) (models.WorkspacePathMutationResult, error)
 	Rename(workspace models.WorkspaceConfig, input models.WorkspacePathRenameInput) (models.WorkspacePathMutationResult, error)
 }
+type contextSearchAccess interface {
+	SearchContext(context.Context, models.WorkspaceConfig, string, bool) (models.WorkspacePathSearchResponse, error)
+}
 
 type Git interface {
+	WithWorkspaceMutation(workspacePath string, action func() error) error
 	Diff(workspacePath, relPath string) (string, error)
 	RevertPaths(workspacePath string, paths []string) error
 	PathStates(workspaceID, workspacePath string) ([]models.WorkspacePathGitState, error)
+}
+type contextGit interface {
+	WithWorkspaceMutationContext(context.Context, string, func() error) error
+	DiffContext(context.Context, string, string) (string, error)
+	RevertPathsContext(context.Context, string, []string) error
 }
 
 type Audit interface {
@@ -71,6 +81,10 @@ func (s *WorkspaceFileService) Read(workspaceID, path string) (models.FileConten
 }
 
 func (s *WorkspaceFileService) Search(query, workspaceID string, includeIgnored bool) (models.WorkspacePathSearchResponse, error) {
+	return s.SearchContext(context.Background(), query, workspaceID, includeIgnored)
+}
+
+func (s *WorkspaceFileService) SearchContext(ctx context.Context, query, workspaceID string, includeIgnored bool) (models.WorkspacePathSearchResponse, error) {
 	if err := workspaceaccess.ValidateSearchQuery(query); err != nil {
 		return models.WorkspacePathSearchResponse{}, err
 	}
@@ -90,7 +104,18 @@ func (s *WorkspaceFileService) Search(query, workspaceID string, includeIgnored 
 	}
 	response := models.WorkspacePathSearchResponse{Results: []models.WorkspacePathSearchResult{}}
 	for _, workspace := range workspaces {
-		result, err := s.files.Search(workspace, query, includeIgnored)
+		if err := ctx.Err(); err != nil {
+			return models.WorkspacePathSearchResponse{}, err
+		}
+		var (
+			result models.WorkspacePathSearchResponse
+			err    error
+		)
+		if contextual, ok := s.files.(contextSearchAccess); ok {
+			result, err = contextual.SearchContext(ctx, workspace, query, includeIgnored)
+		} else {
+			result, err = s.files.Search(workspace, query, includeIgnored)
+		}
 		if err != nil {
 			return models.WorkspacePathSearchResponse{}, err
 		}
@@ -180,6 +205,9 @@ func (s *WorkspaceFileService) Save(workspaceID string, input models.WorkspaceFi
 }
 
 func (s *WorkspaceFileService) Diff(workspaceID, path string) (string, error) {
+	return s.DiffContext(context.Background(), workspaceID, path)
+}
+func (s *WorkspaceFileService) DiffContext(ctx context.Context, workspaceID, path string) (string, error) {
 	workspace, err := s.workspace(workspaceID)
 	if err != nil {
 		return "", err
@@ -189,6 +217,11 @@ func (s *WorkspaceFileService) Diff(workspaceID, path string) (string, error) {
 		return "", err
 	}
 	diff, err := s.git.Diff(workspace.Path, clean)
+	if git, ok := s.git.(contextGit); ok {
+		diff, err = git.DiffContext(ctx, workspace.Path, clean)
+	} else if err = ctx.Err(); err != nil {
+		return "", err
+	}
 	if err != nil {
 		return "", fmt.Errorf("diff unavailable: %w", err)
 	}
@@ -196,6 +229,9 @@ func (s *WorkspaceFileService) Diff(workspaceID, path string) (string, error) {
 }
 
 func (s *WorkspaceFileService) Revert(workspaceID string, input models.WorkspaceFileRevertInput) (models.WorkspaceFileWriteResult, error) {
+	return s.RevertContext(context.Background(), workspaceID, input)
+}
+func (s *WorkspaceFileService) RevertContext(ctx context.Context, workspaceID string, input models.WorkspaceFileRevertInput) (models.WorkspaceFileWriteResult, error) {
 	workspace, err := s.workspace(workspaceID)
 	if err != nil {
 		return models.WorkspaceFileWriteResult{}, err
@@ -205,22 +241,38 @@ func (s *WorkspaceFileService) Revert(workspaceID string, input models.Workspace
 		return models.WorkspaceFileWriteResult{}, err
 	}
 	started := time.Now()
-	if err := s.git.RevertPaths(workspace.Path, []string{clean}); err != nil {
-		s.record(workspace.ID, "workspace_file_revert", []string{clean}, started, err)
-		return models.WorkspaceFileWriteResult{}, err
+	var file models.FileContent
+	var refreshed bool
+	action := func() error {
+		if git, ok := s.git.(contextGit); ok {
+			err = git.RevertPathsContext(ctx, workspace.Path, []string{clean})
+		} else if err = ctx.Err(); err == nil {
+			err = s.git.RevertPaths(workspace.Path, []string{clean})
+		}
+		if err != nil {
+			return err
+		}
+		file, err = s.files.Read(workspace, clean)
+		if err != nil {
+			return err
+		}
+		refreshed, err = s.refreshIfSource(workspace, clean)
+		return err
 	}
-	file, err := s.files.Read(workspace, clean)
-	if err != nil {
-		s.record(workspace.ID, "workspace_file_revert", []string{clean}, started, err)
-		return models.WorkspaceFileWriteResult{}, err
+	if git, ok := s.git.(contextGit); ok {
+		err = git.WithWorkspaceMutationContext(ctx, workspace.Path, action)
+	} else if err = ctx.Err(); err == nil {
+		err = s.git.WithWorkspaceMutation(workspace.Path, action)
 	}
-	refreshed, err := s.refreshIfSource(workspace, clean)
 	result := models.WorkspaceFileWriteResult{File: file, Refreshed: refreshed, Committed: true}
 	if err != nil {
-		result.RefreshRequired = true
-		result.RefreshError = err.Error()
-		s.recordCommittedRefreshFailure(workspace.ID, "workspace_file_revert", []string{clean}, started, err)
-		return result, nil
+		if file.Path != "" {
+			result.RefreshRequired, result.RefreshError = true, err.Error()
+			s.recordCommittedRefreshFailure(workspace.ID, "workspace_file_revert", []string{clean}, started, err)
+			return result, nil
+		}
+		s.record(workspace.ID, "workspace_file_revert", []string{clean}, started, err)
+		return models.WorkspaceFileWriteResult{}, err
 	}
 	s.record(workspace.ID, "workspace_file_revert", []string{clean}, started, nil)
 	return result, nil

@@ -8,9 +8,11 @@ export interface WorkspaceBranchState extends WorkspaceBranches {
   error: string;
   recoveryHint: string;
 }
+export interface BranchSwitchDecision { workspace: WorkspaceConfig; target: string; canCarry: boolean; stashMessage: string }
 
 export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?: (workspaceId: string, branch: string) => void | Promise<void>) {
   const [states, setStates] = useState<Record<string, WorkspaceBranchState>>({});
+	const [decision, setDecision] = useState<BranchSwitchDecision | null>(null);
   const workspaceKey = workspaces.map((workspace) => workspace.id).join('\u0000');
 
   const load = useCallback(async (workspace: WorkspaceConfig) => {
@@ -18,7 +20,7 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
     try {
       const response = await api.workspaceBranches(workspace.id);
       setStates((current) => ({ ...current, [workspace.id]: { ...response, loading: false, switching: current[workspace.id]?.switching ?? false, error: '', recoveryHint: '' } }));
-    } catch (caught) {
+		} catch (caught) {
       setStates((current) => ({
         ...current,
         [workspace.id]: {
@@ -57,11 +59,14 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
     if (!branch || branch === current?.current || current?.switching) return branch === current?.current;
     setStates((value) => ({ ...value, [workspace.id]: { ...(value[workspace.id] ?? fallbackState(workspace)), switching: true, error: '', recoveryHint: '' } }));
     try {
-      const result = await switchBranchWithConfirmation(workspace.id, branch);
+		const result = await api.switchBranch(workspace.id, { name: branch });
       if (!result.ok) {
         throw new ApiError(result.message ?? 'Branch switch failed', result.recoveryHint);
       }
       await onSwitched?.(workspace.id, result.status.branch || branch);
+		const refreshHint = result.refreshRequired
+			? (result.refreshError ? `Git completed, but refresh is required: ${result.refreshError}` : 'Git completed. Reload the workspace to refresh it.')
+			: '';
       setStates((value) => ({
         ...value,
         [workspace.id]: {
@@ -69,12 +74,17 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
           current: result.status.branch || branch,
           switching: false,
           error: '',
-          recoveryHint: ''
+	          recoveryHint: refreshHint
         }
       }));
       await load(workspace);
       return true;
-    } catch (caught) {
+		} catch (caught) {
+			if (caught instanceof ApiError && caught.code === 'branch_switch_decision_required') {
+				setDecision({ workspace, target: branch, canCarry: caught.details?.canCarryChanges === 'true', stashMessage: `Kode Stream: stash ${caught.details?.sourceBranch || current?.current || workspace.baselineBranch} before switching to ${branch}` });
+				setStates((value) => ({ ...value, [workspace.id]: { ...(value[workspace.id] ?? fallbackState(workspace)), switching: false, error: '', recoveryHint: '' } }));
+				return false;
+			}
       setStates((value) => ({
         ...value,
         [workspace.id]: {
@@ -88,7 +98,21 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
     }
   }, [load, onSwitched, states]);
 
-  return { states, load, switchBranch };
+	const resolveDecision = useCallback(async (strategy: 'carry' | 'stash', stashMessage: string) => {
+		if (!decision) return false;
+		const { workspace, target } = decision;
+		setDecision(null);
+		setStates((value) => ({ ...value, [workspace.id]: { ...(value[workspace.id] ?? fallbackState(workspace)), switching: true, error: '', recoveryHint: '' } }));
+		try {
+			const result = await api.switchBranch(workspace.id, { name: target, strategy, stashMessage: strategy === 'stash' ? stashMessage : undefined });
+			await onSwitched?.(workspace.id, result.status.branch || target);
+			setStates((value) => ({ ...value, [workspace.id]: { ...(value[workspace.id] ?? fallbackState(workspace)), current: result.status.branch || target, switching: false, error: '', recoveryHint: '' } }));
+			await load(workspace);
+			return true;
+		} catch (caught) { setStates((value) => ({ ...value, [workspace.id]: { ...(value[workspace.id] ?? fallbackState(workspace)), switching: false, error: caught instanceof Error ? caught.message : 'Branch switch failed', recoveryHint: caught instanceof ApiError ? caught.recoveryHint ?? '' : '' } })); return false; }
+	}, [decision, load, onSwitched]);
+
+	return { states, load, switchBranch, decision, resolveDecision, cancelDecision: () => setDecision(null) };
 }
 
 function fallbackState(workspace: WorkspaceConfig): WorkspaceBranchState {
@@ -101,20 +125,4 @@ function fallbackState(workspace: WorkspaceConfig): WorkspaceBranchState {
     error: '',
     recoveryHint: ''
   };
-}
-
-async function switchBranchWithConfirmation(workspaceId: string, branch: string) {
-  try {
-    return await api.switchBranch(workspaceId, { name: branch, confirm: false });
-  } catch (caught) {
-    if (!(caught instanceof ApiError) || !requiresDirtyTreeConfirmation(caught)) throw caught;
-    const confirmed = window.confirm(`${caught.message}\n\n${caught.recoveryHint || 'Review local changes before switching branches.'}`);
-    if (!confirmed) throw caught;
-    return api.switchBranch(workspaceId, { name: branch, confirm: true });
-  }
-}
-
-function requiresDirtyTreeConfirmation(error: ApiError): boolean {
-  const text = `${error.message} ${error.recoveryHint ?? ''}`.toLocaleLowerCase();
-  return text.includes('confirm to switch') || (text.includes('local changes') && text.includes('confirm'));
 }

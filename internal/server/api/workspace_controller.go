@@ -287,8 +287,8 @@ func (a *workspaceController) workspaceTree(w http.ResponseWriter, r *http.Reque
 
 func (a *workspaceController) workspacePathSearch(w http.ResponseWriter, r *http.Request) {
 	includeIgnored, _ := strconv.ParseBool(r.URL.Query().Get("includeIgnored"))
-	result, err := a.files.Search(r.URL.Query().Get("q"), r.URL.Query().Get("workspaceId"), includeIgnored)
-	respondWorkspaceFileResult(w, result, err)
+	result, err := a.files.SearchContext(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("workspaceId"), includeIgnored)
+	respondSearch(w, result, err)
 }
 
 func (a *workspaceController) workspaceContentSearch(w http.ResponseWriter, r *http.Request) {
@@ -355,7 +355,7 @@ func (a *workspaceController) workspacePathGitStates(w http.ResponseWriter, r *h
 }
 
 func (a *workspaceController) workspaceFileDiff(w http.ResponseWriter, r *http.Request) {
-	diff, err := a.files.Diff(r.PathValue("id"), r.URL.Query().Get("path"))
+	diff, err := a.files.DiffContext(r.Context(), r.PathValue("id"), r.URL.Query().Get("path"))
 	if err != nil {
 		respondWorkspaceFileResult(w, nil, err)
 		return
@@ -368,6 +368,6 @@ func (a *workspaceController) revertWorkspaceFile(w http.ResponseWriter, r *http
 	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
-	result, err := a.files.Revert(r.PathValue("id"), input)
+	result, err := a.files.RevertContext(r.Context(), r.PathValue("id"), input)
 	respondWorkspaceFileResult(w, result, err)
 }

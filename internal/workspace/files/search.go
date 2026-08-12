@@ -3,6 +3,7 @@ package workspacefiles
 // Package workspacefiles provides bounded workspace file operations.
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,6 +20,10 @@ const (
 )
 
 func (a *Access) Search(workspace models.WorkspaceConfig, query string, includeIgnored bool) (models.WorkspacePathSearchResponse, error) {
+	return a.SearchContext(context.Background(), workspace, query, includeIgnored)
+}
+
+func (a *Access) SearchContext(ctx context.Context, workspace models.WorkspaceConfig, query string, includeIgnored bool) (models.WorkspacePathSearchResponse, error) {
 	query = strings.TrimSpace(query)
 	response := models.WorkspacePathSearchResponse{Results: []models.WorkspacePathSearchResult{}}
 	if query == "" {
@@ -40,6 +45,9 @@ func (a *Access) Search(workspace models.WorkspaceConfig, query string, includeI
 	}
 	lowerQuery := strings.ToLower(query)
 	for len(queue) > 0 {
+		if err := ctx.Err(); err != nil {
+			return response, err
+		}
 		current := queue[0]
 		queue = queue[1:]
 		entries, err := os.ReadDir(current.full)
@@ -49,6 +57,9 @@ func (a *Access) Search(workspace models.WorkspaceConfig, query string, includeI
 		sort.SliceStable(entries, func(i, j int) bool { return naturalLess(entries[i].Name(), entries[j].Name()) })
 		paths := make([]string, len(entries))
 		for i, entry := range entries {
+			if err := ctx.Err(); err != nil {
+				return response, err
+			}
 			paths[i] = joinRelative(current.path, entry.Name())
 		}
 		ignored := map[string]bool{}

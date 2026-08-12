@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -20,7 +19,7 @@ type gitController struct {
 }
 
 func (a *gitController) gitStatus(w http.ResponseWriter, r *http.Request) {
-	status, err := a.gitOps.Status(r.PathValue("id"))
+	status, err := a.gitOps.StatusContext(r.Context(), r.PathValue("id"))
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
@@ -33,7 +32,7 @@ func (a *gitController) gitActivity(w http.ResponseWriter, r *http.Request) {
 	if limit <= 0 || limit > 50 {
 		limit = 12
 	}
-	entries, err := a.gitOps.Activity(r.PathValue("id"), r.URL.Query().Get("path"), limit)
+	entries, err := a.gitOps.ActivityContext(r.Context(), r.PathValue("id"), r.URL.Query().Get("path"), limit)
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
@@ -42,7 +41,7 @@ func (a *gitController) gitActivity(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *gitController) gitBranches(w http.ResponseWriter, r *http.Request) {
-	branches, err := a.gitOps.Branches(r.PathValue("id"))
+	branches, err := a.gitOps.BranchesContext(r.Context(), r.PathValue("id"))
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
@@ -51,7 +50,7 @@ func (a *gitController) gitBranches(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *gitController) gitStashes(w http.ResponseWriter, r *http.Request) {
-	stashes, err := a.gitOps.Stashes(r.PathValue("id"))
+	stashes, err := a.gitOps.StashesContext(r.Context(), r.PathValue("id"))
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
@@ -61,71 +60,84 @@ func (a *gitController) gitStashes(w http.ResponseWriter, r *http.Request) {
 
 func (a *gitController) gitApplyStash(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
-	result := withRecoveryHint(a.gitOps.ApplyStash(r.PathValue("id"), r.PathValue("ref")))
+	result := withRecoveryHint(a.gitOps.ApplyStashContext(r.Context(), r.PathValue("id"), r.PathValue("ref")))
 	a.recordGit(r.PathValue("id"), "git_apply_stash", nil, started, result)
 	respondGitResult(w, result)
 }
 
 func (a *gitController) gitFetch(w http.ResponseWriter, r *http.Request) {
-	a.gitOperation(w, r, "git_fetch", a.gitOps.Fetch)
+	var body struct{}
+	if !decodeLimitedJSON(w, r, &body, maxWorkspaceMutationBodyBytes, true) {
+		return
+	}
+	started := time.Now()
+	result := withRecoveryHint(a.gitOps.FetchContext(r.Context(), r.PathValue("id")))
+	a.recordGit(r.PathValue("id"), "git_fetch", nil, started, result)
+	respondGitResult(w, result)
 }
 
 func (a *gitController) gitPull(w http.ResponseWriter, r *http.Request) {
-	a.gitOperation(w, r, "git_pull", a.gitOps.Pull)
+	var body struct{}
+	if !decodeLimitedJSON(w, r, &body, maxWorkspaceMutationBodyBytes, true) {
+		return
+	}
+	started := time.Now()
+	result := withRecoveryHint(a.gitOps.PullContext(r.Context(), r.PathValue("id"), models.GitOperationInput{}))
+	a.recordGit(r.PathValue("id"), "git_pull", nil, started, result)
+	respondGitResult(w, result)
 }
 
 func (a *gitController) gitPush(w http.ResponseWriter, r *http.Request) {
-	a.gitOperation(w, r, "git_push", a.gitOps.Push)
+	var body struct{}
+	if !decodeLimitedJSON(w, r, &body, maxWorkspaceMutationBodyBytes, true) {
+		return
+	}
+	started := time.Now()
+	result := withRecoveryHint(a.gitOps.PushContext(r.Context(), r.PathValue("id")))
+	a.recordGit(r.PathValue("id"), "git_push", nil, started, result)
+	respondGitResult(w, result)
 }
 
 func (a *gitController) gitCommit(w http.ResponseWriter, r *http.Request) {
 	var input models.GitCommitInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	started := time.Now()
-	result := withRecoveryHint(a.gitOps.Commit(r.PathValue("id"), input))
+	result := withRecoveryHint(a.gitOps.CommitContext(r.Context(), r.PathValue("id"), input))
 	a.recordGit(r.PathValue("id"), "git_commit", input.Paths, started, result)
 	respondGitResult(w, result)
 }
 
 func (a *gitController) gitCreateBranch(w http.ResponseWriter, r *http.Request) {
 	var input models.BranchCreateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	started := time.Now()
-	result := withRecoveryHint(a.gitOps.CreateBranch(r.PathValue("id"), input))
+	result := withRecoveryHint(a.gitOps.CreateBranchContext(r.Context(), r.PathValue("id"), input))
 	a.recordGit(r.PathValue("id"), "git_create_branch", nil, started, result)
 	respondGitResult(w, result)
 }
 
 func (a *gitController) gitSwitchBranch(w http.ResponseWriter, r *http.Request) {
 	var input models.BranchSwitchInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	started := time.Now()
-	result := withRecoveryHint(a.gitOps.SwitchBranch(r.PathValue("id"), input))
+	result := withRecoveryHint(a.gitOps.SwitchBranchContext(r.Context(), r.PathValue("id"), input))
 	a.recordGit(r.PathValue("id"), "git_switch_branch", nil, started, result)
 	respondGitResult(w, result)
 }
 
-func (a *gitController) gitOperation(w http.ResponseWriter, r *http.Request, operation string, run func(string, models.GitOperationInput) models.GitOperationResult) {
-	var input models.GitOperationInput
-	if r.Body != nil {
-		_ = json.NewDecoder(r.Body).Decode(&input)
-	}
-	started := time.Now()
-	result := withRecoveryHint(run(r.PathValue("id"), input))
-	a.recordGit(r.PathValue("id"), operation, nil, started, result)
-	respondGitResult(w, result)
-}
-
 func (a *gitController) recordGit(workspaceID, operation string, paths []string, started time.Time, result models.GitOperationResult) {
+	if result.Committed && result.RefreshRequired {
+		if a.audit.repository != nil {
+			_, _ = a.audit.repository.Append(models.AuditEvent{WorkspaceID: workspaceID, Operation: operation, Status: models.AuditStatusSuccess, Message: "Git operation completed; workspace refresh is required.", Paths: paths, DurationMS: time.Since(started).Milliseconds(), Error: result.RefreshError})
+		}
+		return
+	}
 	var err error
 	if !result.OK {
 		err = errors.New(result.Message)
