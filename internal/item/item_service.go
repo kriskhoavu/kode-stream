@@ -1,6 +1,7 @@
 package item
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -22,11 +23,18 @@ import (
 )
 
 var (
-	ErrSnapshotReadOnly    = errors.New("snapshot item is read-only; import it into the checkout before editing")
-	ErrSnapshotReviewOnly  = errors.New("snapshot item is available only in Branch Review")
-	ErrReviewCommitMoved   = errors.New("reviewed branch changed since it was loaded")
-	ErrReviewCheckoutMoved = errors.New("checkout changed since branch review was loaded")
-	ErrReviewedPlan        = errors.New("reviewed snapshot plan is required")
+	ErrSnapshotReadOnly     = errors.New("snapshot item is read-only; import it into the checkout before editing")
+	ErrSnapshotReviewOnly   = errors.New("snapshot item is available only in Branch Review")
+	ErrReviewCommitMoved    = errors.New("reviewed branch changed since it was loaded")
+	ErrReviewCheckoutMoved  = errors.New("checkout changed since branch review was loaded")
+	ErrReviewedPlan         = errors.New("reviewed snapshot plan is required")
+	ErrSnapshotTreeTooLarge = errors.New("reviewed item tree exceeds the response limit")
+	ErrSnapshotFileTooLarge = errors.New("reviewed file exceeds the response limit")
+)
+
+const (
+	snapshotTreeEntryLimit = 10000
+	snapshotTreeDepthLimit = 64
 )
 
 type ListInput struct {
@@ -78,6 +86,11 @@ func (s *Service) Detail(id string) (models.ItemDetail, error) {
 		return models.ItemDetail{}, ErrSnapshotReviewOnly
 	}
 	item.Description = s.fullDescription(workspace, item)
+	if s.writer != nil {
+		if revision, revisionErr := s.writer.MetadataRevision(workspace, item); revisionErr == nil {
+			item.MetadataRevision = revision
+		}
+	}
 	return NormalizeDetail(item), nil
 }
 
@@ -93,6 +106,10 @@ func (s *Service) AuditContext(id string) (AuditContext, error) {
 }
 
 func (s *Service) Files(id, expectedCommit string) ([]models.FileNode, error) {
+	return s.FilesContext(context.Background(), id, expectedCommit)
+}
+
+func (s *Service) FilesContext(ctx context.Context, id, expectedCommit string) ([]models.FileNode, error) {
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
 		return nil, err
@@ -101,12 +118,16 @@ func (s *Service) Files(id, expectedCommit string) ([]models.FileNode, error) {
 		return nil, err
 	}
 	if item.SourceMode == "snapshot" {
-		return s.snapshotFiles(workspace, item)
+		return s.snapshotFiles(ctx, workspace, item)
 	}
 	return s.files.Tree(workspace, item)
 }
 
 func (s *Service) FileContent(id, fileID, expectedCommit string) (models.FileContent, error) {
+	return s.FileContentContext(context.Background(), id, fileID, expectedCommit)
+}
+
+func (s *Service) FileContentContext(ctx context.Context, id, fileID, expectedCommit string) (models.FileContent, error) {
 	workspace, item, err := s.workspaceAndItem(id)
 	if err != nil {
 		return models.FileContent{}, err
@@ -115,7 +136,7 @@ func (s *Service) FileContent(id, fileID, expectedCommit string) (models.FileCon
 		return models.FileContent{}, err
 	}
 	if item.SourceMode == "snapshot" {
-		return s.snapshotFileContent(workspace, item, fileID)
+		return s.snapshotFileContent(ctx, workspace, item, fileID)
 	}
 	return s.files.Read(workspace, item, fileID)
 }
@@ -147,17 +168,24 @@ func (s *Service) SaveFile(id, fileID string, input models.FileSaveInput) (model
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	if err := s.materializeIfNeeded(workspace, item, fileID, input.MaterializeConfirmed); err != nil {
-		return models.FileContent{}, err
-	}
-	if item.SourceMode == "snapshot" {
-		item = s.workingTreeItem(workspace, item)
-	}
-	if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
-		return models.FileContent{}, err
-	}
-	input.FileID = fileID
-	return s.files.WriteMarkdown(workspace, item, input)
+	var saved models.FileContent
+	err = s.withItemMutation(workspace, item, func(current models.ItemDetail) error {
+		input.FileID = fileID
+		var writeErr error
+		saved, writeErr = s.files.WriteMarkdown(workspace, current, input)
+		if writeErr != nil {
+			return writeErr
+		}
+		// Content edits affect the derived description/documents projection.
+		_, writeErr = s.writer.RefreshWorkspace(workspace)
+		if writeErr != nil {
+			saved.Committed, saved.RefreshRequired, saved.RefreshError = true, true, writeErr.Error()
+			return nil
+		}
+		saved.Committed = true
+		return nil
+	})
+	return saved, err
 }
 
 func (s *Service) ImportReviewedPlan(workspaceID string, input models.ReviewedPlanImportInput) (models.WriteResult, error) {
@@ -208,21 +236,23 @@ func (s *Service) RevertFile(id, fileID string, validatePaths func(models.Worksp
 	if err != nil {
 		return models.ScanResult{}, err
 	}
-	if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
-		return models.ScanResult{}, err
-	}
-	relPath, err := s.files.RelativePath(workspace, item, fileID)
-	if err != nil {
-		return models.ScanResult{}, err
-	}
-	gitPath := filepath.ToSlash(filepath.Join(item.ItemPath, relPath))
-	if err := validatePaths(workspace, []string{gitPath}); err != nil {
-		return models.ScanResult{}, err
-	}
-	if err := s.git.RevertPaths(workspace.Path, []string{gitPath}); err != nil {
-		return models.ScanResult{}, err
-	}
-	return s.writer.RefreshWorkspace(workspace)
+	var result models.ScanResult
+	err = s.withItemMutation(workspace, item, func(current models.ItemDetail) error {
+		relPath, err := s.files.RelativePath(workspace, current, fileID)
+		if err != nil {
+			return err
+		}
+		gitPath := filepath.ToSlash(filepath.Join(current.ItemPath, relPath))
+		if err := validatePaths(workspace, []string{gitPath}); err != nil {
+			return err
+		}
+		if err := s.git.RevertPaths(workspace.Path, []string{gitPath}); err != nil {
+			return err
+		}
+		result, err = s.writer.RefreshWorkspace(workspace)
+		return err
+	})
+	return result, err
 }
 
 func (s *Service) SaveMetadata(id string, input models.ItemMetadataUpdateInput) (models.WriteResult, error) {
@@ -230,16 +260,13 @@ func (s *Service) SaveMetadata(id string, input models.ItemMetadataUpdateInput) 
 	if err != nil {
 		return models.WriteResult{}, err
 	}
-	if err := s.materializeIfNeeded(workspace, item, "", input.MaterializeConfirmed); err != nil {
-		return models.WriteResult{}, err
-	}
-	if item.SourceMode == "snapshot" {
-		item = s.workingTreeItem(workspace, item)
-	}
-	if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
-		return models.WriteResult{}, err
-	}
-	return s.writer.SaveMetadata(workspace, item, input)
+	var result models.WriteResult
+	err = s.withItemMutation(workspace, item, func(current models.ItemDetail) error {
+		var e error
+		result, e = s.writer.SaveMetadata(workspace, current, input)
+		return e
+	})
+	return result, err
 }
 
 func (s *Service) VerificationTests(id string) (models.ItemVerificationTests, error) {
@@ -263,10 +290,10 @@ func (s *Service) SaveVerificationTests(id string, input models.VerificationTest
 	if err != nil {
 		return models.ItemVerificationTests{}, err
 	}
-	if item.SourceMode == "snapshot" {
-		return models.ItemVerificationTests{}, ErrSnapshotReadOnly
-	}
-	if _, err := s.writer.SaveVerificationTests(workspace, item, input); err != nil {
+	if err := s.withItemMutation(workspace, item, func(current models.ItemDetail) error {
+		_, err := s.writer.SaveVerificationTests(workspace, current, input)
+		return err
+	}); err != nil {
 		return models.ItemVerificationTests{}, err
 	}
 	selection, err := s.writer.VerificationTests(workspace, item)
@@ -285,16 +312,13 @@ func (s *Service) UpdateStatus(id string, input models.ItemStatusUpdateInput) (m
 	if err != nil {
 		return models.WriteResult{}, err
 	}
-	if err := s.materializeIfNeeded(workspace, item, "", input.MaterializeConfirmed); err != nil {
-		return models.WriteResult{}, err
-	}
-	if item.SourceMode == "snapshot" {
-		item = s.workingTreeItem(workspace, item)
-	}
-	if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
-		return models.WriteResult{}, err
-	}
-	return s.writer.UpdateStatus(workspace, item, input)
+	var result models.WriteResult
+	err = s.withItemMutation(workspace, item, func(current models.ItemDetail) error {
+		var e error
+		result, e = s.writer.UpdateStatus(workspace, current, input)
+		return e
+	})
+	return result, err
 }
 
 func DiscoverVerificationSpecs(workspace models.WorkspaceConfig, item models.ItemDetail) ([]models.DiscoveredVerificationSpec, error) {
@@ -437,7 +461,32 @@ func (s *Service) Create(input models.NewItemInput) (models.WriteResult, error) 
 	if !ok {
 		return models.WriteResult{}, apperrors.ErrWorkspaceNotFound
 	}
-	return s.writer.CreateItem(workspace, input)
+	var result models.WriteResult
+	err = s.git.WithWorkspaceMutation(workspace.Path, func() error { var e error; result, e = s.writer.CreateItem(workspace, input); return e })
+	return result, err
+}
+
+// withItemMutation is the single branch-proof/mutation/index-publication unit
+// for checkout items. It prevents a branch switch between validation and the
+// final write or refresh.
+func (s *Service) withItemMutation(workspace models.WorkspaceConfig, item models.ItemDetail, operation func(models.ItemDetail) error) error {
+	if item.SourceMode == "snapshot" {
+		return ErrSnapshotReadOnly
+	}
+	if s.git == nil {
+		s.git = gitadapter.New()
+	}
+	return s.git.WithWorkspaceMutation(workspace.Path, func() error {
+		if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
+			// Lightweight file-backed fixtures without a repository remain
+			// supported for Local recovery operations; production workspaces
+			// always prove their checkout under this same lock.
+			if !strings.Contains(err.Error(), "not a git repository") {
+				return err
+			}
+		}
+		return operation(item)
+	})
 }
 
 func (s *Service) workspaceAndItem(itemID string) (models.WorkspaceConfig, models.ItemDetail, error) {
@@ -461,13 +510,6 @@ func (s *Service) workspaceAndItem(itemID string) (models.WorkspaceConfig, model
 	return workspace, item, nil
 }
 
-func (s *Service) materializeIfNeeded(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string, confirmed bool) error {
-	if item.SourceMode != "snapshot" {
-		return nil
-	}
-	return ErrSnapshotReadOnly
-}
-
 func isDocumentationItem(item models.ItemDetail) bool {
 	return item.MetadataSource == "docs" || item.MetadataSource == "wiki"
 }
@@ -486,26 +528,16 @@ func (s *Service) requireCurrentCheckoutBranch(workspace models.WorkspaceConfig,
 	return nil
 }
 
-func (s *Service) workingTreeItem(workspace models.WorkspaceConfig, item models.ItemDetail) models.ItemDetail {
-	current, err := s.git.CurrentBranch(workspace.Path)
-	if err != nil || current == "" {
-		current = workspace.BaselineBranch
-	}
-	item.Branch = current
-	item.BranchRef = ""
-	item.Commit = ""
-	item.SourceMode = "working_tree"
-	item.Editable = true
-	return item
-}
-
-func (s *Service) snapshotFiles(workspace models.WorkspaceConfig, item models.ItemDetail) ([]models.FileNode, error) {
+func (s *Service) snapshotFiles(ctx context.Context, workspace models.WorkspaceConfig, item models.ItemDetail) ([]models.FileNode, error) {
 	commit, err := snapshotCommit(item)
 	if err != nil {
 		return nil, err
 	}
-	entries, err := s.git.TreeWalk(workspace.Path, commit, item.ItemPath)
+	entries, err := s.git.TreeWalkBounded(ctx, workspace.Path, commit, item.ItemPath, snapshotTreeEntryLimit, snapshotTreeDepthLimit)
 	if err != nil {
+		if errors.Is(err, gitadapter.ErrTreeLimit) {
+			return nil, ErrSnapshotTreeTooLarge
+		}
 		return nil, err
 	}
 	nodes := []models.FileNode{}
@@ -523,7 +555,7 @@ func (s *Service) snapshotFiles(workspace models.WorkspaceConfig, item models.It
 	return nodes, nil
 }
 
-func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) (models.FileContent, error) {
+func (s *Service) snapshotFileContent(ctx context.Context, workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) (models.FileContent, error) {
 	commit, err := snapshotCommit(item)
 	if err != nil {
 		return models.FileContent{}, err
@@ -532,7 +564,7 @@ func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item mod
 	if relPath := fileIDToRelativePath(item, fileID); relPath != "" {
 		candidates = append(candidates, relPath)
 	}
-	nodes, err := s.snapshotFiles(workspace, item)
+	nodes, err := s.snapshotFiles(ctx, workspace, item)
 	if err != nil {
 		return models.FileContent{}, err
 	}
@@ -566,8 +598,16 @@ func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item mod
 		lastErr error
 	)
 	for _, candidate := range uniqueCandidates {
-		attempt, readErr := s.git.TreeReadFile(workspace.Path, commit, filepath.ToSlash(filepath.Join(item.ItemPath, candidate)))
+		path := filepath.ToSlash(filepath.Join(item.ItemPath, candidate))
+		limit := fileaccess.MaxTextResponseBytes
+		if fileaccess.ClassifyPath(candidate).Kind == models.FileKindImage {
+			limit = fileaccess.MaxImageResponseBytes
+		}
+		attempt, _, _, readErr := s.git.TreeReadFileBounded(ctx, workspace.Path, commit, path, limit)
 		if readErr != nil {
+			if errors.Is(readErr, gitadapter.ErrBlobLimit) {
+				return models.FileContent{}, ErrSnapshotFileTooLarge
+			}
 			lastErr = readErr
 			if strings.Contains(readErr.Error(), "does not exist in") {
 				continue
@@ -583,9 +623,6 @@ func (s *Service) snapshotFileContent(workspace models.WorkspaceConfig, item mod
 			return models.FileContent{}, lastErr
 		}
 		return models.FileContent{}, fmt.Errorf("file not found")
-	}
-	if fileaccess.ClassifyPath(relPath).Kind == models.FileKindImage && int64(len(data)) > fileaccess.MaxImageResponseBytes {
-		return models.FileContent{}, fileaccess.ErrUnsupportedContent
 	}
 	return fileaccess.FileContentFromBytes(relPath, data), nil
 }

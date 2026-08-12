@@ -531,11 +531,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     setGitBusy(operation);
     setError('');
     try {
-      const confirm = operation === 'pull' && Boolean(gitStatus?.dirty);
       const result = operation === 'fetch'
         ? await api.gitFetch(plan.workspaceId)
         : operation === 'pull'
-          ? await api.gitPull(plan.workspaceId, { confirm })
+			? await api.gitPull(plan.workspaceId, {})
           : await api.gitPush(plan.workspaceId);
       setGitStatus(result.status);
       await loadGitActivity(plan.workspaceId, activityPath);
@@ -698,8 +697,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     setSavingMetadata(true);
     setError('');
     try {
-      const result = await api.saveMetadata(itemId, metadataDraft);
-      setPlan(result.item);
+		const result = await api.saveMetadata(itemId, { ...metadataDraft, expectedRevision: plan.metadataRevision });
+		setPlan(result.item);
+		if (result.refreshRequired) setRecoveryHint(result.refreshError || 'The change was committed; reload the item to refresh its index.');
       if (plan) await loadGitStatus(plan.workspaceId);
       await onContentChanged?.();
       notifyReliabilityChanged();
@@ -729,7 +729,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     setVerificationTestsBusy(true);
     setVerificationError('');
     try {
-      const tests = await api.saveItemVerificationTests(plan.id, selection);
+		const tests = await api.saveItemVerificationTests(plan.id, { ...selection, expectedRevision: verificationTests?.selection.revision ?? plan.metadataRevision });
       setVerificationTests(tests);
       return tests;
     } catch (err) {
@@ -1172,7 +1172,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           </div>
           {!leftCollapsed && (
 			<>
-				<ContentSearchInput label="Search inside this item" query={contentSearch.query} onQueryChange={contentSearch.setQuery} />
+				<ContentSearchInput label="Search inside this item" query={contentSearch.query} onQueryChange={contentSearch.setQuery} caseSensitive={contentSearch.caseSensitive} onCaseSensitiveChange={(value) => { setMatchContext(null); setContentSearchIndex(0); contentSearch.setCaseSensitive(value); }} />
 				{contentSearch.query.trim().length >= 2 && <ContentSearchResults {...contentSearch} activeIndex={contentSearchIndex} onActiveIndex={setContentSearchIndex} onOpen={(result) => void openContentResult(result)} onEscape={contentSearch.clear} treeRef={fileTreeRef} showWorkspaceContext={false} />}
 			</>
 		  )}
@@ -1210,7 +1210,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           </div>
 		  {matchContext && <div className="content-match-context">Line {matchContext.lineNumber}, columns {matchContext.columnStart}–{matchContext.columnEnd}</div>}
           {(dirtyMetadata || dirtyFile || autoSaveState !== 'idle') && <div className="edit-state-banner">{dirtyMetadata ? 'Unsaved metadata changes' : autoSaveLabel(autoSaveState)}</div>}
-          {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
+		  {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} selection={matchContext} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
           {tab === 'raw' && (
             <textarea
               className="raw-editor"

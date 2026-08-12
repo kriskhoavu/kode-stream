@@ -3,6 +3,7 @@ package workstream
 // Package workstream owns branch-scoped planning context for a workspace.
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 
 	apperrors "kode-stream/internal/common"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/sourceguard"
 	gitadapter "kode-stream/internal/git"
 	itemindex "kode-stream/internal/item/index"
 	"kode-stream/internal/workspace/registry"
@@ -39,14 +41,21 @@ func New(reg registry.Repository, idx itemindex.Repository, scan *scanner.Scanne
 }
 
 func (s *Service) LoadBranch(id string, input models.WorkstreamBranchLoadInput) (models.WorkstreamBranchLoadResult, error) {
-	return s.loadCheckout(id, strings.TrimSpace(input.Branch), input.Force)
+	return s.LoadBranchContext(context.Background(), id, input)
+}
+
+func (s *Service) LoadBranchContext(ctx context.Context, id string, input models.WorkstreamBranchLoadInput) (models.WorkstreamBranchLoadResult, error) {
+	return s.loadCheckout(ctx, id, strings.TrimSpace(input.Branch), input.Force)
 }
 
 func (s *Service) LoadCheckout(id string, force bool) (models.WorkstreamBranchLoadResult, error) {
-	return s.loadCheckout(id, "", force)
+	return s.LoadCheckoutContext(context.Background(), id, force)
+}
+func (s *Service) LoadCheckoutContext(ctx context.Context, id string, force bool) (models.WorkstreamBranchLoadResult, error) {
+	return s.loadCheckout(ctx, id, "", force)
 }
 
-func (s *Service) loadCheckout(id, requestedBranch string, force bool) (models.WorkstreamBranchLoadResult, error) {
+func (s *Service) loadCheckout(ctx context.Context, id, requestedBranch string, force bool) (models.WorkstreamBranchLoadResult, error) {
 	workspace, err := s.workspace(id)
 	if err != nil {
 		return models.WorkstreamBranchLoadResult{}, err
@@ -60,13 +69,16 @@ func (s *Service) loadCheckout(id, requestedBranch string, force bool) (models.W
 		if requestedBranch != "" && requestedBranch != currentCheckoutBranch {
 			return ErrBranchReviewRequired
 		}
-		result, err = s.load(workspace, currentCheckoutBranch, currentCheckoutBranch, force, false)
+		result, err = s.load(ctx, workspace, currentCheckoutBranch, currentCheckoutBranch, force, false)
 		return err
 	})
 	return result, err
 }
 
 func (s *Service) ReviewBranch(id string, input models.WorkstreamBranchLoadInput) (models.WorkstreamBranchLoadResult, error) {
+	return s.ReviewBranchContext(context.Background(), id, input)
+}
+func (s *Service) ReviewBranchContext(ctx context.Context, id string, input models.WorkstreamBranchLoadInput) (models.WorkstreamBranchLoadResult, error) {
 	workspace, err := s.workspace(id)
 	if err != nil {
 		return models.WorkstreamBranchLoadResult{}, err
@@ -84,7 +96,7 @@ func (s *Service) ReviewBranch(id string, input models.WorkstreamBranchLoadInput
 		if selectedBranch == currentCheckoutBranch {
 			return ErrReviewMatchesCheckout
 		}
-		result, err = s.load(workspace, selectedBranch, currentCheckoutBranch, input.Force, true)
+		result, err = s.load(ctx, workspace, selectedBranch, currentCheckoutBranch, input.Force, true)
 		return err
 	})
 	return result, err
@@ -104,7 +116,10 @@ func (s *Service) workspace(id string) (models.WorkspaceConfig, error) {
 	return workspace, nil
 }
 
-func (s *Service) load(workspace models.WorkspaceConfig, selectedBranch, currentCheckoutBranch string, force, snapshot bool) (models.WorkstreamBranchLoadResult, error) {
+func (s *Service) load(ctx context.Context, workspace models.WorkspaceConfig, selectedBranch, currentCheckoutBranch string, force, snapshot bool) (models.WorkstreamBranchLoadResult, error) {
+	if err := ctx.Err(); err != nil {
+		return models.WorkstreamBranchLoadResult{}, err
+	}
 	ref, commit, err := s.git.ResolveBranch(workspace.Path, selectedBranch)
 	if err != nil {
 		return models.WorkstreamBranchLoadResult{}, err
@@ -139,7 +154,7 @@ func (s *Service) load(workspace models.WorkspaceConfig, selectedBranch, current
 			return branchLoadResult(workspace.ID, selectedBranch, ref, commit, currentCheckoutBranch, sourceMode, editable, metadata.ScannedAt, metadata.Warnings, items), nil
 		}
 	}
-	data, err := s.scanner.ScanWithRequest(scanner.ScanRequest{
+	data, err := s.scanner.ScanWithRequestContext(ctx, scanner.ScanRequest{
 		Workspace:  workspace,
 		Branch:     selectedBranch,
 		BranchRef:  ref,
@@ -185,14 +200,15 @@ func sourceConfigurationHash(workspace models.WorkspaceConfig) string {
 }
 
 func workingTreeSourceHash(root string, sources []string) (string, error) {
+	resolved, err := sourceguard.ResolveAll(root, sources)
+	if err != nil {
+		return "", err
+	}
 	hash := sha256.New()
-	for _, source := range sources {
-		source = filepath.Clean(strings.TrimSpace(source))
-		if source == "." || source == "" || filepath.IsAbs(source) || strings.HasPrefix(source, ".."+string(filepath.Separator)) {
-			continue
-		}
-		sourceRoot := filepath.Join(root, source)
-		err := filepath.WalkDir(sourceRoot, func(path string, entry fs.DirEntry, walkErr error) error {
+	entries := 0
+	const maxHashEntries = 100000
+	for _, source := range resolved {
+		err := filepath.WalkDir(source.RealPath, func(path string, entry fs.DirEntry, walkErr error) error {
 			if os.IsNotExist(walkErr) {
 				return nil
 			}
@@ -201,6 +217,10 @@ func workingTreeSourceHash(root string, sources []string) (string, error) {
 			}
 			if entry.IsDir() {
 				return nil
+			}
+			entries++
+			if entries > maxHashEntries {
+				return fmt.Errorf("working tree change detection exceeds %d files", maxHashEntries)
 			}
 			info, err := entry.Info()
 			if err != nil {

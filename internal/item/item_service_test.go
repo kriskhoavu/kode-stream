@@ -110,9 +110,14 @@ func TestVerificationTestsPersistSelectedSpecs(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	current, err := service.VerificationTests("item-1")
+	if err != nil {
+		t.Fatal(err)
+	}
 	saved, err := service.SaveVerificationTests("item-1", models.VerificationTestSelection{
-		SelectedSpecs: []string{" cypress/e2e/create-offer.cy.ts ", "cypress/e2e/create-offer.cy.ts"},
-		Environment:   " nightly ",
+		ExpectedRevision: current.Selection.Revision,
+		SelectedSpecs:    []string{" cypress/e2e/create-offer.cy.ts ", "cypress/e2e/create-offer.cy.ts"},
+		Environment:      " nightly ",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -355,7 +360,7 @@ func TestSnapshotEditsAreReadOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = service.SaveMetadata("snapshot-item", models.ItemMetadataUpdateInput{Status: models.StatusReview, MaterializeConfirmed: true})
+	_, err = service.SaveMetadata("snapshot-item", models.ItemMetadataUpdateInput{Status: models.StatusReview})
 	if !errors.Is(err, ErrSnapshotReadOnly) {
 		t.Fatalf("expected snapshot read-only error, got %v", err)
 	}
@@ -551,7 +556,7 @@ func TestSnapshotImportReadsCapturedCommitAfterBranchAdvances(t *testing.T) {
 	writer := itemwriter.New(fileaccess.New(), scanner.New(git), nil, nil)
 	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"plans"}}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{Branch: "feature", BranchRef: ref, Commit: commit, SourceMode: "snapshot", MetadataSource: "plan.yaml", ItemPath: "plans/platform/PM-038"}}
-	if err := writer.MaterializeSnapshotItem(workspace, item, ""); err != nil {
+	if _, err := writer.ImportSnapshotPlan(workspace, item); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(root, "plans/platform/PM-038/README.md"))

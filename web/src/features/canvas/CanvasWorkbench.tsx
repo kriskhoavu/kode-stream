@@ -191,7 +191,7 @@ function CanvasItemInfo({ itemId, node, workspace, onSaved }: { itemId: string; 
 	const save = async () => {
 		setSaving(true); setError('');
 		try {
-			const result = await api.saveMetadata(itemId, draft);
+			const result = await api.saveMetadata(itemId, { ...draft, expectedRevision: detail?.metadataRevision });
 			setDetail(result.item);
 			setDraft({ title: result.item.title, scope: result.item.scope, identifier: result.item.identifier, status: result.item.status, owner: result.item.owner ?? '', tags: result.item.tags });
 			onSaved();
@@ -219,7 +219,7 @@ function CanvasQualityPanel({ itemId, workspaceId, capability, job, verifying, r
 	const displayMode: AutomationDisplayMode = tests?.selection.displayMode === 'visible' ? 'visible' : 'silent';
 	const saveSelection = async (selection: VerificationTestSelection) => {
 		setBusy(true); setError('');
-		try { setTests(await api.saveItemVerificationTests(itemId, selection)); }
+		try { setTests(await api.saveItemVerificationTests(itemId, { ...selection, expectedRevision: tests?.selection.revision })); }
 		catch (caught) { setError(caught instanceof Error ? caught.message : 'Automation settings could not be saved.'); }
 		finally { setBusy(false); }
 	};

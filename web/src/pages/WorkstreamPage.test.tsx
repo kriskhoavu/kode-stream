@@ -15,7 +15,8 @@ const draftItem: ItemSummary = {
   status: 'draft',
   tags: [],
   metadataSource: 'plan.yaml',
-  itemPath: 'items/platform/PM-012'
+  itemPath: 'items/platform/PM-012',
+  metadataRevision: 'revision-1'
 };
 
 afterEach(() => {
@@ -280,6 +281,8 @@ describe('WorkstreamPage', () => {
     expect(within(column('Review')).getByText('Drag cards')).toBeInTheDocument();
     await waitFor(() => expect(within(column('Review')).getByText('Persisted title')).toBeInTheDocument());
     expect(fetchMock).toHaveBeenCalledWith('/api/items/p1/status', expect.objectContaining({ method: 'PATCH' }));
+		const statusCall = fetchMock.mock.calls.find(([url]) => String(url) === '/api/items/p1/status');
+		expect(JSON.parse(String(statusCall?.[1]?.body))).toMatchObject({ expectedRevision: 'revision-1' });
     expect(onWorkspacesChanged).toHaveBeenCalledOnce();
   });
 
@@ -328,7 +331,7 @@ function selectCardStatus(status: string): void {
 }
 
 function statusFetchMock(updateStatus: () => Promise<Response>, item: ItemSummary = draftItem) {
-  return vi.fn((input: RequestInfo | URL) => {
+	return vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
     const url = String(input);
     if (url === '/api/workspaces/r1/workstream/checkout') return Promise.resolve(response(workstreamBranchLoadResult([item], item.branch, item.sourceMode)));
     if (url.startsWith('/api/items?')) return Promise.resolve(response([item]));

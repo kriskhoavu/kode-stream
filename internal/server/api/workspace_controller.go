@@ -207,7 +207,7 @@ func (a *workspaceController) loadWorkstreamBranch(w http.ResponseWriter, r *htt
 		}
 	}
 	started := time.Now()
-	result, err := a.workstream.LoadBranch(r.PathValue("id"), input)
+	result, err := a.workstream.LoadBranchContext(r.Context(), r.PathValue("id"), input)
 	a.audit.record(r.PathValue("id"), "", "workstream_branch_load", "Workstream branch loaded.", nil, started, err)
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
@@ -232,7 +232,7 @@ func (a *workspaceController) loadWorkstreamCheckout(w http.ResponseWriter, r *h
 			return
 		}
 	}
-	result, err := a.workstream.LoadCheckout(r.PathValue("id"), input.Force)
+	result, err := a.workstream.LoadCheckoutContext(r.Context(), r.PathValue("id"), input.Force)
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
@@ -248,7 +248,7 @@ func (a *workspaceController) loadBranchReview(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	result, err := a.workstream.ReviewBranch(r.PathValue("id"), input)
+	result, err := a.workstream.ReviewBranchContext(r.Context(), r.PathValue("id"), input)
 	if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return

@@ -3,6 +3,9 @@ package itemwriter
 // Package itemwriter persists and refreshes Item domain files.
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,8 +16,9 @@ import (
 	"gopkg.in/yaml.v3"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
-	"kode-stream/internal/filesystem/fileid"
+	"kode-stream/internal/filesystem/guardedwrite"
 	"kode-stream/internal/filesystem/pathguard"
+	"kode-stream/internal/filesystem/sourceguard"
 	"kode-stream/internal/filesystem/writeguard"
 	gitadapter "kode-stream/internal/git"
 	"kode-stream/internal/item/index"
@@ -29,6 +33,8 @@ type Writer struct {
 	registry       registry.Repository
 	snapshotReader func(models.WorkspaceConfig, models.ItemDetail) scanner.SourceReader
 }
+
+var ErrMetadataRevisionRequired = errors.New("expected metadata revision is required")
 
 func New(files *fileaccess.Access, scan *scanner.Scanner, idx itemindex.Repository, reg registry.Repository) *Writer {
 	return &Writer{
@@ -46,7 +52,7 @@ func (w *Writer) SaveMarkdown(workspace models.WorkspaceConfig, item models.Item
 	if _, err := w.files.WriteMarkdown(workspace, item, input); err != nil {
 		return models.WriteResult{}, err
 	}
-	return w.refresh(workspace, item.ItemPath)
+	return w.committedRefresh(workspace, item.ItemPath)
 }
 
 func (w *Writer) SaveMetadata(workspace models.WorkspaceConfig, item models.ItemDetail, input models.ItemMetadataUpdateInput) (models.WriteResult, error) {
@@ -72,11 +78,22 @@ func (w *Writer) SaveMetadata(workspace models.WorkspaceConfig, item models.Item
 	if err != nil {
 		return models.WriteResult{}, err
 	}
+	if input.ExpectedRevision == "" {
+		return models.WriteResult{}, ErrMetadataRevisionRequired
+	}
+	if input.ExpectedRevision != meta.revision {
+		return models.WriteResult{}, guardedwrite.ErrStale
+	}
 	applyMetadata(&meta, item, input)
 	if err := writePlanMetadata(workspace, item, meta); err != nil {
 		return models.WriteResult{}, err
 	}
-	return w.refresh(workspace, item.ItemPath)
+	return w.committedRefresh(workspace, item.ItemPath)
+}
+
+func (w *Writer) MetadataRevision(workspace models.WorkspaceConfig, item models.ItemDetail) (string, error) {
+	meta, err := readPlanMetadata(workspace, item)
+	return meta.revision, err
 }
 
 func (w *Writer) VerificationTests(workspace models.WorkspaceConfig, item models.ItemDetail) (models.VerificationTestSelection, error) {
@@ -84,7 +101,9 @@ func (w *Writer) VerificationTests(workspace models.WorkspaceConfig, item models
 	if err != nil {
 		return models.VerificationTestSelection{}, err
 	}
-	return normalizeVerificationTests(meta.VerificationTests), nil
+	selection := normalizeVerificationTests(meta.VerificationTests)
+	selection.Revision = meta.revision
+	return selection, nil
 }
 
 func (w *Writer) SaveVerificationTests(workspace models.WorkspaceConfig, item models.ItemDetail, input models.VerificationTestSelection) (models.WriteResult, error) {
@@ -95,6 +114,12 @@ func (w *Writer) SaveVerificationTests(workspace models.WorkspaceConfig, item mo
 	if err != nil {
 		return models.WriteResult{}, err
 	}
+	if input.ExpectedRevision == "" {
+		return models.WriteResult{}, ErrMetadataRevisionRequired
+	}
+	if input.ExpectedRevision != meta.revision {
+		return models.WriteResult{}, guardedwrite.ErrStale
+	}
 	selection, err := normalizeAndValidateVerificationTests(input)
 	if err != nil {
 		return models.WriteResult{}, err
@@ -103,18 +128,28 @@ func (w *Writer) SaveVerificationTests(workspace models.WorkspaceConfig, item mo
 	if err := writePlanMetadata(workspace, item, meta); err != nil {
 		return models.WriteResult{}, err
 	}
-	return w.refresh(workspace, item.ItemPath)
+	return w.committedRefresh(workspace, item.ItemPath)
+}
+
+func (w *Writer) committedRefresh(workspace models.WorkspaceConfig, itemPath string) (models.WriteResult, error) {
+	result, err := w.refresh(workspace, itemPath)
+	if err != nil {
+		return models.WriteResult{Committed: true, RefreshRequired: true, RefreshError: err.Error()}, nil
+	}
+	result.Committed = true
+	if result.Item.ItemPath != "" {
+		if revision, revisionErr := w.MetadataRevision(workspace, result.Item); revisionErr == nil {
+			result.Item.MetadataRevision = revision
+		}
+	}
+	return result, nil
 }
 
 func (w *Writer) UpdateStatus(workspace models.WorkspaceConfig, item models.ItemDetail, input models.ItemStatusUpdateInput) (models.WriteResult, error) {
-	return w.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: input.Status})
+	return w.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: input.Status, ExpectedRevision: input.ExpectedRevision})
 }
 
-func (w *Writer) MaterializeSnapshotItem(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) error {
-	return w.materializeSnapshotItem(workspace, item, fileID)
-}
-
-func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item models.ItemDetail, fileID string) error {
+func (w *Writer) importReviewedSnapshot(workspace models.WorkspaceConfig, item models.ItemDetail) error {
 	if item.SourceMode != "snapshot" {
 		return nil
 	}
@@ -123,17 +158,11 @@ func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item 
 	}
 	reader := w.snapshotReader(workspace, item)
 	scopeRoot := item.ItemPath
-	copyOneFile := isDocumentationRoot(item)
+	copyOneFile := false
 	var targetItemRoot string
-	if copyOneFile {
-		relPath := materializeRelativeFile(item, fileID)
-		if relPath == "" {
-			return fmt.Errorf("snapshot file is not part of the indexed item")
-		}
-		scopeRoot = filepath.ToSlash(filepath.Join(item.ItemPath, relPath))
-	} else {
+	if !copyOneFile {
 		var err error
-		targetItemRoot, err = safeJoin(workspace.Path, item.ItemPath)
+		targetItemRoot, err = safeItemPathForRelative(workspace, item.ItemPath)
 		if err != nil {
 			return err
 		}
@@ -144,14 +173,7 @@ func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item 
 		}
 	}
 	var files []string
-	if copyOneFile {
-		if info, err := reader.Stat(scopeRoot); err != nil {
-			return err
-		} else if info.IsDir() {
-			return fmt.Errorf("snapshot materialization expected a file")
-		}
-		files = append(files, scopeRoot)
-	} else {
+	if !copyOneFile {
 		if err := reader.WalkDir(scopeRoot, func(path string, d scanner.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return err
@@ -165,43 +187,7 @@ func (w *Writer) materializeSnapshotItem(workspace models.WorkspaceConfig, item 
 	if len(files) == 0 {
 		return fmt.Errorf("snapshot item has no files to materialize")
 	}
-	if !copyOneFile {
-		return w.publishStructuredSnapshot(workspace, item, reader, files, targetItemRoot)
-	}
-	for _, rel := range files {
-		if !isInsideConfiguredSource(workspace, rel) {
-			return fmt.Errorf("materialized path is outside configured sources")
-		}
-		full, err := safeJoin(workspace.Path, rel)
-		if err != nil {
-			return err
-		}
-		if _, err := os.Stat(full); err == nil {
-			return fmt.Errorf("This snapshot item cannot be copied because files already exist in the current checkout branch. Resolve the conflict manually or switch branches first.")
-		} else if !os.IsNotExist(err) {
-			return err
-		}
-	}
-	for _, rel := range files {
-		if !isInsideConfiguredSource(workspace, rel) {
-			return fmt.Errorf("materialized path is outside configured sources")
-		}
-		data, err := reader.ReadFile(rel)
-		if err != nil {
-			return err
-		}
-		full, err := safeJoin(workspace.Path, rel)
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(full, data, 0o644); err != nil {
-			return err
-		}
-	}
-	return nil
+	return w.publishStructuredSnapshot(workspace, item, reader, files, targetItemRoot)
 }
 
 func (w *Writer) publishStructuredSnapshot(workspace models.WorkspaceConfig, item models.ItemDetail, reader scanner.SourceReader, files []string, targetItemRoot string) error {
@@ -261,14 +247,14 @@ func (w *Writer) ImportSnapshotPlan(workspace models.WorkspaceConfig, item model
 	if isDocumentationRoot(item) {
 		return models.WriteResult{}, fmt.Errorf("only structured plans can be imported")
 	}
-	if err := w.materializeSnapshotItem(workspace, item, ""); err != nil {
+	if err := w.importReviewedSnapshot(workspace, item); err != nil {
 		return models.WriteResult{}, err
 	}
 	result, err := w.refresh(workspace, item.ItemPath)
 	if err == nil {
 		return result, nil
 	}
-	targetItemRoot, pathErr := safeJoin(workspace.Path, item.ItemPath)
+	targetItemRoot, pathErr := safeItemPathForRelative(workspace, item.ItemPath)
 	if pathErr != nil {
 		return models.WriteResult{}, fmt.Errorf("refresh imported plan: %w; resolve rollback target: %v", err, pathErr)
 	}
@@ -303,7 +289,7 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 	if err != nil {
 		return models.WriteResult{}, err
 	}
-	fullRoot, err := safeJoin(workspace.Path, itemRoot)
+	fullRoot, err := safeItemPathForRelative(workspace, itemRoot)
 	if err != nil {
 		return models.WriteResult{}, err
 	}
@@ -437,17 +423,21 @@ type planYAML struct {
 	Documents         []models.ItemDocument            `yaml:"documents,omitempty"`
 	AutomationTests   []models.AutomationTestPath      `yaml:"automation-test,omitempty"`
 	VerificationTests models.VerificationTestSelection `yaml:"verificationTests,omitempty"`
+	Extra             map[string]any                   `yaml:",inline"`
+	raw               *yaml.Node
+	revision          string
 }
 
 type planFields struct {
-	Identifier string   `yaml:"identifier,omitempty"`
-	Ticket     string   `yaml:"ticket,omitempty"`
-	Title      string   `yaml:"title,omitempty"`
-	Scope      string   `yaml:"scope,omitempty"`
-	Service    string   `yaml:"service,omitempty"`
-	Status     string   `yaml:"status,omitempty"`
-	Owner      string   `yaml:"owner,omitempty"`
-	Tags       []string `yaml:"tags,omitempty"`
+	Identifier string         `yaml:"identifier,omitempty"`
+	Ticket     string         `yaml:"ticket,omitempty"`
+	Title      string         `yaml:"title,omitempty"`
+	Scope      string         `yaml:"scope,omitempty"`
+	Service    string         `yaml:"service,omitempty"`
+	Status     string         `yaml:"status,omitempty"`
+	Owner      string         `yaml:"owner,omitempty"`
+	Tags       []string       `yaml:"tags,omitempty"`
+	Extra      map[string]any `yaml:",inline"`
 }
 
 func readPlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail) (planYAML, error) {
@@ -462,6 +452,7 @@ func readPlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail) 
 		data, err = gitadapter.New().TreeReadFile(workspace.Path, commit, filepath.ToSlash(filepath.Join(item.ItemPath, "plan.yaml")))
 		if err != nil && snapshotMetadataPathMissing(err) {
 			meta.Documents = item.Documents
+			meta.revision = planRevision(nil)
 			return meta, nil
 		}
 	} else {
@@ -472,6 +463,7 @@ func readPlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail) 
 		data, err = os.ReadFile(filepath.Join(root, "plan.yaml"))
 		if os.IsNotExist(err) {
 			meta.Documents = item.Documents
+			meta.revision = planRevision(nil)
 			return meta, nil
 		}
 	}
@@ -481,16 +473,22 @@ func readPlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail) 
 	if err := yaml.Unmarshal(data, &meta); err != nil {
 		return meta, err
 	}
+	meta.revision = planRevision(data)
+	var raw yaml.Node
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return meta, err
+	}
+	meta.raw = &raw
 	if meta.Plan.Identifier == "" {
 		meta.Plan.Identifier = meta.Plan.Ticket
 	}
 	if meta.Plan.Scope == "" {
 		meta.Plan.Scope = meta.Plan.Service
 	}
-	meta.Plan.Ticket = ""
-	meta.Plan.Service = ""
 	return meta, nil
 }
+
+func planRevision(data []byte) string { sum := sha256.Sum256(data); return hex.EncodeToString(sum[:]) }
 
 func snapshotMetadataPathMissing(err error) bool {
 	message := strings.ToLower(err.Error())
@@ -542,12 +540,119 @@ func writePlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail,
 }
 
 func writePlanMetadataAt(root string, meta planYAML) error {
-	compactPlanMetadata(root, &meta)
-	data, err := yaml.Marshal(meta)
+	var data []byte
+	var err error
+	if meta.raw != nil {
+		mergePlanMetadataNode(meta.raw, meta)
+		data, err = yaml.Marshal(meta.raw)
+	} else {
+		compactPlanMetadata(root, &meta)
+		data, err = yaml.Marshal(meta)
+	}
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(root, "plan.yaml"), data, 0o644)
+	return atomicWritePlan(filepath.Join(root, "plan.yaml"), data)
+}
+
+func mergePlanMetadataNode(document *yaml.Node, meta planYAML) {
+	root := document
+	if root.Kind == yaml.DocumentNode && len(root.Content) > 0 {
+		root = root.Content[0]
+	}
+	if root.Kind != yaml.MappingNode {
+		return
+	}
+	plan := mappingValue(root, "plan")
+	if plan == nil || plan.Kind != yaml.MappingNode {
+		plan = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		setMappingValue(root, "plan", plan)
+	}
+	setScalarIfNotEmpty(plan, "identifier", meta.Plan.Identifier)
+	setScalarIfNotEmpty(plan, "ticket", meta.Plan.Ticket)
+	setScalarIfNotEmpty(plan, "title", meta.Plan.Title)
+	setScalarIfNotEmpty(plan, "scope", meta.Plan.Scope)
+	setScalarIfNotEmpty(plan, "service", meta.Plan.Service)
+	setScalarIfNotEmpty(plan, "status", meta.Plan.Status)
+	setScalarIfNotEmpty(plan, "owner", meta.Plan.Owner)
+	if meta.Plan.Tags != nil {
+		setYAMLValue(plan, "tags", meta.Plan.Tags)
+	}
+	if len(meta.VerificationTests.SelectedSpecs) > 0 || meta.VerificationTests.Environment != "" || meta.VerificationTests.DisplayMode != "" {
+		setYAMLValue(root, "verificationTests", meta.VerificationTests)
+	}
+}
+
+func mappingValue(node *yaml.Node, key string) *yaml.Node {
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == key {
+			return node.Content[i+1]
+		}
+	}
+	return nil
+}
+func setMappingValue(node *yaml.Node, key string, value *yaml.Node) {
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == key {
+			node.Content[i+1] = value
+			return
+		}
+	}
+	node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, value)
+}
+func setScalarIfNotEmpty(node *yaml.Node, key, value string) {
+	if value != "" {
+		setMappingValue(node, key, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value})
+	}
+}
+func setYAMLValue(node *yaml.Node, key string, value any) {
+	var encoded yaml.Node
+	if err := encoded.Encode(value); err == nil {
+		setMappingValue(node, key, &encoded)
+	}
+}
+
+// atomicWritePlan publishes a complete next generation and preserves the
+// existing mode. Plan files are user source documents, so a direct WriteFile
+// is never an acceptable publication path.
+func atomicWritePlan(path string, data []byte) error {
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	dir := filepath.Dir(path)
+	temporary, err := os.CreateTemp(dir, ".plan.yaml-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(mode); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return err
+	}
+	directory, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
 }
 
 func compactPlanMetadata(root string, meta *planYAML) {
@@ -564,8 +669,8 @@ func compactPlanMetadata(root string, meta *planYAML) {
 	if inferredTitle := scanner.InferPlanTitle(root, identifier); inferredTitle != "" && meta.Plan.Title == inferredTitle {
 		meta.Plan.Title = ""
 	}
-	meta.Plan.Ticket = ""
-	meta.Plan.Service = ""
+	// ticket/service are documented legacy aliases. Preserve them so metadata
+	// saves never rewrite a valid legacy plan into a lossy representation.
 	meta.Documents = compactDocumentOverrides(root, meta.Documents)
 	if len(meta.VerificationTests.SelectedSpecs) == 0 && strings.TrimSpace(meta.VerificationTests.Environment) == "" && meta.VerificationTests.DisplayMode == "" {
 		meta.VerificationTests = models.VerificationTestSelection{}
@@ -648,6 +753,9 @@ func validateSource(workspace models.WorkspaceConfig, dir string) (string, error
 	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(dir)))
 	for _, allowed := range workspace.Sources {
 		if clean == allowed {
+			if _, err := sourceguard.ResolveOne(workspace.Path, clean); err != nil {
+				return "", err
+			}
 			return clean, nil
 		}
 	}
@@ -655,20 +763,80 @@ func validateSource(workspace models.WorkspaceConfig, dir string) (string, error
 }
 
 func isInsideConfiguredSource(workspace models.WorkspaceConfig, rel string) bool {
-	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(rel)))
-	if clean == "." || clean == "" || strings.HasPrefix(clean, "../") || filepath.IsAbs(clean) {
-		return false
-	}
-	for _, source := range workspace.Sources {
-		if clean == source || strings.HasPrefix(clean, source+"/") {
-			return true
-		}
-	}
-	return false
+	_, err := safeItemPathForRelative(workspace, rel)
+	return err == nil
 }
 
 func safeItemPath(workspace models.WorkspaceConfig, item models.ItemDetail) (string, error) {
-	return safeJoin(workspace.Path, item.ItemPath)
+	return safeItemPathForRelative(workspace, item.ItemPath)
+}
+
+// safeItemPathForRelative revalidates configured sources at each write
+// boundary. A source symlink can change after registration, so lexical joins
+// are deliberately not treated as an authority to write.
+func safeItemPathForRelative(workspace models.WorkspaceConfig, relative string) (string, error) {
+	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(relative)))
+	var selected string
+	for _, source := range workspace.Sources {
+		source = filepath.ToSlash(filepath.Clean(strings.TrimSpace(source)))
+		if clean == source || strings.HasPrefix(clean, source+"/") {
+			selected = source
+			break
+		}
+	}
+	if selected == "" {
+		return "", fmt.Errorf("item path is outside configured sources")
+	}
+	resolved, err := sourceguard.ResolveOne(workspace.Path, selected)
+	if err != nil {
+		// A configured source may be intentionally empty on a new workspace.
+		// Create only its lexical path below the resolved workspace root, then
+		// immediately resolve it through sourceguard; an existing symlink is
+		// never followed as an authority to create outside the workspace.
+		if !strings.Contains(err.Error(), "does not exist") {
+			return "", err
+		}
+		realRoot, rootErr := filepath.EvalSymlinks(workspace.Path)
+		if rootErr != nil {
+			return "", rootErr
+		}
+		candidate, joinErr := safeJoin(realRoot, selected)
+		if joinErr != nil {
+			return "", joinErr
+		}
+		if mkdirErr := os.MkdirAll(candidate, 0o755); mkdirErr != nil {
+			return "", mkdirErr
+		}
+		resolved, err = sourceguard.ResolveOne(workspace.Path, selected)
+		if err != nil {
+			return "", err
+		}
+	}
+	full, err := safeJoin(workspace.Path, relative)
+	if err != nil {
+		return "", err
+	}
+	probe := full
+	for {
+		if _, statErr := os.Lstat(probe); statErr == nil {
+			break
+		} else if !os.IsNotExist(statErr) {
+			return "", statErr
+		}
+		next := filepath.Dir(probe)
+		if next == probe {
+			return "", fmt.Errorf("item path is outside configured sources")
+		}
+		probe = next
+	}
+	realProbe, err := filepath.EvalSymlinks(probe)
+	if err != nil {
+		return "", err
+	}
+	if sourceguard.Contains(resolved.RealPath, realProbe) {
+		return full, nil
+	}
+	return "", fmt.Errorf("item path is outside configured sources")
 }
 
 func safeJoin(root, rel string) (string, error) {
@@ -677,19 +845,6 @@ func safeJoin(root, rel string) (string, error) {
 
 func isDocumentationRoot(item models.ItemDetail) bool {
 	return item.MetadataSource == "docs" || item.MetadataSource == "wiki"
-}
-
-func materializeRelativeFile(item models.ItemDetail, fileID string) string {
-	path, err := fileid.Decode(fileID)
-	if err != nil {
-		return ""
-	}
-	for _, doc := range item.Documents {
-		if filepath.ToSlash(filepath.Clean(doc.Path)) == path {
-			return path
-		}
-	}
-	return ""
 }
 
 func cleanTags(tags []string) []string {

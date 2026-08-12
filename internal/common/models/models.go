@@ -518,25 +518,26 @@ type SourceSettingsResult struct {
 }
 
 type ItemSummary struct {
-	ID             string     `json:"id" yaml:"id"`
-	WorkspaceID    string     `json:"workspaceId" yaml:"workspaceId"`
-	WorkspaceName  string     `json:"workspaceName" yaml:"workspaceName"`
-	Branch         string     `json:"branch" yaml:"branch"`
-	BranchRef      string     `json:"branchRef,omitempty" yaml:"branchRef,omitempty"`
-	Commit         string     `json:"commit,omitempty" yaml:"commit,omitempty"`
-	SourceMode     string     `json:"sourceMode,omitempty" yaml:"sourceMode,omitempty"`
-	Editable       bool       `json:"editable" yaml:"editable"`
-	Scope          string     `json:"scope" yaml:"scope"`
-	Identifier     string     `json:"identifier" yaml:"identifier"`
-	Title          string     `json:"title" yaml:"title"`
-	Status         ItemStatus `json:"status" yaml:"status"`
-	Owner          string     `json:"owner,omitempty" yaml:"owner,omitempty"`
-	Author         string     `json:"author,omitempty" yaml:"author,omitempty"`
-	Tags           []string   `json:"tags" yaml:"tags"`
-	UpdatedAt      time.Time  `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
-	Description    string     `json:"description,omitempty" yaml:"description,omitempty"`
-	MetadataSource string     `json:"metadataSource" yaml:"metadataSource"`
-	ItemPath       string     `json:"itemPath,omitempty" yaml:"itemPath,omitempty"`
+	ID               string     `json:"id" yaml:"id"`
+	WorkspaceID      string     `json:"workspaceId" yaml:"workspaceId"`
+	WorkspaceName    string     `json:"workspaceName" yaml:"workspaceName"`
+	Branch           string     `json:"branch" yaml:"branch"`
+	BranchRef        string     `json:"branchRef,omitempty" yaml:"branchRef,omitempty"`
+	Commit           string     `json:"commit,omitempty" yaml:"commit,omitempty"`
+	SourceMode       string     `json:"sourceMode,omitempty" yaml:"sourceMode,omitempty"`
+	Editable         bool       `json:"editable" yaml:"editable"`
+	Scope            string     `json:"scope" yaml:"scope"`
+	Identifier       string     `json:"identifier" yaml:"identifier"`
+	Title            string     `json:"title" yaml:"title"`
+	Status           ItemStatus `json:"status" yaml:"status"`
+	Owner            string     `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Author           string     `json:"author,omitempty" yaml:"author,omitempty"`
+	Tags             []string   `json:"tags" yaml:"tags"`
+	UpdatedAt        time.Time  `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
+	Description      string     `json:"description,omitempty" yaml:"description,omitempty"`
+	MetadataSource   string     `json:"metadataSource" yaml:"metadataSource"`
+	ItemPath         string     `json:"itemPath,omitempty" yaml:"itemPath,omitempty"`
+	MetadataRevision string     `json:"metadataRevision,omitempty" yaml:"metadataRevision,omitempty"`
 }
 
 type ItemDetail struct {
@@ -582,15 +583,18 @@ const (
 )
 
 type FileContent struct {
-	ID        string   `json:"id" yaml:"id"`
-	Path      string   `json:"path" yaml:"path"`
-	Content   string   `json:"content" yaml:"content"`
-	Language  string   `json:"language" yaml:"language"`
-	Hash      string   `json:"hash" yaml:"hash"`
-	Kind      FileKind `json:"kind" yaml:"kind"`
-	SizeBytes int64    `json:"sizeBytes" yaml:"sizeBytes"`
-	Truncated bool     `json:"truncated,omitempty" yaml:"truncated,omitempty"`
-	Editable  bool     `json:"editable" yaml:"editable"`
+	ID              string   `json:"id" yaml:"id"`
+	Path            string   `json:"path" yaml:"path"`
+	Content         string   `json:"content" yaml:"content"`
+	Language        string   `json:"language" yaml:"language"`
+	Hash            string   `json:"hash" yaml:"hash"`
+	Kind            FileKind `json:"kind" yaml:"kind"`
+	SizeBytes       int64    `json:"sizeBytes" yaml:"sizeBytes"`
+	Truncated       bool     `json:"truncated,omitempty" yaml:"truncated,omitempty"`
+	Editable        bool     `json:"editable" yaml:"editable"`
+	Committed       bool     `json:"committed,omitempty" yaml:"committed,omitempty"`
+	RefreshRequired bool     `json:"refreshRequired,omitempty" yaml:"refreshRequired,omitempty"`
+	RefreshError    string   `json:"refreshError,omitempty" yaml:"refreshError,omitempty"`
 }
 
 type WorkspaceDirectoryListing struct {
@@ -771,27 +775,28 @@ type WorkstreamBranchLoadResult struct {
 }
 
 type FileSaveInput struct {
-	FileID               string `json:"fileId" yaml:"fileId"`
-	Content              string `json:"content" yaml:"content"`
-	ExpectedHash         string `json:"expectedHash,omitempty" yaml:"expectedHash,omitempty"`
-	MaterializeConfirmed bool   `json:"materializeConfirmed,omitempty" yaml:"materializeConfirmed,omitempty"`
+	FileID       string `json:"fileId" yaml:"fileId"`
+	Content      string `json:"content" yaml:"content"`
+	ExpectedHash string `json:"expectedHash,omitempty" yaml:"expectedHash,omitempty"`
 }
 
 type ItemMetadataUpdateInput struct {
-	Title                string     `json:"title,omitempty" yaml:"title,omitempty"`
-	Scope                string     `json:"scope,omitempty" yaml:"scope,omitempty"`
-	Identifier           string     `json:"identifier,omitempty" yaml:"identifier,omitempty"`
-	Status               ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	Owner                string     `json:"owner,omitempty" yaml:"owner,omitempty"`
-	Tags                 []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
-	MaterializeConfirmed bool       `json:"materializeConfirmed,omitempty" yaml:"materializeConfirmed,omitempty"`
+	ExpectedRevision string     `json:"expectedRevision,omitempty" yaml:"expectedRevision,omitempty"`
+	Title            string     `json:"title,omitempty" yaml:"title,omitempty"`
+	Scope            string     `json:"scope,omitempty" yaml:"scope,omitempty"`
+	Identifier       string     `json:"identifier,omitempty" yaml:"identifier,omitempty"`
+	Status           ItemStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Owner            string     `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Tags             []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
 type VerificationTestSelection struct {
-	SelectedSpecs []string              `json:"selectedSpecs" yaml:"selectedSpecs"`
-	Environment   string                `json:"environment,omitempty" yaml:"environment,omitempty"`
-	DisplayMode   AutomationDisplayMode `json:"displayMode,omitempty" yaml:"displayMode,omitempty"`
-	UpdatedAt     time.Time             `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
+	ExpectedRevision string                `json:"expectedRevision,omitempty" yaml:"expectedRevision,omitempty"`
+	Revision         string                `json:"revision,omitempty" yaml:"revision,omitempty"`
+	SelectedSpecs    []string              `json:"selectedSpecs" yaml:"selectedSpecs"`
+	Environment      string                `json:"environment,omitempty" yaml:"environment,omitempty"`
+	DisplayMode      AutomationDisplayMode `json:"displayMode,omitempty" yaml:"displayMode,omitempty"`
+	UpdatedAt        time.Time             `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
 }
 
 type AutomationTestPath struct {
@@ -832,8 +837,8 @@ type E2ERunbookList struct {
 }
 
 type ItemStatusUpdateInput struct {
-	Status               ItemStatus `json:"status" yaml:"status"`
-	MaterializeConfirmed bool       `json:"materializeConfirmed,omitempty" yaml:"materializeConfirmed,omitempty"`
+	ExpectedRevision string     `json:"expectedRevision,omitempty" yaml:"expectedRevision,omitempty"`
+	Status           ItemStatus `json:"status" yaml:"status"`
 }
 
 type NewItemInput struct {
@@ -850,8 +855,11 @@ type NewItemInput struct {
 }
 
 type WriteResult struct {
-	Item      ItemDetail `json:"item" yaml:"item"`
-	ScannedAt time.Time  `json:"scannedAt" yaml:"scannedAt"`
+	Item            ItemDetail `json:"item" yaml:"item"`
+	ScannedAt       time.Time  `json:"scannedAt" yaml:"scannedAt"`
+	Committed       bool       `json:"committed" yaml:"committed"`
+	RefreshRequired bool       `json:"refreshRequired,omitempty" yaml:"refreshRequired,omitempty"`
+	RefreshError    string     `json:"refreshError,omitempty" yaml:"refreshError,omitempty"`
 }
 
 type GitChangeStatus string
@@ -916,7 +924,13 @@ type GitCommitInput struct {
 }
 
 type GitOperationInput struct {
+	// Confirm is retained only for Knowledge's explicit pull confirmation;
+	// Git HTTP operation routes decode a separate empty request shape.
 	Confirm bool `json:"confirm,omitempty" yaml:"confirm,omitempty"`
+}
+
+type KnowledgeConfirmationInput struct {
+	Confirm bool `json:"confirm" yaml:"confirm"`
 }
 
 type BranchCreateInput struct {
@@ -927,7 +941,6 @@ type BranchCreateInput struct {
 
 type BranchSwitchInput struct {
 	Name         string `json:"name" yaml:"name"`
-	Confirm      bool   `json:"confirm,omitempty" yaml:"confirm,omitempty"`
 	Strategy     string `json:"strategy,omitempty" yaml:"strategy,omitempty"`
 	StashMessage string `json:"stashMessage,omitempty" yaml:"stashMessage,omitempty"`
 }
@@ -939,13 +952,17 @@ type BranchSwitchDecision struct {
 }
 
 type GitOperationResult struct {
-	OK           bool                  `json:"ok" yaml:"ok"`
-	Message      string                `json:"message,omitempty" yaml:"message,omitempty"`
-	RecoveryHint string                `json:"recoveryHint,omitempty" yaml:"recoveryHint,omitempty"`
-	Status       GitStatus             `json:"status" yaml:"status"`
-	Code         string                `json:"code,omitempty" yaml:"code,omitempty"`
-	Details      map[string]string     `json:"details,omitempty" yaml:"details,omitempty"`
-	Decision     *BranchSwitchDecision `json:"decision,omitempty" yaml:"decision,omitempty"`
-	StashRef     string                `json:"stashRef,omitempty" yaml:"stashRef,omitempty"`
-	StashMessage string                `json:"stashMessage,omitempty" yaml:"stashMessage,omitempty"`
+	OK              bool                  `json:"ok" yaml:"ok"`
+	Committed       bool                  `json:"committed,omitempty" yaml:"committed,omitempty"`
+	RefreshRequired bool                  `json:"refreshRequired,omitempty" yaml:"refreshRequired,omitempty"`
+	RefreshError    string                `json:"refreshError,omitempty" yaml:"refreshError,omitempty"`
+	Partial         bool                  `json:"partial,omitempty" yaml:"partial,omitempty"`
+	Message         string                `json:"message,omitempty" yaml:"message,omitempty"`
+	RecoveryHint    string                `json:"recoveryHint,omitempty" yaml:"recoveryHint,omitempty"`
+	Status          GitStatus             `json:"status" yaml:"status"`
+	Code            string                `json:"code,omitempty" yaml:"code,omitempty"`
+	Details         map[string]string     `json:"details,omitempty" yaml:"details,omitempty"`
+	Decision        *BranchSwitchDecision `json:"decision,omitempty" yaml:"decision,omitempty"`
+	StashRef        string                `json:"stashRef,omitempty" yaml:"stashRef,omitempty"`
+	StashMessage    string                `json:"stashMessage,omitempty" yaml:"stashMessage,omitempty"`
 }

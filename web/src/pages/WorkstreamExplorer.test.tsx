@@ -100,7 +100,7 @@ describe('WorkstreamExplorer', () => {
 
     fireEvent.change(selector, { target: { value: 'feature/explorer' } });
 
-    await waitFor(() => expect(apiMock.switchBranch).toHaveBeenCalledWith('ws', { name: 'feature/explorer', confirm: false }));
+	await waitFor(() => expect(apiMock.switchBranch).toHaveBeenCalledWith('ws', { name: 'feature/explorer' }));
     await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', mode: 'all' }));
   });
 

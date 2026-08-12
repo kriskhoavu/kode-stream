@@ -386,11 +386,12 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
 			  if (event.key === 'Enter' && searchResults.length) { event.preventDefault(); openUnifiedSearchResult(searchResults[searchIndex] ?? searchResults[0]); }
 			  if (event.key === 'Escape') setExplorerSearchQuery('');
 			}} placeholder="Search files and text" /></label>
+			<button type="button" aria-label="Match case" aria-pressed={contentSearch.caseSensitive} className={contentSearch.caseSensitive ? 'active' : ''} onClick={() => { contentSearch.setCaseSensitive(!contentSearch.caseSensitive); setSearchIndex(0); }}>Aa</button>
 		  </div>}
 		  {!leftCollapsed && !leftPanelContent && pathSearch.query.trim() && <ExplorerUnifiedSearchResults query={pathSearch.query} results={searchResults} loading={pathSearch.loading || contentSearch.loading} error={pathSearch.error || contentSearch.error} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={openUnifiedSearchResult} />}
 		  {!leftCollapsed && !leftPanelContent && <div className="explorer-tree" ref={treeRef} role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>
             {visibleRows.map((row, index) => (
-              <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={row.node.type === 'file' ? explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path)) : undefined} branchState={workspaceBranches.states[row.workspaceId]} showBranchSelector={!embedded} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} onBranchChange={(workspace, branch) => void switchWorkspaceBranch(workspace, branch)} />
+              <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={row.node.type === 'file' ? explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path)) : undefined} branchState={workspaceBranches.states[row.workspaceId]} decision={workspaceBranches.decision} onDecision={(strategy, message) => void workspaceBranches.resolveDecision(strategy, message)} onCancelDecision={workspaceBranches.cancelDecision} showBranchSelector={!embedded} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} onBranchChange={(workspace, branch) => void switchWorkspaceBranch(workspace, branch)} />
             ))}
             {visibleRows.length === 0 && <p className="explorer-empty">No matching paths.</p>}
 			{showModeSelector && explorer.mode === 'sources' && workspaces.every((item) => item.sources.length === 0) && <button className="secondary" type="button" onClick={() => explorer.setMode('all')}>Browse All Files</button>}
@@ -434,7 +435,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
             if (!location?.workspaceId) return;
             void api.scan(location.workspaceId).then(() => { setRefreshWarning(''); explorer.refresh(); }).catch((caught) => showError(caught, 'Workspace refresh failed'));
           }}>Retry workspace refresh</button></div>}
-          {tab === 'preview' && (editor.file ? <ContentViewer file={editor.file} content={editor.content} /> : <ExplorerEmpty row={selectedRow} />)}
+		  {tab === 'preview' && (editor.file ? <ContentViewer file={editor.file} content={editor.content} selection={matchContext} /> : <ExplorerEmpty row={selectedRow} />)}
           {tab === 'raw' && <textarea className="raw-editor" value={editor.file ? editor.content : 'Select a file.'} disabled={!editor.file?.editable} onChange={(event) => editor.setContent(event.target.value)} spellCheck={false} />}
           {tab === 'diff' && <ExplorerDiff diff={diff} onRevert={() => setRevertOpen(true)} disabled={!editor.file || reverting} />}
           </>}
@@ -457,7 +458,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   );
 }
 
-function ExplorerTreeRow({ row, gitState, branchState, showBranchSelector = true, active, selected, expanded, onFocus, onSelect, onToggle, onBranchChange }: { row: VisibleExplorerRow; gitState?: WorkspacePathGitState; branchState?: WorkspaceBranchState; showBranchSelector?: boolean; active: boolean; selected: boolean; expanded: boolean; onFocus: () => void; onSelect: () => void; onToggle: () => void; onBranchChange: (workspace: WorkspaceConfig, branch: string) => void }) {
+function ExplorerTreeRow({ row, gitState, branchState, decision, onDecision, onCancelDecision, showBranchSelector = true, active, selected, expanded, onFocus, onSelect, onToggle, onBranchChange }: { row: VisibleExplorerRow; gitState?: WorkspacePathGitState; branchState?: WorkspaceBranchState; decision?: { workspace: WorkspaceConfig; target: string; canCarry: boolean; stashMessage: string } | null; onDecision: (strategy: 'carry' | 'stash', message: string) => void; onCancelDecision: () => void; showBranchSelector?: boolean; active: boolean; selected: boolean; expanded: boolean; onFocus: () => void; onSelect: () => void; onToggle: () => void; onBranchChange: (workspace: WorkspaceConfig, branch: string) => void }) {
   const expandable = row.node.type === 'workspace' || row.node.type === 'directory';
   const workspace = row.node.type === 'workspace' ? row.node.workspace : undefined;
   return <div className={`explorer-tree-row${selected ? ' selected' : ''}${active ? ' active' : ''}`} role="treeitem" aria-level={row.level + 1} aria-expanded={expandable ? expanded : undefined} aria-selected={selected} style={{ '--explorer-depth': row.level } as CSSProperties} onMouseEnter={onFocus}>
@@ -467,7 +468,7 @@ function ExplorerTreeRow({ row, gitState, branchState, showBranchSelector = true
       <span className={`explorer-row-label ${row.node.type}`}>{row.node.name}</span>
       {row.node.type === 'file' && gitState && <FileStateIcon state={gitState.conflict ? 'conflicted' : gitState.status} />}
     </button>
-    {workspace && showBranchSelector && <WorkspaceBranchSelector workspace={workspace} state={branchState} onChange={(branch) => onBranchChange(workspace, branch)} />}
+    {workspace && showBranchSelector && <WorkspaceBranchSelector workspace={workspace} state={branchState} onChange={(branch) => onBranchChange(workspace, branch)} decision={decision} onDecision={onDecision} onCancelDecision={onCancelDecision} />}
   </div>;
 }
 

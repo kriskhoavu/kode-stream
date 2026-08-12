@@ -56,7 +56,11 @@ func TestSaveMetadataCreatesPlanYAML(t *testing.T) {
 		Status:     models.StatusDraft,
 	}}
 
-	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusInProgress, Owner: "Khoa Vu", Tags: []string{"items", "items", "edit"}}); err != nil {
+	revision, err := writer.MetadataRevision(workspace, item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{ExpectedRevision: revision, Status: models.StatusInProgress, Owner: "Khoa Vu", Tags: []string{"items", "items", "edit"}}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(itemRoot, "plan.yaml"))
@@ -89,7 +93,7 @@ func TestSaveMetadataRejectsDocumentationRoots(t *testing.T) {
 	}
 }
 
-func TestSaveMetadataCompactsLegacyPlanYAML(t *testing.T) {
+func TestSaveMetadataPreservesLegacyAndUnknownPlanYAML(t *testing.T) {
 	root := t.TempDir()
 	itemRoot := filepath.Join(root, "plans", "api", "DI-170")
 	writeFile(t, itemRoot, "README.md", "# DI-170: Custom Assortment Level 2\n")
@@ -117,7 +121,11 @@ documents:
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{
 		ItemPath: "plans/api/DI-170", Scope: "api", Identifier: "DI-170", Title: "Custom Assortment Level 2", Status: models.StatusDraft,
 	}}
-	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); err != nil {
+	revision, err := writer.MetadataRevision(workspace, item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{ExpectedRevision: revision, Status: models.StatusDone}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(itemRoot, "plan.yaml"))
@@ -125,8 +133,10 @@ documents:
 		t.Fatal(err)
 	}
 	text := string(data)
-	if text != "plan:\n    status: done\n    tags:\n        - backend\n" {
-		t.Fatalf("unexpected compact plan.yaml:\n%s", text)
+	for _, want := range []string{"schemaVersion: 1", "ticket: DI-170", "service: api", "targetDate: null", "order: 10", "status: done"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("plan.yaml lost %q:\n%s", want, text)
+		}
 	}
 }
 
@@ -340,7 +350,11 @@ func TestSaveMetadataRefreshesIndex(t *testing.T) {
 		Status:      models.StatusDraft,
 	}}
 
-	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); err != nil {
+	revision, err := writer.MetadataRevision(workspace, item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{ExpectedRevision: revision, Status: models.StatusDone}); err != nil {
 		t.Fatal(err)
 	}
 	items, err := idx.Query(itemindex.Query{WorkspaceID: workspace.ID})
@@ -352,6 +366,46 @@ func TestSaveMetadataRefreshesIndex(t *testing.T) {
 	}
 	if items[0].Status != models.StatusDone {
 		t.Fatalf("status = %q, want done", items[0].Status)
+	}
+}
+
+func TestSaveMetadataRequiresFreshRevisionAndReportsCommittedRefreshFailure(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	itemRoot := filepath.Join(root, "plans", "platform", "PM-100")
+	writeFile(t, itemRoot, "README.md", "# PM-100\n")
+	writeFile(t, itemRoot, "plan.yaml", "plan:\n  status: draft\n")
+	workspace := models.WorkspaceConfig{ID: "w", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "plans/platform/PM-100", Status: models.StatusDraft}}
+	writer := New(fileaccess.New(), scanner.New(gitadapter.New()), failingRefreshIndex{}, nil)
+	before, err := os.ReadFile(filepath.Join(itemRoot, "plan.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); !errors.Is(err, ErrMetadataRevisionRequired) {
+		t.Fatalf("missing revision error = %v", err)
+	}
+	afterMissing, _ := os.ReadFile(filepath.Join(itemRoot, "plan.yaml"))
+	if string(before) != string(afterMissing) {
+		t.Fatal("missing revision changed plan")
+	}
+	revision, err := writer.MetadataRevision(workspace, item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{ExpectedRevision: "stale", Status: models.StatusDone}); err == nil {
+		t.Fatal("expected stale revision")
+	}
+	result, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{ExpectedRevision: revision, Status: models.StatusDone})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Committed || !result.RefreshRequired || !strings.Contains(result.RefreshError, "injected index refresh failure") {
+		t.Fatalf("result=%#v", result)
+	}
+	data, _ := os.ReadFile(filepath.Join(itemRoot, "plan.yaml"))
+	if !strings.Contains(string(data), "status: done") {
+		t.Fatalf("committed plan=%s", data)
 	}
 }
 
@@ -369,7 +423,7 @@ func TestStructuredSnapshotFailureLeavesNoTargetAndCanRetry(t *testing.T) {
 	workspace := models.WorkspaceConfig{Path: targetRoot, Sources: []string{"plans"}}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{Commit: "captured", SourceMode: "snapshot", MetadataSource: "plan.yaml", ItemPath: itemPath}}
 
-	err := writer.MaterializeSnapshotItem(workspace, item, "")
+	_, err := writer.ImportSnapshotPlan(workspace, item)
 	if err == nil || !strings.Contains(err.Error(), "injected snapshot read failure") {
 		t.Fatalf("expected injected read failure, got %v", err)
 	}
@@ -382,7 +436,7 @@ func TestStructuredSnapshotFailureLeavesNoTargetAndCanRetry(t *testing.T) {
 	}
 
 	writer.snapshotReader = func(models.WorkspaceConfig, models.ItemDetail) scanner.SourceReader { return baseReader }
-	if err := writer.MaterializeSnapshotItem(workspace, item, ""); err != nil {
+	if _, err := writer.ImportSnapshotPlan(workspace, item); err != nil {
 		t.Fatalf("retry failed: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(targetRoot, filepath.FromSlash(itemPath), "README.md"))

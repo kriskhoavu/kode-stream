@@ -4,6 +4,8 @@ package scanner
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -285,8 +287,11 @@ func (s *Scanner) parseItem(request ScanRequest, reader SourceReader, branch, sc
 	tags := []string{}
 	documents := []models.ItemDocument{}
 	metadata := map[string]any{}
+	metadataRevision := ""
 
 	if data, source, err := readPlanYAML(reader, itemRoot); err == nil {
+		sum := sha256.Sum256(data)
+		metadataRevision = hex.EncodeToString(sum[:])
 		parsed, parseErr := parsePlanYAML(string(data))
 		if parseErr != nil {
 			warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: parseErr.Error()})
@@ -346,25 +351,26 @@ func (s *Scanner) parseItem(request ScanRequest, reader SourceReader, branch, sc
 	}
 
 	summary := models.ItemSummary{
-		ID:             stablePlanID(workspace.ID, branch, relItemPath),
-		WorkspaceID:    workspace.ID,
-		WorkspaceName:  workspace.Name,
-		Branch:         branch,
-		BranchRef:      request.BranchRef,
-		Commit:         request.Commit,
-		SourceMode:     request.SourceMode,
-		Editable:       request.Editable,
-		Scope:          scope,
-		Identifier:     identifier,
-		Title:          title,
-		Status:         status,
-		Owner:          owner,
-		Author:         author,
-		Tags:           tags,
-		UpdatedAt:      updated,
-		Description:    description,
-		MetadataSource: metaSource,
-		ItemPath:       relItemPath,
+		ID:               stablePlanID(workspace.ID, branch, relItemPath),
+		WorkspaceID:      workspace.ID,
+		WorkspaceName:    workspace.Name,
+		Branch:           branch,
+		BranchRef:        request.BranchRef,
+		Commit:           request.Commit,
+		SourceMode:       request.SourceMode,
+		Editable:         request.Editable,
+		Scope:            scope,
+		Identifier:       identifier,
+		Title:            title,
+		Status:           status,
+		Owner:            owner,
+		Author:           author,
+		Tags:             tags,
+		UpdatedAt:        updated,
+		Description:      description,
+		MetadataSource:   metaSource,
+		ItemPath:         relItemPath,
+		MetadataRevision: metadataRevision,
 	}
 	if summary.Author == "" && owner != "" {
 		summary.Author = owner
@@ -550,13 +556,12 @@ func naturalParts(input string) []naturalPart {
 }
 
 func stablePlanID(repoID, branch, relItemPath string) string {
-	key := repoID + "|" + branch + "|" + relItemPath
-	var h uint32 = 2166136261
-	for _, b := range []byte(key) {
-		h ^= uint32(b)
-		h *= 16777619
-	}
-	return fmt.Sprintf("%s-%08x", repoID, h)
+	// The former 32-bit FNV suffix merged valid plans in the same branch.
+	// A versioned SHA-256 identity is deterministic, URL-safe, and keeps the
+	// workspace prefix useful when inspecting logs without relying on it for
+	// uniqueness.  Old persisted indexes are rebuilt on their next scan.
+	sum := sha256.Sum256([]byte(repoID + "\x00" + branch + "\x00" + filepath.ToSlash(relItemPath)))
+	return fmt.Sprintf("v2-%s-%s", repoID, hex.EncodeToString(sum[:]))
 }
 
 func labelFromPath(path string) string {

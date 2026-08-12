@@ -117,30 +117,46 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [sourceItemsEditor, setSourceItemsEditor] = useState<SourceItemsEditorState | null>(null);
   const suppressPreviewRef = useRef<{ itemId: string; until: number } | null>(null);
   const appliedFocusRef = useRef('');
+	// Every asynchronous board workflow is scoped to this generation. A route
+	// change/unmount invalidates outstanding responses before they can paint a
+	// different workspace.
+	const workspaceGenerationRef = useRef(0);
+	const activeWorkspaceRef = useRef<string | undefined>(workspace?.id);
+	useEffect(() => {
+		activeWorkspaceRef.current = workspace?.id;
+		workspaceGenerationRef.current += 1;
+		return () => { workspaceGenerationRef.current += 1; };
+	}, [workspace?.id]);
   const text = query;
 
   const loadCheckout = async (force = false) => {
     if (!workspace) return;
+		const workspaceID = workspace.id;
+		const generation = workspaceGenerationRef.current;
+		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
     setLoading(true);
     setError('');
     try {
       const result = await api.loadWorkstreamCheckout(workspace.id, { force });
+			if (!active()) return;
       setBranchContext(result);
       setSelectedBranch(result.branch);
       setPlans(result.items);
     } catch (err) {
       try {
         const fallbackItems = await api.items(new URLSearchParams({ workspaceId: workspace.id }));
+			if (!active()) return;
         setBranchContext(null);
         setSelectedBranch(workspace.baselineBranch);
         setPlans(fallbackItems);
         setError('');
       } catch {
+			if (!active()) return;
         setError(err instanceof Error ? err.message : 'Failed to load checkout');
         setPlans([]);
       }
     } finally {
-      setLoading(false);
+		if (active()) setLoading(false);
     }
   };
 
@@ -283,9 +299,13 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   const scan = async () => {
     if (!workspace) return;
+		const workspaceID = workspace.id;
+		const generation = workspaceGenerationRef.current;
+		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
     setScanState('Refreshing');
     try {
       const result = await api.loadWorkstreamCheckout(workspace.id, { force: true });
+			if (!active()) return;
       notifyReliabilityChanged();
       setScanState(`${result.itemCount} items indexed`);
       setBranchContext(result);
@@ -293,7 +313,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       setPlans(result.items);
       onWorkspacesChanged();
     } catch (err) {
-      setScanState(err instanceof Error ? err.message : 'Refresh failed');
+		if (active()) setScanState(err instanceof Error ? err.message : 'Refresh failed');
     }
   };
 
@@ -307,20 +327,26 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     if (!item || !isItemDraggable(item) || !isDropStatus(status) || item.status === status || pendingItemIds.has(itemId)) return;
 
     const previousStatus = item.status;
+		const workspaceID = workspace?.id;
+		const generation = workspaceGenerationRef.current;
+		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
     setError('');
     setPlans((current) => applyItemStatus(current, itemId, status));
     setPendingItemIds((current) => new Set(current).add(itemId));
     try {
-      const result = await api.updateStatus(itemId, { status });
+		const result = await api.updateStatus(itemId, { status, expectedRevision: item.metadataRevision });
+			if (!active()) return;
       setPlans((current) => current.map((candidate) => candidate.id === itemId ? { ...candidate, ...result.item } : candidate));
       notifyReliabilityChanged();
       await onWorkspacesChanged();
     } catch (err) {
+			if (!active()) return;
       setPlans((current) => current.map((candidate) => (
         candidate.id === itemId && candidate.status === status ? { ...candidate, status: previousStatus } : candidate
       )));
       setError(err instanceof Error ? err.message : 'Status update failed');
     } finally {
+			if (!active()) return;
       setPendingItemIds((current) => {
         const next = new Set(current);
         next.delete(itemId);
@@ -374,10 +400,14 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   const fetchJiraIssue = async () => {
     if (!workspace || !newPlanDraft.jiraKey.trim()) return;
+		const workspaceID = workspace.id;
+		const generation = workspaceGenerationRef.current;
+		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
     setJiraLookupLoading(true);
     setNewPlanError('');
     try {
       const result = await api.workspaceJiraIssue(workspace.id, newPlanDraft.jiraKey.trim());
+			if (!active()) return;
       setJiraLookup(result);
       if (result.state === 'available' && result.issue) {
         const issue = result.issue;
@@ -391,10 +421,11 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         }));
       }
     } catch (err) {
+			if (!active()) return;
       setJiraLookup(null);
       setNewPlanError(err instanceof Error ? err.message : 'Jira lookup failed');
     } finally {
-      setJiraLookupLoading(false);
+		if (active()) setJiraLookupLoading(false);
     }
   };
 
@@ -433,17 +464,22 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   const loadSourceItemsSettings = async (directory: string) => {
     if (!workspace) return;
+		const workspaceID = workspace.id;
+		const generation = workspaceGenerationRef.current;
+		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
     setSourceItemsLoading(true);
     setSourceItemsError('');
     setSourceItemsDirectory(directory);
     try {
       const result = await api.sourceStructure(workspace.id, directory);
+			if (!active()) return;
       setSourceItemsEditor(sourceItemsEditorFromResult(workspace, directory, result));
     } catch (err) {
+			if (!active()) return;
       setSourceItemsEditor(null);
       setSourceItemsError(err instanceof Error ? err.message : 'Source settings failed to load');
     } finally {
-      setSourceItemsLoading(false);
+		if (active()) setSourceItemsLoading(false);
     }
   };
 
@@ -1669,7 +1705,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setSavingMetadata(true);
     setError('');
     try {
-      const result = await api.saveMetadata(itemId, metadataDraft);
+		const result = await api.saveMetadata(itemId, { ...metadataDraft, expectedRevision: plan.metadataRevision });
       notifyReliabilityChanged();
       setPlan(result.item);
       await loadGitStatus(plan.workspaceId);
@@ -1686,11 +1722,10 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setGitBusy(operation);
     setError('');
     try {
-      const confirm = operation === 'pull' && Boolean(gitStatus?.dirty);
       const result = operation === 'fetch'
         ? await api.gitFetch(plan.workspaceId)
         : operation === 'pull'
-          ? await api.gitPull(plan.workspaceId, { confirm })
+			? await api.gitPull(plan.workspaceId, {})
           : await api.gitPush(plan.workspaceId);
       notifyReliabilityChanged();
       setGitStatus(result.status);

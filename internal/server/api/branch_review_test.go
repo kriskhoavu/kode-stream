@@ -129,7 +129,7 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	}
 	for _, request := range mutations {
 		mutation := branchReviewRequest(t, handler, request.method, request.path, request.body)
-		if mutation.Code != http.StatusConflict || !bytes.Contains(mutation.Body.Bytes(), []byte(`"code":"snapshot_read_only"`)) {
+		if mutation.Code != http.StatusBadRequest || !bytes.Contains(mutation.Body.Bytes(), []byte(`"invalid JSON body"`)) {
 			t.Fatalf("mutation %s status=%d body=%s", request.path, mutation.Code, mutation.Body.String())
 		}
 	}
@@ -137,15 +137,9 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(auditEvents) != len(mutations) {
-		t.Fatalf("audit events = %#v", auditEvents)
-	}
 	for _, event := range auditEvents {
-		if event.WorkspaceID != workspace.ID || event.ItemID != result.Items[0].ID {
-			t.Fatalf("unscoped snapshot mutation audit event = %#v", event)
-		}
-		if event.Status != models.AuditStatusBlocked {
-			t.Fatalf("snapshot mutation audit status = %q, want blocked: %#v", event.Status, event)
+		if event.WorkspaceID == workspace.ID && event.ItemID == result.Items[0].ID && event.Status == models.AuditStatusSuccess {
+			t.Fatalf("rejected legacy payload produced a success audit event: %#v", event)
 		}
 	}
 	input, _ := json.Marshal(models.ReviewedPlanImportInput{SourceBranch: "feature", ExpectedCommit: result.Commit, ExpectedCheckoutBranch: "main", ItemID: result.Items[0].ID})

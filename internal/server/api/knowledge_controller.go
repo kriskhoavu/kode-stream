@@ -90,7 +90,7 @@ func (a *knowledgeController) knowledgeEnrich(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusServiceUnavailable, "knowledge is unavailable")
 		return
 	}
-	var input models.GitOperationInput
+	var input models.KnowledgeConfirmationInput
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&input); err != nil {

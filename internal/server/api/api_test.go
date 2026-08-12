@@ -4,10 +4,10 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -802,10 +802,29 @@ func TestItemVerificationTestsRoutesPersistSelection(t *testing.T) {
 		t.Fatalf("fixture item detail: %v", err)
 	}
 
+	loaded := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(loaded, httptest.NewRequest(http.MethodGet, "/api/items/"+itemID, nil))
+	var current models.ItemDetail
+	if err := json.Unmarshal(loaded.Body.Bytes(), &current); err != nil {
+		t.Fatal(err)
+	}
+	if current.MetadataRevision == "" {
+		t.Fatal("item detail did not expose metadata revision")
+	}
+	missing := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(missing, httptest.NewRequest(http.MethodPut, "/api/items/"+itemID+"/verification-tests", strings.NewReader(`{"selectedSpecs":["cypress/e2e/create.cy.ts"]}`)))
+	if missing.Code != http.StatusConflict || !strings.Contains(missing.Body.String(), "metadata_revision_required") {
+		t.Fatalf("missing revision status=%d body=%s", missing.Code, missing.Body.String())
+	}
 	put := httptest.NewRecorder()
-	apiHandler.Routes().ServeHTTP(put, httptest.NewRequest(http.MethodPut, "/api/items/"+itemID+"/verification-tests", strings.NewReader(`{"selectedSpecs":["cypress/e2e/create.cy.ts"],"environment":"local"}`)))
+	apiHandler.Routes().ServeHTTP(put, httptest.NewRequest(http.MethodPut, "/api/items/"+itemID+"/verification-tests", strings.NewReader(`{"selectedSpecs":["cypress/e2e/create.cy.ts"],"environment":"local","expectedRevision":"`+current.MetadataRevision+`"}`)))
 	if put.Code != http.StatusOK {
 		t.Fatalf("PUT status = %d, body = %s", put.Code, put.Body.String())
+	}
+	stale := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(stale, httptest.NewRequest(http.MethodPut, "/api/items/"+itemID+"/verification-tests", strings.NewReader(`{"selectedSpecs":["cypress/e2e/other.cy.ts"],"expectedRevision":"`+current.MetadataRevision+`"}`)))
+	if stale.Code != http.StatusConflict {
+		t.Fatalf("stale revision status=%d body=%s", stale.Code, stale.Body.String())
 	}
 
 	get := httptest.NewRecorder()
@@ -1531,6 +1550,51 @@ func TestGitPullDirtyTreeReturnsRecoveryHint(t *testing.T) {
 	}
 }
 
+func TestGitMutationRoutesRejectInvalidBodiesBeforeAuditOrMutation(t *testing.T) {
+	apiHandler, workspace, _, auditStore := reliabilityTestAPI(t)
+	paths := []string{
+		"/api/workspaces/" + workspace.ID + "/git/fetch",
+		"/api/workspaces/" + workspace.ID + "/git/pull",
+		"/api/workspaces/" + workspace.ID + "/git/push",
+		"/api/workspaces/" + workspace.ID + "/git/commit",
+		"/api/workspaces/" + workspace.ID + "/git/branches",
+		"/api/workspaces/" + workspace.ID + "/git/switch",
+	}
+	for _, body := range []string{`{"unknown":true}`, `{} {}`} {
+		for _, path := range paths {
+			request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+			response := httptest.NewRecorder()
+			apiHandler.Routes().ServeHTTP(response, request)
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("%s body %q status=%d body=%s", path, body, response.Code, response.Body.String())
+			}
+		}
+	}
+	if events, err := auditStore.Recent(100); err != nil || len(events) != 0 {
+		t.Fatalf("invalid Git requests recorded audit events=%#v err=%v", events, err)
+	}
+	for _, path := range paths {
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"padding":"`+strings.Repeat("x", int(maxWorkspaceMutationBodyBytes))+`"}`))
+		response := httptest.NewRecorder()
+		apiHandler.Routes().ServeHTTP(response, request)
+		if response.Code != http.StatusRequestEntityTooLarge {
+			t.Fatalf("%s oversized status=%d", path, response.Code)
+		}
+	}
+	if current, err := gitadapter.New().CurrentBranch(workspace.Path); err != nil || current != "main" {
+		t.Fatalf("invalid body changed checkout current=%q err=%v", current, err)
+	}
+	if output, err := exec.Command("git", "-C", workspace.Path, "diff", "--cached", "--quiet").CombinedOutput(); err != nil {
+		t.Fatalf("invalid body staged files: %s", output)
+	}
+	if output, err := exec.Command("git", "-C", workspace.Path, "branch", "--format=%(refname:short)").CombinedOutput(); err != nil || strings.TrimSpace(string(output)) != "main" {
+		t.Fatalf("invalid body created branch output=%q err=%v", output, err)
+	}
+	if _, err := os.Stat(filepath.Join(workspace.Path, ".git", "FETCH_HEAD")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("invalid body invoked remote fetch: %v", err)
+	}
+}
+
 func TestGitBranchesReturnsCurrentSortedLocalBranches(t *testing.T) {
 	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
 	for _, branch := range []string{"zeta", "alpha"} {
@@ -1705,7 +1769,6 @@ func writeAPITestFile(t *testing.T, root, rel, content string) {
 }
 
 func stableAPITestPlanID(repoID, branch, relItemPath string) string {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(repoID + "|" + branch + "|" + relItemPath))
-	return fmt.Sprintf("%s-%08x", repoID, h.Sum32())
+	sum := sha256.Sum256([]byte(repoID + "\x00" + branch + "\x00" + filepath.ToSlash(relItemPath)))
+	return fmt.Sprintf("v2-%s-%x", repoID, sum)
 }

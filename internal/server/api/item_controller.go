@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/guardedwrite"
 	appitem "kode-stream/internal/item"
+	itemwriter "kode-stream/internal/item/writer"
 	knowledgeindex "kode-stream/internal/knowledge"
 	appsearch "kode-stream/internal/search"
 )
@@ -24,10 +24,7 @@ type itemController struct {
 
 func (a *itemController) importReviewedPlan(w http.ResponseWriter, r *http.Request) {
 	var input models.ReviewedPlanImportInput
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	result, err := a.items.ImportReviewedPlan(r.PathValue("id"), input)
@@ -72,13 +69,17 @@ func (a *itemController) itemDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *itemController) itemFiles(w http.ResponseWriter, r *http.Request) {
-	tree, err := a.items.Files(r.PathValue("id"), r.URL.Query().Get("expectedCommit"))
+	tree, err := a.items.FilesContext(r.Context(), r.PathValue("id"), r.URL.Query().Get("expectedCommit"))
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
 	}
 	if errors.Is(err, appitem.ErrReviewCommitMoved) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "review_commit_moved"})
+		return
+	}
+	if errors.Is(err, appitem.ErrSnapshotTreeTooLarge) {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"error": err.Error(), "code": "snapshot_tree_too_large"})
 		return
 	}
 	respond(w, tree, err)
@@ -97,13 +98,17 @@ func (a *itemController) itemContentSearch(w http.ResponseWriter, r *http.Reques
 }
 
 func (a *itemController) itemFileContent(w http.ResponseWriter, r *http.Request) {
-	content, err := a.items.FileContent(r.PathValue("id"), r.PathValue("fileID"), r.URL.Query().Get("expectedCommit"))
+	content, err := a.items.FileContentContext(r.Context(), r.PathValue("id"), r.PathValue("fileID"), r.URL.Query().Get("expectedCommit"))
 	if errors.Is(err, apperrors.ErrItemNotFound) {
 		writeError(w, http.StatusNotFound, "item not found")
 		return
 	}
 	if errors.Is(err, appitem.ErrReviewCommitMoved) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "review_commit_moved"})
+		return
+	}
+	if errors.Is(err, appitem.ErrSnapshotFileTooLarge) {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"error": err.Error(), "code": "snapshot_file_too_large"})
 		return
 	}
 	respond(w, content, err)
@@ -161,8 +166,7 @@ func (a *itemController) revertItemFile(w http.ResponseWriter, r *http.Request) 
 
 func (a *itemController) saveItemMetadata(w http.ResponseWriter, r *http.Request) {
 	var input models.ItemMetadataUpdateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	auditContext, contextErr := a.items.AuditContext(r.PathValue("id"))
@@ -224,10 +228,7 @@ func (a *itemController) itemE2ERunbooks(w http.ResponseWriter, r *http.Request)
 
 func (a *itemController) saveItemVerificationTests(w http.ResponseWriter, r *http.Request) {
 	var input models.VerificationTestSelection
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	tests, err := a.items.SaveVerificationTests(r.PathValue("id"), input)
@@ -240,8 +241,7 @@ func (a *itemController) saveItemVerificationTests(w http.ResponseWriter, r *htt
 
 func (a *itemController) updateItemStatus(w http.ResponseWriter, r *http.Request) {
 	var input models.ItemStatusUpdateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	auditContext, contextErr := a.items.AuditContext(r.PathValue("id"))
@@ -264,6 +264,10 @@ func (a *itemController) updateItemStatus(w http.ResponseWriter, r *http.Request
 }
 
 func respondItemMutation(w http.ResponseWriter, result any, err error) {
+	if errors.Is(err, itemwriter.ErrMetadataRevisionRequired) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "metadata_revision_required", "recoveryHint": "Reload the item before saving metadata."})
+		return
+	}
 	if errors.Is(err, guardedwrite.ErrHashRequired) || errors.Is(err, guardedwrite.ErrStale) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "stale_file_content", "recoveryHint": "Reload the file and retry your edit."})
 		return
@@ -281,8 +285,7 @@ func respondItemMutation(w http.ResponseWriter, result any, err error) {
 
 func (a *itemController) createItem(w http.ResponseWriter, r *http.Request) {
 	var input models.NewItemInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxWorkspaceMutationBodyBytes, true) {
 		return
 	}
 	result, err := a.items.Create(input)

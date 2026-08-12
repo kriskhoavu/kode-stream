@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -34,6 +35,13 @@ func decodeLimitedJSON(w http.ResponseWriter, r *http.Request, target any, limit
 			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body exceeds the write limit", "code": "request_too_large"})
 			return false
 		}
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return false
+	}
+	// A successful first Decode is not sufficient: json.Decoder otherwise
+	// accepts a second JSON value after the requested request object.
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return false
 	}
@@ -121,6 +129,14 @@ func respondContentSearch(w http.ResponseWriter, data any, err error) {
 	default:
 		writeError(w, http.StatusBadRequest, err.Error())
 	}
+}
+
+func respondSearch(w http.ResponseWriter, data any, err error) {
+	if errors.Is(err, context.Canceled) {
+		writeError(w, 499, "search canceled")
+		return
+	}
+	respond(w, data, err)
 }
 
 func optionalBool(r *http.Request, name string) (bool, error) {
