@@ -10,39 +10,56 @@ export type Route =
   | { name: 'knowledge'; location?: KnowledgeLocation }
   | { name: 'canvas'; location?: CanvasLocation }
   | { name: 'review'; location?: ReviewLocation }
-  | { name: 'item'; itemId: string };
+  | { name: 'item'; itemId: string }
+  | { name: 'not-found'; path: string };
+
+export const routeDescriptors: Record<Route['name'], { title: string; mainId: string }> = {
+  workstream: { title: 'Workstream · Kode Stream', mainId: 'app-main' },
+  workspaces: { title: 'Workspaces · Kode Stream', mainId: 'app-main' },
+  settings: { title: 'Settings · Kode Stream', mainId: 'app-main' },
+  knowledge: { title: 'Knowledge · Kode Stream', mainId: 'app-main' },
+  canvas: { title: 'Workbench · Kode Stream', mainId: 'app-main' },
+  review: { title: 'Branch Review · Kode Stream', mainId: 'app-main' },
+  item: { title: 'Item · Kode Stream', mainId: 'app-main' },
+  'not-found': { title: 'Page not found · Kode Stream', mainId: 'app-main' }
+};
 
 export function routeFromLocation(): Route {
-  const path = window.location.pathname;
+  return routeFromPath(window.location.pathname, window.location.search);
+}
+
+export function routeFromPath(path: string, search = ''): Route {
   if (path.startsWith('/items/')) {
-    return { name: 'item', itemId: decodeURIComponent(path.split('/')[2] ?? '') };
+    const itemId = decodeURIComponent(path.split('/')[2] ?? '');
+    return itemId ? { name: 'item', itemId } : { name: 'not-found', path };
   }
-  if (path.startsWith('/workspaces')) {
+  if (path === '/workspaces') {
     return { name: 'workspaces' };
   }
-  if (path.startsWith('/settings')) {
+  if (path === '/settings') {
     return { name: 'settings' };
   }
   if (path === '/knowledge') {
-	return { name: 'knowledge', location: knowledgeLocationFromSearch(window.location.search) };
+    return { name: 'knowledge', location: knowledgeLocationFromSearch(search) };
   }
 	if (path === '/canvas') {
-		return { name: 'canvas', location: canvasLocationFromSearch(window.location.search) };
+    return { name: 'canvas', location: canvasLocationFromSearch(search) };
 	}
   if (path === '/review') {
-    return { name: 'review', location: reviewLocationFromSearch(window.location.search) };
+    return { name: 'review', location: reviewLocationFromSearch(search) };
   }
   if (path === '/workstream' || path === '/') {
-    return { name: 'workstream', focusedItemId: workstreamFocusedItemFromSearch(window.location.search) };
+    return { name: 'workstream', focusedItemId: workstreamFocusedItemFromSearch(search) };
   }
-  return { name: 'workstream' };
+  return { name: 'not-found', path };
 }
 
 export function pathForRoute(route: Route): string {
 	if (route.name === 'knowledge') return knowledgePath(route.location);
 	if (route.name === 'canvas') return canvasPath(route.location);
   if (route.name === 'review') return reviewPath(route.location);
-  return route.name === 'item'
+  return route.name === 'not-found' ? route.path
+    : route.name === 'item'
     ? `/items/${encodeURIComponent(route.itemId)}`
     : route.name === 'workspaces'
       ? '/workspaces'

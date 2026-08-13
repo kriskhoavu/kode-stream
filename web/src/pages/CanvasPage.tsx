@@ -9,6 +9,7 @@ import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspa
 import type { CanvasNode, CanvasSection, WorkspaceConfig } from '../lib/types';
 import { FolderGit2, Workflow } from 'lucide-react';
 import '../features/canvas/canvas.css';
+import { readPreference, readStringPreference, writePreference } from '../shared/preferences/store';
 
 export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, onOpenWorkspaces }: { workspace?: WorkspaceConfig; location?: CanvasLocation; onLocationChange: (location: CanvasLocation) => void; onOpenItem?: (itemId: string) => void; onOpenWorkspaces?: () => void }) {
 	const workspaceId = location?.workspaceId ?? workspace?.id;
@@ -28,22 +29,21 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		if (!sectionLayoutID) { setSections([]); setSectionsLoadedFor(''); return; }
 		if (sectionsLoadedFor === sectionLayoutID) return;
 		try {
-			const stored = localStorage.getItem(`canvas-sections:${sectionLayoutID}`);
-			const existing = stored ? JSON.parse(stored) as CanvasSection[] : [];
+			const existing = readPreference<CanvasSection[]>(`canvas-sections:${sectionLayoutID}`, (value) => Array.isArray(value) ? value.filter((entry): entry is CanvasSection => Boolean(entry) && typeof entry === 'object') : undefined, []);
 			const initializedKey = `canvas-service-sections-version:${sectionLayoutID}`;
 			const defaultSectionVersion = '3';
-			if (localStorage.getItem(initializedKey) !== defaultSectionVersion) {
+			if (readStringPreference(initializedKey) !== defaultSectionVersion) {
 				setSections([...defaultServiceGroups.sections, ...existing.filter((section) => !isDefaultSection(section))]);
 			} else {
 				setSections(existing);
 			}
-			localStorage.setItem(initializedKey, defaultSectionVersion);
+			writePreference(initializedKey, defaultSectionVersion);
 		} catch { setSections([]); }
 		setSectionsLoadedFor(sectionLayoutID);
 	}, [canvas.moveNode, defaultServiceGroups, sectionLayoutID, sectionsLoadedFor]);
 	useEffect(() => {
 		if (!sectionLayoutID || sectionsLoadedFor !== sectionLayoutID) return;
-		localStorage.setItem(`canvas-sections:${sectionLayoutID}`, JSON.stringify(sections));
+		writePreference(`canvas-sections:${sectionLayoutID}`, sections);
 	}, [sectionLayoutID, sections, sectionsLoadedFor]);
 
 	useEffect(() => {

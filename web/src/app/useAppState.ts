@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../shared/api';
 import type { AppState, RuntimeContext, WorkspaceConfig } from '../lib/types';
-import { pathForRoute, routeFromLocation } from './router';
+import { pathForRoute, routeDescriptors, routeFromLocation } from './router';
 import type { Route } from './router';
+import { readStringPreference, removePreference, writePreference } from '../shared/preferences/store';
 
 const localRuntimeContext: RuntimeContext = {
   mode: 'local',
@@ -31,17 +32,29 @@ function normalizeRuntimeContext(state?: AppState): RuntimeContext {
   };
 }
 
+const unavailableRuntimeContext: RuntimeContext = {
+  mode: 'cloud', role: 'viewer', capabilities: {
+    read: false, write: false, workspace_registration: false, git: false, system: false,
+    terminal: false, ai: false, runtime: false, verification: false
+  }, agent: { available: false, status: 'offline' }
+};
+
+export type AppDataStatus = 'loading' | 'ready' | 'unavailable';
+
 export function useAppState() {
   const [route, setRoute] = useState<Route>(routeFromLocation);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => readStringPreference('theme') === 'dark' ? 'dark' : 'light');
   const [workspaces, setWorkspaces] = useState<WorkspaceConfig[]>([]);
-  const [runtimeContext, setRuntimeContext] = useState<RuntimeContext>(localRuntimeContext);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => localStorage.getItem('activeWorkspaceId') ?? '');
+  const [runtimeContext, setRuntimeContext] = useState<RuntimeContext>(unavailableRuntimeContext);
+  const [dataStatus, setDataStatus] = useState<AppDataStatus>('loading');
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => readStringPreference('activeWorkspaceId'));
   const [contentRefreshKey, setContentRefreshKey] = useState(0);
+  const generation = useRef(0);
+  const controller = useRef<AbortController | undefined>(undefined);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem('theme', theme);
+    writePreference('theme', theme);
   }, [theme]);
 
   useEffect(() => {
@@ -50,24 +63,46 @@ export function useAppState() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  const navigate = (next: Route) => {
+  useEffect(() => {
+    const descriptor = routeDescriptors[route.name];
+    document.title = descriptor.title;
+    const main = document.getElementById(descriptor.mainId);
+    main?.focus();
+  }, [route]);
+
+  const navigate = useCallback((next: Route) => {
     history.pushState(null, '', pathForRoute(next));
     setRoute(next);
-  };
+  }, []);
 
-  const refreshRuntimeContext = () => api.state().then((state) => setRuntimeContext(normalizeRuntimeContext(state))).catch(() => setRuntimeContext(localRuntimeContext));
-  const refreshWorkspaces = () => api.workspaces().then(setWorkspaces).catch(() => setWorkspaces([]));
-  const refreshAppData = async () => {
-    await Promise.all([refreshRuntimeContext(), refreshWorkspaces()]);
-    setContentRefreshKey((key) => key + 1);
-  };
-  const refreshAppStateOnly = async () => {
-    await Promise.all([refreshRuntimeContext(), refreshWorkspaces()]);
-  };
+  const refreshAppData = useCallback(async (advanceContent = true) => {
+    controller.current?.abort();
+    const active = new AbortController();
+    controller.current = active;
+    const requestGeneration = ++generation.current;
+    setDataStatus('loading');
+    try {
+      const [state, nextWorkspaces] = await Promise.all([api.state(active.signal), api.workspaces(active.signal)]);
+      if (active.signal.aborted || requestGeneration !== generation.current) return false;
+      setRuntimeContext(normalizeRuntimeContext(state));
+      setWorkspaces(nextWorkspaces);
+      setDataStatus('ready');
+      if (advanceContent) setContentRefreshKey((key) => key + 1);
+      return true;
+    } catch (error) {
+      if (active.signal.aborted || requestGeneration !== generation.current) return false;
+      // A failure must never masquerade as a trusted Local administrator session or an empty registry.
+      setRuntimeContext((current) => current.mode === 'local' ? current : unavailableRuntimeContext);
+      setDataStatus('unavailable');
+      return false;
+    }
+  }, []);
+  const refreshAppStateOnly = useCallback(async () => refreshAppData(false), [refreshAppData]);
 
   useEffect(() => {
     void refreshAppData();
-  }, []);
+    return () => controller.current?.abort();
+  }, [refreshAppData]);
 
   useEffect(() => {
     const refreshCheckoutContext = () => void refreshAppData();
@@ -80,24 +115,24 @@ export function useAppState() {
       window.removeEventListener('focus', refreshCheckoutContext);
       document.removeEventListener('visibilitychange', refreshVisibleCheckoutContext);
     };
-  }, []);
+  }, [refreshAppData]);
 
   useEffect(() => {
     if (workspaces.length === 0) {
       setActiveWorkspaceId('');
-      localStorage.removeItem('activeWorkspaceId');
+      removePreference('activeWorkspaceId');
       return;
     }
     if (!workspaces.some((repo) => repo.id === activeWorkspaceId)) {
       const nextId = workspaces[0].id;
       setActiveWorkspaceId(nextId);
-      localStorage.setItem('activeWorkspaceId', nextId);
+      writePreference('activeWorkspaceId', nextId);
     }
   }, [activeWorkspaceId, workspaces]);
 
   const selectWorkspace = (repo: WorkspaceConfig) => {
     setActiveWorkspaceId(repo.id);
-    localStorage.setItem('activeWorkspaceId', repo.id);
+    writePreference('activeWorkspaceId', repo.id);
     if (route.name === 'knowledge') {
       navigate({ name: 'knowledge', location: { workspaceId: repo.id, view: 'browse' } });
       return;
@@ -129,6 +164,7 @@ export function useAppState() {
     workspaces,
     activeRepo,
     runtimeContext,
+    dataStatus,
     contentRefreshKey,
     navigate,
     selectWorkspace,

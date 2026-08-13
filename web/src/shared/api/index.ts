@@ -112,6 +112,13 @@ export class ApiError extends Error {
 const inFlightRequests = new Map<string, Promise<unknown>>();
 const defaultLocalAPIOrigin = 'http://127.0.0.1:4317';
 const localAPIOriginStorageKey = 'kodeStreamApiOrigin';
+const maxJSONResponseBytes = 2 * 1024 * 1024;
+const maxSSEBufferBytes = 256 * 1024;
+const maxSSETotalBytes = 2 * 1024 * 1024;
+
+export class ApiResponseError extends Error {
+  constructor(message: string) { super(message); this.name = 'ApiResponseError'; }
+}
 
 export function isExtensionSurface(protocol = globalThis.location?.protocol): boolean {
   return protocol === 'chrome-extension:';
@@ -141,9 +148,9 @@ async function request<T>(path: string, options?: RequestInit, dedupe = options?
         ...(options?.headers ?? {})
       }
     });
-    const payload = await res.json().catch(() => ({}));
+    const payload = await readJSONResponse(res);
     if (!res.ok) {
-      throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog ?? payload.log, { code: payload.code, nodeIds: payload.nodeIds, details: payload.details, status: res.status });
+      throw new ApiError(stringField(payload, 'error') || stringField(payload, 'message') || `Request failed: ${res.status}`, stringField(payload, 'recoveryHint'), stringField(payload, 'operationLog') || stringField(payload, 'log'), { code: stringField(payload, 'code'), nodeIds: arrayField(payload, 'nodeIds'), details: recordField(payload, 'details'), status: res.status });
     }
     return payload as T;
   })();
@@ -153,6 +160,55 @@ async function request<T>(path: string, options?: RequestInit, dedupe = options?
     return await pending;
   } finally {
     if (key && inFlightRequests.get(key) === pending) inFlightRequests.delete(key);
+  }
+}
+
+function stringField(value: Record<string, unknown>, key: string): string | undefined { return typeof value[key] === 'string' ? value[key] : undefined; }
+function arrayField(value: Record<string, unknown>, key: string): string[] | undefined { return Array.isArray(value[key]) && value[key].every((entry) => typeof entry === 'string') ? value[key] as string[] : undefined; }
+function recordField(value: Record<string, unknown>, key: string): Record<string, string> | undefined {
+  const candidate = value[key];
+  return candidate && typeof candidate === 'object' && Object.values(candidate).every((entry) => typeof entry === 'string') ? candidate as Record<string, string> : undefined;
+}
+
+async function readJSONResponse(res: Response): Promise<Record<string, unknown>> {
+  // Lightweight test doubles and intentional legacy adapters may expose json()
+  // without a stream. Browser Responses always provide headers/body.
+  if (!res.body) {
+    const json = (res as unknown as { json?: () => Promise<unknown> }).json;
+    if (!json) return {};
+    const payload = await json();
+    return payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  }
+  const contentType = res.headers?.get?.('content-type')?.toLowerCase() ?? '';
+  if (res.status !== 204 && contentType && !contentType.includes('application/json') && !contentType.includes('+json')) {
+    throw new ApiResponseError('The server returned an unexpected response format.');
+  }
+  if (res.status === 204) return {};
+  const body = await readResponseText(res, maxJSONResponseBytes);
+  if (!body.trim()) return {};
+  try {
+    const payload: unknown = JSON.parse(body);
+    return payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  } catch {
+    throw new ApiResponseError('The server returned an invalid response.');
+  }
+}
+
+async function readResponseText(res: Response, limit: number): Promise<string> {
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let result = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) return result + decoder.decode();
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel();
+      throw new ApiResponseError('The server response is too large.');
+    }
+    result += decoder.decode(value, { stream: true });
   }
 }
 
@@ -203,7 +259,7 @@ export const api = {
       return false;
     }
   },
-  state: () => request<AppState>('/api/state'),
+  state: (signal?: AbortSignal) => request<AppState>('/api/state', { signal }, !signal),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   cloudAgents: async () => ((await request<CloudAgent[] | null>('/api/agents')) ?? []),
   createAgentConnectToken: (input: { name?: string; platform?: string } = {}) => request<AgentConnectToken>('/api/agents/connect-token', { method: 'POST', body: JSON.stringify(input) }),
@@ -227,7 +283,7 @@ export const api = {
     const suffix = query.size ? `?${query.toString()}` : '';
     return ((await request<AuditEvent[] | null>(`/api/audit-events${suffix}`)) ?? []).map(normalizeAuditEvent);
   },
-  workspaces: async () => ((await request<WorkspaceConfig[] | null>('/api/workspaces')) ?? []).map(normalizeWorkspace),
+  workspaces: async (signal?: AbortSignal) => ((await request<WorkspaceConfig[] | null>('/api/workspaces', { signal }, !signal)) ?? []).map(normalizeWorkspace),
 	previewWorkspaceImport: (sourcePath: string) => request<WorkspaceImportPreview>('/api/workspaces/import-preview', { method: 'POST', body: JSON.stringify({ sourcePath }) }).then(normalizeWorkspaceImportPreview),
 	importWorkspaces: (input: WorkspaceImportRequest) => request<WorkspaceImportResult[] | null>('/api/workspaces/import', { method: 'POST', body: JSON.stringify(input) }).then((results) => (Array.isArray(results) ? results : []).map(normalizeWorkspaceImportResult)),
   createWorkspace: async (input: WorkspaceInput) => {
@@ -243,29 +299,52 @@ export const api = {
       operationLog: ''
     };
   },
-  createWorkspaceStream: async (input: WorkspaceInput, onLog: (chunk: string) => void) => {
+  createWorkspaceStream: async (input: WorkspaceInput, onLog: (chunk: string) => void, signal?: AbortSignal) => {
     const res = await fetch(apiURL('/api/workspaces/stream-create'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input)
+      body: JSON.stringify(input), signal
     });
     if (!res.ok || !res.body) {
-      const payload = await res.json().catch(() => ({}));
-      throw new ApiError(payload.error ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog);
+      const payload: Record<string, unknown> = await readJSONResponse(res);
+      throw new ApiError(stringField(payload, 'error') || `Request failed: ${res.status}`, stringField(payload, 'recoveryHint'), stringField(payload, 'operationLog'));
+    }
+    const contentType = res.headers?.get?.('content-type')?.toLowerCase() ?? '';
+    if (!contentType.includes('text/event-stream')) {
+      await res.body.cancel();
+      throw new ApiResponseError('The server returned an unexpected workspace progress format.');
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let total = 0;
     let result: { workspace?: WorkspaceConfig; operationLog?: string } = {};
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
+			if (signal?.aborted) {
+				await reader.cancel();
+				throw new DOMException('The workspace registration was cancelled.', 'AbortError');
+			}
+      total += value.byteLength;
+      if (total > maxSSETotalBytes) {
+        await reader.cancel();
+        throw new ApiResponseError('Workspace progress response is too large.');
+      }
       buffer += decoder.decode(value, { stream: true });
+      if (buffer.length > maxSSEBufferBytes) {
+        await reader.cancel();
+        throw new ApiResponseError('Workspace progress response is too large.');
+      }
       const messages = buffer.split('\n\n');
       buffer = messages.pop() ?? '';
       for (const raw of messages) {
         const parsed = parseSSEMessage(raw);
         if (!parsed) continue;
+			if (signal?.aborted) {
+				await reader.cancel();
+				throw new DOMException('The workspace registration was cancelled.', 'AbortError');
+			}
         if (parsed.event === 'log' && typeof parsed.data?.chunk === 'string') {
           onLog(parsed.data.chunk);
         }

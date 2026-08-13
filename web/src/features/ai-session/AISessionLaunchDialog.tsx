@@ -1,5 +1,5 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bot, ChevronDown, ChevronRight, FolderTree, Globe2, Search, Ticket, X } from 'lucide-react';
 import { api } from '../../shared/api';
 import type {
@@ -16,6 +16,7 @@ import type {
 	E2ERunbook
 } from '../../lib/types';
 import { appendJiraDescriptionPrompt, removeJiraDescriptionPrompt } from './jiraPrompt';
+import { useModalDialog } from '../../components/overlay';
 
 type EmbeddedLaunchGuards = Pick<EmbeddedAISessionLaunchInput, 'expectedWorkspaceId' | 'expectedBranch' | 'observedCommit' | 'idempotencyKey'>;
 
@@ -43,8 +44,7 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 	const [loading, setLoading] = useState(true);
 	const [launching, setLaunching] = useState(false);
 	const [error, setError] = useState('');
-	const closeRef = useRef<HTMLButtonElement | null>(null);
-	const dialogRef = useRef<HTMLElement | null>(null);
+	const dialog = useModalDialog(onClose, !launching);
 
 	const providers = toolOptions(settings?.providers, capabilities, 'provider');
 	const terminals = toolOptions(settings?.terminals, capabilities, 'terminal');
@@ -133,22 +133,6 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 		return () => { active = false; controller.abort(); };
 	}, [includeJiraDescription, itemId, presetId, e2eMode]);
 
-	useEffect(() => {
-		closeRef.current?.focus();
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === 'Escape' && !launching) onClose();
-			if (event.key !== 'Tab' || !dialogRef.current) return;
-			const controls = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled])'));
-			if (controls.length === 0) return;
-			const first = controls[0];
-			const last = controls[controls.length - 1];
-			if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-			if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-		};
-		window.addEventListener('keydown', onKeyDown);
-		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [launching, onClose]);
-
 	const handlePresetChange = (nextPresetId: string) => {
 		const nextPreset = presets.find((preset) => preset.id === nextPresetId);
 		setPresetId(nextPresetId);
@@ -204,8 +188,8 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 
 	return (
 		<div className="modal-backdrop ai-launch-backdrop" role="presentation">
-			<section ref={dialogRef} className="modal-panel ai-launch-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-launch-title">
-				<header><div><h2 id="ai-launch-title"><Bot size={19} /> {e2eMode ? 'Run E2E test' : 'Open AI session'}</h2><span>{e2eMode ? `Runbook: ${e2eRunbook!.title}` : workspaceMode ? 'Start an interactive CLI at this workspace root.' : 'Start an interactive CLI with this workspace and item context.'}</span></div><button ref={closeRef} className="icon-button" type="button" aria-label="Close AI session dialog" disabled={launching} onClick={onClose}><X size={18} /></button></header>
+			<section ref={dialog.ref} className="modal-panel ai-launch-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-launch-title">
+				<header><div><h2 id="ai-launch-title"><Bot size={19} /> {e2eMode ? 'Run E2E test' : 'Open AI session'}</h2><span>{e2eMode ? `Runbook: ${e2eRunbook!.title}` : workspaceMode ? 'Start an interactive CLI at this workspace root.' : 'Start an interactive CLI with this workspace and item context.'}</span></div><button data-autofocus className="icon-button" type="button" aria-label="Close AI session dialog" disabled={launching} onClick={onClose}><X size={18} /></button></header>
 				{loading && <p role="status">Loading available tools...</p>}
 				{error && <p className="error" role="alert">{error}</p>}
 				{settings && eligibility && <div className="ai-launch-fields">

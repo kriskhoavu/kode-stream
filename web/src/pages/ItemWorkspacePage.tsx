@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MutableRefObject } from 'react';
+import type { CSSProperties, MutableRefObject, RefObject } from 'react';
 import {
   ArrowLeft,
   ChevronDown,
@@ -24,6 +24,8 @@ import {
   X,
 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useModalDialog } from '../components/overlay';
+import { readStringPreference, writePreference } from '../shared/preferences/store';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
@@ -117,6 +119,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [openTabs, setOpenTabs] = useState<OpenItemFileTab[]>([]);
   const [activeTabId, setActiveTabId] = useState('');
   const openTabsRef = useRef<OpenItemFileTab[]>([]);
+  const artifactDialog = useModalDialog(() => setArtifactPreview(null), true, Boolean(artifactPreview));
+  const specPickerDialog = useModalDialog(() => setSpecPickerOpen(false), true, specPickerOpen);
+  const createPathDialog = useModalDialog(() => { setCreatePathKind(null); setCreatePathName(''); }, !creatingPath, Boolean(createPathKind));
+  const renamePathDialog = useModalDialog(() => { setRenameOpen(false); setRenameName(''); }, !renamingPath, renameOpen);
 
   const showOperationError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -847,7 +853,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   };
 
   const artifactAbsolutePath = (artifact: { root?: string; path: string }) => {
-    const root = artifact.root === 'automation' ? verificationJob?.automationRepoPath : workspaceConfig?.path;
+    // Older job payloads do not carry the automation root. The workspace runtime
+    // configuration remains the authoritative compatible fallback for their locators.
+    const root = artifact.root === 'automation' ? verificationJob?.automationRepoPath || automationRepoPath : workspaceConfig?.path;
     if (!root || artifact.path.startsWith('/') || artifact.path.includes('..')) return '';
     return `${root.replace(/\/$/, '')}/${artifact.path}`;
   };
@@ -1020,7 +1028,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
         const open = event.currentTarget.open;
         setGitActivityOpen(open);
-        localStorage.setItem('item.details.gitActivityOpen', open ? '1' : '0');
+        writePreference('item.details.gitActivityOpen', open ? '1' : '0');
       }}>
         <summary>
           <span>Recent Activity</span>
@@ -1261,8 +1269,8 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       </div>
       )}
       {artifactPreview && (
-        <section className="modal-backdrop" role="presentation" onClick={() => setArtifactPreview(null)}>
-          <div className="modal-panel artifact-preview-modal" role="dialog" aria-modal="true" aria-label="Artifact preview" onClick={(event) => event.stopPropagation()}>
+        <section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setArtifactPreview(null); }}>
+          <div ref={artifactDialog.ref as RefObject<HTMLDivElement>} className="modal-panel artifact-preview-modal" role="dialog" aria-modal="true" aria-label="Artifact preview">
             <header>
               <div>
                 <h2>{artifactPreview.title}</h2>
@@ -1273,21 +1281,21 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
             {!artifactPreview.loading && artifactPreview.error && <p className="error">{artifactPreview.error}</p>}
             {!artifactPreview.loading && !artifactPreview.error && <pre className="artifact-preview-content">{artifactPreview.content || 'No text content available.'}</pre>}
             <div className="modal-actions">
-              <button className="secondary" type="button" onClick={() => void openArtifactPath({ root: 'workspace', path: artifactPreview.path })}>Open externally</button>
+              <button data-autofocus className="secondary" type="button" onClick={() => void openArtifactPath({ root: 'workspace', path: artifactPreview.path })}>Open externally</button>
               <button className="primary" type="button" onClick={() => setArtifactPreview(null)}>Close</button>
             </div>
           </div>
         </section>
       )}
       {specPickerOpen && (
-        <section className="modal-backdrop" role="presentation" onClick={() => setSpecPickerOpen(false)}>
-          <div className="modal-panel spec-picker-modal" role="dialog" aria-modal="true" aria-label="Browse automation specs" onClick={(event) => event.stopPropagation()}>
+        <section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSpecPickerOpen(false); }}>
+          <div ref={specPickerDialog.ref as RefObject<HTMLDivElement>} className="modal-panel spec-picker-modal" role="dialog" aria-modal="true" aria-label="Browse automation specs">
             <header>
               <div>
                 <h2>Browse automation specs</h2>
                 <span>{automationWorkspace?.name ?? 'Automation repository'} / {specPickerPath || 'root'}</span>
               </div>
-              <button className="icon-button" type="button" aria-label="Close spec browser" onClick={() => setSpecPickerOpen(false)}><X size={16} /></button>
+              <button data-autofocus className="icon-button" type="button" aria-label="Close spec browser" onClick={() => setSpecPickerOpen(false)}><X size={16} /></button>
             </header>
             {specPickerPath && (
               <button className="secondary spec-picker-up" type="button" onClick={() => setSpecPickerPath(parentPath(specPickerPath))}>Up one folder</button>
@@ -1316,12 +1324,12 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
         </section>
       )}
       {createPathKind && (
-        <div className="modal-backdrop" role="presentation">
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-label={`Create new ${createPathKind}`}>
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creatingPath) { setCreatePathKind(null); setCreatePathName(''); } }}>
+          <section ref={createPathDialog.ref} className="modal-panel" role="dialog" aria-modal="true" aria-label={`Create new ${createPathKind}`}>
             <header><h2>New {createPathKind === 'file' ? 'file' : 'folder'}</h2></header>
             <div className="metadata-form">
               <p>Parent: {selectedDirectoryPath || 'item root'}</p>
-              <label>Relative path<input autoFocus value={createPathName} onChange={(event) => setCreatePathName(event.target.value)} placeholder={createPathKind === 'file' ? 'schema.json' : 'api'} /></label>
+              <label>Relative path<input data-autofocus value={createPathName} onChange={(event) => setCreatePathName(event.target.value)} placeholder={createPathKind === 'file' ? 'schema.json' : 'api'} /></label>
             </div>
             <footer className="modal-actions">
               <button className="ghost" type="button" disabled={creatingPath} onClick={() => { setCreatePathKind(null); setCreatePathName(''); }}>Cancel</button>
@@ -1331,12 +1339,12 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
         </div>
       )}
       {renameOpen && selectedTreeNode && (
-        <div className="modal-backdrop" role="presentation">
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Rename path">
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !renamingPath) { setRenameOpen(false); setRenameName(''); } }}>
+          <section ref={renamePathDialog.ref} className="modal-panel" role="dialog" aria-modal="true" aria-label="Rename path">
             <header><h2>Rename {selectedTreeNode.type}</h2></header>
             <div className="metadata-form">
               <p>Current: {selectedTreeNode.path}</p>
-              <label>Name<input autoFocus value={renameName} onChange={(event) => setRenameName(event.target.value)} /></label>
+              <label>Name<input data-autofocus value={renameName} onChange={(event) => setRenameName(event.target.value)} /></label>
             </div>
             <footer className="modal-actions">
               <button className="ghost" type="button" disabled={renamingPath} onClick={() => { setRenameOpen(false); setRenameName(''); }}>Cancel</button>
@@ -1597,7 +1605,7 @@ function toWorkspaceRelativePath(workspacePath: string | undefined, absolutePath
 }
 
 function readStoredToggle(key: string): boolean {
-  return localStorage.getItem(key) === '1';
+  return readStringPreference(key) === '1';
 }
 
 function visibleItemWarnings(plan: ItemDetail | null): { itemPath?: string; message: string }[] {

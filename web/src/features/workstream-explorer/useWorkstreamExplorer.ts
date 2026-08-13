@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExplorerLocation } from './types';
 import { api } from '../../shared/api';
+import { readPreference, readStringPreference, writePreference } from '../../shared/preferences/store';
 import type { ExplorerTreeMode, WorkspaceConfig } from '../../lib/types';
 import { buildItemDecorations, directoryCacheKey, explorerNodeId, flattenVisibleTree } from './tree';
 import type { DirectoryCacheEntry, ExplorerSelection } from './types';
@@ -16,7 +17,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
     .map((workspace) => [workspace.id, workspace.name, workspace.baselineBranch, workspace.sources.join('|')].join(':'))
     .join('\u0000');
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() => readExpanded());
-  const [showIgnored, setShowIgnoredState] = useState(() => localStorage.getItem(ignoredStorageKey) === 'true');
+  const [showIgnored, setShowIgnoredState] = useState(() => readStringPreference(ignoredStorageKey) === 'true');
 	const [mode, setModeState] = useState<ExplorerTreeMode>(() => location?.mode ?? readMode());
   const [cache, setCache] = useState<Map<string, DirectoryCacheEntry>>(new Map());
   const [decorations, setDecorations] = useState(() => new Map());
@@ -80,7 +81,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
 
 	const setMode = useCallback((value: ExplorerTreeMode) => {
 		setModeState(value);
-		localStorage.setItem(modeStorageKey, value);
+		writePreference(modeStorageKey, value);
 		onLocationChange?.({ ...location, mode: value });
 	}, [location, onLocationChange]);
 
@@ -94,7 +95,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      localStorage.setItem(expandedStorageKey, JSON.stringify([...next]));
+      writePreference(expandedStorageKey, [...next]);
       return next;
     });
     if (!expandedNodeIds.has(id)) void loadDirectory(workspaceId, path);
@@ -102,7 +103,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
 
   const setShowIgnored = useCallback((value: boolean) => {
     setShowIgnoredState(value);
-    localStorage.setItem(ignoredStorageKey, String(value));
+    writePreference(ignoredStorageKey, String(value));
     setCache(new Map());
   }, []);
 
@@ -148,7 +149,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
     setExpandedNodeIds((current) => {
       const next = new Set(current);
       ancestors.forEach((ancestor) => next.add(explorerNodeId(workspaceId, ancestor)));
-      localStorage.setItem(expandedStorageKey, JSON.stringify([...next]));
+      writePreference(expandedStorageKey, [...next]);
       return next;
     });
     await Promise.all(ancestors.map((ancestor) => loadDirectory(workspaceId, ancestor)));
@@ -157,7 +158,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
 
   const collapseAll = useCallback(() => {
     setExpandedNodeIds(new Set());
-    localStorage.setItem(expandedStorageKey, '[]');
+    writePreference(expandedStorageKey, []);
   }, []);
 
   const collapsePath = useCallback((workspaceId: string, path = '') => {
@@ -165,7 +166,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
     const descendantPrefix = normalizedPath.endsWith(':') ? normalizedPath : `${normalizedPath}/`;
     setExpandedNodeIds((current) => {
       const next = new Set([...current].filter((id) => id !== normalizedPath && !id.startsWith(descendantPrefix)));
-      localStorage.setItem(expandedStorageKey, JSON.stringify([...next]));
+      writePreference(expandedStorageKey, [...next]);
       return next;
     });
   }, []);
@@ -191,7 +192,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
       const next = new Set(current);
       directoryPaths.forEach((path) => next.add(explorerNodeId(location.workspaceId!, path)));
       if (next.size === current.size) return current;
-      localStorage.setItem(expandedStorageKey, JSON.stringify([...next]));
+      writePreference(expandedStorageKey, [...next]);
       return next;
     });
     directoryPaths.forEach((path) => void loadDirectory(location.workspaceId!, path));
@@ -203,14 +204,9 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
 }
 
 function readMode(): ExplorerTreeMode {
-	return localStorage.getItem(modeStorageKey) === 'all' ? 'all' : 'sources';
+	return readStringPreference(modeStorageKey) === 'all' ? 'all' : 'sources';
 }
 
 function readExpanded(): Set<string> {
-  try {
-    const value = JSON.parse(localStorage.getItem(expandedStorageKey) ?? '[]');
-    return new Set(Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []);
-  } catch {
-    return new Set();
-  }
+  return new Set(readPreference<string[]>(expandedStorageKey, (value) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : undefined, []));
 }

@@ -3,11 +3,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../shared/api';
 import type { RecentItem, SearchResult } from '../lib/types';
 import { useGlobalSearch } from '../features/search/hooks';
+import { useModalDialog } from './overlay';
 
 export function SearchDialog({ workspaceId, onClose, onNavigate }: { workspaceId?: string; onClose: () => void; onNavigate: (route: string) => void }) {
   const [allWorkspaces, setAllWorkspaces] = useState(false);
   const [recents, setRecents] = useState<RecentItem[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dialog = useModalDialog(onClose);
   const search = useGlobalSearch({
     workspaceId,
     allWorkspaces,
@@ -25,11 +27,11 @@ export function SearchDialog({ workspaceId, onClose, onNavigate }: { workspaceId
   const groups = useMemo(() => groupResults(search.results), [search.results]);
   return (
     <div className="search-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="search-dialog" role="dialog" aria-modal="true" aria-label="Global search">
+      <section ref={dialog.ref} className="search-dialog" role="dialog" aria-modal="true" aria-label="Global search">
         <header>
           <label className="global-search-input">
             <Search size={18} />
-            <input ref={inputRef} value={search.query} onChange={(event) => search.setQuery(event.target.value)} onKeyDown={search.onKeyDown} placeholder="Search items across workspaces" />
+            <input data-autofocus ref={inputRef} value={search.query} onChange={(event) => search.setQuery(event.target.value)} onKeyDown={search.onKeyDown} placeholder="Search items across workspaces" />
           </label>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Close search"><X size={17} /></button>
         </header>

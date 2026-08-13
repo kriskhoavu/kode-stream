@@ -1,4 +1,4 @@
-import { type DragEvent, type Dispatch, type FormEvent, type ReactNode, type SetStateAction, useEffect, useRef, useState } from 'react';
+import { type DragEvent, type Dispatch, type FormEvent, type ReactNode, type RefObject, type SetStateAction, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, FolderOpen, HardDrive, Link2, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
@@ -9,10 +9,12 @@ import { applySegmentRole, lastPathSegment, normalizeDroppedPath, parseSources, 
 import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
+import { useModalDialog } from '../components/overlay';
 
 export { applySegmentRole, normalizeDroppedPath, parseSources, previewPathSegments };
 
 const DEFAULT_SOURCES = ['wiki', 'plans'];
+const maxRegistrationLogChars = 256 * 1024;
 const UNSORTED_SELECTION_ID = UNSORTED_SOURCE_SELECTION_ID;
 const emptyJiraConnection = (): JiraConnection => ({ deploymentType: 'cloud', baseUrl: '', projectKey: '', accountEmail: '', tokenEnvVar: 'JIRA_API_TOKEN' });
 const defaultRuntimeConfig = (): WorkspaceRuntimeConfig => ({
@@ -99,10 +101,13 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
   const [collapsedOverviewSections, setCollapsedOverviewSections] = useState<Record<OverviewSectionKey, boolean>>({ general: false, sources: false });
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 	const importStatusRef = useRef<HTMLDivElement | null>(null);
+  const registrationController = useRef<AbortController | null>(null);
+  const registrationDialog = useModalDialog(closeRegistration, true, registrationOpen);
 
   const selectedWorkspaces = workspaces.filter((workspace) => selectedWorkspaceIds.includes(workspace.id));
   const allSelected = workspaces.length > 0 && selectedWorkspaces.length === workspaces.length;
-  const busy = pendingOperations.length > 0;
+const busy = pendingOperations.length > 0;
+	const sourceStructureDialog = useModalDialog(() => setSettingsEditor(null), !busy, Boolean(settingsEditor));
   const cloudMode = runtimeContext.mode === 'cloud';
   const registrationLocationReady = registrationMode === 'local_path' ? Boolean(path.trim()) : registrationMode === 'remote_clone' ? Boolean(remoteUrl.trim()) : Boolean(importSourcePath.trim());
   const operationBusy = (operation: string) => pendingOperations.includes(operation);
@@ -138,6 +143,8 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
     };
   }, []);
 
+  useEffect(() => () => registrationController.current?.abort(), []);
+
 	useEffect(() => {
 		if (importState === 'reviewing' || importState === 'complete') importStatusRef.current?.focus();
 	}, [importState]);
@@ -156,9 +163,9 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
       const input = buildWorkspaceInput({ name, registrationMode, path, remoteUrl, cloneRoot, baselineBranch, sources, jira });
       const result = registrationMode === 'remote_clone'
         ? await api.createWorkspaceStream(input, (chunk) => {
-          setRegistrationLog((current) => `${current}${chunk}`);
+          setRegistrationLog((current) => `${current}${chunk}`.slice(-maxRegistrationLogChars));
           setRegistrationLogOpen(true);
-        })
+        }, (registrationController.current = new AbortController()).signal)
         : await api.createWorkspace(input);
       setNotice({ tone: 'success', title: 'Workspace registered', details: [name || 'New workspace'] });
       if (result.operationLog.trim()) {
@@ -185,6 +192,7 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
         setRegistrationLogOpen(true);
       }
     } finally {
+      registrationController.current = null;
       setBusy(false);
     }
   };
@@ -277,9 +285,15 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
     setActiveDetailTab(tab);
   };
 
-  const closeRegistration = () => {
+  function closeRegistration() {
+	if (busy) {
+		registrationController.current?.abort();
+		setRegistrationOpen(false);
+		return;
+	}
 	const dirty = Boolean(name.trim() || path.trim() || remoteUrl.trim() || importSourcePath.trim() || sources.trim() || jira);
     if (dirty && !window.confirm('Discard this workspace registration draft?')) return;
+    registrationController.current?.abort();
     setName('');
     setRegistrationMode('local_path');
     setPath('');
@@ -292,7 +306,7 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
     setRegistrationNameEdited(false);
 	resetWorkspaceImport();
     setRegistrationOpen(false);
-  };
+  }
 
   const advanceRegistration = (event: FormEvent) => {
     event.preventDefault();
@@ -776,8 +790,8 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
         </div>
       </div>
 
-      {registrationOpen && <section className="modal-backdrop" role="presentation">
-        <div className="modal-panel workspace-registration-modal" role="dialog" aria-modal="true" aria-labelledby="add-workspace-title">
+      {registrationOpen && <section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closeRegistration(); }}>
+        <div ref={registrationDialog.ref as RefObject<HTMLDivElement>} className="modal-panel workspace-registration-modal" role="dialog" aria-modal="true" aria-labelledby="add-workspace-title">
           <header>
             <div><h2 id="add-workspace-title">Add workspace</h2><span>Register, clone, or import existing workspace definitions.</span></div>
             <button className="icon-button" type="button" onClick={closeRegistration} aria-label="Close add workspace"><X size={16} /></button>
@@ -885,14 +899,14 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
         />
       )}
       {settingsEditor && (
-        <section className="modal-backdrop" role="presentation">
-          <div className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
+        <section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setSettingsEditor(null); }}>
+          <div ref={sourceStructureDialog.ref as RefObject<HTMLDivElement>} className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
             <header>
               <div>
                 <h2>{labels.sourceStructure}</h2>
                 <span>{settingsEditor.repo.name} / {settingsEditor.directory}</span>
               </div>
-              <button className="icon-button" type="button" onClick={() => setSettingsEditor(null)} disabled={busy} aria-label="Close source items">
+              <button data-autofocus className="icon-button" type="button" onClick={() => setSettingsEditor(null)} disabled={busy} aria-label="Close source items">
                 <X size={16} />
               </button>
             </header>

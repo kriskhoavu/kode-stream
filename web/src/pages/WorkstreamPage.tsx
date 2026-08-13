@@ -1,7 +1,9 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, SetStateAction } from 'react';
+import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
 import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
+import { useModalDialog } from '../components/overlay';
+import { readStringPreference, writePreference } from '../shared/preferences/store';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
@@ -115,6 +117,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [sourceItemsDirectory, setSourceItemsDirectory] = useState('');
   const [sourceItemsError, setSourceItemsError] = useState('');
   const [sourceItemsEditor, setSourceItemsEditor] = useState<SourceItemsEditorState | null>(null);
+	const sourceItemsDialog = useModalDialog(() => setSourceItemsOpen(false), !sourceItemsSaving, sourceItemsOpen);
+	const newItemDialog = useModalDialog(() => closeNewPlan(), !creatingPlan, newPlanOpen);
   const suppressPreviewRef = useRef<{ itemId: string; until: number } | null>(null);
   const appliedFocusRef = useRef('');
 	// Every asynchronous board workflow is scoped to this generation. A route
@@ -732,14 +736,14 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         />
       )}
       {sourceItemsOpen && workspace && (
-        <div className="modal-backdrop" role="presentation">
-          <div className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !sourceItemsSaving) setSourceItemsOpen(false); }}>
+          <div ref={sourceItemsDialog.ref as RefObject<HTMLDivElement>} className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
             <header>
               <div>
                 <h2>{labels.sourceStructure}</h2>
                 <span>{workspace.name} / {sourceItemsDirectory || workspace.sources[0]}</span>
               </div>
-              <button className="icon-button" type="button" onClick={() => setSourceItemsOpen(false)} disabled={sourceItemsSaving} aria-label="Close source items">
+              <button data-autofocus className="icon-button" type="button" onClick={() => setSourceItemsOpen(false)} disabled={sourceItemsSaving} aria-label="Close source items">
                 <X size={16} />
               </button>
             </header>
@@ -802,11 +806,11 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         </div>
       )}
       {newPlanOpen && workspace && (
-        <div className="modal-backdrop" role="presentation">
-          <section className={newPlanDraft.origin === 'jira' ? 'modal-panel new-work-item-modal jira-mode' : 'modal-panel new-work-item-modal'} role="dialog" aria-modal="true" aria-label="Create new work item">
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creatingPlan) closeNewPlan(); }}>
+          <section ref={newItemDialog.ref} className={newPlanDraft.origin === 'jira' ? 'modal-panel new-work-item-modal jira-mode' : 'modal-panel new-work-item-modal'} role="dialog" aria-modal="true" aria-label="Create new work item">
             <header>
               <h2>New Work Item</h2>
-              <button type="button" className="icon-button" onClick={() => {
+				<button data-autofocus type="button" className="icon-button" onClick={() => {
 				closeNewPlan();
               }}><X size={16} /></button>
             </header>
@@ -1948,7 +1952,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                   <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
                     const open = event.currentTarget.open;
                     setGitActivityOpen(open);
-                    localStorage.setItem('workstream.drawer.gitActivityOpen', open ? '1' : '0');
+                    writePreference('workstream.drawer.gitActivityOpen', open ? '1' : '0');
                   }}>
                     <summary>
                       <span>Recent Activity</span>
@@ -2048,5 +2052,5 @@ function unique(values: string[]): string[] {
 }
 
 function readStoredToggle(key: string): boolean {
-  return localStorage.getItem(key) === '1';
+  return readStringPreference(key) === '1';
 }

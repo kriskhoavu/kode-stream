@@ -26,7 +26,7 @@ export const ContentViewer = memo(function ContentViewer({ file, content, compac
   return (
     <section className={`content-viewer ${compact ? 'compact' : ''}`} data-file-kind={file.kind}>
       <ViewerToolbar modes={adapter.modes} mode={mode} onChange={setMode} />
-      <ViewerErrorBoundary key={`${file.id}:${mode}`}>
+      <ViewerErrorBoundary resetKey={`${file.id}:${file.path}:${mode}:${content.length}`}>
         <Suspense fallback={<div className="viewer-loading">Loading preview...</div>}>
           {file.kind === 'unsupported' ? (
             <div className="viewer-empty">

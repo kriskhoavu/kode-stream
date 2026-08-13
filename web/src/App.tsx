@@ -4,6 +4,7 @@ import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
 export { routeFromLocation } from './app/router';
+import { routeFromPath } from './app/router';
 import { WorkstreamPage } from './pages/WorkstreamPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
@@ -14,6 +15,7 @@ import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';
 import { useAppSettings } from './features/settings/appSettings';
 import { EmbeddedTerminalDock } from './features/ai-session/EmbeddedTerminalDock';
+import { readStringPreference, writePreference } from './shared/preferences/store';
 
 const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((module) => ({ default: module.KnowledgePage })));
 const CanvasPage = lazy(() => import('./pages/CanvasPage').then((module) => ({ default: module.CanvasPage })));
@@ -28,6 +30,7 @@ export function App() {
     workspaces,
     activeRepo,
     runtimeContext,
+    dataStatus,
     contentRefreshKey,
     navigate,
     selectWorkspace: selectWorkspaceState,
@@ -36,7 +39,7 @@ export function App() {
     lastSync
   } = useAppState();
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
-  const [leftNavCollapsed, setLeftNavCollapsed] = useState(() => localStorage.getItem('leftNavCollapsed') === 'true');
+  const [leftNavCollapsed, setLeftNavCollapsed] = useState(() => readStringPreference('leftNavCollapsed') === 'true');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [localAPIStatus, setLocalAPIStatus] = useState<'ready' | 'checking' | 'unavailable'>(extensionSurface ? 'checking' : 'ready');
@@ -45,7 +48,7 @@ export function App() {
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const cloudUserLabel = runtimeContext.user?.name || runtimeContext.user?.email || runtimeContext.user?.id || 'Cloud user';
-  const modeLabel = runtimeContext.mode === 'cloud' ? `Cloud · ${runtimeContext.role ?? 'viewer'} · ${runtimeContext.agent.status}` : 'Local';
+  const modeLabel = dataStatus === 'unavailable' ? 'Runtime unavailable' : runtimeContext.mode === 'cloud' ? `Cloud · ${runtimeContext.role ?? 'viewer'} · ${runtimeContext.agent.status}` : 'Local';
 
   useEffect(() => {
     if (!workspaceMenuOpen && !profileMenuOpen) return;
@@ -79,7 +82,7 @@ export function App() {
 
   const toggleLeftNav = () => setLeftNavCollapsed((collapsed) => {
     const next = !collapsed;
-    localStorage.setItem('leftNavCollapsed', String(next));
+    writePreference('leftNavCollapsed', String(next));
     return next;
   });
 
@@ -144,7 +147,12 @@ export function App() {
 
       <header className="topbar">
         <div className="workspace-switcher" ref={workspaceMenuRef}>
-          <button className="workspace-title" type="button" onClick={() => setWorkspaceMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={workspaceMenuOpen}>
+          <button className="workspace-title" type="button" onClick={() => {
+            setProfileMenuOpen(false);
+            setActivityOpen(false);
+            quickSwitcher.close();
+            setWorkspaceMenuOpen((open) => !open);
+          }} aria-haspopup="menu" aria-expanded={workspaceMenuOpen}>
             <WorkstreamIcon size={16} />
             <span>{activeRepo?.name ?? 'No workspace selected'}</span>
             <ChevronDown className={workspaceMenuOpen ? 'workspace-title-chevron open' : 'workspace-title-chevron'} size={15} />
@@ -185,11 +193,21 @@ export function App() {
           )}
         </div>
         <div className="topbar-actions">
-          <button className="search-trigger" type="button" onClick={() => quickSwitcher.setOpen(true)} aria-label="Search">
+          <button className="search-trigger" type="button" onClick={() => {
+            setWorkspaceMenuOpen(false);
+            setProfileMenuOpen(false);
+            setActivityOpen(false);
+            quickSwitcher.setOpen(true);
+          }} aria-label="Search">
             <Search size={16} /><span>Search</span>
           </button>
           <span className="runtime-mode-label">{modeLabel}</span>
-          <button className="icon-button topbar-icon" type="button" aria-label="Recent activity" aria-expanded={activityOpen} onClick={() => setActivityOpen((open) => !open)}>
+          <button className="icon-button topbar-icon" type="button" aria-label="Recent activity" aria-expanded={activityOpen} onClick={() => {
+            setWorkspaceMenuOpen(false);
+            setProfileMenuOpen(false);
+            quickSwitcher.close();
+            setActivityOpen((open) => !open);
+          }}>
             <Bell size={17} />
           </button>
           <button className="icon-button topbar-icon" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Toggle theme">
@@ -204,6 +222,8 @@ export function App() {
               aria-expanded={profileMenuOpen}
               onClick={() => {
                 setWorkspaceMenuOpen(false);
+                setActivityOpen(false);
+                quickSwitcher.close();
                 setProfileMenuOpen((open) => !open);
               }}
             >
@@ -246,12 +266,11 @@ export function App() {
       </header>
 
       {activityOpen && <ActivityPanel workspaceId={activeRepo?.id} onClose={() => setActivityOpen(false)} />}
-      {quickSwitcher.open && <SearchDialog workspaceId={activeRepo?.id} onClose={quickSwitcher.close} onNavigate={(path) => {
-        history.pushState(null, '', path);
-        window.dispatchEvent(new PopStateEvent('popstate'));
-      }} />}
+      {quickSwitcher.open && <SearchDialog workspaceId={activeRepo?.id} onClose={quickSwitcher.close} onNavigate={(path) => navigate(routeFromNavigationPath(path))} />}
 
-      <main className="main-content">
+      <main id="app-main" className="main-content" tabIndex={-1}>
+        <div className="sr-only" aria-live="polite">{dataStatus === 'unavailable' ? 'Application data is unavailable. Retry to continue.' : `Navigated to ${route.name}`}</div>
+        {dataStatus === 'unavailable' && <section className="empty-state" role="alert"><p>Application data is unavailable. Your existing workspace view is retained.</p><button type="button" className="primary" onClick={() => void refreshAppData()}>Retry</button></section>}
         {route.name === 'workstream' && (
           <WorkstreamPage
             workspace={activeRepo}
@@ -259,13 +278,13 @@ export function App() {
             visibleStatuses={appSettings.visibleWorkstreamStatuses}
             focusedItemId={route.focusedItemId}
             onOpenPlan={(itemId) => navigate({ name: 'item', itemId })}
-            onWorkspacesChanged={() => refreshAppData()}
+            onWorkspacesChanged={async () => { await refreshAppData(); }}
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
             onOpenReview={() => navigate({ name: 'review', location: { workspaceId: activeRepo?.id } })}
           />
         )}
-        {route.name === 'item' && <ItemWorkspacePage key={route.itemId} itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} allowEmbeddedAISessions={!extensionSurface} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={() => refreshAppStateOnly()} />}
-        {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={() => refreshAppData()} />}
+        {route.name === 'item' && <ItemWorkspacePage key={route.itemId} itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} allowEmbeddedAISessions={!extensionSurface} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={async () => { await refreshAppStateOnly(); }} />}
+        {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={async () => { await refreshAppData(); }} />}
         {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} activeWorkspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
 		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Canvas...</section>}><CanvasPage workspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
@@ -277,6 +296,7 @@ export function App() {
           onImported={(itemId) => { void refreshAppData(); navigate({ name: 'item', itemId }); }}
           onCheckoutSwitched={async () => { await refreshAppData(); navigate({ name: 'workstream' }); }}
         /></Suspense>}
+        {route.name === 'not-found' && <section className="empty-state" role="alert"><h1>Page not found</h1><p>This link is not a Kode Stream route.</p><button type="button" className="primary" onClick={() => navigate({ name: 'workstream' })}>Go to Workstream</button></section>}
       </main>
 
       <nav className="bottom-nav">
@@ -289,6 +309,11 @@ export function App() {
 		{!extensionSurface && <EmbeddedTerminalDock workspaces={workspaces} />}
     </div>
   );
+}
+
+function routeFromNavigationPath(path: string) {
+  const url = new URL(path, window.location.origin);
+  return routeFromPath(url.pathname, url.search);
 }
 
 export function LocalServerUnavailable({ status, apiOrigin, onRetry }: { status: 'checking' | 'unavailable'; apiOrigin: string; onRetry: () => void }) {

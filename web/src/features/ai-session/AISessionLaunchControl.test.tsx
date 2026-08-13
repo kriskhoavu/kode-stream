@@ -21,7 +21,7 @@ describe('AISessionLaunchControl', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open AI session' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save test choice' }));
-		expect(JSON.parse(localStorage.getItem('aiSession.lastLaunch') ?? 'null')).toEqual({ provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only', surface: 'external' });
+  expect(JSON.parse(localStorage.getItem('kodeStream.aiSession.lastLaunch') ?? 'null')).toEqual({ provider: 'codex', terminal: 'iterm2', contextMode: 'workspace_only', surface: 'external' });
     expect(screen.getByRole('button', { name: /using saved choice: Codex · iTerm2 · workspace only/i })).toHaveAttribute('title', 'Saved choice: Codex · iTerm2 · workspace only');
     fireEvent.click(screen.getByRole('button', { name: /using saved choice/i }));
 
@@ -59,4 +59,12 @@ describe('AISessionLaunchControl', () => {
     expect(screen.getByRole('button', { name: 'Save test choice' })).toBeInTheDocument();
     expect(api.startEmbeddedAISession).not.toHaveBeenCalled();
   });
+
+	it('continues to open configuration when preference storage throws', () => {
+		vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => { throw new Error('blocked'); } });
+		render(<AISessionLaunchControl itemId="item-1" onLaunched={vi.fn()} onError={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Open AI session' }));
+		expect(screen.getByRole('button', { name: 'Save test choice' })).toBeInTheDocument();
+		vi.unstubAllGlobals();
+	});
 });

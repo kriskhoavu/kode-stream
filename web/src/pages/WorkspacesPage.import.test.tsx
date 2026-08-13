@@ -25,6 +25,25 @@ describe('existing workspace import state', () => {
 		expect(await screen.findByRole('link', { name: 'Open deep link again' })).toHaveAttribute('href', 'kodestream://connect?token=token');
 	});
 
+	it('cancels a remote registration stream when the dialog closes', async () => {
+		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
+		let signal: AbortSignal | undefined;
+		vi.spyOn(api, 'createWorkspaceStream').mockImplementation((_input, _onLog, nextSignal) => {
+			signal = nextSignal;
+			return new Promise(() => undefined);
+		});
+		render(<WorkspacesPage workspaces={[]} onChanged={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Add workspace' }));
+		fireEvent.click(screen.getByRole('radio', { name: 'Remote Git URL' }));
+		fireEvent.change(screen.getByPlaceholderText('git@bitbucket.org:team/repo.git'), { target: { value: 'git@example.com:team/repo.git' } });
+		fireEvent.click(screen.getByRole('button', { name: /Next: Jira/ }));
+		fireEvent.click(screen.getByRole('button', { name: /Register workspace/ }));
+		await waitFor(() => expect(signal).toBeDefined());
+		fireEvent.click(screen.getByRole('button', { name: 'Close add workspace' }));
+		expect(signal?.aborted).toBe(true);
+		expect(screen.queryByRole('dialog', { name: /Add workspace/ })).not.toBeInTheDocument();
+	});
+
 	it('renders Cloud Agent workspace metadata without direct path reveal', () => {
 		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
 		render(<WorkspacesPage workspaces={[{ id: 'cloud', name: 'Cloud Repo', path: '', location: 'cloud_agent', localRootLabel: '.../repo', remoteUrl: 'git@example.com:repo.git', agentId: 'agent-1', scanStatus: 'published', baselineBranch: 'main', sources: ['plans'], createdAt: '' }]} runtimeContext={{ mode: 'cloud', role: 'editor', capabilities: { read: true, write: true, workspace_registration: true, git: true, system: false, terminal: true, ai: true, runtime: true, verification: true }, agent: { available: true, status: 'connected' } }} onChanged={vi.fn()} />);

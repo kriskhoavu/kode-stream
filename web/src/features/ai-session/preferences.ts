@@ -1,10 +1,11 @@
 import type { AISessionLaunchInput } from '../../lib/types';
+import { readPreference, writePreference } from '../../shared/preferences/store';
 
 const storageKey = 'aiSession.lastLaunch';
 
 export function readAISessionPreference(): AISessionLaunchInput | null {
   try {
-    const value = JSON.parse(localStorage.getItem(storageKey) ?? 'null') as Partial<AISessionLaunchInput> | null;
+    const value = readPreference<Partial<AISessionLaunchInput> | null>(storageKey, (input) => input && typeof input === 'object' ? input as Partial<AISessionLaunchInput> : null, null);
     if (!value || typeof value.provider !== 'string' || !value.provider || typeof value.terminal !== 'string' || !value.terminal) return null;
     if (value.contextMode !== 'workspace_only' && value.contextMode !== 'card_context') return null;
 		if (value.surface !== undefined && value.surface !== 'external' && value.surface !== 'embedded') return null;
@@ -24,5 +25,5 @@ export function readAISessionPreference(): AISessionLaunchInput | null {
 }
 
 export function saveAISessionPreference(value: AISessionLaunchInput) {
-  localStorage.setItem(storageKey, JSON.stringify(value));
+  writePreference(storageKey, value);
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { statusOrder } from '../../shared/api';
 import type { ItemStatus } from '../../lib/types';
+import { readPreference, writePreference } from '../../shared/preferences/store';
 
 const storageKey = 'planManager.appSettings';
 
@@ -16,7 +17,7 @@ export function useAppSettings(): [AppSettings, (settings: AppSettings) => void]
   const [settings, setSettingsState] = useState(loadAppSettings);
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(settings));
+    writePreference(storageKey, settings);
   }, [settings]);
 
   const setSettings = (next: AppSettings) => setSettingsState(normalizeAppSettings(next));
@@ -26,7 +27,7 @@ export function useAppSettings(): [AppSettings, (settings: AppSettings) => void]
 
 export function loadAppSettings(): AppSettings {
   try {
-    return normalizeAppSettings(JSON.parse(localStorage.getItem(storageKey) ?? '{}') as Partial<AppSettings>);
+    return readPreference(storageKey, (value) => normalizeAppSettings(value as Partial<AppSettings>), defaultAppSettings);
   } catch {
     return defaultAppSettings;
   }

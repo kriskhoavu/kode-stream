@@ -33,6 +33,14 @@ describe('WorkstreamExplorer', () => {
 		apiMock.searchWorkspaceContent.mockResolvedValue({ results: [], truncated: false, filesVisited: 0, bytesRead: 0, skippedFiles: 0 });
   });
 
+	it('continues rendering when Explorer preferences cannot be read or written', async () => {
+		const brokenStorage = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => { throw new Error('blocked'); } };
+		vi.stubGlobal('localStorage', brokenStorage);
+		render(<WorkstreamExplorer workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} />);
+		expect(await screen.findByRole('tree', { name: 'Workspace files' })).toBeInTheDocument();
+		vi.unstubAllGlobals();
+	});
+
   it('loads one directory when a workspace root expands', async () => {
 		const { container } = render(<WorkstreamExplorer workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} />);
     fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canvasLocationFromSearch, canvasPath, knowledgeLocationFromSearch, knowledgePath, pathForRoute, reviewLocationFromSearch, reviewPath, routeFromLocation } from './router';
+import { canvasLocationFromSearch, canvasPath, knowledgeLocationFromSearch, knowledgePath, pathForRoute, reviewLocationFromSearch, reviewPath, routeDescriptors, routeFromLocation } from './router';
 
 describe('router', () => {
   it('parses item workspace routes', () => {
@@ -41,18 +41,29 @@ describe('router', () => {
     expect(reviewPath()).toBe('/review');
   });
 
-  it('falls removed top-level list routes back to Workstream', () => {
+  it('keeps valid legacy top-level routes and presents unknown paths as accessible not-found routes', () => {
     window.history.pushState(null, '', '/items');
-    expect(routeFromLocation()).toEqual({ name: 'workstream' });
+    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/items' });
     window.history.pushState(null, '', '/branches');
-    expect(routeFromLocation()).toEqual({ name: 'workstream' });
+    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/branches' });
     window.history.pushState(null, '', '/workstream?itemId=item-1');
     expect(routeFromLocation()).toEqual({ name: 'workstream', focusedItemId: 'item-1' });
     window.history.pushState(null, '', '/kanban?itemId=item-1');
-    expect(routeFromLocation()).toEqual({ name: 'workstream' });
+    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/kanban' });
     window.history.pushState(null, '', '/explorer?workspaceId=ws-1&path=docs%2Fguide.md');
-    expect(routeFromLocation()).toEqual({ name: 'workstream' });
+    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/explorer' });
     window.history.pushState(null, '', '/settings');
     expect(routeFromLocation()).toEqual({ name: 'settings' });
+  });
+
+  it('matches route segments exactly', () => {
+    window.history.pushState(null, '', '/workspaces-anything');
+    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/workspaces-anything' });
+    window.history.pushState(null, '', '/settings-extra');
+    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/settings-extra' });
+  });
+
+  it('declares an accessible title and focus target for every route', () => {
+    expect(Object.values(routeDescriptors).every((descriptor) => descriptor.title.includes('Kode Stream') && descriptor.mainId === 'app-main')).toBe(true);
   });
 });

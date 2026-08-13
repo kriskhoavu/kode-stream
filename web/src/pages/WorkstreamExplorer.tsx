@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
 import {
   ChevronDown, ChevronRight, Clipboard, Code2, Eye, File, Folder, FolderGit2, GitCompare,
   FilePlus2, FolderPlus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, X
 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useModalDialog } from '../components/overlay';
+import { readStringPreference, writePreference } from '../shared/preferences/store';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
@@ -61,8 +63,8 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   const [reverting, setReverting] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [leftWidth, setLeftWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.leftWidth'), 400, boundedLeftPanelWidth));
-  const [rightWidth, setRightWidth] = useState(() => boundedNumber(localStorage.getItem('workstreamExplorer.rightWidth'), 300, boundedRightPanelWidth));
+  const [leftWidth, setLeftWidth] = useState(() => boundedNumber(readStringPreference('workstreamExplorer.leftWidth'), 400, boundedLeftPanelWidth));
+  const [rightWidth, setRightWidth] = useState(() => boundedNumber(readStringPreference('workstreamExplorer.rightWidth'), 300, boundedRightPanelWidth));
   const [openTabs, setOpenTabs] = useState<OpenWorkspaceFileTab[]>([]);
   const [activeTabKey, setActiveTabKey] = useState('');
   const [searchIndex, setSearchIndex] = useState(0);
@@ -340,7 +342,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
-      localStorage.setItem(side === 'left' ? 'workstreamExplorer.leftWidth' : 'workstreamExplorer.rightWidth', String(latest));
+      writePreference(side === 'left' ? 'workstreamExplorer.leftWidth' : 'workstreamExplorer.rightWidth', String(latest));
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up, { once: true });
@@ -490,10 +492,11 @@ function ExplorerUnifiedSearchResults({ query, results, loading, error, activeIn
 function ExplorerPathDialog({ dialog, busy, error, onCancel, onSubmit }: { dialog: PathDialog; busy: boolean; error: string; onCancel: () => void; onSubmit: (name: string) => Promise<boolean> }) {
   const [name, setName] = useState(dialog.initialName ?? '');
   const title = dialog.kind === 'file' ? 'Create file' : dialog.kind === 'directory' ? 'Create directory' : 'Rename path';
-  return <div className="dialog-backdrop" role="presentation"><section className="explorer-path-dialog" role="dialog" aria-modal="true" aria-labelledby="explorer-path-dialog-title">
+  const modal = useModalDialog(onCancel, !busy);
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}><section ref={modal.ref as RefObject<HTMLElement>} className="explorer-path-dialog" role="dialog" aria-modal="true" aria-labelledby="explorer-path-dialog-title">
     <header><h2 id="explorer-path-dialog-title">{title}</h2><button className="icon-button" onClick={onCancel} aria-label="Close"><X size={16} /></button></header>
     <p>Parent: {dialog.parentPath || 'workspace root'}</p>
-    <label>Name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && name.trim()) void onSubmit(name.trim()); }} /></label>
+    <label>Name<input data-autofocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && name.trim()) void onSubmit(name.trim()); }} /></label>
     {error && <p className="error">{error}</p>}
     <footer><button className="ghost" disabled={busy} onClick={onCancel}>Cancel</button><button className="primary" disabled={busy || !name.trim()} onClick={() => void onSubmit(name.trim())}>{busy ? 'Saving...' : dialog.kind === 'rename' ? 'Rename' : 'Create'}</button></footer>
   </section></div>;
@@ -559,7 +562,7 @@ function ExplorerInspector({ workspace, row, file }: { workspace?: WorkspaceConf
       <details className="recent-activity-panel" open={activityOpen} onToggle={(event) => {
         const open = event.currentTarget.open;
         setActivityOpen(open);
-        localStorage.setItem('explorer.inspector.gitActivityOpen', open ? '1' : '0');
+        writePreference('explorer.inspector.gitActivityOpen', open ? '1' : '0');
       }}>
         <summary>
           <span>Recent Activity</span>
@@ -615,5 +618,5 @@ function restrictRowsToRoot(rows: VisibleExplorerRow[], workspaceId: string | un
 }
 
 function readStoredToggle(key: string): boolean {
-  return localStorage.getItem(key) === '1';
+  return readStringPreference(key) === '1';
 }

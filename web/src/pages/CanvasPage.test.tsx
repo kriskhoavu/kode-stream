@@ -9,6 +9,15 @@ vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, o
 vi.mock('../features/canvas/CanvasWorkbench', () => ({ CanvasWorkbench: ({ selectedNode, onClose }: { selectedNode?: unknown; onClose: () => void }) => selectedNode ? <aside aria-label="Canvas Workbench"><button type="button" onClick={onClose}>Close Workbench</button></aside> : null }));
 
 describe('CanvasPage', () => {
+	it('continues rendering when browser preference storage is unavailable', async () => {
+		const brokenStorage = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => { throw new Error('blocked'); } };
+		vi.stubGlobal('localStorage', brokenStorage);
+		canvasState.projection = projection();
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		expect(await screen.findByLabelText('Workspace Canvas')).toBeInTheDocument();
+		vi.unstubAllGlobals();
+	});
+
 	it('returns keyboard focus to the selected node after closing the Workbench', async () => {
 		canvasState.projection = projection();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);

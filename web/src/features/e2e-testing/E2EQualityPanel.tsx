@@ -4,6 +4,7 @@ import type { E2ERunbook, FileContent } from '../../lib/types';
 import { api } from '../../shared/api';
 import { ContentViewer } from '../content-viewer/ContentViewer';
 import { AISessionLaunchDialog } from '../ai-session/AISessionLaunchDialog';
+import { useModalDialog } from '../../components/overlay';
 
 type EvidencePreview = {
 	path: string;
@@ -27,6 +28,7 @@ export function E2EQualityPanel({
 }) {
 	const [selected, setSelected] = useState<E2ERunbook | null>(null);
 	const [evidencePreview, setEvidencePreview] = useState<EvidencePreview | null>(null);
+	const evidenceDialog = useModalDialog(() => setEvidencePreview(null), true, Boolean(evidencePreview));
 	const [query, setQuery] = useState('');
 	const [openSources, setOpenSources] = useState<Set<string>>(() => new Set(['plan']));
 	const groups = useMemo(() => {
@@ -96,10 +98,10 @@ export function E2EQualityPanel({
 					})}
 			</>}
 		{onRefresh && <button className="secondary" type="button" onClick={onRefresh}><RefreshCw size={14} /> Refresh E2E results</button>}
-		{evidencePreview && <section className="e2e-evidence-preview" role="dialog" aria-modal="true" aria-labelledby="e2e-evidence-title">
+		{evidencePreview && <section ref={evidenceDialog.ref} className="e2e-evidence-preview" role="dialog" aria-modal="true" aria-labelledby="e2e-evidence-title">
 			<header>
 				<div><strong id="e2e-evidence-title">E2E evidence</strong><span>{evidencePreview.path}</span></div>
-				<button className="icon-button" type="button" aria-label="Close evidence preview" onClick={() => setEvidencePreview(null)}><X size={16} /></button>
+				<button data-autofocus className="icon-button" type="button" aria-label="Close evidence preview" onClick={() => setEvidencePreview(null)}><X size={16} /></button>
 			</header>
 			{evidencePreview.loading && <span role="status">Loading evidence...</span>}
 			{evidencePreview.error && <span className="error" role="alert">{evidencePreview.error}</span>}

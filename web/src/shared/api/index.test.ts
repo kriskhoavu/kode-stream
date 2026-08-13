@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, api, apiURL, isExtensionSurface, localAPIOrigin } from '.';
+import { ApiError, ApiResponseError, api, apiURL, isExtensionSurface, localAPIOrigin } from '.';
 
 describe('shared api facade', () => {
   afterEach(() => {
@@ -32,6 +32,72 @@ describe('shared api facade', () => {
 
     await expect(api.localServerReachable()).resolves.toBe(false);
   });
+
+  it('rejects an unexpected response media type without exposing its body', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>proxy failure</html>', { status: 502, headers: { 'content-type': 'text/html' } })));
+    await expect(api.state()).rejects.toBeInstanceOf(ApiResponseError);
+  });
+
+  it('rejects oversized JSON responses before parsing them', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(`{"value":"${'x'.repeat(2 * 1024 * 1024)}"}`, { status: 200, headers: { 'content-type': 'application/json' } })));
+    await expect(api.state()).rejects.toMatchObject({ name: 'ApiResponseError', message: 'The server response is too large.' });
+  });
+
+  it('propagates abort signals without joining signal-free GET de-duplication', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_path, options: RequestInit) => new Promise((_resolve, reject) => options.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))))));
+    const pending = api.workspaces(controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('requires event-stream responses for workspace progress', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not an event stream', { status: 200, headers: { 'content-type': 'text/plain' } })));
+    await expect(api.createWorkspaceStream({ name: 'One', path: '/repo', baselineBranch: 'main', sources: [] }, vi.fn())).rejects.toBeInstanceOf(ApiResponseError);
+  });
+
+  it('preserves typed format failures on workspace stream error responses', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>bad gateway</html>', { status: 502, headers: { 'content-type': 'text/html' } })));
+    await expect(api.createWorkspaceStream({ name: 'One', path: '/repo', baselineBranch: 'main', sources: [] }, vi.fn())).rejects.toBeInstanceOf(ApiResponseError);
+  });
+
+  it('parses bounded workspace progress events and returns the final workspace', async () => {
+    const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('event: log\ndata: {"chunk":"cloning"}\n\nevent: result\ndata: {"workspace":{"id":"w1","name":"One","path":"/repo","baselineBranch":"main","sources":[],"createdAt":""}}\n\n')); controller.close(); } });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } })));
+    const progress = vi.fn();
+    await expect(api.createWorkspaceStream({ name: 'One', path: '/repo', baselineBranch: 'main', sources: [] }, progress)).resolves.toMatchObject({ workspace: { id: 'w1' } });
+    expect(progress).toHaveBeenCalledWith('cloning');
+  });
+
+  it('passes cancellation through workspace progress streaming', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal('fetch', vi.fn((_path, init: RequestInit) => new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))))));
+    const pending = api.createWorkspaceStream({ name: 'One', path: '/repo', baselineBranch: 'main', sources: [] }, vi.fn(), controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+	it('rejects an oversized unfinished SSE event without invoking progress callbacks', async () => {
+		const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(`event: log\ndata: ${'x'.repeat(256 * 1024)} `)); controller.close(); } });
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } })));
+		const progress = vi.fn();
+		await expect(api.createWorkspaceStream({ name: 'One', path: '/repo', baselineBranch: 'main', sources: [] }, progress)).rejects.toMatchObject({ name: 'ApiResponseError', message: 'Workspace progress response is too large.' });
+		expect(progress).not.toHaveBeenCalled();
+	});
+
+	it('does not deliver a late SSE progress callback after cancellation', async () => {
+		let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+		const stream = new ReadableStream<Uint8Array>({ start(controller) { streamController = controller; } });
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } })));
+		const abort = new AbortController();
+		const progress = vi.fn();
+		const pending = api.createWorkspaceStream({ name: 'One', path: '/repo', baselineBranch: 'main', sources: [] }, progress, abort.signal);
+		abort.abort();
+		streamController?.enqueue(new TextEncoder().encode('event: log\ndata: {"chunk":"late"}\n\n'));
+		streamController?.close();
+		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+		expect(progress).not.toHaveBeenCalled();
+	});
 
   it('pins snapshot file requests to the expected reviewed commit', async () => {
     const fetchMock = vi.fn()

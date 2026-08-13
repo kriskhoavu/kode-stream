@@ -352,7 +352,7 @@ function column(name: string): HTMLElement {
 
 function selectCardStatus(status: string): void {
   fireEvent.click(screen.getByRole('button', { name: 'Move item status' }));
-  fireEvent.click(screen.getByRole('button', { name: status }));
+  fireEvent.click(screen.getByRole('menuitemradio', { name: status }));
 }
 
 function statusFetchMock(updateStatus: () => Promise<Response>, item: ItemSummary = draftItem) {
