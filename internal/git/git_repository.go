@@ -64,15 +64,19 @@ func (g *GitAdapter) ValidateBranch(workspacePath, branch string) error {
 }
 
 func (g *GitAdapter) ResolveBranch(workspacePath, branch string) (string, string, error) {
-	if err := g.ValidateBranch(workspacePath, branch); err != nil {
+	return g.ResolveBranchContext(context.Background(), workspacePath, branch)
+}
+
+func (g *GitAdapter) ResolveBranchContext(ctx context.Context, workspacePath, branch string) (string, string, error) {
+	if _, err := g.runContextLimited(ctx, workspacePath, 1<<20, "show-ref", "--verify", "refs/heads/"+branch); err != nil {
 		return "", "", err
 	}
 	ref := "refs/heads/" + branch
-	out, err := g.run(workspacePath, "rev-parse", "--verify", ref+"^{commit}")
+	out, err := g.runContextLimited(ctx, workspacePath, 1<<20, "rev-parse", "--verify", ref+"^{commit}")
 	if err != nil {
 		return "", "", err
 	}
-	return ref, strings.TrimSpace(out), nil
+	return ref, strings.TrimSpace(string(out)), nil
 }
 
 func (g *GitAdapter) CurrentBranch(workspacePath string) (string, error) {

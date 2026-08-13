@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -9,6 +10,10 @@ import (
 	"kode-stream/internal/common/models"
 	gitadapter "kode-stream/internal/git"
 )
+
+type contextSessionRecords interface {
+	ListContext(context.Context, string, string) ([]SessionRecord, error)
+}
 
 type sessionBranchResolver interface {
 	CurrentBranch(string) (string, error)
@@ -30,15 +35,30 @@ func (s *Service) ConfigureSessionRecords(records SessionRecordRepository, branc
 }
 
 func (s *Service) SessionRecords(workspaceID, branch string) ([]SessionRecordView, error) {
+	return s.SessionRecordsContext(context.Background(), workspaceID, branch)
+}
+func (s *Service) SessionRecordsContext(ctx context.Context, workspaceID, branch string) ([]SessionRecordView, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if s.records == nil {
 		return []SessionRecordView{}, nil
 	}
-	records, err := s.records.List(strings.TrimSpace(workspaceID), strings.TrimSpace(branch))
+	var records []SessionRecord
+	var err error
+	if repository, ok := s.records.(contextSessionRecords); ok {
+		records, err = repository.ListContext(ctx, strings.TrimSpace(workspaceID), strings.TrimSpace(branch))
+	} else {
+		records, err = s.records.List(strings.TrimSpace(workspaceID), strings.TrimSpace(branch))
+	}
 	if err != nil {
 		return nil, err
 	}
 	views := make([]SessionRecordView, 0, len(records))
 	for _, record := range records {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		live := false
 		if s.embedded != nil {
 			_, liveErr := s.embedded.Get(record.ID)

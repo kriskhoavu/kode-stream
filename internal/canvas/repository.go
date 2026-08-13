@@ -1,6 +1,7 @@
 package canvas
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -31,6 +32,12 @@ func (e *PlacementConflictError) Error() string {
 
 type Repository interface {
 	ResolveDefault(ownerUserID, workspaceID, branchKey string) (Layout, bool, error)
+	FindDefault(ownerUserID, workspaceID, branchKey string) (Layout, bool, error)
+	// InitializeDefault publishes a newly-created layout and its complete initial
+	// projection together.  Callers must build the bounded deterministic seed
+	// before this call; a failed publication must not leave a visible layout.
+	InitializeDefault(ownerUserID, workspaceID, branchKey string, placements []Placement) (Layout, bool, error)
+	InitializeDefaultContext(context.Context, string, string, string, []Placement) (Layout, bool, error)
 	GetLayout(id string) (Layout, bool, error)
 	Layouts() ([]Layout, error)
 	Placements(layoutID string) ([]Placement, error)
@@ -39,6 +46,17 @@ type Repository interface {
 	SaveViewport(layoutID string, expectedVersion int64, viewport Viewport) (Layout, error)
 	Snapshot() (Snapshot, error)
 	ReplaceAll(Snapshot) error
+}
+
+// ContextRepository is the request-bound Canvas persistence seam. Production
+// adapters implement it so HTTP cancellation reaches database/file work rather
+// than being observed only after an unbounded operation returns.
+type ContextRepository interface {
+	GetLayoutContext(context.Context, string) (Layout, bool, error)
+	PlacementsContext(context.Context, string) ([]Placement, error)
+	PatchPlacementsContext(context.Context, string, []PlacementPatch) ([]Placement, error)
+	RemovePlacementContext(context.Context, string, string, int64) error
+	SaveViewportContext(context.Context, string, int64, Viewport) (Layout, error)
 }
 
 func NewLayout(ownerUserID, workspaceID, branchKey string, now time.Time) (Layout, error) {

@@ -17,6 +17,7 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 	const [error, setError] = useState('');
 	const pendingKey = useRef('');
 	const verificationPollRef = useRef(0);
+	const runbooksAbortRef = useRef<AbortController | undefined>(undefined);
 	const workbenchRef = useRef<HTMLElement>(null);
 	const workspaceNode = projection.nodes.find((node) => node.kind === 'workspace')?.workspace;
 
@@ -26,14 +27,18 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 	const itemId = selectedNode?.plan?.itemId;
 
 	const refreshE2ERunbooks = useCallback(async () => {
+		runbooksAbortRef.current?.abort();
+		const controller = new AbortController();
+		runbooksAbortRef.current = controller;
 		if (!itemId) {
 			setE2ERunbooks({ runbooks: [] });
 			return;
 		}
 		try {
-			setE2ERunbooks(await api.itemE2ERunbooks(itemId));
+			const runbooks = await api.itemE2ERunbooks(itemId, controller.signal);
+			if (!controller.signal.aborted) setE2ERunbooks(runbooks);
 		} catch (caught) {
-			setE2ERunbooks({ runbooks: [], diagnostic: caught instanceof Error ? caught.message : 'E2E coverage could not be loaded.' });
+			if (!controller.signal.aborted) setE2ERunbooks({ runbooks: [], diagnostic: caught instanceof Error ? caught.message : 'E2E coverage could not be loaded.' });
 		}
 	}, [itemId]);
 
@@ -43,7 +48,7 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 		setCollapsed(false);
 		setVerificationJob(undefined);
 		void refreshE2ERunbooks();
-		return () => { verificationPollRef.current += 1; };
+		return () => { verificationPollRef.current += 1; runbooksAbortRef.current?.abort(); };
 	}, [itemId, refreshE2ERunbooks]);
 
 	const waitForVerification = async (job: VerificationJob, pollID: number) => {
@@ -177,13 +182,13 @@ function CanvasItemInfo({ itemId, node, workspace, onSaved }: { itemId: string; 
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState('');
 	useEffect(() => {
-		let active = true;
-		api.item(itemId).then((next) => {
-			if (!active) return;
+		const controller = new AbortController();
+		api.item(itemId, controller.signal).then((next) => {
+			if (controller.signal.aborted) return;
 			setDetail(next);
 			setDraft({ title: next.title, scope: next.scope, identifier: next.identifier, status: next.status, owner: next.owner ?? '', tags: next.tags });
-		}).catch((caught) => active && setError(caught instanceof Error ? caught.message : 'Item details could not be loaded.'));
-		return () => { active = false; };
+		}).catch((caught) => !controller.signal.aborted && setError(caught instanceof Error ? caught.message : 'Item details could not be loaded.'));
+		return () => controller.abort();
 	}, [itemId]);
 	const canvasPlan = node.plan;
 	if (!canvasPlan) return null;
@@ -208,11 +213,11 @@ function CanvasQualityPanel({ itemId, workspaceId, capability, job, verifying, r
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState('');
 	useEffect(() => {
-		let active = true;
+		const controller = new AbortController();
 		const load = api.itemVerificationTests;
 		if (typeof load !== 'function') return;
-		load(itemId).then((value) => active && setTests(value)).catch((caught) => active && setError(caught instanceof Error ? caught.message : 'Automation settings could not be loaded.'));
-		return () => { active = false; };
+		load(itemId, controller.signal).then((value) => !controller.signal.aborted && setTests(value)).catch((caught) => !controller.signal.aborted && setError(caught instanceof Error ? caught.message : 'Automation settings could not be loaded.'));
+		return () => controller.abort();
 	}, [itemId]);
 	const selectedSpecs = tests?.selection.selectedSpecs ?? [];
 	const environment = tests?.selection.environment || 'local';

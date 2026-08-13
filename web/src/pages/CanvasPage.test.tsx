@@ -26,11 +26,11 @@ describe('CanvasPage', () => {
 		expect(screen.getByRole('status')).toHaveTextContent('Saved');
 	});
 
-	it('keeps a selected terminal session in the Canvas instead of opening the Workbench', () => {
+	it('keeps a selected terminal session in the Canvas instead of opening the Workbench', async () => {
 		canvasState.projection = sessionProjection();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: 'Session: codex' }));
-		expect(screen.queryByLabelText('Canvas Workbench')).not.toBeInTheDocument();
+		await waitFor(() => expect(screen.queryByLabelText('Canvas Workbench')).not.toBeInTheDocument());
 	});
 });
 

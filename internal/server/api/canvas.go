@@ -1,7 +1,7 @@
 package api
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -11,13 +11,15 @@ import (
 	appworkstream "kode-stream/internal/workstream"
 )
 
+const maxCanvasMutationBodyBytes int64 = 64 << 10
+
 type canvasController struct {
 	canvas     *appcanvas.Service
 	workstream *appworkstream.Service
 }
 
 func (a *canvasController) resolveDefaultCanvas(w http.ResponseWriter, r *http.Request) {
-	if a.canvas == nil {
+	if a.canvas == nil || a.workstream == nil {
 		writeError(w, http.StatusServiceUnavailable, "Canvas is unavailable")
 		return
 	}
@@ -25,9 +27,10 @@ func (a *canvasController) resolveDefaultCanvas(w http.ResponseWriter, r *http.R
 		WorkspaceID string `json:"workspaceId"`
 		BranchKey   string `json:"branchKey,omitempty"`
 	}
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil || strings.TrimSpace(input.WorkspaceID) == "" {
+	if !decodeLimitedJSON(w, r, &input, maxCanvasMutationBodyBytes, true) {
+		return
+	}
+	if strings.TrimSpace(input.WorkspaceID) == "" {
 		writeError(w, http.StatusBadRequest, "workspaceId is required")
 		return
 	}
@@ -40,7 +43,7 @@ func (a *canvasController) resolveDefaultCanvas(w http.ResponseWriter, r *http.R
 		writeJSON(w, http.StatusConflict, map[string]any{"error": "Canvas branch differs from the current checkout", "code": "canvas_branch_mismatch", "checkoutBranch": checkout.Branch})
 		return
 	}
-	projection, err := a.canvas.ResolveDefault(a.canvasOwner(r), input.WorkspaceID, checkout.Branch)
+	projection, err := a.canvas.ResolveDefaultContext(r.Context(), a.canvasOwner(r), input.WorkspaceID, checkout.Branch)
 	a.respondCanvas(w, projection, err)
 }
 
@@ -49,7 +52,7 @@ func (a *canvasController) canvasLayout(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusServiceUnavailable, "Canvas is unavailable")
 		return
 	}
-	projection, err := a.canvas.Project(a.canvasOwner(r), r.PathValue("id"))
+	projection, err := a.canvas.ProjectContext(r.Context(), a.canvasOwner(r), r.PathValue("id"))
 	a.respondCanvas(w, projection, err)
 }
 
@@ -61,13 +64,14 @@ func (a *canvasController) patchCanvasPlacements(w http.ResponseWriter, r *http.
 	var input struct {
 		Patches []appcanvas.PlacementPatch `json:"patches"`
 	}
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxCanvasMutationBodyBytes, true) {
 		return
 	}
-	projection, err := a.canvas.PatchPlacements(a.canvasOwner(r), r.PathValue("id"), input.Patches)
+	if len(input.Patches) == 0 {
+		writeError(w, http.StatusBadRequest, "patches are required")
+		return
+	}
+	projection, err := a.canvas.PatchPlacementsContext(r.Context(), a.canvasOwner(r), r.PathValue("id"), input.Patches)
 	a.respondCanvas(w, projection, err)
 }
 
@@ -80,13 +84,14 @@ func (a *canvasController) patchCanvasViewport(w http.ResponseWriter, r *http.Re
 		ExpectedVersion int64              `json:"expectedVersion"`
 		Viewport        appcanvas.Viewport `json:"viewport"`
 	}
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxCanvasMutationBodyBytes, true) {
 		return
 	}
-	projection, err := a.canvas.SaveViewport(a.canvasOwner(r), r.PathValue("id"), input.ExpectedVersion, input.Viewport)
+	if input.ExpectedVersion < 1 {
+		writeError(w, http.StatusBadRequest, "expectedVersion is required")
+		return
+	}
+	projection, err := a.canvas.SaveViewportContext(r.Context(), a.canvasOwner(r), r.PathValue("id"), input.ExpectedVersion, input.Viewport)
 	a.respondCanvas(w, projection, err)
 }
 
@@ -100,7 +105,7 @@ func (a *canvasController) removeCanvasPlacement(w http.ResponseWriter, r *http.
 		writeError(w, http.StatusBadRequest, "expectedRevision is required")
 		return
 	}
-	projection, err := a.canvas.RemovePlacement(a.canvasOwner(r), r.PathValue("id"), r.PathValue("nodeId"), revision)
+	projection, err := a.canvas.RemovePlacementContext(r.Context(), a.canvasOwner(r), r.PathValue("id"), r.PathValue("nodeId"), revision)
 	a.respondCanvas(w, projection, err)
 }
 
@@ -118,6 +123,9 @@ func (a *canvasController) respondCanvas(w http.ResponseWriter, projection appca
 	}
 	if errors.Is(err, appcanvas.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "Canvas layout not found")
+		return
+	}
+	if errors.Is(err, context.Canceled) {
 		return
 	}
 	var conflict *appcanvas.PlacementConflictError

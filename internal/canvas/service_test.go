@@ -1,6 +1,8 @@
 package canvas
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +15,37 @@ import (
 	itemindex "kode-stream/internal/item/index"
 	"kode-stream/internal/workspace/registry"
 )
+
+func TestCanvasServiceCancelledResolveDoesNotPublishLayout(t *testing.T) {
+	repository, reg, items, git, workspaceConfig, _, _ := canvasServiceFixture(t)
+	service := NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := service.ResolveDefaultContext(ctx, "owner", workspaceConfig.ID, "main"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err=%v", err)
+	}
+	if _, found, err := repository.FindDefault("owner", workspaceConfig.ID, "main"); err != nil || found {
+		t.Fatalf("cancelled request published a layout: found=%v err=%v", found, err)
+	}
+}
+
+func TestCanvasServiceCancelledOwnershipReadPreventsMutation(t *testing.T) {
+	repository, reg, items, git, workspaceConfig, _, _ := canvasServiceFixture(t)
+	service := NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
+	projection, err := service.ResolveDefault("owner", workspaceConfig.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := service.SaveViewportContext(ctx, "owner", projection.Layout.ID, projection.Layout.Version, Viewport{X: 1, Y: 2, Zoom: 1.1}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err=%v", err)
+	}
+	layout, found, err := repository.GetLayout(projection.Layout.ID)
+	if err != nil || !found || layout.Version != projection.Layout.Version {
+		t.Fatalf("cancelled ownership read mutated layout=%#v found=%v err=%v", layout, found, err)
+	}
+}
 
 type canvasSessionReader struct{ records []ai.SessionRecordView }
 

@@ -92,6 +92,18 @@ describe('CanvasWorkbench', () => {
 		fireEvent.click(screen.getByRole('button', { name: /Refresh reference/ }));
 		expect(reload).toHaveBeenCalled();
 	});
+
+	it('aborts a superseded E2E runbook request without painting stale coverage', async () => {
+		let signal: AbortSignal | undefined;
+		vi.mocked(api.itemE2ERunbooks).mockImplementation((_id, nextSignal) => {
+			signal = nextSignal;
+			return new Promise(() => {});
+		});
+		const { unmount } = renderWorkbench(planNode());
+		await waitFor(() => expect(signal).toBeDefined());
+		unmount();
+		expect(signal?.aborted).toBe(true);
+	});
 });
 
 function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.ComponentProps<typeof CanvasWorkbench>> = {}) {

@@ -124,6 +124,25 @@ func TestCanvasAPIDefaultProjectionPlacementConflictAndViewportIndependence(t *t
 	}
 }
 
+func TestCanvasDefaultRejectsInvalidBodiesAndPartialFixtureIsUnavailable(t *testing.T) {
+	controller := &canvasController{}
+	for _, body := range []string{"{}", `{"workspaceId":"w","unknown":true}`, `{"workspaceId":"w"} {}`} {
+		response := httptest.NewRecorder()
+		controller.resolveDefaultCanvas(response, httptest.NewRequest(http.MethodPost, "/api/canvas/default", bytes.NewBufferString(body)))
+		if response.Code != http.StatusServiceUnavailable {
+			t.Fatalf("partial fixture body=%q status=%d", body, response.Code)
+		}
+	}
+	// Once Canvas exists, the missing Workstream dependency must still be a
+	// stable unavailable response, before the body can trigger branch work.
+	controller.canvas = &appcanvas.Service{}
+	response := httptest.NewRecorder()
+	controller.resolveDefaultCanvas(response, httptest.NewRequest(http.MethodPost, "/api/canvas/default", bytes.NewBufferString(`{"workspaceId":"w"}`)))
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func apiCanvasGit(t *testing.T, root string, args ...string) {
 	t.Helper()
 	command := exec.Command("git", append([]string{"-C", root}, args...)...)

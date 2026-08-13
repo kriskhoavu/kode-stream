@@ -157,11 +157,11 @@ async function request<T>(path: string, options?: RequestInit, dedupe = options?
 }
 
 export const api = {
-	resolveDefaultCanvas: (workspaceId: string) => request<CanvasProjection>('/api/canvas/default', { method: 'POST', body: JSON.stringify({ workspaceId }) }, false),
-	canvasLayout: (layoutId: string) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}`, undefined, false),
-	patchCanvasPlacements: (layoutId: string, patches: CanvasPlacementPatch[]) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/placements`, { method: 'PATCH', body: JSON.stringify({ patches }) }, false),
-	patchCanvasViewport: (layoutId: string, expectedVersion: number, viewport: CanvasViewport) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/viewport`, { method: 'PATCH', body: JSON.stringify({ expectedVersion, viewport }) }, false),
-	removeCanvasPlacement: (layoutId: string, nodeId: string, expectedRevision: number) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/placements/${encodeURIComponent(nodeId)}?expectedRevision=${expectedRevision}`, { method: 'DELETE' }, false),
+	resolveDefaultCanvas: (workspaceId: string, signal?: AbortSignal) => request<CanvasProjection>('/api/canvas/default', { method: 'POST', body: JSON.stringify({ workspaceId }), signal }, !signal),
+	canvasLayout: (layoutId: string, signal?: AbortSignal) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}`, { signal }, !signal),
+	patchCanvasPlacements: (layoutId: string, patches: CanvasPlacementPatch[], signal?: AbortSignal) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/placements`, { method: 'PATCH', body: JSON.stringify({ patches }), signal }, !signal),
+	patchCanvasViewport: (layoutId: string, expectedVersion: number, viewport: CanvasViewport, signal?: AbortSignal) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/viewport`, { method: 'PATCH', body: JSON.stringify({ expectedVersion, viewport }), signal }, !signal),
+	removeCanvasPlacement: (layoutId: string, nodeId: string, expectedRevision: number, signal?: AbortSignal) => request<CanvasProjection>(`/api/canvas/layouts/${encodeURIComponent(layoutId)}/placements/${encodeURIComponent(nodeId)}?expectedRevision=${expectedRevision}`, { method: 'DELETE', signal }, !signal),
 	knowledgeWikis: async (workspaceId: string, signal?: AbortSignal) => (await request<KnowledgeWiki[] | null>(`/api/knowledge/wikis?workspaceId=${encodeURIComponent(workspaceId)}`, { signal }, !signal)) ?? [],
 	knowledgePages: (workspaceId: string, root: string, signal?: AbortSignal) => request<KnowledgePagesResponse>(knowledgeURL(workspaceId, root, 'pages'), { signal }, !signal),
 	knowledgePage: (workspaceId: string, root: string, slug: string, signal?: AbortSignal) => request<KnowledgePageDetail>(`${knowledgeURL(workspaceId, root, 'pages')}/${encodeURIComponent(slug)}`, { signal }, !signal),
@@ -303,11 +303,11 @@ export const api = {
     request<RunArtifact[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}/artifacts`, undefined, false),
   rerunVerificationJob: (workspaceId: string, jobId: string, profile?: VerifyProfile) =>
     request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}/rerun`, { method: 'POST', body: JSON.stringify({ profile }) }, false),
-  itemVerificationTests: (itemId: string) =>
-    request<ItemVerificationTests>(`/api/items/${encodeURIComponent(itemId)}/verification-tests`).then(normalizeItemVerificationTests),
+  itemVerificationTests: (itemId: string, signal?: AbortSignal) =>
+    request<ItemVerificationTests>(`/api/items/${encodeURIComponent(itemId)}/verification-tests`, { signal }, !signal).then(normalizeItemVerificationTests),
   saveItemVerificationTests: (itemId: string, input: VerificationTestSelection) =>
     request<ItemVerificationTests>(`/api/items/${encodeURIComponent(itemId)}/verification-tests`, { method: 'PUT', body: JSON.stringify(input) }).then(normalizeItemVerificationTests),
-	itemE2ERunbooks: (itemId: string) => request<E2ERunbookList>(`/api/items/${encodeURIComponent(itemId)}/e2e-runbooks`),
+	itemE2ERunbooks: (itemId: string, signal?: AbortSignal) => request<E2ERunbookList>(`/api/items/${encodeURIComponent(itemId)}/e2e-runbooks`, { signal }, !signal),
   jiraIssue: (itemId: string, signal?: AbortSignal) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira`, { signal }, !signal),
   refreshJiraIssue: (itemId: string, signal?: AbortSignal) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira/refresh`, { method: 'POST', signal }, false),
   jiraAttachmentURL: (itemId: string, attachmentId: string) => apiURL(`/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`),
@@ -388,7 +388,7 @@ export const api = {
   syncStorage: (direction: StorageSyncDirection) =>
     request<StorageSyncResult>('/api/storage/sync', { method: 'POST', body: JSON.stringify({ direction, confirm: true }) }).then(normalizeStorageSyncResult),
   items: async (params: URLSearchParams) => ((await request<ItemSummary[] | null>(`/api/items?${params.toString()}`)) ?? []).map(normalizeItem),
-  item: async (id: string) => normalizeItemDetail(await request<ItemDetail>(`/api/items/${id}`)),
+  item: async (id: string, signal?: AbortSignal) => normalizeItemDetail(await request<ItemDetail>(`/api/items/${id}`, { signal }, !signal)),
   files: async (id: string, expectedCommit?: string) => {
 		const query = expectedCommit ? `?expectedCommit=${encodeURIComponent(expectedCommit)}` : '';
 		return (await request<FileNode[] | null>(`/api/items/${encodeURIComponent(id)}/files${query}`)) ?? [];

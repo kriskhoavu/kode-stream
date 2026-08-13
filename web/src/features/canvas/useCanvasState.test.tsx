@@ -30,7 +30,7 @@ describe('useCanvasState', () => {
 	it('loads branch context, moves optimistically, and saves a bounded patch', async () => {
 		const { result } = renderHook(() => useCanvasState('workspace-1'));
 		await act(async () => { await vi.runAllTimersAsync(); });
-		expect(api.resolveDefaultCanvas).toHaveBeenCalledWith('workspace-1');
+		expect(api.resolveDefaultCanvas).toHaveBeenCalledWith('workspace-1', expect.any(AbortSignal));
 		act(() => result.current.moveNode('plan:item-1', { x: 90, y: 80 }));
 		expect(result.current.projection?.nodes[0].position).toEqual({ x: 90, y: 80 });
 		expect(result.current.dirtyCount).toBe(1);
@@ -60,10 +60,23 @@ describe('useCanvasState', () => {
 		await act(async () => { await vi.runAllTimersAsync(); });
 		act(() => result.current.saveViewport({ x: 5, y: 6, zoom: 1.2 }));
 		await act(async () => { await vi.advanceTimersByTimeAsync(501); });
-		expect(api.patchCanvasViewport).toHaveBeenCalledWith('layout-1', 1, { x: 5, y: 6, zoom: 1.2 });
+		expect(api.patchCanvasViewport).toHaveBeenCalledWith('layout-1', 1, { x: 5, y: 6, zoom: 1.2 }, expect.any(AbortSignal));
 		await act(async () => { await result.current.reload(); });
 		await act(async () => { await vi.runAllTimersAsync(); });
-		expect(api.resolveDefaultCanvas).toHaveBeenLastCalledWith('workspace-1');
+		expect(api.resolveDefaultCanvas).toHaveBeenLastCalledWith('workspace-1', expect.any(AbortSignal));
+	});
+
+	it('keeps the newest optimistic viewport when an older save settles late', async () => {
+		let settleFirst: ((value: CanvasProjection) => void) | undefined;
+		vi.mocked(api.patchCanvasViewport).mockImplementationOnce(() => new Promise((resolve) => { settleFirst = resolve; })).mockResolvedValueOnce({ ...projection(), layout: { ...projection().layout, version: 2, viewport: { x: 9, y: 10, zoom: 1.3 } } });
+		const { result } = renderHook(() => useCanvasState('workspace-1'));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		act(() => result.current.saveViewport({ x: 1, y: 2, zoom: 1.1 }));
+		await act(async () => { await vi.advanceTimersByTimeAsync(501); });
+		act(() => result.current.saveViewport({ x: 9, y: 10, zoom: 1.3 }));
+		await act(async () => { await vi.advanceTimersByTimeAsync(501); });
+		await act(async () => { settleFirst?.({ ...projection(), layout: { ...projection().layout, version: 2, viewport: { x: 1, y: 2, zoom: 1.1 } } }); });
+		expect(result.current.projection?.layout.viewport).toEqual({ x: 9, y: 10, zoom: 1.3 });
 	});
 
 	it('preserves an optimistic move through a transient failure and retries twice at most', async () => {
@@ -86,7 +99,7 @@ describe('useCanvasState', () => {
 		vi.mocked(api.patchCanvasPlacements).mockResolvedValue(projection());
 		const { result } = renderHook(() => useCanvasState('workspace-1'));
 		await act(async () => { await vi.runAllTimersAsync(); });
-		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', expectedRevision: 0 })]);
+		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', expectedRevision: 0 })], expect.any(AbortSignal));
 		expect(result.current.projection?.unplaced).toHaveLength(0);
 		act(() => result.current.resetPositions());
 		expect(result.current.projection?.nodes[0].position).toEqual({ x: 360, y: 0 });
@@ -103,8 +116,8 @@ describe('useCanvasState', () => {
 		const { result } = renderHook(() => useCanvasState('workspace-1'));
 		await act(async () => { await vi.runAllTimersAsync(); });
 		await act(async () => { await result.current.refresh(); });
-		expect(api.resolveDefaultCanvas).toHaveBeenLastCalledWith('workspace-1');
-		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-2', expectedRevision: 0 })]);
+		expect(api.resolveDefaultCanvas).toHaveBeenLastCalledWith('workspace-1', expect.any(AbortSignal));
+		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-2', expectedRevision: 0 })], expect.any(AbortSignal));
 		expect(result.current.projection?.nodes).toHaveLength(2);
 	});
 
@@ -146,5 +159,18 @@ describe('useCanvasState', () => {
 		await act(async () => { await result.current.placeSession('session-1'); });
 		expect(api.patchCanvasPlacements).toHaveBeenLastCalledWith('layout-1', [expect.objectContaining({ nodeId: 'session:session-1', entityRef: sessionRef, collapsed: false, expectedRevision: 1 })]);
 		expect(result.current.projection?.nodes.find((node) => node.id === sessionNode.id)?.collapsed).toBe(false);
+	});
+
+	it('does not let an aborted automatic placement poison a newer refresh', async () => {
+		let resolveOld: ((value: CanvasProjection) => void) | undefined;
+		const unplaced = { ...projection(), nodes: [], unplaced: [projection().nodes[0].entityRef] };
+		vi.mocked(api.resolveDefaultCanvas).mockResolvedValueOnce(unplaced).mockResolvedValueOnce(projection());
+		vi.mocked(api.patchCanvasPlacements).mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }));
+		const { result } = renderHook(() => useCanvasState('workspace-1'));
+		await act(async () => { await Promise.resolve(); });
+		await act(async () => { await result.current.refresh(); });
+		expect(result.current.projection?.layout.id).toBe('layout-1');
+		await act(async () => { resolveOld?.(projection()); });
+		expect(result.current.error).toBe('');
 	});
 });

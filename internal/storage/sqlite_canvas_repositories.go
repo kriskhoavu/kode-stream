@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -42,6 +43,79 @@ func (r *SQLiteCanvasRepository) ResolveDefault(ownerUserID, workspaceID, branch
 	return layout, err == nil && rows == 1, err
 }
 
+func (r *SQLiteCanvasRepository) FindDefault(ownerUserID, workspaceID, branchKey string) (canvas.Layout, bool, error) {
+	layout, err := r.getDefault(ownerUserID, workspaceID, branchKey)
+	if errors.Is(err, canvas.ErrNotFound) {
+		return canvas.Layout{}, false, nil
+	}
+	return layout, err == nil, err
+}
+
+// InitializeDefault is deliberately one transaction: creation must never be
+// observable without the complete initial placement set.
+func (r *SQLiteCanvasRepository) InitializeDefault(ownerUserID, workspaceID, branchKey string, placements []canvas.Placement) (canvas.Layout, bool, error) {
+	return r.InitializeDefaultContext(context.Background(), ownerUserID, workspaceID, branchKey, placements)
+}
+
+func (r *SQLiteCanvasRepository) InitializeDefaultContext(ctx context.Context, ownerUserID, workspaceID, branchKey string, placements []canvas.Placement) (canvas.Layout, bool, error) {
+	if len(placements) == 0 || len(placements) > canvas.MaxPlacements {
+		return canvas.Layout{}, false, errors.New("canvas initial placements are outside allowed limits")
+	}
+	created, err := canvas.NewLayout(ownerUserID, workspaceID, branchKey, r.now().UTC())
+	if err != nil {
+		return canvas.Layout{}, false, err
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return canvas.Layout{}, false, err
+	}
+	defer tx.Rollback()
+	viewportJSON, _ := json.Marshal(created.Viewport)
+	result, err := tx.ExecContext(ctx, rebindSQL(r.driver, `INSERT INTO canvas_layouts (id, owner_user_id, workspace_id, branch_key, viewport_json, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, workspace_id, branch_key) DO NOTHING`), created.ID, created.OwnerUserID, created.WorkspaceID, created.BranchKey, string(viewportJSON), created.Version, formatTime(created.CreatedAt), formatTime(created.UpdatedAt))
+	if err != nil {
+		return canvas.Layout{}, false, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return canvas.Layout{}, false, err
+	}
+	if affected == 0 {
+		layout, err := getDefaultTx(tx, r.driver, ownerUserID, workspaceID, branchKey)
+		if err != nil {
+			return canvas.Layout{}, false, err
+		}
+		if err := tx.Commit(); err != nil {
+			return canvas.Layout{}, false, err
+		}
+		return layout, false, nil
+	}
+	for _, placement := range placements {
+		if err := ctx.Err(); err != nil {
+			return canvas.Layout{}, false, err
+		}
+		placement.LayoutID = created.ID
+		if err := canvas.ValidateSnapshot(canvas.Snapshot{Layouts: []canvas.Layout{created}, Placements: []canvas.Placement{placement}}); err != nil {
+			return canvas.Layout{}, false, err
+		}
+		refJSON, _ := json.Marshal(placement.EntityRef)
+		if _, err := tx.ExecContext(ctx, rebindSQL(r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`), placement.LayoutID, placement.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, databaseBoolValue(r.driver, placement.Collapsed), databaseBoolValue(r.driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt)); err != nil {
+			return canvas.Layout{}, false, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return canvas.Layout{}, false, err
+	}
+	return created, true, nil
+}
+
+func getDefaultTx(tx *sql.Tx, driver, ownerUserID, workspaceID, branchKey string) (canvas.Layout, error) {
+	layout, err := scanCanvasLayout(tx.QueryRow(rebindSQL(driver, `SELECT id, owner_user_id, workspace_id, branch_key, viewport_json, version, created_at, updated_at FROM canvas_layouts WHERE owner_user_id = ? AND workspace_id = ? AND branch_key = ?`), ownerUserID, workspaceID, branchKey))
+	if errors.Is(err, sql.ErrNoRows) {
+		return canvas.Layout{}, canvas.ErrNotFound
+	}
+	return layout, err
+}
+
 func (r *SQLiteCanvasRepository) getDefault(ownerUserID, workspaceID, branchKey string) (canvas.Layout, error) {
 	row := queryRowSQL(r.db, r.driver, `SELECT id, owner_user_id, workspace_id, branch_key, viewport_json, version, created_at, updated_at FROM canvas_layouts WHERE owner_user_id = ? AND workspace_id = ? AND branch_key = ?`, ownerUserID, workspaceID, branchKey)
 	layout, err := scanCanvasLayout(row)
@@ -53,6 +127,14 @@ func (r *SQLiteCanvasRepository) getDefault(ownerUserID, workspaceID, branchKey 
 
 func (r *SQLiteCanvasRepository) GetLayout(id string) (canvas.Layout, bool, error) {
 	row := queryRowSQL(r.db, r.driver, `SELECT id, owner_user_id, workspace_id, branch_key, viewport_json, version, created_at, updated_at FROM canvas_layouts WHERE id = ?`, id)
+	layout, err := scanCanvasLayout(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return canvas.Layout{}, false, nil
+	}
+	return layout, err == nil, err
+}
+func (r *SQLiteCanvasRepository) GetLayoutContext(ctx context.Context, id string) (canvas.Layout, bool, error) {
+	row := r.db.QueryRowContext(ctx, rebindSQL(r.driver, `SELECT id, owner_user_id, workspace_id, branch_key, viewport_json, version, created_at, updated_at FROM canvas_layouts WHERE id = ?`), id)
 	layout, err := scanCanvasLayout(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return canvas.Layout{}, false, nil
@@ -97,6 +179,51 @@ func (r *SQLiteCanvasRepository) Placements(layoutID string) ([]canvas.Placement
 		result = append(result, placement)
 	}
 	return result, rows.Err()
+}
+func (r *SQLiteCanvasRepository) PlacementsContext(ctx context.Context, layoutID string) ([]canvas.Placement, error) {
+	if _, found, err := r.GetLayoutContext(ctx, layoutID); err != nil {
+		return nil, err
+	} else if !found {
+		return nil, canvas.ErrNotFound
+	}
+	rows, err := r.db.QueryContext(ctx, rebindSQL(r.driver, `SELECT layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at FROM canvas_placements WHERE layout_id = ? ORDER BY node_id`), layoutID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	placements := []canvas.Placement{}
+	for rows.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		placement, err := scanCanvasPlacement(rows)
+		if err != nil {
+			return nil, err
+		}
+		placements = append(placements, placement)
+	}
+	return placements, rows.Err()
+}
+
+// Mutations use the existing validated transaction implementations; their
+// context check prevents a cancelled request from entering or publishing one.
+func (r *SQLiteCanvasRepository) PatchPlacementsContext(ctx context.Context, id string, patches []canvas.PlacementPatch) ([]canvas.Placement, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return r.PatchPlacements(id, patches)
+}
+func (r *SQLiteCanvasRepository) RemovePlacementContext(ctx context.Context, id, node string, revision int64) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return r.RemovePlacement(id, node, revision)
+}
+func (r *SQLiteCanvasRepository) SaveViewportContext(ctx context.Context, id string, version int64, viewport canvas.Viewport) (canvas.Layout, error) {
+	if err := ctx.Err(); err != nil {
+		return canvas.Layout{}, err
+	}
+	return r.SaveViewport(id, version, viewport)
 }
 
 func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canvas.PlacementPatch) ([]canvas.Placement, error) {
@@ -338,14 +465,20 @@ func (r *SQLiteSessionRecordRepository) FindByIdempotency(workspaceID, key strin
 }
 
 func (r *SQLiteSessionRecordRepository) List(workspaceID, branch string) ([]ai.SessionRecord, error) {
+	return r.ListContext(context.Background(), workspaceID, branch)
+}
+func (r *SQLiteSessionRecordRepository) ListContext(ctx context.Context, workspaceID, branch string) ([]ai.SessionRecord, error) {
 	query := sessionRecordSelect + ` WHERE (? = '' OR workspace_id = ?) AND (? = '' OR requested_branch = ?) ORDER BY started_at DESC, id`
-	rows, err := querySQL(r.db, r.driver, query, workspaceID, workspaceID, branch, branch)
+	rows, err := r.db.QueryContext(ctx, rebindSQL(r.driver, query), workspaceID, workspaceID, branch, branch)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	result := []ai.SessionRecord{}
 	for rows.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		record, err := scanSessionRecord(rows)
 		if err != nil {
 			return nil, err

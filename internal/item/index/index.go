@@ -37,6 +37,9 @@ type Repository interface {
 	DeleteWorkspace(string) error
 	Query(Query) ([]models.ItemSummary, error)
 	BranchItems(string, string) ([]models.ItemSummary, error)
+	// VisitContext is the bounded, cancellable read seam. Callers that render a
+	// projection must not materialize a whole workspace index first.
+	VisitContext(context.Context, Query, func(models.ItemSummary) bool) error
 	BranchScan(string, string) (models.BranchScanMetadata, bool, error)
 	Get(string) (models.ItemDetail, bool, error)
 }

@@ -1,7 +1,11 @@
 package canvas
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,14 +15,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const maxCanvasFileBytes int64 = 4 << 20
+
 type FileRepository struct {
-	path string
-	now  func() time.Time
-	mu   sync.Mutex
+	path          string
+	now           func() time.Time
+	syncDirectory func(string) error
+	mu            sync.Mutex
 }
 
 func NewFileRepository(path string) *FileRepository {
-	return &FileRepository{path: path, now: time.Now}
+	return &FileRepository{path: path, now: time.Now, syncDirectory: syncCanvasDirectory}
 }
 
 func (r *FileRepository) ResolveDefault(ownerUserID, workspaceID, branchKey string) (Layout, bool, error) {
@@ -41,9 +48,79 @@ func (r *FileRepository) ResolveDefault(ownerUserID, workspaceID, branchKey stri
 	return layout, true, r.save(state)
 }
 
-func (r *FileRepository) GetLayout(id string) (Layout, bool, error) {
+func (r *FileRepository) FindDefault(ownerUserID, workspaceID, branchKey string) (Layout, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	state, err := r.load()
+	if err != nil {
+		return Layout{}, false, err
+	}
+	for _, layout := range state.Layouts {
+		if layout.OwnerUserID == ownerUserID && layout.WorkspaceID == workspaceID && layout.BranchKey == branchKey {
+			return layout, true, nil
+		}
+	}
+	return Layout{}, false, nil
+}
+
+func (r *FileRepository) InitializeDefault(ownerUserID, workspaceID, branchKey string, placements []Placement) (Layout, bool, error) {
+	return r.InitializeDefaultContext(context.Background(), ownerUserID, workspaceID, branchKey, placements)
+}
+
+func (r *FileRepository) InitializeDefaultContext(ctx context.Context, ownerUserID, workspaceID, branchKey string, placements []Placement) (Layout, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return Layout{}, false, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return Layout{}, false, err
+	}
+	state, err := r.load()
+	if err != nil {
+		return Layout{}, false, err
+	}
+	for _, layout := range state.Layouts {
+		if layout.OwnerUserID == ownerUserID && layout.WorkspaceID == workspaceID && layout.BranchKey == branchKey {
+			return layout, false, nil
+		}
+	}
+	layout, err := NewLayout(ownerUserID, workspaceID, branchKey, r.now().UTC())
+	if err != nil {
+		return Layout{}, false, err
+	}
+	if len(placements) == 0 || len(placements) > MaxPlacements {
+		return Layout{}, false, errors.New("canvas initial placements are outside allowed limits")
+	}
+	next := Snapshot{Version: state.Version, Layouts: append(append([]Layout(nil), state.Layouts...), layout), Placements: append([]Placement(nil), state.Placements...)}
+	for _, placement := range placements {
+		placement.LayoutID = layout.ID
+		next.Placements = append(next.Placements, placement)
+	}
+	if err := ValidateSnapshot(next); err != nil {
+		return Layout{}, false, err
+	}
+	if err := ctx.Err(); err != nil {
+		return Layout{}, false, err
+	}
+	if err := r.save(next); err != nil {
+		return Layout{}, false, err
+	}
+	return layout, true, nil
+}
+
+func (r *FileRepository) GetLayout(id string) (Layout, bool, error) {
+	return r.GetLayoutContext(context.Background(), id)
+}
+func (r *FileRepository) GetLayoutContext(ctx context.Context, id string) (Layout, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return Layout{}, false, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return Layout{}, false, err
+	}
 	state, err := r.load()
 	if err != nil {
 		return Layout{}, false, err
@@ -69,8 +146,17 @@ func (r *FileRepository) Layouts() ([]Layout, error) {
 }
 
 func (r *FileRepository) Placements(layoutID string) ([]Placement, error) {
+	return r.PlacementsContext(context.Background(), layoutID)
+}
+func (r *FileRepository) PlacementsContext(ctx context.Context, layoutID string) ([]Placement, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	state, err := r.load()
 	if err != nil {
 		return nil, err
@@ -80,6 +166,9 @@ func (r *FileRepository) Placements(layoutID string) ([]Placement, error) {
 	}
 	result := []Placement{}
 	for _, placement := range state.Placements {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if placement.LayoutID == layoutID {
 			result = append(result, placement)
 		}
@@ -89,8 +178,17 @@ func (r *FileRepository) Placements(layoutID string) ([]Placement, error) {
 }
 
 func (r *FileRepository) PatchPlacements(layoutID string, patches []PlacementPatch) ([]Placement, error) {
+	return r.PatchPlacementsContext(context.Background(), layoutID, patches)
+}
+func (r *FileRepository) PatchPlacementsContext(ctx context.Context, layoutID string, patches []PlacementPatch) ([]Placement, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if len(patches) == 0 || len(patches) > MaxPlacementBatch {
 		return nil, errors.New("canvas placement batch is outside allowed limits")
 	}
@@ -113,8 +211,17 @@ func (r *FileRepository) PatchPlacements(layoutID string, patches []PlacementPat
 }
 
 func (r *FileRepository) RemovePlacement(layoutID, nodeID string, expectedRevision int64) error {
+	return r.RemovePlacementContext(context.Background(), layoutID, nodeID, expectedRevision)
+}
+func (r *FileRepository) RemovePlacementContext(ctx context.Context, layoutID, nodeID string, expectedRevision int64) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	state, err := r.load()
 	if err != nil {
 		return err
@@ -137,11 +244,20 @@ func (r *FileRepository) RemovePlacement(layoutID, nodeID string, expectedRevisi
 }
 
 func (r *FileRepository) SaveViewport(layoutID string, expectedVersion int64, viewport Viewport) (Layout, error) {
+	return r.SaveViewportContext(context.Background(), layoutID, expectedVersion, viewport)
+}
+func (r *FileRepository) SaveViewportContext(ctx context.Context, layoutID string, expectedVersion int64, viewport Viewport) (Layout, error) {
+	if err := ctx.Err(); err != nil {
+		return Layout{}, err
+	}
 	if err := validateViewport(viewport); err != nil {
 		return Layout{}, err
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return Layout{}, err
+	}
 	state, err := r.load()
 	if err != nil {
 		return Layout{}, err
@@ -182,16 +298,30 @@ func (r *FileRepository) ReplaceAll(snapshot Snapshot) error {
 }
 
 func (r *FileRepository) load() (Snapshot, error) {
-	data, err := os.ReadFile(r.path)
+	file, err := os.Open(r.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return normalizeSnapshot(Snapshot{}), nil
 	}
 	if err != nil {
 		return Snapshot{}, err
 	}
-	var state Snapshot
-	if err := yaml.Unmarshal(data, &state); err != nil {
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, maxCanvasFileBytes+1))
+	if err != nil {
 		return Snapshot{}, err
+	}
+	if int64(len(data)) > maxCanvasFileBytes {
+		return Snapshot{}, errors.New("canvas file exceeds the read limit")
+	}
+	var state Snapshot
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&state); err != nil {
+		return Snapshot{}, err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return Snapshot{}, errors.New("canvas file contains multiple YAML documents")
 	}
 	state = normalizeSnapshot(state)
 	return state, ValidateSnapshot(state)
@@ -209,13 +339,19 @@ func (r *FileRepository) save(state Snapshot) error {
 	if err != nil {
 		return err
 	}
+	mode := os.FileMode(0o600)
+	if info, statErr := os.Stat(r.path); statErr == nil {
+		mode = info.Mode().Perm()
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return statErr
+	}
 	temporary, err := os.CreateTemp(filepath.Dir(r.path), ".canvases-*")
 	if err != nil {
 		return err
 	}
 	temporaryPath := temporary.Name()
 	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(0o600); err != nil {
+	if err := temporary.Chmod(mode); err != nil {
 		_ = temporary.Close()
 		return err
 	}
@@ -230,7 +366,64 @@ func (r *FileRepository) save(state Snapshot) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temporaryPath, r.path)
+	backupPath := ""
+	if _, err := os.Stat(r.path); err == nil {
+		backup, err := os.CreateTemp(filepath.Dir(r.path), ".canvases-previous-*")
+		if err != nil {
+			return err
+		}
+		backupPath = backup.Name()
+		if err := backup.Close(); err != nil {
+			return err
+		}
+		if err := os.Rename(r.path, backupPath); err != nil {
+			return err
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.Rename(temporaryPath, r.path); err != nil {
+		if backupPath != "" {
+			_ = os.Rename(backupPath, r.path)
+		}
+		return err
+	}
+	if err := r.syncDirectory(filepath.Dir(r.path)); err != nil {
+		rollbackErr := restoreCanvasGeneration(r.path, backupPath, r.syncDirectory)
+		if rollbackErr != nil {
+			return fmt.Errorf("canvas publication failed: %w (rollback failed: %v)", err, rollbackErr)
+		}
+		return err
+	}
+	if backupPath != "" {
+		if err := os.Remove(backupPath); err != nil {
+			return err
+		}
+		if err := r.syncDirectory(filepath.Dir(r.path)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func syncCanvasDirectory(path string) error {
+	directory, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
+}
+
+func restoreCanvasGeneration(path, backupPath string, syncDirectory func(string) error) error {
+	if backupPath == "" {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	} else if err := os.Rename(backupPath, path); err != nil {
+		return err
+	}
+	return syncDirectory(filepath.Dir(path))
 }
 
 func applyPlacementPatches(state Snapshot, layout Layout, patches []PlacementPatch, now time.Time) ([]Placement, Snapshot, error) {

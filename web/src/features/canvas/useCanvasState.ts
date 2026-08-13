@@ -20,7 +20,10 @@ export function useCanvasState(workspaceId?: string) {
 	const mutationRef = useRef(0);
 	const viewportTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const placementTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-	const automaticPlacementRef = useRef<Promise<CanvasProjection> | undefined>(undefined);
+	const requestRef = useRef(0);
+	const loadAbortRef = useRef<AbortController | undefined>(undefined);
+	const viewportAbortRef = useRef<AbortController | undefined>(undefined);
+	const viewportMutationRef = useRef(0);
 
 	const setProjection = useCallback((next: CanvasProjection | undefined) => {
 		if (next) {
@@ -42,34 +45,27 @@ export function useCanvasState(workspaceId?: string) {
 		return discarded;
 	}, []);
 
-	const placeNewNodes = useCallback(async (projection: CanvasProjection) => {
+	const placeNewNodes = useCallback(async (projection: CanvasProjection, signal?: AbortSignal) => {
 		if (projection.unplaced.length === 0) return projection;
 		const capability = projection.nodes.find((node) => node.workspace)?.workspace?.actions['layout.move'];
 		if (capability && capability.state !== 'available') return projection;
-		if (automaticPlacementRef.current) {
-			await automaticPlacementRef.current;
-			return api.canvasLayout(projection.layout.id);
+		let current = projection;
+		while (current.unplaced.length > 0) {
+			if (signal?.aborted) throw new DOMException('Canvas request was aborted.', 'AbortError');
+			const refs = current.unplaced.slice(0, 50);
+			const patches = refs.map((entityRef, index) => ({ nodeId: nodeID(entityRef), entityRef, position: deterministicPosition(current.nodes.length + index, entityRef.kind), collapsed: entityRef.kind === 'session', expectedRevision: 0 }));
+			current = await api.patchCanvasPlacements(current.layout.id, patches, signal);
+			const remaining = new Set(current.unplaced.map(nodeID));
+			if (refs.some((ref) => remaining.has(nodeID(ref)))) throw new Error('Canvas could not place newly discovered nodes.');
 		}
-		const operation = (async () => {
-			let current = projection;
-			while (current.unplaced.length > 0) {
-				const refs = current.unplaced.slice(0, 50);
-				const patches = refs.map((entityRef, index) => ({ nodeId: nodeID(entityRef), entityRef, position: deterministicPosition(current.nodes.length + index, entityRef.kind), collapsed: entityRef.kind === 'session', expectedRevision: 0 }));
-				current = await api.patchCanvasPlacements(current.layout.id, patches);
-				const remaining = new Set(current.unplaced.map(nodeID));
-				if (refs.some((ref) => remaining.has(nodeID(ref)))) throw new Error('Canvas could not place newly discovered nodes.');
-			}
-			return current;
-		})();
-		automaticPlacementRef.current = operation;
-		try {
-			return await operation;
-		} finally {
-			if (automaticPlacementRef.current === operation) automaticPlacementRef.current = undefined;
-		}
+		return current;
 	}, []);
 
 	const load = useCallback(async () => {
+		loadAbortRef.current?.abort();
+		const controller = new AbortController();
+		loadAbortRef.current = controller;
+		const generation = ++requestRef.current;
 		if (!workspaceId) {
 			setProjection(undefined);
 			return;
@@ -77,34 +73,42 @@ export function useCanvasState(workspaceId?: string) {
 		setLoading(true);
 		setError('');
 		try {
-			const next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId));
+			const next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId, controller.signal), controller.signal);
+			if (controller.signal.aborted || generation !== requestRef.current) return;
 			discardPendingChangesFor(next);
 			dirtyRef.current.clear();
 			setConflicts([]);
 			setProjection(next);
 		} catch (caught) {
-			setError(messageFrom(caught));
+			if (!controller.signal.aborted && generation === requestRef.current) setError(messageFrom(caught));
 		} finally {
-			setLoading(false);
+			if (generation === requestRef.current) setLoading(false);
 		}
 	}, [discardPendingChangesFor, placeNewNodes, setProjection, workspaceId]);
 
 	const refresh = useCallback(async () => {
 		if (!workspaceId) return;
+		loadAbortRef.current?.abort();
+		const controller = new AbortController();
+		loadAbortRef.current = controller;
+		const generation = ++requestRef.current;
 		try {
 			// Re-resolve the default layout because a checkout can change between refreshes.
-			const next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId));
+			const next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId, controller.signal), controller.signal);
+			if (controller.signal.aborted || generation !== requestRef.current) return;
 			const discarded = discardPendingChangesFor(next);
 			setProjection(next);
 			setError(discarded ? 'Unsaved Canvas moves were discarded after the checkout changed.' : '');
 		} catch (caught) {
-			setError(messageFrom(caught));
+			if (!controller.signal.aborted && generation === requestRef.current) setError(messageFrom(caught));
 		}
 	}, [discardPendingChangesFor, placeNewNodes, setProjection, workspaceId]);
 
 	useEffect(() => {
 		void load();
 		return () => {
+			loadAbortRef.current?.abort();
+			viewportAbortRef.current?.abort();
 			if (viewportTimer.current) clearTimeout(viewportTimer.current);
 			if (placementTimer.current) clearTimeout(placementTimer.current);
 		};
@@ -192,16 +196,26 @@ export function useCanvasState(workspaceId?: string) {
 	const saveViewport = useCallback((viewport: CanvasViewport) => {
 		const current = projectionRef.current;
 		if (!current) return;
+		const mutation = ++viewportMutationRef.current;
 		setProjection({ ...current, layout: { ...current.layout, viewport } });
 		if (viewportTimer.current) clearTimeout(viewportTimer.current);
 		viewportTimer.current = setTimeout(async () => {
 			const latest = projectionRef.current;
 			if (!latest) return;
+			viewportAbortRef.current?.abort();
+			const controller = new AbortController();
+			viewportAbortRef.current = controller;
+			const layoutID = latest.layout.id;
 			try {
-				setProjection(await api.patchCanvasViewport(latest.layout.id, latest.layout.version, viewport));
+				const saved = await api.patchCanvasViewport(layoutID, latest.layout.version, viewport, controller.signal);
+				// The mutation is versioned when input arrives, rather than when the
+				// debounce fires. A late response can therefore never regress a newer
+				// optimistic viewport, even if it could not be aborted in time.
+				if (controller.signal.aborted || mutation !== viewportMutationRef.current || projectionRef.current?.layout.id !== layoutID) return;
+				setProjection(saved);
 				setError('');
 			} catch (caught) {
-				setError(messageFrom(caught));
+				if (!controller.signal.aborted) setError(messageFrom(caught));
 			}
 		}, 500);
 	}, [setProjection]);

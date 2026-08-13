@@ -51,6 +51,72 @@ func TestFileRepositoryResolvesAndPatchesIndependentPlacements(t *testing.T) {
 	}
 }
 
+func TestFileRepositoryInitializesLayoutAndSeedAtomically(t *testing.T) {
+	repository := NewFileRepository(filepath.Join(t.TempDir(), "canvases.yaml"))
+	_, created, err := repository.InitializeDefault("owner", "workspace-1", "main", []Placement{{NodeID: "invalid", EntityRef: EntityRef{Kind: EntityPlan, WorkspaceID: "workspace-1"}, Revision: 1, UpdatedAt: time.Now()}})
+	if err == nil || created {
+		t.Fatalf("invalid initialization err=%v created=%v", err, created)
+	}
+	if _, found, err := repository.FindDefault("owner", "workspace-1", "main"); err != nil || found {
+		t.Fatalf("failed initialization was published: found=%v err=%v", found, err)
+	}
+	seed := []Placement{{NodeID: "workspace:workspace-1", EntityRef: EntityRef{Kind: EntityWorkspace, WorkspaceID: "workspace-1"}, Revision: 1, UpdatedAt: time.Now().UTC()}}
+	layout, created, err := repository.InitializeDefault("owner", "workspace-1", "main", seed)
+	if err != nil || !created {
+		t.Fatalf("initialize err=%v created=%v", err, created)
+	}
+	placements, err := repository.Placements(layout.ID)
+	if err != nil || len(placements) != 1 {
+		t.Fatalf("placements=%#v err=%v", placements, err)
+	}
+	_, created, err = repository.InitializeDefault("owner", "workspace-1", "main", seed)
+	if err != nil || created {
+		t.Fatalf("retry err=%v created=%v", err, created)
+	}
+}
+
+func TestFileRepositoryRejectsOversizedAndUnknownCanvasYAML(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "canvases.yaml")
+	if err := os.WriteFile(path, []byte("layouts: []\nplacements: []\nunexpected: true\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewFileRepository(path).Snapshot(); err == nil {
+		t.Fatal("unknown Canvas YAML field was accepted")
+	}
+	if err := os.WriteFile(path, make([]byte, maxCanvasFileBytes+1), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewFileRepository(path).Snapshot(); err == nil {
+		t.Fatal("oversized Canvas YAML was accepted")
+	}
+}
+
+func TestFileRepositoryRestoresPreviousGenerationAfterDirectorySyncFailure(t *testing.T) {
+	repository := NewFileRepository(filepath.Join(t.TempDir(), "canvases.yaml"))
+	layout, _, err := repository.ResolveDefault("", "workspace-1", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.PatchPlacements(layout.ID, []PlacementPatch{{NodeID: "workspace:workspace-1", EntityRef: EntityRef{Kind: EntityWorkspace, WorkspaceID: "workspace-1"}, ExpectedRevision: 0}}); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	repository.syncDirectory = func(string) error {
+		calls++
+		if calls == 1 {
+			return errors.New("directory sync failed")
+		}
+		return nil
+	}
+	if _, err := repository.SaveViewport(layout.ID, layout.Version, Viewport{X: 4, Y: 5, Zoom: 1.1}); err == nil {
+		t.Fatal("directory sync failure was accepted")
+	}
+	loaded, found, err := repository.GetLayout(layout.ID)
+	if err != nil || !found || loaded.Version != layout.Version {
+		t.Fatalf("rollback layout=%#v found=%v err=%v", loaded, found, err)
+	}
+}
+
 func TestFileRepositoryMigratesLegacySessionsToCollapsedOnce(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "canvases.yaml")
 	layout, err := NewLayout("", "workspace-1", "main", time.Now().UTC())

@@ -1,10 +1,12 @@
 package canvas
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"kode-stream/internal/ai"
 	"kode-stream/internal/common/models"
@@ -21,6 +23,8 @@ const (
 	NodeStale     NodeState = "stale"
 	NodeForbidden NodeState = "forbidden"
 )
+
+const maxProjectionCandidates = MaxPlacements
 
 type WorkspaceNode struct {
 	ID           string                                             `json:"id"`
@@ -82,9 +86,17 @@ type gitReader interface {
 	ResolveBranch(string, string) (string, string, error)
 	Status(string, string) (models.GitStatus, error)
 }
+type contextGitReader interface {
+	CurrentBranchContext(context.Context, string) (string, error)
+	ResolveBranchContext(context.Context, string, string) (string, string, error)
+	StatusContext(context.Context, string, string) (models.GitStatus, error)
+}
 
 type sessionReader interface {
 	SessionRecords(string, string) ([]ai.SessionRecordView, error)
+}
+type contextSessionReader interface {
+	SessionRecordsContext(context.Context, string, string) ([]ai.SessionRecordView, error)
 }
 
 type verificationReader interface {
@@ -108,6 +120,13 @@ func NewService(repository Repository, workspaces registry.Repository, items ite
 }
 
 func (s *Service) ResolveDefault(ownerUserID, workspaceID, branchKey string) (Projection, error) {
+	return s.ResolveDefaultContext(context.Background(), ownerUserID, workspaceID, branchKey)
+}
+
+func (s *Service) ResolveDefaultContext(ctx context.Context, ownerUserID, workspaceID, branchKey string) (Projection, error) {
+	if err := ctx.Err(); err != nil {
+		return Projection{}, err
+	}
 	if s.repository == nil {
 		return Projection{}, errors.New("canvas repository is unavailable")
 	}
@@ -127,20 +146,31 @@ func (s *Service) ResolveDefault(ownerUserID, workspaceID, branchKey string) (Pr
 			branchKey = workspaceConfig.BaselineBranch
 		}
 	}
-	layout, created, err := s.repository.ResolveDefault(ownerUserID, workspaceID, branchKey)
+	if layout, found, err := s.repository.FindDefault(ownerUserID, workspaceID, branchKey); err != nil {
+		return Projection{}, err
+	} else if found {
+		return s.ProjectContext(ctx, ownerUserID, layout.ID)
+	}
+	seed, err := s.initialPlacements(ctx, workspaceID, branchKey)
 	if err != nil {
 		return Projection{}, err
 	}
-	if created {
-		if err := s.seedInitialPlacements(layout); err != nil {
-			return Projection{}, err
-		}
+	layout, _, err := s.repository.InitializeDefaultContext(ctx, ownerUserID, workspaceID, branchKey, seed)
+	if err != nil {
+		return Projection{}, err
 	}
-	return s.Project(ownerUserID, layout.ID)
+	return s.ProjectContext(ctx, ownerUserID, layout.ID)
 }
 
 func (s *Service) Project(ownerUserID, layoutID string) (Projection, error) {
-	layout, found, err := s.repository.GetLayout(layoutID)
+	return s.ProjectContext(context.Background(), ownerUserID, layoutID)
+}
+
+func (s *Service) ProjectContext(ctx context.Context, ownerUserID, layoutID string) (Projection, error) {
+	if err := ctx.Err(); err != nil {
+		return Projection{}, err
+	}
+	layout, found, err := s.getLayoutContext(ctx, layoutID)
 	if err != nil {
 		return Projection{}, err
 	}
@@ -154,42 +184,59 @@ func (s *Service) Project(ownerUserID, layoutID string) (Projection, error) {
 	if !found {
 		return Projection{}, ErrNotFound
 	}
-	items, err := s.items.BranchItems(layout.WorkspaceID, layout.BranchKey)
+	items, err := s.branchItemsContext(ctx, layout.WorkspaceID, layout.BranchKey)
 	if err != nil {
 		return Projection{}, err
 	}
-	items = canvasPlanItems(items)
+	items = boundedPlanItems(ctx, items)
 	sessions := []ai.SessionRecordView{}
 	if s.sessions != nil {
-		sessions, err = s.sessions.SessionRecords(layout.WorkspaceID, layout.BranchKey)
+		sessions, err = s.sessionRecordsContext(ctx, layout.WorkspaceID, layout.BranchKey)
 		if err != nil {
 			return Projection{}, err
 		}
 	}
-	placements, err := s.repository.Placements(layout.ID)
+	if len(sessions) > maxProjectionCandidates {
+		sessions = sessions[:maxProjectionCandidates]
+	}
+	if err := ctx.Err(); err != nil {
+		return Projection{}, err
+	}
+	placements, err := s.placementsContext(ctx, layout.ID)
 	if err != nil {
 		return Projection{}, err
 	}
-	return s.project(layout, workspaceConfig, items, sessions, placements), nil
+	return s.projectContext(ctx, layout, workspaceConfig, items, sessions, placements), nil
 }
 
 func (s *Service) PatchPlacements(ownerUserID, layoutID string, patches []PlacementPatch) (Projection, error) {
-	layout, err := s.ownedLayout(ownerUserID, layoutID)
+	return s.PatchPlacementsContext(context.Background(), ownerUserID, layoutID, patches)
+}
+
+func (s *Service) PatchPlacementsContext(ctx context.Context, ownerUserID, layoutID string, patches []PlacementPatch) (Projection, error) {
+	if err := ctx.Err(); err != nil {
+		return Projection{}, err
+	}
+	layout, err := s.ownedLayoutContext(ctx, ownerUserID, layoutID)
 	if err != nil {
 		return Projection{}, err
 	}
-	patches, err = s.canonicalizeNewPlacementPatches(layout, patches)
+	patches, err = s.canonicalizeNewPlacementPatchesContext(ctx, layout, patches)
 	if err != nil {
 		return Projection{}, err
 	}
-	if _, err := s.repository.PatchPlacements(layoutID, patches); err != nil {
+	if _, err := s.patchPlacementsContext(ctx, layoutID, patches); err != nil {
 		return Projection{}, err
 	}
-	return s.Project(ownerUserID, layoutID)
+	return s.ProjectContext(ctx, ownerUserID, layoutID)
 }
 
 func (s *Service) canonicalizeNewPlacementPatches(layout Layout, patches []PlacementPatch) ([]PlacementPatch, error) {
-	placements, err := s.repository.Placements(layout.ID)
+	return s.canonicalizeNewPlacementPatchesContext(context.Background(), layout, patches)
+}
+
+func (s *Service) canonicalizeNewPlacementPatchesContext(ctx context.Context, layout Layout, patches []PlacementPatch) ([]PlacementPatch, error) {
+	placements, err := s.placementsContext(ctx, layout.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +260,7 @@ func (s *Service) canonicalizeNewPlacementPatches(layout Layout, patches []Place
 			}
 			patch.EntityRef = EntityRef{Kind: EntityWorkspace, WorkspaceID: layout.WorkspaceID}
 		case EntityPlan:
-			items, err := s.items.BranchItems(layout.WorkspaceID, layout.BranchKey)
+			items, err := s.branchItemsContext(ctx, layout.WorkspaceID, layout.BranchKey)
 			if err != nil {
 				return nil, err
 			}
@@ -232,7 +279,7 @@ func (s *Service) canonicalizeNewPlacementPatches(layout Layout, patches []Place
 			if s.sessions == nil {
 				return nil, errors.New("canvas session placement does not resolve")
 			}
-			sessions, err := s.sessions.SessionRecords(layout.WorkspaceID, layout.BranchKey)
+			sessions, err := s.sessionRecordsContext(ctx, layout.WorkspaceID, layout.BranchKey)
 			if err != nil {
 				return nil, err
 			}
@@ -255,27 +302,43 @@ func (s *Service) canonicalizeNewPlacementPatches(layout Layout, patches []Place
 }
 
 func (s *Service) SaveViewport(ownerUserID, layoutID string, expectedVersion int64, viewport Viewport) (Projection, error) {
-	if _, err := s.ownedLayout(ownerUserID, layoutID); err != nil {
+	return s.SaveViewportContext(context.Background(), ownerUserID, layoutID, expectedVersion, viewport)
+}
+func (s *Service) SaveViewportContext(ctx context.Context, ownerUserID, layoutID string, expectedVersion int64, viewport Viewport) (Projection, error) {
+	if err := ctx.Err(); err != nil {
 		return Projection{}, err
 	}
-	if _, err := s.repository.SaveViewport(layoutID, expectedVersion, viewport); err != nil {
+	if _, err := s.ownedLayoutContext(ctx, ownerUserID, layoutID); err != nil {
 		return Projection{}, err
 	}
-	return s.Project(ownerUserID, layoutID)
+	if _, err := s.saveViewportContext(ctx, layoutID, expectedVersion, viewport); err != nil {
+		return Projection{}, err
+	}
+	return s.ProjectContext(ctx, ownerUserID, layoutID)
 }
 
 func (s *Service) RemovePlacement(ownerUserID, layoutID, nodeID string, expectedRevision int64) (Projection, error) {
-	if _, err := s.ownedLayout(ownerUserID, layoutID); err != nil {
+	return s.RemovePlacementContext(context.Background(), ownerUserID, layoutID, nodeID, expectedRevision)
+}
+func (s *Service) RemovePlacementContext(ctx context.Context, ownerUserID, layoutID, nodeID string, expectedRevision int64) (Projection, error) {
+	if err := ctx.Err(); err != nil {
 		return Projection{}, err
 	}
-	if err := s.repository.RemovePlacement(layoutID, nodeID, expectedRevision); err != nil {
+	if _, err := s.ownedLayoutContext(ctx, ownerUserID, layoutID); err != nil {
 		return Projection{}, err
 	}
-	return s.Project(ownerUserID, layoutID)
+	if err := s.removePlacementContext(ctx, layoutID, nodeID, expectedRevision); err != nil {
+		return Projection{}, err
+	}
+	return s.ProjectContext(ctx, ownerUserID, layoutID)
 }
 
 func (s *Service) ownedLayout(ownerUserID, layoutID string) (Layout, error) {
-	layout, found, err := s.repository.GetLayout(layoutID)
+	return s.ownedLayoutContext(context.Background(), ownerUserID, layoutID)
+}
+
+func (s *Service) ownedLayoutContext(ctx context.Context, ownerUserID, layoutID string) (Layout, error) {
+	layout, found, err := s.getLayoutContext(ctx, layoutID)
 	if err != nil {
 		return Layout{}, err
 	}
@@ -285,45 +348,126 @@ func (s *Service) ownedLayout(ownerUserID, layoutID string) (Layout, error) {
 	return layout, nil
 }
 
-func (s *Service) seedInitialPlacements(layout Layout) error {
-	items, err := s.items.BranchItems(layout.WorkspaceID, layout.BranchKey)
-	if err != nil {
+func (s *Service) getLayoutContext(ctx context.Context, id string) (Layout, bool, error) {
+	if repository, ok := s.repository.(ContextRepository); ok {
+		return repository.GetLayoutContext(ctx, id)
+	}
+	if err := ctx.Err(); err != nil {
+		return Layout{}, false, err
+	}
+	return s.repository.GetLayout(id)
+}
+func (s *Service) placementsContext(ctx context.Context, id string) ([]Placement, error) {
+	if repository, ok := s.repository.(ContextRepository); ok {
+		return repository.PlacementsContext(ctx, id)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.repository.Placements(id)
+}
+func (s *Service) patchPlacementsContext(ctx context.Context, id string, patches []PlacementPatch) ([]Placement, error) {
+	if repository, ok := s.repository.(ContextRepository); ok {
+		return repository.PatchPlacementsContext(ctx, id, patches)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.repository.PatchPlacements(id, patches)
+}
+func (s *Service) removePlacementContext(ctx context.Context, id, node string, revision int64) error {
+	if repository, ok := s.repository.(ContextRepository); ok {
+		return repository.RemovePlacementContext(ctx, id, node, revision)
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	items = canvasPlanItems(items)
-	sessions := []ai.SessionRecordView{}
-	if s.sessions != nil {
-		sessions, err = s.sessions.SessionRecords(layout.WorkspaceID, layout.BranchKey)
-		if err != nil {
-			return err
-		}
+	return s.repository.RemovePlacement(id, node, revision)
+}
+func (s *Service) saveViewportContext(ctx context.Context, id string, version int64, viewport Viewport) (Layout, error) {
+	if repository, ok := s.repository.(ContextRepository); ok {
+		return repository.SaveViewportContext(ctx, id, version, viewport)
 	}
-	patches := []PlacementPatch{{NodeID: workspaceNodeID(layout.WorkspaceID), EntityRef: EntityRef{Kind: EntityWorkspace, WorkspaceID: layout.WorkspaceID}, Position: Position{X: 0, Y: 0}}}
-	for i, item := range items {
-		if len(patches) == MaxPlacements {
-			break
-		}
-		patches = append(patches, PlacementPatch{NodeID: planNodeID(item.ID), EntityRef: planRef(item), Position: Position{X: 360 + float64(i%3)*320, Y: float64(i/3) * 190}})
+	if err := ctx.Err(); err != nil {
+		return Layout{}, err
 	}
-	for i, session := range sessions {
-		if len(patches) == MaxPlacements {
-			break
-		}
-		patches = append(patches, PlacementPatch{NodeID: sessionNodeID(session.ID), EntityRef: sessionRef(session), Position: Position{X: 360 + float64(i%3)*320, Y: 420 + float64(i/3)*190}, Collapsed: true})
-	}
-	for start := 0; start < len(patches); start += MaxPlacementBatch {
-		end := start + MaxPlacementBatch
-		if end > len(patches) {
-			end = len(patches)
-		}
-		if _, err := s.repository.PatchPlacements(layout.ID, patches[start:end]); err != nil {
-			return err
-		}
-	}
-	return nil
+	return s.repository.SaveViewport(id, version, viewport)
 }
 
-func (s *Service) project(layout Layout, workspaceConfig models.WorkspaceConfig, items []models.ItemSummary, sessions []ai.SessionRecordView, placements []Placement) Projection {
+func (s *Service) initialPlacements(ctx context.Context, workspaceID, branchKey string) ([]Placement, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	items, err := s.branchItemsContext(ctx, workspaceID, branchKey)
+	if err != nil {
+		return nil, err
+	}
+	items = boundedPlanItems(ctx, items)
+	sessions := []ai.SessionRecordView{}
+	if s.sessions != nil {
+		sessions, err = s.sessionRecordsContext(ctx, workspaceID, branchKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(sessions) > maxProjectionCandidates {
+		sessions = sessions[:maxProjectionCandidates]
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	placements := []Placement{{NodeID: workspaceNodeID(workspaceID), EntityRef: EntityRef{Kind: EntityWorkspace, WorkspaceID: workspaceID}, Position: Position{X: 0, Y: 0}, Revision: 1, UpdatedAt: now}}
+	for i, item := range items {
+		if len(placements) == MaxPlacements {
+			break
+		}
+		placements = append(placements, Placement{NodeID: planNodeID(item.ID), EntityRef: planRef(item), Position: Position{X: 360 + float64(i%3)*320, Y: float64(i/3) * 190}, Revision: 1, UpdatedAt: now})
+	}
+	for i, session := range sessions {
+		if len(placements) == MaxPlacements {
+			break
+		}
+		placements = append(placements, Placement{NodeID: sessionNodeID(session.ID), EntityRef: sessionRef(session), Position: Position{X: 360 + float64(i%3)*320, Y: 420 + float64(i/3)*190}, Collapsed: true, Revision: 1, UpdatedAt: now})
+	}
+	return placements, nil
+}
+
+func (s *Service) branchItemsContext(ctx context.Context, workspaceID, branch string) ([]models.ItemSummary, error) {
+	items := make([]models.ItemSummary, 0, maxProjectionCandidates)
+	err := s.items.VisitContext(ctx, itemindex.Query{WorkspaceID: workspaceID, Branch: branch, IncludeSnapshots: true}, func(item models.ItemSummary) bool {
+		if canvasPlanService(item) == "" {
+			return true
+		}
+		items = append(items, item)
+		return len(items) < maxProjectionCandidates
+	})
+	return items, err
+}
+func (s *Service) sessionRecordsContext(ctx context.Context, workspaceID, branch string) ([]ai.SessionRecordView, error) {
+	if reader, ok := s.sessions.(contextSessionReader); ok {
+		return reader.SessionRecordsContext(ctx, workspaceID, branch)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.sessions.SessionRecords(workspaceID, branch)
+}
+
+func boundedPlanItems(ctx context.Context, items []models.ItemSummary) []models.ItemSummary {
+	result := make([]models.ItemSummary, 0, min(len(items), maxProjectionCandidates))
+	for _, item := range items {
+		if ctx.Err() != nil || len(result) >= maxProjectionCandidates {
+			break
+		}
+		if canvasPlanService(item) != "" {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceConfig models.WorkspaceConfig, items []models.ItemSummary, sessions []ai.SessionRecordView, placements []Placement) Projection {
 	itemByID := map[string]models.ItemSummary{}
 	for _, item := range items {
 		itemByID[item.ID] = item
@@ -336,12 +480,24 @@ func (s *Service) project(layout Layout, workspaceConfig models.WorkspaceConfig,
 	var gitStatus *models.GitStatus
 	contentAvailable := strings.TrimSpace(workspaceConfig.Path) != ""
 	if s.git != nil && contentAvailable {
-		currentBranch, _ = s.git.CurrentBranch(workspaceConfig.Path)
-		_, commit, _ = s.git.ResolveBranch(workspaceConfig.Path, layout.BranchKey)
-		if status, statusErr := s.git.Status(workspaceConfig.ID, workspaceConfig.Path); statusErr == nil {
-			gitStatus = &status
-		} else {
+		if contextual, ok := s.git.(contextGitReader); ok {
+			currentBranch, _ = contextual.CurrentBranchContext(ctx, workspaceConfig.Path)
+			_, commit, _ = contextual.ResolveBranchContext(ctx, workspaceConfig.Path, layout.BranchKey)
+			if status, statusErr := contextual.StatusContext(ctx, workspaceConfig.ID, workspaceConfig.Path); statusErr == nil {
+				gitStatus = &status
+			} else {
+				contentAvailable = false
+			}
+		} else if err := ctx.Err(); err != nil {
 			contentAvailable = false
+		} else {
+			currentBranch, _ = s.git.CurrentBranch(workspaceConfig.Path)
+			_, commit, _ = s.git.ResolveBranch(workspaceConfig.Path, layout.BranchKey)
+			if status, statusErr := s.git.Status(workspaceConfig.ID, workspaceConfig.Path); statusErr == nil {
+				gitStatus = &status
+			} else {
+				contentAvailable = false
+			}
 		}
 	}
 	authorization := s.authorization
