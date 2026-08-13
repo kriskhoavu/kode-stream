@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,7 +79,7 @@ func TestAutomationVerificationRunsSelectedSpecsAndCollectsArtifacts(t *testing.
 	if !hasStep(job, "automation") || !hasStep(job, "down") {
 		t.Fatalf("steps = %#v", job.Steps)
 	}
-	if !hasArtifact(job, filepath.Join(automationRepo, "run.txt")) {
+	if !hasArtifact(job, "run.txt") {
 		t.Fatalf("artifacts = %#v", job.Artifacts)
 	}
 	if !hasArtifactKindSuffix(job, "automation_log", "automation.log") || !hasArtifactKindSuffix(job, "runtime_log", "runtime.log") {
@@ -187,6 +188,149 @@ func TestAutomationVerificationRejectsPathTraversal(t *testing.T) {
 	_, err := service.Start("workspace-1", CreateInput{Mode: JobModeAutomation, SelectedSpecs: []string{"../secret.cy.ts"}})
 	if err == nil || !strings.Contains(err.Error(), "relative") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestAutomationVerificationRejectsShellEnvironmentBeforeStarting(t *testing.T) {
+	workspacePath := t.TempDir()
+	automationRepo := t.TempDir()
+	marker := filepath.Join(automationRepo, "injected")
+	service := NewService(verificationRegistry(t, models.WorkspaceConfig{
+		ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"},
+		Runtime: verificationRuntime("true", &models.RuntimeAutomationConfig{Enabled: true, RepositoryPath: automationRepo, Runner: models.AutomationRunnerCypress, CommandTemplate: "touch " + marker + " {env} {specs}"}),
+	}), appruntime.NewService())
+	if _, err := service.Start("workspace-1", CreateInput{Mode: JobModeAutomation, Environment: "local; touch " + marker, SelectedSpecs: []string{"safe.cy.ts"}}); err == nil {
+		t.Fatal("unsafe environment was accepted")
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("injection marker exists: %v", err)
+	}
+}
+
+func TestAutomationArtifactSymlinkOutsideRepositoryIsSkipped(t *testing.T) {
+	workspacePath := t.TempDir()
+	automationRepo := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(automationRepo, "escape")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	service := NewService(verificationRegistry(t, models.WorkspaceConfig{
+		ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"},
+		Runtime: verificationRuntime("true", &models.RuntimeAutomationConfig{Enabled: true, RepositoryPath: automationRepo, Runner: models.AutomationRunnerCypress, CommandTemplate: "true", ArtifactPaths: []string{"escape"}}),
+	}), appruntime.NewService())
+	job, err := service.Start("workspace-1", CreateInput{Mode: JobModeAutomation, SelectedSpecs: []string{"safe.cy.ts"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job = waitVerificationJob(t, service, "workspace-1", job.ID)
+	if hasArtifact(job, "secret.txt") || job.ArtifactWarning == "" {
+		t.Fatalf("unsafe artifact was exposed: %#v", job)
+	}
+}
+
+func TestAutomationArtifactLocatorIncludesConfiguredRoot(t *testing.T) {
+	workspacePath, automationRepo := t.TempDir(), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(automationRepo, "reports"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(automationRepo, "reports", "result.txt"), []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", &models.RuntimeAutomationConfig{Enabled: true, RepositoryPath: automationRepo, Runner: models.AutomationRunnerCypress, CommandTemplate: "true", ArtifactPaths: []string{"reports"}})}), appruntime.NewService())
+	job, err := service.Start("workspace-1", CreateInput{Mode: JobModeAutomation, SelectedSpecs: []string{"safe.cy.ts"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job = waitVerificationJob(t, service, "workspace-1", job.ID)
+	found := false
+	for _, artifact := range job.Artifacts {
+		if artifact.Root == "automation" && artifact.Path == "reports/result.txt" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("automation locator omitted configured root: %#v", job.Artifacts)
+	}
+}
+
+func TestVerificationRetentionPrunesOldTerminalJobsAndTheirOwnedArtifacts(t *testing.T) {
+	workspacePath := t.TempDir()
+	service := NewService(verificationRegistry(t, models.WorkspaceConfig{
+		ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", nil),
+	}), appruntime.NewService()).ConfigureRetention(1, time.Hour)
+	first, err := service.Start("workspace-1", CreateInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = waitVerificationJob(t, service, "workspace-1", first.ID)
+	second, err := service.Start("workspace-1", CreateInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = waitVerificationJob(t, service, "workspace-1", second.ID)
+	if _, ok := service.Get("workspace-1", first.ID); ok {
+		t.Fatal("old terminal job was retained")
+	}
+	if _, ok := service.Get("workspace-1", second.ID); !ok {
+		t.Fatal("latest terminal job was pruned")
+	}
+	if _, err := os.Stat(filepath.Join(workspacePath, ".artifacts", "verification", first.ID)); !os.IsNotExist(err) {
+		t.Fatalf("old artifact root remains: %v", err)
+	}
+}
+
+func TestVerificationRetentionRecordsArtifactCleanupFailure(t *testing.T) {
+	workspacePath := t.TempDir()
+	service := NewService(verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", nil)}), appruntime.NewService()).ConfigureRetention(1, time.Hour)
+	service.removeArtifact = func(string) error { return errors.New("disk busy") }
+	first, err := service.Start("workspace-1", CreateInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = waitVerificationJob(t, service, "workspace-1", first.ID)
+	second, err := service.Start("workspace-1", CreateInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = waitVerificationJob(t, service, "workspace-1", second.ID)
+	if warnings := service.RetentionWarnings(); len(warnings) != 1 || !strings.Contains(warnings[0], "disk busy") {
+		t.Fatalf("warnings=%#v", warnings)
+	}
+}
+
+func TestVerificationRetentionPrunesExpiredTerminalJob(t *testing.T) {
+	workspacePath := t.TempDir()
+	service := NewService(verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", nil)}), appruntime.NewService()).ConfigureRetention(10, time.Nanosecond)
+	service.mu.Lock()
+	service.jobs["old"] = &Job{ID: "old", WorkspaceID: "workspace-1", Status: JobStatusPassed, FinishedAt: time.Now().Add(-time.Hour)}
+	service.jobs["new"] = &Job{ID: "new", WorkspaceID: "workspace-1", Status: JobStatusPassed, FinishedAt: time.Now()}
+	service.mu.Unlock()
+	service.pruneTerminalJobs()
+	if _, ok := service.snapshotAny("old"); ok {
+		t.Fatal("expired terminal job retained")
+	}
+}
+
+func TestVerificationServiceStartupCleansOnlyOwnedOrphanArtifactGenerations(t *testing.T) {
+	workspacePath := t.TempDir()
+	reg := verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", nil)})
+	orphan := filepath.Join(workspacePath, ".artifacts", "verification", "verify-orphan")
+	keep := filepath.Join(workspacePath, ".artifacts", "verification", "not-a-job")
+	if err := os.MkdirAll(orphan, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(keep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = NewService(reg, appruntime.NewService())
+	if _, err := os.Stat(orphan); !os.IsNotExist(err) {
+		t.Fatalf("orphan remains: %v", err)
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Fatalf("unowned directory removed: %v", err)
 	}
 }
 

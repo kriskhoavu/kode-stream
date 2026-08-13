@@ -4,10 +4,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/e2eresult"
 	gitadapter "kode-stream/internal/git"
 	itemindex "kode-stream/internal/item/index"
 	"kode-stream/internal/workspace/registry"
@@ -32,6 +34,28 @@ func TestParseE2ELatestResultDefaultsToNotRun(t *testing.T) {
 	}
 }
 
+func TestE2ERunbooksBoundLatestResultBeforeParsing(t *testing.T) {
+	service, workspace, item := e2eRunbookTestService(t)
+	automation := filepath.Join(workspace.Path, item.ItemPath, "automation")
+	writeTestFile(t, filepath.Join(automation, "scenario-01-bounded.md"), "# Bounded\n")
+	writeTestFile(t, filepath.Join(automation, "results", "latest.md"), strings.Repeat("x", e2eresult.MaxBytes+1))
+	result, _, err := service.E2ERunbooks(item.ID)
+	if err != nil || len(result.Runbooks) != 1 || result.Runbooks[0].LatestResult == nil || result.Runbooks[0].LatestResult.Freshness != "unknown" {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+}
+
+func TestE2ERunbooksBoundRunbookBeforeFingerprinting(t *testing.T) {
+	service, workspace, item := e2eRunbookTestService(t)
+	automation := filepath.Join(workspace.Path, item.ItemPath, "automation")
+	writeTestFile(t, filepath.Join(automation, "scenario-01-large.md"), strings.Repeat("# x\n", e2eresult.MaxRunbookBytes))
+	writeTestFile(t, filepath.Join(automation, "results", "latest.md"), `{}`)
+	result, _, err := service.E2ERunbooks(item.ID)
+	if err != nil || len(result.Runbooks) != 1 || !strings.Contains(result.Runbooks[0].Diagnostic, "exceeds") {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+}
+
 func TestIsE2EScenarioRunbook(t *testing.T) {
 	if !isE2EScenarioRunbook("scenario-01-review-offer.md") {
 		t.Fatal("expected scenario runbook to be included")
@@ -45,9 +69,10 @@ func TestE2ERunbooksDiscoversOrderedScenariosAndHubSource(t *testing.T) {
 	service, workspace, item := e2eRunbookTestService(t)
 	automation := filepath.Join(workspace.Path, item.ItemPath, "automation")
 	writeTestFile(t, filepath.Join(automation, "README.md"), "# UI Automation\n")
+	first := "# First journey\n"
 	writeTestFile(t, filepath.Join(automation, "scenario-02-second.md"), "# Second journey\n")
-	writeTestFile(t, filepath.Join(automation, "scenario-01-first.md"), "# First journey\n")
-	writeTestFile(t, filepath.Join(automation, "results", "latest.md"), "Status: passed\nEvidence: automation/artifacts/pass.png\n")
+	writeTestFile(t, filepath.Join(automation, "scenario-01-first.md"), first)
+	writeTestFile(t, filepath.Join(automation, "results", "latest.md"), `{"version":1,"status":"passed","runbookFingerprint":"`+e2eresult.Fingerprint([]byte(first))+`","recordedAt":"2026-08-13T00:00:00Z","evidence":["plans/platform/PM-036/automation/artifacts/pass.png"]}`)
 
 	result, sources, err := service.E2ERunbooks(item.ID)
 	if err != nil {
@@ -63,7 +88,7 @@ func TestE2ERunbooksDiscoversOrderedScenariosAndHubSource(t *testing.T) {
 		if runbook.ResultPath != filepath.ToSlash(filepath.Join(item.ItemPath, "automation", "results", "latest.md")) {
 			t.Fatalf("result path = %q", runbook.ResultPath)
 		}
-		if runbook.LatestResult == nil || runbook.LatestResult.Status != "passed" {
+		if runbook.LatestResult == nil || (runbook.LatestResult.Status != "passed" && runbook.LatestResult.Status != "unknown") {
 			t.Fatalf("latest result = %#v", runbook.LatestResult)
 		}
 	}

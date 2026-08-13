@@ -160,6 +160,7 @@ export interface VerificationStepResult {
 
 export interface RunArtifact {
   kind: string;
+  root?: 'workspace' | 'automation' | string;
   path: string;
   sizeBytes: number;
   createdAt: string;
@@ -218,6 +219,8 @@ export interface ItemVerificationTests {
 
 export interface E2ELatestResult {
   status: string;
+  freshness?: 'fresh' | 'stale' | 'unknown';
+  recordedAt?: string;
   provider?: string;
   environment?: string;
   failedStep?: string;

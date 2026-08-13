@@ -27,6 +27,17 @@ const (
 	JobStatusFailed  JobStatus = "failed"
 )
 
+const (
+	maxAutomationSpecs                = 64
+	maxAutomationSpecBytes            = 512
+	maxAutomationEnvironment          = 64
+	maxArtifactFiles                  = 256
+	maxArtifactBytes            int64 = 128 << 20
+	maxArtifactDepth                  = 12
+	defaultMaxTerminalJobs            = 100
+	defaultTerminalJobRetention       = 24 * time.Hour
+)
+
 type FailureType string
 
 const (
@@ -66,6 +77,7 @@ type StepResult struct {
 
 type Artifact struct {
 	Kind      string    `json:"kind"`
+	Root      string    `json:"root,omitempty"`
 	Path      string    `json:"path"`
 	SizeBytes int64     `json:"sizeBytes"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -92,6 +104,7 @@ type Job struct {
 	FinishedAt         time.Time                      `json:"finishedAt,omitempty"`
 	Steps              []StepResult                   `json:"steps"`
 	Artifacts          []Artifact                     `json:"artifacts"`
+	ArtifactWarning    string                         `json:"artifactWarning,omitempty"`
 	Runtime            *models.WorkspaceRuntimeConfig `json:"runtime,omitempty"`
 	StartFingerprint   *RepositoryFingerprint         `json:"startFingerprint,omitempty"`
 	FinishFingerprint  *RepositoryFingerprint         `json:"finishFingerprint,omitempty"`
@@ -120,16 +133,20 @@ type CheckpointEvent struct {
 }
 
 type Service struct {
-	registry    registry.Repository
-	runtime     *appruntime.Service
-	mu          sync.RWMutex
-	jobs        map[string]*Job
-	seq         atomic.Int64
-	slots       chan struct{}
-	timeout     time.Duration
-	ctx         context.Context
-	cancel      context.CancelFunc
-	fingerprint Fingerprinter
+	registry        registry.Repository
+	runtime         *appruntime.Service
+	mu              sync.RWMutex
+	jobs            map[string]*Job
+	seq             atomic.Int64
+	slots           chan struct{}
+	timeout         time.Duration
+	maxTerminal     int
+	retention       time.Duration
+	removeArtifact  func(string) error
+	cleanupWarnings []string
+	ctx             context.Context
+	cancel          context.CancelFunc
+	fingerprint     Fingerprinter
 }
 
 func NewService(reg registry.Repository, runtimeService *appruntime.Service) *Service {
@@ -144,7 +161,31 @@ func NewServiceWithPolicy(reg registry.Repository, runtimeService *appruntime.Se
 		timeout = 10 * time.Minute
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Service{registry: reg, runtime: runtimeService, jobs: map[string]*Job{}, slots: make(chan struct{}, maxRunning), timeout: timeout, ctx: ctx, cancel: cancel, fingerprint: GitFingerprinter{}}
+	service := &Service{registry: reg, runtime: runtimeService, jobs: map[string]*Job{}, slots: make(chan struct{}, maxRunning), timeout: timeout, maxTerminal: defaultMaxTerminalJobs, retention: defaultTerminalJobRetention, removeArtifact: os.RemoveAll, ctx: ctx, cancel: cancel, fingerprint: GitFingerprinter{}}
+	if reg != nil {
+		service.cleanupOrphanArtifacts()
+	}
+	return service
+}
+
+// ConfigureRetention bounds process-local completed job history. Active jobs are
+// never removed; callers may reduce these values in resource-constrained hosts.
+func (s *Service) ConfigureRetention(maxTerminal int, retention time.Duration) *Service {
+	if maxTerminal > 0 {
+		s.maxTerminal = maxTerminal
+	}
+	if retention > 0 {
+		s.retention = retention
+	}
+	return s
+}
+
+// RetentionWarnings exposes cleanup failures to host diagnostics without
+// resurrecting pruned job records. Returned data is copied for callers.
+func (s *Service) RetentionWarnings() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return append([]string(nil), s.cleanupWarnings...)
 }
 
 func (s *Service) ConfigureFingerprinter(fingerprinter Fingerprinter) *Service {
@@ -165,6 +206,16 @@ func (s *Service) Limits() (int, time.Duration) {
 		return 0, 0
 	}
 	return cap(s.slots), s.timeout
+}
+
+// JobCount is a diagnostic snapshot of in-memory retained jobs.
+func (s *Service) JobCount() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.jobs)
 }
 
 func (s *Service) Start(workspaceID string, input CreateInput) (Job, error) {
@@ -221,27 +272,35 @@ func (s *Service) Start(workspaceID string, input CreateInput) (Job, error) {
 	s.mu.Lock()
 	s.jobs[job.ID] = job
 	s.mu.Unlock()
+	initial := cloneJob(*job)
 
 	go s.run(job.ID, workspace)
-	return cloneJob(*job), nil
+	return initial, nil
 }
 
 func (s *Service) Get(workspaceID, jobID string) (Job, bool) {
-	s.mu.RLock()
-	job, ok := s.jobs[jobID]
-	if !ok || job.WorkspaceID != workspaceID {
-		s.mu.RUnlock()
+	return s.GetContext(context.Background(), workspaceID, jobID)
+}
+
+func (s *Service) GetContext(ctx context.Context, workspaceID, jobID string) (Job, bool) {
+	copy, ok := s.snapshot(workspaceID, jobID)
+	if !ok {
 		return Job{}, false
 	}
-	copy := cloneJob(*job)
-	s.mu.RUnlock()
 	if workspace, found, err := s.registry.Get(workspaceID); err == nil && found {
-		if current, fingerprintErr := s.fingerprint.Fingerprint(workspace, copy); fingerprintErr == nil {
+		if current, fingerprintErr := s.fingerprintContext(ctx, workspace, copy); fingerprintErr == nil {
 			copy.CurrentFingerprint = &current
 		}
 	}
 	copy.Freshness = projectFreshness(copy)
 	return copy, true
+}
+
+func (s *Service) fingerprintContext(ctx context.Context, workspace models.WorkspaceConfig, job Job) (RepositoryFingerprint, error) {
+	if contextual, ok := s.fingerprint.(ContextFingerprinter); ok {
+		return contextual.FingerprintContext(ctx, workspace, job)
+	}
+	return s.fingerprint.Fingerprint(workspace, job)
 }
 
 func (s *Service) Latest(workspaceID string) (Job, bool) {
@@ -310,17 +369,23 @@ func (s *Service) IngestCheckpoint(workspaceID string, event CheckpointEvent) (J
 
 func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	defer func() { <-s.slots }()
-	job, ok := s.getInternal(jobID)
+	job, ok := s.snapshotAny(jobID)
 	if !ok {
 		return
 	}
-	job.Status = JobStatusRunning
-	job.StartedAt = time.Now().UTC()
+	s.mutate(jobID, func(state *Job) {
+		state.Status = JobStatusRunning
+		state.StartedAt = time.Now().UTC()
+	})
+	job, _ = s.snapshotAny(jobID)
 	finalStatus := JobStatusFailed
 	defer func() {
-		s.captureFinishFingerprint(job, workspace)
-		job.Status = finalStatus
-		job.FinishedAt = time.Now().UTC()
+		s.captureFinishFingerprint(jobID, workspace)
+		s.mutate(jobID, func(state *Job) {
+			state.Status = finalStatus
+			state.FinishedAt = time.Now().UTC()
+		})
+		s.pruneTerminalJobs()
 	}()
 	config := job.Runtime
 	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
@@ -328,75 +393,79 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 
 	artifactRoot, err := appruntime.EnsureArtifactRoot(workspace.Path, job.ID)
 	if err != nil {
-		s.failJob(job, FailureTypeInfra, 30, "create artifact directory", err)
+		s.failJob(jobID, FailureTypeInfra, 30, "create artifact directory", err)
 		return
 	}
 	runtimeLogPath := filepath.Join(artifactRoot, "runtime.log")
 	verifyLogPath := filepath.Join(artifactRoot, verifyLogName(job.Mode))
 	runtimeLog, err := os.Create(runtimeLogPath)
 	if err != nil {
-		s.failJob(job, FailureTypeInfra, 30, "open runtime log", err)
+		s.failJob(jobID, FailureTypeInfra, 30, "open runtime log", err)
 		return
 	}
 	defer runtimeLog.Close()
 	verifyLog, err := os.Create(verifyLogPath)
 	if err != nil {
-		s.failJob(job, FailureTypeInfra, 30, "open verify log", err)
+		s.failJob(jobID, FailureTypeInfra, 30, "open verify log", err)
 		return
 	}
 	defer verifyLog.Close()
 
-	if err := s.runStep(job, "prepare", runtimeLog, func() error {
+	if err := s.runStep(jobID, "prepare", runtimeLog, func() error {
 		return s.runtime.Prepare(ctx, workspace.Path, config, runtimeLog)
 	}); err != nil {
-		s.failJob(job, FailureTypeInfra, 30, "prepare failed", err)
-		s.collectArtifacts(job, artifactRoot)
+		s.failJob(jobID, FailureTypeInfra, 30, "prepare failed", err)
+		s.collectArtifacts(jobID, artifactRoot)
 		return
 	}
-	if err := s.runStep(job, "up", runtimeLog, func() error {
+	if err := s.runStep(jobID, "up", runtimeLog, func() error {
 		return s.runtime.Up(ctx, workspace.Path, config, runtimeLog)
 	}); err != nil {
 		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
-		s.failJob(job, FailureTypeBoot, 10, "startup failed", err)
-		s.collectArtifacts(job, artifactRoot)
+		s.failJob(jobID, FailureTypeBoot, 10, "startup failed", err)
+		s.collectArtifacts(jobID, artifactRoot)
 		return
 	}
-	if err := s.runStep(job, "health", runtimeLog, func() error {
+	if err := s.runStep(jobID, "health", runtimeLog, func() error {
 		return s.runtime.Health(ctx, workspace.Path, config, runtimeLog)
 	}); err != nil {
 		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
-		s.failJob(job, FailureTypeBoot, 10, "health checks failed", err)
-		s.collectArtifacts(job, artifactRoot)
+		s.failJob(jobID, FailureTypeBoot, 10, "health checks failed", err)
+		s.collectArtifacts(jobID, artifactRoot)
 		return
 	}
-	if err := s.runStep(job, verifyStepName(job.Mode), verifyLog, func() error {
+	if err := s.runStep(jobID, verifyStepName(job.Mode), verifyLog, func() error {
 		if job.Mode == JobModeAutomation {
 			return s.runtime.RunCommand(ctx, job.AutomationRepoPath, job.RenderedCommand, verifyLog)
 		}
 		return s.runtime.Verify(ctx, workspace.Path, config, job.Profile, verifyLog)
 	}); err != nil {
 		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
-		s.failJob(job, FailureTypeTest, 20, "verification failed", err)
-		s.collectArtifacts(job, artifactRoot)
-		s.collectAutomationArtifacts(job)
+		s.failJob(jobID, FailureTypeTest, 20, "verification failed", err)
+		s.collectArtifacts(jobID, artifactRoot)
+		s.collectAutomationArtifacts(jobID)
 		return
 	}
-	_ = s.runStep(job, "down", runtimeLog, func() error {
+	_ = s.runStep(jobID, "down", runtimeLog, func() error {
 		return s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
 	})
 
-	s.collectArtifacts(job, artifactRoot)
-	s.collectAutomationArtifacts(job)
+	s.collectArtifacts(jobID, artifactRoot)
+	s.collectAutomationArtifacts(jobID)
 	finalStatus = JobStatusPassed
-	job.ExitCode = 0
+	s.mutate(jobID, func(state *Job) { state.ExitCode = 0 })
 }
 
-func (s *Service) captureFinishFingerprint(job *Job, workspace models.WorkspaceConfig) {
+func (s *Service) captureFinishFingerprint(jobID string, workspace models.WorkspaceConfig) {
 	if current, found, err := s.registry.Get(workspace.ID); err == nil && found {
 		workspace = current
 	}
-	if fingerprint, err := s.fingerprint.Fingerprint(workspace, *job); err == nil {
-		job.FinishFingerprint = &fingerprint
+	job, ok := s.snapshotAny(jobID)
+	if !ok {
+		return
+	}
+	if fingerprint, err := s.fingerprint.Fingerprint(workspace, job); err == nil {
+		s.mutate(jobID, func(state *Job) { state.FinishFingerprint = &fingerprint })
 	}
 }
 
@@ -449,6 +518,12 @@ func prepareAutomationJob(runtimeConfig *models.WorkspaceRuntimeConfig, input Cr
 	if environment == "" {
 		environment = runtimeConfig.Automation.DefaultEnvironment
 	}
+	if err := validateAutomationEnvironment(environment); err != nil {
+		return automationJobConfig{}, err
+	}
+	if err := appruntime.ValidateAutomationCommandTemplate(runtimeConfig.Automation.CommandTemplate); err != nil {
+		return automationJobConfig{}, err
+	}
 	displayMode := normalizeAutomationDisplayMode(input.DisplayMode)
 	rendered := renderAutomationCommand(runtimeConfig.Automation.CommandTemplate, runtimeConfig.Automation.Runner, environment, selectedSpecs, displayMode)
 	if strings.TrimSpace(rendered) == "" {
@@ -464,6 +539,9 @@ func prepareAutomationJob(runtimeConfig *models.WorkspaceRuntimeConfig, input Cr
 }
 
 func validateSelectedSpecs(repositoryPath string, specs []string) ([]string, error) {
+	if len(specs) > maxAutomationSpecs {
+		return nil, fmt.Errorf("at most %d selected specs are allowed", maxAutomationSpecs)
+	}
 	root, err := filepath.Abs(strings.TrimSpace(repositoryPath))
 	if err != nil || root == "" {
 		return nil, errors.New("runtime automation repositoryPath is invalid")
@@ -471,6 +549,9 @@ func validateSelectedSpecs(repositoryPath string, specs []string) ([]string, err
 	selected := make([]string, 0, len(specs))
 	seen := map[string]struct{}{}
 	for _, spec := range specs {
+		if len(spec) > maxAutomationSpecBytes || strings.ContainsAny(spec, "\x00\r\n") {
+			return nil, fmt.Errorf("selected spec %q is invalid", spec)
+		}
 		clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(spec)))
 		if clean == "" || clean == "." {
 			continue
@@ -495,6 +576,18 @@ func validateSelectedSpecs(repositoryPath string, specs []string) ([]string, err
 	return selected, nil
 }
 
+func validateAutomationEnvironment(environment string) error {
+	if environment == "" || len(environment) > maxAutomationEnvironment {
+		return errors.New("automation environment is invalid")
+	}
+	for _, r := range environment {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-') {
+			return errors.New("automation environment is invalid")
+		}
+	}
+	return nil
+}
+
 func normalizeAutomationDisplayMode(mode models.AutomationDisplayMode) models.AutomationDisplayMode {
 	if mode == models.AutomationDisplayModeVisible {
 		return models.AutomationDisplayModeVisible
@@ -506,8 +599,11 @@ func renderAutomationCommand(template string, runner models.AutomationRunner, en
 	rendered := strings.TrimSpace(template)
 	modeArgs := automationModeArgs(runner, displayMode)
 	hasModePlaceholder := strings.Contains(rendered, "{modeArgs}") || strings.Contains(rendered, "{headed}") || strings.Contains(rendered, "{browser}")
-	rendered = strings.ReplaceAll(rendered, "{env}", environment)
-	rendered = strings.ReplaceAll(rendered, "{specs}", strings.Join(selectedSpecs, ","))
+	// The command template remains administrator-authored, but values originating
+	// from the request are always a single POSIX shell word. Template validation
+	// rejects quoted user placeholders so values cannot escape their token.
+	rendered = strings.ReplaceAll(rendered, "{env}", shellQuoteIfNeeded(environment))
+	rendered = strings.ReplaceAll(rendered, "{specs}", shellQuoteIfNeeded(strings.Join(selectedSpecs, ",")))
 	rendered = strings.ReplaceAll(rendered, "{modeArgs}", modeArgs)
 	rendered = strings.ReplaceAll(rendered, "{headed}", automationHeadedArg(displayMode))
 	rendered = strings.ReplaceAll(rendered, "{browser}", automationBrowserArg(runner, displayMode))
@@ -515,6 +611,17 @@ func renderAutomationCommand(template string, runner models.AutomationRunner, en
 		rendered = strings.TrimSpace(rendered + " " + modeArgs)
 	}
 	return rendered
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\\"'\\\"'") + "'"
+}
+
+func shellQuoteIfNeeded(value string) string {
+	if value != "" && !strings.ContainsAny(value, " \t\r\n\\\"'$`;&|<>(){}[]*!?") {
+		return value
+	}
+	return shellQuote(value)
 }
 
 func automationModeArgs(runner models.AutomationRunner, displayMode models.AutomationDisplayMode) string {
@@ -558,7 +665,7 @@ func verifyStepName(mode JobMode) string {
 	return "verify"
 }
 
-func (s *Service) runStep(job *Job, name string, _ *os.File, run func() error) error {
+func (s *Service) runStep(jobID, name string, _ *os.File, run func() error) error {
 	start := time.Now()
 	err := run()
 	step := StepResult{Step: name, At: time.Now().UTC(), DurationMS: time.Since(start).Milliseconds()}
@@ -568,35 +675,91 @@ func (s *Service) runStep(job *Job, name string, _ *os.File, run func() error) e
 	} else {
 		step.Status = "ok"
 	}
-	job.Steps = append(job.Steps, step)
+	s.mutate(jobID, func(job *Job) { job.Steps = append(job.Steps, step) })
 	return err
 }
 
-func (s *Service) collectArtifacts(job *Job, root string) {
-	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil || entry.IsDir() {
-			return nil
+func (s *Service) collectArtifacts(jobID, root string) {
+	artifacts, warning := collectArtifacts(root)
+	for index := range artifacts {
+		artifacts[index].Root = "workspace"
+	}
+	s.mutate(jobID, func(job *Job) {
+		job.Artifacts = append(job.Artifacts, artifacts...)
+		if warning != "" {
+			job.ArtifactWarning = warning
 		}
-		info, err := entry.Info()
-		if err != nil {
-			return nil
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			rel = filepath.Base(path)
-		}
-		artifact := Artifact{
-			Kind:      classifyArtifact(rel),
-			Path:      filepath.ToSlash(path),
-			SizeBytes: info.Size(),
-			CreatedAt: time.Now().UTC(),
-		}
-		job.Artifacts = append(job.Artifacts, artifact)
-		return nil
 	})
 }
 
-func (s *Service) collectAutomationArtifacts(job *Job) {
+func collectArtifacts(root string) ([]Artifact, string) {
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return nil, "Artifact collection root is unavailable."
+	}
+	canonicalRoot, err = filepath.Abs(canonicalRoot)
+	if err != nil {
+		return nil, "Artifact collection root is unavailable."
+	}
+	walkRoot := canonicalRoot
+	if info, statErr := os.Stat(canonicalRoot); statErr != nil {
+		return nil, "Artifact collection root is unavailable."
+	} else if !info.IsDir() {
+		walkRoot = filepath.Dir(canonicalRoot)
+	}
+	artifacts := []Artifact{}
+	var total int64
+	warning := ""
+	_ = filepath.WalkDir(canonicalRoot, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			warning = "Some artifacts could not be collected."
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() {
+			return nil
+		}
+		rel, err := filepath.Rel(walkRoot, path)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			warning = "Unsafe artifact path was skipped."
+			return nil
+		}
+		if len(strings.Split(filepath.ToSlash(rel), "/")) > maxArtifactDepth {
+			warning = "Artifact collection reached its depth limit."
+			return nil
+		}
+		if len(artifacts) >= maxArtifactFiles || total+info.Size() > maxArtifactBytes {
+			warning = "Artifact collection reached its retention limit."
+			return filepath.SkipDir
+		}
+		total += info.Size()
+		artifact := Artifact{
+			Kind:      classifyArtifact(rel),
+			Path:      filepath.ToSlash(rel),
+			SizeBytes: info.Size(),
+			CreatedAt: time.Now().UTC(),
+		}
+		artifacts = append(artifacts, artifact)
+		return nil
+	})
+	sort.Slice(artifacts, func(i, j int) bool { return artifacts[i].Path < artifacts[j].Path })
+	return artifacts, warning
+}
+
+func (s *Service) collectAutomationArtifacts(jobID string) {
+	job, ok := s.snapshotAny(jobID)
+	if !ok {
+		return
+	}
 	if job.Mode != JobModeAutomation || job.Runtime == nil || job.Runtime.Automation == nil {
 		return
 	}
@@ -604,25 +767,50 @@ func (s *Service) collectAutomationArtifacts(job *Job) {
 	if root == "" {
 		return
 	}
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		s.mutate(jobID, func(state *Job) { state.ArtifactWarning = "Automation artifact root is unavailable." })
+		return
+	}
 	for _, relRoot := range job.Runtime.Automation.ArtifactPaths {
+		if err := appruntime.ValidateArtifactRelativePath(relRoot); err != nil {
+			s.mutate(jobID, func(state *Job) { state.ArtifactWarning = "Unsafe automation artifact path was skipped." })
+			continue
+		}
 		artifactPath := filepath.Join(root, filepath.FromSlash(relRoot))
-		_ = filepath.WalkDir(artifactPath, func(path string, entry os.DirEntry, walkErr error) error {
-			if walkErr != nil || entry.IsDir() {
-				return nil
+		canonicalPath, resolveErr := filepath.EvalSymlinks(artifactPath)
+		if resolveErr == nil && !pathWithin(canonicalRoot, canonicalPath) {
+			s.mutate(jobID, func(state *Job) { state.ArtifactWarning = "Unsafe automation artifact path was skipped." })
+			continue
+		}
+		artifacts, warning := collectArtifacts(artifactPath)
+		includeRoot := true
+		if info, statErr := os.Stat(artifactPath); statErr == nil && !info.IsDir() {
+			includeRoot = false
+		}
+		for index := range artifacts {
+			artifacts[index].Root = "automation"
+			if includeRoot {
+				artifacts[index].Path = filepath.ToSlash(filepath.Join(relRoot, artifacts[index].Path))
 			}
-			info, err := entry.Info()
-			if err != nil {
-				return nil
+		}
+		s.mutate(jobID, func(state *Job) {
+			state.Artifacts = append(state.Artifacts, artifacts...)
+			if warning != "" {
+				state.ArtifactWarning = warning
 			}
-			job.Artifacts = append(job.Artifacts, Artifact{
-				Kind:      classifyArtifact(path),
-				Path:      filepath.ToSlash(path),
-				SizeBytes: info.Size(),
-				CreatedAt: time.Now().UTC(),
-			})
-			return nil
 		})
 	}
+}
+
+func pathWithin(root, path string) bool {
+	root, rootErr := filepath.Abs(root)
+	path, pathErr := filepath.Abs(path)
+	if rootErr != nil || pathErr != nil {
+		return false
+	}
+	rel, err := filepath.Rel(root, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func classifyArtifact(path string) string {
@@ -650,23 +838,145 @@ func classifyArtifact(path string) string {
 	}
 }
 
-func (s *Service) failJob(job *Job, failure FailureType, code int, message string, err error) {
-	job.FailureType = failure
-	job.ExitCode = code
-	job.Steps = append(job.Steps, StepResult{
-		Step:       "failure",
-		Status:     "failed",
-		Message:    fmt.Sprintf("%s: %v", message, err),
-		DurationMS: 0,
-		At:         time.Now().UTC(),
+func (s *Service) failJob(jobID string, failure FailureType, code int, message string, err error) {
+	s.mutate(jobID, func(job *Job) {
+		job.FailureType = failure
+		job.ExitCode = code
+		job.Steps = append(job.Steps, StepResult{
+			Step:       "failure",
+			Status:     "failed",
+			Message:    fmt.Sprintf("%s: %v", message, err),
+			DurationMS: 0,
+			At:         time.Now().UTC(),
+		})
 	})
 }
 
-func (s *Service) getInternal(jobID string) (*Job, bool) {
+func (s *Service) snapshot(workspaceID, jobID string) (Job, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	job, ok := s.jobs[jobID]
-	return job, ok
+	if !ok || job.WorkspaceID != workspaceID {
+		return Job{}, false
+	}
+	return cloneJob(*job), true
+}
+
+func (s *Service) snapshotAny(jobID string) (Job, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	job, ok := s.jobs[jobID]
+	if !ok {
+		return Job{}, false
+	}
+	return cloneJob(*job), true
+}
+
+func (s *Service) mutate(jobID string, mutate func(*Job)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if job, ok := s.jobs[jobID]; ok {
+		mutate(job)
+	}
+}
+
+func (s *Service) pruneTerminalJobs() {
+	now := time.Now().UTC()
+	type candidate struct {
+		id          string
+		workspaceID string
+		finished    time.Time
+	}
+	var remove []candidate
+	s.mu.Lock()
+	latestByWorkspace := map[string]string{}
+	terminals := make([]candidate, 0)
+	for id, job := range s.jobs {
+		if job.Status != JobStatusPassed && job.Status != JobStatusFailed {
+			continue
+		}
+		candidate := candidate{id: id, workspaceID: job.WorkspaceID, finished: job.FinishedAt}
+		terminals = append(terminals, candidate)
+		if previous, ok := latestByWorkspace[job.WorkspaceID]; !ok || s.jobs[previous].FinishedAt.Before(job.FinishedAt) {
+			latestByWorkspace[job.WorkspaceID] = id
+		}
+	}
+	sort.Slice(terminals, func(i, j int) bool { return terminals[i].finished.Before(terminals[j].finished) })
+	remaining := len(terminals)
+	for _, candidate := range terminals {
+		expired := s.retention > 0 && !candidate.finished.IsZero() && now.Sub(candidate.finished) > s.retention
+		overCapacity := remaining > s.maxTerminal
+		if (expired || overCapacity) && latestByWorkspace[candidate.workspaceID] != candidate.id {
+			delete(s.jobs, candidate.id)
+			remove = append(remove, candidate)
+			remaining--
+		}
+	}
+	s.mu.Unlock()
+	for _, candidate := range remove {
+		if err := s.removeArtifactRoot(candidate.workspaceID, candidate.id); err != nil {
+			s.mu.Lock()
+			s.cleanupWarnings = append(s.cleanupWarnings, fmt.Sprintf("could not remove retained verification artifacts for %s: %v", candidate.id, err))
+			s.mu.Unlock()
+		}
+	}
+}
+
+func (s *Service) removeArtifactRoot(workspaceID, jobID string) error {
+	workspace, found, err := s.registry.Get(workspaceID)
+	if err != nil {
+		return err
+	}
+	if !found || strings.TrimSpace(workspace.Path) == "" || strings.Contains(jobID, string(filepath.Separator)) {
+		return errors.New("verification artifact cleanup target is unavailable")
+	}
+	root := filepath.Join(workspace.Path, ".artifacts", "verification")
+	target := filepath.Join(root, jobID)
+	if !pathWithin(root, target) {
+		return errors.New("verification artifact cleanup target is unsafe")
+	}
+	return s.removeArtifact(target)
+}
+
+// cleanupOrphanArtifacts establishes the restart contract: job state is
+// process-local, so an owned verification generation found at startup has no
+// runnable owner and is safely removed. Only direct, non-symlinked child
+// directories under each registered workspace's owned root are eligible.
+func (s *Service) cleanupOrphanArtifacts() {
+	workspaces, err := s.registry.List()
+	if err != nil {
+		s.recordCleanupWarning(fmt.Sprintf("could not inspect orphan verification artifacts: %v", err))
+		return
+	}
+	for _, workspace := range workspaces {
+		root := filepath.Join(workspace.Path, ".artifacts", "verification")
+		entries, readErr := os.ReadDir(root)
+		if os.IsNotExist(readErr) {
+			continue
+		}
+		if readErr != nil {
+			s.recordCleanupWarning(fmt.Sprintf("could not inspect orphan verification artifacts: %v", readErr))
+			continue
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || !strings.HasPrefix(entry.Name(), "verify-") {
+				continue
+			}
+			target := filepath.Join(root, entry.Name())
+			if !pathWithin(root, target) {
+				continue
+			}
+			if removeErr := s.removeArtifact(target); removeErr != nil {
+				s.recordCleanupWarning(fmt.Sprintf("could not remove orphan verification artifacts for %s: %v", entry.Name(), removeErr))
+			}
+		}
+	}
+}
+
+func (s *Service) recordCleanupWarning(message string) {
+	s.mu.Lock()
+	s.cleanupWarnings = append(s.cleanupWarnings, message)
+	s.mu.Unlock()
 }
 
 func (s *Service) nextID() string {

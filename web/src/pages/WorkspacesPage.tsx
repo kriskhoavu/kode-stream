@@ -32,7 +32,7 @@ const defaultRuntimeConfig = (): WorkspaceRuntimeConfig => ({
     repositoryPath: '',
     runner: 'cypress',
     defaultEnvironment: 'local',
-    commandTemplate: 'CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec "{specs}"',
+commandTemplate: 'CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec {specs}',
     artifactPaths: ['cypress/reports', 'cypress/screenshots', 'cypress/videos']
   }
 });

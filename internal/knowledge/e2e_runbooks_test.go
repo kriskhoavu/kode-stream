@@ -3,9 +3,11 @@ package knowledge
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/e2eresult"
 )
 
 func TestMatchesE2ESource(t *testing.T) {
@@ -24,7 +26,10 @@ func TestKnowledgeE2ERunbookUsesLatestPlanResultSource(t *testing.T) {
 	root := t.TempDir()
 	older := "plans/platform/PM-020/automation/results/latest.md"
 	latest := "plans/platform/PM-036/automation/results/latest.md"
-	writeKnowledgeTestFile(t, filepath.Join(root, latest), "Status: blocked\nProvider: playwright\nEvidence: automation/artifacts/blocked.png\n")
+	runbookPath := "wiki/e2e-testing/cross-domain/run-e2e.md"
+	runbookContent := "# Run E2E coverage\n"
+	writeKnowledgeTestFile(t, filepath.Join(root, runbookPath), runbookContent)
+	writeKnowledgeTestFile(t, filepath.Join(root, latest), `{"version":1,"status":"blocked","runbookFingerprint":"`+e2eresult.Fingerprint([]byte(runbookContent))+`","recordedAt":"2026-08-13T00:00:00Z","provider":"playwright","evidence":["automation/artifacts/blocked.png"]}`)
 	page := KnowledgePage{
 		Slug: "e2e-quality-runbook", Title: "Run E2E coverage", Path: "e2e-testing/cross-domain/run-e2e.md",
 		Domain: "e2e-testing/cross-domain",
@@ -61,6 +66,30 @@ func TestKnowledgeE2ERunbookProvidesSafeFallbackBeforeFirstRun(t *testing.T) {
 func TestParseE2EResultRejectsUnknownStatus(t *testing.T) {
 	if result := parseE2EResult("Status: maybe\n"); result.Status != "not run" {
 		t.Fatalf("status = %q", result.Status)
+	}
+}
+
+func TestKnowledgeE2ERunbookBoundsRunbookBeforeFingerprinting(t *testing.T) {
+	root := t.TempDir()
+	pagePath := "e2e-testing/example.md"
+	resultPath := "wiki/e2e-testing/automation/results/latest.md"
+	writeKnowledgeTestFile(t, filepath.Join(root, "wiki", pagePath), strings.Repeat("# x\n", e2eresult.MaxRunbookBytes))
+	writeKnowledgeTestFile(t, filepath.Join(root, resultPath), `{}`)
+	runbook := (&KnowledgeService{}).e2ERunbook(models.WorkspaceConfig{Path: root}, "wiki", KnowledgePage{Title: "Example", Path: pagePath, Domain: "e2e-testing"})
+	if !strings.Contains(runbook.Diagnostic, "exceeds") {
+		t.Fatalf("runbook=%#v", runbook)
+	}
+}
+
+func TestKnowledgeE2ERunbookBoundsLatestResultBeforeParsing(t *testing.T) {
+	root := t.TempDir()
+	pagePath := "e2e-testing/example.md"
+	resultPath := "wiki/e2e-testing/automation/results/latest.md"
+	writeKnowledgeTestFile(t, filepath.Join(root, "wiki", pagePath), "# Example\n")
+	writeKnowledgeTestFile(t, filepath.Join(root, resultPath), strings.Repeat("x", e2eresult.MaxBytes+1))
+	runbook := (&KnowledgeService{}).e2ERunbook(models.WorkspaceConfig{Path: root}, "wiki", KnowledgePage{Title: "Example", Path: pagePath, Domain: "e2e-testing"})
+	if runbook.LatestResult == nil || runbook.LatestResult.Freshness != "unknown" {
+		t.Fatalf("runbook=%#v", runbook)
 	}
 }
 

@@ -81,7 +81,7 @@ export function E2EQualityPanel({
 										<strong>{runbook.title}</strong>
 										<span>{runbook.source} · {runbook.path}</span>
 										{runbook.latestResult
-											? <span>{runbook.latestResult.status}{runbook.latestResult.provider ? ` · ${runbook.latestResult.provider}` : ''}{runbook.latestResult.environment ? ` · ${runbook.latestResult.environment}` : ''}{runbook.latestResult.failedStep ? ` · failed: ${runbook.latestResult.failedStep}` : ''}</span>
+										? <span>{runbook.latestResult.status}{runbook.latestResult.freshness && runbook.latestResult.freshness !== 'fresh' ? ` · ${runbook.latestResult.freshness}` : ''}{runbook.latestResult.provider ? ` · ${runbook.latestResult.provider}` : ''}{runbook.latestResult.environment ? ` · ${runbook.latestResult.environment}` : ''}{runbook.latestResult.failedStep ? ` · failed: ${runbook.latestResult.failedStep}` : ''}</span>
 											: <span>{runbook.diagnostic || 'Not run'}</span>}
 										{runbook.latestResult?.evidence.length
 											? <span className="e2e-evidence-links" aria-label={`Evidence for ${runbook.title}`}>

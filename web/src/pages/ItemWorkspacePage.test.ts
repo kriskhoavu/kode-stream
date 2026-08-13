@@ -261,8 +261,10 @@ describe('ItemWorkspacePage', () => {
           exitCode: 0,
           steps: [],
           artifacts: [
-            { kind: 'automation_log', path: '/repo/.artifacts/verification/verify-1/automation.log', sizeBytes: 1234, createdAt: '2026-07-12T12:00:00Z' },
-            { kind: 'runtime_log', path: '/repo/.artifacts/verification/verify-1/runtime.log', sizeBytes: 456, createdAt: '2026-07-12T12:00:01Z' }
+            { kind: 'automation_log', root: 'workspace', path: '.artifacts/verification/verify-1/automation.log', sizeBytes: 1234, createdAt: '2026-07-12T12:00:00Z' },
+				{ kind: 'runtime_log', root: 'workspace', path: '.artifacts/verification/verify-1/runtime.log', sizeBytes: 456, createdAt: '2026-07-12T12:00:01Z' },
+				{ kind: 'playwright_report', root: 'automation', path: 'reports/result.txt', sizeBytes: 10, createdAt: '2026-07-12T12:00:01Z' },
+				{ kind: 'playwright_video', root: 'automation', path: 'videos/result.txt', sizeBytes: 10, createdAt: '2026-07-12T12:00:01Z' }
           ]
         }));
       }
@@ -307,6 +309,12 @@ describe('ItemWorkspacePage', () => {
     expect(await screen.findByText('automation · passed')).toBeInTheDocument();
     expect(screen.getByText('Automation log')).toBeInTheDocument();
     expect(screen.getByText('Runtime setup log')).toBeInTheDocument();
+		fireEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0]);
+		await waitFor(() => expect(requests.some((request) => request.url.includes('path=.artifacts%2Fverification%2Fverify-1%2Fautomation.log'))).toBe(true));
+		const openButtons = screen.getAllByRole('button', { name: 'Open' });
+		fireEvent.click(openButtons[2]);
+		fireEvent.click(openButtons[3]);
+		await waitFor(() => expect(requests.filter((request) => request.url === '/api/system/open-path').map((request) => request.body)).toEqual(expect.arrayContaining([{ path: '/automation/reports/result.txt' }, { path: '/automation/videos/result.txt' }])));
   });
 
   it('browses multiple automation specs from the registered automation repository', async () => {

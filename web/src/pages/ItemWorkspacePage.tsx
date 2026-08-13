@@ -846,7 +846,18 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     }
   };
 
-  const openArtifactPath = async (path: string) => {
+  const artifactAbsolutePath = (artifact: { root?: string; path: string }) => {
+    const root = artifact.root === 'automation' ? verificationJob?.automationRepoPath : workspaceConfig?.path;
+    if (!root || artifact.path.startsWith('/') || artifact.path.includes('..')) return '';
+    return `${root.replace(/\/$/, '')}/${artifact.path}`;
+  };
+
+  const openArtifactPath = async (artifact: { root?: string; path: string }) => {
+    const path = artifactAbsolutePath(artifact);
+    if (!path) {
+      setVerificationError('Could not resolve the artifact path safely.');
+      return;
+    }
     try {
       await api.openPath(path);
     } catch {
@@ -854,19 +865,19 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     }
   };
 
-  const previewArtifact = async (kind: string, absolutePath: string) => {
+  const previewArtifact = async (kind: string, artifact: { root?: string; path: string }) => {
     if (!plan) return;
-    const relativePath = toWorkspaceRelativePath(workspaceConfig?.path, absolutePath);
-    setArtifactPreview({ title: kind, path: absolutePath, content: '', loading: true, error: '' });
-    if (!relativePath) {
-      setArtifactPreview({ title: kind, path: absolutePath, content: '', loading: false, error: 'Preview unavailable for this artifact path. Use Open to view it externally.' });
+    const absolutePath = artifactAbsolutePath(artifact);
+    setArtifactPreview({ title: kind, path: artifact.path, content: '', loading: true, error: '' });
+    if (artifact.root !== 'workspace' || !absolutePath) {
+      setArtifactPreview({ title: kind, path: artifact.path, content: '', loading: false, error: 'Preview unavailable for this artifact path. Use Open to view it externally.' });
       return;
     }
     try {
-      const file = await api.workspaceFile(plan.workspaceId, relativePath);
-      setArtifactPreview({ title: kind, path: absolutePath, content: file.content, loading: false, error: '' });
+      const file = await api.workspaceFile(plan.workspaceId, artifact.path);
+      setArtifactPreview({ title: kind, path: artifact.path, content: file.content, loading: false, error: '' });
     } catch (caught) {
-      setArtifactPreview({ title: kind, path: absolutePath, content: '', loading: false, error: caught instanceof Error ? caught.message : 'Could not load artifact preview' });
+      setArtifactPreview({ title: kind, path: artifact.path, content: '', loading: false, error: caught instanceof Error ? caught.message : 'Could not load artifact preview' });
     }
   };
 
@@ -964,8 +975,8 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
                 <small>{formatBytes(artifact.sizeBytes)} · {formatAt(artifact.createdAt)}</small>
               </div>
               <div className="verification-artifact-actions">
-                <button className="secondary" type="button" onClick={() => void previewArtifact(formatArtifactKind(artifact.kind, artifact.path), artifact.path)}>Preview</button>
-                <button className="secondary" type="button" onClick={() => void openArtifactPath(artifact.path)}>Open</button>
+                <button className="secondary" type="button" onClick={() => void previewArtifact(formatArtifactKind(artifact.kind, artifact.path), artifact)}>Preview</button>
+                <button className="secondary" type="button" onClick={() => void openArtifactPath(artifact)}>Open</button>
               </div>
             </article>
           ))}
@@ -1262,7 +1273,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
             {!artifactPreview.loading && artifactPreview.error && <p className="error">{artifactPreview.error}</p>}
             {!artifactPreview.loading && !artifactPreview.error && <pre className="artifact-preview-content">{artifactPreview.content || 'No text content available.'}</pre>}
             <div className="modal-actions">
-              <button className="secondary" type="button" onClick={() => void openArtifactPath(artifactPreview.path)}>Open externally</button>
+              <button className="secondary" type="button" onClick={() => void openArtifactPath({ root: 'workspace', path: artifactPreview.path })}>Open externally</button>
               <button className="primary" type="button" onClick={() => setArtifactPreview(null)}>Close</button>
             </div>
           </div>

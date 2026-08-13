@@ -863,6 +863,81 @@ func TestItemVerificationTestsRoutesPersistSelection(t *testing.T) {
 	}
 }
 
+func TestVerificationMutationRoutesRejectTrailingAndOversizeBodiesBeforeSideEffects(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	for _, test := range []struct {
+		path, body string
+		want       int
+	}{
+		{"/api/workspaces/" + workspace.ID + "/verification-jobs", `{} {}`, http.StatusBadRequest},
+		{"/api/workspaces/" + workspace.ID + "/verification-checkpoints", `{} {}`, http.StatusBadRequest},
+		{"/api/workspaces/" + workspace.ID + "/verification-jobs/missing/rerun", `{} {}`, http.StatusBadRequest},
+		{"/api/workspaces/" + workspace.ID + "/runtime", `{"type":"` + strings.Repeat("x", 300<<10) + `"}`, http.StatusRequestEntityTooLarge},
+	} {
+		response := httptest.NewRecorder()
+		apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, test.path, strings.NewReader(test.body)))
+		if strings.HasSuffix(test.path, "/runtime") { // runtime route is PUT
+			response = httptest.NewRecorder()
+			apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPut, test.path, strings.NewReader(test.body)))
+		}
+		if response.Code != test.want {
+			t.Fatalf("%s: status=%d body=%s", test.path, response.Code, response.Body.String())
+		}
+	}
+	if _, ok := apiHandler.verification.verification.Latest(workspace.ID); ok {
+		t.Fatal("invalid verification request created a job")
+	}
+}
+
+func TestVerificationMutationRoutesRejectEveryInvalidBodyBeforeSideEffects(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	routes := []struct{ method, path string }{
+		{http.MethodPost, "/api/workspaces/" + workspace.ID + "/verification-jobs"},
+		{http.MethodPost, "/api/workspaces/" + workspace.ID + "/verification-checkpoints"},
+		{http.MethodPost, "/api/workspaces/" + workspace.ID + "/verification-jobs/missing/rerun"},
+		{http.MethodPut, "/api/workspaces/" + workspace.ID + "/runtime"},
+	}
+	for _, route := range routes {
+		for _, body := range []string{"", "{", `{"unknown":true}`, `{} {}`, `{"padding":"` + strings.Repeat("x", 300<<10) + `"}`} {
+			response := httptest.NewRecorder()
+			apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(route.method, route.path, strings.NewReader(body)))
+			want := http.StatusBadRequest
+			if len(body) > 256<<10 {
+				want = http.StatusRequestEntityTooLarge
+			}
+			if response.Code != want {
+				t.Fatalf("%s %q: status=%d body=%s", route.path, body[:min(len(body), 16)], response.Code, response.Body.String())
+			}
+		}
+	}
+	if _, ok := apiHandler.verification.verification.Latest(workspace.ID); ok {
+		t.Fatal("invalid mutation created a verification job")
+	}
+}
+
+func TestVerificationCreateReturnsQueueFullWithoutPartialJob(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	if _, err := apiHandler.verification.workspaces.SaveRuntime(workspace.ID, &models.WorkspaceRuntimeConfig{Type: models.RuntimeTypeCustom, Commands: models.RuntimeCommandSet{Up: "true", Down: "true", Verify: models.RuntimeVerifyCommands{Smoke: "sleep 0.5"}}}); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		response := httptest.NewRecorder()
+		apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/verification-jobs", strings.NewReader(`{}`)))
+		if response.Code != http.StatusAccepted {
+			t.Fatalf("accepted job status=%d body=%s", response.Code, response.Body.String())
+		}
+	}
+	response := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/verification-jobs", strings.NewReader(`{}`)))
+	if response.Code != http.StatusTooManyRequests {
+		t.Fatalf("queue-full status=%d body=%s", response.Code, response.Body.String())
+	}
+	count := apiHandler.verification.verification.JobCount()
+	if count != 2 {
+		t.Fatalf("queue-full request created partial job; jobs=%d", count)
+	}
+}
+
 func TestStateRoutePreservesCountsAndVersionContract(t *testing.T) {
 	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
 

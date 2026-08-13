@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/e2eresult"
 	"kode-stream/internal/filesystem/pathguard"
 
 	"gopkg.in/yaml.v3"
@@ -106,12 +107,21 @@ func readE2ERunbook(workspaceRoot, fullPath, relativePath, resultRelativePath, s
 	}
 	resultPath, err := pathguard.ValidateMarkdownFile(workspaceRoot, resultRelativePath)
 	if err == nil {
-		data, readErr := os.ReadFile(resultPath)
+		data, readErr := e2eresult.ReadFile(resultPath)
 		if readErr != nil {
 			runbook.Diagnostic = "Latest E2E result could not be read."
 			return runbook
 		}
-		runbook.LatestResult = parseE2ELatestResult(string(data))
+		runbookData, runbookErr := e2eresult.ReadFileLimit(fullPath, e2eresult.MaxRunbookBytes)
+		if runbookErr != nil {
+			runbook.Diagnostic = "E2E runbook could not be read."
+			return runbook
+		}
+		if len(runbookData) > e2eresult.MaxRunbookBytes {
+			runbook.Diagnostic = "E2E runbook exceeds the supported size."
+			return runbook
+		}
+		runbook.LatestResult, runbook.Diagnostic = e2eresult.Parse(data, runbookData)
 	} else if os.IsNotExist(err) {
 		runbook.Diagnostic = "Not run"
 	} else {

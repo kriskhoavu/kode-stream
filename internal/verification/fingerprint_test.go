@@ -43,6 +43,27 @@ func TestGitFingerprintChangesForRepositoryAndVerificationConfiguration(t *testi
 	}
 }
 
+func TestGitFingerprintPreservesWhitespaceInUntrackedPathNames(t *testing.T) {
+	root := verificationGitWorkspace(t)
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Path: root, Runtime: verificationRuntime("true", nil)}
+	job := Job{Mode: JobModeRuntime, Profile: appruntime.VerifyProfileSmoke}
+	if err := os.WriteFile(filepath.Join(root, " leading-and-trailing "), []byte("one"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fingerprint := GitFingerprinter{}
+	first, err := fingerprint.Fingerprint(workspace, job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, " leading-and-trailing "), []byte("two"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second, err := fingerprint.Fingerprint(workspace, job)
+	if err != nil || first.Value == second.Value {
+		t.Fatalf("whitespace path was not fingerprinted exactly: first=%#v second=%#v err=%v", first, second, err)
+	}
+}
+
 func TestVerificationFreshnessBecomesStaleAndDetectsDuringRunChanges(t *testing.T) {
 	root := verificationGitWorkspace(t)
 	runtimeConfig := verificationRuntime("true", nil)

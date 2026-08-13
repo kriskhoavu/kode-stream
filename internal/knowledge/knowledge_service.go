@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/e2eresult"
 	"kode-stream/internal/filesystem/content"
 	"kode-stream/internal/filesystem/pathguard"
 	"kode-stream/internal/workspace/registry"
@@ -499,12 +500,26 @@ func (s *KnowledgeService) e2ERunbook(workspace models.WorkspaceConfig, wikiRoot
 	}
 	result, err := pathguard.ValidateMarkdownFile(workspace.Path, resultRelative)
 	if err == nil {
-		data, readErr := os.ReadFile(result)
+		data, readErr := e2eresult.ReadFile(result)
 		if readErr != nil {
 			runbook.Diagnostic = "Latest E2E result could not be read."
 			return runbook
 		}
-		runbook.LatestResult = parseE2EResult(string(data))
+		runbookPath, runbookErr := pathguard.ValidateMarkdownFile(workspace.Path, runbook.Path)
+		if runbookErr != nil {
+			runbook.Diagnostic = "E2E runbook path is unsafe or unsupported."
+			return runbook
+		}
+		runbookData, runbookErr := e2eresult.ReadFileLimit(runbookPath, e2eresult.MaxRunbookBytes)
+		if runbookErr != nil {
+			runbook.Diagnostic = "E2E runbook could not be read."
+			return runbook
+		}
+		if len(runbookData) > e2eresult.MaxRunbookBytes {
+			runbook.Diagnostic = "E2E runbook exceeds the supported size."
+			return runbook
+		}
+		runbook.LatestResult, runbook.Diagnostic = e2eresult.Parse(data, runbookData)
 	} else if os.IsNotExist(err) {
 		runbook.Diagnostic = "Not run"
 	} else {

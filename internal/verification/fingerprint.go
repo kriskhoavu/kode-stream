@@ -21,20 +21,29 @@ import (
 
 const maxFingerprintFileBytes int64 = 10 * 1024 * 1024
 const maxFingerprintUntrackedBytes int64 = 50 * 1024 * 1024
+const maxFingerprintGitOutputBytes int64 = 8 * 1024 * 1024
 
 type Fingerprinter interface {
 	Fingerprint(models.WorkspaceConfig, Job) (RepositoryFingerprint, error)
 }
 
+type ContextFingerprinter interface {
+	FingerprintContext(context.Context, models.WorkspaceConfig, Job) (RepositoryFingerprint, error)
+}
+
 type GitFingerprinter struct{}
 
 func (GitFingerprinter) Fingerprint(workspace models.WorkspaceConfig, job Job) (RepositoryFingerprint, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return GitFingerprinter{}.FingerprintContext(ctx, workspace, job)
+}
+
+func (GitFingerprinter) FingerprintContext(ctx context.Context, workspace models.WorkspaceConfig, job Job) (RepositoryFingerprint, error) {
 	root := strings.TrimSpace(workspace.Path)
 	if root == "" {
 		return RepositoryFingerprint{}, errors.New("workspace path is unavailable")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	branch, err := gitText(ctx, root, "branch", "--show-current")
 	if err != nil {
 		return RepositoryFingerprint{}, err
@@ -62,10 +71,10 @@ func (GitFingerprinter) Fingerprint(workspace models.WorkspaceConfig, job Job) (
 	}
 	var total int64
 	for _, raw := range bytes.Split(untracked, []byte{0}) {
-		rel := strings.TrimSpace(string(raw))
-		if rel == "" {
+		if len(raw) == 0 {
 			continue
 		}
+		rel := string(raw)
 		full, err := safeFingerprintPath(root, rel)
 		if err != nil {
 			return RepositoryFingerprint{}, err
@@ -114,11 +123,36 @@ func gitText(ctx context.Context, root string, args ...string) (string, error) {
 
 func gitBytes(ctx context.Context, root string, args ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, "git", append([]string{"-C", root}, args...)...)
-	data, err := command.CombinedOutput()
+	output := &limitedOutput{limit: maxFingerprintGitOutputBytes}
+	command.Stdout = output
+	command.Stderr = output
+	err := command.Run()
+	data := output.Bytes()
+	if output.exceeded {
+		return nil, errors.New("git fingerprint output exceeds limit")
+	}
 	if err != nil {
 		return nil, fmt.Errorf("git fingerprint command failed: %w: %s", err, strings.TrimSpace(string(data)))
 	}
 	return data, nil
+}
+
+type limitedOutput struct {
+	bytes.Buffer
+	limit    int64
+	exceeded bool
+}
+
+func (w *limitedOutput) Write(data []byte) (int, error) {
+	if int64(w.Len()+len(data)) > w.limit {
+		remaining := int(w.limit - int64(w.Len()))
+		if remaining > 0 {
+			_, _ = w.Buffer.Write(data[:remaining])
+		}
+		w.exceeded = true
+		return len(data), nil
+	}
+	return w.Buffer.Write(data)
 }
 
 func hashGitOutput(ctx context.Context, hasher hash.Hash, root, label string, args ...string) error {

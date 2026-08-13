@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -11,6 +10,8 @@ import (
 	appverification "kode-stream/internal/verification"
 	appworkspace "kode-stream/internal/workspace"
 )
+
+const maxVerificationMutationBodyBytes int64 = 256 << 10
 
 type verificationController struct {
 	workspaces   *appworkspace.Service
@@ -44,10 +45,7 @@ func (a *verificationController) saveWorkspaceRuntime(w http.ResponseWriter, r *
 		return
 	}
 	var input models.WorkspaceRuntimeConfig
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxVerificationMutationBodyBytes, true) {
 		return
 	}
 	runtimeConfig, err := a.workspaces.SaveRuntime(r.PathValue("id"), &input)
@@ -68,10 +66,7 @@ func (a *verificationController) createVerificationJob(w http.ResponseWriter, r 
 		return
 	}
 	var input appverification.CreateInput
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxVerificationMutationBodyBytes, true) {
 		return
 	}
 	if input.Profile == "" {
@@ -81,6 +76,10 @@ func (a *verificationController) createVerificationJob(w http.ResponseWriter, r 
 	if err != nil {
 		if err.Error() == "workspace not found" {
 			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		if err.Error() == "verification queue is full" {
+			writeError(w, http.StatusTooManyRequests, err.Error())
 			return
 		}
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -94,7 +93,7 @@ func (a *verificationController) verificationJob(w http.ResponseWriter, r *http.
 		writeError(w, http.StatusServiceUnavailable, "verification service unavailable")
 		return
 	}
-	job, ok := a.verification.Get(r.PathValue("id"), r.PathValue("jobId"))
+	job, ok := a.verification.GetContext(r.Context(), r.PathValue("id"), r.PathValue("jobId"))
 	if !ok {
 		writeError(w, http.StatusNotFound, "verification job not found")
 		return
@@ -123,10 +122,7 @@ func (a *verificationController) rerunVerificationJob(w http.ResponseWriter, r *
 	var input struct {
 		Profile appruntime.VerifyProfile `json:"profile"`
 	}
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxVerificationMutationBodyBytes, true) {
 		return
 	}
 	job, err := a.verification.Rerun(r.PathValue("id"), r.PathValue("jobId"), input.Profile)
@@ -143,16 +139,17 @@ func (a *verificationController) ingestVerificationCheckpoint(w http.ResponseWri
 		return
 	}
 	var input appverification.CheckpointEvent
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxVerificationMutationBodyBytes, true) {
 		return
 	}
 	job, err := a.verification.IngestCheckpoint(r.PathValue("id"), input)
 	if err != nil {
 		if err.Error() == "workspace not found" {
 			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		if err.Error() == "verification queue is full" {
+			writeError(w, http.StatusTooManyRequests, err.Error())
 			return
 		}
 		writeError(w, http.StatusBadRequest, err.Error())

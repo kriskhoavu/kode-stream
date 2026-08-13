@@ -175,6 +175,54 @@ func validateAutomationConfig(config *models.RuntimeAutomationConfig) error {
 	if strings.TrimSpace(config.CommandTemplate) == "" {
 		return errors.New("runtime automation commandTemplate is required")
 	}
+	if err := ValidateAutomationCommandTemplate(config.CommandTemplate); err != nil {
+		return err
+	}
+	for _, artifactPath := range config.ArtifactPaths {
+		if err := ValidateArtifactRelativePath(artifactPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ValidateAutomationCommandTemplate keeps administrator-authored shell templates
+// explicit: only the documented placeholders are supported and user-controlled
+// placeholders must occupy their own shell token so they can be quoted safely.
+func ValidateAutomationCommandTemplate(template string) error {
+	template = strings.TrimSpace(template)
+	if template == "" {
+		return errors.New("runtime automation commandTemplate is required")
+	}
+	for _, marker := range []string{"{env}", "{specs}"} {
+		if !strings.Contains(template, marker) {
+			continue
+		}
+		if strings.Contains(template, "\""+marker+"\"") || strings.Contains(template, "'"+marker+"'") {
+			return fmt.Errorf("runtime automation commandTemplate must not quote %s", marker)
+		}
+	}
+	for _, part := range strings.Split(template, "{") {
+		if !strings.Contains(part, "}") {
+			continue
+		}
+		name := strings.SplitN(part, "}", 2)[0]
+		switch name {
+		case "env", "specs", "modeArgs", "headed", "browser":
+		default:
+			return fmt.Errorf("runtime automation commandTemplate placeholder {%s} is invalid", name)
+		}
+	}
+	return nil
+}
+
+// ValidateArtifactRelativePath makes saved paths safe before a later job uses
+// them and is intentionally repeated at collection time for old configuration.
+func ValidateArtifactRelativePath(path string) error {
+	path = filepath.ToSlash(filepath.Clean(strings.TrimSpace(path)))
+	if path == "" || path == "." || filepath.IsAbs(path) || path == ".." || strings.HasPrefix(path, "../") {
+		return errors.New("runtime artifact path must be relative to the configured root")
+	}
 	return nil
 }
 
@@ -182,7 +230,7 @@ func defaultAutomationCommandTemplate(runner models.AutomationRunner) string {
 	if runner == models.AutomationRunnerPlaywright {
 		return "npx playwright test {specs}"
 	}
-	return "CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec \"{specs}\""
+	return "CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec {specs}"
 }
 
 func defaultAutomationArtifactPaths(runner models.AutomationRunner) []string {

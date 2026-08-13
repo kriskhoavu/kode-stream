@@ -815,11 +815,13 @@ type ItemVerificationTests struct {
 }
 
 type E2ELatestResult struct {
-	Status      string   `json:"status" yaml:"status"`
-	Provider    string   `json:"provider,omitempty" yaml:"provider,omitempty"`
-	Environment string   `json:"environment,omitempty" yaml:"environment,omitempty"`
-	FailedStep  string   `json:"failedStep,omitempty" yaml:"failedStep,omitempty"`
-	Evidence    []string `json:"evidence" yaml:"evidence"`
+	Status      string    `json:"status" yaml:"status"`
+	Freshness   string    `json:"freshness,omitempty" yaml:"freshness,omitempty"`
+	RecordedAt  time.Time `json:"recordedAt,omitempty" yaml:"recordedAt,omitempty"`
+	Provider    string    `json:"provider,omitempty" yaml:"provider,omitempty"`
+	Environment string    `json:"environment,omitempty" yaml:"environment,omitempty"`
+	FailedStep  string    `json:"failedStep,omitempty" yaml:"failedStep,omitempty"`
+	Evidence    []string  `json:"evidence" yaml:"evidence"`
 }
 
 type E2ERunbook struct {
