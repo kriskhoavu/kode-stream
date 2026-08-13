@@ -68,6 +68,29 @@ func (r *SQLCloudRepository) UpsertWorkspace(ctx context.Context, owner string, 
 	return workspace, err
 }
 
+func (r *SQLCloudRepository) PublishAgentWorkspace(ctx context.Context, owner string, workspace models.WorkspaceConfig, expectedRevision int64) (models.WorkspaceConfig, bool, error) {
+	workspace.OwnerUserID = owner
+	workspace.CloudPublicationRevision = expectedRevision + 1
+	raw, err := json.Marshal(workspace)
+	if err != nil {
+		return models.WorkspaceConfig{}, false, err
+	}
+	if expectedRevision == 0 {
+		result, err := r.db.ExecContext(ctx, rebindSQL(r.driver, `INSERT INTO cloud_workspaces (owner_user_id, id, workspace_json, updated_at, publication_revision) VALUES (?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, id) DO NOTHING`), owner, workspace.ID, string(raw), formatTime(r.now().UTC()), workspace.CloudPublicationRevision)
+		if err != nil {
+			return models.WorkspaceConfig{}, false, err
+		}
+		rows, err := result.RowsAffected()
+		return workspace, rows == 0, err
+	}
+	result, err := r.db.ExecContext(ctx, rebindSQL(r.driver, `UPDATE cloud_workspaces SET workspace_json = ?, updated_at = ?, publication_revision = ? WHERE owner_user_id = ? AND id = ? AND publication_revision = ?`), string(raw), formatTime(r.now().UTC()), workspace.CloudPublicationRevision, owner, workspace.ID, expectedRevision)
+	if err != nil {
+		return models.WorkspaceConfig{}, false, err
+	}
+	rows, err := result.RowsAffected()
+	return workspace, rows == 0, err
+}
+
 func (r *SQLCloudRepository) ListAgents(ctx context.Context, owner string) ([]models.CloudAgent, error) {
 	rows, err := r.db.QueryContext(ctx, rebindSQL(r.driver, `SELECT agent_json FROM cloud_agents WHERE owner_user_id = ? ORDER BY last_seen_at DESC`), owner)
 	if err != nil {
@@ -142,4 +165,13 @@ func (r *SQLCloudRepository) SaveEncryptedConnection(ctx context.Context, owner,
 func (r *SQLCloudRepository) RevokeConnection(ctx context.Context, owner, instanceID string) error {
 	_, err := r.db.ExecContext(ctx, rebindSQL(r.driver, `DELETE FROM cloud_provider_connections WHERE owner_user_id = ? AND provider_instance_id = ?`), owner, instanceID)
 	return err
+}
+
+func (r *SQLCloudRepository) ConsumeEnrollmentToken(ctx context.Context, id string, expiresAt time.Time) (bool, error) {
+	result, err := r.db.ExecContext(ctx, rebindSQL(r.driver, `INSERT INTO cloud_agent_enrollment_tokens (id, expires_at, consumed_at) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING`), id, formatTime(expiresAt.UTC()), formatTime(r.now().UTC()))
+	if err != nil {
+		return false, err
+	}
+	count, err := result.RowsAffected()
+	return count == 1, err
 }

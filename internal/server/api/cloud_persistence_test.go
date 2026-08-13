@@ -14,11 +14,13 @@ import (
 	"testing"
 	"time"
 
+	"kode-stream/internal/audit"
 	"kode-stream/internal/common/models"
 	appgit "kode-stream/internal/git"
 	"kode-stream/internal/provider"
 	"kode-stream/internal/storage"
 	"kode-stream/internal/system"
+	"strings"
 )
 
 type cloudPersistenceDouble struct {
@@ -54,7 +56,7 @@ func TestCloudPostgresPersistenceAcrossAPIReconstruction(t *testing.T) {
 	parsed.RawQuery = query.Encode()
 	dir := t.TempDir()
 	paths := system.Paths{Dir: dir, RegistryFile: filepath.Join(dir, "workspaces.yaml"), PlanIndexFile: filepath.Join(dir, "item-index.yaml"), SQLiteDatabaseFile: filepath.Join(dir, "state.db"), KnowledgeIndexFile: filepath.Join(dir, "knowledge.yaml"), AuditLogFile: filepath.Join(dir, "audit.jsonl"), SavedFiltersFile: filepath.Join(dir, "filters.yaml"), RecentItemsFile: filepath.Join(dir, "recents.yaml"), AISettingsFile: filepath.Join(dir, "ai.yaml"), CanvasFile: filepath.Join(dir, "canvas.yaml"), AISessionRecordsFile: filepath.Join(dir, "sessions.yaml")}
-	runtime := system.RuntimeConfig{Mode: models.RuntimeModeCloud, AuthMode: "app_oidc", CookieSecret: "shared-secret"}
+	runtime := system.RuntimeConfig{Mode: models.RuntimeModeCloud, AuthMode: "oauth2_proxy", CookieSecret: "shared-secret", TrustedProxyCIDRs: []string{"192.0.2.0/24"}}
 	state, err := storage.OpenAppOwnedState(paths, runtime, appgit.New(), func(key string) string {
 		switch key {
 		case storage.EnvStorageDriver:
@@ -94,6 +96,110 @@ func TestCloudPostgresPersistenceAcrossAPIReconstruction(t *testing.T) {
 	}
 	if token, ok, err := second.cloud.providers.connections.Token(context.Background(), owner, "github"); err != nil || !ok || token != "postgres-secret" {
 		t.Fatalf("token=%q ok=%v err=%v", token, ok, err)
+	}
+}
+
+func TestCloudPostgresPublicationCredentialsAndRevisionsAreAtomicAcrossAPIInstances(t *testing.T) {
+	databaseURL := os.Getenv(storage.EnvDatabaseURL)
+	if databaseURL == "" {
+		t.Skip("set KODE_STREAM_DATABASE_URL to run Cloud Postgres publication contract")
+	}
+	admin, err := sql.Open("pgx", databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	schema := fmt.Sprintf("kode_stream_cloud_publication_%d", time.Now().UnixNano())
+	if _, err := admin.Exec(`CREATE SCHEMA "` + schema + `"`); err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Exec(`DROP SCHEMA IF EXISTS "` + schema + `" CASCADE`)
+	parsed, err := url.Parse(databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := parsed.Query()
+	query.Set("search_path", schema)
+	parsed.RawQuery = query.Encode()
+	dir := t.TempDir()
+	paths := system.Paths{Dir: dir, RegistryFile: filepath.Join(dir, "workspaces.yaml"), PlanIndexFile: filepath.Join(dir, "items.yaml"), SQLiteDatabaseFile: filepath.Join(dir, "state.db"), KnowledgeIndexFile: filepath.Join(dir, "knowledge.yaml"), AuditLogFile: filepath.Join(dir, "audit.jsonl"), SavedFiltersFile: filepath.Join(dir, "filters.yaml"), RecentItemsFile: filepath.Join(dir, "recents.yaml"), AISettingsFile: filepath.Join(dir, "ai.yaml"), CanvasFile: filepath.Join(dir, "canvas.yaml"), AISessionRecordsFile: filepath.Join(dir, "sessions.yaml")}
+	runtime := system.RuntimeConfig{Mode: models.RuntimeModeCloud, AuthMode: "oauth2_proxy", CookieSecret: "shared-secret", TrustedProxyCIDRs: []string{"192.0.2.0/24"}}
+	state, err := storage.OpenAppOwnedState(paths, runtime, appgit.New(), func(key string) string {
+		switch key {
+		case storage.EnvStorageDriver:
+			return storage.StorageDriverPostgres
+		case storage.EnvDatabaseURL:
+			return parsed.String()
+		default:
+			return ""
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer state.SQLStore.Close()
+	first := New(Dependencies{RuntimeConfig: runtime, CloudPersistence: state.Cloud, Audit: state.Audit})
+	second := New(Dependencies{RuntimeConfig: runtime, CloudPersistence: state.Cloud, Audit: state.Audit})
+	firstRoutes := first.Routes()
+	secondRoutes := second.Routes()
+	owner, agentID := "postgres-owner", "postgres-agent"
+	expires := time.Now().UTC().Add(time.Minute)
+	publish := func(apiHandler *API, routes http.Handler, tokenID, publicationID, name string) *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/workspaces/from-agent", strings.NewReader(`{"name":"`+name+`","baselineBranch":"main","sources":["plans"],"revision":0}`))
+		request.Header.Set("Authorization", "Bearer "+apiHandler.cloud.signAgentToken(agentConnectToken{ID: tokenID, WorkspacePublicationID: publicationID, UserID: owner, AgentID: agentID, Name: "Agent", ExpiresAt: expires}))
+		routes.ServeHTTP(response, request)
+		return response
+	}
+	// A publication bearer is consumed by the shared database, not by one API
+	// process's in-memory state.
+	if response := publish(first, firstRoutes, "connect-a", "publication-once", "Once"); response.Code != http.StatusCreated {
+		t.Fatalf("first publication=%d %s", response.Code, response.Body.String())
+	}
+	if response := publish(second, secondRoutes, "connect-b", "publication-once", "Once"); response.Code != http.StatusUnauthorized {
+		t.Fatalf("cross-instance replay=%d %s", response.Code, response.Body.String())
+	}
+
+	// Two separately authenticated publications for revision zero race across
+	// controller instances. PostgreSQL CAS permits one create and rejects the
+	// stale contender without emitting a success audit event.
+	responses := make(chan *httptest.ResponseRecorder, 2)
+	start := make(chan struct{})
+	for _, attempt := range []struct {
+		apiHandler             *API
+		routes                 http.Handler
+		tokenID, publicationID string
+	}{{first, firstRoutes, "connect-c", "publication-c"}, {second, secondRoutes, "connect-d", "publication-d"}} {
+		attempt := attempt
+		go func() {
+			<-start
+			responses <- publish(attempt.apiHandler, attempt.routes, attempt.tokenID, attempt.publicationID, "Race")
+		}()
+	}
+	close(start)
+	created, conflicts := 0, 0
+	for range 2 {
+		response := <-responses
+		switch response.Code {
+		case http.StatusCreated:
+			created++
+		case http.StatusConflict:
+			conflicts++
+		default:
+			t.Fatalf("publication race=%d %s", response.Code, response.Body.String())
+		}
+	}
+	if created != 1 || conflicts != 1 {
+		t.Fatalf("CAS race must have one winner and one stale request: created=%d conflicts=%d", created, conflicts)
+	}
+	events, err := state.Audit.QueryContext(context.Background(), audit.Query{OwnerUserID: owner})
+	if err != nil || len(events) != 2 {
+		t.Fatalf("only committed publications may audit success: events=%#v err=%v", events, err)
+	}
+	for _, event := range events {
+		if event.Status != models.AuditStatusSuccess {
+			t.Fatalf("stale publication produced non-success audit=%#v", event)
+		}
 	}
 }
 
@@ -234,7 +340,7 @@ func TestCloudPersistenceErrorsAreCallScopedAndDoNotPublishConnectedAgent(t *tes
 
 func TestCloudPersistenceSurvivesAPIReconstructionAndIsolatesHTTPReads(t *testing.T) {
 	persistence := newCloudPersistenceDouble()
-	runtime := system.RuntimeConfig{Mode: models.RuntimeModeCloud, AuthMode: "app_oidc", CookieSecret: "shared-secret"}
+	runtime := system.RuntimeConfig{Mode: models.RuntimeModeCloud, AuthMode: "oauth2_proxy", CookieSecret: "shared-secret", TrustedProxyCIDRs: []string{"192.0.2.0/24"}}
 	first := New(Dependencies{RuntimeConfig: runtime, CloudPersistence: persistence})
 	ownerA := stableCloudUserID("owner-a")
 	workspace := models.WorkspaceConfig{ID: "workspace", Name: "Durable", OwnerUserID: ownerA, Sources: []string{}}

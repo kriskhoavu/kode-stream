@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/provider"
 	workspacecap "kode-stream/internal/workspace"
 )
 
@@ -55,13 +56,9 @@ func (a *cloudController) cloudSnapshotInfo(w http.ResponseWriter, r *http.Reque
 		writeError(w, status, message)
 		return
 	}
-	resolved, _, err := adapter.Resolve(r.Context(), session, workspace)
+	resolved, _, err := adapter.ResolvePinned(r.Context(), session, workspace)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "remote snapshot is unavailable")
-		return
-	}
-	if _, err := a.workspaces.Upsert(r.Context(), resolved); err != nil {
-		writeError(w, http.StatusServiceUnavailable, "Cloud workspace persistence is unavailable")
+		writeSnapshotError(w, err, "remote snapshot is unavailable")
 		return
 	}
 	writeJSON(w, http.StatusOK, remoteSnapshotView{Workspace: resolved, Capabilities: snapshotCapabilities(), Actions: snapshotActionCapabilities(session.User.Role, resolved)})
@@ -73,15 +70,15 @@ func (a *cloudController) cloudSnapshotTree(w http.ResponseWriter, r *http.Reque
 		writeError(w, status, message)
 		return
 	}
-	resolved, integration, err := adapter.Resolve(r.Context(), session, workspace)
+	resolved, integration, err := adapter.ResolvePinned(r.Context(), session, workspace)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "remote snapshot is unavailable")
+		writeSnapshotError(w, err, "remote snapshot is unavailable")
 		return
 	}
 	directory := cleanSnapshotPath(r.URL.Query().Get("path"))
 	entries, err := integration.Tree(r.Context(), resolved.ProviderRepository, resolved.ResolvedCommitSHA, directory)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "remote snapshot tree is unavailable")
+		writeSnapshotError(w, err, "remote snapshot tree is unavailable")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"workspaceId": resolved.ID, "commitSha": resolved.ResolvedCommitSHA, "entries": entries})
@@ -98,18 +95,26 @@ func (a *cloudController) cloudSnapshotFile(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "snapshot file path is required")
 		return
 	}
-	resolved, integration, err := adapter.Resolve(r.Context(), session, workspace)
+	resolved, integration, err := adapter.ResolvePinned(r.Context(), session, workspace)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "remote snapshot is unavailable")
+		writeSnapshotError(w, err, "remote snapshot is unavailable")
 		return
 	}
 	file, err := integration.ReadFile(r.Context(), resolved.ProviderRepository, resolved.ResolvedCommitSHA, filePath)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "remote snapshot file is unavailable")
+		writeSnapshotError(w, err, "remote snapshot file is unavailable")
 		return
 	}
 	digest := sha256.Sum256([]byte(file.Content))
 	writeJSON(w, http.StatusOK, map[string]any{"path": file.Path, "content": file.Content, "hash": hex.EncodeToString(digest[:]), "commitSha": resolved.ResolvedCommitSHA, "editable": false})
+}
+
+func writeSnapshotError(w http.ResponseWriter, err error, unavailable string) {
+	if provider.IsLimitError(err) {
+		writeError(w, http.StatusRequestEntityTooLarge, "remote snapshot exceeds Cloud limits")
+		return
+	}
+	writeError(w, http.StatusBadGateway, unavailable)
 }
 
 func cleanSnapshotPath(value string) string {
@@ -117,5 +122,9 @@ func cleanSnapshotPath(value string) string {
 	if value == "" || value == "." || strings.HasPrefix(value, "../") || strings.Contains(value, "/../") {
 		return ""
 	}
-	return strings.Trim(path.Clean(value), "/")
+	clean := strings.Trim(path.Clean(value), "/")
+	if !provider.ValidPath(clean) {
+		return ""
+	}
+	return clean
 }

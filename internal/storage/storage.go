@@ -585,6 +585,14 @@ DELETE FROM scan_warnings WHERE workspace_id NOT IN (SELECT id FROM workspaces);
 		Version: 8,
 		Name:    "legacy_import_coordination",
 		SQL:     `CREATE TABLE IF NOT EXISTS import_locks (source_name TEXT PRIMARY KEY, acquired_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);`,
+	}, {
+		Version: 9,
+		Name:    "cloud_agent_enrollment_tokens",
+		SQL:     `CREATE TABLE IF NOT EXISTS cloud_agent_enrollment_tokens (id TEXT PRIMARY KEY, expires_at TEXT NOT NULL, consumed_at TEXT NOT NULL);`,
+	}, {
+		Version: 10,
+		Name:    "cloud_workspace_publication_revisions",
+		SQL:     `ALTER TABLE cloud_workspaces ADD COLUMN publication_revision INTEGER NOT NULL DEFAULT 0;`,
 	}}
 }
 
@@ -596,7 +604,9 @@ func postgresMigrations() []Migration {
 		{Version: 5, Name: "ownership_and_cloud_state", SQL: postgresOwnershipAndCloudDDL},
 		{Version: 6, Name: "owner_scoped_navigation_keys", SQL: postgresOwnerScopedNavigationDDL},
 		{Version: 7, Name: "repair_orphan_workspace_projections", SQL: repairOrphanWorkspaceProjectionsDDL},
-		{Version: 8, Name: "legacy_import_coordination", SQL: `CREATE TABLE IF NOT EXISTS import_locks (source_name TEXT PRIMARY KEY, acquired_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP);`}}
+		{Version: 8, Name: "legacy_import_coordination", SQL: `CREATE TABLE IF NOT EXISTS import_locks (source_name TEXT PRIMARY KEY, acquired_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP);`},
+		{Version: 9, Name: "cloud_agent_enrollment_tokens", SQL: `CREATE TABLE IF NOT EXISTS cloud_agent_enrollment_tokens (id TEXT PRIMARY KEY, expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ NOT NULL);`},
+		{Version: 10, Name: "cloud_workspace_publication_revisions", SQL: `ALTER TABLE cloud_workspaces ADD COLUMN IF NOT EXISTS publication_revision BIGINT NOT NULL DEFAULT 0;`}}
 
 }
 

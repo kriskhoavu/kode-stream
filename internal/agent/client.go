@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"kode-stream/internal/common/models"
 )
 
 type Config struct {
@@ -61,8 +63,10 @@ func (c *Client) Run(ctx context.Context) error {
 		return fmt.Errorf("agent channel dial failed: %w", err)
 	}
 	defer connection.Close()
+	connection.SetReadLimit(MaxFrameBytes)
 
-	if err := c.readFrame(connection, FrameConnected); err != nil {
+	connected, err := c.readFrame(connection, FrameConnected)
+	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(c.config.Repo) != "" {
@@ -77,7 +81,7 @@ func (c *Client) Run(ctx context.Context) error {
 
 	var writeMu sync.Mutex
 	errc := make(chan error, 1)
-	go func() { errc <- c.readLoop(connection, &writeMu) }()
+	go func() { errc <- c.readLoop(connection, &writeMu, connected.Agent) }()
 	ticker := time.NewTicker(c.config.HeartbeatInterval)
 	defer ticker.Stop()
 	for {
@@ -98,10 +102,13 @@ func (c *Client) Run(ctx context.Context) error {
 	}
 }
 
-func (c *Client) readLoop(connection *websocket.Conn, writeMu *sync.Mutex) error {
+func (c *Client) readLoop(connection *websocket.Conn, writeMu *sync.Mutex, connected models.CloudAgent) error {
 	for {
 		var frame Frame
 		if err := connection.ReadJSON(&frame); err != nil {
+			return err
+		}
+		if err := ValidateFrame(frame, connected.ID, connected.UserID); err != nil {
 			return err
 		}
 		c.emit(frame)
@@ -117,17 +124,17 @@ func (c *Client) readLoop(connection *websocket.Conn, writeMu *sync.Mutex) error
 	}
 }
 
-func (c *Client) readFrame(connection *websocket.Conn, expected string) error {
+func (c *Client) readFrame(connection *websocket.Conn, expected string) (Frame, error) {
 	var frame Frame
 	if err := connection.ReadJSON(&frame); err != nil {
-		return err
+		return Frame{}, err
 	}
 	c.emit(frame)
 	if frame.Type != expected {
 		data, _ := json.Marshal(frame)
-		return fmt.Errorf("expected %s frame, got %s", expected, data)
+		return Frame{}, fmt.Errorf("expected %s frame, got %s", expected, data)
 	}
-	return nil
+	return frame, nil
 }
 
 func (c *Client) emit(frame Frame) {

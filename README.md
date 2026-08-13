@@ -241,6 +241,7 @@ Storage configuration:
 | `KODE_STREAM_SQLITE_PATH`    | `<effective-data-dir>/kode-stream.db` | unused                              |
 | `KODE_STREAM_DATABASE_URL`   | unused                                | secret-managed Postgres URL         |
 | `KODE_STREAM_MIGRATIONS`     | `auto`                                | `auto` or operator-managed `manual` |
+| `KODE_STREAM_TRUSTED_PROXY_CIDRS` | unused                           | non-catch-all CIDRs of the header-injecting OAuth proxy |
 
 Local examples:
 

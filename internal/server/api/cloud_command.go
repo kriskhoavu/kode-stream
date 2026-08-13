@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"regexp"
 	"strings"
@@ -9,6 +8,8 @@ import (
 
 	"kode-stream/internal/common/models"
 )
+
+const maxCloudCommandBodyBytes int64 = 64 << 10
 
 var secretPattern = regexp.MustCompile(`(?i)(token|secret|password|key)=(\S+)`)
 
@@ -28,11 +29,8 @@ func (a *cloudController) cloudWorkspaceCommand(w http.ResponseWriter, r *http.R
 		return
 	}
 	var input cloudCommandInput
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
+	if !decodeLimitedJSON(w, r, &input, maxCloudCommandBodyBytes, true) {
 		a.recordCloudCommand(session, r.PathValue("id"), "unknown", models.AuditStatusBlocked, "invalid command request")
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 	adapter, status, message := a.workspaceAccessAdapter(workspace)

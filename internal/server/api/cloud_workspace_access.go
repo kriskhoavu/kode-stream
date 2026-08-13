@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"strings"
 
 	"kode-stream/internal/common/models"
 	workspacecap "kode-stream/internal/workspace"
@@ -46,16 +45,10 @@ func (a agentAccessAdapter) Command(session cloudSession, workspace models.Works
 	if !roleCapabilities(session.User.Role)[capability] {
 		return models.CommandResult{}, http.StatusForbidden, "role cannot run this command"
 	}
-	command := models.CommandEnvelope{
-		ID:          stableCloudUserID(session.User.ID + ":" + workspace.ID + ":" + input.Type),
-		Type:        strings.TrimSpace(input.Type),
-		WorkspaceID: workspace.ID,
-		UserID:      session.User.ID,
-		AgentID:     workspace.AgentID,
-		Capability:  capability,
-		Payload:     input.Payload,
-	}
-	return models.CommandResult{Accepted: true, Command: command, Log: redactCommandLog(input.Log)}, http.StatusAccepted, ""
+	// A connected socket is not yet a durable command queue.  Refuse rather
+	// than acknowledge work that cannot be delivered/correlated exactly once.
+	// This is intentionally stable until a persisted command lifecycle exists.
+	return models.CommandResult{}, http.StatusServiceUnavailable, "Cloud Agent command delivery is unavailable"
 }
 
 func commandAction(capability models.Capability) (models.WorkspaceAction, bool) {

@@ -31,6 +31,22 @@ func TestCloudModeRequiresSessionOutsideHealthAndAuth(t *testing.T) {
 	}
 }
 
+func TestCloudDirectIdentityHeadersAreRejectedOutsideTrustedProxy(t *testing.T) {
+	apiHandler, _, _, _ := reliabilityTestAPI(t)
+	config := testCloudRuntimeConfig()
+	config.TrustedProxyCIDRs = []string{"10.0.0.0/8"}
+	handler := withTestRuntime(apiHandler, config).Routes()
+	request := httptest.NewRequest(http.MethodGet, "/api/state", nil)
+	request.RemoteAddr = "192.0.2.1:1234"
+	request.Header.Set("X-Kode-Stream-Subject", "forged-admin")
+	request.Header.Set("X-Kode-Stream-Role", "admin")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("forged headers authenticated: %d %s", response.Code, response.Body.String())
+	}
+}
+
 func TestCloudEmbeddedSessionRoutesAreTenantScopedBeforeWebSocketUpgrade(t *testing.T) {
 	manager := appaisession.NewTerminalManager(appaisession.Config{})
 	t.Cleanup(func() { _ = manager.Close() })
@@ -256,7 +272,7 @@ func TestDomain02SystemStorageRouteHTTPRoleMatrix(t *testing.T) {
 	}
 }
 
-func TestCloudEditorMutationsRequireCSRF(t *testing.T) {
+func TestCloudEditorMutationsUseTrustedProxyCSRF(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
 	handler := withTestRuntime(apiHandler, testAppOIDCRuntimeConfig()).Routes()
 
@@ -265,8 +281,8 @@ func TestCloudEditorMutationsRequireCSRF(t *testing.T) {
 	request.Header.Set("X-Kode-Stream-Role", "editor")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusForbidden {
-		t.Fatalf("missing csrf status = %d body = %s", response.Code, response.Body.String())
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("proxy csrf status = %d body = %s", response.Code, response.Body.String())
 	}
 
 	withCSRF := httptest.NewRecorder()
@@ -280,28 +296,14 @@ func TestCloudEditorMutationsRequireCSRF(t *testing.T) {
 	}
 }
 
-func TestCloudLogoutClearsSessionWithCSRF(t *testing.T) {
+func TestCloudLogoutDelegatesToTrustedProxy(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
-	handler := withTestRuntime(apiHandler, testAppOIDCRuntimeConfig()).Routes()
-
-	login := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/api/auth/callback", nil)
-	request.Header.Set("X-Kode-Stream-Subject", "editor")
-	request.Header.Set("X-Kode-Stream-Role", "editor")
-	handler.ServeHTTP(login, request)
-	if login.Code != http.StatusOK {
-		t.Fatalf("login status = %d", login.Code)
-	}
-
+	handler := withTestRuntime(apiHandler, testCloudRuntimeConfig()).Routes()
 	logout := httptest.NewRecorder()
 	logoutRequest := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
-	for _, cookie := range login.Result().Cookies() {
-		logoutRequest.AddCookie(cookie)
-	}
-	logoutRequest.Header.Set(csrfHeader, stableCloudUserID("editor:csrf"))
 	handler.ServeHTTP(logout, logoutRequest)
-	if logout.Code != http.StatusOK || logout.Result().Cookies()[0].MaxAge != -1 {
-		t.Fatalf("logout status = %d cookies=%#v body=%s", logout.Code, logout.Result().Cookies(), logout.Body.String())
+	if logout.Code != http.StatusOK || !strings.Contains(logout.Body.String(), "/oauth2/sign_out") {
+		t.Fatalf("logout status = %d body=%s", logout.Code, logout.Body.String())
 	}
 }
 
@@ -361,22 +363,19 @@ func TestLocalModeBypassesCloudAuthPolicy(t *testing.T) {
 
 func testCloudRuntimeConfig() system.RuntimeConfig {
 	config := system.RuntimeConfig{
-		Mode:         models.RuntimeModeCloud,
-		AuthMode:     "oauth2_proxy",
-		BindAddress:  "0.0.0.0",
-		CookieSecret: "test-secret",
-		AdminUsers:   []string{"admin@example.com"},
-		Capabilities: map[models.Capability]bool{models.CapabilityRead: true},
-		Agent:        models.AgentConnection{Available: false, Status: "offline"},
+		Mode:              models.RuntimeModeCloud,
+		AuthMode:          "oauth2_proxy",
+		BindAddress:       "0.0.0.0",
+		CookieSecret:      "test-secret",
+		AdminUsers:        []string{"admin@example.com"},
+		TrustedProxyCIDRs: []string{"192.0.2.0/24"},
+		Capabilities:      map[models.Capability]bool{models.CapabilityRead: true},
+		Agent:             models.AgentConnection{Available: false, Status: "offline"},
 	}
 	return config
 }
 
 func testAppOIDCRuntimeConfig() system.RuntimeConfig {
 	config := testCloudRuntimeConfig()
-	config.AuthMode = "app_oidc"
-	config.OIDCIssuer = "https://issuer.example.com"
-	config.OIDCClientID = "client"
-	config.OIDCClientSecret = "secret"
 	return config
 }

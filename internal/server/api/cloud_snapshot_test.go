@@ -13,11 +13,13 @@ import (
 )
 
 func TestCloudSnapshotReadsCommitPinnedProviderContent(t *testing.T) {
+	branchResolutions := 0
 	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/user/repos":
 			_, _ = w.Write([]byte(`[{"id":1,"name":"repo","full_name":"acme/repo"}]`))
 		case "/repos/acme/repo/branches":
+			branchResolutions++
 			_, _ = w.Write([]byte(`[{"name":"main","commit":{"sha":"commit-1"}}]`))
 		case "/repos/acme/repo/tags":
 			_, _ = w.Write([]byte(`[]`))
@@ -40,7 +42,7 @@ func TestCloudSnapshotReadsCommitPinnedProviderContent(t *testing.T) {
 	if err := apiHandler.cloud.providers.connections.Save(userID, "github", "read-token"); err != nil {
 		t.Fatal(err)
 	}
-	workspace, err := apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "snapshot", Name: "Snapshot", OwnerUserID: userID, AccessMode: models.WorkspaceAccessModeRemoteSnapshot, Provider: "github", ProviderInstanceID: "github", ProviderRepository: "acme/repo", SelectedRef: "main", Sources: []string{}})
+	workspace, err := apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "snapshot", Name: "Snapshot", OwnerUserID: userID, AccessMode: models.WorkspaceAccessModeRemoteSnapshot, Provider: "github", ProviderInstanceID: "github", ProviderRepository: "acme/repo", SelectedRef: "main", ResolvedCommitSHA: "commit-1", Sources: []string{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,6 +57,9 @@ func TestCloudSnapshotReadsCommitPinnedProviderContent(t *testing.T) {
 		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "commit-1") {
 			t.Fatalf("%s: status = %d body = %s", endpoint, response.Code, response.Body.String())
 		}
+	}
+	if branchResolutions != 0 {
+		t.Fatalf("immutable snapshot reads re-resolved mutable ref %d times", branchResolutions)
 	}
 
 	response := httptest.NewRecorder()

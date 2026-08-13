@@ -118,8 +118,8 @@ func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 	if !health.OK {
 		t.Fatalf("health = %#v", health)
 	}
-	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 8 {
-		t.Fatalf("health = %#v, want sqlite version 8", health)
+	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 10 {
+		t.Fatalf("health = %#v, want sqlite version 10", health)
 	}
 	for _, table := range []string{"workspaces", "branch_scans", "indexed_items", "import_status", "canvas_layouts", "canvas_placements", "ai_session_records"} {
 		var name string
@@ -164,7 +164,7 @@ func TestSQLiteOwnershipMigrationsUpgradeExistingSchemaWithoutReset(t *testing.T
 			t.Fatal(err)
 		}
 	}
-	if version, err := ensureMigrations(context.Background(), db, StorageDriverSQLite, "auto", migrations); err != nil || version != 8 {
+	if version, err := ensureMigrations(context.Background(), db, StorageDriverSQLite, "auto", migrations); err != nil || version != 10 {
 		t.Fatalf("upgrade version=%d err=%v", version, err)
 	}
 	var owner string
@@ -807,6 +807,28 @@ func TestSQLCloudRepositoryPersistsAcrossReconstructionAndScopesOwners(t *testin
 	}
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSQLCloudRepositoryPublishesAgentWorkspaceWithCompareAndSwap(t *testing.T) {
+	store, err := openSQLStore(Config{Driver: StorageDriverSQLite, SQLitePath: filepath.Join(t.TempDir(), "cloud-publication.db"), Migrations: "auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	repository := &SQLCloudRepository{db: store.db, driver: store.driver, now: time.Now}
+	workspace := models.WorkspaceConfig{ID: "agent-workspace", Name: "First", OwnerUserID: "owner", Sources: []string{}}
+	published, conflict, err := repository.PublishAgentWorkspace(context.Background(), "owner", workspace, 0)
+	if err != nil || conflict || published.CloudPublicationRevision != 1 {
+		t.Fatalf("first publish=%#v conflict=%v err=%v", published, conflict, err)
+	}
+	workspace.Name = "Stale overwrite"
+	if _, conflict, err := repository.PublishAgentWorkspace(context.Background(), "owner", workspace, 0); err != nil || !conflict {
+		t.Fatalf("stale publish conflict=%v err=%v", conflict, err)
+	}
+	loaded, ok, err := repository.GetWorkspace(context.Background(), "owner", workspace.ID)
+	if err != nil || !ok || loaded.Name != "First" || loaded.CloudPublicationRevision != 1 {
+		t.Fatalf("stale overwrite leaked workspace=%#v ok=%v err=%v", loaded, ok, err)
 	}
 }
 

@@ -6,7 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
+	"net/netip"
 	"slices"
 	"strings"
 	"time"
@@ -72,20 +74,10 @@ func (a *cloudController) cloudLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "login is handled by oauth2-proxy")
 		return
 	}
-	session, ok := a.sessionFromTrustedHeaders(r)
-	if !ok {
-		http.Redirect(w, r, strings.TrimRight(a.runtimeConfig.OIDCIssuer, "/"), http.StatusFound)
-		return
-	}
-	a.writeCloudSession(w, session)
-	writeJSON(w, http.StatusOK, map[string]any{"user": session.User, "csrfToken": session.CSRFToken})
+	writeError(w, http.StatusUnauthorized, "Cloud login is unavailable")
 }
 
 func (a *cloudController) cloudCallback(w http.ResponseWriter, r *http.Request) {
-	if a.runtimeConfig.AuthMode == "oauth2_proxy" {
-		writeError(w, http.StatusUnauthorized, "callback is handled by oauth2-proxy")
-		return
-	}
 	session, ok := a.sessionFromTrustedHeaders(r)
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "Cloud identity headers are required")
@@ -110,6 +102,9 @@ func (a *cloudController) cloudLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *cloudController) sessionFromTrustedHeaders(r *http.Request) (cloudSession, bool) {
+	if a.runtimeConfig.AuthMode != "oauth2_proxy" || !a.requestFromTrustedProxy(r) {
+		return cloudSession{}, false
+	}
 	subject := firstHeader(r,
 		"X-Kode-Stream-Subject",
 		"X-Auth-Request-User",
@@ -142,6 +137,24 @@ func (a *cloudController) sessionFromTrustedHeaders(r *http.Request) (cloudSessi
 		Subject: subject,
 	}
 	return cloudSession{User: user, CSRFToken: stableCloudUserID(subject + ":csrf"), ExpiresAt: time.Now().UTC().Add(12 * time.Hour)}, true
+}
+
+func (a *cloudController) requestFromTrustedProxy(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	address, err := netip.ParseAddr(host)
+	if err != nil {
+		return false
+	}
+	for _, raw := range a.runtimeConfig.TrustedProxyCIDRs {
+		prefix, err := netip.ParsePrefix(raw)
+		if err == nil && prefix.Contains(address) {
+			return true
+		}
+	}
+	return false
 }
 
 func firstHeader(r *http.Request, names ...string) string {

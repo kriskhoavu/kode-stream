@@ -94,6 +94,7 @@ jobs:
           KODE_STREAM_PUBLIC_URL: https://kode-stream.example.com
           KODE_STREAM_COOKIE_SECRET: 0123456789abcdef0123456789abcdef
           KODE_STREAM_ADMIN_USERS: admin@example.com
+          KODE_STREAM_TRUSTED_PROXY_CIDRS: 127.0.0.1/32
           KODE_STREAM_STORAGE_OPTION: database
           KODE_STREAM_STORAGE_DRIVER: postgres
           KODE_STREAM_DATABASE_URL: postgres://kode_stream:kode_stream@127.0.0.1:5432/kode_stream?sslmode=disable

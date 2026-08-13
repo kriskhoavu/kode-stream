@@ -120,6 +120,7 @@ type WorkspaceConfig struct {
 	ProviderRepository         string                    `json:"providerRepository,omitempty" yaml:"providerRepository,omitempty"`
 	SelectedRef                string                    `json:"selectedRef,omitempty" yaml:"selectedRef,omitempty"`
 	ResolvedCommitSHA          string                    `json:"resolvedCommitSha,omitempty" yaml:"resolvedCommitSha,omitempty"`
+	CloudPublicationRevision   int64                     `json:"cloudPublicationRevision,omitempty" yaml:"cloudPublicationRevision,omitempty"`
 	LocalRootLabel             string                    `json:"localRootLabel,omitempty" yaml:"localRootLabel,omitempty"`
 	PublishedSummary           bool                      `json:"publishedSummary,omitempty" yaml:"publishedSummary,omitempty"`
 	ScanStatus                 string                    `json:"scanStatus,omitempty" yaml:"scanStatus,omitempty"`

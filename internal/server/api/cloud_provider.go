@@ -152,3 +152,16 @@ func (a remoteSnapshotAdapter) Resolve(ctx context.Context, session cloudSession
 	workspace.ResolvedCommitSHA = ref.CommitSHA
 	return workspace, integration, nil
 }
+
+// ResolvePinned deliberately does not resolve SelectedRef. A remote snapshot is
+// an immutable review generation, not a live branch view.
+func (a remoteSnapshotAdapter) ResolvePinned(ctx context.Context, session cloudSession, workspace models.WorkspaceConfig) (models.WorkspaceConfig, provider.GitProviderIntegration, error) {
+	if strings.TrimSpace(workspace.ResolvedCommitSHA) == "" {
+		return models.WorkspaceConfig{}, nil, fmt.Errorf("remote snapshot has no immutable commit pin")
+	}
+	integration, err := a.providers.integration(ctx, session.User.ID, workspace)
+	if err != nil {
+		return models.WorkspaceConfig{}, nil, err
+	}
+	return workspace, integration, nil
+}

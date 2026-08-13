@@ -13,7 +13,7 @@ import (
 	"kode-stream/internal/common/models"
 )
 
-func TestCloudCommandRoutesToOwnerAgentAndRedactsLog(t *testing.T) {
+func TestCloudCommandIsUnavailableUntilDeliveryLifecycleExists(t *testing.T) {
 	apiHandler, workspaceID := cloudCommandTestAPI(t, true)
 	handler := apiHandler.Routes()
 
@@ -24,21 +24,11 @@ func TestCloudCommandRoutesToOwnerAgentAndRedactsLog(t *testing.T) {
 	request.Header.Set(csrfHeader, stableCloudUserID("editor:csrf"))
 	handler.ServeHTTP(response, request)
 
-	if response.Code != http.StatusAccepted {
+	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
 	}
-	var result models.CommandResult
-	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
-		t.Fatal(err)
-	}
-	if !result.Accepted || result.Command.AgentID != "agent-1" || result.Command.UserID != stableCloudUserID("editor") || result.Command.Capability != models.CapabilityGit {
-		t.Fatalf("result = %#v", result)
-	}
-	if strings.Contains(result.Log, "abc123") || strings.Contains(result.Log, "hunter2") || !strings.Contains(result.Log, "[REDACTED]") {
-		t.Fatalf("log not redacted: %q", result.Log)
-	}
 	events, err := apiHandler.cloud.audit.QueryContext(context.Background(), audit.Query{OwnerUserID: stableCloudUserID("editor"), WorkspaceID: workspaceID, Limit: 1})
-	if err != nil || len(events) != 1 || events[0].ActorUserID != stableCloudUserID("editor") || events[0].Status != models.AuditStatusSuccess {
+	if err != nil || len(events) != 1 || events[0].ActorUserID != stableCloudUserID("editor") || events[0].Status != models.AuditStatusFailed {
 		t.Fatalf("command audit = %#v, %v", events, err)
 	}
 	raw, _ := json.Marshal(events[0])

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,7 +17,7 @@ func TestCloudWorkspaceRegistrationFromAgentStoresMetadata(t *testing.T) {
 	apiHandler, _, _, auditStore := reliabilityTestAPI(t)
 	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
 	handler := apiHandler.Routes()
-	token := apiHandler.cloud.signAgentToken(agentConnectToken{UserID: "user-1", AgentID: "agent-1", Name: "MacBook", ExpiresAt: time.Now().UTC().Add(time.Minute)})
+	token := apiHandler.cloud.signAgentToken(agentConnectToken{ID: "connect-1", WorkspacePublicationID: "publish-1", UserID: "user-1", AgentID: "agent-1", Name: "MacBook", ExpiresAt: time.Now().UTC().Add(time.Minute)})
 
 	create := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/from-agent", strings.NewReader(`{"name":"Platform","baselineBranch":"main","sources":["plans"],"remoteUrl":"git@example.com:repo.git","localRootLabel":"/Users/kdvu/src/repo","publishedSummary":true}`))
@@ -38,6 +39,31 @@ func TestCloudWorkspaceRegistrationFromAgentStoresMetadata(t *testing.T) {
 	events, err := auditStore.Recent(1)
 	if err != nil || len(events) != 1 || events[0].Operation != "cloud_workspace_register" || events[0].OwnerUserID != "user-1" || events[0].ActorUserID != "user-1" {
 		t.Fatalf("registration audit=%#v err=%v", events, err)
+	}
+}
+
+func TestCloudAgentWorkspacePublicationIsSingleUseAndRevisionProtected(t *testing.T) {
+	apiHandler, _, _, _ := reliabilityTestAPI(t)
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
+	handler := apiHandler.Routes()
+	publish := func(token agentConnectToken, revision int64) *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/workspaces/from-agent", strings.NewReader(`{"name":"Platform","baselineBranch":"main","sources":["plans"],"revision":`+strconv.FormatInt(revision, 10)+`}`))
+		request.Header.Set("Authorization", "Bearer "+apiHandler.cloud.signAgentToken(token))
+		handler.ServeHTTP(response, request)
+		return response
+	}
+	expires := time.Now().UTC().Add(time.Minute)
+	first := agentConnectToken{ID: "connect-a", WorkspacePublicationID: "publication-a", UserID: "user", AgentID: "agent", Name: "Agent", ExpiresAt: expires}
+	if response := publish(first, 0); response.Code != http.StatusCreated {
+		t.Fatalf("first publication=%d %s", response.Code, response.Body.String())
+	}
+	if response := publish(first, 0); response.Code != http.StatusUnauthorized {
+		t.Fatalf("replayed publication=%d %s", response.Code, response.Body.String())
+	}
+	stale := agentConnectToken{ID: "connect-b", WorkspacePublicationID: "publication-b", UserID: "user", AgentID: "agent", Name: "Agent", ExpiresAt: expires}
+	if response := publish(stale, 0); response.Code != http.StatusConflict {
+		t.Fatalf("stale publication=%d %s", response.Code, response.Body.String())
 	}
 }
 

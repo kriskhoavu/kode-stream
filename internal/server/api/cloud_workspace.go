@@ -2,12 +2,12 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	appagent "kode-stream/internal/agent"
 	"kode-stream/internal/cloudstate"
 	"kode-stream/internal/common/models"
 )
@@ -67,6 +67,29 @@ func (s *cloudWorkspaceStore) Upsert(ctx context.Context, workspace models.Works
 	return workspace, nil
 }
 
+func (s *cloudWorkspaceStore) PublishAgentWorkspace(ctx context.Context, workspace models.WorkspaceConfig, expectedRevision int64) (models.WorkspaceConfig, bool, error) {
+	workspace = normalizeCloudWorkspaceAccess(workspace)
+	if durable, ok := s.persistence.(cloudstate.WorkspacePublicationRepository); ok {
+		return durable.PublishAgentWorkspace(ctx, workspace.OwnerUserID, workspace, expectedRevision)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.workspaces[workspace.OwnerUserID] == nil {
+		s.workspaces[workspace.OwnerUserID] = map[string]models.WorkspaceConfig{}
+	}
+	previous, exists := s.workspaces[workspace.OwnerUserID][workspace.ID]
+	if exists {
+		if previous.CloudPublicationRevision != expectedRevision {
+			return previous, true, nil
+		}
+	} else if expectedRevision != 0 {
+		return models.WorkspaceConfig{}, true, nil
+	}
+	workspace.CloudPublicationRevision = expectedRevision + 1
+	s.workspaces[workspace.OwnerUserID][workspace.ID] = workspace
+	return workspace, false, nil
+}
+
 func normalizeCloudWorkspaceAccess(workspace models.WorkspaceConfig) models.WorkspaceConfig {
 	if workspace.AccessMode == "" {
 		workspace.AccessMode = models.WorkspaceAccessModeAgentBacked
@@ -93,31 +116,18 @@ func (a *cloudController) registerCloudWorkspaceFromAgent(w http.ResponseWriter,
 		writeError(w, http.StatusUnauthorized, "invalid agent credential")
 		return
 	}
-	var input struct {
-		Name             string   `json:"name"`
-		BaselineBranch   string   `json:"baselineBranch"`
-		Sources          []string `json:"sources"`
-		RemoteURL        string   `json:"remoteUrl"`
-		LocalRootLabel   string   `json:"localRootLabel"`
-		PublishedSummary bool     `json:"publishedSummary"`
-		ScanStatus       string   `json:"scanStatus"`
+	var input appagent.WorkspaceMetadata
+	if !decodeLimitedJSON(w, r, &input, appagent.MaxWorkspaceMetadataBytes, true) {
+		return
 	}
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
+	input, err := appagent.ValidateWorkspaceMetadata(input)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	name := strings.TrimSpace(input.Name)
-	if name == "" {
-		writeError(w, http.StatusBadRequest, "workspace name is required")
-		return
-	}
-	branch := strings.TrimSpace(input.BaselineBranch)
-	if branch == "" {
-		branch = "main"
-	}
-	sources := normalizeCloudSources(input.Sources)
+	name := input.Name
+	branch := input.BaselineBranch
+	sources := input.Sources
 	workspace := models.WorkspaceConfig{
 		ID:               stableCloudUserID(token.UserID + ":" + token.AgentID + ":" + name),
 		Name:             name,
@@ -127,21 +137,31 @@ func (a *cloudController) registerCloudWorkspaceFromAgent(w http.ResponseWriter,
 		OwnerUserID:      token.UserID,
 		AgentID:          token.AgentID,
 		LocalRootLabel:   redactRootLabel(input.LocalRootLabel),
-		RemoteURL:        strings.TrimSpace(input.RemoteURL),
+		RemoteURL:        input.RemoteURL,
 		PublishedSummary: input.PublishedSummary,
-		ScanStatus:       strings.TrimSpace(input.ScanStatus),
+		ScanStatus:       input.ScanStatus,
 		BaselineBranch:   branch,
 		RegistrationMode: models.WorkspaceRegistrationModeExisting,
 		Sources:          sources,
 		CreatedAt:        time.Now().UTC(),
 		LastScannedAt:    time.Now().UTC(),
 	}
-	if workspace.ScanStatus == "" {
-		workspace.ScanStatus = "published"
+	consumed, err := a.consumeWorkspacePublication(r.Context(), token)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "Cloud agent persistence is unavailable")
+		return
 	}
-	created, err := a.workspaces.Upsert(r.Context(), workspace)
+	if !consumed {
+		writeError(w, http.StatusUnauthorized, "agent workspace publication credential has already been used")
+		return
+	}
+	created, conflict, err := a.workspaces.PublishAgentWorkspace(r.Context(), workspace, input.Revision)
 	if err != nil {
 		writeError(w, http.StatusServiceUnavailable, "Cloud workspace persistence is unavailable")
+		return
+	}
+	if conflict {
+		writeError(w, http.StatusConflict, "agent workspace publication is stale; reconnect and publish the latest generation")
 		return
 	}
 	if a.audit != nil {
@@ -151,17 +171,11 @@ func (a *cloudController) registerCloudWorkspaceFromAgent(w http.ResponseWriter,
 }
 
 func normalizeCloudSources(sources []string) []string {
-	if len(sources) == 0 {
+	metadata, err := appagent.ValidateWorkspaceMetadata(appagent.WorkspaceMetadata{Name: "sources", Sources: sources})
+	if err != nil {
 		return []string{}
 	}
-	result := make([]string, 0, len(sources))
-	for _, source := range sources {
-		clean := strings.Trim(strings.TrimSpace(source), "/")
-		if clean != "" && !strings.Contains(clean, "..") {
-			result = append(result, clean)
-		}
-	}
-	return result
+	return metadata.Sources
 }
 
 func redactRootLabel(label string) string {

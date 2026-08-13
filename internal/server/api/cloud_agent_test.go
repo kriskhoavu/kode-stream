@@ -35,7 +35,7 @@ func TestCloudAgentConnectTokenRequiresAuthenticatedUser(t *testing.T) {
 	}
 }
 
-func TestCloudAgentConnectTokenRequiresCSRFInAppOIDCMode(t *testing.T) {
+func TestCloudAgentConnectTokenUsesTrustedProxyIdentity(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
 	handler := withTestRuntime(apiHandler, testAppOIDCRuntimeConfig()).Routes()
 
@@ -44,8 +44,8 @@ func TestCloudAgentConnectTokenRequiresCSRFInAppOIDCMode(t *testing.T) {
 	request.Header.Set("X-Kode-Stream-Subject", "editor")
 	request.Header.Set("X-Kode-Stream-Role", "editor")
 	handler.ServeHTTP(forbidden, request)
-	if forbidden.Code != http.StatusForbidden {
-		t.Fatalf("forbidden status = %d body=%s", forbidden.Code, forbidden.Body.String())
+	if forbidden.Code != http.StatusOK {
+		t.Fatalf("trusted proxy status = %d body=%s", forbidden.Code, forbidden.Body.String())
 	}
 }
 
@@ -55,6 +55,40 @@ func TestCloudAgentTokenExpiry(t *testing.T) {
 	expired := apiHandler.cloud.signAgentToken(agentConnectToken{UserID: "user", AgentID: "agent", ExpiresAt: time.Now().UTC().Add(-time.Second)})
 	if _, ok := apiHandler.cloud.verifyAgentToken(expired); ok {
 		t.Fatal("expired token verified")
+	}
+}
+
+func TestCloudAgentEnrollmentTokenCannotBeReplayed(t *testing.T) {
+	apiHandler, _, _, _ := reliabilityTestAPI(t)
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
+	server := httptest.NewServer(apiHandler.Routes())
+	defer server.Close()
+	token := apiHandler.cloud.signAgentToken(agentConnectToken{ID: "single-use", UserID: "user", AgentID: "agent", Name: "Agent", ExpiresAt: time.Now().UTC().Add(time.Minute)})
+	endpoint := websocketURL(server.URL, "/api/agents/channel?token="+url.QueryEscape(token))
+	first, _, err := websocket.DefaultDialer.Dial(endpoint, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = first.Close()
+	if replay, response, err := websocket.DefaultDialer.Dial(endpoint, nil); err == nil {
+		_ = replay.Close()
+		t.Fatal("replayed enrollment token connected")
+	} else if response == nil || response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("replay response=%v err=%v", response, err)
+	}
+}
+
+func TestCloudAgentConnectTokenRejectsUnknownTrailingAndOversizedBodies(t *testing.T) {
+	apiHandler, _, _, _ := reliabilityTestAPI(t)
+	handler := withTestRuntime(apiHandler, testCloudRuntimeConfig()).Routes()
+	for _, body := range []string{`{"unknown":true}`, `{} {}`, `{"name":"` + strings.Repeat("x", 20<<10) + `"}`} {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/agents/connect-token", strings.NewReader(body))
+		request.Header.Set("X-Auth-Request-User", "editor")
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusBadRequest && response.Code != http.StatusRequestEntityTooLarge {
+			t.Fatalf("body=%q status=%d body=%s", body[:min(len(body), 32)], response.Code, response.Body.String())
+		}
 	}
 }
 

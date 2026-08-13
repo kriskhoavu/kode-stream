@@ -2,6 +2,7 @@ package system
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"strings"
 
@@ -9,31 +10,33 @@ import (
 )
 
 const (
-	EnvRuntimeMode      = "KODE_STREAM_MODE"
-	EnvAuthMode         = "KODE_STREAM_AUTH_MODE"
-	EnvBindAddress      = "KODE_STREAM_BIND_ADDR"
-	EnvCookieSecret     = "KODE_STREAM_COOKIE_SECRET"
-	EnvOIDCIssuer       = "KODE_STREAM_OIDC_ISSUER"
-	EnvOIDCClientID     = "KODE_STREAM_OIDC_CLIENT_ID"
-	EnvOIDCClientSecret = "KODE_STREAM_OIDC_CLIENT_SECRET"
-	EnvPublicURL        = "KODE_STREAM_PUBLIC_URL"
-	EnvAdminUsers       = "KODE_STREAM_ADMIN_USERS"
+	EnvRuntimeMode       = "KODE_STREAM_MODE"
+	EnvAuthMode          = "KODE_STREAM_AUTH_MODE"
+	EnvBindAddress       = "KODE_STREAM_BIND_ADDR"
+	EnvCookieSecret      = "KODE_STREAM_COOKIE_SECRET"
+	EnvOIDCIssuer        = "KODE_STREAM_OIDC_ISSUER"
+	EnvOIDCClientID      = "KODE_STREAM_OIDC_CLIENT_ID"
+	EnvOIDCClientSecret  = "KODE_STREAM_OIDC_CLIENT_SECRET"
+	EnvPublicURL         = "KODE_STREAM_PUBLIC_URL"
+	EnvAdminUsers        = "KODE_STREAM_ADMIN_USERS"
+	EnvTrustedProxyCIDRs = "KODE_STREAM_TRUSTED_PROXY_CIDRS"
 )
 
 type RuntimeConfig struct {
-	Mode             models.RuntimeMode         `json:"mode"`
-	AuthMode         string                     `json:"-"`
-	BindAddress      string                     `json:"bindAddress"`
-	CookieSecret     string                     `json:"-"`
-	OIDCIssuer       string                     `json:"-"`
-	OIDCClientID     string                     `json:"-"`
-	OIDCClientSecret string                     `json:"-"`
-	PublicURL        string                     `json:"-"`
-	AdminUsers       []string                   `json:"-"`
-	User             *models.CloudUser          `json:"user,omitempty"`
-	Role             models.CloudRole           `json:"role"`
-	Capabilities     map[models.Capability]bool `json:"capabilities"`
-	Agent            models.AgentConnection     `json:"agent"`
+	Mode              models.RuntimeMode         `json:"mode"`
+	AuthMode          string                     `json:"-"`
+	BindAddress       string                     `json:"bindAddress"`
+	CookieSecret      string                     `json:"-"`
+	OIDCIssuer        string                     `json:"-"`
+	OIDCClientID      string                     `json:"-"`
+	OIDCClientSecret  string                     `json:"-"`
+	PublicURL         string                     `json:"-"`
+	AdminUsers        []string                   `json:"-"`
+	TrustedProxyCIDRs []string                   `json:"-"`
+	User              *models.CloudUser          `json:"user,omitempty"`
+	Role              models.CloudRole           `json:"role"`
+	Capabilities      map[models.Capability]bool `json:"capabilities"`
+	Agent             models.AgentConnection     `json:"agent"`
 }
 
 func ResolveRuntimeConfig() (RuntimeConfig, error) {
@@ -59,18 +62,19 @@ func ResolveRuntimeConfigFromEnv(getenv func(string) string) (RuntimeConfig, err
 	}
 
 	config := RuntimeConfig{
-		Mode:             mode,
-		AuthMode:         strings.TrimSpace(getenv(EnvAuthMode)),
-		BindAddress:      bindAddress,
-		CookieSecret:     strings.TrimSpace(getenv(EnvCookieSecret)),
-		OIDCIssuer:       strings.TrimSpace(getenv(EnvOIDCIssuer)),
-		OIDCClientID:     strings.TrimSpace(getenv(EnvOIDCClientID)),
-		OIDCClientSecret: strings.TrimSpace(getenv(EnvOIDCClientSecret)),
-		PublicURL:        strings.TrimRight(strings.TrimSpace(getenv(EnvPublicURL)), "/"),
-		AdminUsers:       splitList(getenv(EnvAdminUsers)),
-		Role:             models.CloudRoleAdmin,
-		Capabilities:     defaultCapabilities(mode),
-		Agent:            models.AgentConnection{Available: mode == models.RuntimeModeLocal, Status: "unsupported"},
+		Mode:              mode,
+		AuthMode:          strings.TrimSpace(getenv(EnvAuthMode)),
+		BindAddress:       bindAddress,
+		CookieSecret:      strings.TrimSpace(getenv(EnvCookieSecret)),
+		OIDCIssuer:        strings.TrimSpace(getenv(EnvOIDCIssuer)),
+		OIDCClientID:      strings.TrimSpace(getenv(EnvOIDCClientID)),
+		OIDCClientSecret:  strings.TrimSpace(getenv(EnvOIDCClientSecret)),
+		PublicURL:         strings.TrimRight(strings.TrimSpace(getenv(EnvPublicURL)), "/"),
+		AdminUsers:        splitList(getenv(EnvAdminUsers)),
+		TrustedProxyCIDRs: splitList(getenv(EnvTrustedProxyCIDRs)),
+		Role:              models.CloudRoleAdmin,
+		Capabilities:      defaultCapabilities(mode),
+		Agent:             models.AgentConnection{Available: mode == models.RuntimeModeLocal, Status: "unsupported"},
 	}
 	if mode == models.RuntimeModeLocal {
 		config.AuthMode = "local"
@@ -98,18 +102,20 @@ func ValidateCloudRuntimeConfig(config RuntimeConfig) error {
 	}
 	switch config.AuthMode {
 	case "oauth2_proxy":
-	case "app_oidc":
-		if config.OIDCIssuer == "" {
-			missing = append(missing, EnvOIDCIssuer)
+		if len(config.TrustedProxyCIDRs) == 0 {
+			missing = append(missing, EnvTrustedProxyCIDRs)
 		}
-		if config.OIDCClientID == "" {
-			missing = append(missing, EnvOIDCClientID)
-		}
-		if config.OIDCClientSecret == "" {
-			missing = append(missing, EnvOIDCClientSecret)
+		for _, cidr := range config.TrustedProxyCIDRs {
+			prefix, err := netip.ParsePrefix(cidr)
+			if err != nil {
+				return fmt.Errorf("%s contains invalid CIDR %q", EnvTrustedProxyCIDRs, cidr)
+			}
+			if prefix.Bits() == 0 {
+				return fmt.Errorf("%s must not contain catch-all CIDR %q", EnvTrustedProxyCIDRs, cidr)
+			}
 		}
 	default:
-		return fmt.Errorf("cloud mode %s must be oauth2_proxy or app_oidc", EnvAuthMode)
+		return fmt.Errorf("cloud mode %s must be oauth2_proxy; app_oidc is not implemented", EnvAuthMode)
 	}
 	if len(config.AdminUsers) == 0 {
 		missing = append(missing, EnvAdminUsers)

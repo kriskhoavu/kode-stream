@@ -2,11 +2,44 @@ package provider
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+func TestGitHubRejectsOversizedAndUnsafeSnapshotPayloads(t *testing.T) {
+	large := base64.StdEncoding.EncodeToString(make([]byte, MaxFileBytes+1))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/contents/"):
+			_, _ = w.Write([]byte(`{"path":"README.md","content":"` + large + `","encoding":"base64"}`))
+		default:
+			_, _ = w.Write([]byte(`{"tree":[{"path":"../secret","type":"blob"}]}`))
+		}
+	}))
+	defer server.Close()
+	github := NewGitHub(server.URL, "token")
+	if _, err := github.ReadFile(context.Background(), "acme/repo", "commit", "README.md"); !IsLimitError(err) {
+		t.Fatalf("oversized file error=%v", err)
+	}
+	if _, err := github.Tree(context.Background(), "acme/repo", "commit", ""); err == nil {
+		t.Fatal("unsafe provider path accepted")
+	}
+}
+
+func TestProviderJSONResponseLimitIsTypedBeforeDecode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"value":"` + strings.Repeat("x", MaxResponseBytes+1) + `"}`))
+	}))
+	defer server.Close()
+	var target map[string]string
+	err := (HTTPIntegration{Provider: "github", BaseURL: server.URL}).request(context.Background(), "payload", &target)
+	if !IsLimitError(err) {
+		t.Fatalf("response limit error=%T %v", err, err)
+	}
+}
 
 func TestGitHubReadOnlySnapshotContract(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

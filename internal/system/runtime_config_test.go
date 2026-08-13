@@ -30,6 +30,8 @@ func TestResolveRuntimeConfigCloudDefaultsToPublicBindAndAgentOffline(t *testing
 			return "https://cloud.example.com/"
 		case EnvAdminUsers:
 			return "admin@example.com, subject-1"
+		case EnvTrustedProxyCIDRs:
+			return "10.0.0.0/8"
 		}
 		return ""
 	})
@@ -50,7 +52,7 @@ func TestResolveRuntimeConfigCloudDefaultsToPublicBindAndAgentOffline(t *testing
 	}
 }
 
-func TestResolveRuntimeConfigCloudAppOIDCRequiresOIDCEnv(t *testing.T) {
+func TestResolveRuntimeConfigCloudRejectsUnimplementedAppOIDC(t *testing.T) {
 	config, err := ResolveRuntimeConfigFromEnv(func(key string) string {
 		switch key {
 		case EnvRuntimeMode:
@@ -78,13 +80,8 @@ func TestResolveRuntimeConfigCloudAppOIDCRequiresOIDCEnv(t *testing.T) {
 	if config.AuthMode != "app_oidc" || config.OIDCIssuer != "https://issuer.example.com" {
 		t.Fatalf("app oidc config = %#v", config)
 	}
-	if err := ValidateCloudRuntimeConfig(config); err != nil {
-		t.Fatal(err)
-	}
-
-	config.OIDCIssuer = ""
 	if err := ValidateCloudRuntimeConfig(config); err == nil {
-		t.Fatal("expected missing app oidc env error")
+		t.Fatal("expected app oidc to be rejected until verified callback support exists")
 	}
 }
 
@@ -105,6 +102,15 @@ func TestValidateCloudRuntimeConfigRejectsInvalidAuthMode(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected invalid auth mode error")
+	}
+}
+
+func TestValidateCloudRuntimeConfigRejectsCatchAllTrustedProxyCIDRs(t *testing.T) {
+	for _, cidr := range []string{"0.0.0.0/0", "::/0"} {
+		config := RuntimeConfig{Mode: models.RuntimeModeCloud, AuthMode: "oauth2_proxy", PublicURL: "https://cloud.example.com", CookieSecret: "secret", AdminUsers: []string{"admin@example.com"}, TrustedProxyCIDRs: []string{cidr}}
+		if err := ValidateCloudRuntimeConfig(config); err == nil {
+			t.Fatalf("catch-all CIDR %q was accepted", cidr)
+		}
 	}
 }
 
