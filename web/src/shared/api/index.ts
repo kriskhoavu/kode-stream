@@ -170,18 +170,18 @@ export const api = {
 	rescanKnowledge: (workspaceId: string, root: string) => request<KnowledgeActionResult>(knowledgeURL(workspaceId, root, 'rescan'), { method: 'POST' }),
 	syncKnowledge: (workspaceId: string, confirm = false) => request<KnowledgeActionResult>(`/api/knowledge/workspaces/${encodeURIComponent(workspaceId)}/sync`, { method: 'POST', body: JSON.stringify({ confirm }) }),
 	enrichKnowledge: (workspaceId: string, confirm: boolean) => request<KnowledgeActionResult>(`/api/knowledge/workspaces/${encodeURIComponent(workspaceId)}/enrich`, { method: 'POST', body: JSON.stringify({ confirm }) }),
-  aiCapabilities: () => request<AICapability[]>('/api/ai/capabilities'),
-  aiProviderCapabilities: (providerId: string, context?: { itemId?: string; workspaceId?: string }) => {
+  aiCapabilities: (signal?: AbortSignal) => request<AICapability[]>('/api/ai/capabilities', { signal }, !signal),
+  aiProviderCapabilities: (providerId: string, context?: { itemId?: string; workspaceId?: string; signal?: AbortSignal }) => {
     const query = new URLSearchParams();
     if (context?.itemId) query.set('itemId', context.itemId);
     if (context?.workspaceId) query.set('workspaceId', context.workspaceId);
     const suffix = query.size > 0 ? `?${query.toString()}` : '';
-    return request<AIProviderCapabilityCatalog>(`/api/ai/providers/${encodeURIComponent(providerId)}/capabilities${suffix}`);
+    return request<AIProviderCapabilityCatalog>(`/api/ai/providers/${encodeURIComponent(providerId)}/capabilities${suffix}`, { signal: context?.signal }, !context?.signal);
   },
-  aiPresets: () => request<AIPlanPreset[]>('/api/ai/presets'),
-  aiSettings: () => request<AISettings>('/api/ai/settings').then(normalizeAISettings),
+  aiPresets: (signal?: AbortSignal) => request<AIPlanPreset[]>('/api/ai/presets', { signal }, !signal),
+  aiSettings: (signal?: AbortSignal) => request<AISettings>('/api/ai/settings', { signal }, !signal).then(normalizeAISettings),
   saveAISettings: (settings: AISettings) => request<AISettings>('/api/ai/settings', { method: 'PUT', body: JSON.stringify(normalizeAISettings(settings)) }).then(normalizeAISettings),
-  aiSessionEligibility: (itemId: string) => request<AISessionEligibility>(`/api/items/${encodeURIComponent(itemId)}/ai-session-eligibility`),
+  aiSessionEligibility: (itemId: string, signal?: AbortSignal) => request<AISessionEligibility>(`/api/items/${encodeURIComponent(itemId)}/ai-session-eligibility`, { signal }, !signal),
   launchAISession: (itemId: string, input: AISessionLaunchInput) => request<AISessionLaunchResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions`, { method: 'POST', body: JSON.stringify(input) }),
 	launchWorkspaceAISession: (workspaceId: string, input: AISessionLaunchInput & { contextPath: string }) => request<AISessionLaunchResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/ai-sessions`, { method: 'POST', body: JSON.stringify(input) }),
 	startEmbeddedAISession: (itemId: string, input: EmbeddedAISessionLaunchInput) => request<EmbeddedAISessionResult>(`/api/items/${encodeURIComponent(itemId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }, false),

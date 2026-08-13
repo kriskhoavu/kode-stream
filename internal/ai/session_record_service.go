@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -85,17 +86,43 @@ func (s *Service) configureSessionObserver() {
 	}
 	if s.records == nil {
 		s.embedded.SetObserver(nil)
+		s.embedded.SetStartObserver(nil)
 		return
 	}
 	s.embedded.SetObserver(s.syncSessionRecord)
+	s.embedded.SetStartObserver(s.persistRunningSession)
+}
+
+func (s *Service) persistRunningSession(session Session) error {
+	if s.records == nil {
+		return nil
+	}
+	record, ok, err := s.records.Get(session.ID)
+	if err != nil || !ok {
+		if err != nil {
+			return err
+		}
+		return errors.New("session record reservation is missing")
+	}
+	record.State, record.LastKnownAt = session.State, s.sessionNow()
+	_, err = s.records.Upsert(record)
+	return err
 }
 
 func (s *Service) syncSessionRecord(session Session) {
 	if s.records == nil {
 		return
 	}
+	s.sessionRecordMu.Lock()
+	defer s.sessionRecordMu.Unlock()
 	record, ok, err := s.records.Get(session.ID)
 	if err != nil || !ok {
+		return
+	}
+	// A launch compensation deliberately clears the idempotency key and records a
+	// terminal failure. A late process observer must never resurrect its stale
+	// starting/running copy and poison a legitimate retry.
+	if record.State == StateFailed && record.IdempotencyKey == "" && session.State != StateFailed {
 		return
 	}
 	record.State = session.State

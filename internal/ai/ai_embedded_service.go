@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"fmt"
 	"strings"
 
 	"kode-stream/internal/filesystem/pathguard"
@@ -27,6 +28,8 @@ func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput
 	if s.embedded == nil || s.launch == nil || s.launch.registry == nil {
 		return EmbeddedResult{}, launchError("launch_failed", "embedded AI sessions are unavailable")
 	}
+	s.embeddedLaunchMu.Lock()
+	defer s.embeddedLaunchMu.Unlock()
 	workspace, found, err := s.launch.registry.Get(workspaceID)
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
@@ -79,6 +82,9 @@ func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput
 	}
 	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", Executable: capability.Executable, Args: launchProviderArgs("workspace_only", provider.Args, values), Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 	if err != nil {
+		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
+			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))
+		}
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
 	if saved, ok, getErr := s.recordsGet(record.ID); getErr == nil && ok {
@@ -97,6 +103,8 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	if s.embedded == nil || s.launch == nil || s.launch.registry == nil || s.launch.index == nil {
 		return EmbeddedResult{}, launchError("launch_failed", "embedded AI sessions are unavailable")
 	}
+	s.embeddedLaunchMu.Lock()
+	defer s.embeddedLaunchMu.Unlock()
 	item, found, err := s.launch.index.Get(itemID)
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
@@ -170,12 +178,32 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	}
 	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 	if err != nil {
+		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
+			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))
+		}
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
 	if saved, ok, getErr := s.recordsGet(record.ID); getErr == nil && ok {
 		record = saved
 	}
 	return EmbeddedResult{Session: session, Grant: grant, Record: &record}, nil
+}
+
+func (s *Service) markLaunchFailed(record SessionRecord) error {
+	if s.records == nil {
+		return nil
+	}
+	s.sessionRecordMu.Lock()
+	defer s.sessionRecordMu.Unlock()
+	now := s.sessionNow()
+	record.State = StateFailed
+	record.EndedAt = now
+	record.LastKnownAt = now
+	// A failed reservation must not occupy the caller's idempotency key: there
+	// is no live process for a retry to discover.
+	record.IdempotencyKey = ""
+	_, err := s.records.Upsert(record)
+	return err
 }
 
 func (s *Service) recordsGet(id string) (SessionRecord, bool, error) {

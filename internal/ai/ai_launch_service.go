@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -384,6 +385,10 @@ func (s *Service) composePromptWithCatalog(catalog ProviderCapabilityCatalog, co
 }
 
 func (s *Service) ProviderCapabilities(providerID, itemID string) (ProviderCapabilityCatalog, error) {
+	return s.ProviderCapabilitiesContext(context.Background(), providerID, itemID)
+}
+
+func (s *Service) ProviderCapabilitiesContext(ctx context.Context, providerID, itemID string) (ProviderCapabilityCatalog, error) {
 	settings, err := s.Settings()
 	if err != nil {
 		return ProviderCapabilityCatalog{}, err
@@ -416,7 +421,10 @@ func (s *Service) ProviderCapabilities(providerID, itemID string) (ProviderCapab
 		}
 		workspacePath = workspace.Path
 	}
-	skills, agents := discoverProviderCapabilities(id, workspacePath)
+	skills, agents := discoverProviderCapabilitiesContext(ctx, id, workspacePath)
+	if err := ctx.Err(); err != nil {
+		return ProviderCapabilityCatalog{}, err
+	}
 	return ProviderCapabilityCatalog{
 		Provider:                id,
 		Skills:                  skills,
@@ -427,6 +435,10 @@ func (s *Service) ProviderCapabilities(providerID, itemID string) (ProviderCapab
 }
 
 func (s *Service) ProviderCapabilitiesForWorkspace(providerID, workspaceID string) (ProviderCapabilityCatalog, error) {
+	return s.ProviderCapabilitiesForWorkspaceContext(context.Background(), providerID, workspaceID)
+}
+
+func (s *Service) ProviderCapabilitiesForWorkspaceContext(ctx context.Context, providerID, workspaceID string) (ProviderCapabilityCatalog, error) {
 	if s.launch == nil || s.launch.registry == nil {
 		return ProviderCapabilityCatalog{}, launchError("launch_failed", "AI session launch is unavailable")
 	}
@@ -448,7 +460,10 @@ func (s *Service) ProviderCapabilitiesForWorkspace(providerID, workspaceID strin
 	if _, ok := settings.Providers[id]; !ok {
 		return ProviderCapabilityCatalog{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
 	}
-	skills, agents := discoverProviderCapabilities(id, workspace.Path)
+	skills, agents := discoverProviderCapabilitiesContext(ctx, id, workspace.Path)
+	if err := ctx.Err(); err != nil {
+		return ProviderCapabilityCatalog{}, err
+	}
 	return ProviderCapabilityCatalog{
 		Provider:                id,
 		Skills:                  skills,
@@ -456,6 +471,22 @@ func (s *Service) ProviderCapabilitiesForWorkspace(providerID, workspaceID strin
 		SupportsNativeSelection: false,
 		SupportsPromptFallback:  true,
 	}, nil
+}
+
+// ItemWorkspace is deliberately narrow transport support for ownership checks;
+// it does not expose the workspace path or item content.
+func (s *Service) ItemWorkspace(itemID string) (string, error) {
+	if s.launch == nil || s.launch.index == nil {
+		return "", launchError("launch_failed", "AI session launch is unavailable")
+	}
+	item, found, err := s.launch.index.Get(strings.TrimSpace(itemID))
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", launchError("item_not_found", "item not found")
+	}
+	return item.WorkspaceID, nil
 }
 
 func (s *Service) startTerminal(id string, terminal LaunchTemplate, terminalArgs []string, workspace, provider string, providerArgs []string, checkpoint verificationCheckpoint) error {

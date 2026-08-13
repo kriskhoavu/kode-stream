@@ -194,6 +194,28 @@ func TestAISettingsRoutesReadValidateAndPersist(t *testing.T) {
 	}
 }
 
+func TestAIMutationRoutesRejectStrictBodiesBeforeAnyAction(t *testing.T) {
+	handler := New(Dependencies{AISessions: appaisession.New(appaisession.NewSettingsRepository(filepath.Join(t.TempDir(), "settings.yaml")))}).Routes()
+	paths := []string{"/api/ai/settings", "/api/items/missing/ai-sessions", "/api/items/missing/ai-sessions/embedded", "/api/workspaces/missing/ai-sessions", "/api/workspaces/missing/ai-sessions/embedded"}
+	for _, body := range []string{"", `{"unknown":true}`, `{} {}`, `{"padding":"` + strings.Repeat("x", int(maxAIMutationBodyBytes)) + `"}`} {
+		for _, path := range paths {
+			response := httptest.NewRecorder()
+			method := http.MethodPost
+			if path == "/api/ai/settings" {
+				method = http.MethodPut
+			}
+			handler.ServeHTTP(response, httptest.NewRequest(method, path, strings.NewReader(body)))
+			want := http.StatusBadRequest
+			if len(body) > int(maxAIMutationBodyBytes) {
+				want = http.StatusRequestEntityTooLarge
+			}
+			if response.Code != want {
+				t.Fatalf("%s body length=%d status=%d body=%s", path, len(body), response.Code, response.Body.String())
+			}
+		}
+	}
+}
+
 func TestAICapabilitiesRouteReturnsStableShape(t *testing.T) {
 	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(t.TempDir(), "ai-settings.yaml")))
 	handler := New(Dependencies{AISessions: service}).Routes()

@@ -54,7 +54,8 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 
 	useEffect(() => {
 		let active = true;
-		Promise.all([api.aiSettings(), api.aiCapabilities(), api.aiPresets(), itemId ? api.aiSessionEligibility(itemId) : Promise.resolve({ editable: true, cardContextAvailable: true, missing: [] })]).then(([nextSettings, nextCapabilities, nextPresets, nextEligibility]) => {
+		const controller = new AbortController();
+		Promise.all([api.aiSettings(controller.signal), api.aiCapabilities(controller.signal), api.aiPresets(controller.signal), itemId ? api.aiSessionEligibility(itemId, controller.signal) : Promise.resolve({ editable: true, cardContextAvailable: true, missing: [] })]).then(([nextSettings, nextCapabilities, nextPresets, nextEligibility]) => {
 			if (!active) return;
 			const nextProvider = preference?.provider ?? nextSettings.defaultProvider;
 			const nextPresetId = preference?.presetId ?? nextPresets[0]?.id ?? '';
@@ -76,15 +77,16 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 			setSelectedAgents([]);
 			setSurface(allowEmbedded ? preference?.surface ?? 'external' : 'external');
 		}).catch((caught) => active && setError(caught instanceof Error ? caught.message : 'AI session options are unavailable.')).finally(() => active && setLoading(false));
-		return () => { active = false; };
+		return () => { active = false; controller.abort(); };
 	}, [allowEmbedded, itemId, preference, e2eMode, e2eRunbook?.resultPath, workspaceMode, workspaceTarget?.contextPath]);
 
 	useEffect(() => {
 		if (!provider) return;
 		let active = true;
+		const controller = new AbortController();
 		setProviderCatalog(null);
 		setProviderCatalogError('');
-		api.aiProviderCapabilities(provider, workspaceMode ? { workspaceId: workspaceTarget!.workspaceId } : { itemId }).then((catalog) => {
+		api.aiProviderCapabilities(provider, workspaceMode ? { workspaceId: workspaceTarget!.workspaceId, signal: controller.signal } : { itemId, signal: controller.signal }).then((catalog) => {
 			if (!active) return;
 			const e2eSkill = findE2ETestingSkill(catalog.skills);
 			setProviderCatalog(catalog);
@@ -97,7 +99,7 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 			setSelectedSkills([]);
 			setSelectedAgents([]);
 		});
-		return () => { active = false; };
+		return () => { active = false; controller.abort(); };
 	}, [provider, itemId, workspaceMode, workspaceTarget?.workspaceId]);
 
 	useEffect(() => {

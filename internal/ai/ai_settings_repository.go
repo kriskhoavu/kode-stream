@@ -3,8 +3,8 @@ package ai
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -13,8 +13,13 @@ import (
 )
 
 const (
-	KindProvider = "provider"
-	KindTerminal = "terminal"
+	KindProvider               = "provider"
+	KindTerminal               = "terminal"
+	maxTemplateIDBytes         = 128
+	maxTemplateExecutableBytes = 4096
+	maxTemplateArgs            = 64
+	maxTemplateArgumentBytes   = 64 << 10
+	maxTemplatesPerKind        = 64
 )
 
 var (
@@ -45,27 +50,34 @@ type SettingsStore interface {
 }
 
 type AISettingsRepository struct {
-	mu   sync.Mutex
-	path string
+	mu      sync.Mutex
+	path    string
+	publish func(string, []byte) error
 }
 
 func NewSettingsRepository(path string) *AISettingsRepository {
-	return &AISettingsRepository{path: path}
+	return &AISettingsRepository{path: path, publish: publishDurableFile}
 }
 
 func (s *AISettingsRepository) Load() (Settings, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var settings Settings
-	data, err := os.ReadFile(s.path)
+	data, err := readBoundedFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return normalize(settings), nil
 	}
 	if err != nil {
 		return Settings{}, err
 	}
-	if err := yaml.Unmarshal(data, &settings); err != nil {
+	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&settings); err != nil {
 		return Settings{}, fmt.Errorf("read AI settings: %w", err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return Settings{}, errors.New("read AI settings: multiple YAML documents are not supported")
 	}
 	return normalize(settings), nil
 }
@@ -81,27 +93,7 @@ func (s *AISettingsRepository) Save(settings Settings) (Settings, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return Settings{}, err
-	}
-	temporary, err := os.CreateTemp(filepath.Dir(s.path), ".ai-settings-*")
-	if err != nil {
-		return Settings{}, err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(0o600); err != nil {
-		temporary.Close()
-		return Settings{}, err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		temporary.Close()
-		return Settings{}, err
-	}
-	if err := temporary.Close(); err != nil {
-		return Settings{}, err
-	}
-	if err := os.Rename(temporaryPath, s.path); err != nil {
+	if err := s.publish(s.path, data); err != nil {
 		return Settings{}, err
 	}
 	return settings, nil
@@ -130,15 +122,24 @@ func Validate(settings Settings) error {
 }
 
 func validateTemplates(kind string, templates map[string]LaunchTemplate) error {
+	if len(templates) > maxTemplatesPerKind {
+		return fmt.Errorf("%s templates exceed the %d entry limit", kind, maxTemplatesPerKind)
+	}
 	for id, template := range templates {
-		if strings.TrimSpace(id) == "" {
+		if strings.TrimSpace(id) == "" || len(id) > maxTemplateIDBytes {
 			return fmt.Errorf("%s ID is required", kind)
+		}
+		if len(template.Executable) > maxTemplateExecutableBytes || len(template.Args) > maxTemplateArgs {
+			return fmt.Errorf("%s %q exceeds template limits", kind, id)
 		}
 		if template.Enabled && strings.TrimSpace(template.Executable) == "" {
 			return fmt.Errorf("%s %q executable is required", kind, id)
 		}
 		values := append([]string{template.Executable}, template.Args...)
 		for _, value := range values {
+			if len(value) > maxTemplateArgumentBytes {
+				return fmt.Errorf("%s %q exceeds template limits", kind, id)
+			}
 			for _, match := range placeholderPattern.FindAllStringSubmatch(value, -1) {
 				if !allowedPlaceholders[match[1]] {
 					return fmt.Errorf("%s %q uses unsupported placeholder {%s}", kind, id, match[1])

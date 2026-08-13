@@ -2,7 +2,10 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,8 +14,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	maxCapabilityEntries         = 256
+	maxCapabilityFileBytes int64 = 128 << 10
+	maxCapabilityResults         = 128
+)
+
 type capabilityRoot struct {
 	path        string
+	anchor      string
 	scope       string
 	displayBase string
 	kind        string
@@ -20,17 +30,30 @@ type capabilityRoot struct {
 }
 
 func discoverProviderCapabilities(providerID, workspacePath string) ([]CapabilityDescriptor, []CapabilityDescriptor) {
+	return discoverProviderCapabilitiesContext(context.Background(), providerID, workspacePath)
+}
+
+// discoverProviderCapabilitiesContext deliberately looks only one directory level
+// deep. Capability roots are an input boundary: entries must be regular files below
+// the resolved root and metadata is read through a bounded reader.
+func discoverProviderCapabilitiesContext(ctx context.Context, providerID, workspacePath string) ([]CapabilityDescriptor, []CapabilityDescriptor) {
 	roots := providerCapabilityRoots(providerID, workspacePath)
 	skills := []CapabilityDescriptor{}
 	agents := []CapabilityDescriptor{}
 	seen := map[string]bool{}
 	for _, root := range roots {
-		files, err := discoverCapabilityFiles(root)
+		if ctx.Err() != nil {
+			break
+		}
+		files, canonicalRoot, err := discoverCapabilityFilesContext(ctx, root)
 		if err != nil {
 			continue
 		}
 		for _, file := range files {
-			descriptor, ok := buildCapabilityDescriptor(providerID, root, file)
+			if ctx.Err() != nil || len(skills)+len(agents) >= maxCapabilityResults {
+				break
+			}
+			descriptor, ok := buildCapabilityDescriptorContext(ctx, providerID, root, canonicalRoot, file)
 			seenKey := providerID + ":" + descriptor.Scope + ":" + descriptor.SourcePath
 			if !ok || seen[seenKey] {
 				continue
@@ -48,13 +71,84 @@ func discoverProviderCapabilities(providerID, workspacePath string) ([]Capabilit
 	return skills, agents
 }
 
+func discoverCapabilityFilesContext(ctx context.Context, root capabilityRoot) ([]string, string, error) {
+	canonicalAnchor, err := filepath.EvalSymlinks(root.anchor)
+	if err != nil {
+		return nil, "", err
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(root.path)
+	if err != nil {
+		return nil, "", err
+	}
+	relative, err := filepath.Rel(canonicalAnchor, canonicalRoot)
+	if err != nil || relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return nil, "", errors.New("capability root escapes its permitted anchor")
+	}
+	info, err := os.Stat(canonicalRoot)
+	if err != nil || !info.IsDir() {
+		return nil, "", err
+	}
+	entries, err := os.ReadDir(canonicalRoot)
+	if err != nil {
+		return nil, "", err
+	}
+	files := make([]string, 0, min(len(entries), maxCapabilityEntries))
+	for index, entry := range entries {
+		if ctx.Err() != nil {
+			return nil, "", ctx.Err()
+		}
+		if index >= maxCapabilityEntries {
+			break
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+		path := filepath.Join(canonicalRoot, entry.Name())
+		if root.mode == "skill_dirs" && entry.IsDir() {
+			if candidate, ok := boundedCapabilityEntrypoint(ctx, canonicalRoot, path, root.kind); ok {
+				files = append(files, candidate)
+			}
+			continue
+		}
+		info, statErr := entry.Info()
+		if statErr != nil || !info.Mode().IsRegular() || !isCapabilityFile(path) {
+			continue
+		}
+		files = append(files, path)
+	}
+	return files, canonicalRoot, nil
+}
+
+func boundedCapabilityEntrypoint(ctx context.Context, canonicalRoot, directory, kind string) (string, bool) {
+	if filepath.Dir(directory) != canonicalRoot {
+		return "", false
+	}
+	candidates := []string{"README.md"}
+	if kind == "agent" {
+		candidates = append([]string{"AGENT.md", "AGENTS.md", "agent.md", "agents.md"}, candidates...)
+	} else {
+		candidates = append([]string{"SKILL.md", "skill.md"}, candidates...)
+	}
+	for _, name := range candidates {
+		if ctx.Err() != nil {
+			return "", false
+		}
+		path := filepath.Join(directory, name)
+		info, err := os.Lstat(path)
+		if err == nil && info.Mode().IsRegular() {
+			return path, true
+		}
+	}
+	return "", false
+}
+
 func providerCapabilityRoots(providerID, workspacePath string) []capabilityRoot {
 	roots := []capabilityRoot{}
 	add := func(path, scope, displayBase, kind, mode string) {
 		if strings.TrimSpace(path) == "" {
 			return
 		}
-		roots = append(roots, capabilityRoot{path: path, scope: scope, displayBase: displayBase, kind: kind, mode: mode})
+		roots = append(roots, capabilityRoot{path: path, anchor: displayBase, scope: scope, displayBase: displayBase, kind: kind, mode: mode})
 	}
 	if workspacePath != "" {
 		for _, root := range providerWorkspaceRoots(providerID) {
@@ -266,6 +360,30 @@ func buildCapabilityDescriptor(providerID string, root capabilityRoot, file stri
 	}, true
 }
 
+func buildCapabilityDescriptorContext(ctx context.Context, providerID string, root capabilityRoot, canonicalRoot, file string) (CapabilityDescriptor, bool) {
+	relative, err := filepath.Rel(canonicalRoot, file)
+	if err != nil || relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return CapabilityDescriptor{}, false
+	}
+	info, err := os.Lstat(file)
+	if err != nil || !info.Mode().IsRegular() {
+		return CapabilityDescriptor{}, false
+	}
+	kind := root.kind
+	if kind == "" {
+		kind = classifyCapabilityKind(providerID, file)
+	}
+	normalizedRelative := filepath.ToSlash(strings.TrimSpace(relative))
+	name, description := capabilityMetadataContext(ctx, file, normalizedRelative)
+	sourcePath := normalizedRelative
+	if root.displayBase != "" {
+		if displayRelative, relErr := filepath.Rel(root.displayBase, filepath.Join(root.path, relative)); relErr == nil && !strings.HasPrefix(displayRelative, "..") {
+			sourcePath = filepath.ToSlash(displayRelative)
+		}
+	}
+	return CapabilityDescriptor{ID: providerID + ":" + root.scope + ":" + sourcePath, Name: name, Description: firstNonEmpty(strings.TrimSpace(description), capabilityDescription(kind, providerID, root.scope, normalizedRelative)), Kind: kind, Provider: providerID, Scope: root.scope, SourcePath: sourcePath}, true
+}
+
 func classifyCapabilityKind(providerID, path string) string {
 	lower := strings.ToLower(filepath.ToSlash(path))
 	switch {
@@ -373,6 +491,38 @@ func capabilityMetadata(filePath, fallbackRelativePath string) (string, string) 
 		}
 	}
 	return firstNonEmpty(title, name), ""
+}
+
+func capabilityMetadataContext(ctx context.Context, filePath, fallbackRelativePath string) (string, string) {
+	name := capabilityNameFromPath(fallbackRelativePath)
+	if ctx.Err() != nil {
+		return name, ""
+	}
+	file, err := os.Open(filePath)
+	if err != nil {
+		return name, ""
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, maxCapabilityFileBytes+1))
+	if err != nil || int64(len(data)) > maxCapabilityFileBytes {
+		return name, ""
+	}
+	if metaName, metaDescription, ok := decodeStructuredCapabilityMetadata(data); ok {
+		return firstNonEmpty(metaName, name), metaDescription
+	}
+	for _, raw := range strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n") {
+		if ctx.Err() != nil {
+			return name, ""
+		}
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "---") {
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			return firstNonEmpty(strings.TrimSpace(strings.TrimLeft(line, "#")), name), ""
+		}
+	}
+	return name, ""
 }
 
 func decodeStructuredCapabilityMetadata(data []byte) (string, string, bool) {

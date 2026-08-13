@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	appaisession "kode-stream/internal/ai"
 	"kode-stream/internal/audit"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/system"
@@ -27,6 +28,83 @@ func TestCloudModeRequiresSessionOutsideHealthAndAuth(t *testing.T) {
 	handler.ServeHTTP(state, httptest.NewRequest(http.MethodGet, "/api/state", nil))
 	if state.Code != http.StatusUnauthorized {
 		t.Fatalf("state status = %d body = %s", state.Code, state.Body.String())
+	}
+}
+
+func TestCloudEmbeddedSessionRoutesAreTenantScopedBeforeWebSocketUpgrade(t *testing.T) {
+	manager := appaisession.NewTerminalManager(appaisession.Config{})
+	t.Cleanup(func() { _ = manager.Close() })
+	session, grant, err := manager.Start(appaisession.StartRequest{ID: "tenant-terminal", WorkspaceID: "owner-workspace", Executable: "/bin/sh", Args: []string{"-c", "sleep 10"}, Dir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiHandler := withTestRuntime(New(Dependencies{AISessions: appaisession.New(nil).ConfigureEmbedded(manager)}), testAppOIDCRuntimeConfig())
+	owner := stableCloudUserID("owner")
+	other := stableCloudUserID("other")
+	for _, workspace := range []models.WorkspaceConfig{{ID: session.WorkspaceID, OwnerUserID: owner}, {ID: "other-workspace", OwnerUserID: other}} {
+		if _, err := apiHandler.cloud.workspaces.Upsert(context.Background(), workspace); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler := apiHandler.Routes()
+	requestFor := func(subject, path string) *http.Request {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.Header.Set("X-Kode-Stream-Subject", subject)
+		request.Header.Set("X-Kode-Stream-Role", "editor")
+		return request
+	}
+	ownerResponse := httptest.NewRecorder()
+	handler.ServeHTTP(ownerResponse, requestFor("owner", "/api/ai/sessions/"+session.ID))
+	if ownerResponse.Code != http.StatusOK {
+		t.Fatalf("owner status=%d body=%s", ownerResponse.Code, ownerResponse.Body.String())
+	}
+	for _, path := range []string{"/api/ai/sessions/" + session.ID, "/api/ai/sessions/" + session.ID + "/channel?token=" + grant.Token} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, requestFor("other", path))
+		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), session.ID) {
+			t.Fatalf("path=%s status=%d body=%s", path, response.Code, response.Body.String())
+		}
+	}
+	for _, test := range []struct{ method, path string }{
+		{http.MethodPost, "/api/ai/sessions/" + session.ID + "/grant"},
+		{http.MethodDelete, "/api/ai/sessions/" + session.ID},
+		{http.MethodGet, "/api/ai/providers/codex/capabilities?workspaceId=owner-workspace"},
+	} {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(test.method, test.path, strings.NewReader(`{}`))
+		request.Header.Set("X-Kode-Stream-Subject", "other")
+		request.Header.Set("X-Kode-Stream-Role", "editor")
+		request.Header.Set(csrfHeader, stableCloudUserID("other:csrf"))
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), session.ID) {
+			t.Fatalf("%s %s status=%d body=%s", test.method, test.path, response.Code, response.Body.String())
+		}
+		stillLive, getErr := manager.Get(session.ID)
+		if getErr != nil || stillLive.State != appaisession.StateRunning {
+			t.Fatalf("denied %s changed session=%#v err=%v", test.path, stillLive, getErr)
+		}
+	}
+	ownerGrant := httptest.NewRecorder()
+	ownerGrantRequest := httptest.NewRequest(http.MethodPost, "/api/ai/sessions/"+session.ID+"/grant", nil)
+	ownerGrantRequest.Header.Set("X-Kode-Stream-Subject", "owner")
+	ownerGrantRequest.Header.Set("X-Kode-Stream-Role", "editor")
+	ownerGrantRequest.Header.Set(csrfHeader, stableCloudUserID("owner:csrf"))
+	handler.ServeHTTP(ownerGrant, ownerGrantRequest)
+	if ownerGrant.Code != http.StatusOK {
+		t.Fatalf("owner grant status=%d body=%s", ownerGrant.Code, ownerGrant.Body.String())
+	}
+	for _, test := range []struct {
+		invoke func(http.ResponseWriter, *http.Request)
+		body   string
+	}{{apiHandler.aiSessions.launchWorkspaceAISession, `{}`}, {apiHandler.aiSessions.startEmbeddedWorkspaceAISession, `{"columns":80,"rows":24}`}} {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/workspaces/owner-workspace/ai-sessions", strings.NewReader(test.body))
+		request.SetPathValue("id", session.WorkspaceID)
+		request = request.WithContext(context.WithValue(request.Context(), cloudSessionContextKey{}, cloudSession{User: models.CloudUser{ID: other, Role: models.CloudRoleEditor}}))
+		test.invoke(response, request)
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("direct launch authorization status=%d body=%s", response.Code, response.Body.String())
+		}
 	}
 }
 

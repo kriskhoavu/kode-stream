@@ -310,7 +310,7 @@ describe('AISessionLaunchDialog', () => {
 			onLaunched={vi.fn()}
 		/>);
 		expect(await screen.findByText(/required skill ready/i)).toHaveTextContent('E2E testing');
-		expect(api.aiProviderCapabilities).toHaveBeenCalledWith('codex', { workspaceId: 'workspace-1' });
+		expect(api.aiProviderCapabilities).toHaveBeenCalledWith('codex', expect.objectContaining({ workspaceId: 'workspace-1', signal: expect.any(AbortSignal) }));
 		expect(screen.getByLabelText('Prompt')).toHaveValue('Execute the E2E runbook at plans/platform/PM-036/automation/scenario-01.md. Use the e2e-testing skill, request missing runtime inputs, and record the result at plans/platform/PM-036/automation/results/latest.md.');
 		expect(screen.getByLabelText('Prompt')).toBeDisabled();
 		fireEvent.click(screen.getByRole('button', { name: 'Open session' }));

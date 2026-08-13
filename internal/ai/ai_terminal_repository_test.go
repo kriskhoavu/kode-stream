@@ -156,3 +156,17 @@ func TestSessionObserverReceivesRunningAndCancelledLifecycle(t *testing.T) {
 		t.Fatalf("states=%#v", states)
 	}
 }
+
+func TestStartObserverFailureCancelsStartedProcess(t *testing.T) {
+	manager := NewTerminalManager(Config{})
+	defer manager.Close()
+	manager.SetStartObserver(func(Session) error { return errors.New("record unavailable") })
+	_, _, err := manager.Start(StartRequest{ID: "observer-failure", Executable: "/bin/sh", Args: []string{"-c", "sleep 10"}, Dir: t.TempDir()})
+	if err == nil {
+		t.Fatal("expected observer error")
+	}
+	session, getErr := manager.Get("observer-failure")
+	if getErr != nil || session.State != StateCancelled {
+		t.Fatalf("session=%#v err=%v", session, getErr)
+	}
+}

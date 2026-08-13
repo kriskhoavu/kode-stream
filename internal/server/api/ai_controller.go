@@ -4,8 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -14,6 +16,12 @@ import (
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/system"
 )
+
+const maxAIMutationBodyBytes int64 = 1 << 20
+const maxTerminalFrameBytes int64 = 64 << 10
+const maxTerminalInputBytes = 16 << 10
+const maxTerminalDimension uint16 = 500
+const maxTerminalInputBytesPerSecond = 64 << 10
 
 type aiController struct {
 	aiSessions      *appaisession.Service
@@ -27,10 +35,14 @@ func (a *aiController) startEmbeddedAISession(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var input appaisession.EmbeddedInput
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxAIMutationBodyBytes, true) {
+		return
+	}
+	if !validEmbeddedInput(input) {
+		writeError(w, http.StatusBadRequest, "AI launch input exceeds the allowed limits")
+		return
+	}
+	if !a.authorizeItemWorkspace(w, r, r.PathValue("id")) {
 		return
 	}
 	result, err := a.aiSessions.StartEmbedded(r.PathValue("id"), input)
@@ -47,10 +59,14 @@ func (a *aiController) startEmbeddedWorkspaceAISession(w http.ResponseWriter, r 
 		return
 	}
 	var input appaisession.EmbeddedInput
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxAIMutationBodyBytes, true) {
+		return
+	}
+	if !validEmbeddedInput(input) {
+		writeError(w, http.StatusBadRequest, "AI launch input exceeds the allowed limits")
+		return
+	}
+	if !a.authorizeWorkspace(w, r, r.PathValue("id")) {
 		return
 	}
 	result, err := a.aiSessions.StartEmbeddedWorkspace(r.PathValue("id"), input)
@@ -114,6 +130,9 @@ func (a *aiController) embeddedAISession(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusNotFound, "session not found")
 		return
 	}
+	if !a.authorizeWorkspace(w, r, session.WorkspaceID) {
+		return
+	}
 	writeJSON(w, http.StatusOK, session)
 }
 
@@ -122,7 +141,15 @@ func (a *aiController) embeddedAISessionGrant(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
 		return
 	}
-	grant, err := a.aiSessions.EmbeddedManager().IssueGrant(r.PathValue("sessionId"))
+	manager := a.aiSessions.EmbeddedManager()
+	session, err := manager.Get(r.PathValue("sessionId"))
+	if err != nil || !a.authorizeWorkspace(w, r, session.WorkspaceID) {
+		if err != nil {
+			writeError(w, http.StatusNotFound, "session not found")
+		}
+		return
+	}
+	grant, err := manager.IssueGrant(r.PathValue("sessionId"))
 	if err != nil {
 		if errors.Is(err, appaisession.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "session not found")
@@ -139,7 +166,15 @@ func (a *aiController) cancelEmbeddedAISession(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusServiceUnavailable, "embedded AI sessions are unavailable")
 		return
 	}
-	session, err := a.aiSessions.EmbeddedManager().Cancel(r.PathValue("sessionId"))
+	manager := a.aiSessions.EmbeddedManager()
+	existing, err := manager.Get(r.PathValue("sessionId"))
+	if err != nil || !a.authorizeWorkspace(w, r, existing.WorkspaceID) {
+		if err != nil {
+			writeError(w, http.StatusNotFound, "session not found")
+		}
+		return
+	}
+	session, err := manager.Cancel(r.PathValue("sessionId"))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "session not found")
 		return
@@ -169,6 +204,13 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 	}
 	manager := a.aiSessions.EmbeddedManager()
 	id := r.PathValue("sessionId")
+	session, err := manager.Get(id)
+	if err != nil || !a.authorizeWorkspace(w, r, session.WorkspaceID) {
+		if err != nil {
+			writeError(w, http.StatusNotFound, "session not found")
+		}
+		return
+	}
 	if err := manager.Authenticate(id, r.URL.Query().Get("token")); err != nil {
 		writeError(w, http.StatusUnauthorized, "invalid session grant")
 		return
@@ -181,35 +223,88 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 		return
 	}
 	defer connection.Close()
+	connection.SetReadLimit(maxTerminalFrameBytes)
+	var writeMu sync.Mutex
+	writeChannel := func(payload channelOutput) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		return connection.WriteJSON(payload)
+	}
 	output, buffered, unsubscribe, err := manager.Subscribe(id)
 	if err != nil {
 		return
 	}
 	defer unsubscribe()
 	if len(buffered) > 0 {
-		_ = connection.WriteJSON(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(buffered), Encoding: "base64"})
+		_ = writeChannel(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(buffered), Encoding: "base64"})
 	}
 	state, _ := manager.Get(id)
-	_ = connection.WriteJSON(channelOutput{Type: "state", State: state.State, ExitCode: state.ExitCode})
+	_ = writeChannel(channelOutput{Type: "state", State: state.State, ExitCode: state.ExitCode})
 	done := make(chan struct{})
 	defer close(done)
+	readDone := make(chan struct{})
 	go func() {
+		defer close(readDone)
+		windowStarted := time.Now()
+		windowBytes := 0
 		for {
+			messageType, reader, err := connection.NextReader()
+			if err != nil || messageType != websocket.TextMessage {
+				return
+			}
 			var message channelInput
-			if err := connection.ReadJSON(&message); err != nil {
+			decoder := json.NewDecoder(io.LimitReader(reader, maxTerminalFrameBytes))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&message); err != nil {
+				_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal message"})
+				return
+			}
+			var extra any
+			if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+				_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal message"})
 				return
 			}
 			switch message.Type {
 			case "input":
 				decoded, err := base64.StdEncoding.DecodeString(message.Data)
-				if err == nil {
-					_ = manager.Write(id, decoded)
+				if err != nil || len(decoded) == 0 || len(decoded) > maxTerminalInputBytes {
+					_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal input"})
+					return
+				}
+				if time.Since(windowStarted) >= time.Second {
+					windowStarted, windowBytes = time.Now(), 0
+				}
+				windowBytes += len(decoded)
+				if windowBytes > maxTerminalInputBytesPerSecond {
+					_ = writeChannel(channelOutput{Type: "error", Message: "terminal input rate exceeded"})
+					return
+				}
+				if err := manager.Write(id, decoded); err != nil {
+					_ = writeChannel(channelOutput{Type: "error", Message: "terminal input rejected"})
+					return
 				}
 			case "resize":
-				_ = manager.Resize(id, message.Columns, message.Rows)
+				if message.Columns == 0 || message.Rows == 0 || message.Columns > maxTerminalDimension || message.Rows > maxTerminalDimension {
+					_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal size"})
+					return
+				}
+				if err := manager.Resize(id, message.Columns, message.Rows); err != nil {
+					_ = writeChannel(channelOutput{Type: "error", Message: "terminal resize rejected"})
+					return
+				}
 			case "cancel":
-				_, _ = manager.Cancel(id)
+				if _, err := manager.Cancel(id); err != nil {
+					_ = writeChannel(channelOutput{Type: "error", Message: "terminal cancel rejected"})
+					return
+				}
 			case "heartbeat":
+				if message.Data != "" || message.Columns != 0 || message.Rows != 0 {
+					_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal message"})
+					return
+				}
+			default:
+				_ = writeChannel(channelOutput{Type: "error", Message: "unknown terminal message"})
+				return
 			}
 		}
 	}()
@@ -222,7 +317,7 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 			if !ok {
 				return
 			}
-			if err := connection.WriteJSON(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(data), Encoding: "base64"}); err != nil {
+			if err := writeChannel(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(data), Encoding: "base64"}); err != nil {
 				return
 			}
 		case <-ticker.C:
@@ -231,7 +326,7 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 				return
 			}
 			if current.State != lastState {
-				if err := connection.WriteJSON(channelOutput{Type: "state", State: current.State, ExitCode: current.ExitCode}); err != nil {
+				if err := writeChannel(channelOutput{Type: "state", State: current.State, ExitCode: current.ExitCode}); err != nil {
 					return
 				}
 				lastState = current.State
@@ -241,6 +336,8 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 			}
 		case <-done:
 			return
+		case <-readDone:
+			return
 		}
 	}
 }
@@ -248,6 +345,9 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 func (a *aiController) aiSessionEligibility(w http.ResponseWriter, r *http.Request) {
 	if a.aiSessions == nil {
 		writeError(w, http.StatusServiceUnavailable, "AI session launch is unavailable")
+		return
+	}
+	if !a.authorizeItemWorkspace(w, r, r.PathValue("id")) {
 		return
 	}
 	result, err := a.aiSessions.Eligibility(r.PathValue("id"))
@@ -269,10 +369,14 @@ func (a *aiController) launchAISession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input appaisession.LaunchInput
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxAIMutationBodyBytes, true) {
+		return
+	}
+	if !validLaunchInput(input) {
+		writeError(w, http.StatusBadRequest, "AI launch input exceeds the allowed limits")
+		return
+	}
+	if !a.authorizeItemWorkspace(w, r, r.PathValue("id")) {
 		return
 	}
 	result, err := a.aiSessions.Launch(r.PathValue("id"), input)
@@ -300,10 +404,14 @@ func (a *aiController) launchWorkspaceAISession(w http.ResponseWriter, r *http.R
 		return
 	}
 	var input appaisession.LaunchInput
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &input, maxAIMutationBodyBytes, true) {
+		return
+	}
+	if !validLaunchInput(input) {
+		writeError(w, http.StatusBadRequest, "AI launch input exceeds the allowed limits")
+		return
+	}
+	if !a.authorizeWorkspace(w, r, r.PathValue("id")) {
 		return
 	}
 	result, err := a.aiSessions.LaunchWorkspace(r.PathValue("id"), input)
@@ -350,9 +458,15 @@ func (a *aiController) aiProviderCapabilities(w http.ResponseWriter, r *http.Req
 	var result appaisession.ProviderCapabilityCatalog
 	var err error
 	if workspaceID := strings.TrimSpace(r.URL.Query().Get("workspaceId")); workspaceID != "" {
-		result, err = a.aiSessions.ProviderCapabilitiesForWorkspace(r.PathValue("id"), workspaceID)
+		if !a.authorizeWorkspace(w, r, workspaceID) {
+			return
+		}
+		result, err = a.aiSessions.ProviderCapabilitiesForWorkspaceContext(r.Context(), r.PathValue("id"), workspaceID)
 	} else {
-		result, err = a.aiSessions.ProviderCapabilities(r.PathValue("id"), r.URL.Query().Get("itemId"))
+		if itemID := strings.TrimSpace(r.URL.Query().Get("itemId")); itemID != "" && !a.authorizeItemWorkspace(w, r, itemID) {
+			return
+		}
+		result, err = a.aiSessions.ProviderCapabilitiesContext(r.Context(), r.PathValue("id"), r.URL.Query().Get("itemId"))
 	}
 	if err == nil {
 		writeJSON(w, http.StatusOK, result)
@@ -381,12 +495,74 @@ func (a *aiController) saveAISettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var settings appaisession.Settings
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&settings); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeLimitedJSON(w, r, &settings, maxAIMutationBodyBytes, true) {
 		return
 	}
 	saved, err := a.aiSessions.Save(settings)
 	respond(w, saved, err)
+}
+
+// Cloud denials intentionally use the same response as a missing resource.  Session
+// IDs are process-local bearer-adjacent identifiers and must not become an oracle.
+func (a *aiController) authorizeWorkspace(w http.ResponseWriter, r *http.Request, workspaceID string) bool {
+	if a.runtimeConfig.Mode != models.RuntimeModeCloud {
+		return true
+	}
+	session, ok := cloudSessionFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "Cloud session is required")
+		return false
+	}
+	if a.cloudWorkspaces == nil {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return false
+	}
+	if _, found, err := a.cloudWorkspaces.Get(r.Context(), session.User.ID, strings.TrimSpace(workspaceID)); err != nil || !found {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return false
+	}
+	return true
+}
+
+func (a *aiController) authorizeItemWorkspace(w http.ResponseWriter, r *http.Request, itemID string) bool {
+	if a.runtimeConfig.Mode != models.RuntimeModeCloud {
+		return true
+	}
+	workspaceID, err := a.aiSessions.ItemWorkspace(itemID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return false
+	}
+	return a.authorizeWorkspace(w, r, workspaceID)
+}
+
+func validLaunchInput(input appaisession.LaunchInput) bool {
+	return validAIStrings(input.Provider, input.Terminal, input.ContextMode, input.PresetID, input.PromptDraft, input.CustomPrompt, input.ContextPath) && validCapabilitySelection(input.SelectedSkills, input.SelectedAgents)
+}
+
+func validEmbeddedInput(input appaisession.EmbeddedInput) bool {
+	return input.Columns >= 20 && input.Columns <= maxTerminalDimension && input.Rows >= 5 && input.Rows <= 200 && validAIStrings(input.Provider, input.ContextMode, input.PresetID, input.PromptDraft, input.CustomPrompt, input.ContextPath, input.ExpectedWorkspaceID, input.ExpectedBranch, input.ObservedCommit, input.IdempotencyKey) && validCapabilitySelection(input.SelectedSkills, input.SelectedAgents)
+}
+
+func validAIStrings(values ...string) bool {
+	for _, value := range values {
+		if len(value) > 64<<10 {
+			return false
+		}
+	}
+	return true
+}
+
+func validCapabilitySelection(groups ...[]string) bool {
+	for _, group := range groups {
+		if len(group) > 64 {
+			return false
+		}
+		for _, value := range group {
+			if len(value) == 0 || len(value) > 512 {
+				return false
+			}
+		}
+	}
+	return true
 }

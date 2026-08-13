@@ -3,8 +3,8 @@ package ai
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -49,12 +49,13 @@ type SessionRecordRepository interface {
 }
 
 type FileSessionRecordRepository struct {
-	path string
-	mu   sync.Mutex
+	path    string
+	mu      sync.Mutex
+	publish func(string, []byte) error
 }
 
 func NewFileSessionRecordRepository(path string) *FileSessionRecordRepository {
-	return &FileSessionRecordRepository{path: path}
+	return &FileSessionRecordRepository{path: path, publish: publishDurableFile}
 }
 
 func (r *FileSessionRecordRepository) Get(id string) (SessionRecord, bool, error) {
@@ -153,6 +154,15 @@ func (r *FileSessionRecordRepository) ReplaceAll(records []SessionRecord) error 
 	if records == nil {
 		records = []SessionRecord{}
 	}
+	if err := validateSessionRecords(records); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.save(records)
+}
+
+func validateSessionRecords(records []SessionRecord) error {
 	seen := map[string]bool{}
 	idempotency := map[string]string{}
 	for i := range records {
@@ -172,9 +182,7 @@ func (r *FileSessionRecordRepository) ReplaceAll(records []SessionRecord) error 
 			idempotency[key] = records[i].ID
 		}
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.save(records)
+	return nil
 }
 
 func ValidateSessionRecord(record SessionRecord) error {
@@ -224,57 +232,43 @@ func normalizeSessionRecord(record SessionRecord) SessionRecord {
 }
 
 func (r *FileSessionRecordRepository) load() ([]SessionRecord, error) {
-	data, err := os.ReadFile(r.path)
+	data, err := readBoundedFile(r.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return []SessionRecord{}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	return decodeSessionRecords(data)
+}
+
+// decodeSessionRecords validates a candidate generation before it is published.
+// Keeping decoding separate lets imports/sync reject an unsafe snapshot without
+// replacing the last durable file.
+func decodeSessionRecords(data []byte) ([]SessionRecord, error) {
 	var records []SessionRecord
-	if err := yaml.Unmarshal(data, &records); err != nil {
+	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&records); err != nil {
 		return nil, err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return nil, errors.New("multiple YAML documents are not supported")
 	}
 	if records == nil {
 		records = []SessionRecord{}
 	}
-	for i := range records {
-		records[i] = normalizeSessionRecord(records[i])
-		if err := ValidateSessionRecord(records[i]); err != nil {
-			return nil, err
-		}
+	if err := validateSessionRecords(records); err != nil {
+		return nil, err
 	}
 	return records, nil
 }
 
 func (r *FileSessionRecordRepository) save(records []SessionRecord) error {
-	if err := os.MkdirAll(filepath.Dir(r.path), 0o755); err != nil {
-		return err
-	}
 	data, err := yaml.Marshal(records)
 	if err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(r.path), ".ai-session-records-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(0o600); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryPath, r.path)
+	return r.publish(r.path, data)
 }

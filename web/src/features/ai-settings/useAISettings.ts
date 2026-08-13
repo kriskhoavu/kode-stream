@@ -10,22 +10,23 @@ export function useAISettings() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError('');
     setSaved(false);
     try {
-      const [nextSettings, nextCapabilities] = await Promise.all([api.aiSettings(), api.aiCapabilities()]);
+			const [nextSettings, nextCapabilities] = await Promise.all([api.aiSettings(signal), api.aiCapabilities(signal)]);
       setSettings(nextSettings);
       setCapabilities(nextCapabilities);
-    } catch (caught) {
+		} catch (caught) {
+			if (signal?.aborted) return;
       setError(caught instanceof Error ? caught.message : 'AI settings are unavailable.');
     } finally {
-      setLoading(false);
+			if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+	useEffect(() => { const controller = new AbortController(); void refresh(controller.signal); return () => controller.abort(); }, [refresh]);
 
   const save = useCallback(async () => {
     if (!settings) return;

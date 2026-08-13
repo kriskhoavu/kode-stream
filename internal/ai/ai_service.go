@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 )
 
 type Capability struct {
@@ -20,14 +21,16 @@ type Capability struct {
 }
 
 type AIService struct {
-	store    SettingsStore
-	lookPath func(string) (string, error)
-	stat     func(string) (os.FileInfo, error)
-	goos     string
-	launch   *launchDependencies
-	embedded *Manager
-	records  SessionRecordRepository
-	branches sessionBranchResolver
+	store            SettingsStore
+	lookPath         func(string) (string, error)
+	stat             func(string) (os.FileInfo, error)
+	goos             string
+	launch           *launchDependencies
+	embedded         *Manager
+	records          SessionRecordRepository
+	branches         sessionBranchResolver
+	embeddedLaunchMu sync.Mutex
+	sessionRecordMu  sync.Mutex
 }
 
 type Service = AIService

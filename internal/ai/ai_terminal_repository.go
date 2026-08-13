@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -74,11 +75,12 @@ type managed struct {
 }
 
 type Manager struct {
-	mu       sync.RWMutex
-	sessions map[string]*managed
-	config   Config
-	closed   bool
-	observer func(Session)
+	mu            sync.RWMutex
+	sessions      map[string]*managed
+	config        Config
+	closed        bool
+	observer      func(Session)
+	observerError func(Session) error
 }
 
 func NewTerminalManager(config Config) *Manager {
@@ -160,7 +162,10 @@ func (m *Manager) Start(request StartRequest) (Session, Grant, error) {
 	go m.read(s)
 	go m.wait(s)
 	running := s.snapshot()
-	m.notify(running)
+	if err := m.notifyStart(running); err != nil {
+		_, _ = m.stop(id, StateCancelled)
+		return Session{}, Grant{}, fmt.Errorf("persist embedded session start: %w", err)
+	}
 	return running, Grant{SessionID: id, Token: token, ExpiresAt: s.grantExpires}, nil
 }
 
@@ -211,6 +216,14 @@ func (m *Manager) IssueGrant(id string) (Grant, error) {
 func (m *Manager) SetObserver(observer func(Session)) {
 	m.mu.Lock()
 	m.observer = observer
+	m.mu.Unlock()
+}
+
+// SetStartObserver makes the synchronous running-state publication observable to
+// the launch unit of work. Runtime lifecycle observations remain best-effort.
+func (m *Manager) SetStartObserver(observer func(Session) error) {
+	m.mu.Lock()
+	m.observerError = observer
 	m.mu.Unlock()
 }
 
@@ -386,6 +399,17 @@ func (m *Manager) notify(session Session) {
 	if observer != nil {
 		observer(session)
 	}
+}
+
+func (m *Manager) notifyStart(session Session) error {
+	m.notify(session)
+	m.mu.RLock()
+	observer := m.observerError
+	m.mu.RUnlock()
+	if observer == nil {
+		return nil
+	}
+	return observer(session)
 }
 func (s *managed) snapshot() Session { s.mu.Lock(); defer s.mu.Unlock(); return s.info }
 func random(size int) (string, error) {
