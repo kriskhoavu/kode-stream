@@ -637,6 +637,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
             </button>
         <span className="scan-state">{scanState}</span>
       </div>
+      <div className="workstream-filter-row">
       <div className="facet-bar">
         {facetConfig.map((facet) => (
           <FacetMenu
@@ -666,6 +667,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
             <button type="button" onClick={() => void deleteSavedFilter(saved.id)} aria-label={`Delete ${saved.name}`} title={`Delete ${saved.name}`}><Trash2 size={12} /></button>
           </span>
         ))}
+      </div>
       </div>
       <SelectedFilters facets={facetConfig} filters={filters} onRemove={toggleFilter} />
       <div className="filter-summary">

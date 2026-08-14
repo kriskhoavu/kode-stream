@@ -11,6 +11,7 @@ import { WorkspacesPage } from './pages/WorkspacesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { api, isExtensionSurface, localAPIOrigin } from './shared/api';
 import { ActivityPanel } from './components/ReliabilityPanels';
+import { NeonHeaderBackdrop, neonBandRoutes } from './components/NeonHeaderBackdrop';
 import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';
 import { useAppSettings } from './features/settings/appSettings';
@@ -104,8 +105,12 @@ export function App() {
     return <LocalServerUnavailable status={localAPIStatus} apiOrigin={localAPIOrigin()} onRetry={() => void checkLocalAPI()} />;
   }
 
+  const neonBand = (neonBandRoutes as readonly string[]).includes(route.name);
+  const shellClasses = ['app-shell', leftNavCollapsed ? 'left-nav-collapsed' : '', neonBand ? `neon-band neon-band-${route.name}` : ''].filter(Boolean).join(' ');
+
   return (
-    <div className={leftNavCollapsed ? 'app-shell left-nav-collapsed' : 'app-shell'}>
+    <div className={shellClasses}>
+      {neonBand && <NeonHeaderBackdrop />}
       <aside className="left-nav">
         <div className="left-nav-brand-row">
           <button className="brand" onClick={() => navigate({ name: 'workstream' })} aria-label="Kode Stream home">

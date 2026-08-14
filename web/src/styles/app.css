@@ -1807,7 +1807,15 @@ select {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  box-shadow: 18px 0 36px rgba(2, 6, 23, 0.18);
+  /*
+   * A crisp edge instead of a 36px blur. The old wide smear only looked clean
+   * while the nav painted over the content and the blur landed on top of it as
+   * a vignette; wherever the content sits inset from the nav (the Workbench
+   * card most of all) the same blur is exposed against the page background as a
+   * grey band filling the gutter.
+   */
+  border-right: 1px solid color-mix(in srgb, var(--nav) 65%, #000);
+  box-shadow: 2px 0 10px rgba(2, 6, 23, 0.07);
   overflow: hidden;
 }
 
@@ -1978,8 +1986,14 @@ select {
   grid-row: 2;
   overflow: auto;
   padding: 22px 28px 28px;
+  /*
+   * Two symmetric glows rather than one at 80%: a single right-hand circle left
+   * the left edge visibly darker than the right. Mirroring it lights both ends
+   * and leaves the middle as the darkest part of the band.
+   */
   background:
-    radial-gradient(circle at 80% -10%, color-mix(in srgb, var(--blue) 8%, transparent), transparent 34%),
+    radial-gradient(circle at 16% -12%, color-mix(in srgb, var(--blue) 9%, transparent), transparent 38%),
+    radial-gradient(circle at 84% -12%, color-mix(in srgb, var(--blue) 9%, transparent), transparent 38%),
     var(--bg);
 }
 
@@ -2938,11 +2952,28 @@ select:disabled {
   }
 }
 
+/*
+ * Facets and the saved-view controls share one row, with the saved-view group
+ * pushed to the trailing edge. Both keep wrapping internally, and the row wraps
+ * as a whole on narrow widths so the saved-view group drops below the facets
+ * instead of squeezing them.
+ */
+.workstream-filter-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+
+.workstream-filter-row .saved-filter-bar {
+  margin-left: auto;
+}
+
 .facet-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
 }
 
 .facet-menu {
