@@ -21,3 +21,61 @@
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(16px);
 }
+
+/*
+ * Neon icon band: the decorative layer is a child of the shell, so the shell
+ * becomes the positioning context and the icons span the full window width —
+ * across the dark left nav, behind the topbar, and down through each page's
+ * toolbar and filter rows.
+ *
+ * Stacking inside the shell: nav surface 0, icon band 1, real chrome 2. The
+ * band has to out-rank the left nav because that nav is `position: sticky`,
+ * which would otherwise paint its opaque fill over the icons. Every app
+ * overlay (menus, dialogs, docks) lives at 20 or above, so nothing here
+ * competes with them.
+ */
+.app-shell.neon-band {
+  position: relative;
+  /* Reaches past the facet/filter row, where the mask has already faded out. */
+  --neon-band-height: 360px;
+}
+
+.app-shell.neon-band-knowledge {
+  --neon-band-height: 300px;
+}
+
+/*
+ * Workbench needs the tallest band: its board card starts higher up the page
+ * than Workstream's bare search and facet rows, so a shorter band left barely
+ * any of the icon field visible above the card.
+ */
+.app-shell.neon-band-canvas {
+  --neon-band-height: 430px;
+}
+
+.app-shell.neon-band .left-nav {
+  z-index: 0;
+}
+
+.app-shell.neon-band .left-nav > * {
+  position: relative;
+  z-index: 2;
+}
+
+.app-shell.neon-band .topbar {
+  position: relative;
+  z-index: 2;
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom-color: transparent;
+}
+
+/*
+ * .main-content keeps its own fill: as a non-positioned block its background
+ * paints below the positioned band layer, so the icons still read through it.
+ * Only its children need lifting.
+ */
+.app-shell.neon-band .main-content > :not(.sr-only) {
+  position: relative;
+  z-index: 2;
+}

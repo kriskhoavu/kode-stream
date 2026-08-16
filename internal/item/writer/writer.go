@@ -293,8 +293,17 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 	if err != nil {
 		return models.WriteResult{}, err
 	}
-	if _, err := os.Stat(fullRoot); err == nil {
-		return models.WriteResult{}, fmt.Errorf("item already exists")
+	if info, err := os.Stat(fullRoot); err == nil {
+		// A manual deletion of an item's contents can leave the directory behind.
+		// An empty directory holds no item, so reuse it instead of reporting a
+		// duplicate the workspace cannot show.
+		empty, emptyErr := isEmptyDir(fullRoot, info)
+		if emptyErr != nil {
+			return models.WriteResult{}, emptyErr
+		}
+		if !empty {
+			return models.WriteResult{}, fmt.Errorf("item already exists")
+		}
 	} else if !os.IsNotExist(err) {
 		return models.WriteResult{}, err
 	}
@@ -318,6 +327,20 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 		}
 	}
 	return w.refresh(workspace, itemRoot)
+}
+
+// isEmptyDir reports whether path is a directory holding no entries. A
+// non-directory is never empty, so an existing file at the item path still
+// counts as occupied.
+func isEmptyDir(path string, info os.FileInfo) (bool, error) {
+	if !info.IsDir() {
+		return false, nil
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false, err
+	}
+	return len(entries) == 0, nil
 }
 
 var createItemPatternVariable = regexp.MustCompile(`\{([A-Za-z][A-Za-z0-9_]*)\}`)

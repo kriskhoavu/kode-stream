@@ -1,0 +1,66 @@
+/*
+ * Neon icon band. Sits over the content column's top strip, spanning the
+ * topbar down through the page toolbar/filter rows, and fades out at the
+ * bottom so the exact band height never needs to be pixel-accurate.
+ */
+.neon-backdrop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  height: var(--neon-band-height, 360px);
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 46%, rgba(0, 0, 0, 0.55) 74%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 46%, rgba(0, 0, 0, 0.55) 74%, transparent 100%);
+}
+
+.neon-backdrop-icon {
+  position: absolute;
+  display: block;
+  translate: -50% -50%;
+  color: hsl(var(--neon-hue) 92% 58%);
+  opacity: 0.68;
+  filter:
+    drop-shadow(0 0 4px currentColor)
+    drop-shadow(0 0 10px color-mix(in srgb, currentColor 55%, transparent));
+  animation-name: neon-drift, neon-pulse;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: transform, opacity;
+}
+
+:root[data-theme="dark"] .neon-backdrop-icon {
+  color: hsl(var(--neon-hue) 95% 66%);
+  opacity: 0.72;
+}
+
+@keyframes neon-drift {
+  from {
+    transform: translate3d(-3px, -6px, 0) rotate(-3deg);
+  }
+  to {
+    transform: translate3d(3px, 6px, 0) rotate(3deg);
+  }
+}
+
+@keyframes neon-pulse {
+  from {
+    filter:
+      drop-shadow(0 0 3px currentColor)
+      drop-shadow(0 0 7px color-mix(in srgb, currentColor 40%, transparent));
+  }
+  to {
+    filter:
+      drop-shadow(0 0 6px currentColor)
+      drop-shadow(0 0 16px color-mix(in srgb, currentColor 65%, transparent));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neon-backdrop-icon {
+    animation: none;
+  }
+}

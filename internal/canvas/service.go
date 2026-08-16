@@ -469,8 +469,14 @@ func boundedPlanItems(ctx context.Context, items []models.ItemSummary) []models.
 
 func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceConfig models.WorkspaceConfig, items []models.ItemSummary, sessions []ai.SessionRecordView, placements []Placement) Projection {
 	itemByID := map[string]models.ItemSummary{}
+	// Placements reference items by ID, but the ID scheme has changed before
+	// (see stablePlanID) without migrating stored placements. A path index lets
+	// an orphaned placement rebind to the item it always meant, because
+	// (workspace, branch, path) determines the current ID uniquely.
+	itemByPath := map[string]models.ItemSummary{}
 	for _, item := range items {
 		itemByID[item.ID] = item
+		itemByPath[canvasPathKey(item.ItemPath)] = item
 	}
 	sessionByID := map[string]ai.SessionRecordView{}
 	for _, session := range sessions {
@@ -507,10 +513,14 @@ func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceCo
 	axes := workspace.ProviderAxes(s.mode, s.datastore, workspaceConfig)
 	actions := workspace.ResolveActionCapabilities(workspace.ActionCapabilityInput{Axes: axes, Authorization: authorization, ContentAvailable: contentAvailable, ExecutionAvailable: axes.ExecutionProvider != models.WorkspaceExecutionProviderNone, Writable: workspaceConfig.AccessMode != models.WorkspaceAccessModeRemoteSnapshot, CurrentBranch: currentBranch, TargetBranch: layout.BranchKey})
 	readForbidden := actions[models.WorkspaceActionRepositoryRead].State == models.ActionCapabilityForbidden
+	// Filled before projecting so a rebind can tell whether the item is already
+	// placed under its current ID, rather than depending on placement order.
 	placed := map[string]bool{}
-	nodes := make([]ProjectedNode, 0, len(placements))
 	for _, placement := range placements {
 		placed[placement.NodeID] = true
+	}
+	nodes := make([]ProjectedNode, 0, len(placements))
+	for _, placement := range placements {
 		if placement.Hidden {
 			continue
 		}
@@ -532,6 +542,7 @@ func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceCo
 			}
 			node.Workspace = &view
 		case EntityPlan:
+			observedCommit := placement.EntityRef.ObservedCommit
 			item, ok := itemByID[placement.EntityRef.ItemID]
 			if !ok {
 				// Canvas only projects ticket roots under plans/{service}/{ticket}.
@@ -540,10 +551,28 @@ func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceCo
 				if canvasPlanServiceFromPath(placement.EntityRef.ItemPath) == "" {
 					continue
 				}
-				node.State = NodeStale
-				break
+				rebound, found := itemByPath[canvasPathKey(placement.EntityRef.ItemPath)]
+				if !found {
+					// The plan itself is gone. Keep the placement stale so it stays
+					// recoverable instead of being deleted behind the user's back.
+					node.State = NodeStale
+					break
+				}
+				if placed[planNodeID(rebound.ID)] {
+					// The item is already placed under its current ID, so this
+					// orphan is a superseded duplicate of that node.
+					continue
+				}
+				// Adopt the placement: re-anchor it to the current identity so the
+				// drift check below compares against the commit we just resolved
+				// rather than one recorded under the previous ID scheme.
+				placed[planNodeID(rebound.ID)] = true
+				item = rebound
+				observedCommit = item.Commit
+				node.EntityRef.ItemID = item.ID
+				node.EntityRef.ObservedCommit = item.Commit
 			}
-			if placement.EntityRef.ObservedCommit != "" && item.Commit != "" && placement.EntityRef.ObservedCommit != item.Commit {
+			if observedCommit != "" && item.Commit != "" && observedCommit != item.Commit {
 				node.State = NodeStale
 			}
 			node.Plan = &PlanNode{ItemID: item.ID, Identifier: item.Identifier, Title: item.Title, Service: canvasPlanService(item), Status: item.Status, Branch: item.Branch, Commit: item.Commit, Editable: item.Editable, Actions: actions}
@@ -589,6 +618,10 @@ func canvasPlanItems(items []models.ItemSummary) []models.ItemSummary {
 
 func canvasPlanService(item models.ItemSummary) string {
 	return canvasPlanServiceFromPath(item.ItemPath)
+}
+
+func canvasPathKey(itemPath string) string {
+	return strings.Trim(strings.ReplaceAll(itemPath, `\`, "/"), "/")
 }
 
 func canvasPlanServiceFromPath(itemPath string) string {

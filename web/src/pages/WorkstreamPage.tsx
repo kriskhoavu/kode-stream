@@ -34,6 +34,7 @@ import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../f
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
+import { MarkdownPreview } from '../features/content-viewer/renderers/MarkdownPreview';
 import { lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -105,6 +106,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [saveFilterName, setSaveFilterName] = useState('');
   const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(() => new Set());
   const [activeItemId, setActiveItemId] = useState('');
+  const [createdItemId, setCreatedItemId] = useState('');
+  // Holds a just-created item until a reload reports it, so a rescan that has
+  // not caught up yet cannot make the new card flash and vanish.
+  const pendingCreatedItemRef = useRef<ItemSummary | null>(null);
   const [dragTargetStatus, setDragTargetStatus] = useState<ItemStatus | ''>('');
   const [workspaceGitStatus, setWorkspaceGitStatus] = useState<GitStatus | null>(null);
   const [workspaceBranchCurrent, setWorkspaceBranchCurrent] = useState('');
@@ -142,19 +147,31 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 	}, [workspace?.id]);
   const text = query;
 
-  const loadCheckout = async (force = false) => {
+  const withPendingCreated = (loaded: ItemSummary[]) => {
+    const pending = pendingCreatedItemRef.current;
+    if (!pending) return loaded;
+    if (loaded.some((candidate) => candidate.id === pending.id)) {
+      pendingCreatedItemRef.current = null;
+      return loaded;
+    }
+    return [pending, ...loaded];
+  };
+
+  // silent keeps the board on screen while it refreshes, so a background reload
+  // never blanks the columns the user is already looking at.
+  const loadCheckout = async (force = false, { silent = false }: { silent?: boolean } = {}) => {
     if (!workspace) return;
 		const workspaceID = workspace.id;
 		const generation = workspaceGenerationRef.current;
 		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError('');
     try {
       const result = await api.loadWorkstreamCheckout(workspace.id, { force });
 			if (!active()) return;
       setBranchContext(result);
       setSelectedBranch(result.branch);
-      setPlans(result.items);
+      setPlans(withPendingCreated(result.items));
     } catch (err) {
       try {
         const fallbackItems = await api.items(new URLSearchParams({ workspaceId: workspace.id }));
@@ -194,6 +211,16 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     setQuery(item.identifier || item.title);
     setDrawerPlanId(item.id);
   }, [focusedItemId, items, loading, selectedBranch, workspace?.id]);
+
+  // Bring the freshly created card into view and let its highlight fade on its own.
+  useEffect(() => {
+    if (!createdItemId) return;
+    const card = Array.from(document.querySelectorAll<HTMLElement>('[data-item-id]'))
+      .find((candidate) => candidate.dataset.itemId === createdItemId);
+    card?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    const timer = window.setTimeout(() => setCreatedItemId(''), 2600);
+    return () => window.clearTimeout(timer);
+  }, [createdItemId]);
 
   useEffect(() => {
     if (!newPlanOpen && !sourceItemsOpen) return;
@@ -328,9 +355,9 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     }
   };
 
-  const reloadPlans = async () => {
+  const reloadPlans = async (options?: { silent?: boolean }) => {
     if (!workspace) return;
-    await loadCheckout(false);
+    await loadCheckout(false, options);
   };
 
   const moveItem = async (itemId: string, status: ItemStatus) => {
@@ -426,12 +453,15 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       if (result.state === 'available' && result.issue) {
         const issue = result.issue;
         const nextTags = jiraTags(issue).join(', ');
+        // Fetching is an explicit request for this ticket's values, so they
+        // replace whatever a previous fetch imported. Keeping the old values
+        // left the details panel describing a different ticket than the preview.
         setNewPlanDraft((draft) => ({
           ...draft,
-          identifier: draft.identifier.trim() || issue.key,
-          title: draft.title.trim() || issue.summary,
-          owner: draft.owner.trim() || issue.assignee?.displayName || '',
-          tags: draft.tags.trim() || nextTags
+          identifier: issue.key,
+          title: issue.summary,
+          owner: issue.assignee?.displayName || '',
+          tags: nextTags
         }));
       }
 		} catch (err) {
@@ -464,12 +494,18 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         initialReadme: jiraIssue ? jiraReadme(jiraIssue) : undefined
       });
       notifyReliabilityChanged();
+      // Show the new card on the board rather than jumping to the detail page.
+      // The refresh is silent so the columns never blank out, and the dialog
+      // stays up until the board behind it already holds the item.
+      pendingCreatedItemRef.current = result.item;
+      setPlans((current) => current.some((candidate) => candidate.id === result.item.id)
+        ? current.map((candidate) => (candidate.id === result.item.id ? { ...candidate, ...result.item } : candidate))
+        : [result.item, ...current]);
+      setCreatedItemId(result.item.id);
       setNewPlanOpen(false);
       setNewPlanDraft(emptyNewWorkItemDraft());
       setJiraLookup(null);
-      await onWorkspacesChanged();
-      await reloadPlans();
-      onOpenPlan(result.item.id);
+      void Promise.resolve(onWorkspacesChanged()).then(() => reloadPlans({ silent: true }));
     } catch (err) {
       setNewPlanError(err instanceof Error ? err.message : 'Item creation failed');
     } finally {
@@ -629,14 +665,17 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           <Search size={15} />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search items..." />
         </label>
-        <button className="secondary" onClick={scan}>
-          <RotateCw size={16} /> Refresh
-            </button>
-            <button className="primary" onClick={() => setNewPlanOpen(true)}>
-              + New Work Item
-            </button>
-        <span className="scan-state">{scanState}</span>
+        <div className="board-toolbar-actions">
+          <button className="secondary" onClick={scan}>
+            <RotateCw size={16} /> Refresh
+          </button>
+          <button className="primary" onClick={() => setNewPlanOpen(true)}>
+            + New Work Item
+          </button>
+          <span className="scan-state">{scanState}</span>
+        </div>
       </div>
+      <div className="workstream-filter-row">
       <div className="facet-bar">
         {facetConfig.map((facet) => (
           <FacetMenu
@@ -666,6 +705,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
             <button type="button" onClick={() => void deleteSavedFilter(saved.id)} aria-label={`Delete ${saved.name}`} title={`Delete ${saved.name}`}><Trash2 size={12} /></button>
           </span>
         ))}
+      </div>
       </div>
       <SelectedFilters facets={facetConfig} filters={filters} onRemove={toggleFilter} />
       <div className="filter-summary">
@@ -697,6 +737,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                   workspace={workspace}
                   pending={pendingItemIds.has(plan.id)}
                   active={activeItemId === plan.id}
+                  created={createdItemId === plan.id}
                   onDragStart={(event) => handleCardDragStart(event, plan.id)}
                   onDragEnd={() => handleCardDragEnd(plan.id)}
                   onPreview={() => {
@@ -886,13 +927,18 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                               <strong>{jiraLookup.issue.key}: {jiraLookup.issue.summary}</strong>
                               {jiraLookup.issue.browserUrl && <a href={jiraLookup.issue.browserUrl} target="_blank" rel="noreferrer">Open Jira</a>}
                             </header>
+                            <div className="jira-issue-preview-body">
+                              <strong className="jira-issue-preview-label">Description</strong>
+                              {jiraLookup.issue.description
+                                ? <div className="jira-issue-preview-description"><MarkdownPreview content={jiraLookup.issue.description} /></div>
+                                : <p className="jira-issue-preview-description empty">This Jira ticket has no description.</p>}
+                            </div>
                             <dl className="jira-issue-preview-meta">
                               <div><dt>Type</dt><dd>{jiraLookup.issue.issueType || 'Issue'}</dd></div>
                               <div><dt>Status</dt><dd>{jiraLookup.issue.status || 'Unknown'}</dd></div>
                               <div><dt>Assignee</dt><dd>{jiraLookup.issue.assignee?.displayName || 'Unassigned'}</dd></div>
                               {jiraLookup.issue.priority && <div><dt>Priority</dt><dd>{jiraLookup.issue.priority}</dd></div>}
                             </dl>
-                            {jiraLookup.issue.description && <p className="jira-issue-preview-description">{jiraLookup.issue.description}</p>}
                             {jiraLookup.issue.attachments.length > 0 && <small>{jiraLookup.issue.attachments.length} attachment{jiraLookup.issue.attachments.length === 1 ? '' : 's'} referenced</small>}
                           </>
                         ) : (
@@ -1399,11 +1445,12 @@ function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetSt
   );
 }
 
-const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, onDragStart, onDragEnd, onPreview, onOpen, onMove }: {
+const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, onDragStart, onDragEnd, onPreview, onOpen, onMove }: {
   item: ItemSummary;
   workspace?: WorkspaceConfig;
   pending: boolean;
   active: boolean;
+  created: boolean;
   onDragStart: (event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
   onPreview: () => void;
@@ -1425,8 +1472,10 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   if (draggable) classes.push('draggable');
   if (active) classes.push('dragging');
   if (pending) classes.push('move-pending');
+  if (created) classes.push('just-created');
   return (
     <article
+      data-item-id={plan.id}
       className={classes.join(' ')}
       draggable={draggable}
       aria-busy={pending}

@@ -267,3 +267,93 @@ func TestAttachmentRedirectPolicyAllowsOnlyCloudMediaWithoutCredentials(t *testi
 		})
 	}
 }
+
+func TestNormalizeDescriptionExtractsNonTextADFNodes(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "hard break becomes a newline",
+			raw:  `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"one"},{"type":"hardBreak"},{"type":"text","text":"two"}]}]}`,
+			want: "one\ntwo",
+		},
+		{
+			name: "mention keeps the referenced person",
+			raw:  `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"ping "},{"type":"mention","attrs":{"text":"@Kim"}}]}]}`,
+			want: "ping @Kim",
+		},
+		{
+			name: "inline card keeps its link",
+			raw:  `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"inlineCard","attrs":{"url":"https://jira.example/browse/DI-1"}}]}]}`,
+			want: "https://jira.example/browse/DI-1",
+		},
+		{
+			name: "emoji keeps its shortname",
+			raw:  `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"emoji","attrs":{"shortName":":warning:"}}]}]}`,
+			want: ":warning:",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, _ := normalizeDescription([]byte(testCase.raw))
+			if got != testCase.want {
+				t.Fatalf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestGetIssueFallsBackToCustomDescriptionField(t *testing.T) {
+	var requests []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.URL.RawQuery)
+		if strings.Contains(r.URL.RawQuery, "expand=names") {
+			_, _ = w.Write([]byte(`{"key":"DI-510","names":{"summary":"Summary","customfield_10101":"User Story Description"},"fields":{"summary":"Remove legacy ArticleIndex","customfield_10101":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"As a development team, we want to remove Solr."}]}]}}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"key":"DI-510","fields":{"summary":"Remove legacy ArticleIndex","description":null,"status":{"name":"QA"},"issuetype":{"name":"User-Story"},"labels":[],"attachment":[]}}`))
+	}))
+	defer server.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	issue, err := client.GetIssue(context.Background(), models.JiraConnection{DeploymentType: "cloud", BaseURL: server.URL, AccountEmail: "a@b.com", TokenEnvVar: "TOKEN"}, "DI-510")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if issue.Description != "As a development team, we want to remove Solr." {
+		t.Fatalf("description=%q requests=%v", issue.Description, requests)
+	}
+}
+
+func TestGetIssueDoesNotRefetchWhenStandardDescriptionIsPresent(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(`{"key":"DI-1","fields":{"summary":"S","description":"plain text","status":{},"issuetype":{},"labels":[],"attachment":[]}}`))
+	}))
+	defer server.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	issue, err := client.GetIssue(context.Background(), models.JiraConnection{DeploymentType: "server", BaseURL: server.URL, TokenEnvVar: "TOKEN"}, "DI-1")
+	if err != nil || issue.Description != "plain text" {
+		t.Fatalf("issue=%#v err=%v", issue, err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected a single request, got %d", calls)
+	}
+}
+
+func TestGetIssueCarriesStatusCategory(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"key":"DI-365","fields":{"summary":"Redesign","description":"text","status":{"name":"Test Done","statusCategory":{"key":"done","name":"Done"}},"issuetype":{"name":"User-Story"},"labels":[],"attachment":[]}}`))
+	}))
+	defer server.Close()
+	client := New()
+	client.getenv = func(string) string { return "token" }
+	issue, err := client.GetIssue(context.Background(), models.JiraConnection{DeploymentType: "server", BaseURL: server.URL, TokenEnvVar: "TOKEN"}, "DI-365")
+	if err != nil || issue.Status != "Test Done" || issue.StatusCategory != "done" {
+		t.Fatalf("issue=%#v err=%v", issue, err)
+	}
+}

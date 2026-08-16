@@ -97,7 +97,11 @@ describe('WorkstreamPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create Item' }));
 
-    await waitFor(() => expect(onOpenPlan).toHaveBeenCalledWith('created'));
+    // The new item lands on the board, highlighted; it does not navigate away.
+    await waitFor(() => expect(screen.queryByLabelText('Item name')).not.toBeInTheDocument());
+    const card = await screen.findByText('Jira First Workspace');
+    expect(card.closest('.plan-card')).toHaveClass('just-created');
+    expect(onOpenPlan).not.toHaveBeenCalled();
     const createCall = fetchMock.mock.calls.find(([url, init]) => String(url) === '/api/items' && init?.method === 'POST');
     const body = JSON.parse(String(createCall?.[1]?.body ?? '{}')) as Record<string, unknown>;
     expect(body).toMatchObject({ workspaceId: 'r1', source: 'items', scope: 'items', identifier: 'PM-025', title: 'Jira First Workspace', owner: 'Kim', jiraKey: 'PM-025' });
@@ -446,5 +450,79 @@ describe('filterPlans', () => {
   it('uses AND across facets', () => {
     const result = filterPlans(items, { sources: ['docs'], scopes: ['docs'], statuses: ['unsorted'], branches: [], authors: ['Giang'] }, '', workspace);
     expect(result.map((plan) => plan.id)).toEqual(['p2']);
+  });
+});
+
+describe('Jira intake refetch', () => {
+  const issue = (key: string, summary: string, assignee: string, priority: string) => ({
+    state: 'available',
+    issue: {
+      key, summary, status: 'QA', description: `${key} description`, issueType: 'User-Story',
+      assignee: { displayName: assignee }, reporter: { displayName: 'BA' }, priority,
+      labels: [], browserUrl: `https://jira.example/browse/${key}`, attachments: []
+    }
+  });
+
+  it('replaces the imported details when a different ticket is fetched', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/checkout') return Promise.resolve(response(workstreamBranchLoadResult([], 'main')));
+      if (url === '/api/workspaces/r1/jira/issues/DI-512') return Promise.resolve(response(issue('DI-512', 'Team meetings', 'Thu Ho Linh Pham', 'Low')));
+      if (url === '/api/workspaces/r1/jira/issues/DI-510') return Promise.resolve(response(issue('DI-510', 'Remove legacy ArticleIndex', 'Viet Van Nguyen', 'Medium')));
+      return Promise.resolve(response([]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ New Work Item/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'From Jira' }));
+
+    fireEvent.change(screen.getByLabelText('Jira key'), { target: { value: 'DI-512' } });
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Jira/i }));
+    await waitFor(() => expect(screen.getByLabelText('Item name')).toHaveValue('DI-512'));
+    expect(screen.getByLabelText('Title')).toHaveValue('Team meetings');
+    expect(screen.getByLabelText('Owner')).toHaveValue('Thu Ho Linh Pham');
+
+    fireEvent.change(screen.getByLabelText('Jira key'), { target: { value: 'DI-510' } });
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Jira/i }));
+
+    await waitFor(() => expect(screen.getByLabelText('Item name')).toHaveValue('DI-510'));
+    expect(screen.getByLabelText('Title')).toHaveValue('Remove legacy ArticleIndex');
+    expect(screen.getByLabelText('Owner')).toHaveValue('Viet Van Nguyen');
+  });
+});
+
+describe('Jira description formatting', () => {
+  it('renders the description as formatted Markdown', async () => {
+    const markdown = '## User Story\n\nRemove the obsolete Solr integration.\n\n## Acceptance Criteria\n\n- No connection to Solr.\n- `ArticleIndex` stays a DTO.';
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/checkout') return Promise.resolve(response(workstreamBranchLoadResult([], 'main')));
+      if (url === '/api/workspaces/r1/jira/issues/DI-510') return Promise.resolve(response({
+        state: 'available',
+        issue: {
+          key: 'DI-510', summary: 'Remove legacy ArticleIndex', status: 'QA', description: markdown,
+          issueType: 'User-Story', assignee: { displayName: 'Viet Van Nguyen' }, priority: 'Medium',
+          labels: [], browserUrl: 'https://jira.example/browse/DI-510', attachments: []
+        }
+      }));
+      return Promise.resolve(response([]));
+    }));
+
+    render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ New Work Item/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'From Jira' }));
+    fireEvent.change(screen.getByLabelText('Jira key'), { target: { value: 'DI-510' } });
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Jira/i }));
+
+    const preview = await screen.findByLabelText('Jira issue preview');
+    // Headings, list items and inline code survive as real elements rather
+    // than being run together into one paragraph.
+    await waitFor(() => expect(within(preview).getByRole('heading', { name: 'User Story' })).toBeInTheDocument());
+    expect(within(preview).getByRole('heading', { name: 'Acceptance Criteria' })).toBeInTheDocument();
+    expect(within(preview).getAllByRole('listitem')).toHaveLength(2);
+    expect(preview.querySelector('code')?.textContent).toBe('ArticleIndex');
   });
 });

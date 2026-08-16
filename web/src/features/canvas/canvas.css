@@ -1,13 +1,66 @@
-.canvas-page { min-height: calc(100vh - 108px); display: flex; flex-direction: column; background: var(--bg); }
+/* No background of its own: an opaque fill here covered the neon icon band
+ * across the whole header, which is why Workbench showed far fewer icons than
+ * Workstream, whose page wrapper is transparent. .main-content already paints
+ * --bg plus the header glows underneath. */
+.canvas-page { min-height: calc(100vh - 108px); display: flex; flex-direction: column; }
 .canvas-page-header { flex: 0 0 auto; }
 .canvas-state { display: flex; align-items: center; gap: 12px; padding: 12px 24px; color: var(--muted); }
 .canvas-state.error { color: var(--danger); }
-.canvas-work-area { position: relative; flex: 1; min-height: 560px; display: flex; overflow: hidden; }
+/*
+ * The work area is the visible edge between the board and the page background,
+ * so it carries the card treatment: a radius, a hairline border and a tinted
+ * outer glow that bleeds the accent into the page instead of ending on a hard
+ * 90-degree seam. Its own box-shadow is not affected by `overflow: hidden`
+ * (that clips descendants only), and the radius clips the square shell inside.
+ */
+.canvas-work-area {
+  position: relative;
+  flex: 1;
+  min-height: 560px;
+  display: flex;
+  overflow: hidden;
+  /* Lets the header's divider and the icon band breathe above the card, which
+   * previously started immediately under the title. */
+  margin-top: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 1px color-mix(in srgb, var(--nav) 5%, transparent),
+    0 18px 44px -22px color-mix(in srgb, var(--blue) 30%, transparent),
+    0 30px 70px -40px color-mix(in srgb, var(--nav) 26%, transparent);
+}
+
 .canvas-work-area .canvas-board-shell { flex: 1 1 auto; min-width: 0; }
 .canvas-board-shell { position: relative; flex: 1; min-height: 560px; overflow: hidden; }
 .canvas-board { position: absolute; inset: 144px 0 0; }
-.canvas-toolbar { position: absolute; z-index: 6; inset: 0 0 auto; min-height: 144px; display: grid; align-content: start; gap: 8px; padding: 10px 12px 8px; border-bottom: 1px solid var(--line); background: var(--panel-soft); }
-.canvas-board .react-flow { background: var(--panel-soft); }
+
+/*
+ * The board is clipped flush against the toolbar's divider, so a section's
+ * dashed boundary that happens to land on that edge reads as a stray coloured
+ * rule across the page rather than as canvas content. Whether it does depends
+ * on the restored viewport, which is why it only appeared on some reloads. This
+ * inner shading gives the board a lip of its own, so content arriving at the
+ * top edge is visibly *under* the chrome instead of continuous with it.
+ */
+.canvas-board::before {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  inset: 0 0 auto;
+  height: 14px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--nav) 9%, transparent), transparent);
+  pointer-events: none;
+}
+
+/* Toolbar reads as the card's header strip; the board below is the recessed
+ * work surface. --bg and --panel-soft are near-identical, so the board gets a
+ * faint accent tint to separate the two deliberately rather than by accident. */
+.canvas-toolbar { position: absolute; z-index: 6; inset: 0 0 auto; min-height: 144px; display: grid; align-content: start; gap: 8px; padding: 10px 12px 8px; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); background: var(--panel); }
+.canvas-board .react-flow {
+  background:
+    radial-gradient(140% 70% at 50% 0%, color-mix(in srgb, var(--blue) 4%, transparent), transparent 64%),
+    color-mix(in srgb, var(--panel-soft) 88%, var(--line) 12%);
+}
 .canvas-board-toolbar { display: grid; grid-template-columns: minmax(240px, 1fr) auto auto; gap: 10px; align-items: center; }
 .canvas-board-toolbar .plan-search { min-height: 40px; box-shadow: var(--shadow-soft); }
 .canvas-search { min-width: 240px; }

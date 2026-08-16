@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -58,21 +60,25 @@ type Attachment struct {
 }
 
 type Issue struct {
-	Key         string       `json:"key"`
-	Summary     string       `json:"summary"`
-	Status      string       `json:"status"`
-	Description string       `json:"description"`
-	IssueType   string       `json:"issueType"`
-	Assignee    *Person      `json:"assignee,omitempty"`
-	Reporter    *Person      `json:"reporter,omitempty"`
-	Priority    string       `json:"priority,omitempty"`
-	Labels      []string     `json:"labels"`
-	CreatedAt   string       `json:"createdAt,omitempty"`
-	UpdatedAt   string       `json:"updatedAt,omitempty"`
-	BrowserURL  string       `json:"browserUrl"`
-	Attachments []Attachment `json:"attachments"`
-	Truncated   bool         `json:"truncated,omitempty"`
-	Warnings    []string     `json:"warnings,omitempty"`
+	Key     string `json:"key"`
+	Summary string `json:"summary"`
+	Status  string `json:"status"`
+	// StatusCategory is Jira's own coarse grouping ("new", "indeterminate",
+	// "done"). Workflow status names are project-specific, so this is the only
+	// reliable signal for colouring a status.
+	StatusCategory string       `json:"statusCategory,omitempty"`
+	Description    string       `json:"description"`
+	IssueType      string       `json:"issueType"`
+	Assignee       *Person      `json:"assignee,omitempty"`
+	Reporter       *Person      `json:"reporter,omitempty"`
+	Priority       string       `json:"priority,omitempty"`
+	Labels         []string     `json:"labels"`
+	CreatedAt      string       `json:"createdAt,omitempty"`
+	UpdatedAt      string       `json:"updatedAt,omitempty"`
+	BrowserURL     string       `json:"browserUrl"`
+	Attachments    []Attachment `json:"attachments"`
+	Truncated      bool         `json:"truncated,omitempty"`
+	Warnings       []string     `json:"warnings,omitempty"`
 }
 
 type AttachmentContent struct {
@@ -134,7 +140,11 @@ type jiraIssueResponse struct {
 		Summary     string          `json:"summary"`
 		Description json.RawMessage `json:"description"`
 		Status      struct {
-			Name string `json:"name"`
+			Name           string `json:"name"`
+			StatusCategory struct {
+				Key  string `json:"key"`
+				Name string `json:"name"`
+			} `json:"statusCategory"`
 		} `json:"status"`
 		IssueType struct {
 			Name string `json:"name"`
@@ -191,6 +201,15 @@ func (c *Client) GetIssue(ctx context.Context, connection models.JiraConnection,
 		return Issue{}, fmt.Errorf("decode Jira issue: %w", err)
 	}
 	description, truncated := normalizeDescription(payload.Fields.Description)
+	if description == "" {
+		// Projects often keep the prose in a custom field ("User Story
+		// Description" and friends) and leave the standard one empty. Only pay
+		// for the wider lookup when the standard field gave us nothing.
+		if custom, customTruncated, err := c.customDescription(ctx, connection, version, key); err == nil && custom != "" {
+			description = custom
+			truncated = truncated || customTruncated
+		}
+	}
 	keyValue, clipped := boundedString(payload.Key, maxScalarBytes)
 	truncated = truncated || clipped
 	summary, clipped := boundedString(payload.Fields.Summary, maxScalarBytes)
@@ -207,7 +226,9 @@ func (c *Client) GetIssue(ctx context.Context, connection models.JiraConnection,
 	truncated = truncated || clipped
 	reporter, clipped := normalizePerson(payload.Fields.Reporter)
 	truncated = truncated || clipped
-	issue := Issue{Key: keyValue, Summary: summary, Status: status, Description: description, IssueType: issueType, Assignee: assignee, Reporter: reporter, Labels: boundedStrings(payload.Fields.Labels, maxLabels, maxScalarBytes, &truncated), CreatedAt: created, UpdatedAt: updated, BrowserURL: connection.BaseURL + "/browse/" + url.PathEscape(payload.Key), Attachments: []Attachment{}}
+	statusCategory, clipped := boundedString(payload.Fields.Status.StatusCategory.Key, maxScalarBytes)
+	truncated = truncated || clipped
+	issue := Issue{Key: keyValue, Summary: summary, Status: status, StatusCategory: statusCategory, Description: description, IssueType: issueType, Assignee: assignee, Reporter: reporter, Labels: boundedStrings(payload.Fields.Labels, maxLabels, maxScalarBytes, &truncated), CreatedAt: created, UpdatedAt: updated, BrowserURL: connection.BaseURL + "/browse/" + url.PathEscape(payload.Key), Attachments: []Attachment{}}
 	if payload.Fields.Priority != nil {
 		issue.Priority, clipped = boundedString(payload.Fields.Priority.Name, maxScalarBytes)
 		truncated = truncated || clipped
@@ -318,6 +339,299 @@ func boundedStrings(values []string, count, bytes int, truncated *bool) []string
 	return result
 }
 
+// customDescription looks for a description held in a custom field. Jira only
+// reports human-readable field names under expand=names, so the field is
+// matched by its display name rather than a hard-coded customfield id.
+func (c *Client) customDescription(ctx context.Context, connection models.JiraConnection, version, key string) (string, bool, error) {
+	endpoint := connection.BaseURL + "/rest/api/" + version + "/issue/" + url.PathEscape(key) + "?expand=names&fields=*all"
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", false, err
+	}
+	if err := c.authorize(request, connection); err != nil {
+		return "", false, err
+	}
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return "", false, err
+	}
+	if err := responseError(response, ErrNotFound); err != nil {
+		return "", false, err
+	}
+	var payload struct {
+		Names  map[string]string          `json:"names"`
+		Fields map[string]json.RawMessage `json:"fields"`
+	}
+	if err := decodeBounded(response, &payload); err != nil {
+		return "", false, err
+	}
+	ids := make([]string, 0, len(payload.Names))
+	for id, name := range payload.Names {
+		if id == "description" || !strings.Contains(strings.ToLower(name), "description") {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	// Stable order so the same ticket always resolves to the same field.
+	sort.Strings(ids)
+	for _, id := range ids {
+		if text, truncated := normalizeDescription(payload.Fields[id]); text != "" {
+			return text, truncated, nil
+		}
+	}
+	return "", false, nil
+}
+
+// adfNodeText returns the readable text an ADF leaf node contributes, if any.
+func adfNodeText(node map[string]any) (string, bool) {
+	attrString := func(names ...string) (string, bool) {
+		attrs, ok := node["attrs"].(map[string]any)
+		if !ok {
+			return "", false
+		}
+		for _, name := range names {
+			if value, ok := attrs[name].(string); ok && value != "" {
+				return value, true
+			}
+		}
+		return "", false
+	}
+	switch node["type"] {
+	case "text":
+		value, ok := node["text"].(string)
+		return value, ok
+	case "hardBreak":
+		return "\n", true
+	case "mention":
+		return attrString("text", "displayName")
+	case "emoji":
+		return attrString("shortName", "text")
+	case "inlineCard", "blockCard", "embedCard":
+		return attrString("url")
+	}
+	return "", false
+}
+
+// adfBudget accumulates converted Markdown while enforcing the description
+// byte ceiling, clipping on rune boundaries so output stays valid UTF-8.
+type adfBudget struct {
+	used      int
+	truncated bool
+}
+
+func (b *adfBudget) take(text string) string {
+	if text == "" {
+		return ""
+	}
+	remaining := maxDescriptionBytes - b.used
+	if remaining <= 0 {
+		b.truncated = true
+		return ""
+	}
+	part, clipped := boundedString(text, remaining)
+	b.used += len(part)
+	if clipped {
+		b.truncated = true
+	}
+	return part
+}
+
+// adfInline converts a run of inline nodes, applying the marks Jira records
+// alongside each text node.
+func adfInline(nodes []any, depth int, budget *adfBudget) string {
+	var out strings.Builder
+	for _, raw := range nodes {
+		node, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if depth > maxADFDepth {
+			budget.truncated = true
+			continue
+		}
+		if content, ok := node["content"].([]any); ok && node["type"] != "text" {
+			out.WriteString(adfInline(content, depth+1, budget))
+			continue
+		}
+		text, ok := adfNodeText(node)
+		if !ok {
+			continue
+		}
+		out.WriteString(adfApplyMarks(budget.take(text), node))
+	}
+	return out.String()
+}
+
+func adfApplyMarks(text string, node map[string]any) string {
+	marks, ok := node["marks"].([]any)
+	if !ok || text == "" || strings.TrimSpace(text) == "" {
+		return text
+	}
+	for _, raw := range marks {
+		mark, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch mark["type"] {
+		case "strong":
+			text = "**" + text + "**"
+		case "em":
+			text = "_" + text + "_"
+		case "code":
+			text = "`" + text + "`"
+		case "strike":
+			text = "~~" + text + "~~"
+		case "link":
+			if attrs, ok := mark["attrs"].(map[string]any); ok {
+				if href, ok := attrs["href"].(string); ok && href != "" {
+					text = "[" + text + "](" + href + ")"
+				}
+			}
+		}
+	}
+	return text
+}
+
+// adfBlocks converts block-level nodes into Markdown blocks. Keeping blocks
+// separate is what preserves headings and lists: the previous flat walk ran
+// every text node together, gluing a heading onto the paragraph before it.
+func adfBlocks(nodes []any, depth int, budget *adfBudget) []string {
+	var blocks []string
+	for _, raw := range nodes {
+		node, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		blocks = append(blocks, adfBlock(node, depth, budget)...)
+	}
+	return blocks
+}
+
+func adfBlock(node map[string]any, depth int, budget *adfBudget) []string {
+	if depth > maxADFDepth {
+		budget.truncated = true
+		return nil
+	}
+	content, _ := node["content"].([]any)
+	switch node["type"] {
+	case "doc":
+		return adfBlocks(content, depth+1, budget)
+	case "paragraph":
+		if text := strings.TrimRight(adfInline(content, depth+1, budget), " \t"); text != "" {
+			return []string{text}
+		}
+	case "heading":
+		level := 3
+		if attrs, ok := node["attrs"].(map[string]any); ok {
+			if raw, ok := attrs["level"].(float64); ok && raw >= 1 && raw <= 6 {
+				level = int(raw)
+			}
+		}
+		if text := adfInline(content, depth+1, budget); text != "" {
+			return []string{strings.Repeat("#", level) + " " + text}
+		}
+	case "bulletList", "orderedList":
+		ordered := node["type"] == "orderedList"
+		var lines []string
+		for index, raw := range content {
+			item, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			itemContent, _ := item["content"].([]any)
+			marker := "- "
+			if ordered {
+				marker = strconv.Itoa(index+1) + ". "
+			}
+			inner := adfBlocks(itemContent, depth+1, budget)
+			for innerIndex, line := range inner {
+				if innerIndex == 0 {
+					lines = append(lines, marker+line)
+					continue
+				}
+				lines = append(lines, adfIndent(line, strings.Repeat(" ", len(marker))))
+			}
+		}
+		if len(lines) > 0 {
+			return []string{strings.Join(lines, "\n")}
+		}
+	case "codeBlock":
+		language := ""
+		if attrs, ok := node["attrs"].(map[string]any); ok {
+			if value, ok := attrs["language"].(string); ok {
+				language = value
+			}
+		}
+		if text := adfInline(content, depth+1, budget); text != "" {
+			return []string{"```" + language + "\n" + text + "\n```"}
+		}
+	case "blockquote":
+		inner := adfBlocks(content, depth+1, budget)
+		if len(inner) > 0 {
+			return []string{adfIndent(strings.Join(inner, "\n\n"), "> ")}
+		}
+	case "rule":
+		return []string{"---"}
+	case "table":
+		if rows := adfTable(content, depth+1, budget); rows != "" {
+			return []string{rows}
+		}
+	case "mediaSingle", "mediaGroup", "media":
+		return nil
+	default:
+		if len(content) > 0 {
+			return adfBlocks(content, depth+1, budget)
+		}
+		if text := strings.TrimSpace(adfInline([]any{node}, depth+1, budget)); text != "" {
+			return []string{text}
+		}
+	}
+	return nil
+}
+
+func adfIndent(text, prefix string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		lines[i] = prefix + line
+	}
+	return strings.Join(lines, "\n")
+}
+
+func adfTable(rows []any, depth int, budget *adfBudget) string {
+	var lines []string
+	for rowIndex, raw := range rows {
+		row, ok := raw.(map[string]any)
+		if !ok || row["type"] != "tableRow" {
+			continue
+		}
+		cells, _ := row["content"].([]any)
+		var values []string
+		for _, rawCell := range cells {
+			cell, ok := rawCell.(map[string]any)
+			if !ok {
+				continue
+			}
+			cellContent, _ := cell["content"].([]any)
+			text := strings.Join(adfBlocks(cellContent, depth+1, budget), " ")
+			values = append(values, strings.ReplaceAll(strings.TrimSpace(text), "|", "\\|"))
+		}
+		if len(values) == 0 {
+			continue
+		}
+		lines = append(lines, "| "+strings.Join(values, " | ")+" |")
+		if rowIndex == 0 {
+			separator := make([]string, len(values))
+			for i := range separator {
+				separator[i] = "---"
+			}
+			lines = append(lines, "| "+strings.Join(separator, " | ")+" |")
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// normalizeDescription converts a Jira description into Markdown. Cloud sends
+// ADF; Server sends plain text, which is passed through unchanged.
 func normalizeDescription(raw json.RawMessage) (string, bool) {
 	if len(raw) == 0 || string(raw) == "null" {
 		return "", false
@@ -330,58 +644,15 @@ func normalizeDescription(raw json.RawMessage) (string, bool) {
 	if json.Unmarshal(raw, &value) != nil {
 		return "", false
 	}
-	parts := make([]string, 0, 32)
-	used, truncated := 0, false
-	type entry struct {
-		node  any
-		depth int
+	budget := &adfBudget{}
+	var blocks []string
+	switch root := value.(type) {
+	case map[string]any:
+		blocks = adfBlock(root, 0, budget)
+	case []any:
+		blocks = adfBlocks(root, 0, budget)
 	}
-	stack := []entry{{node: value}}
-	for len(stack) > 0 {
-		currentEntry := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		if currentEntry.depth > maxADFDepth {
-			truncated = true
-			continue
-		}
-		node := currentEntry.node
-		switch current := node.(type) {
-		case map[string]any:
-			if current["type"] == "text" {
-				if value, ok := current["text"].(string); ok {
-					remaining := maxDescriptionBytes - used
-					if remaining <= 0 {
-						truncated = true
-						continue
-					}
-					part, clipped := boundedString(value, remaining)
-					parts = append(parts, part)
-					used += len(part)
-					if clipped {
-						truncated = true
-					}
-				}
-			}
-			if content, ok := current["content"].([]any); ok {
-				for i := len(content) - 1; i >= 0; i-- {
-					stack = append(stack, entry{node: content[i], depth: currentEntry.depth + 1})
-				}
-				if current["type"] == "paragraph" {
-					if used < maxDescriptionBytes {
-						parts = append(parts, "\n")
-						used++
-					} else {
-						truncated = true
-					}
-				}
-			}
-		case []any:
-			for i := len(current) - 1; i >= 0; i-- {
-				stack = append(stack, entry{node: current[i], depth: currentEntry.depth + 1})
-			}
-		}
-	}
-	return strings.TrimSpace(strings.Join(parts, "")), truncated
+	return strings.TrimSpace(strings.Join(blocks, "\n\n")), budget.truncated
 }
 
 func New() *Client {

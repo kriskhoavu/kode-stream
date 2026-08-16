@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, ExternalLink, FileDown, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../shared/api';
+import { MarkdownPreview } from '../content-viewer/renderers/MarkdownPreview';
 import { useJiraIssue } from './useJiraIssue';
 
 export function JiraItemPanel({ itemId }: { itemId: string }) {
@@ -12,13 +13,21 @@ export function JiraItemPanel({ itemId }: { itemId: string }) {
   if (jira.result.state !== 'available' || !jira.result.issue) return <div className="jira-panel-state"><strong>{stateTitle(jira.result.state)}</strong><span>{jira.result.message}</span>{jira.result.recoveryHint && <small>{jira.result.recoveryHint}</small>}<button className="secondary" type="button" disabled={jira.refreshing} onClick={() => void jira.refresh()}><RefreshCw size={14} /> Refresh</button></div>;
   const issue = jira.result.issue;
   return <div className="jira-item-panel">
-    <div className="jira-panel-heading"><span className="status-badge">{issue.status}</span><button className="icon-button" type="button" aria-label="Refresh Jira ticket" disabled={jira.refreshing} onClick={() => void jira.refresh()}><RefreshCw size={14} /></button></div>
-    <a href={issue.browserUrl} target="_blank" rel="noreferrer"><strong>{issue.key}</strong> <ExternalLink size={13} /></a>
+    <div className="jira-panel-heading"><a href={issue.browserUrl} target="_blank" rel="noreferrer"><strong>{issue.key}</strong> <ExternalLink size={13} /></a><button className="icon-button" type="button" aria-label="Refresh Jira ticket" disabled={jira.refreshing} onClick={() => void jira.refresh()}><RefreshCw size={14} /></button></div>
     <h3>{issue.summary}</h3>
     {issue.truncated && <p className="jira-panel-state" role="status">{issue.warnings?.[0] ?? 'Jira issue content was truncated to safe limits.'}</p>}
-    <dl><dt>Type</dt><dd>{issue.issueType || '—'}</dd><dt>Priority</dt><dd>{issue.priority || '—'}</dd><dt>Assignee</dt><dd>{issue.assignee?.displayName || 'Unassigned'}</dd><dt>Reporter</dt><dd>{issue.reporter?.displayName || '—'}</dd><dt>Updated</dt><dd>{formatDate(issue.updatedAt)}</dd></dl>
+    <dl>
+      <dt>Status</dt><dd><span className={`jira-status-badge ${statusTone(issue.statusCategory)}`}>{issue.status || '—'}</span></dd>
+      <dt>Type</dt><dd>{issue.issueType || '—'}</dd>
+      <dt>Priority</dt><dd>{issue.priority || '—'}</dd>
+      <dt>Assignee</dt><dd>{issue.assignee?.displayName || 'Unassigned'}</dd>
+      <dt>Reporter</dt><dd>{issue.reporter?.displayName || '—'}</dd>
+      <dt>Updated</dt><dd>{formatDate(issue.updatedAt)}</dd>
+    </dl>
     {issue.labels.length > 0 && <div className="jira-labels">{issue.labels.map((label) => <span key={label}>{label}</span>)}</div>}
-    <section><h4>Description</h4><p className="jira-description">{issue.description || 'No description.'}</p></section>
+    <section><h4>Description</h4>{issue.description
+      ? <div className="jira-description"><MarkdownPreview content={issue.description} /></div>
+      : <p className="jira-description empty">No description.</p>}</section>
     <section className="jira-attachment-section">
       <button className="jira-attachment-toggle" type="button" aria-expanded={attachmentsOpen} onClick={() => setAttachmentsOpen((open) => !open)}>
         {attachmentsOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
@@ -38,6 +47,16 @@ export function JiraItemPanel({ itemId }: { itemId: string }) {
   </div>;
 }
 
+// Workflow status names are project-specific ("Test Done", "QA", "Ready"), so
+// the colour comes from Jira's own status category instead of the name.
+function statusTone(category?: string) {
+  switch (category) {
+    case 'done': return 'done';
+    case 'indeterminate': return 'in-progress';
+    case 'new': return 'todo';
+    default: return 'unknown';
+  }
+}
 function stateTitle(state: string) { return ({ not_configured:'Jira not configured', invalid_identifier:'Not a Jira ticket', project_mismatch:'Different Jira project', not_found:'No Jira ticket', authentication_failed:'Jira authentication failed', forbidden:'Jira access forbidden', unavailable:'Jira unavailable' } as Record<string,string>)[state] ?? 'Jira unavailable'; }
 function formatDate(value?: string) { if (!value) return '—'; const date=new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString(); }
 function formatBytes(value: number) { if (value < 1024) return `${value} B`; if (value < 1024*1024) return `${(value/1024).toFixed(1)} KB`; return `${(value/(1024*1024)).toFixed(1)} MB`; }

@@ -184,6 +184,78 @@ func TestCanvasServiceReturnsForbiddenReferencesWithoutEntityDetails(t *testing.
 	}
 }
 
+// Item IDs migrated to the versioned stablePlanID scheme without migrating the
+// canvas placements that referenced them, so every pre-migration placement was
+// orphaned: it projected as stale while the same plan was reported unplaced and
+// then auto-placed again, leaving two nodes for one path.
+func TestCanvasServiceRebindsPlacementsAfterItemIDMigration(t *testing.T) {
+	repository, reg, items, git, workspaceConfig, initialItems, _ := canvasServiceFixture(t)
+	service := NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
+	projection, err := service.ResolveDefault("", workspaceConfig.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	placedPosition := findProjectedNode(t, projection, planNodeID(initialItems[0].ID)).Position
+
+	// Re-index the same paths under new IDs, exactly as the scheme change did.
+	migrated := make([]models.ItemDetail, 0, len(initialItems))
+	for _, item := range initialItems {
+		item.ID = "v2-" + item.ID
+		migrated = append(migrated, item)
+	}
+	if err := items.ReplaceWorkspace(workspaceConfig.ID, migrated, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	projection, err = service.Project("", projection.Layout.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(projection.Unplaced) != 0 {
+		t.Fatalf("migrated items reported unplaced, which auto-places a duplicate: %#v", projection.Unplaced)
+	}
+	byPath := map[string]int{}
+	for _, node := range projection.Nodes {
+		if node.Kind != EntityPlan {
+			continue
+		}
+		if node.State != NodeResolved || node.Plan == nil {
+			t.Fatalf("plan placement did not rebind to the migrated item: %#v", node)
+		}
+		byPath[node.EntityRef.ItemPath]++
+	}
+	for path, count := range byPath {
+		if count != 1 {
+			t.Fatalf("path %s projected %d nodes, want 1", path, count)
+		}
+	}
+	if got := findProjectedNode(t, projection, planNodeID(initialItems[0].ID)).Position; got != placedPosition {
+		t.Fatalf("rebind moved the placement: got %#v want %#v", got, placedPosition)
+	}
+}
+
+// A placement whose path no longer exists at all is genuinely orphaned and must
+// still surface as stale so it can be recovered or removed deliberately.
+func TestCanvasServiceKeepsDeletedPlanPlacementsStale(t *testing.T) {
+	repository, reg, items, git, workspaceConfig, initialItems, _ := canvasServiceFixture(t)
+	service := NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
+	projection, err := service.ResolveDefault("", workspaceConfig.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := items.ReplaceWorkspace(workspaceConfig.ID, []models.ItemDetail{initialItems[0]}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	projection, err = service.Project("", projection.Layout.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale := findProjectedNode(t, projection, planNodeID(initialItems[1].ID))
+	if stale.State != NodeStale || stale.Plan != nil {
+		t.Fatalf("deleted plan placement=%#v", stale)
+	}
+}
+
 func canvasServiceFixture(t *testing.T) (*FileRepository, *registry.Registry, *itemindex.Index, *gitadapter.GitAdapter, models.WorkspaceConfig, []models.ItemDetail, ai.SessionRecordView) {
 	t.Helper()
 	root := t.TempDir()
