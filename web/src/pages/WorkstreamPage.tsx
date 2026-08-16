@@ -34,6 +34,7 @@ import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../f
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
+import { MarkdownPreview } from '../features/content-viewer/renderers/MarkdownPreview';
 import { lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -452,12 +453,15 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       if (result.state === 'available' && result.issue) {
         const issue = result.issue;
         const nextTags = jiraTags(issue).join(', ');
+        // Fetching is an explicit request for this ticket's values, so they
+        // replace whatever a previous fetch imported. Keeping the old values
+        // left the details panel describing a different ticket than the preview.
         setNewPlanDraft((draft) => ({
           ...draft,
-          identifier: draft.identifier.trim() || issue.key,
-          title: draft.title.trim() || issue.summary,
-          owner: draft.owner.trim() || issue.assignee?.displayName || '',
-          tags: draft.tags.trim() || nextTags
+          identifier: issue.key,
+          title: issue.summary,
+          owner: issue.assignee?.displayName || '',
+          tags: nextTags
         }));
       }
 		} catch (err) {
@@ -923,13 +927,18 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                               <strong>{jiraLookup.issue.key}: {jiraLookup.issue.summary}</strong>
                               {jiraLookup.issue.browserUrl && <a href={jiraLookup.issue.browserUrl} target="_blank" rel="noreferrer">Open Jira</a>}
                             </header>
+                            <div className="jira-issue-preview-body">
+                              <strong className="jira-issue-preview-label">Description</strong>
+                              {jiraLookup.issue.description
+                                ? <div className="jira-issue-preview-description"><MarkdownPreview content={jiraLookup.issue.description} /></div>
+                                : <p className="jira-issue-preview-description empty">This Jira ticket has no description.</p>}
+                            </div>
                             <dl className="jira-issue-preview-meta">
                               <div><dt>Type</dt><dd>{jiraLookup.issue.issueType || 'Issue'}</dd></div>
                               <div><dt>Status</dt><dd>{jiraLookup.issue.status || 'Unknown'}</dd></div>
                               <div><dt>Assignee</dt><dd>{jiraLookup.issue.assignee?.displayName || 'Unassigned'}</dd></div>
                               {jiraLookup.issue.priority && <div><dt>Priority</dt><dd>{jiraLookup.issue.priority}</dd></div>}
                             </dl>
-                            {jiraLookup.issue.description && <p className="jira-issue-preview-description">{jiraLookup.issue.description}</p>}
                             {jiraLookup.issue.attachments.length > 0 && <small>{jiraLookup.issue.attachments.length} attachment{jiraLookup.issue.attachments.length === 1 ? '' : 's'} referenced</small>}
                           </>
                         ) : (

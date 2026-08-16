@@ -59,6 +59,38 @@
   display: grid;
   grid-template-columns: minmax(70px, auto) 1fr;
   gap: 6px 10px;
+  align-items: center;
+}
+
+/* Jira status colours follow Jira's own status category, so an unrecognised
+   workflow name still lands on a sensible neutral tone. */
+.jira-status-badge {
+  min-height: 22px;
+  border-radius: 999px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--panel-soft);
+  color: var(--muted);
+}
+
+.jira-status-badge.todo,
+.jira-status-badge.unknown {
+  background: color-mix(in srgb, #64748b 14%, var(--panel));
+  color: #475569;
+}
+
+.jira-status-badge.in-progress {
+  background: color-mix(in srgb, var(--blue) 14%, var(--panel));
+  color: var(--blue);
+}
+
+.jira-status-badge.done {
+  background: color-mix(in srgb, var(--green) 16%, var(--panel));
+  color: color-mix(in srgb, var(--green) 78%, var(--text));
 }
 
 .jira-labels {
@@ -76,7 +108,57 @@
 
 .jira-description {
   margin-top: 6px !important;
-  white-space: pre-wrap;
+}
+
+.jira-description.empty {
+  font-style: italic;
+  opacity: 0.75;
+}
+
+/* Rendered Markdown, scaled to the narrow right-hand panel. */
+.jira-description .content-viewer-markdown {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.jira-description .content-viewer-markdown > :first-child {
+  margin-top: 0;
+}
+
+.jira-description .content-viewer-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.jira-description .content-viewer-markdown h1,
+.jira-description .content-viewer-markdown h2,
+.jira-description .content-viewer-markdown h3,
+.jira-description .content-viewer-markdown h4 {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.jira-description .content-viewer-markdown p {
+  margin: 0 0 8px;
+}
+
+.jira-description .content-viewer-markdown ul,
+.jira-description .content-viewer-markdown ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.jira-description .content-viewer-markdown li {
+  margin: 0 0 3px;
+}
+
+/* Long Confluence/Jira URLs must not force the panel to scroll sideways. */
+.jira-description .content-viewer-markdown a {
+  overflow-wrap: anywhere;
+}
+
+.jira-description .content-viewer-markdown pre {
+  overflow-x: auto;
 }
 
 .jira-attachments {
@@ -7046,7 +7128,8 @@ body.is-resizing-panel {
 }
 
 .jira-issue-preview {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   min-height: 320px;
   padding: 16px;
@@ -7127,13 +7210,74 @@ body.is-resizing-panel {
   overflow-wrap: anywhere;
 }
 
+/* Takes the slack in the panel so the meta tiles sit at the bottom instead of
+   leaving a blank band under the summary. */
+.jira-issue-preview-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.jira-issue-preview-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text) 62%, transparent);
+}
+
 .jira-issue-preview-description {
-  max-height: 240px;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 0 4px;
   color: var(--muted);
-  line-height: 1.35;
+  line-height: 1.45;
   overflow: auto;
-  white-space: pre-wrap;
+}
+
+/* The description is rendered Markdown, so it carries the shared viewer
+   styles. Scale them down to fit inside the dialog. */
+.jira-issue-preview-description .content-viewer-markdown {
+  font-size: 13px;
+}
+
+.jira-issue-preview-description .content-viewer-markdown > :first-child {
+  margin-top: 0;
+}
+
+.jira-issue-preview-description .content-viewer-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.jira-issue-preview-description .content-viewer-markdown h1,
+.jira-issue-preview-description .content-viewer-markdown h2,
+.jira-issue-preview-description .content-viewer-markdown h3,
+.jira-issue-preview-description .content-viewer-markdown h4 {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.jira-issue-preview-description .content-viewer-markdown p {
+  margin: 0 0 8px;
+}
+
+.jira-issue-preview-description .content-viewer-markdown ul,
+.jira-issue-preview-description .content-viewer-markdown ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.jira-issue-preview-description .content-viewer-markdown li {
+  margin: 0 0 3px;
+}
+
+.jira-issue-preview-description.empty {
+  font-style: italic;
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
 }
 
 .workspace-actions {
