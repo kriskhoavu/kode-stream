@@ -178,6 +178,20 @@ func (s *Scanner) scanItemDirectory(request ScanRequest, reader SourceReader, br
 			warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(filepath.Join(source, scopeEntry.Name())), Message: err.Error()})
 			continue
 		}
+		// The writer allows creating an item directly under the source root
+		// (scope == source, see writer.isSourceRootScope). Such a directory is an
+		// item, not a scope, so recognise it before falling through to the
+		// scope/identifier walk.
+		if isSourceRootItem(reader, scopeRoot, scopeEntry.Name(), tickets) {
+			detail, itemWarnings, err := s.parseItem(request, reader, branch, filepath.Base(source), scopeEntry.Name(), scopeRoot, scopeRoot)
+			if err != nil {
+				warnings = append(warnings, models.ScanWarning{ItemPath: scopeRoot, Message: err.Error()})
+				continue
+			}
+			warnings = append(warnings, itemWarnings...)
+			items = append(items, detail)
+			continue
+		}
 		for _, identifierEntry := range tickets {
 			if !identifierEntry.IsDir() || strings.HasPrefix(identifierEntry.Name(), ".") {
 				continue
@@ -268,6 +282,17 @@ func hasStructuredItemChildren(reader SourceReader, root string, entries []DirEn
 		}
 	}
 	return false
+}
+
+// isSourceRootItem reports whether a directory sitting directly under a source
+// root is an item rather than a scope. It is an item when it looks like one and
+// holds no item directories of its own, so real scopes such as plans/api keep
+// being walked as scopes.
+func isSourceRootItem(reader SourceReader, path, name string, entries []DirEntry) bool {
+	if !isItemFolder(reader, path, name) {
+		return false
+	}
+	return !hasStructuredItemChildren(reader, path, entries)
 }
 
 func isItemFolder(reader SourceReader, path, name string) bool {

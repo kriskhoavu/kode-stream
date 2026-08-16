@@ -2401,12 +2401,33 @@ h1 {
   color: #b91c1c;
 }
 
+/*
+ * Two tracks: search, and one actions group holding Refresh, New Work Item
+ * and scan-state. Grouping them keeps the row's right edge exactly at the
+ * container edge regardless of whether scan-state has text, matching Save
+ * view on the row below (also flush right). A stale unused fifth track used
+ * to eat ~100px here before scan-state was folded into this group, pushing
+ * New Work Item out of alignment with Save view.
+ */
 .board-toolbar {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) auto auto auto minmax(80px, auto);
+  grid-template-columns: minmax(240px, 1fr) auto;
   gap: 10px;
   margin-bottom: 12px;
   align-items: center;
+}
+
+.board-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Without this, an empty scan-state still consumes a flex gap, leaving New
+ * Work Item 10px short of the group's (and Save view's) right edge whenever
+ * there is no scan message to show. */
+.board-toolbar-actions .scan-state:empty {
+  display: none;
 }
 
 .board-toolbar .plan-search {
@@ -3299,6 +3320,23 @@ select:disabled {
   pointer-events: none;
 }
 
+.plan-card.just-created {
+  border-color: color-mix(in srgb, var(--button-accent) 62%, var(--line));
+  animation: plan-card-just-created 2.6s ease-out forwards;
+}
+
+@keyframes plan-card-just-created {
+  0% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--button-accent) 42%, transparent), 0 10px 22px rgba(17, 24, 39, 0.09);
+  }
+  70% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--button-accent) 28%, transparent), 0 10px 22px rgba(17, 24, 39, 0.09);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent, 0 8px 18px rgba(17, 24, 39, 0.06);
+  }
+}
+
 .drag-overlay-card {
   width: min(280px, calc(100vw - 32px));
   cursor: grabbing;
@@ -3326,6 +3364,10 @@ select:disabled {
   .drag-overlay-card,
   .drag-overlay-card:hover {
     transform: none;
+  }
+
+  .plan-card.just-created {
+    animation: none;
   }
 }
 
@@ -7710,7 +7752,7 @@ body.is-resizing-panel {
   }
 
   .board-toolbar {
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto;
   }
 
   .facet-trigger {

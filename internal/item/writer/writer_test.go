@@ -146,6 +146,9 @@ func TestCreateItemRejectsDuplicate(t *testing.T) {
 	if err := os.MkdirAll(existing, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(existing, "README.md"), []byte("# PM-002\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	writer := New(fileaccess.New(), nil, nil, nil)
 	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
@@ -495,5 +498,28 @@ func initGitRepo(t *testing.T, root string) {
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git init failed: %v\n%s", err, out)
+	}
+}
+
+func TestCreateItemReusesEmptyLeftoverDirectory(t *testing.T) {
+	root := t.TempDir()
+	// A manual deletion of the item's contents can leave the directory behind.
+	leftover := filepath.Join(root, "items", "platform", "PM-002")
+	if err := os.MkdirAll(leftover, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	writer := New(fileaccess.New(), nil, nil, nil)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	if _, err := writer.CreateItem(workspace, models.NewItemInput{
+		Source:     "items",
+		Scope:      "platform",
+		Identifier: "PM-002",
+		Title:      "Item Editing",
+	}); err != nil {
+		t.Fatalf("expected creation into empty leftover directory to succeed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(leftover, "README.md")); err != nil {
+		t.Fatalf("README.md not written: %v", err)
 	}
 }

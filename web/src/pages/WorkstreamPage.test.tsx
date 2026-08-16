@@ -97,7 +97,11 @@ describe('WorkstreamPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create Item' }));
 
-    await waitFor(() => expect(onOpenPlan).toHaveBeenCalledWith('created'));
+    // The new item lands on the board, highlighted; it does not navigate away.
+    await waitFor(() => expect(screen.queryByLabelText('Item name')).not.toBeInTheDocument());
+    const card = await screen.findByText('Jira First Workspace');
+    expect(card.closest('.plan-card')).toHaveClass('just-created');
+    expect(onOpenPlan).not.toHaveBeenCalled();
     const createCall = fetchMock.mock.calls.find(([url, init]) => String(url) === '/api/items' && init?.method === 'POST');
     const body = JSON.parse(String(createCall?.[1]?.body ?? '{}')) as Record<string, unknown>;
     expect(body).toMatchObject({ workspaceId: 'r1', source: 'items', scope: 'items', identifier: 'PM-025', title: 'Jira First Workspace', owner: 'Kim', jiraKey: 'PM-025' });
