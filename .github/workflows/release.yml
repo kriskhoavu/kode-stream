@@ -69,12 +69,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Install dependencies
-        run: |
-          npm ci --no-audit --no-fund || {
-            echo "===== npm debug log ====="
-            tail -n 150 /home/runner/.npm/_logs/*-debug-0.log || true
-            exit 1
-          }
+        run: npm ci --no-audit --no-fund
 
       - name: Frontend typecheck and test
         run: npm run typecheck && npm test -- --run
