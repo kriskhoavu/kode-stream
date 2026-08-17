@@ -81,6 +81,11 @@ type Manager struct {
 	closed        bool
 	observer      func(Session)
 	observerError func(Session) error
+	// running tracks the per-session reader and reaper goroutines so Close can
+	// wait for them. They notify observers, which persist session records, so
+	// returning from Close while they are still in flight lets writes land
+	// after the caller believes the manager has shut down.
+	running sync.WaitGroup
 }
 
 func NewTerminalManager(config Config) *Manager {
@@ -159,8 +164,9 @@ func (m *Manager) Start(request StartRequest) (Session, Grant, error) {
 	s.mu.Lock()
 	s.file, s.command, s.info.State = file, command, StateRunning
 	s.mu.Unlock()
-	go m.read(s)
-	go m.wait(s)
+	m.running.Add(2)
+	go func() { defer m.running.Done(); m.read(s) }()
+	go func() { defer m.running.Done(); m.wait(s) }()
 	running := s.snapshot()
 	if err := m.notifyStart(running); err != nil {
 		_, _ = m.stop(id, StateCancelled)
@@ -304,6 +310,7 @@ func (m *Manager) Close() error {
 	for _, id := range ids {
 		_, _ = m.stop(id, StateCancelled)
 	}
+	m.running.Wait()
 	return nil
 }
 
