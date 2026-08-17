@@ -15,37 +15,6 @@ import (
 	"kode-stream/internal/common/models"
 )
 
-func TestSwitchBranchWaitsForWorkspaceMutation(t *testing.T) {
-	root := newGitRepo(t)
-	writeGitFile(t, root, "README.md", "# Main\n")
-	gitCommit(t, root, "main")
-	gitRun(t, root, "branch", "feature")
-	adapter := New()
-
-	locked := make(chan struct{})
-	release := make(chan struct{})
-	go func() {
-		_ = adapter.WithWorkspaceMutation(root, func() error {
-			close(locked)
-			<-release
-			return nil
-		})
-	}()
-	<-locked
-
-	done := make(chan error, 1)
-	go func() { done <- adapter.SwitchBranch(root, "feature") }()
-	select {
-	case err := <-done:
-		t.Fatalf("switch completed while workspace mutation was locked: %v", err)
-	case <-time.After(50 * time.Millisecond):
-	}
-	close(release)
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestSwitchBranchSafelyCarriesOrStashesLocalChanges(t *testing.T) {
 	root := newGitRepo(t)
 	writeGitFile(t, root, "shared.md", "main\n")

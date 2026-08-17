@@ -39,6 +39,9 @@ func TestServiceMutationsWaitForSharedWorkspaceLock(t *testing.T) {
 		func() models.GitOperationResult {
 			return service.CreateBranchContext(context.Background(), "ws", models.BranchCreateInput{Name: "feature", Checkout: false})
 		},
+		func() models.GitOperationResult {
+			return service.SwitchBranchContext(context.Background(), "ws", models.BranchSwitchInput{Name: "feature", Strategy: "carry"})
+		},
 	} {
 		done := make(chan models.GitOperationResult, 1)
 		go func() { done <- run() }()

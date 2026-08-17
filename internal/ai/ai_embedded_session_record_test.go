@@ -176,9 +176,14 @@ func TestEmbeddedLaunchObserverFailureCancelsAndRetryWorksForItemAndWorkspace(t 
 	if err := os.WriteFile(executable, []byte("#!/bin/sh\nsleep 10\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	// t.Cleanup runs LIFO and t.TempDir registers its removal when called, so
+	// the record directory must be created before the manager cleanup is
+	// registered. Otherwise it is deleted while the launched processes are
+	// still running and still writing records into it.
+	recordsPath := filepath.Join(t.TempDir(), "records.yaml")
 	manager := NewTerminalManager(Config{})
 	t.Cleanup(func() { _ = manager.Close() })
-	base := NewFileSessionRecordRepository(filepath.Join(t.TempDir(), "records.yaml"))
+	base := NewFileSessionRecordRepository(recordsPath)
 	// reserve succeeds; running-state observer fails; terminal cancellation and
 	// failed-record compensation follow, then the same key can be retried.
 	records := &failNthRecordRepository{SessionRecordRepository: base, failRunningAt: 2}
