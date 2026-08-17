@@ -1,63 +1,174 @@
 # Homebrew Release Procedure
 
-Canonical runbook for packaging Kode Stream, publishing GitHub releases, and updating Homebrew tap metadata.
+Canonical runbook for publishing a Kode Stream release and updating the Homebrew tap.
+
+Last exercised end to end on **v2.0.0**. The troubleshooting section records failures that
+actually occurred, not hypothetical ones.
 
 ## Scope
 
-- Build and package cross-platform artifacts.
-- Publish or update a GitHub release tag.
-- Generate and use `SHA256SUMS`.
-- Update Homebrew formula with the release version and macOS checksums.
+- Publish a GitHub release via CI.
+- Point `kriskhoavu/homebrew-tap` at the new artifacts.
+- Verify the formula installs before anyone else gets it.
 
 ## Prerequisites
 
-- `git`, `gh`, `npm`, `go`, `python3`, `zip`, `tar`, `shasum`.
-- GitHub authentication for `kriskhoavu/kode-stream` and `kriskhoavu/homebrew-tap`.
-- Tap repo cloned as sibling directory: `../homebrew-tap`.
+- `git`, `gh`, `npm`, `go`, `python3`, `shasum`, `brew`.
+- GitHub auth for `kriskhoavu/kode-stream` and `kriskhoavu/homebrew-tap` (`gh auth status`).
+- Tap cloned locally, by default `../homebrew-tap`.
 
-## Primary Automation
+## Preflight
 
-Use the one-shot script from the `kode-stream` repository root:
+CI builds on Linux; local development is macOS. Everything below has broken a release before,
+so check it rather than assuming.
 
 ```bash
-../cmd/scripts/distribution/release_and_update_tap.sh 1.0.0 ../homebrew-tap
+go test ./...                 # must pass; see "macOS-only passes" in Troubleshooting
+npm ci && npm run typecheck && npm test -- --run && npm run build
+grep -c 'artifacts.mgm-tp.com' package-lock.json   # must be 0
+git ls-files --error-unmatch package-lock.json     # must be tracked
 ```
 
-What it does:
+`package-lock.json` must be **committed** and must resolve from `registry.npmjs.org`. The
+workflow uses `actions/setup-node` with `cache: npm` and installs with `npm ci`; both require
+the lockfile, and a lockfile resolved against an internal mirror cannot be fetched from a
+GitHub runner.
 
-1. Builds frontend and cross-platform binaries.
-2. Packages release artifacts into `release/<version>/`.
-3. Generates `SHA256SUMS`.
-4. Creates/pushes `v<version>` tag if needed.
-5. Creates or updates GitHub release assets.
-6. Downloads `SHA256SUMS` from the release.
-7. Updates `../homebrew-tap/Formula/kode-stream.rb` checksums.
-8. Commits and pushes the tap formula update.
-
-## Homebrew-only Helper
-
-If release assets already exist and you only need to update the tap formula:
+If your `~/.npmrc` points at a private registry, regenerate the lockfile in a clean directory
+so those URLs never enter it:
 
 ```bash
-../cmd/scripts/distribution/update_homebrew_formula_from_release.sh 1.0.0 ../homebrew-tap
+mkdir /tmp/lockgen && cp package.json /tmp/lockgen/ && cd /tmp/lockgen
+NPM_CONFIG_USERCONFIG=/dev/null npm install --package-lock-only \
+  --registry=https://registry.npmjs.org/ --no-audit --no-fund
+cp package-lock.json "$OLDPWD/" && cd "$OLDPWD"
 ```
 
-This script:
+Regenerating in place fails: npm reconciles against the existing `node_modules` and aborts
+with `Cannot read properties of null (reading 'edgesOut')`.
 
-- pulls `SHA256SUMS` from `v<version>` release,
-- updates formula `version`, `darwin_arm64` and `darwin_amd64` `sha256` values,
-- commits and pushes the tap update.
+## 1) Publish the release (CI)
 
-## Validation
+Tagging is the whole trigger. `.github/workflows/release.yml` runs `verify`, builds
+darwin arm64/amd64, linux amd64 and windows amd64, generates `SHA256SUMS`, and publishes.
 
 ```bash
-brew update
-brew tap kriskhoavu/homebrew-tap
-brew install kode-stream
+git tag -a v<version> -m "kode-stream v<version>"
+git push origin v<version>
+gh run watch "$(gh run list --workflow=release.yml --limit 1 --json databaseId -q '.[0].databaseId')" \
+  -R kriskhoavu/kode-stream --interval 30
+```
+
+To retry after a fix, move the tag — CI only triggers on the tag push:
+
+```bash
+git push origin :refs/tags/v<version> && git tag -d v<version>
+# re-tag and push again
+```
+
+Iterate on workflow changes without burning tags using `gh workflow run release.yml --ref main`;
+the `verify` and `build` jobs run, `publish` stays tag-gated.
+
+Signing is opt-in. `sign-macos` and `sign-windows` are skipped unless the `MACOS_CERT_*` /
+`WINDOWS_CERT_*` secrets exist — currently they do not, so **published binaries are unsigned**.
+macOS users get a Gatekeeper prompt on first run.
+
+## 2) Verify the release before touching the tap
+
+Never trust the published `SHA256SUMS` blindly — recompute it:
+
+```bash
+mkdir /tmp/rel && cd /tmp/rel
+gh release download v<version> -R kriskhoavu/kode-stream
+shasum -a 256 kode-stream_<version>_* | diff - <(grep kode-stream SHA256SUMS) && echo MATCH
+tar -xzf kode-stream_<version>_darwin_arm64.tar.gz && ./kode-stream   # prints Usage, exits 2
+```
+
+## 3) Update the tap
+
+```bash
+cmd/scripts/distribution/update_homebrew_formula_from_release.sh <version> ../homebrew-tap
+```
+
+Downloads `SHA256SUMS` from the release, rewrites the formula via `update_formula.py`, commits
+and pushes. The updater rewrites the version **inside every release URL** and replaces all three
+platform checksums together, and exits non-zero if any asset is missing from `SHA256SUMS`, if the
+formula is unchanged, or if any URL is left on a different version. See "silent checksum
+mismatch" in Troubleshooting for why that strictness exists.
+
+## 4) Validate the published formula
+
+Do this before telling anyone the release is out. `brew` caches taps, so refresh first.
+
+```bash
+brew untap kriskhoavu/tap 2>/dev/null
+brew install kriskhoavu/tap/kode-stream
+brew test kriskhoavu/tap/kode-stream
+brew audit --strict --formula kriskhoavu/tap/kode-stream
 kode-stream doctor
-kode-stream agent doctor --cloud-url https://kode-stream.example.com --repo /path/to/repo
-brew test kode-stream
 ```
+
+`brew audit --strict` must exit 0. Two rules the formula is shaped around:
+
+- **no `version` line** — audit rejects it as redundant with the version scanned from the URL,
+  which is why URLs carry the version literally instead of interpolating `#{version}`.
+- **`desc` under 80 characters**, not starting with the formula name.
+
+## Fallback: release without CI
+
+`cmd/scripts/distribution/release_and_update_tap.sh <version> ../homebrew-tap` builds every
+target locally and uploads them.
+
+Use it only when Actions is unavailable. Pushing the tag triggers the workflow, which publishes
+the same asset names, while the script uploads its own build with `--clobber`. Running both
+against one tag is a race: the tap can end up carrying checksums from the build that lost. Let
+the workflow finish, or cancel it, before the script uploads.
+
+## Troubleshooting
+
+**`Dependencies lock file is not found`** — `package-lock.json` is not committed. `setup-node`
+fails before any build step. Commit it; do not switch the workflow to `npm install`.
+
+**`npm error Exit handler never called!`** — npm's generic crash, almost never an npm bug here.
+Read the debug log it points at; the real error is inside. On v2.0.0 it was hundreds of
+`ENOTFOUND artifacts.mgm-tp.com` from a lockfile resolved against the internal mirror. Surface it
+with:
+
+```yaml
+run: |
+  npm ci --no-audit --no-fund || { tail -n 150 /home/runner/.npm/_logs/*-debug-0.log; exit 1; }
+```
+
+Worse, on Node 20 the crash did **not** fail the step: the build continued against a
+half-installed tree and failed later with `Cannot find module 'react'`. CI is pinned to Node 22.
+
+**Tests that only pass on macOS** — timing-sensitive tests can pass locally and fail on the
+faster Linux runner. Two were fixed for v2.0.0:
+
+- an adapter-level test asserted a lock the adapter never takes (the *service* layer holds it);
+  it passed on macOS only because `git switch` there outran the 50 ms window.
+- `Manager.Close()` signalled processes without waiting for the goroutines it spawned, so session
+  records were still being written while `t.TempDir()` cleanup ran.
+
+Reproduce with `go test ./... -count=3 -race` before blaming the runner, and prefer asserting at
+the layer that owns the guarantee.
+
+**Silent checksum mismatch in the tap** — the old updater matched a `version "x.y.z"` line. When
+that line was removed for `brew audit --strict`, it silently updated the checksums and left the
+URLs on the previous release: a valid-looking formula where every install fails its checksum
+check. `update_formula.py` now fails loudly instead. Always run step 4.
+
+**`No available formula ... Did you mean kriskhoavu/tap/plan-manager?`** — a stale tap clone.
+`brew untap kriskhoavu/tap` then reinstall, or
+`git -C "$(brew --repository)/Library/Taps/kriskhoavu/homebrew-tap" fetch origin && git reset --hard origin/main`.
+
+**`Homebrew requires formulae to be in a tap`** — you cannot `brew install` a formula by path.
+Tap a local checkout to test before publishing:
+`brew tap kriskhoavu/localtest /path/to/homebrew-tap`. `brew tap` clones at the current commit,
+so commit first and re-tap after amending.
+
+**`curl .../SHA256SUMS` returns 404** — the tag exists but assets do not; the workflow failed or
+is still running.
 
 ## Cloud Release Checklist
 
@@ -79,18 +190,11 @@ brew test kode-stream
 - Confirm hosted Git, terminal, AI, runtime, and verification routes do not execute without the owner agent.
 - Back up and restore `KODE_STREAM_DATA_DIR` during upgrade and rollback rehearsal.
 
-## Troubleshooting
-
-- `curl .../SHA256SUMS` returns 404: release tag exists but assets are missing.
-- `npm ci` fails due to missing lockfile: script falls back to `npm install`.
-- no tap commit created: formula already matches target version and checksums.
-- Cloud agent disconnected: check WebSocket proxy upgrade and idle timeout settings.
-- Cloud role denied: check `KODE_STREAM_ADMIN_USERS` and OIDC email/subject claims.
-- Cloud image unhealthy: check required Cloud environment variables and `/api/health`.
-
 ## Related Files
 
-- `cmd/scripts/distribution/release_and_update_tap.sh`
-- `cmd/scripts/distribution/update_homebrew_formula_from_release.sh`
-- `cmd/scripts/distribution/kode-stream.rb`
+- `.github/workflows/release.yml` — builds and publishes; the tag is the trigger
+- `cmd/scripts/distribution/update_formula.py` — rewrites URLs and checksums, fails loudly
+- `cmd/scripts/distribution/update_homebrew_formula_from_release.sh` — tap update from a release
+- `cmd/scripts/distribution/release_and_update_tap.sh` — local-build fallback, races CI
+- `cmd/scripts/distribution/kode-stream.rb` — formula template for bootstrap
 - `runbooks/homebrew/homebrew-tap-bootstrap.md`

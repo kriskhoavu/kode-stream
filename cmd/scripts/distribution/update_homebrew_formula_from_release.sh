@@ -28,42 +28,8 @@ fi
 echo "==> Downloading checksums for ${TAG}"
 curl -fL "https://github.com/kriskhoavu/kode-stream/releases/download/${TAG}/SHA256SUMS" -o "$SUMS_FILE"
 
-ARM64_SHA="$(awk '/kode-stream_'"${VERSION}"'_darwin_arm64.tar.gz/{print $1}' "$SUMS_FILE")"
-AMD64_SHA="$(awk '/kode-stream_'"${VERSION}"'_darwin_amd64.tar.gz/{print $1}' "$SUMS_FILE")"
-
-if [[ -z "$ARM64_SHA" || -z "$AMD64_SHA" ]]; then
-  echo "Could not extract darwin checksums from $SUMS_FILE"
-  exit 1
-fi
-
 echo "==> Updating formula"
-VERSION_ENV="$VERSION" ARM64_SHA_ENV="$ARM64_SHA" AMD64_SHA_ENV="$AMD64_SHA" FORMULA_ENV="$FORMULA_FILE" python3 - <<'PY'
-import os
-import re
-from pathlib import Path
-
-formula = Path(os.environ["FORMULA_ENV"])
-version = os.environ["VERSION_ENV"]
-arm = os.environ["ARM64_SHA_ENV"]
-amd = os.environ["AMD64_SHA_ENV"]
-
-text = formula.read_text()
-text = re.sub(r'version\s+"[^"]+"', f'version "{version}"', text)
-text = re.sub(
-    r'(darwin_arm64\.tar\.gz"\n\s+sha256\s+")([^"]+)(")',
-    rf'\g<1>{arm}\3',
-    text,
-    count=1,
-)
-text = re.sub(
-    r'(darwin_amd64\.tar\.gz"\n\s+sha256\s+")([^"]+)(")',
-    rf'\g<1>{amd}\3',
-    text,
-    count=1,
-)
-formula.write_text(text)
-print(f"Updated {formula}")
-PY
+python3 "$ROOT_DIR/cmd/scripts/distribution/update_formula.py" "$FORMULA_FILE" "$VERSION" "$SUMS_FILE"
 
 echo "==> Committing tap update"
 git -C "$TAP_PATH" add Formula/kode-stream.rb

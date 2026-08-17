@@ -29,6 +29,15 @@ require_cmd() {
   fi
 }
 
+cat <<'WARNING'
+NOTE: pushing a v* tag triggers .github/workflows/release.yml, which builds and
+publishes the release assets itself. This script also builds locally and uploads
+with --clobber, so running both against one tag races: whichever finishes last
+wins, and the tap can end up pointing at assets whose checksums came from the
+other build. Prefer the CI path in runbooks/homebrew/release.md. Use this script
+only when Actions is unavailable, and let the workflow finish or cancel it first.
+WARNING
+
 echo "==> Checking required tools"
 for c in git gh npm go python3 awk shasum zip tar; do
   require_cmd "$c"
@@ -48,12 +57,9 @@ echo "==> Building release artifacts for $TAG"
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
-if [[ -f "$ROOT_DIR/package-lock.json" ]]; then
-  npm ci
-else
-  echo "No package-lock.json found; using npm install"
-  npm install
-fi
+# package-lock.json is committed. Falling back to npm install here would hide a
+# missing or unusable lockfile, which is exactly what broke the release workflow.
+npm ci
 npm run build
 
 for target in "darwin arm64" "darwin amd64" "linux amd64" "windows amd64"; do
@@ -113,42 +119,8 @@ fi
 echo "==> Downloading release SHA256SUMS"
 curl -fL "https://github.com/kriskhoavu/kode-stream/releases/download/${TAG}/SHA256SUMS" -o "$SUMS_FILE"
 
-ARM64_SHA="$(awk '/kode-stream_'"${VERSION}"'_darwin_arm64.tar.gz/{print $1}' "$SUMS_FILE")"
-AMD64_SHA="$(awk '/kode-stream_'"${VERSION}"'_darwin_amd64.tar.gz/{print $1}' "$SUMS_FILE")"
-
-if [[ -z "$ARM64_SHA" || -z "$AMD64_SHA" ]]; then
-  echo "Could not extract darwin checksums from $SUMS_FILE"
-  exit 1
-fi
-
 echo "==> Updating Homebrew formula"
-VERSION_ENV="$VERSION" ARM64_SHA_ENV="$ARM64_SHA" AMD64_SHA_ENV="$AMD64_SHA" FORMULA_ENV="$FORMULA_FILE" python3 - <<'PY'
-import os
-import re
-from pathlib import Path
-
-formula = Path(os.environ["FORMULA_ENV"])
-version = os.environ["VERSION_ENV"]
-arm = os.environ["ARM64_SHA_ENV"]
-amd = os.environ["AMD64_SHA_ENV"]
-
-text = formula.read_text()
-text = re.sub(r'version\s+"[^"]+"', f'version "{version}"', text)
-text = re.sub(
-    r'(darwin_arm64\.tar\.gz"\n\s+sha256\s+")([^"]+)(")',
-    rf'\g<1>{arm}\3',
-    text,
-    count=1,
-)
-text = re.sub(
-    r'(darwin_amd64\.tar\.gz"\n\s+sha256\s+")([^"]+)(")',
-    rf'\g<1>{amd}\3',
-    text,
-    count=1,
-)
-formula.write_text(text)
-print(f"Updated {formula}")
-PY
+python3 "$ROOT_DIR/cmd/scripts/distribution/update_formula.py" "$FORMULA_FILE" "$VERSION" "$SUMS_FILE"
 
 echo "==> Committing and pushing tap update"
 git -C "$TAP_PATH" add Formula/kode-stream.rb
