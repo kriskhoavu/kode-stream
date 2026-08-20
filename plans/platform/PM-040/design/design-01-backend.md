@@ -7,8 +7,9 @@ new fields on the page model. Two call sites in the Knowledge service stop match
 changes, no new HTTP routes, no changes under `web/`.
 
 The Knowledge index is app-owned and rebuilt by rescan, so the new fields need no migration — the next rescan
-repopulates them. A stale index read before its first rescan yields empty bucket, area, and tier, and the journey
-lookup falls back to the default bucket name, which is the pre-PM-040 behaviour.
+repopulates them. A stale index read before its first rescan yields empty bucket, area, and tier. Defaulting the
+bucket *name* is not enough on its own in that state, because no page has a bucket to compare against; journey
+resolution falls back to the page path instead. See Role Resolution below.
 
 ## Data Model
 
@@ -129,6 +130,11 @@ select pages whose bucket is the bucket holding role `journeys`.
 | Settings declare a `journeys` bucket | The declared bucket                      |
 | Settings declare no `journeys` role  | `e2e-testing`, the same default          |
 
+A page is then matched against that bucket in one of two ways. A page carrying a `bucket` is compared directly. A
+page carrying none comes from an index written before PM-040, and is compared against its `domain` path instead —
+either equal to the bucket or prefixed by `bucket + "/"`. Without that second branch, journey lookup returns
+nothing until the first rescan, which the existing full-stack API test demonstrates.
+
 The default preserves current behaviour for every existing Wiki Root with no new file, which is what keeps this ticket
 free of a migration. The comparison also tightens from prefix to exact bucket match, so a sibling directory such as
 `e2e-testing-archive` no longer matches by accident.
@@ -145,6 +151,7 @@ unchanged. Added JSON fields are additive and omitted when empty, so existing cl
 | Detection after `ResolveRelationships` | The tier rule is a property of the whole page set; per-file parsing cannot see it.         |
 | `tiers` replaces, roles merge          | Curators override detection to remove a wrong tier; roles have nothing to merge with.      |
 | Exact bucket match, not prefix         | Prefix matching silently captures sibling directories sharing the bucket name as a prefix. |
+| Path fallback for a pre-PM-040 index   | A stale index has no bucket on any page, so bucket-only matching would drop every journey. |
 | Settings live at the Wiki Root         | Same placement as `workspace-settings.yaml`; travels with the wiki through Git.            |
 | Fields omitted when empty              | A root-level page has no bucket; emitting empty strings would imply a bucket named "".     |
 | No `web/` change                       | `Domain` still drives the tree and graph, keeping the risky surface out of this ticket.    |

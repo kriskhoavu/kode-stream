@@ -299,8 +299,14 @@ Verification
 LLM Wiki & Graph
   -> index structured Markdown knowledge
   -> build graph relationships
+  -> detect bucket, area, and tier from wiki layout
   -> expose reads, sync, enrichment, and graph views
 ```
+
+Wiki structure is inferred rather than configured. A directory name becomes a tier when it appears under two or
+more distinct parents inside one bucket, and each page carries its bucket, area, and tier alongside the existing
+domain. An optional `knowledge-settings.yaml` at the wiki root overrides the detected tiers and declares what a
+bucket means; the `journeys` role selects the bucket holding reusable E2E coverage and defaults to `e2e-testing`.
 
 ## API Structure
 

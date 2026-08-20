@@ -20,12 +20,12 @@ having populated `bucket`. The critical path is B1 → B3 → B4; B2 is the shor
 
 ## Phases Summary
 
-| Phase | Name                         | Track   | Status |
-|-------|------------------------------|---------|--------|
-| B1    | Detection and classification | Backend |        |
-| B2    | Settings override reader     | Backend |        |
-| B3    | Model and indexer wiring     | Backend |        |
-| B4    | Role-based journey lookup    | Backend |        |
+| Phase | Name                         | Track   | Status   |
+|-------|------------------------------|---------|----------|
+| B1    | Detection and classification | Backend | Complete |
+| B2    | Settings override reader     | Backend | Complete |
+| B3    | Model and indexer wiring     | Backend | Complete |
+| B4    | Role-based journey lookup    | Backend | Complete |
 
 ## Backend Phases
 
@@ -36,14 +36,14 @@ must be shown to reject the global-recurrence alternative.
 
 **Deliverables:**
 
-- [ ] `internal/knowledge/taxonomy.go` — `Taxonomy` type, tier detection, path classification.
-- [ ] Table tests for tier under bucket with no area (`platform/concepts`).
-- [ ] Table tests for area nested in area (`domains/master-data/article/reference`).
-- [ ] Table tests for a bucket with no tier at all (`e2e-testing/offer`).
-- [ ] Test that a root-level page yields empty bucket, area, and tier.
-- [ ] Regression test that `offer` and `master-data`, which recur across buckets, are areas and not tiers.
-- [ ] Test that a globally-learned tier is recognised where it appears only once in its bucket.
-- [ ] Test that an empty page set yields an empty tier set without panicking.
+- [x] `internal/knowledge/taxonomy.go` — `Taxonomy` type, tier detection, path classification.
+- [x] Table tests for tier under bucket with no area (`platform/concepts`).
+- [x] Table tests for area nested in area (`domains/master-data/article/reference`).
+- [x] Table tests for a bucket with no tier at all (`e2e-testing/offer`).
+- [x] Test that a root-level page yields empty bucket, area, and tier.
+- [x] Regression test that `offer` and `master-data`, which recur across buckets, are areas and not tiers.
+- [x] Test that a globally-learned tier is recognised where it appears only once in its bucket.
+- [x] Test that an empty page set yields an empty tier set without panicking.
 
 **Verification:** `go test ./internal/knowledge`
 
@@ -58,12 +58,12 @@ detection rather than failing the scan.
 
 **Deliverables:**
 
-- [ ] `internal/knowledge/taxonomy_settings.go` — read and validate `knowledge-settings.yaml` with `KnownFields(true)`.
-- [ ] Absent file returns no override and no warning.
-- [ ] Test that `taxonomy.tiers` replaces rather than merges with a detected set.
-- [ ] Test that a declared bucket role is returned.
-- [ ] Warning tests for bad YAML, `version` other than `1`, unknown field, unknown role, duplicate bucket path.
-- [ ] Test that every defect yields `invalid_metadata` and never an error return.
+- [x] `internal/knowledge/taxonomy_settings.go` — read and validate `knowledge-settings.yaml` with `KnownFields(true)`.
+- [x] Absent file returns no override and no warning.
+- [x] Test that `taxonomy.tiers` replaces rather than merges with a detected set.
+- [x] Test that a declared bucket role is returned.
+- [x] Warning tests for bad YAML, `version` other than `1`, unknown field, unknown role, duplicate bucket path.
+- [x] Test that every defect yields `invalid_metadata` and never an error return.
 
 **Verification:** `go test ./internal/knowledge`
 
@@ -77,12 +77,12 @@ The join phase. First contact with shared indexer code, so the existing detector
 
 **Deliverables:**
 
-- [ ] `internal/knowledge/models.go` — `Bucket`, `Area`, `Tier` on `KnowledgePage`, omitted when empty.
-- [ ] `internal/knowledge/detector.go` — read settings, detect, apply override, classify, after `ResolveRelationships`.
-- [ ] Settings warnings joined into the existing wiki warning list.
-- [ ] Detector test over a fixture tree asserting classification of every page.
-- [ ] Detector test asserting a malformed settings file still indexes every page and adds a warning.
-- [ ] Test that `Domain` is unchanged for every page in the fixture.
+- [x] `internal/knowledge/models.go` — `Bucket`, `Area`, `Tier` on `KnowledgePage`, omitted when empty.
+- [x] `internal/knowledge/detector.go` — read settings, detect, apply override, classify, after `ResolveRelationships`.
+- [x] Settings warnings joined into the existing wiki warning list.
+- [x] Detector test over a fixture tree asserting classification of every page.
+- [x] Detector test asserting a malformed settings file still indexes every page and adds a warning.
+- [x] Test that `Domain` is unchanged for every page in the fixture.
 
 **Verification:** `go test ./internal/knowledge ./internal/server/api`
 
@@ -97,12 +97,12 @@ explicit test rather than being assumed.
 
 **Deliverables:**
 
-- [ ] `internal/knowledge/knowledge_service.go` — resolve the journeys bucket by role in `E2ERunbooksForSources`.
-- [ ] Same resolution in `E2ERunbook`; both literal prefix matches removed.
-- [ ] Test that with no settings file the default `e2e-testing` bucket resolves, preserving PM-036 behaviour.
-- [ ] Test that a declared `journeys` bucket replaces the default.
-- [ ] Test that a sibling bucket such as `e2e-testing-archive` no longer matches, proving exact over prefix.
-- [ ] Test that a declared bucket absent from the tree returns no journeys and warns.
+- [x] `internal/knowledge/knowledge_service.go` — resolve the journeys bucket by role in `E2ERunbooksForSources`.
+- [x] Same resolution in `E2ERunbook`; both literal prefix matches removed.
+- [x] Test that with no settings file the default `e2e-testing` bucket resolves, preserving PM-036 behaviour.
+- [x] Test that a declared `journeys` bucket replaces the default.
+- [x] Test that a sibling bucket such as `e2e-testing-archive` no longer matches, proving exact over prefix.
+- [x] Test that a declared bucket absent from the tree returns no journeys and warns.
 
 **Verification:** `go test ./internal/knowledge ./internal/server/api`
 
@@ -112,13 +112,13 @@ explicit test rather than being assumed.
 
 ## Post-Implementation Checklist
 
-- [ ] Full backend suite: `go test ./...`
-- [ ] Frontend untouched but confirmed green: `npm run typecheck && npm test`
-- [ ] Update `docs/architecture/ARCHITECTURE.md` where it describes Knowledge wiki detection.
-- [ ] Confirm no literal remains: `grep -rn '"e2e-testing"' internal/`
-- [ ] Update PM-040 documents if naming drifted during implementation.
-- [ ] Re-render `brief.html` if the plan changed.
-- [ ] Keep phase commits separate.
+- [x] Full backend suite: `go test ./...`
+- [x] Frontend untouched but confirmed green: `npm run typecheck && npm test`
+- [x] Update `docs/architecture/ARCHITECTURE.md` where it describes Knowledge wiki detection.
+- [x] Confirm no literal remains: only the named `DefaultJourneysBucket` constant
+- [x] Update PM-040 documents if naming drifted during implementation.
+- [x] Re-render `brief.html` if the plan changed.
+- [x] Keep phase commits separate.
 
 ## Testing Strategy
 
@@ -132,7 +132,12 @@ any particular workspace.
 
 ## Migration Notes
 
-None. The Knowledge index is app-owned and rebuilt by rescan, so the new fields populate on the next scan. An index
-written before PM-040 yields empty taxonomy fields, and the journey lookup falls back to the default bucket, which
-matches pre-PM-040 behaviour. No persisted schema, route, or JSON contract is broken; the added fields are omitted
-when empty.
+None, but not for the reason first assumed. The Knowledge index is app-owned and rebuilt by rescan, so the new
+fields populate on the next scan. An index written before PM-040 carries no `bucket` at all, so matching on bucket
+alone would have returned no journeys until a rescan. Journey resolution therefore falls back to the page path when
+`bucket` is empty, which is what actually preserves pre-PM-040 behaviour.
+
+The existing full-stack test `TestE2ERunbookReadRoutesReturnLocalAndCanonicalCoverage` writes its index directly
+with `Domain` set and no `Bucket`, so it is exactly this case; removing the fallback makes it fail with "No
+canonical E2E journey is linked to this plan." No persisted schema, route, or JSON contract is broken, and the
+added fields are omitted when empty.

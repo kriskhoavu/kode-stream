@@ -476,7 +476,7 @@
       <span><strong>ticket</strong> PM-040</span>
       <span><strong>service</strong> platform</span>
       <span><strong>tracks</strong> backend</span>
-      <span><strong>status</strong> draft</span>
+      <span><strong>status</strong> complete</span>
     </div>
     <h1>Knowledge learns the shape of a wiki</h1>
     <p class="standfirst">
@@ -693,7 +693,7 @@
           <text x="578" y="338" font-size="11.5" fill="var(--accent-stop)">An unknown role warns, is dropped, and lands here.</text>
         </svg>
       </div>
-      <figcaption><b>Figure 3.</b> Step 4 is the whole compatibility story, and it is the one assumption in this plan carrying real risk — phase B4's first test exists to prove it rather than assume it.</figcaption>
+      <figcaption><b>Figure 3.</b> Step 4 is the whole compatibility story. It held, but not as drawn: a page from an index written before PM-040 has no bucket to compare, so resolution falls back to the page path — see the resolved decision below.</figcaption>
     </figure>
   </section>
 
@@ -798,7 +798,8 @@
       <div class="phase">
         <div class="phase-n">B1</div>
         <div class="phase-body">
-          <div class="phase-head"><h3>Detection and classification</h3></div>
+          <div class="phase-head"><h3>Detection and classification</h3>
+            <span class="pill done">complete</span></div>
           <p>
             Establishes the rule as a pure function of path shape, testable with no wiring at all. The
             tests are the specification here: the three structural shapes in the reference wiki, plus a
@@ -810,7 +811,8 @@
       <div class="phase">
         <div class="phase-n">B2</div>
         <div class="phase-body">
-          <div class="phase-head"><h3>Settings override reader</h3></div>
+          <div class="phase-head"><h3>Settings override reader</h3>
+            <span class="pill done">complete</span></div>
           <p>
             Establishes that a curator can correct detection, and that a broken file cannot take a wiki
             down. Mirrors the existing scanner settings reader deliberately, so the validation and
@@ -822,7 +824,8 @@
       <div class="phase">
         <div class="phase-n">B3</div>
         <div class="phase-body">
-          <div class="phase-head"><h3>Model and indexer wiring</h3></div>
+          <div class="phase-head"><h3>Model and indexer wiring</h3>
+            <span class="pill done">complete</span></div>
           <p>
             The join. Pages start carrying <code>bucket</code>, <code>area</code> and <code>tier</code>,
             and settings warnings join the existing warning list. The regression that matters is that
@@ -834,7 +837,8 @@
       <div class="phase">
         <div class="phase-n">B4</div>
         <div class="phase-body">
-          <div class="phase-head"><h3>Role-based journey lookup</h3></div>
+          <div class="phase-head"><h3>Role-based journey lookup</h3>
+            <span class="pill done">complete</span></div>
           <p>
             Deletes both literal prefix matches. Establishes that journeys are found by declared meaning,
             and — through the default — that no existing workspace needs a settings file to keep working.
@@ -895,17 +899,18 @@
   <!-- ========================================================= -->
   <section class="sec">
     <p class="eyebrow">Open</p>
-    <h2>Two decisions still to make</h2>
+    <h2>One decision resolved, one still open</h2>
 
-    <div class="note stop">
-      <h3>Does the compatibility default actually cover every path into journeys?</h3>
+    <div class="note">
+      <h3>Resolved: the compatibility default needed a second branch</h3>
       <p>
-        The plan asserts that defaulting the <code>journeys</code> role to <code>e2e-testing</code>
-        preserves PM-036 behaviour. That was verified against the two call sites in
-        <code>knowledge_service.go</code> and not against PM-036's own call paths. If PM-036 reaches
-        canonical journeys by some other route, B4 grows to cover it. The B4 test suite is written to
-        fail loudly rather than quietly pass if this is wrong. Owner: whoever implements B4, before
-        writing the fix.
+        The literal <code>e2e-testing</code> turned out to exist in exactly two places in the Go
+        codebase — both the planned call sites — with no other route in or under <code>web/</code>. But
+        defaulting the bucket <em>name</em> was not sufficient on its own: an index written before
+        PM-040 carries no <code>bucket</code> on any page, so matching on bucket alone returned no
+        journeys at all until a rescan. Resolution now falls back to the page path when
+        <code>bucket</code> is empty. The existing full-stack API test is exactly that case, and
+        removing the fallback makes it fail — so the branch is load-bearing rather than defensive.
       </p>
     </div>
 
@@ -928,7 +933,7 @@
   <!-- 8. FOOTER — provenance                                    -->
   <!-- ========================================================= -->
   <p class="foot">
-    Rendered from plans/platform/PM-040/ · 2026-08-20 · f77669c<br>
+    Rendered from plans/platform/PM-040/ · 2026-08-21 · 9f818b4<br>
     The markdown in that directory is the source of truth. Re-render this page after changing it.
   </p>
 
