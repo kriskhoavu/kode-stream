@@ -308,6 +308,11 @@ more distinct parents inside one bucket, and each page carries its bucket, area,
 domain. An optional `knowledge-settings.yaml` at the wiki root overrides the detected tiers and declares what a
 bucket means; the `journeys` role selects the bucket holding reusable E2E coverage and defaults to `e2e-testing`.
 
+Both Knowledge views group by bucket then area, with tier shown as a page attribute rather than a level. That caps
+the rendered hierarchy at two levels whatever the wiki's directory depth, and a nested area is drawn as one compound
+row. Where an index predates the taxonomy, both views derive bucket and area from `domain` so an unrescanned
+workspace still renders correctly.
+
 ## API Structure
 
 All API routes are local and grouped by capability.
