@@ -1,10 +1,10 @@
 import type { Edge, MarkerType, Node } from '@xyflow/react';
 import type { KnowledgeGraph, KnowledgeGraphNode } from '../../lib/types';
+import { areaKey, bucketKey, formatArea, formatSegment, groupingOf, rootGroupKey, type Grouping } from './taxonomy';
 
 export type KnowledgeHierarchyRole = 'domain' | 'root' | 'parent' | 'leaf' | 'related';
 
 const domainNodePrefix = '__knowledge_domain__:';
-const rootGroupKey = 'root';
 
 interface Hierarchy {
 	roleByID: Map<string, KnowledgeHierarchyRole>;
@@ -48,34 +48,9 @@ export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string
 	return { nodes, edges, neighbors };
 }
 
-interface Grouping {
-	bucket: string;
-	area: string;
-}
-
 interface Section {
 	bucketID: string;
 	columns: { areaID?: string; pages: KnowledgeGraphNode[] }[];
-}
-
-// Grouping comes from the taxonomy when the index carries it. An index written
-// before the taxonomy existed has only `domain`, so bucket and area are derived
-// from its first segment and remainder. Either way grouping is two levels deep,
-// which is what the positioner can lay out.
-function groupingOf(node: KnowledgeGraphNode): Grouping {
-	if (node.bucket !== undefined || node.area !== undefined || node.tier !== undefined) {
-		return { bucket: node.bucket ?? '', area: node.area ?? '' };
-	}
-	const parts = (node.domain === rootGroupKey ? '' : node.domain).split('/').filter(Boolean);
-	return { bucket: parts[0] ?? '', area: parts.slice(1).join('/') };
-}
-
-function bucketKey(grouping: Grouping): string {
-	return grouping.bucket || rootGroupKey;
-}
-
-function areaKey(grouping: Grouping): string | undefined {
-	return grouping.area ? `${bucketKey(grouping)}/${grouping.area}` : undefined;
 }
 
 function withDomainParents(graph: KnowledgeGraph): KnowledgeGraph {
@@ -235,11 +210,7 @@ function edgeKey(edge: { source: string; target: string }): string { return `${e
 
 function domainNodeID(domain: string): string { return `${domainNodePrefix}${domain}`; }
 function isDomainNode(id: string): boolean { return id.startsWith(domainNodePrefix); }
-function formatDomain(domain: string): string { return domain.split(/[\/_-]/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') || 'Other'; }
-function formatArea(area: string): string {
-	return area.split('/').filter(Boolean).map(formatDomain).join(' / ') || 'Other';
-}
-
+function formatDomain(domain: string): string { return formatSegment(domain); }
 // A bucket's own landing page is redundant once the bucket is drawn as a group
 // node, but only when that bucket actually has areas beneath it.
 function isContainerOverview(node: KnowledgeGraphNode, bucketsWithAreas: Set<string>): boolean {

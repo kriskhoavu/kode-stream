@@ -160,3 +160,60 @@ describe('KnowledgeBrowser', () => {
 		expect(screen.getByRole('heading', { name: 'No valid pages indexed' })).toBeInTheDocument();
 	});
 });
+
+describe('taxonomy grouping', () => {
+	const taxonomyPages: KnowledgePage[] = [
+		{ slug: 'wiki-index', title: 'Documentation Index', path: 'index.md', domain: 'root', bucket: '', area: '', tier: '', pageType: 'REFERENCE', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'offer-index', title: 'Offer Documentation', path: 'domains/offer/README.md', domain: 'domains/offer', bucket: 'domains', area: 'offer', tier: '', pageType: 'CONCEPT', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'offer-approval', title: 'Offer Approval', path: 'domains/offer/concepts/approval.md', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts', pageType: 'HOW_TO', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'offer-permissions', title: 'Offer Permissions', path: 'domains/offer/reference/permissions.md', domain: 'domains/offer/reference', bucket: 'domains', area: 'offer', tier: 'reference', pageType: 'REFERENCE', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'article-spec', title: 'Article Fields', path: 'domains/master-data/article/reference/spec.md', domain: 'domains/master-data/article/reference', bucket: 'domains', area: 'master-data/article', tier: 'reference', pageType: 'REFERENCE', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'rollback', title: 'Deployment Rollback', path: 'platform/concepts/rollback.md', domain: 'platform/concepts', bucket: 'platform', area: '', tier: 'concepts', pageType: 'CONCEPT', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }
+	];
+
+	// The reported defect: a tier directory has no README anywhere in the corpus,
+	// so it rendered as a non-interactive label with only a chevron to open it.
+	it('reaches a tier page without the tier being a folder', () => {
+		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
+
+		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
+		fireEvent.click(screen.getByRole('button', { name: 'Open domains/offer index' }));
+
+		expect(screen.getByRole('button', { name: /Offer Approval/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Offer Permissions/i })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /^concepts$/i })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /^reference$/i })).not.toBeInTheDocument();
+	});
+
+	it('labels tier partitions inside their area', () => {
+		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
+		fireEvent.click(screen.getByRole('button', { name: 'Open domains/offer index' }));
+
+		const tiers = screen.getAllByTestId('knowledge-tier-label').map((element) => element.textContent);
+		expect(tiers).toEqual(expect.arrayContaining(['concepts', 'reference']));
+	});
+
+	it('shows a nested area as one row', () => {
+		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
+
+		expect(screen.getByRole('button', { name: /master-data \/ article/i })).toBeInTheDocument();
+	});
+
+	it('toggles a section from its header even with no landing page', () => {
+		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
+
+		const platform = screen.getByRole('button', { name: /^platform$/i });
+		expect(platform).toHaveAttribute('aria-expanded', 'false');
+		fireEvent.click(platform);
+		expect(screen.getByRole('button', { name: /^platform$/i })).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByRole('button', { name: /Deployment Rollback/i })).toBeInTheDocument();
+	});
+
+	it('expands the bucket and area of a selected deep page', () => {
+		render(<KnowledgeBrowser pages={taxonomyPages} selectedSlug="article-spec" warnings={[]} onSelect={vi.fn()} />);
+
+		expect(screen.getByRole('button', { name: /Article Fields/i })).toBeInTheDocument();
+	});
+});

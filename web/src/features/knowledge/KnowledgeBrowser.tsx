@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { BookMarked, BookOpen, ChevronRight, GripVertical, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
+import { areaKey, bucketKey, groupingOf, rootGroupKey } from './taxonomy';
 
 export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children, sidePanel }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode; sidePanel?: ReactNode }) {
 	const [query, setQuery] = useState('');
@@ -19,10 +20,11 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		const selectedPage = pages.find((page) => page.slug === selectedSlug);
 		if (!selectedPage) return;
 		setQuery('');
-		const parts = (selectedPage.domain || 'root').split('/').filter(Boolean);
+		const grouping = groupingOf(selectedPage);
+		const keys = [bucketKey(grouping), areaKey(grouping)].filter(Boolean) as string[];
 		setExpandedDomains((current) => {
 			const next = new Set(current);
-			for (let index = 0; index < parts.length; index++) next.add(parts.slice(0, index + 1).join('/').toLowerCase());
+			for (const key of keys) next.add(key.toLowerCase());
 			return next;
 		});
 	}, [pages, selectedSlug]);
@@ -57,8 +59,10 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		window.addEventListener('pointerup', finish);
 	};
 	const renderDomain = (node: DomainNode): ReactNode => {
-		const childPages = node.landingPage ? node.pages.filter((page) => page !== node.landingPage) : node.pages;
-		const collapsible = childPages.length > 0 || node.children.length > 0;
+		const tiers = node.tiers
+			.map((group) => ({ ...group, pages: node.landingPage ? group.pages.filter((page) => page !== node.landingPage) : group.pages }))
+			.filter((group) => group.pages.length > 0);
+		const collapsible = tiers.length > 0 || node.children.length > 0;
 		const expanded = query.trim() !== '' || expandedDomains.has(node.path.toLowerCase());
 		const toggleDomain = () => setExpandedDomains((current) => {
 			const next = new Set(current);
@@ -82,9 +86,26 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			}
 			moveFocus(event, node.landingPage!.slug);
 		};
-		return <section className="knowledge-domain" key={node.path}>
-			<div className="knowledge-domain-header"><h3>{node.landingPage ? <button data-knowledge-entry data-knowledge-slug={node.landingPage.slug} type="button" className={node.landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={openOrToggleLanding} onKeyDown={handleLandingKeyDown} aria-label={`Open ${node.path} index`}><BookMarked size={13} /><span>{node.name}</span></button> : <span className="knowledge-domain-label"><BookMarked size={13} /><span>{node.name}</span></span>}</h3>{collapsible && <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>}</div>
-			{expanded && childPages.map((page) => { const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length; return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}><span><strong className="knowledge-page-title">{page.title}</strong><small><span className="knowledge-page-type">{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span></button>; })}
+		const depth = node.path.includes('/') ? 'area' : 'bucket';
+		const Marker = BookMarked;
+		const renderPage = (page: KnowledgePage) => {
+			const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length;
+			return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}>
+				<span><strong className="knowledge-page-title">{page.title}</strong><small><span className="knowledge-page-type">{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span>
+			</button>;
+		};
+		return <section className={`knowledge-domain knowledge-domain-${depth}`} key={node.path}>
+			<div className="knowledge-domain-header">
+				<h3>{node.landingPage
+					? <button data-knowledge-entry data-knowledge-slug={node.landingPage.slug} type="button" className={node.landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={openOrToggleLanding} onKeyDown={handleLandingKeyDown} aria-label={`Open ${node.path} index`}><Marker size={13} /><span>{node.name}</span></button>
+					: <button data-knowledge-entry type="button" className="knowledge-domain-link knowledge-domain-link-toggle" aria-expanded={collapsible ? expanded : undefined} onClick={toggleDomain} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); toggleDomain(); } }}><Marker size={13} /><span>{node.name}</span></button>}
+				</h3>
+				{collapsible && <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>}
+			</div>
+			{expanded && tiers.map((group) => <div className="knowledge-tier" key={group.tier || '_'}>
+				{group.tier && <p className="knowledge-tier-label" data-testid="knowledge-tier-label">{group.tier}</p>}
+				{group.pages.map(renderPage)}
+			</div>)}
 			{expanded && node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map(renderDomain)}</div>}
 		</section>;
 	};
@@ -103,10 +124,15 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 	</div>;
 }
 
+interface TierGroup {
+	tier: string;
+	pages: KnowledgePage[];
+}
+
 interface DomainNode {
 	name: string;
 	path: string;
-	pages: KnowledgePage[];
+	tiers: TierGroup[];
 	landingPage?: KnowledgePage;
 	children: DomainNode[];
 }
@@ -115,28 +141,58 @@ function findLandingPage(pages: KnowledgePage[]): KnowledgePage | undefined {
 	return pages.find((page) => /(?:^|\/)index\.md$/i.test(page.path)) ?? pages.find((page) => /(?:^|\/)readme\.md$/i.test(page.path));
 }
 
+// Pages are grouped bucket then area, and an area's pages are partitioned by
+// tier. A tier is never a node: it has no landing page anywhere in a corpus, so
+// as a node it could only be opened through its disclosure control.
 function buildDomainTree(visiblePages: KnowledgePage[], allPages: KnowledgePage[]): DomainNode[] {
-	const roots: DomainNode[] = [];
-	const nodes = new Map<string, DomainNode>();
+	const buckets = new Map<string, DomainNode>();
+	const areas = new Map<string, DomainNode>();
+	const order: string[] = [];
+	const nodeFor = (key: string, name: string, into?: DomainNode[]): DomainNode => {
+		const existing = areas.get(key) ?? buckets.get(key);
+		if (existing) return existing;
+		const node: DomainNode = { name, path: key, tiers: [], children: [] };
+		(into ?? []).push(node);
+		return node;
+	};
 	for (const page of visiblePages) {
-		const parts = (page.domain || 'root').split('/').filter(Boolean);
-		let siblings = roots;
-		for (let index = 0; index < parts.length; index++) {
-			const path = parts.slice(0, index + 1).join('/');
-			let node = nodes.get(path);
-			if (!node) {
-				node = { name: parts[index], path, pages: [], children: [] };
-				nodes.set(path, node);
-				siblings.push(node);
-			}
-			siblings = node.children;
+		const grouping = groupingOf(page);
+		const bucket = bucketKey(grouping);
+		let bucketNode = buckets.get(bucket);
+		if (!bucketNode) {
+			bucketNode = { name: grouping.bucket || rootGroupKey, path: bucket, tiers: [], children: [] };
+			buckets.set(bucket, bucketNode);
+			order.push(bucket);
 		}
-		nodes.get(parts.join('/'))!.pages.push(page);
+		const area = areaKey(grouping);
+		let target = bucketNode;
+		if (area) {
+			let areaNode = areas.get(area);
+			if (!areaNode) {
+				areaNode = nodeFor(area, grouping.area.split('/').filter(Boolean).join(' / '), bucketNode.children);
+				areas.set(area, areaNode);
+			}
+			target = areaNode;
+		}
+		const tier = grouping.tier;
+		const group = target.tiers.find((candidate) => candidate.tier === tier);
+		if (group) group.pages.push(page);
+		else target.tiers.push({ tier, pages: [page] });
 	}
-	for (const node of nodes.values()) node.landingPage = findLandingPage(allPages.filter((page) => (page.domain || 'root') === node.path));
-	const rootIndex = roots.findIndex((node) => node.path.toLowerCase() === 'root');
+	for (const node of [...buckets.values(), ...areas.values()]) {
+		node.landingPage = findLandingPage(allPages.filter((page) => nodeKeyOf(page) === node.path));
+		node.tiers.sort((left, right) => left.tier.localeCompare(right.tier));
+		node.children.sort((left, right) => left.name.localeCompare(right.name));
+	}
+	const roots = order.map((key) => buckets.get(key)!).sort((left, right) => left.name.localeCompare(right.name));
+	const rootIndex = roots.findIndex((node) => node.path === rootGroupKey);
 	if (rootIndex > 0) roots.unshift(...roots.splice(rootIndex, 1));
 	return roots;
+}
+
+function nodeKeyOf(page: KnowledgePage): string {
+	const grouping = groupingOf(page);
+	return areaKey(grouping) ?? bucketKey(grouping);
 }
 
 function displayPageType(pageType?: string): string {
