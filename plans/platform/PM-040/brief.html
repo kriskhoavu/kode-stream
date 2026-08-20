@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PM-040: Detected Wiki Taxonomy</title>
+<style>
+  /* feature-brief page stylesheet — self-contained, no external assets.
+     Colour tokens carry meaning per page; declare that meaning in the legend.
+     accent-a / accent-b / accent-stop are the only three meaning-carrying colours. */
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body { margin: 0; }
+
+  img, svg { max-width: 100%; }
+
+  :root {
+    color-scheme: light dark;
+    --paper: #F5F6F4;
+    --paper-2: #EAECE8;
+    --card: #FFFFFF;
+    --ink: #151A1E;
+    --ink-2: #4A5560;
+    --ink-3: #77828C;
+    --rule: #D8DCD6;
+    --rule-soft: #E6E9E4;
+    --accent-a: #2C7A6B;
+    --accent-a-tint: #E4EFEC;
+    --accent-b: #9C6A18;
+    --accent-b-tint: #F6EEDF;
+    --accent-stop: #9E3B33;
+    --accent-stop-tint: #F6E6E4;
+
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+    --measure: 68ch;
+    --band: 1080px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161A;
+      --paper-2: #1A1F24;
+      --card: #191E23;
+      --ink: #E6EAE7;
+      --ink-2: #A8B2B8;
+      --ink-3: #7C868C;
+      --rule: #2C343A;
+      --rule-soft: #232A30;
+      --accent-a: #57AD9B;
+      --accent-a-tint: #17302C;
+      --accent-b: #D9A344;
+      --accent-b-tint: #33280F;
+      --accent-stop: #D07A6E;
+      --accent-stop-tint: #34211E;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #12161A;
+    --paper-2: #1A1F24;
+    --card: #191E23;
+    --ink: #E6EAE7;
+    --ink-2: #A8B2B8;
+    --ink-3: #7C868C;
+    --rule: #2C343A;
+    --rule-soft: #232A30;
+    --accent-a: #57AD9B;
+    --accent-a-tint: #17302C;
+    --accent-b: #D9A344;
+    --accent-b-tint: #33280F;
+    --accent-stop: #D07A6E;
+    --accent-stop-tint: #34211E;
+  }
+
+  :root[data-theme="light"] {
+    --paper: #F5F6F4;
+    --paper-2: #EAECE8;
+    --card: #FFFFFF;
+    --ink: #151A1E;
+    --ink-2: #4A5560;
+    --ink-3: #77828C;
+    --rule: #D8DCD6;
+    --rule-soft: #E6E9E4;
+    --accent-a: #2C7A6B;
+    --accent-a-tint: #E4EFEC;
+    --accent-b: #9C6A18;
+    --accent-b-tint: #F6EEDF;
+    --accent-stop: #9E3B33;
+    --accent-stop-tint: #F6E6E4;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: var(--band);
+    margin: 0 auto;
+    padding: 0 24px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 1px solid var(--rule);
+    padding: 40px 0 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .meta-row span strong {
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(28px, 4.4vw, 44px);
+    line-height: 1.12;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    max-width: var(--measure);
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--ink-2);
+    margin: 0;
+  }
+
+  /* ---------- sections ---------- */
+
+  .sec {
+    padding-top: 56px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-a);
+    margin: 0;
+  }
+
+  h2 {
+    font-family: var(--mono);
+    font-size: clamp(21px, 2.6vw, 27px);
+    line-height: 1.25;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  h3 {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0;
+    margin: 0;
+  }
+
+  .sec p,
+  .sec ul,
+  .sec ol {
+    max-width: var(--measure);
+    margin: 0;
+  }
+
+  .sec ul,
+  .sec ol {
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  li::marker {
+    color: var(--ink-3);
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--paper-2);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    padding: 1px 5px;
+    word-break: break-word;
+  }
+
+  a {
+    color: var(--accent-a);
+    text-underline-offset: 3px;
+  }
+
+  a:focus-visible,
+  .legend-key:focus-visible {
+    outline: 2px solid var(--accent-b);
+    outline-offset: 3px;
+  }
+
+  /* ---------- legend ---------- */
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    padding: 14px 18px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .legend-key {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--ink-2);
+  }
+
+  .swatch {
+    width: 22px;
+    height: 11px;
+    border-radius: 2px;
+    flex: none;
+  }
+
+  .swatch.a { background: var(--accent-a-tint); border: 1.5px solid var(--accent-a); }
+  .swatch.b { background: var(--accent-b-tint); border: 1.5px solid var(--accent-b); }
+  .swatch.stop { background: var(--accent-stop-tint); border: 1.5px dashed var(--accent-stop); }
+
+  /* ---------- figures ---------- */
+
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .frame {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 20px;
+    overflow-x: auto;
+  }
+
+  .frame svg {
+    display: block;
+    width: 100%;
+    min-width: 640px;
+    max-width: 100%;
+    height: auto;
+    color: var(--ink-2);
+  }
+
+  figcaption {
+    max-width: var(--measure);
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+
+  figcaption b {
+    color: var(--ink-2);
+    font-weight: 600;
+  }
+
+  /* ---------- tables ---------- */
+
+  .scroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--card);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+
+  thead th {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 500;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  td.accent-a { color: var(--accent-a); font-family: var(--mono); font-size: 12.5px; }
+  td.accent-b { color: var(--accent-b); font-family: var(--mono); font-size: 12.5px; }
+  td code { background: none; border: none; padding: 0; }
+
+  /* ---------- phase list ---------- */
+
+  .phases {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 100%;
+  }
+
+  .phase {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 18px;
+    padding: 18px 20px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent-a);
+    border-radius: 4px;
+  }
+
+  .phase-n {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent-a);
+    line-height: 1.2;
+  }
+
+  .phase-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .phase-body p,
+  .phase-body ul { max-width: 62ch; }
+
+  .phase-body p { font-size: 15px; color: var(--ink-2); }
+  .phase-body ul { font-size: 14.5px; color: var(--ink-2); }
+
+  /* ---------- callout ---------- */
+
+  .note {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px 20px;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent-b);
+    border-radius: 4px;
+    background: var(--card);
+    max-width: var(--measure);
+  }
+
+  .note h3 { color: var(--accent-b); }
+  .note p { font-size: 15px; color: var(--ink-2); }
+
+  .note.stop { border-left-color: var(--accent-stop); }
+  .note.stop h3 { color: var(--accent-stop); }
+
+  /* ---------- footer ---------- */
+
+  .foot {
+    margin-top: 72px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    color: var(--ink-3);
+    max-width: var(--measure);
+    line-height: 1.7;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a { transition: color 120ms ease; }
+  }
+
+  @media (max-width: 620px) {
+    .page { padding: 0 16px 72px; }
+    .phase { grid-template-columns: 1fr; gap: 8px; }
+  }
+
+  /* ---------- phase accent variants ---------- */
+  /* Default phase cards use accent-a. Use .b / .stop only when the page's legend
+     gives those accents a meaning that applies to a phase (e.g. per-track colour). */
+
+  .phase.b { border-left-color: var(--accent-b); }
+  .phase.b .phase-n { color: var(--accent-b); }
+  .phase.stop { border-left-color: var(--accent-stop); }
+  .phase.stop .phase-n { color: var(--accent-stop); }
+
+  /* ---------- status pill ---------- */
+
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--paper-2);
+    color: var(--ink-3);
+    vertical-align: 2px;
+    white-space: nowrap;
+  }
+
+  .pill.done { border-color: var(--accent-a); color: var(--accent-a); background: var(--accent-a-tint); }
+  .pill.active { border-color: var(--accent-b); color: var(--accent-b); background: var(--accent-b-tint); }
+  .pill.blocked { border-color: var(--accent-stop); color: var(--accent-stop); background: var(--accent-stop-tint); }
+
+  .phase-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ========================================================= -->
+  <!-- 1. MASTHEAD                                               -->
+  <!-- ========================================================= -->
+  <header class="masthead">
+    <div class="meta-row">
+      <span><strong>ticket</strong> PM-040</span>
+      <span><strong>service</strong> platform</span>
+      <span><strong>tracks</strong> backend</span>
+      <span><strong>status</strong> draft</span>
+    </div>
+    <h1>Knowledge learns the shape of a wiki</h1>
+    <p class="standfirst">
+      PM-040 infers a wiki's bucket, area and tier structure from the directory layout it already
+      indexes, and lets an optional settings file declare the one thing layout cannot express: what a
+      bucket means. The first beneficiary is the E2E journey lookup, which stops matching a hardcoded
+      string.
+    </p>
+  </header>
+
+  <!-- ========================================================= -->
+  <!-- 2. THE SHORT VERSION  (+ mandatory legend)                -->
+  <!-- ========================================================= -->
+  <section class="sec">
+    <p class="eyebrow">The short version</p>
+    <h2>The layout was always readable — the meaning was hardcoded</h2>
+    <p>
+      A restructured wiki does not break Knowledge today. Every page still carries <code>slug</code> and
+      <code>title</code>, the root still has <code>index.md</code>, and <code>domain</code> already
+      tolerates arbitrary nesting. What breaks is narrower and worse: the app has no idea that
+      <code>domains</code> is a subject bucket while <code>concepts</code> is a tier, so twenty distinct
+      path strings arrive flat. And one bucket's meaning is written into the service as the literal
+      <code>e2e-testing</code>, which makes the wiki's own naming a load-bearing part of the code.
+    </p>
+    <p>
+      After PM-040, tiers are detected from within-bucket recurrence, each page carries
+      <code>bucket</code>, <code>area</code> and <code>tier</code>, and the journey lookup asks for the
+      bucket holding the <code>journeys</code> role. A workspace with no settings file behaves exactly as
+      it does now, because that role defaults to <code>e2e-testing</code>. <code>domain</code> is
+      untouched, so no surface changes and nothing under <code>web/</code> is edited.
+    </p>
+
+    <div class="legend">
+      <span class="legend-key"><span class="swatch a"></span> existing behaviour, preserved unchanged</span>
+      <span class="legend-key"><span class="swatch b"></span> new in PM-040</span>
+      <span class="legend-key"><span class="swatch stop"></span> rejected alternative, or warned and dropped</span>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- FIGURE 1 — BEFORE / AFTER SPLIT                            -->
+  <!-- ========================================================= -->
+  <section class="sec">
+    <p class="eyebrow">Figure 1</p>
+    <h2>Where you count parents decides whether the rule works</h2>
+    <p>
+      Detecting tiers means finding directory names that repeat. The obvious version of that test counts
+      parents across the whole tree, and it fails on the reference wiki: <code>offer</code> appears under
+      both <code>domains</code> and <code>e2e-testing</code>, so a naive count promotes a subject area to
+      a tier. Counting inside a single bucket separates the two cleanly.
+    </p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 1020 400" role="img"
+             aria-label="Two rules compared: counting parent directories anywhere in the tree wrongly classifies offer as a tier, while counting parents within a single bucket correctly leaves offer as an area. Both rules agree that reference is a tier.">
+
+          <text x="30" y="40" font-size="11" font-weight="600" letter-spacing="1.1" fill="currentColor" opacity="0.8">Two ways to count a repeated directory name</text>
+
+          <rect x="30" y="60" width="470" height="222" rx="4" fill="var(--accent-stop-tint)" stroke="var(--accent-stop)" stroke-width="2"/>
+          <text x="48" y="86" font-size="11" font-weight="600" letter-spacing="1.1" fill="var(--accent-stop)">Rejected — parents counted anywhere</text>
+
+          <rect x="48" y="102" width="434" height="74" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1"/>
+          <text x="66" y="128" font-size="13.5" font-weight="600" fill="currentColor">reference</text>
+          <text x="464" y="128" font-size="11.5" font-weight="600" text-anchor="end" fill="currentColor">tier</text>
+          <text x="66" y="152" font-size="11.5" fill="currentColor" opacity="0.8">10 distinct parents across the whole tree</text>
+
+          <rect x="48" y="190" width="434" height="74" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1"/>
+          <text x="66" y="216" font-size="13.5" font-weight="600" fill="currentColor">offer</text>
+          <text x="464" y="216" font-size="11.5" font-weight="600" text-anchor="end" fill="var(--accent-stop)">tier — wrong</text>
+          <text x="66" y="240" font-size="11.5" fill="currentColor" opacity="0.8">2 parents — domains and e2e-testing</text>
+
+          <rect x="520" y="60" width="470" height="222" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="2"/>
+          <text x="538" y="86" font-size="11" font-weight="600" letter-spacing="1.1" fill="var(--accent-b)">Chosen — parents counted inside one bucket</text>
+
+          <rect x="538" y="102" width="434" height="74" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1"/>
+          <text x="556" y="128" font-size="13.5" font-weight="600" fill="currentColor">reference</text>
+          <text x="954" y="128" font-size="11.5" font-weight="600" text-anchor="end" fill="currentColor">tier</text>
+          <text x="556" y="152" font-size="11.5" fill="currentColor" opacity="0.8">5 distinct parents inside domains</text>
+
+          <rect x="538" y="190" width="434" height="74" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1"/>
+          <text x="556" y="216" font-size="13.5" font-weight="600" fill="currentColor">offer</text>
+          <text x="954" y="216" font-size="11.5" font-weight="600" text-anchor="end" fill="var(--accent-b)">area — correct</text>
+          <text x="556" y="240" font-size="11.5" fill="currentColor" opacity="0.8">1 parent in domains, 1 in e2e-testing</text>
+
+          <rect x="30" y="310" width="960" height="60" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1.5"/>
+          <text x="48" y="336" font-size="13.5" font-weight="600" fill="currentColor">Both rules agree on reference. They disagree on offer.</text>
+          <text x="48" y="357" font-size="11.5" fill="currentColor" opacity="0.8">The tier set is learned globally once, so a name qualifying in any bucket is recognised in every bucket.</text>
+        </svg>
+      </div>
+      <figcaption><b>Figure 1.</b> The threshold is two distinct parents within a single bucket. Measured on the reference wiki this leaves every subject-matter name at exactly one parent per bucket, so the margin between tier and area is wide rather than borderline.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- FIGURE 2 — LEFT-TO-RIGHT PIPELINE                          -->
+  <!-- ========================================================= -->
+  <section class="sec">
+    <p class="eyebrow">Figure 2</p>
+    <h2>Detection cannot live where every other page rule lives</h2>
+    <p>
+      Every existing page rule runs inside <code>ParsePage</code>, once per file. The tier rule cannot:
+      it is a property of the whole page set, and a single file carries no evidence of what repeats. So
+      detection runs after the walk completes, alongside <code>ResolveRelationships</code>, which is the
+      one point where the page slice is finished and warnings are still open.
+    </p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 1020 440" role="img"
+             aria-label="A four-stage pipeline running after parsing: the complete page path set feeds tier detection, then the optional settings override, then per-page classification. The settings file enters as a side channel that replaces the detected tiers.">
+          <defs>
+            <marker id="f2-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-b)"/>
+            </marker>
+            <marker id="f2-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <text x="30" y="76" font-size="11" font-weight="600" letter-spacing="1.1" fill="currentColor" opacity="0.8">Runs after ParsePage and ResolveRelationships</text>
+
+          <rect x="30" y="100" width="225" height="100" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="48" y="126" font-size="13.5" font-weight="600" fill="currentColor">Every page path</text>
+          <text x="48" y="148" font-size="11.5" fill="currentColor" opacity="0.8">the finished slice, not</text>
+          <text x="48" y="168" font-size="11.5" fill="currentColor" opacity="0.8">one file at a time</text>
+
+          <line x1="257" y1="150" x2="269" y2="150" stroke="currentColor" stroke-width="1.6" marker-end="url(#f2-n)"/>
+
+          <rect x="275" y="100" width="225" height="100" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="293" y="126" font-size="13.5" font-weight="600" fill="currentColor">Detect tier names</text>
+          <text x="293" y="148" font-size="11.5" fill="currentColor" opacity="0.8">within-bucket</text>
+          <text x="293" y="168" font-size="11.5" fill="currentColor" opacity="0.8">recurrence</text>
+
+          <line x1="502" y1="150" x2="514" y2="150" stroke="currentColor" stroke-width="1.6" marker-end="url(#f2-n)"/>
+
+          <rect x="520" y="100" width="225" height="100" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="538" y="126" font-size="13.5" font-weight="600" fill="currentColor">Apply override</text>
+          <text x="538" y="148" font-size="11.5" fill="currentColor" opacity="0.8">tiers replaced,</text>
+          <text x="538" y="168" font-size="11.5" fill="currentColor" opacity="0.8">roles added</text>
+
+          <line x1="747" y1="150" x2="759" y2="150" stroke="currentColor" stroke-width="1.6" marker-end="url(#f2-n)"/>
+
+          <rect x="765" y="100" width="225" height="100" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="783" y="126" font-size="13.5" font-weight="600" fill="currentColor">Classify each page</text>
+          <text x="783" y="148" font-size="11.5" fill="currentColor" opacity="0.8">bucket, area, tier</text>
+
+          <rect x="520" y="250" width="225" height="70" rx="4" fill="var(--card)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="538" y="276" font-size="13.5" font-weight="600" fill="currentColor">Settings override</text>
+          <text x="538" y="298" font-size="11.5" fill="currentColor" opacity="0.8">optional, at the wiki root</text>
+
+          <line x1="632" y1="250" x2="632" y2="206" stroke="var(--accent-b)" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#f2-b)"/>
+          <text x="644" y="232" font-size="11" fill="currentColor" opacity="0.85">absent by default</text>
+
+          <rect x="30" y="350" width="960" height="60" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="48" y="376" font-size="13.5" font-weight="600" fill="currentColor">One page is never enough evidence.</text>
+          <text x="48" y="397" font-size="11.5" fill="currentColor" opacity="0.8">A young wiki with a single concepts directory yields no tier at all, rather than a guess that later has to be unlearned.</text>
+        </svg>
+      </div>
+      <figcaption><b>Figure 2.</b> The override is a side channel, not a stage: it is absent in every existing workspace, and when present it replaces the detected tier set rather than merging with it, so a wrongly detected tier can actually be removed.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- FIGURE 3 — NUMBERED FLOW                                   -->
+  <!-- ========================================================= -->
+  <section class="sec">
+    <p class="eyebrow">Figure 3</p>
+    <h2>The literal becomes a default, so nothing has to migrate</h2>
+    <p>
+      Removing a hardcoded string usually means every existing installation needs new configuration.
+      Here it does not. The <code>journeys</code> role falls back to a bucket named
+      <code>e2e-testing</code>, so a workspace that never gains a settings file resolves to exactly the
+      pages it resolves to today.
+    </p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 1020 384" role="img"
+             aria-label="A four-step resolution flow: the journey lookup requests the journeys bucket, the settings file is consulted, and either a declared bucket is used or the e2e-testing default stands. An unknown role warns and is dropped, leaving the default in force.">
+          <defs>
+            <marker id="f3-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <circle cx="54" cy="96" r="16" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="54" y="101" font-size="13.5" font-weight="600" text-anchor="middle" fill="currentColor">1</text>
+          <rect x="90" y="60" width="900" height="72" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="108" y="86" font-size="13.5" font-weight="600" fill="currentColor">A plan asks for its linked E2E coverage</text>
+          <text x="108" y="110" font-size="11.5" fill="currentColor" opacity="0.8">Two call sites, unchanged in purpose: they select candidate pages, then match sourceRef against the plan.</text>
+
+          <line x1="54" y1="112" x2="54" y2="166" stroke="currentColor" stroke-width="1.6" marker-end="url(#f3-n)"/>
+
+          <circle cx="54" cy="188" r="16" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="54" y="193" font-size="13.5" font-weight="600" text-anchor="middle" fill="currentColor">2</text>
+          <rect x="90" y="152" width="900" height="72" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="108" y="178" font-size="13.5" font-weight="600" fill="currentColor">Which bucket carries the journeys role?</text>
+          <text x="108" y="202" font-size="11.5" fill="currentColor" opacity="0.8">Replaces a prefix test on the domain path. Comparison also tightens to an exact bucket match.</text>
+
+          <path d="M 540 224 L 540 248 L 305 248 L 305 262" fill="none" stroke="currentColor" stroke-width="1.6" marker-end="url(#f3-n)"/>
+          <path d="M 540 248 L 775 248 L 775 262" fill="none" stroke="currentColor" stroke-width="1.6" marker-end="url(#f3-n)"/>
+
+          <rect x="90" y="268" width="430" height="86" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="108" y="294" font-size="13.5" font-weight="600" fill="currentColor">Declared</text>
+          <text x="502" y="294" font-size="11.5" font-weight="600" text-anchor="end" fill="currentColor">3</text>
+          <text x="108" y="317" font-size="11.5" fill="currentColor" opacity="0.8">That bucket is used, whatever it is named.</text>
+          <text x="108" y="338" font-size="11.5" fill="var(--accent-b)">A named bucket absent from the tree warns.</text>
+
+          <rect x="560" y="268" width="430" height="86" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="578" y="294" font-size="13.5" font-weight="600" fill="currentColor">Absent</text>
+          <text x="972" y="294" font-size="11.5" font-weight="600" text-anchor="end" fill="currentColor">4</text>
+          <text x="578" y="317" font-size="11.5" fill="currentColor" opacity="0.8">e2e-testing stands. Today's behaviour, exactly.</text>
+          <text x="578" y="338" font-size="11.5" fill="var(--accent-stop)">An unknown role warns, is dropped, and lands here.</text>
+        </svg>
+      </div>
+      <figcaption><b>Figure 3.</b> Step 4 is the whole compatibility story, and it is the one assumption in this plan carrying real risk — phase B4's first test exists to prove it rather than assume it.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- FIGURE 4 — LAYERED TOPOLOGY                                -->
+  <!-- ========================================================= -->
+  <section class="sec">
+    <p class="eyebrow">Figure 4</p>
+    <h2>The blast radius stops at the package boundary</h2>
+    <p>
+      Two new files, three changed, and nothing above or beside them. The browser tree and the graph
+      filter both read <code>domain</code>, and <code>domain</code> is deliberately left alone — which is
+      what keeps a structural change out of the UI. <code>parser.go</code> is untouched too, so the front
+      matter contract every page depends on is not in play.
+    </p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 1020 470" role="img"
+             aria-label="A layered view: the web layer is unchanged and still reads domain; inside internal slash knowledge two files are new and two are changed; below, the parser stays untouched, the index gains three fields on rescan, and the settings file is new and optional.">
+          <defs>
+            <marker id="f4-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-a)"/>
+            </marker>
+            <marker id="f4-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <rect x="30" y="60" width="960" height="64" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1.5"/>
+          <text x="48" y="86" font-size="13.5" font-weight="600" fill="currentColor">web/ — Knowledge browser, page graph, domain filter</text>
+          <text x="972" y="86" font-size="11.5" font-weight="600" text-anchor="end" fill="var(--accent-a)">not edited</text>
+          <text x="48" y="108" font-size="11.5" fill="currentColor" opacity="0.8">Reads domain, which keeps its meaning and its value for every page.</text>
+
+          <line x1="510" y1="160" x2="510" y2="130" stroke="var(--accent-a)" stroke-width="1.6" marker-end="url(#f4-a)"/>
+          <text x="522" y="150" font-size="11" fill="currentColor" opacity="0.85">serves domain, plus three additive fields</text>
+
+          <rect x="30" y="160" width="960" height="156" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="2"/>
+          <text x="48" y="186" font-size="13.5" font-weight="600" fill="currentColor">internal/knowledge</text>
+
+          <rect x="48" y="202" width="216" height="96" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1"/>
+          <text x="66" y="228" font-size="13.5" font-weight="600" fill="currentColor">taxonomy.go</text>
+          <text x="66" y="250" font-size="11.5" fill="currentColor" opacity="0.8">detect tiers,</text>
+          <text x="66" y="270" font-size="11.5" fill="currentColor" opacity="0.8">classify paths</text>
+          <text x="66" y="290" font-size="11.5" font-weight="600" fill="var(--accent-b)">new</text>
+
+          <rect x="284" y="202" width="216" height="96" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1"/>
+          <text x="302" y="228" font-size="13.5" font-weight="600" fill="currentColor">taxonomy_settings</text>
+          <text x="302" y="250" font-size="11.5" fill="currentColor" opacity="0.8">read and validate</text>
+          <text x="302" y="270" font-size="11.5" fill="currentColor" opacity="0.8">the override</text>
+          <text x="302" y="290" font-size="11.5" font-weight="600" fill="var(--accent-b)">new</text>
+
+          <rect x="520" y="202" width="216" height="96" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1"/>
+          <text x="538" y="228" font-size="13.5" font-weight="600" fill="currentColor">detector.go</text>
+          <text x="538" y="250" font-size="11.5" fill="currentColor" opacity="0.8">applies taxonomy</text>
+          <text x="538" y="270" font-size="11.5" fill="currentColor" opacity="0.8">once per scan</text>
+          <text x="538" y="290" font-size="11.5" font-weight="600" fill="var(--accent-b)">changed</text>
+
+          <rect x="756" y="202" width="216" height="96" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1"/>
+          <text x="774" y="228" font-size="13.5" font-weight="600" fill="currentColor">knowledge_service</text>
+          <text x="774" y="250" font-size="11.5" fill="currentColor" opacity="0.8">resolve bucket</text>
+          <text x="774" y="270" font-size="11.5" fill="currentColor" opacity="0.8">by role</text>
+          <text x="774" y="290" font-size="11.5" font-weight="600" fill="var(--accent-b)">changed</text>
+
+          <line x1="183" y1="316" x2="183" y2="344" stroke="currentColor" stroke-width="1.6" marker-end="url(#f4-n)"/>
+          <line x1="510" y1="316" x2="510" y2="344" stroke="currentColor" stroke-width="1.6" marker-end="url(#f4-n)"/>
+          <line x1="837" y1="316" x2="837" y2="344" stroke="currentColor" stroke-width="1.6" marker-end="url(#f4-n)"/>
+
+          <rect x="30" y="350" width="306" height="90" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1.5"/>
+          <text x="48" y="376" font-size="13.5" font-weight="600" fill="currentColor">parser.go</text>
+          <text x="48" y="398" font-size="11.5" fill="currentColor" opacity="0.8">Front matter contract unchanged.</text>
+          <text x="48" y="420" font-size="11.5" fill="var(--accent-stop)">lastVerified still unparsed.</text>
+
+          <rect x="357" y="350" width="306" height="90" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="375" y="376" font-size="13.5" font-weight="600" fill="currentColor">knowledge-index.yaml</text>
+          <text x="375" y="398" font-size="11.5" fill="currentColor" opacity="0.8">App-owned, rebuilt by rescan.</text>
+          <text x="375" y="420" font-size="11.5" fill="currentColor" opacity="0.8">Gains three fields, no migration.</text>
+
+          <rect x="684" y="350" width="306" height="90" rx="4" fill="var(--card)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="702" y="376" font-size="13.5" font-weight="600" fill="currentColor">knowledge-settings.yaml</text>
+          <text x="702" y="398" font-size="11.5" fill="currentColor" opacity="0.8">Optional, lives at the wiki root.</text>
+          <text x="702" y="420" font-size="11.5" fill="currentColor" opacity="0.8">Travels with the wiki through Git.</text>
+        </svg>
+      </div>
+      <figcaption><b>Figure 4.</b> No route, status, or JSON contract changes. The three added fields are omitted when empty, so a page at the wiki root does not appear to belong to a bucket named with the empty string.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- 4. DELIVERY                                               -->
+  <!-- ========================================================= -->
+  <section class="sec">
+    <p class="eyebrow">Delivery</p>
+    <h2>Two pure phases, then a join, then the only behaviour change</h2>
+    <p>
+      B1 and B2 touch nothing shared and can be built in either order. B3 is the join and the first
+      contact with indexer code. B4 is the only phase a user could observe, and it lands last so the
+      pieces it depends on are already proven.
+    </p>
+
+    <div class="phases">
+      <div class="phase">
+        <div class="phase-n">B1</div>
+        <div class="phase-body">
+          <div class="phase-head"><h3>Detection and classification</h3></div>
+          <p>
+            Establishes the rule as a pure function of path shape, testable with no wiring at all. The
+            tests are the specification here: the three structural shapes in the reference wiki, plus a
+            regression case proving the rejected global-recurrence rule stays rejected.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">B2</div>
+        <div class="phase-body">
+          <div class="phase-head"><h3>Settings override reader</h3></div>
+          <p>
+            Establishes that a curator can correct detection, and that a broken file cannot take a wiki
+            down. Mirrors the existing scanner settings reader deliberately, so the validation and
+            warning behaviour is already familiar.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">B3</div>
+        <div class="phase-body">
+          <div class="phase-head"><h3>Model and indexer wiring</h3></div>
+          <p>
+            The join. Pages start carrying <code>bucket</code>, <code>area</code> and <code>tier</code>,
+            and settings warnings join the existing warning list. The regression that matters is that
+            <code>domain</code> comes out identical for every page in the fixture.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">B4</div>
+        <div class="phase-body">
+          <div class="phase-head"><h3>Role-based journey lookup</h3></div>
+          <p>
+            Deletes both literal prefix matches. Establishes that journeys are found by declared meaning,
+            and — through the default — that no existing workspace needs a settings file to keep working.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- 5. REFERENCE                                              -->
+  <!-- ========================================================= -->
+  <section class="sec">
+    <p class="eyebrow">Reference</p>
+    <h2>The vocabulary a wiki path now resolves into</h2>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Term</th><th>Status</th><th>Meaning</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Domain</td><td class="accent-a">unchanged</td><td>Relative parent directory used to group pages, as defined by PM-022</td><td><code>domains/offer/concepts</code></td></tr>
+          <tr><td>Bucket</td><td class="accent-b">new</td><td>First path segment under the wiki root</td><td><code>domains</code></td></tr>
+          <tr><td>Area</td><td class="accent-b">new</td><td>Subject segments between bucket and tier, slash-joined</td><td><code>master-data/article</code></td></tr>
+          <tr><td>Tier</td><td class="accent-b">new</td><td>Name recurring under two or more parents inside one bucket</td><td><code>concepts</code></td></tr>
+          <tr><td>Bucket role</td><td class="accent-b">new</td><td>Declared meaning of a bucket; never inferred</td><td><code>journeys</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <h3>Area absorbs anything the rule does not recognise</h3>
+      <p>
+        Segments appearing after a matched tier fold into the area rather than being discarded. A layout
+        deeper or stranger than the reference wiki therefore degrades into a longer area string instead of
+        silently losing a path component — which matters because the taxonomy is inferred, and inference
+        on an unfamiliar tree will sometimes be wrong.
+      </p>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- 6. SCOPE                                                  -->
+  <!-- ========================================================= -->
+  <section class="sec">
+    <p class="eyebrow">Scope</p>
+    <h2>Deliberately not included</h2>
+    <ul>
+      <li><b>Front matter freshness.</b> The restructured wiki adds <code>lastVerified</code> and claim-status marking to every page, and <code>parser.go</code> ignores both. That is schema work on the struct every page flows through, not layout configuration, and it earns its own ticket rather than riding along with this one.</li>
+      <li><b>Chunk metadata.</b> The <code>chunkId</code> and <code>keywords</code> comments are pure retrieval signal and are currently discarded. Worth capturing, but it changes what the agent can find rather than how pages are organised.</li>
+      <li><b>Any use of the taxonomy in the UI.</b> Grouping the browser tree by bucket and tier, and replacing the graph's flat domain dropdown, are the visible payoff — and they are the risky part. They come back in once the detected values have been observed against real wikis and trusted.</li>
+    </ul>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- 7. OPEN DECISIONS                                         -->
+  <!-- ========================================================= -->
+  <section class="sec">
+    <p class="eyebrow">Open</p>
+    <h2>Two decisions still to make</h2>
+
+    <div class="note stop">
+      <h3>Does the compatibility default actually cover every path into journeys?</h3>
+      <p>
+        The plan asserts that defaulting the <code>journeys</code> role to <code>e2e-testing</code>
+        preserves PM-036 behaviour. That was verified against the two call sites in
+        <code>knowledge_service.go</code> and not against PM-036's own call paths. If PM-036 reaches
+        canonical journeys by some other route, B4 grows to cover it. The B4 test suite is written to
+        fail loudly rather than quietly pass if this is wrong. Owner: whoever implements B4, before
+        writing the fix.
+      </p>
+    </div>
+
+    <div class="note stop">
+      <h3>Should a detected taxonomy be sticky, or re-derived every scan?</h3>
+      <p>
+        As written, the taxonomy is inferred fresh on each rescan, so a growing wiki can see
+        <code>concepts</code> shift from area to tier the moment a second area acquires one. That is
+        arguably correct — the evidence genuinely changed — but it means classification is not stable over
+        a wiki's lifetime. The alternative is writing detected values back into the settings file once
+        confident, as the source-structure proposal flow already does for cards. That is more machinery
+        and one more thing that can be stale. Deferred until the instability is observed rather than
+        predicted. Owner: the ticket that first surfaces bucket and tier in the UI, since it is the first
+        thing that would visibly flicker.
+      </p>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- 8. FOOTER — provenance                                    -->
+  <!-- ========================================================= -->
+  <p class="foot">
+    Rendered from plans/platform/PM-040/ · 2026-08-20 · f77669c<br>
+    The markdown in that directory is the source of truth. Re-render this page after changing it.
+  </p>
+
+</div>
+
+</body>
+</html>
