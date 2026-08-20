@@ -39,6 +39,9 @@ type KnowledgePage struct {
 	Title       string          `json:"title" yaml:"title"`
 	Path        string          `json:"path" yaml:"path"`
 	Domain      string          `json:"domain" yaml:"domain"`
+	Bucket      string          `json:"bucket,omitempty" yaml:"bucket,omitempty"`
+	Area        string          `json:"area,omitempty" yaml:"area,omitempty"`
+	Tier        string          `json:"tier,omitempty" yaml:"tier,omitempty"`
 	PageType    string          `json:"pageType,omitempty" yaml:"pageType,omitempty"`
 	Roles       []string        `json:"roles" yaml:"roles"`
 	Topics      []string        `json:"topics" yaml:"topics"`

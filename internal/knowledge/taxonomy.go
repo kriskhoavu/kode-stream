@@ -90,3 +90,25 @@ func pathSegments(relativePath string) []string {
 	}
 	return strings.Split(directory, "/")
 }
+
+// applyTaxonomy classifies every page in one Wiki Root. Detection needs the
+// finished page set, so it runs here rather than per file during parsing.
+//
+// A settings file that could not be used leaves the detected taxonomy in place,
+// so a broken override costs the wiki its overrides and nothing else.
+func applyTaxonomy(root string, pages []KnowledgePage) ([]KnowledgePage, []KnowledgeWarning) {
+	paths := make([]string, 0, len(pages))
+	for _, page := range pages {
+		paths = append(paths, page.Path)
+	}
+	taxonomy := DetectTaxonomy(paths)
+	settings, present, warnings := ReadTaxonomySettings(root)
+	if present {
+		warnings = append(warnings, ValidateTaxonomyBuckets(taxonomy, settings)...)
+		taxonomy = ApplyTaxonomySettings(taxonomy, settings)
+	}
+	for index := range pages {
+		pages[index].Bucket, pages[index].Area, pages[index].Tier = taxonomy.Classify(pages[index].Path)
+	}
+	return pages, warnings
+}

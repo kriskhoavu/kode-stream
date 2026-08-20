@@ -223,6 +223,12 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 		relationshipWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
 	}
 	warnings = append(warnings, relationshipWarnings...)
+	pages, taxonomyWarnings := applyTaxonomy(resolved, pages)
+	for index := range taxonomyWarnings {
+		taxonomyWarnings[index].WorkspaceID = workspace.ID
+		taxonomyWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
+	}
+	warnings = append(warnings, taxonomyWarnings...)
 	sort.Slice(warnings, func(i, j int) bool {
 		if warnings[i].Path == warnings[j].Path {
 			return warnings[i].Code < warnings[j].Code
