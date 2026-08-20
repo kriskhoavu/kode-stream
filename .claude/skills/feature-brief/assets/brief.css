@@ -1,0 +1,457 @@
+/* feature-brief page stylesheet — self-contained, no external assets.
+   Colour tokens carry meaning per page; declare that meaning in the legend.
+   accent-a / accent-b / accent-stop are the only three meaning-carrying colours. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body { margin: 0; }
+
+img, svg { max-width: 100%; }
+
+:root {
+  color-scheme: light dark;
+  --paper: #F5F6F4;
+  --paper-2: #EAECE8;
+  --card: #FFFFFF;
+  --ink: #151A1E;
+  --ink-2: #4A5560;
+  --ink-3: #77828C;
+  --rule: #D8DCD6;
+  --rule-soft: #E6E9E4;
+  --accent-a: #2C7A6B;
+  --accent-a-tint: #E4EFEC;
+  --accent-b: #9C6A18;
+  --accent-b-tint: #F6EEDF;
+  --accent-stop: #9E3B33;
+  --accent-stop-tint: #F6E6E4;
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+  --measure: 68ch;
+  --band: 1080px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #12161A;
+    --paper-2: #1A1F24;
+    --card: #191E23;
+    --ink: #E6EAE7;
+    --ink-2: #A8B2B8;
+    --ink-3: #7C868C;
+    --rule: #2C343A;
+    --rule-soft: #232A30;
+    --accent-a: #57AD9B;
+    --accent-a-tint: #17302C;
+    --accent-b: #D9A344;
+    --accent-b-tint: #33280F;
+    --accent-stop: #D07A6E;
+    --accent-stop-tint: #34211E;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #12161A;
+  --paper-2: #1A1F24;
+  --card: #191E23;
+  --ink: #E6EAE7;
+  --ink-2: #A8B2B8;
+  --ink-3: #7C868C;
+  --rule: #2C343A;
+  --rule-soft: #232A30;
+  --accent-a: #57AD9B;
+  --accent-a-tint: #17302C;
+  --accent-b: #D9A344;
+  --accent-b-tint: #33280F;
+  --accent-stop: #D07A6E;
+  --accent-stop-tint: #34211E;
+}
+
+:root[data-theme="light"] {
+  --paper: #F5F6F4;
+  --paper-2: #EAECE8;
+  --card: #FFFFFF;
+  --ink: #151A1E;
+  --ink-2: #4A5560;
+  --ink-3: #77828C;
+  --rule: #D8DCD6;
+  --rule-soft: #E6E9E4;
+  --accent-a: #2C7A6B;
+  --accent-a-tint: #E4EFEC;
+  --accent-b: #9C6A18;
+  --accent-b-tint: #F6EEDF;
+  --accent-stop: #9E3B33;
+  --accent-stop-tint: #F6E6E4;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: var(--band);
+  margin: 0 auto;
+  padding: 0 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  padding: 40px 0 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.meta-row span strong {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+h1 {
+  font-family: var(--mono);
+  font-size: clamp(28px, 4.4vw, 44px);
+  line-height: 1.12;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.standfirst {
+  max-width: var(--measure);
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+/* ---------- sections ---------- */
+
+.sec {
+  padding-top: 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-a);
+  margin: 0;
+}
+
+h2 {
+  font-family: var(--mono);
+  font-size: clamp(21px, 2.6vw, 27px);
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+h3 {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.sec p,
+.sec ul,
+.sec ol {
+  max-width: var(--measure);
+  margin: 0;
+}
+
+.sec ul,
+.sec ol {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+li::marker {
+  color: var(--ink-3);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--paper-2);
+  border: 1px solid var(--rule-soft);
+  border-radius: 3px;
+  padding: 1px 5px;
+  word-break: break-word;
+}
+
+a {
+  color: var(--accent-a);
+  text-underline-offset: 3px;
+}
+
+a:focus-visible,
+.legend-key:focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 3px;
+}
+
+/* ---------- legend ---------- */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding: 14px 18px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.legend-key {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink-2);
+}
+
+.swatch {
+  width: 22px;
+  height: 11px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.swatch.a { background: var(--accent-a-tint); border: 1.5px solid var(--accent-a); }
+.swatch.b { background: var(--accent-b-tint); border: 1.5px solid var(--accent-b); }
+.swatch.stop { background: var(--accent-stop-tint); border: 1.5px dashed var(--accent-stop); }
+
+/* ---------- figures ---------- */
+
+figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.frame {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 20px;
+  overflow-x: auto;
+}
+
+.frame svg {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+  max-width: 100%;
+  height: auto;
+  color: var(--ink-2);
+}
+
+figcaption {
+  max-width: var(--measure);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+
+figcaption b {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+/* ---------- tables ---------- */
+
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--card);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 560px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+th, td {
+  text-align: left;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--rule-soft);
+  vertical-align: top;
+}
+
+thead th {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--rule);
+}
+
+tbody tr:last-child td { border-bottom: none; }
+
+td.accent-a { color: var(--accent-a); font-family: var(--mono); font-size: 12.5px; }
+td.accent-b { color: var(--accent-b); font-family: var(--mono); font-size: 12.5px; }
+td code { background: none; border: none; padding: 0; }
+
+/* ---------- phase list ---------- */
+
+.phases {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 100%;
+}
+
+.phase {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 18px;
+  padding: 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent-a);
+  border-radius: 4px;
+}
+
+.phase-n {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--accent-a);
+  line-height: 1.2;
+}
+
+.phase-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.phase-body p,
+.phase-body ul { max-width: 62ch; }
+
+.phase-body p { font-size: 15px; color: var(--ink-2); }
+.phase-body ul { font-size: 14.5px; color: var(--ink-2); }
+
+/* ---------- callout ---------- */
+
+.note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent-b);
+  border-radius: 4px;
+  background: var(--card);
+  max-width: var(--measure);
+}
+
+.note h3 { color: var(--accent-b); }
+.note p { font-size: 15px; color: var(--ink-2); }
+
+.note.stop { border-left-color: var(--accent-stop); }
+.note.stop h3 { color: var(--accent-stop); }
+
+/* ---------- footer ---------- */
+
+.foot {
+  margin-top: 72px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  max-width: var(--measure);
+  line-height: 1.7;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a { transition: color 120ms ease; }
+}
+
+@media (max-width: 620px) {
+  .page { padding: 0 16px 72px; }
+  .phase { grid-template-columns: 1fr; gap: 8px; }
+}
+
+/* ---------- phase accent variants ---------- */
+/* Default phase cards use accent-a. Use .b / .stop only when the page's legend
+   gives those accents a meaning that applies to a phase (e.g. per-track colour). */
+
+.phase.b { border-left-color: var(--accent-b); }
+.phase.b .phase-n { color: var(--accent-b); }
+.phase.stop { border-left-color: var(--accent-stop); }
+.phase.stop .phase-n { color: var(--accent-stop); }
+
+/* ---------- status pill ---------- */
+
+.pill {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  color: var(--ink-3);
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+
+.pill.done { border-color: var(--accent-a); color: var(--accent-a); background: var(--accent-a-tint); }
+.pill.active { border-color: var(--accent-b); color: var(--accent-b); background: var(--accent-b-tint); }
+.pill.blocked { border-color: var(--accent-stop); color: var(--accent-stop); background: var(--accent-stop-tint); }
+
+.phase-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
