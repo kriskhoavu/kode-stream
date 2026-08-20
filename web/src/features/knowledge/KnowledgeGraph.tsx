@@ -4,7 +4,7 @@ import { Background, Handle, Position, ReactFlow, useReactFlow } from '@xyflow/r
 import type { Node, NodeProps, OnNodeDrag } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { KnowledgeGraph as GraphData, KnowledgeGraphNode as GraphNodeData, KnowledgePage, KnowledgePageDetail } from '../../lib/types';
-import { adaptKnowledgeGraph, type KnowledgeHierarchyRole } from './graphModel';
+import { adaptKnowledgeGraph, nodeBucket, type KnowledgeHierarchyRole } from './graphModel';
 import { KnowledgeReader } from './KnowledgeReader';
 
 const nodeTypes = { knowledge: KnowledgeNode };
@@ -42,12 +42,12 @@ function KnowledgeNode({ data }: NodeProps) {
 		<Handle type="target" position={Position.Top} />
 		<div className="knowledge-flow-node-card" role={nodeData.isDomain ? undefined : 'button'} tabIndex={nodeData.isDomain ? -1 : 0} onClick={(event) => { event.stopPropagation(); if (!nodeData.isDomain) nodeData.onSelect(node.id); }} onKeyDown={onKeyDown}>
 			<div className="knowledge-flow-node-heading"><strong>{node.title}</strong><span className="knowledge-flow-node-role">{roleLabel}</span></div>
-			<span>{node.pageType || 'PAGE'} · {node.domain}</span>
+			<span>{node.pageType || 'PAGE'}{node.tier ? <span className="knowledge-flow-node-tier">{node.tier}</span> : null}</span>
 		</div>
 		{!nodeData.isDomain && nodeData.isTooltipOpen && <div className="knowledge-node-tooltip" role="tooltip">
 			<button type="button" className="knowledge-node-tooltip-close nodrag nopan" aria-label="Close node tooltip" onClick={closeTooltip}><X size={13} /></button>
 			<strong>{node.title}</strong>
-			<dl><dt>Path</dt><dd>{node.path}</dd><dt>Domain</dt><dd>{node.domain}</dd><dt>Type</dt><dd>{node.pageType || 'Page'}</dd><dt>Links</dt><dd>{node.inbound} in · {node.outbound} out</dd>{node.roles.length > 0 && <><dt>Roles</dt><dd>{node.roles.join(', ')}</dd></>}{node.topics.length > 0 && <><dt>Topics</dt><dd>{node.topics.join(', ')}</dd></>}</dl>
+			<dl><dt>Path</dt><dd>{node.path}</dd><dt>Bucket</dt><dd>{node.bucket || node.domain}</dd>{node.area ? <><dt>Area</dt><dd>{node.area}</dd></> : null}{node.tier ? <><dt>Tier</dt><dd>{node.tier}</dd></> : null}<dt>Type</dt><dd>{node.pageType || 'Page'}</dd><dt>Links</dt><dd>{node.inbound} in · {node.outbound} out</dd>{node.roles.length > 0 && <><dt>Roles</dt><dd>{node.roles.join(', ')}</dd></>}{node.topics.length > 0 && <><dt>Topics</dt><dd>{node.topics.join(', ')}</dd></>}</dl>
 			<div className="knowledge-node-tooltip-actions nodrag nopan" onMouseDown={stop}>
 				<button type="button" className="knowledge-node-tooltip-link" onClick={openDetails}>Open details</button>
 			</div>
@@ -133,7 +133,8 @@ function autoArrangeNodes(nodes: Node[], edges: Array<{ source: string; target: 
 
 export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onSelect, onOpenDetails }: { graph: GraphData; pages: KnowledgePage[]; selectedSlug?: string; selectedDetail?: KnowledgePageDetail | null; onSelect: (slug: string) => void; onOpenDetails: (slug: string) => void }) {
 	const [query, setQuery] = useState('');
-	const [domain, setDomain] = useState('');
+	const [bucket, setBucket] = useState('');
+	const [tier, setTier] = useState('');
 	const [pageType, setPageType] = useState('');
 	const [focusRelationships, setFocusRelationships] = useState(false);
 	const [showConnections, setShowConnections] = useState(false);
@@ -191,10 +192,10 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 			return { ...graph, nodes: graph.nodes.filter((node) => related.has(node.id)), edges: graph.edges.filter((edge) => edge.source === selectedSlug || edge.target === selectedSlug) };
 		}
 		const needle = query.trim().toLowerCase();
-		const nodes = graph.nodes.filter((node) => (!needle || node.title.toLowerCase().includes(needle) || node.id.toLowerCase().includes(needle)) && (!domain || node.domain === domain) && (!pageType || node.pageType === pageType));
+		const nodes = graph.nodes.filter((node) => (!needle || node.title.toLowerCase().includes(needle) || node.id.toLowerCase().includes(needle)) && (!bucket || nodeBucket(node) === bucket) && (!tier || (node.tier ?? '') === tier) && (!pageType || node.pageType === pageType));
 		const allowed = new Set(nodes.map((node) => node.id));
 		return { ...graph, nodes, edges: graph.edges.filter((edge) => allowed.has(edge.source) && allowed.has(edge.target)) };
-	}, [domain, focusRelationships, graph, pageType, query, selectedSlug]);
+	}, [bucket, focusRelationships, graph, pageType, query, selectedSlug, tier]);
 	const model = useMemo(() => {
 		const adapted = adaptKnowledgeGraph(filtered, isSelectionDismissed ? undefined : selectedSlug);
 		return {
@@ -219,7 +220,8 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 			return { ...current, [node.id]: node.position };
 		});
 	};
-	const domains = Array.from(new Set(graph.nodes.map((node) => node.domain))).sort();
+	const buckets = Array.from(new Set(graph.nodes.map(nodeBucket).filter(Boolean))).sort();
+	const tiers = Array.from(new Set(graph.nodes.map((node) => node.tier).filter(Boolean))).sort();
 	const pageTypes = Array.from(new Set(graph.nodes.map((node) => node.pageType).filter(Boolean))).sort();
 	const selectedPage = pages.find((page) => page.slug === selectedSlug);
 	const selectedGraphNode = graph.nodes.find((node) => node.id === selectedSlug);
@@ -229,9 +231,9 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 		return model.edges.filter((edge) => edge.source.startsWith('__knowledge_domain__:') || edge.source === selectedSlug || edge.target === selectedSlug);
 	}, [model.edges, selectedSlug, showConnections]);
 	return <div className="knowledge-graph-view" ref={graphViewRef}>
-		<div className="knowledge-graph-filters"><input aria-label="Search graph pages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search graph" disabled={focusRelationships} /><select aria-label="Filter graph domain" value={domain} onChange={(event) => setDomain(event.target.value)} disabled={focusRelationships}><option value="">All domains</option>{domains.map((value) => <option key={value}>{value}</option>)}</select><select aria-label="Filter graph page type" value={pageType} onChange={(event) => setPageType(event.target.value)} disabled={focusRelationships}><option value="">All page types</option>{pageTypes.map((value) => <option key={value}>{value}</option>)}</select><button className={focusRelationships ? 'active' : ''} type="button" aria-pressed={focusRelationships} disabled={!selectedSlug} onClick={() => setFocusRelationships((current) => { const next = !current; if (next) { setShowConnections(true); setIsSelectionDismissed(false); } return next; })}>{focusRelationships ? 'Show all components' : 'Focus relationships'}</button><button className={showConnections ? 'active' : ''} type="button" aria-pressed={showConnections} disabled={!selectedSlug} onClick={() => setShowConnections((current) => { const next = !current; if (current) { setFocusRelationships(false); setIsSelectionDismissed(true); } else setIsSelectionDismissed(false); return next; })}>{showConnections ? 'Hide selected links' : 'Show selected links'}</button></div>
+		<div className="knowledge-graph-filters"><input aria-label="Search graph pages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search graph" disabled={focusRelationships} /><select aria-label="Filter graph bucket" value={bucket} onChange={(event) => setBucket(event.target.value)} disabled={focusRelationships}><option value="">All buckets</option>{buckets.map((value) => <option key={value}>{value}</option>)}</select><select aria-label="Filter graph tier" value={tier} onChange={(event) => setTier(event.target.value)} disabled={focusRelationships}><option value="">All tiers</option>{tiers.map((value) => <option key={value}>{value}</option>)}</select><select aria-label="Filter graph page type" value={pageType} onChange={(event) => setPageType(event.target.value)} disabled={focusRelationships}><option value="">All page types</option>{pageTypes.map((value) => <option key={value}>{value}</option>)}</select><button className={focusRelationships ? 'active' : ''} type="button" aria-pressed={focusRelationships} disabled={!selectedSlug} onClick={() => setFocusRelationships((current) => { const next = !current; if (next) { setShowConnections(true); setIsSelectionDismissed(false); } return next; })}>{focusRelationships ? 'Show all components' : 'Focus relationships'}</button><button className={showConnections ? 'active' : ''} type="button" aria-pressed={showConnections} disabled={!selectedSlug} onClick={() => setShowConnections((current) => { const next = !current; if (current) { setFocusRelationships(false); setIsSelectionDismissed(true); } else setIsSelectionDismissed(false); return next; })}>{showConnections ? 'Hide selected links' : 'Show selected links'}</button></div>
 		<div className="knowledge-graph-legend" aria-label="Graph hierarchy legend"><span className="knowledge-legend-domain"><GitBranch size={14} /> Domain parent</span><span className="knowledge-legend-root"><CircleDot size={14} /> Root</span><span className="knowledge-legend-leaf">Leaf</span><span className="knowledge-legend-line"><i /> Domain grouping</span><span className="knowledge-legend-selected"><i /> Selected relationships</span></div>
-		{graph.truncated && <p className="knowledge-graph-notice" role="status">Showing {graph.nodes.length} of {graph.totalNodes} pages and {graph.edges.length} of {graph.totalEdges} relationships. Filter by domain to narrow the graph.</p>}
+		{graph.truncated && <p className="knowledge-graph-notice" role="status">Showing {graph.nodes.length} of {graph.totalNodes} pages and {graph.edges.length} of {graph.totalEdges} relationships. Filter by bucket or tier to narrow the graph.</p>}
 		<div className="knowledge-graph-layout">
 			<div className="knowledge-graph-stage">
 				<div className="knowledge-graph-canvas"><ReactFlow nodes={model.nodes} edges={visibleEdges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.08, maxZoom: 1.35 }} minZoom={0.2} maxZoom={2} onNodeClick={(_, node) => { if (!(node.data as KnowledgeNodeData).isDomain) handleSelect(node.id); }} onNodeDragStop={handleNodeDragStop} nodesDraggable onlyRenderVisibleElements edgesFocusable={false}><Background color="var(--line)" gap={20} /><FocusedRelationshipViewport active={focusRelationships} nodeCount={model.nodes.length} revision={layoutRevision} /><KnowledgeGraphControls canResetLayout={hasCustomLayout} onResetLayout={() => setNodePositions({})} onBeautify={beautifyLayout} onAutoArrange={autoArrangeLayout} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} /></ReactFlow></div>

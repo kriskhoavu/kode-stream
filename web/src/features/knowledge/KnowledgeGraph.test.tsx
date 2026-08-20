@@ -87,9 +87,35 @@ describe('Knowledge graph', () => {
 		render(<KnowledgeGraph graph={graph} pages={pages} onSelect={onSelect} onOpenDetails={vi.fn()} />);
 		expect(screen.getByRole('status')).toHaveTextContent('Showing 2 of 5 pages');
 		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' })); expect(onSelect).toHaveBeenCalledWith('a');
-		fireEvent.change(screen.getByRole('combobox', { name: 'Filter graph domain' }), { target: { value: 'offer' } });
+		fireEvent.change(screen.getByRole('combobox', { name: 'Filter graph bucket' }), { target: { value: 'offer' } });
 		expect(within(screen.getByTestId('flow')).queryByRole('button', { name: 'Beta' })).not.toBeInTheDocument();
 		expect(screen.queryByRole('region', { name: 'Knowledge relationships' })).not.toBeInTheDocument();
+	});
+
+	it('filters by bucket and tier instead of a flat domain path', async () => {
+		const { KnowledgeGraph } = await import('./KnowledgeGraph');
+		const taxonomyGraph: GraphData = {
+			...graph,
+			nodes: [
+				{ id: 'approval', title: 'Approval', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts', pageType: 'HOW_TO', roles: [], topics: [], path: 'domains/offer/concepts/approval.md', inbound: 0, outbound: 0 },
+				{ id: 'permissions', title: 'Permissions', domain: 'domains/offer/reference', bucket: 'domains', area: 'offer', tier: 'reference', pageType: 'REFERENCE', roles: [], topics: [], path: 'domains/offer/reference/permissions.md', inbound: 0, outbound: 0 },
+				{ id: 'rollback', title: 'Rollback', domain: 'platform/concepts', bucket: 'platform', area: '', tier: 'concepts', pageType: 'CONCEPT', roles: [], topics: [], path: 'platform/concepts/rollback.md', inbound: 0, outbound: 0 }
+			],
+			edges: []
+		};
+		render(<KnowledgeGraph graph={taxonomyGraph} pages={[]} onSelect={vi.fn()} onOpenDetails={vi.fn()} />);
+
+		const buckets = screen.getByRole('combobox', { name: 'Filter graph bucket' });
+		expect(within(buckets).getByRole('option', { name: 'domains' })).toBeInTheDocument();
+		expect(within(buckets).getByRole('option', { name: 'platform' })).toBeInTheDocument();
+
+		fireEvent.change(buckets, { target: { value: 'domains' } });
+		expect(within(screen.getByTestId('flow')).queryByRole('button', { name: 'Rollback' })).not.toBeInTheDocument();
+		expect(within(screen.getByTestId('flow')).getByRole('button', { name: 'Approval' })).toBeInTheDocument();
+
+		fireEvent.change(screen.getByRole('combobox', { name: 'Filter graph tier' }), { target: { value: 'reference' } });
+		expect(within(screen.getByTestId('flow')).getByRole('button', { name: 'Permissions' })).toBeInTheDocument();
+		expect(within(screen.getByTestId('flow')).queryByRole('button', { name: 'Approval' })).not.toBeInTheDocument();
 	});
 
 	it('focuses the graph on the selected node and its direct relationships', async () => {

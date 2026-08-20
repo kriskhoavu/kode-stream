@@ -4,6 +4,7 @@ import type { KnowledgeGraph, KnowledgeGraphNode } from '../../lib/types';
 export type KnowledgeHierarchyRole = 'domain' | 'root' | 'parent' | 'leaf' | 'related';
 
 const domainNodePrefix = '__knowledge_domain__:';
+const rootGroupKey = 'root';
 
 interface Hierarchy {
 	roleByID: Map<string, KnowledgeHierarchyRole>;
@@ -47,22 +48,103 @@ export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string
 	return { nodes, edges, neighbors };
 }
 
-function withDomainParents(graph: KnowledgeGraph): KnowledgeGraph {
-	const domains = new Map<string, KnowledgeGraphNode>();
-	for (const node of graph.nodes) {
-		const domain = node.domain || 'other';
-		for (const ancestor of domainAncestors(domain)) {
-			if (!domains.has(ancestor)) domains.set(ancestor, { id: domainNodeID(ancestor), title: formatDomain(ancestor), domain: ancestor, pageType: 'DOMAIN', roles: [], topics: [], path: ancestor, inbound: 0, outbound: 0 });
-		}
+interface Grouping {
+	bucket: string;
+	area: string;
+}
+
+interface Section {
+	bucketID: string;
+	columns: { areaID?: string; pages: KnowledgeGraphNode[] }[];
+}
+
+// Grouping comes from the taxonomy when the index carries it. An index written
+// before the taxonomy existed has only `domain`, so bucket and area are derived
+// from its first segment and remainder. Either way grouping is two levels deep,
+// which is what the positioner can lay out.
+function groupingOf(node: KnowledgeGraphNode): Grouping {
+	if (node.bucket !== undefined || node.area !== undefined || node.tier !== undefined) {
+		return { bucket: node.bucket ?? '', area: node.area ?? '' };
 	}
-	const visiblePages = graph.nodes.filter((node) => !isContainerOverview(node, domains));
-	const pageEdges = visiblePages.map((node) => ({ source: domainNodeID(node.domain || 'other'), target: node.id }));
-	const hierarchyEdges = [...domains.keys()].flatMap((domain) => {
-		const parent = parentDomain(domain);
-		return parent && domains.has(parent) ? [{ source: domainNodeID(parent), target: domainNodeID(domain) }] : [];
+	const parts = (node.domain === rootGroupKey ? '' : node.domain).split('/').filter(Boolean);
+	return { bucket: parts[0] ?? '', area: parts.slice(1).join('/') };
+}
+
+function bucketKey(grouping: Grouping): string {
+	return grouping.bucket || rootGroupKey;
+}
+
+function areaKey(grouping: Grouping): string | undefined {
+	return grouping.area ? `${bucketKey(grouping)}/${grouping.area}` : undefined;
+}
+
+function withDomainParents(graph: KnowledgeGraph): KnowledgeGraph {
+	const groups = new Map<string, KnowledgeGraphNode>();
+	const bucketsWithAreas = new Set<string>();
+	for (const node of graph.nodes) {
+		const grouping = groupingOf(node);
+		if (areaKey(grouping)) bucketsWithAreas.add(bucketKey(grouping));
+	}
+	const visiblePages = graph.nodes.filter((node) => !isContainerOverview(node, bucketsWithAreas));
+	const groupNode = (key: string, label: string): KnowledgeGraphNode => ({
+		id: domainNodeID(key), title: label, domain: key, pageType: 'DOMAIN',
+		roles: [], topics: [], path: key, inbound: 0, outbound: 0
 	});
+	const pageEdges: { source: string; target: string }[] = [];
+	for (const node of visiblePages) {
+		const grouping = groupingOf(node);
+		const bucket = bucketKey(grouping);
+		if (!groups.has(bucket)) groups.set(bucket, groupNode(bucket, formatDomain(grouping.bucket || rootGroupKey)));
+		const area = areaKey(grouping);
+		if (area && !groups.has(area)) groups.set(area, groupNode(area, formatArea(grouping.area)));
+		pageEdges.push({ source: domainNodeID(area ?? bucket), target: node.id });
+	}
+	const hierarchyEdges = [...groups.keys()].filter((key) => key.includes('/')).map((key) => ({
+		source: domainNodeID(key.slice(0, key.indexOf('/'))), target: domainNodeID(key)
+	}));
 	const visibleIDs = new Set(visiblePages.map((node) => node.id));
-	return { ...graph, nodes: [...domains.values(), ...visiblePages], edges: [...hierarchyEdges, ...pageEdges, ...graph.edges.filter((edge) => visibleIDs.has(edge.source) && visibleIDs.has(edge.target))] };
+	return {
+		...graph,
+		nodes: [...groups.values(), ...visiblePages],
+		edges: [...hierarchyEdges, ...pageEdges, ...graph.edges.filter((edge) => visibleIDs.has(edge.source) && visibleIDs.has(edge.target))]
+	};
+}
+
+// Sections are built from the original graph so grouping and positioning agree.
+function sectionsOf(nodes: KnowledgeGraphNode[]): Section[] {
+	const order: string[] = [];
+	const byBucket = new Map<string, Map<string | undefined, KnowledgeGraphNode[]>>();
+	for (const node of nodes) {
+		if (isDomainNode(node.id)) continue;
+		const grouping = groupingOf(node);
+		const bucket = bucketKey(grouping);
+		if (!byBucket.has(bucket)) {
+			byBucket.set(bucket, new Map());
+			order.push(bucket);
+		}
+		const columns = byBucket.get(bucket)!;
+		const area = areaKey(grouping);
+		columns.set(area, [...(columns.get(area) ?? []), node]);
+	}
+	order.sort((left, right) => left.localeCompare(right));
+	return order.map((bucket) => {
+		const columns = byBucket.get(bucket)!;
+		const areaColumns = [...columns.entries()]
+			.filter(([area]) => area !== undefined)
+			.sort(([left], [right]) => left!.localeCompare(right!));
+		const direct = columns.get(undefined);
+		return {
+			bucketID: domainNodeID(bucket),
+			columns: [
+				...(direct ? [{ areaID: undefined, pages: sortPages(direct) }] : []),
+				...areaColumns.map(([area, pages]) => ({ areaID: domainNodeID(area!), pages: sortPages(pages) }))
+			]
+		};
+	});
+}
+
+function sortPages(pages: KnowledgeGraphNode[]): KnowledgeGraphNode[] {
+	return [...pages].sort((left, right) => left.title.localeCompare(right.title) || left.id.localeCompare(right.id));
 }
 
 function deriveHierarchy(graph: KnowledgeGraph): Hierarchy {
@@ -122,38 +204,29 @@ function distancesFromRoots(roots: string[], outgoing: Map<string, string[]>): M
 }
 
 function domainSectionPositions(nodes: KnowledgeGraphNode[]): Map<string, { x: number; y: number }> {
-	const pagesByDomain = new Map<string, KnowledgeGraphNode[]>();
-	for (const node of nodes) {
-		if (isDomainNode(node.id)) continue;
-		const domain = node.domain || 'other';
-		pagesByDomain.set(domain, [...(pagesByDomain.get(domain) ?? []), node]);
-	}
-	const domainNodes = nodes.filter((node) => isDomainNode(node.id));
-	const topDomains = domainNodes.filter((node) => !parentDomain(node.domain)).sort((left, right) => left.title.localeCompare(right.title));
 	const positions = new Map<string, { x: number; y: number }>();
 	const sectionWidth = 1_320;
 	const nodeSpacingX = 300;
 	const nodeSpacingY = 160;
 	const leavesPerRow = 4;
 	let nextSectionX = 0;
-	for (const domainNode of topDomains) {
-		const children = domainNodes.filter((node) => parentDomain(node.domain) === domainNode.domain).sort((left, right) => left.title.localeCompare(right.title));
-		const sectionCount = Math.max(1, children.length);
+	for (const section of sectionsOf(nodes)) {
+		const columnCount = Math.max(1, section.columns.length);
 		const sectionX = nextSectionX;
-		positions.set(domainNode.id, { x: sectionX + ((sectionCount - 1) * sectionWidth) / 2 + 150, y: 0 });
-		if (children.length) {
-			for (let childIndex = 0; childIndex < children.length; childIndex++) {
-				const child = children[childIndex];
-				const childX = sectionX + childIndex * sectionWidth;
-				const pages = (pagesByDomain.get(child.domain) ?? []).sort((left, right) => left.title.localeCompare(right.title) || left.id.localeCompare(right.id));
-				positions.set(child.id, { x: childX + 450, y: 180 });
-				for (let index = 0; index < pages.length; index++) positions.set(pages[index].id, { x: childX + (index % leavesPerRow) * nodeSpacingX, y: 360 + Math.floor(index / leavesPerRow) * nodeSpacingY });
+		positions.set(section.bucketID, { x: sectionX + ((columnCount - 1) * sectionWidth) / 2 + 150, y: 0 });
+		for (let columnIndex = 0; columnIndex < section.columns.length; columnIndex++) {
+			const column = section.columns[columnIndex];
+			const columnX = sectionX + columnIndex * sectionWidth;
+			const pageY = column.areaID ? 360 : 180;
+			if (column.areaID) positions.set(column.areaID, { x: columnX + 450, y: 180 });
+			for (let index = 0; index < column.pages.length; index++) {
+				positions.set(column.pages[index].id, {
+					x: columnX + (index % leavesPerRow) * nodeSpacingX,
+					y: pageY + Math.floor(index / leavesPerRow) * nodeSpacingY
+				});
 			}
-		} else {
-			const pages = (pagesByDomain.get(domainNode.domain) ?? []).sort((left, right) => left.title.localeCompare(right.title) || left.id.localeCompare(right.id));
-			for (let index = 0; index < pages.length; index++) positions.set(pages[index].id, { x: sectionX + (index % leavesPerRow) * nodeSpacingX, y: 180 + Math.floor(index / leavesPerRow) * nodeSpacingY });
 		}
-		nextSectionX += sectionCount * sectionWidth + 180;
+		nextSectionX += columnCount * sectionWidth + 180;
 	}
 	return positions;
 }
@@ -163,20 +236,28 @@ function edgeKey(edge: { source: string; target: string }): string { return `${e
 function domainNodeID(domain: string): string { return `${domainNodePrefix}${domain}`; }
 function isDomainNode(id: string): boolean { return id.startsWith(domainNodePrefix); }
 function formatDomain(domain: string): string { return domain.split(/[\/_-]/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') || 'Other'; }
-function domainAncestors(domain: string): string[] {
-	const parts = domain.split('/').filter(Boolean);
-	return parts.map((_, index) => parts.slice(0, index + 1).join('/'));
+function formatArea(area: string): string {
+	return area.split('/').filter(Boolean).map(formatDomain).join(' / ') || 'Other';
 }
-function parentDomain(domain: string): string | undefined {
-	const slash = domain.lastIndexOf('/');
-	return slash > 0 ? domain.slice(0, slash) : undefined;
-}
-function isContainerOverview(node: KnowledgeGraphNode, domains: Map<string, KnowledgeGraphNode>): boolean {
-	if (node.domain.includes('/')) return false;
+
+// A bucket's own landing page is redundant once the bucket is drawn as a group
+// node, but only when that bucket actually has areas beneath it.
+function isContainerOverview(node: KnowledgeGraphNode, bucketsWithAreas: Set<string>): boolean {
+	const grouping = groupingOf(node);
+	if (grouping.area || !grouping.bucket) return false;
 	const path = node.path.replace(/\\/g, '/').toLowerCase();
-	return path === `${node.domain.toLowerCase()}/readme.md` && [...domains.keys()].some((domain) => domain.startsWith(`${node.domain}/`));
+	const bucket = grouping.bucket.toLowerCase();
+	const landing = path === `${bucket}/readme.md` || path === `${bucket}/index.md`;
+	return landing && bucketsWithAreas.has(grouping.bucket);
 }
 
 function byTitle(nodes: Map<string, KnowledgeGraphNode>): (left: string, right: string) => number {
 	return (left, right) => (nodes.get(left)?.title ?? left).localeCompare(nodes.get(right)?.title ?? right) || left.localeCompare(right);
+}
+
+// nodeBucket exposes the grouping bucket for filters, so the graph filters and
+// the graph layout agree on what a bucket is, including for an index written
+// before the taxonomy existed.
+export function nodeBucket(node: KnowledgeGraphNode): string {
+	return groupingOf(node).bucket;
 }
