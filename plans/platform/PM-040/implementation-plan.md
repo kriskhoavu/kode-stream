@@ -3,29 +3,39 @@
 ## Overview
 
 Add taxonomy detection and an optional settings override to `internal/knowledge`, carry bucket, area, and tier on the
-page model, and replace the hardcoded `e2e-testing` prefix match with role-based bucket resolution. Backend only.
+page model, and replace the hardcoded `e2e-testing` prefix match with role-based bucket resolution. Then consume the
+taxonomy in both Knowledge views, which group by the raw domain path today and break on a wiki more than two
+directories deep.
 
 ## Execution Flow
 
 ```text
 B1 Detection and classification ──┐
                                   ├─> B3 Model and indexer wiring ─> B4 Role-based journey lookup
-B2 Settings override reader ──────┘
+B2 Settings override reader ──────┘         │
+                                            └─> B5 Graph payload ─> F1 Graph grouping ──┐
+                                                                                        ├─> F3 Hierarchy styling
+                                                                    F2 Pages grouping ──┘
 ```
 
-B1 and B2 are pure, independent, and testable with no wiring, so they can be built in either order or in parallel. B3
-is the join: it is the first phase that touches shared indexer code, and it needs both the detector from B1 and the
-override reader from B2 to apply a final taxonomy. B4 is the only behavioural change in the ticket and depends on B3
-having populated `bucket`. The critical path is B1 → B3 → B4; B2 is the shorter branch. No external gates.
+B1 and B2 are pure, independent, and testable with no wiring. B3 is the join: the first phase touching shared indexer
+code, needing both the detector and the override reader. B4 is the only backend behaviour change. B5 exposes the
+taxonomy on the graph payload and is the sole backend prerequisite for the frontend work. F1 and F2 are independent
+of each other and can run in parallel once B5 lands; F2 needs no backend change beyond B3. F3 restyles what both
+produce, so it lands last. The critical path is B1 → B3 → B5 → F1 → F3. No external gates.
 
 ## Phases Summary
 
-| Phase | Name                         | Track   | Status   |
-|-------|------------------------------|---------|----------|
-| B1    | Detection and classification | Backend | Complete |
-| B2    | Settings override reader     | Backend | Complete |
-| B3    | Model and indexer wiring     | Backend | Complete |
-| B4    | Role-based journey lookup    | Backend | Complete |
+| Phase | Name                          | Track    | Status   |
+|-------|-------------------------------|----------|----------|
+| B1    | Detection and classification  | Backend  | Complete |
+| B2    | Settings override reader      | Backend  | Complete |
+| B3    | Model and indexer wiring      | Backend  | Complete |
+| B4    | Role-based journey lookup     | Backend  | Complete |
+| B5    | Taxonomy on the graph payload | Backend  |          |
+| F1    | Graph grouping by taxonomy    | Frontend |          |
+| F2    | Pages grouping by taxonomy    | Frontend |          |
+| F3    | Hierarchy styling pass        | Frontend |          |
 
 ## Backend Phases
 
@@ -109,6 +119,82 @@ explicit test rather than being assumed.
 **Commit:** `PM-040: Resolve E2E journeys by bucket role`
 
 ---
+
+---
+
+### Phase B5: Taxonomy On The Graph Payload
+
+The graph node carries `domain` but not the taxonomy, so the frontend cannot group by it. One field trio, mirroring
+what `KnowledgePage` already holds.
+
+**Deliverables:**
+
+- [ ] `internal/knowledge/models.go` — `Bucket`, `Area`, and `Tier` on `KnowledgeGraphNode`, omitted when empty.
+- [ ] `internal/knowledge/relationships.go` — copy the three fields when building each graph node.
+- [ ] Test that a graph built from classified pages carries the taxonomy on every node.
+- [ ] Test that `Domain` is still present and unchanged on the graph node.
+
+**Verification:** `go test ./internal/knowledge ./internal/server/api`
+
+**Commit:** `PM-040: Expose taxonomy on knowledge graph nodes`
+
+---
+
+### Phase F1: Graph Grouping By Taxonomy
+
+Replaces domain-path grouping with bucket then area, capping grouping at two levels for any wiki depth. This is the
+phase that fixes the reported defect.
+
+**Deliverables:**
+
+- [ ] `web/src/features/knowledge/graphModel.ts` — group and position by bucket then area.
+- [ ] Nested areas render as one compound row rather than one level per segment.
+- [ ] Tier moves onto the node as a badge beside the page type.
+- [ ] Bucket filter and separate tier filter replace the flat domain dropdown.
+- [ ] Regression test asserting no node lands at the origin for a four-level tree.
+- [ ] Test covering a bucket with no area, and pages with no bucket at all.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
+
+**Commit:** `PM-040: Group the knowledge graph by bucket and area`
+
+---
+
+### Phase F2: Pages Grouping By Taxonomy
+
+Same grouping model in the browser tree, and the fix for tier folders that cannot be opened.
+
+**Deliverables:**
+
+- [ ] `web/src/features/knowledge/KnowledgeBrowser.tsx` — build the tree from bucket and area.
+- [ ] Render tier as a labelled partition inside its area, not a collapsible node.
+- [ ] The whole header row toggles its section, so expansion never depends on a landing page.
+- [ ] Keep a distinct control for opening a landing page where one exists.
+- [ ] Test that a tier with no `README.md` is reachable without a landing page.
+- [ ] Test that selecting a deep page expands its bucket and area.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
+
+**Commit:** `PM-040: Group knowledge pages by bucket, area, and tier`
+
+---
+
+### Phase F3: Hierarchy Styling Pass
+
+Indentation, weight, and colour per role, so depth is not the only signal. See `design/design-02-frontend.md`.
+
+**Deliverables:**
+
+- [ ] `web/src/features/knowledge/knowledge.css` — per-role weight, case, and colour from existing tokens.
+- [ ] Bucket and area draw indentation rails; tier sits flush, capping indent at two rails.
+- [ ] Tier rendered as an uppercase label with a hairline to the list edge.
+- [ ] Distinct markers for bucket and area; none for tier or page.
+- [ ] Graph node role styling aligned to the same vocabulary.
+- [ ] Verify both themes and keyboard focus in the browser pane.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
+
+**Commit:** `PM-040: Restyle the knowledge hierarchy by role`
 
 ## Post-Implementation Checklist
 

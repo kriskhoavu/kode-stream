@@ -2,9 +2,12 @@
 
 PM-040 teaches Knowledge the structural shape of a Wiki Root instead of hardcoding it. Bucket, area, and tier are
 inferred from the directory layout of the pages already indexed, and an optional `knowledge-settings.yaml` names what
-detection cannot infer: what a bucket *means*. The first consumer is the E2E journey lookup, which today matches the
-literal string `e2e-testing` and afterwards asks for the bucket carrying the `journeys` role. No user-visible surface
-changes in this ticket.
+detection cannot infer: what a bucket *means*.
+
+Both Knowledge views then consume that taxonomy. They group by the raw `domain` path today, which is a directory path
+of unbounded depth; the graph positions only two levels of it and the browser tree styles every level identically. A
+wiki three or four directories deep therefore loses most of its graph nodes to the origin and becomes unreadable as a
+tree. Grouping by bucket then area caps the hierarchy at two levels for any depth.
 
 ## Related Plans
 
@@ -16,13 +19,15 @@ changes in this ticket.
 
 ## Scope
 
-In scope: taxonomy detection, the settings override, and de-hardcoding the journey bucket.
+In scope: taxonomy detection, the settings override, de-hardcoding the journey bucket, and grouping both Knowledge
+views by the taxonomy including the hierarchy styling pass.
 
 Out of scope, and deliberately so — each is its own ticket:
 
 - Parsing `lastVerified` or claim-status front matter.
 - Parsing `chunkId` / `keywords` chunk comments for retrieval.
-- Grouping the Knowledge browser tree or graph filters by bucket and tier.
+- The wiki appearing as cards in Workstream, which comes from `wiki/workspace-settings.yaml` and is unrelated to
+  Knowledge grouping.
 
 ## Glossary
 
@@ -46,6 +51,10 @@ Extends the PM-022 glossary rather than replacing it. `Domain` keeps its existin
 | Domain  | `knowledge/models.go`            | Carry `bucket`, `area`, and `tier` on a page                   |
 | Service | `knowledge/detector.go`          | Classify the page set once, after relationships resolve        |
 | Service | `knowledge/knowledge_service.go` | Select the journeys bucket by role rather than by literal      |
+| Service | `knowledge/relationships.go`     | Carry the taxonomy onto every graph node                       |
+| View    | `knowledge/graphModel.ts`        | Group and position the graph by bucket then area               |
+| View    | `knowledge/KnowledgeBrowser.tsx` | Build the browser tree by bucket then area                     |
+| View    | `knowledge/knowledge.css`        | Per-role weight, case, colour, and indentation                 |
 
 ## Detection Rule
 
@@ -99,6 +108,7 @@ All three occur in the reference Wiki Root and all three must classify correctly
 
 - [Scenario Overview](scenario/scenario-00-overview.md)
 - [Backend Design](design/design-01-backend.md)
+- [Frontend Design](design/design-02-frontend.md)
 - [UI Automation](automation/README.md)
 - [Implementation Plan](implementation-plan.md)
 - [Visual Brief](brief.html)
