@@ -10,10 +10,11 @@ import (
 const minTierParents = 2
 
 // Taxonomy describes the structural shape of one Wiki Root: which directory
-// names are tiers, and what each bucket means.
+// names are tiers, which buckets exist, and what each bucket means.
 type Taxonomy struct {
-	Tiers map[string]bool
-	Roles map[string]string
+	Tiers   map[string]bool
+	Buckets map[string]bool
+	Roles   map[string]string
 }
 
 // DetectTaxonomy infers tier names from the layout of the pages already
@@ -25,12 +26,14 @@ type Taxonomy struct {
 // globally and would be mistaken for a tier.
 func DetectTaxonomy(paths []string) Taxonomy {
 	parentsByBucket := make(map[string]map[string]map[string]struct{})
+	buckets := make(map[string]bool)
 	for _, relativePath := range paths {
 		segments := pathSegments(relativePath)
 		if len(segments) == 0 {
 			continue
 		}
 		bucket := segments[0]
+		buckets[bucket] = true
 		byName, ok := parentsByBucket[bucket]
 		if !ok {
 			byName = make(map[string]map[string]struct{})
@@ -54,7 +57,7 @@ func DetectTaxonomy(paths []string) Taxonomy {
 			}
 		}
 	}
-	return Taxonomy{Tiers: tiers, Roles: make(map[string]string)}
+	return Taxonomy{Tiers: tiers, Buckets: buckets, Roles: make(map[string]string)}
 }
 
 // Classify resolves a page path into its bucket, area, and tier. Segments on
