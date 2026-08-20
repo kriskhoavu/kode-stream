@@ -96,7 +96,7 @@ func pathSegments(relativePath string) []string {
 //
 // A settings file that could not be used leaves the detected taxonomy in place,
 // so a broken override costs the wiki its overrides and nothing else.
-func applyTaxonomy(root string, pages []KnowledgePage) ([]KnowledgePage, []KnowledgeWarning) {
+func applyTaxonomy(root string, pages []KnowledgePage) ([]KnowledgePage, string, []KnowledgeWarning) {
 	paths := make([]string, 0, len(pages))
 	for _, page := range pages {
 		paths = append(paths, page.Path)
@@ -110,5 +110,44 @@ func applyTaxonomy(root string, pages []KnowledgePage) ([]KnowledgePage, []Knowl
 	for index := range pages {
 		pages[index].Bucket, pages[index].Area, pages[index].Tier = taxonomy.Classify(pages[index].Path)
 	}
-	return pages, warnings
+	return pages, journeysBucketFor(taxonomy), warnings
+}
+
+// journeysBucketFor returns the bucket declared with the journeys role, or the
+// default when no settings file names one.
+func journeysBucketFor(taxonomy Taxonomy) string {
+	for bucket, role := range taxonomy.Roles {
+		if role == RoleJourneys {
+			return bucket
+		}
+	}
+	return DefaultJourneysBucket
+}
+
+// DefaultJourneysBucket is the bucket assumed to hold reusable E2E journeys
+// when no settings file declares one. It keeps every Wiki Root that predates
+// PM-040 working without new configuration.
+const DefaultJourneysBucket = "e2e-testing"
+
+// journeysBucket resolves the bucket holding reusable E2E journeys.
+func (w KnowledgeWiki) journeysBucket() string {
+	if strings.TrimSpace(w.JourneysBucket) == "" {
+		return DefaultJourneysBucket
+	}
+	return w.JourneysBucket
+}
+
+// pageIsJourney reports whether a page belongs to the Wiki Root's journeys
+// bucket.
+//
+// A page carrying no bucket comes from an index written before PM-040, so the
+// path is used instead until the next rescan. Both branches require a full
+// segment match, which is stricter than the prefix test this replaced: a
+// sibling bucket such as e2e-testing-archive no longer matches by accident.
+func pageIsJourney(wiki KnowledgeWiki, page KnowledgePage) bool {
+	bucket := wiki.journeysBucket()
+	if page.Bucket != "" {
+		return page.Bucket == bucket
+	}
+	return page.Domain == bucket || strings.HasPrefix(page.Domain, bucket+"/")
 }

@@ -27,6 +27,7 @@ type KnowledgeWiki struct {
 	WorkspaceID    string             `json:"workspaceId" yaml:"workspaceId"`
 	Root           string             `json:"root" yaml:"root"`
 	DisplayName    string             `json:"displayName" yaml:"displayName"`
+	JourneysBucket string             `json:"journeysBucket,omitempty" yaml:"journeysBucket,omitempty"`
 	CheckoutBranch string             `json:"checkoutBranch,omitempty" yaml:"checkoutBranch,omitempty"`
 	CheckoutCommit string             `json:"checkoutCommit,omitempty" yaml:"checkoutCommit,omitempty"`
 	Pages          []KnowledgePage    `json:"pages" yaml:"pages"`

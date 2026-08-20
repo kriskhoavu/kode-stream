@@ -449,7 +449,7 @@ func (s *KnowledgeService) E2ERunbooksForSources(workspaceID string, sourceRefs 
 	matched := make([]models.E2ERunbook, 0)
 	for _, wiki := range wikis {
 		for _, page := range wiki.Pages {
-			if !strings.HasPrefix(page.Domain, "e2e-testing") || !matchesE2ESource(page.SourceRefs, sourceRefs) {
+			if !pageIsJourney(wiki, page) || !matchesE2ESource(page.SourceRefs, sourceRefs) {
 				continue
 			}
 			matched = append(matched, s.e2ERunbook(workspace, wiki.Root, page))
@@ -472,7 +472,7 @@ func (s *KnowledgeService) E2ERunbook(workspaceID, root, slug string) (models.E2
 		return models.E2ERunbookList{}, err
 	}
 	for _, page := range wiki.Pages {
-		if page.Slug == slug && strings.HasPrefix(page.Domain, "e2e-testing") {
+		if page.Slug == slug && pageIsJourney(wiki, page) {
 			return models.E2ERunbookList{Runbooks: []models.E2ERunbook{s.e2ERunbook(workspace, wiki.Root, page)}}, nil
 		}
 	}

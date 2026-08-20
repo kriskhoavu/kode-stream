@@ -223,7 +223,7 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 		relationshipWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
 	}
 	warnings = append(warnings, relationshipWarnings...)
-	pages, taxonomyWarnings := applyTaxonomy(resolved, pages)
+	pages, journeysBucket, taxonomyWarnings := applyTaxonomy(resolved, pages)
 	for index := range taxonomyWarnings {
 		taxonomyWarnings[index].WorkspaceID = workspace.ID
 		taxonomyWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
@@ -235,7 +235,7 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 		}
 		return warnings[i].Path < warnings[j].Path
 	})
-	return KnowledgeWiki{WorkspaceID: workspace.ID, Root: filepath.ToSlash(cleanSource), DisplayName: displayName(cleanSource), Pages: pages, Warnings: warnings, IndexedAt: time.Now().UTC()}, true, nil
+	return KnowledgeWiki{WorkspaceID: workspace.ID, Root: filepath.ToSlash(cleanSource), DisplayName: displayName(cleanSource), JourneysBucket: journeysBucket, Pages: pages, Warnings: warnings, IndexedAt: time.Now().UTC()}, true, nil
 }
 
 // readStableBounded never allocates more than limit bytes.  The path is
