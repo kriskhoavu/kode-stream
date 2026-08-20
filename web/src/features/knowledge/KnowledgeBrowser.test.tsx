@@ -52,9 +52,9 @@ describe('KnowledgeBrowser', () => {
 		const childPage = screen.getByRole('button', { name: /A12 Architecture Analysis/ });
 		expect(childPage).toBeInTheDocument();
 		const landingControl = screen.getByRole('button', { name: 'Open A12 index' });
-		expect(landingControl.firstElementChild).toHaveClass('lucide-book-marked');
+		expect(landingControl.firstElementChild).toHaveClass('lucide-library');
 		expect(landingControl.lastElementChild).toHaveTextContent('A12');
-		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-book-marked')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-library')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-chevron-right')).not.toBeInTheDocument();
 	});
 
@@ -135,8 +135,8 @@ describe('KnowledgeBrowser', () => {
 		expect(screen.queryByRole('button', { name: /Article Page/ })).not.toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Collapse root' })).toHaveAttribute('aria-expanded', 'true');
 		expect(screen.getByRole('button', { name: 'Expand article' })).toHaveAttribute('aria-expanded', 'false');
-		expect(screen.getByRole('heading', { name: 'root' }).querySelector('.lucide-book-marked')).toBeInTheDocument();
-		expect(screen.getByRole('heading', { name: 'article' }).querySelector('.lucide-book-marked')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'root' }).querySelector('.lucide-library')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'article' }).querySelector('.lucide-library')).toBeInTheDocument();
 	});
 
 	it('expands and focuses a referenced page selected outside the tree', async () => {

@@ -1231,3 +1231,73 @@ body.is-resizing-panel .knowledge-browser {
     width: 100%;
   }
 }
+
+/* Hierarchy roles ------------------------------------------------------------
+   Depth alone cannot distinguish a bucket from an area, so each role differs in
+   colour, size, weight, and case. Colours match the graph's node roles so both
+   views share one vocabulary: blue for a bucket, terracotta for an area, muted
+   for a tier. */
+
+.knowledge-domain-bucket > .knowledge-domain-header h3 {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.knowledge-domain-area > .knowledge-domain-header h3 {
+  /* Bare --button-accent measures 4.14:1 on light and 4.25:1 on dark, both
+     below AA for 13px text. Mixing toward --text lifts it past 5:1 in each
+     theme while keeping the accent identity. */
+  color: color-mix(in srgb, var(--button-accent) 85%, var(--text));
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.knowledge-domain-bucket > .knowledge-domain-header .knowledge-domain-link:hover {
+  color: color-mix(in srgb, var(--blue) 78%, var(--text));
+}
+
+.knowledge-domain-area > .knowledge-domain-header .knowledge-domain-link:hover {
+  color: color-mix(in srgb, var(--button-accent) 78%, var(--text));
+}
+
+/* A tier partitions an area's pages; it is a label with a rule, never a row
+   with a disclosure control. */
+.knowledge-tier-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 11px 3px 3px 7px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.knowledge-tier-label::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.knowledge-tier + .knowledge-tier {
+  margin-top: 2px;
+}
+
+/* Tier on a graph node, beside the page type. */
+.knowledge-flow-node-tier {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 16%, var(--panel));
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}

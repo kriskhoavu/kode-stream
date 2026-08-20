@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookMarked, BookOpen, ChevronRight, GripVertical, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
+import { BookMarked, BookOpen, ChevronRight, GripVertical, Library, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
 import { areaKey, bucketKey, groupingOf, rootGroupKey } from './taxonomy';
@@ -87,7 +87,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			moveFocus(event, node.landingPage!.slug);
 		};
 		const depth = node.path.includes('/') ? 'area' : 'bucket';
-		const Marker = BookMarked;
+		const Marker = depth === 'bucket' ? Library : BookMarked;
 		const renderPage = (page: KnowledgePage) => {
 			const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length;
 			return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}>
