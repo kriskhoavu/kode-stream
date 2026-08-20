@@ -89,7 +89,7 @@ func buildGraph(pages []KnowledgePage, edges []KnowledgeGraphEdge) KnowledgeGrap
 			continue
 		}
 		seen[page.Slug] = struct{}{}
-		nodes = append(nodes, KnowledgeGraphNode{ID: page.Slug, Title: page.Title, Domain: page.Domain, PageType: page.PageType, Roles: page.Roles, Topics: page.Topics, Path: page.Path, Inbound: inbound[page.Slug], Outbound: outbound[page.Slug]})
+		nodes = append(nodes, KnowledgeGraphNode{ID: page.Slug, Title: page.Title, Domain: page.Domain, Bucket: page.Bucket, Area: page.Area, Tier: page.Tier, PageType: page.PageType, Roles: page.Roles, Topics: page.Topics, Path: page.Path, Inbound: inbound[page.Slug], Outbound: outbound[page.Slug]})
 	}
 	sort.Slice(nodes, func(i, j int) bool {
 		if nodes[i].Domain != nodes[j].Domain {
