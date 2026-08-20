@@ -32,10 +32,10 @@ produce, so it lands last. The critical path is B1 → B3 → B5 → F1 → F3. 
 | B2    | Settings override reader      | Backend  | Complete |
 | B3    | Model and indexer wiring      | Backend  | Complete |
 | B4    | Role-based journey lookup     | Backend  | Complete |
-| B5    | Taxonomy on the graph payload | Backend  |          |
-| F1    | Graph grouping by taxonomy    | Frontend |          |
-| F2    | Pages grouping by taxonomy    | Frontend |          |
-| F3    | Hierarchy styling pass        | Frontend |          |
+| B5    | Taxonomy on the graph payload | Backend  | Complete |
+| F1    | Graph grouping by taxonomy    | Frontend | Complete |
+| F2    | Pages grouping by taxonomy    | Frontend | Complete |
+| F3    | Hierarchy styling pass        | Frontend | Complete |
 
 ## Backend Phases
 
@@ -129,10 +129,10 @@ what `KnowledgePage` already holds.
 
 **Deliverables:**
 
-- [ ] `internal/knowledge/models.go` — `Bucket`, `Area`, and `Tier` on `KnowledgeGraphNode`, omitted when empty.
-- [ ] `internal/knowledge/relationships.go` — copy the three fields when building each graph node.
-- [ ] Test that a graph built from classified pages carries the taxonomy on every node.
-- [ ] Test that `Domain` is still present and unchanged on the graph node.
+- [x] `internal/knowledge/models.go` — `Bucket`, `Area`, and `Tier` on `KnowledgeGraphNode`, omitted when empty.
+- [x] `internal/knowledge/relationships.go` — copy the three fields when building each graph node.
+- [x] Test that a graph built from classified pages carries the taxonomy on every node.
+- [x] Test that `Domain` is still present and unchanged on the graph node.
 
 **Verification:** `go test ./internal/knowledge ./internal/server/api`
 
@@ -147,12 +147,12 @@ phase that fixes the reported defect.
 
 **Deliverables:**
 
-- [ ] `web/src/features/knowledge/graphModel.ts` — group and position by bucket then area.
-- [ ] Nested areas render as one compound row rather than one level per segment.
-- [ ] Tier moves onto the node as a badge beside the page type.
-- [ ] Bucket filter and separate tier filter replace the flat domain dropdown.
-- [ ] Regression test asserting no node lands at the origin for a four-level tree.
-- [ ] Test covering a bucket with no area, and pages with no bucket at all.
+- [x] `web/src/features/knowledge/graphModel.ts` — group and position by bucket then area.
+- [x] Nested areas render as one compound row rather than one level per segment.
+- [x] Tier moves onto the node as a badge beside the page type.
+- [x] Bucket filter and separate tier filter replace the flat domain dropdown.
+- [x] Regression test asserting no node lands at the origin for a four-level tree.
+- [x] Test covering a bucket with no area, and pages with no bucket at all.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
 
@@ -166,12 +166,12 @@ Same grouping model in the browser tree, and the fix for tier folders that canno
 
 **Deliverables:**
 
-- [ ] `web/src/features/knowledge/KnowledgeBrowser.tsx` — build the tree from bucket and area.
-- [ ] Render tier as a labelled partition inside its area, not a collapsible node.
-- [ ] The whole header row toggles its section, so expansion never depends on a landing page.
-- [ ] Keep a distinct control for opening a landing page where one exists.
-- [ ] Test that a tier with no `README.md` is reachable without a landing page.
-- [ ] Test that selecting a deep page expands its bucket and area.
+- [x] `web/src/features/knowledge/KnowledgeBrowser.tsx` — build the tree from bucket and area.
+- [x] Render tier as a labelled partition inside its area, not a collapsible node.
+- [x] The whole header row toggles its section, so expansion never depends on a landing page.
+- [x] Keep a distinct control for opening a landing page where one exists.
+- [x] Test that a tier with no `README.md` is reachable without a landing page.
+- [x] Test that selecting a deep page expands its bucket and area.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
 
@@ -185,12 +185,12 @@ Indentation, weight, and colour per role, so depth is not the only signal. See `
 
 **Deliverables:**
 
-- [ ] `web/src/features/knowledge/knowledge.css` — per-role weight, case, and colour from existing tokens.
-- [ ] Bucket and area draw indentation rails; tier sits flush, capping indent at two rails.
-- [ ] Tier rendered as an uppercase label with a hairline to the list edge.
-- [ ] Distinct markers for bucket and area; none for tier or page.
-- [ ] Graph node role styling aligned to the same vocabulary.
-- [ ] Verify both themes and keyboard focus in the browser pane.
+- [x] `web/src/features/knowledge/knowledge.css` — per-role weight, case, and colour from existing tokens.
+- [x] Bucket and area draw indentation rails; tier sits flush, capping indent at two rails.
+- [x] Tier rendered as an uppercase label with a hairline to the list edge.
+- [x] Distinct markers for bucket and area; none for tier or page.
+- [x] Graph node role styling aligned to the same vocabulary.
+- [x] Verify both themes and keyboard focus in the browser pane.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
 

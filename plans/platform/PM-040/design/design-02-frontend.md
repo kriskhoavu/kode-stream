@@ -52,12 +52,19 @@ tell a bucket from a tier without counting rails. Each level therefore gets a di
 
 ### Role treatments
 
-| Role   | Colour            | Type                                   | Marker         |
-|--------|-------------------|----------------------------------------|----------------|
-| Bucket | `--purple`        | 12px, 600, uppercase, 0.08em tracking  | Library icon   |
-| Area   | `--button-accent` | 13px, 600, sentence case               | Book icon      |
-| Tier   | `--muted`         | 10.5px, 600, uppercase, 0.1em tracking | None; the rule |
-| Page   | `--text`          | 13px, 450, sentence case               | None; the row  |
+| Role   | Colour                              | Type                                   | Marker         |
+|--------|-------------------------------------|----------------------------------------|----------------|
+| Bucket | `--blue`                            | 12px, 600, uppercase, 0.08em tracking  | Library icon   |
+| Area   | `--button-accent` mixed to `--text` | 13px, 600, sentence case               | Book icon      |
+| Tier   | `--muted`                           | 10.5px, 600, uppercase, 0.1em tracking | None; the rule |
+| Page   | `--text`                            | 13px, 450, sentence case               | None; the row  |
+
+Bucket uses `--blue` rather than a new `--purple`: the graph already marks a bucket-level node with `--blue`, and
+introducing a third colour would have broken the single-vocabulary rule this section sets out.
+
+Bare `--button-accent` measured 4.14:1 on light and 4.25:1 on dark against the list background, below AA for 13px
+text in **both** themes. Mixing 85% of the accent with `--text` reaches 4.97 and 4.98 while keeping the accent
+identity.
 
 Bucket is the only uppercase heading and area the only sentence-case heading at weight 600, so the two grouping
 levels are distinguishable at a glance without reading them. Tier borrows the existing page-type badge treatment,
@@ -72,8 +79,9 @@ there is no folder left to fail to open.
 
 ### Indentation
 
-Only bucket and area draw an indentation rail. Tier sits flush inside its area. Maximum indent is therefore two
-rails whatever the wiki's depth, against four and rising today.
+Only bucket and area draw an indentation rail. Tier sits flush inside its area. Because tier is not a node and a
+nested area is one compound row, nesting is a single rail whatever the wiki's depth — better than the two the
+grouping model allows, and against four and rising today.
 
 ```text
 DOMAINS                                        ▾   bucket
@@ -92,9 +100,10 @@ DOMAINS                                        ▾   bucket
 
 ### Interaction
 
-The whole header row toggles its section, so expansion never depends on a landing page existing. Where a landing
-page does exist it keeps a separate control that opens it, so opening a section and reading its index stay
-distinct actions. Tier labels are not interactive.
+A section with no landing page gets a title button that toggles it, replacing the inert label that caused the
+defect. Where a landing page does exist the established interaction is kept — the title opens the index, the
+chevron toggles — because that contract is already learned and only the missing-landing-page case was broken. Tier
+labels are not interactive.
 
 ## Graph Positioning
 
@@ -109,7 +118,10 @@ with a separate tier filter, so the twenty-value flat list of path strings becom
 
 Colour is never the only signal: each role also differs in weight, case, and marker. Header rows stay real buttons
 with `aria-expanded`, keyboard arrow navigation is unchanged, and the tier rule is decorative with its label read as
-a group heading. Both themes are covered by using existing tokens rather than new colour values.
+a group heading.
+
+Measured against the list background, every role clears AA in both themes: bucket 6.01 light and 10.60 dark, area
+4.97 and 4.98, tier 4.55 and 7.13, page title 16.97 and above.
 
 ## Design Decisions
 

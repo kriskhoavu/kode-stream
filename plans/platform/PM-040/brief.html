@@ -475,15 +475,14 @@
     <div class="meta-row">
       <span><strong>ticket</strong> PM-040</span>
       <span><strong>service</strong> platform</span>
-      <span><strong>tracks</strong> backend</span>
+      <span><strong>tracks</strong> backend, frontend</span>
       <span><strong>status</strong> complete</span>
     </div>
     <h1>Knowledge learns the shape of a wiki</h1>
     <p class="standfirst">
-      PM-040 infers a wiki's bucket, area and tier structure from the directory layout it already
-      indexes, and lets an optional settings file declare the one thing layout cannot express: what a
-      bucket means. The first beneficiary is the E2E journey lookup, which stops matching a hardcoded
-      string.
+      A wiki more than two directories deep lost most of its graph to a single point and became
+      unreadable as a tree. PM-040 infers bucket, area and tier from the directory layout, then groups
+      both Knowledge views by them — capping the hierarchy at two levels whatever the wiki's depth.
     </p>
   </header>
 
@@ -702,12 +701,12 @@
   <!-- ========================================================= -->
   <section class="sec">
     <p class="eyebrow">Figure 4</p>
-    <h2>The blast radius stops at the package boundary</h2>
+    <h2>One taxonomy, consumed by both views</h2>
     <p>
-      Two new files, three changed, and nothing above or beside them. The browser tree and the graph
-      filter both read <code>domain</code>, and <code>domain</code> is deliberately left alone — which is
-      what keeps a structural change out of the UI. <code>parser.go</code> is untouched too, so the front
-      matter contract every page depends on is not in play.
+      Detection happens once, in the indexer, and both views read the result through one shared module —
+      which is what stops the tree and the graph drifting into two different ideas of the hierarchy.
+      <code>domain</code> survives untouched for breadcrumbs, and <code>parser.go</code> is not in play,
+      so the front matter contract every page depends on is unaffected.
     </p>
 
     <figure>
@@ -715,8 +714,8 @@
         <svg viewBox="0 0 1020 470" role="img"
              aria-label="A layered view: the web layer is unchanged and still reads domain; inside internal slash knowledge two files are new and two are changed; below, the parser stays untouched, the index gains three fields on rescan, and the settings file is new and optional.">
           <defs>
-            <marker id="f4-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-a)"/>
+            <marker id="f4-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-b)"/>
             </marker>
             <marker id="f4-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
@@ -724,12 +723,12 @@
           </defs>
 
           <rect x="30" y="60" width="960" height="64" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1.5"/>
-          <text x="48" y="86" font-size="13.5" font-weight="600" fill="currentColor">web/ — Knowledge browser, page graph, domain filter</text>
-          <text x="972" y="86" font-size="11.5" font-weight="600" text-anchor="end" fill="var(--accent-a)">not edited</text>
-          <text x="48" y="108" font-size="11.5" fill="currentColor" opacity="0.8">Reads domain, which keeps its meaning and its value for every page.</text>
+          <text x="48" y="86" font-size="13.5" font-weight="600" fill="currentColor">web/ — graphModel.ts, KnowledgeBrowser.tsx, taxonomy.ts</text>
+          <text x="972" y="86" font-size="11.5" font-weight="600" text-anchor="end" fill="var(--accent-b)">grouped by bucket, area, tier</text>
+          <text x="48" y="108" font-size="11.5" fill="currentColor" opacity="0.8">One shared grouping module, so the tree and the graph cannot disagree.</text>
 
-          <line x1="510" y1="160" x2="510" y2="130" stroke="var(--accent-a)" stroke-width="1.6" marker-end="url(#f4-a)"/>
-          <text x="522" y="150" font-size="11" fill="currentColor" opacity="0.85">serves domain, plus three additive fields</text>
+          <line x1="510" y1="160" x2="510" y2="130" stroke="var(--accent-b)" stroke-width="1.6" marker-end="url(#f4-b)"/>
+          <text x="522" y="150" font-size="11" fill="currentColor" opacity="0.85">serves bucket, area, and tier on pages and graph nodes</text>
 
           <rect x="30" y="160" width="960" height="156" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="2"/>
           <text x="48" y="186" font-size="13.5" font-weight="600" fill="currentColor">internal/knowledge</text>
@@ -754,8 +753,8 @@
 
           <rect x="756" y="202" width="216" height="96" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1"/>
           <text x="774" y="228" font-size="13.5" font-weight="600" fill="currentColor">knowledge_service</text>
-          <text x="774" y="250" font-size="11.5" fill="currentColor" opacity="0.8">resolve bucket</text>
-          <text x="774" y="270" font-size="11.5" fill="currentColor" opacity="0.8">by role</text>
+          <text x="774" y="250" font-size="11.5" fill="currentColor" opacity="0.8">resolve by role,</text>
+          <text x="774" y="270" font-size="11.5" fill="currentColor" opacity="0.8">carry onto graph</text>
           <text x="774" y="290" font-size="11.5" font-weight="600" fill="var(--accent-b)">changed</text>
 
           <line x1="183" y1="316" x2="183" y2="344" stroke="currentColor" stroke-width="1.6" marker-end="url(#f4-n)"/>
@@ -778,7 +777,7 @@
           <text x="702" y="420" font-size="11.5" fill="currentColor" opacity="0.8">Travels with the wiki through Git.</text>
         </svg>
       </div>
-      <figcaption><b>Figure 4.</b> No route, status, or JSON contract changes. The three added fields are omitted when empty, so a page at the wiki root does not appear to belong to a bucket named with the empty string.</figcaption>
+      <figcaption><b>Figure 4.</b> No route, status, or JSON contract changes: the added fields are omitted when empty, so a page at the wiki root does not appear to belong to a bucket named with the empty string. Both views also fall back to deriving bucket and area from <code>domain</code>, so an index written before the taxonomy still lays out correctly.</figcaption>
     </figure>
   </section>
 
@@ -787,11 +786,11 @@
   <!-- ========================================================= -->
   <section class="sec">
     <p class="eyebrow">Delivery</p>
-    <h2>Two pure phases, then a join, then the only behaviour change</h2>
+    <h2>Backend first, then the two views that consume it</h2>
     <p>
-      B1 and B2 touch nothing shared and can be built in either order. B3 is the join and the first
-      contact with indexer code. B4 is the only phase a user could observe, and it lands last so the
-      pieces it depends on are already proven.
+      B1 and B2 touch nothing shared. B3 is the join and the first contact with indexer code. B5 is the
+      one backend change the views needed. F1 and F2 are independent of each other; F3 restyles what
+      both produce, so it lands last.
     </p>
 
     <div class="phases">
@@ -845,6 +844,54 @@
           </p>
         </div>
       </div>
+
+      <div class="phase">
+        <div class="phase-n">B5</div>
+        <div class="phase-body">
+          <div class="phase-head"><h3>Taxonomy on the graph payload</h3>
+            <span class="pill done">complete</span></div>
+          <p>
+            One field trio on the graph node. The whole reason the views could not group by taxonomy,
+            and the only backend work the frontend phases needed.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F1</div>
+        <div class="phase-body">
+          <div class="phase-head"><h3>Graph grouping by taxonomy</h3>
+            <span class="pill done">complete</span></div>
+          <p>
+            Fixes the reported defect. Grouping runs bucket then area, tier becomes a badge, and a
+            nested area stays one compound row. Verified on the real wiki: 41 nodes, none at the origin.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F2</div>
+        <div class="phase-body">
+          <div class="phase-head"><h3>Pages grouping by taxonomy</h3>
+            <span class="pill done">complete</span></div>
+          <p>
+            The same model in the tree. A tier stops being a node at all, which is what removes the
+            folder that could not be opened, and a section with no landing page gains a working title.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F3</div>
+        <div class="phase-body">
+          <div class="phase-head"><h3>Hierarchy styling pass</h3>
+            <span class="pill done">complete</span></div>
+          <p>
+            Colour, size, weight, case and marker per role, so depth stops being the only signal of
+            what a row is. Measured in both themes rather than assumed.
+          </p>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -890,7 +937,7 @@
     <ul>
       <li><b>Front matter freshness.</b> The restructured wiki adds <code>lastVerified</code> and claim-status marking to every page, and <code>parser.go</code> ignores both. That is schema work on the struct every page flows through, not layout configuration, and it earns its own ticket rather than riding along with this one.</li>
       <li><b>Chunk metadata.</b> The <code>chunkId</code> and <code>keywords</code> comments are pure retrieval signal and are currently discarded. Worth capturing, but it changes what the agent can find rather than how pages are organised.</li>
-      <li><b>Any use of the taxonomy in the UI.</b> Grouping the browser tree by bucket and tier, and replacing the graph's flat domain dropdown, are the visible payoff — and they are the risky part. They come back in once the detected values have been observed against real wikis and trusted.</li>
+      <li><b>The wiki appearing as cards in Workstream.</b> That comes from <code>wiki/workspace-settings.yaml</code>, whose path pattern turns each top-level wiki directory into an item card. It is a scanner concern with nothing to do with Knowledge grouping, so it stays out until looked at on its own.</li>
     </ul>
   </section>
 
@@ -933,7 +980,7 @@
   <!-- 8. FOOTER — provenance                                    -->
   <!-- ========================================================= -->
   <p class="foot">
-    Rendered from plans/platform/PM-040/ · 2026-08-21 · 9f818b4<br>
+    Rendered from plans/platform/PM-040/ · 2026-08-21 · 230c030<br>
     The markdown in that directory is the source of truth. Re-render this page after changing it.
   </p>
 
