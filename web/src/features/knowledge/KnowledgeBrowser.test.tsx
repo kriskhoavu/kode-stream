@@ -171,18 +171,19 @@ describe('taxonomy grouping', () => {
 		{ slug: 'rollback', title: 'Deployment Rollback', path: 'platform/concepts/rollback.md', domain: 'platform/concepts', bucket: 'platform', area: '', tier: 'concepts', pageType: 'CONCEPT', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }
 	];
 
-	// The reported defect: a tier directory has no README anywhere in the corpus,
-	// so it rendered as a non-interactive label with only a chevron to open it.
-	it('reaches a tier page without the tier being a folder', () => {
+	// The reported defect was a tier that no control could open, because it had no
+	// README to hang a button on. A tier is now a section that opens from its own
+	// label, so the defect cannot recur.
+	it('opens a tier from its own label with no landing page involved', () => {
 		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
 
 		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
 		fireEvent.click(screen.getByRole('button', { name: 'Open domains/offer index' }));
+		fireEvent.click(screen.getByRole('button', { name: /^concepts$/i }));
+		fireEvent.click(screen.getByRole('button', { name: /^reference$/i }));
 
 		expect(screen.getByRole('button', { name: /Offer Approval/i })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /Offer Permissions/i })).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /^concepts$/i })).not.toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /^reference$/i })).not.toBeInTheDocument();
 	});
 
 	it('labels tier partitions inside their area', () => {
@@ -208,6 +209,7 @@ describe('taxonomy grouping', () => {
 		expect(platform).toHaveAttribute('aria-expanded', 'false');
 		fireEvent.click(platform);
 		expect(screen.getByRole('button', { name: /^platform$/i })).toHaveAttribute('aria-expanded', 'true');
+		fireEvent.click(screen.getByRole('button', { name: /^concepts$/i }));
 		expect(screen.getByRole('button', { name: /Deployment Rollback/i })).toBeInTheDocument();
 	});
 
@@ -248,6 +250,8 @@ describe('tier colour and page type suppression', () => {
 	it('drops the page type on rows inside a tier', () => {
 		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
 		openOffer();
+		fireEvent.click(screen.getByRole('button', { name: /^concepts$/i }));
+		fireEvent.click(screen.getByRole('button', { name: /^reference$/i }));
 
 		expect(rowFor('Offer Approval').querySelector('.knowledge-page-type')).toBeNull();
 		expect(rowFor('Offer Permissions').querySelector('.knowledge-page-type')).toBeNull();
@@ -267,5 +271,59 @@ describe('tier colour and page type suppression', () => {
 		fireEvent.click(screen.getByRole('button', { name: /^e2e-testing$/i }));
 
 		expect(rowFor('Base Setup').querySelector('.page-type-how-to')).toBeNull();
+	});
+});
+
+describe('collapsible tiers', () => {
+	const tierPages: KnowledgePage[] = [
+		{ slug: 'offer-index', title: 'Offer Documentation', path: 'domains/offer/README.md', domain: 'domains/offer', bucket: 'domains', area: 'offer', tier: '', pageType: 'CONCEPT', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'approval', title: 'Offer Approval', path: 'domains/offer/concepts/approval.md', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts', pageType: 'HOW_TO', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'perms', title: 'Offer Permissions', path: 'domains/offer/reference/perms.md', domain: 'domains/offer/reference', bucket: 'domains', area: 'offer', tier: 'reference', pageType: 'REFERENCE', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }
+	];
+
+	const openArea = () => {
+		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
+		fireEvent.click(screen.getByRole('button', { name: 'Open domains/offer index' }));
+	};
+	const tierToggle = (tier: string) => screen.getByRole('button', { name: new RegExp(`^${tier}$`, 'i') });
+
+	it('collapses every tier by default', () => {
+		render(<KnowledgeBrowser pages={tierPages} warnings={[]} onSelect={vi.fn()} />);
+		openArea();
+
+		expect(tierToggle('concepts')).toHaveAttribute('aria-expanded', 'false');
+		expect(screen.queryByRole('button', { name: /Offer Approval/i })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Offer Permissions/i })).not.toBeInTheDocument();
+	});
+
+	it('expands and collapses a tier from its label', () => {
+		render(<KnowledgeBrowser pages={tierPages} warnings={[]} onSelect={vi.fn()} />);
+		openArea();
+
+		fireEvent.click(tierToggle('concepts'));
+		expect(tierToggle('concepts')).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByRole('button', { name: /Offer Approval/i })).toBeInTheDocument();
+		// The sibling tier stays shut; tiers open independently.
+		expect(screen.queryByRole('button', { name: /Offer Permissions/i })).not.toBeInTheDocument();
+
+		fireEvent.click(tierToggle('concepts'));
+		expect(screen.queryByRole('button', { name: /Offer Approval/i })).not.toBeInTheDocument();
+	});
+
+	// Without this a page opened from a link or a deep link would sit inside a
+	// shut tier and be invisible.
+	it('expands the tier holding the selected page', () => {
+		render(<KnowledgeBrowser pages={tierPages} selectedSlug="perms" warnings={[]} onSelect={vi.fn()} />);
+
+		expect(screen.getByRole('button', { name: /Offer Permissions/i })).toBeInTheDocument();
+		expect(tierToggle('reference')).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.queryByRole('button', { name: /Offer Approval/i })).not.toBeInTheDocument();
+	});
+
+	it('reveals matches inside collapsed tiers while filtering', () => {
+		render(<KnowledgeBrowser pages={tierPages} warnings={[]} onSelect={vi.fn()} />);
+		fireEvent.change(screen.getByRole('textbox', { name: /Filter Knowledge pages/i }), { target: { value: 'permissions' } });
+
+		expect(screen.getByRole('button', { name: /Offer Permissions/i })).toBeInTheDocument();
 	});
 });

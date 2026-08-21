@@ -21,7 +21,8 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		if (!selectedPage) return;
 		setQuery('');
 		const grouping = groupingOf(selectedPage);
-		const keys = [bucketKey(grouping), areaKey(grouping)].filter(Boolean) as string[];
+		const section = areaKey(grouping) ?? bucketKey(grouping);
+		const keys = [bucketKey(grouping), areaKey(grouping), grouping.tier ? tierKey(section, grouping.tier) : ''].filter(Boolean) as string[];
 		setExpandedDomains((current) => {
 			const next = new Set(current);
 			for (const key of keys) next.add(key.toLowerCase());
@@ -102,10 +103,23 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 				</h3>
 				{collapsible && <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>}
 			</div>
-			{expanded && tiers.map((group) => <div className="knowledge-tier" key={group.tier || '_'}>
-				{group.tier && <p className={tierLabelClass(group.tier)} data-testid="knowledge-tier-label">{group.tier}</p>}
-				{group.pages.map((page) => renderPage(page, group.tier))}
-			</div>)}
+			{expanded && tiers.map((group) => {
+				if (!group.tier) return <div className="knowledge-tier" key="_">{group.pages.map((page) => renderPage(page, ''))}</div>;
+				const key = tierKey(node.path, group.tier);
+				const tierExpanded = query.trim() !== '' || expandedDomains.has(key);
+				const toggleTier = () => setExpandedDomains((current) => {
+					const next = new Set(current);
+					if (next.has(key)) next.delete(key); else next.add(key);
+					return next;
+				});
+				return <div className="knowledge-tier" key={group.tier}>
+					<button data-knowledge-entry type="button" className={tierExpanded ? `${tierLabelClass(group.tier)} expanded` : tierLabelClass(group.tier)} data-testid="knowledge-tier-label" aria-expanded={tierExpanded} onClick={toggleTier} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleTier(); } }}>
+						<ChevronRight size={11} className="knowledge-tier-chevron" />
+						<span>{group.tier}</span>
+					</button>
+					{tierExpanded && group.pages.map((page) => renderPage(page, group.tier))}
+				</div>;
+			})}
 			{expanded && node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map(renderDomain)}</div>}
 		</section>;
 	};
@@ -199,6 +213,10 @@ function nodeKeyOf(page: KnowledgePage): string {
 // beyond the two the corpus uses falls back to the muted default rather than
 // being assigned a colour nobody chose.
 const markedTiers: Record<string, string> = { concepts: 'tier-concepts', reference: 'tier-reference' };
+
+function tierKey(sectionPath: string, tier: string): string {
+	return `${sectionPath}#${tier}`.toLowerCase();
+}
 
 function tierLabelClass(tier: string): string {
 	const marker = markedTiers[tier.toLowerCase()];
