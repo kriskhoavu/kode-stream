@@ -38,6 +38,7 @@ produce, so it lands last. The critical path is B1 → B3 → B5 → F1 → F3. 
 | F3    | Hierarchy styling pass        | Frontend | Complete |
 | F4    | Tier colour and row density   | Frontend | Complete |
 | F5    | Palette reduction             | Frontend | Complete |
+| F6    | Collapsible tier sections     | Frontend | Complete |
 
 ## Backend Phases
 
@@ -235,6 +236,25 @@ Second review pass: the hierarchy was legible but carried too much colour.
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
 
 **Commit:** `PM-040: Quieten the tree palette`
+
+---
+
+### Phase F6: Collapsible Tier Sections
+
+Third review pass. A tier had to become closable, which reverses F2's decision that a tier is never a disclosure
+control.
+
+**Deliverables:**
+
+- [x] The tier label becomes a toggle button with a chevron and `aria-expanded`.
+- [x] Tiers start collapsed and open independently of their siblings.
+- [x] Selecting a page opens the tier holding it, so a linked page is never hidden.
+- [x] Filtering still reveals matches inside collapsed tiers.
+- [x] Update the three F2 and F4 tests that assumed tier pages were always rendered.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
+
+**Commit:** `PM-040: Make tier sections collapsible, shut by default`
 
 ## Post-Implementation Checklist
 

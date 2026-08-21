@@ -100,10 +100,25 @@ exactly the bucket heading colour.
 
 ### The tier rule
 
-Tier is rendered as a short uppercase label followed by a hairline running to the edge of the list, not as a row
-with a disclosure control. This is the one deliberate device on the page, and it earns its place by encoding
-something true: a tier partitions an area's pages, it does not contain them. It also removes the defect directly —
-there is no folder left to fail to open.
+Tier is rendered as a short uppercase label followed by a hairline running to the edge of the list. This is the one
+deliberate device on the page.
+
+The label is also the tier's disclosure control, and tiers start collapsed. An earlier pass made a tier
+non-interactive on the argument that it partitions an area's pages rather than containing them. Use showed the
+argument was too pure: an area of 27 pages needs to be closable, and the reader's mental model is a folder whatever
+the taxonomy calls it.
+
+The original defect cannot recur through this. It happened because a tier's only control was a chevron that existed
+only when a `README.md` did; here the label itself is the button and depends on nothing. Two behaviours protect the
+collapsed default:
+
+| Situation          | Behaviour                                             |
+|--------------------|-------------------------------------------------------|
+| A page is selected | Its bucket, area, and tier all open, so it is visible |
+| A filter is active | Every tier opens, so no match hides inside a shut one |
+
+Without the first, a page opened from a wiki link or a deep link would render inside a closed section and appear
+missing.
 
 ### Indentation
 
@@ -116,12 +131,11 @@ DOMAINS                                        ▾   bucket
 │
 │  Offer                                       ▾   area
 │  │
-│  │  CONCEPTS ─────────────────────────────       tier rule
-│  │  Offer Approval                  HOW-TO
-│  │  Offer Creation                  HOW-TO
+│  │  ⌄ CONCEPTS ───────────────────────────       tier rule, open
+│  │  Offer Approval
+│  │  Offer Creation
 │  │
-│  │  REFERENCE ────────────────────────────
-│  │  Action Permission Model       REFERENCE
+│  │  › REFERENCE ──────────────────────────       tier rule, shut by default
 │  │
 │  Master Data / Article                       ▸   nested area, one row
 ```
@@ -130,8 +144,8 @@ DOMAINS                                        ▾   bucket
 
 A section with no landing page gets a title button that toggles it, replacing the inert label that caused the
 defect. Where a landing page does exist the established interaction is kept — the title opens the index, the
-chevron toggles — because that contract is already learned and only the missing-landing-page case was broken. Tier
-labels are not interactive.
+chevron toggles — because that contract is already learned and only the missing-landing-page case was broken. A tier
+label is a toggle for its own section and nothing else.
 
 ## Graph Positioning
 
