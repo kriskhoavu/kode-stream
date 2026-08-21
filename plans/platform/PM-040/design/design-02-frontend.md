@@ -70,26 +70,30 @@ Bucket is the only uppercase heading and area the only sentence-case heading at 
 levels are distinguishable at a glance without reading them. Tier borrows the existing page-type badge treatment,
 because a tier and a page type are the same kind of fact.
 
-### Page type, not tier, carries the colour
+### The tier carries the colour
 
-Tier looks like the obvious thing to colour, and it is the wrong choice. Measured on the reference corpus, the
-`reference` tier is REFERENCE for 27 of 27 pages, so a tier colour would restate in a second channel what the badge
-on every row beneath it already says. The `concepts` tier is where the variety actually lives — 16 CONCEPT, 13
-HOW_TO and 1 DECISION — and that variation had no visual signal at all.
+The tier is the grouping a reader scans, so it is what gets the colour. Page type does not, and inside a tier it is
+not shown at all.
 
-| Page type | Treatment                    | Why                                           |
-|-----------|------------------------------|-----------------------------------------------|
-| HOW_TO    | `--green` mixed to `--text`  | Actionable; the thing a reader hunts for      |
-| REFERENCE | `--purple` mixed to `--text` | Lookup material                               |
-| CONCEPT   | `--muted`, unchanged         | The default; marking it would mark everything |
-| DECISION  | `--muted`, unchanged         | One page in the corpus; not worth a colour    |
+| Element                 | Treatment                    | Why                                          |
+|-------------------------|------------------------------|----------------------------------------------|
+| Tier `concepts`         | `--green` mixed to `--text`  | Explanatory material                         |
+| Tier `reference`        | `--purple` mixed to `--text` | Lookup material                              |
+| Any other tier          | `--muted`, unchanged         | No colour is assigned to a tier nobody chose |
+| Page type inside a tier | Not rendered                 | The label above already states it            |
+| Page type with no tier  | `--muted`, unchanged         | The only classification such a row carries   |
 
-Colour therefore means one thing per axis: level for a heading, kind for a badge. Tier labels stay muted, which is
-what keeps the two axes from competing.
+Suppressing the page type inside a tier removes a measured redundancy: the `reference` tier is REFERENCE for 27 of
+27 pages, so the badge restated its own heading on every row. It also buys back a line of density in a list that
+runs to 34 pages in one area.
 
-`--green` needed a heavier mix toward `--text` than `--purple`: at 88% it measured 4.32:1 on light, just under AA,
-and 80% reaches 4.90. `--orange` and `--warning` were rejected outright because both resolve to `#f9b98c` in dark
-mode, which is exactly the bucket heading colour.
+The cost is real and worth stating: the `concepts` tier mixes 16 CONCEPT, 13 HOW_TO and 1 DECISION, so hiding the
+badge there loses a distinction the tier does not carry. That was accepted deliberately in favour of a calmer list;
+the page type is still on the page itself and on the graph node.
+
+`--green` needs a heavier mix toward `--text` than `--purple`: at 88% it measured 4.32:1 on light, so it sits at
+80%. `--orange` and `--warning` were rejected outright because both resolve to `#f9b98c` in dark mode, which is
+exactly the bucket heading colour.
 
 ### The tier rule
 
@@ -142,22 +146,26 @@ with `aria-expanded`, keyboard arrow navigation is unchanged, and the tier rule 
 a group heading.
 
 Measured against the list background, every role clears AA in both themes: bucket 6.01 light and 10.60 dark, area
-4.97 and 4.98, tier 4.55 and 7.13, page title 16.97 and above. The page-type marks clear it too: HOW_TO 4.91 and
-9.27, REFERENCE 7.75 and 7.17, unmarked 4.55 and 7.13.
+4.97 and 4.98, page title 16.97 and above. The tier colours clear it too: `concepts` 4.91 and 9.27, `reference`
+7.75 and 7.17, an unmarked tier or page type 4.55 and 7.13.
 
-In light mode the REFERENCE violet sits in the same family as the indigo bucket heading. They stay separable by
+In light mode the `reference` violet sits in the same family as the indigo bucket heading. They stay separable by
 size, weight, and position rather than hue alone, which is the weakest pairing in the scheme and worth revisiting if
 a better token appears.
 
+Colour is still never the only signal. A tier keeps its written label, and a page type suppressed in the tree is
+still shown on the page itself and on the graph node.
+
 ## Design Decisions
 
-| Decision                               | Rationale                                                                                     |
-|----------------------------------------|-----------------------------------------------------------------------------------------------|
-| Group by bucket and area, not `domain` | Caps grouping at two levels for any wiki depth, which is the shape both views already assume. |
-| Tier as attribute, not container       | Tiers have no landing page and carry no subject meaning; as a level they only add depth.      |
-| Nested area as one compound row        | Keeps indentation flat and matches the slash-joined area the backend already produces.        |
-| Reuse the graph's role colours         | One vocabulary across both views; no new tokens, so both themes stay correct for free.        |
-| Colour page type, not tier             | Tier restates the badge beside it 27/27 times; page type is what varies inside a group.       |
-| Mark only two of four page types       | CONCEPT is the default and DECISION is a single page; marking all four would read as noise.   |
-| Whole header row toggles               | Removes the dependency on a `README.md` that no tier directory has.                           |
-| Keep `domain` in the payload           | Still used for breadcrumbs and existing tests; grouping simply stops reading it.              |
+| Decision                                 | Rationale                                                                                     |
+|------------------------------------------|-----------------------------------------------------------------------------------------------|
+| Group by bucket and area, not `domain`   | Caps grouping at two levels for any wiki depth, which is the shape both views already assume. |
+| Tier as attribute, not container         | Tiers have no landing page and carry no subject meaning; as a level they only add depth.      |
+| Nested area as one compound row          | Keeps indentation flat and matches the slash-joined area the backend already produces.        |
+| Reuse the graph's role colours           | One vocabulary across both views; no new tokens, so both themes stay correct for free.        |
+| Colour the tier, not the page type       | The tier is the grouping a reader scans; colouring both would make colour mean two things.    |
+| Hide the page type inside a tier         | The label above states it; for the reference tier it restated it 27 times out of 27.          |
+| Keep the page type when there is no tier | Such a row has no heading above it, so the badge is its only classification.                  |
+| Whole header row toggles                 | Removes the dependency on a `README.md` that no tier directory has.                           |
+| Keep `domain` in the payload             | Still used for breadcrumbs and existing tests; grouping simply stops reading it.              |
