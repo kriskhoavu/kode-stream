@@ -36,6 +36,7 @@ produce, so it lands last. The critical path is B1 → B3 → B5 → F1 → F3. 
 | F1    | Graph grouping by taxonomy    | Frontend | Complete |
 | F2    | Pages grouping by taxonomy    | Frontend | Complete |
 | F3    | Hierarchy styling pass        | Frontend | Complete |
+| F4    | Page type badge colour        | Frontend | Complete |
 
 ## Backend Phases
 
@@ -195,6 +196,24 @@ Indentation, weight, and colour per role, so depth is not the only signal. See `
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
 
 **Commit:** `PM-040: Restyle the knowledge hierarchy by role`
+
+---
+
+### Phase F4: Page Type Badge Colour
+
+Follow-up after review: the hierarchy read well but every page row still looked alike inside a group.
+
+**Deliverables:**
+
+- [x] Mark HOW_TO and REFERENCE on page rows and on graph nodes.
+- [x] Leave CONCEPT and DECISION neutral so the list does not become a rainbow.
+- [x] Keep tier labels muted, so colour means level for headings and kind for badges.
+- [x] Tests asserting the marked types carry a modifier class and the rest do not.
+- [x] Contrast measured in both themes; the green needed an 80% mix to clear AA.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
+
+**Commit:** `PM-040: Colour the page type badge`
 
 ## Post-Implementation Checklist
 
