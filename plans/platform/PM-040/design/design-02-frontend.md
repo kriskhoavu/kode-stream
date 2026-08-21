@@ -54,21 +54,24 @@ tell a bucket from a tier without counting rails. Each level therefore gets a di
 
 | Role   | Colour                              | Type                                   | Marker         |
 |--------|-------------------------------------|----------------------------------------|----------------|
-| Bucket | `--blue`                            | 12px, 600, uppercase, 0.08em tracking  | Library icon   |
-| Area   | `--button-accent` mixed to `--text` | 13px, 600, sentence case               | Book icon      |
-| Tier   | `--muted`                           | 10.5px, 600, uppercase, 0.1em tracking | None; the rule |
+| Bucket | `--button-accent` mixed to `--text` | 12px, 600, uppercase, 0.08em tracking  | Library icon   |
+| Area   | `--text`                            | 13px, 600, sentence case               | Book icon      |
+| Tier   | Per tier; see below                 | 10.5px, 600, uppercase, 0.1em tracking | None; the rule |
 | Page   | `--text`                            | 13px, 450, sentence case               | None; the row  |
 
-Bucket uses `--blue` rather than a new `--purple`: the graph already marks a bucket-level node with `--blue`, and
-introducing a third colour would have broken the single-vocabulary rule this section sets out.
-
-Bare `--button-accent` measured 4.14:1 on light and 4.25:1 on dark against the list background, below AA for 13px
-text in **both** themes. Mixing 85% of the accent with `--text` reaches 4.97 and 4.98 while keeping the accent
-identity.
+Only two levels are coloured — the bucket and the tier. An area reads as the level below a bucket through weight and
+case, and a page title needs no emphasis on top of the three treatments above it. A first pass coloured three levels
+and bolded the page titles as well; review found the result too busy, and the signal each level carries survives the
+reduction intact.
 
 Bucket is the only uppercase heading and area the only sentence-case heading at weight 600, so the two grouping
-levels are distinguishable at a glance without reading them. Tier borrows the existing page-type badge treatment,
-because a tier and a page type are the same kind of fact.
+levels stay distinguishable at a glance without reading them.
+
+Bare `--button-accent` measured 4.14:1 on light and 4.25:1 on dark against the list background, below AA in **both**
+themes. Mixing 85% of the accent with `--text` reaches 4.97 and 4.98 while keeping the accent identity.
+
+No blue remains in the tree. Hover, the active landing-page icon, and the selected-row wash all use the selection
+accent that already marks the selected row's edge, rather than introducing a colour the hierarchy does not use.
 
 ### The tier carries the colour
 
@@ -145,13 +148,13 @@ Colour is never the only signal: each role also differs in weight, case, and mar
 with `aria-expanded`, keyboard arrow navigation is unchanged, and the tier rule is decorative with its label read as
 a group heading.
 
-Measured against the list background, every role clears AA in both themes: bucket 6.01 light and 10.60 dark, area
-4.97 and 4.98, page title 16.97 and above. The tier colours clear it too: `concepts` 4.91 and 9.27, `reference`
-7.75 and 7.17, an unmarked tier or page type 4.55 and 7.13.
+Measured against the list background, every role clears AA in both themes: bucket 4.97 light and 4.98 dark, area and
+page title 16.97 and 14.44, `concepts` 4.91 and 9.27, `reference` 7.75 and 7.17, an unmarked tier or page type 4.55
+and 7.13.
 
-In light mode the `reference` violet sits in the same family as the indigo bucket heading. They stay separable by
-size, weight, and position rather than hue alone, which is the weakest pairing in the scheme and worth revisiting if
-a better token appears.
+Retiring the indigo also retired the one weak pairing in the earlier scheme, where the `reference` violet sat in the
+same hue family as the bucket heading. Bucket orange, `concepts` green, and `reference` violet are three distinct
+families.
 
 Colour is still never the only signal. A tier keeps its written label, and a page type suppressed in the tree is
 still shown on the page itself and on the graph node.

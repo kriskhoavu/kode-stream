@@ -37,6 +37,7 @@ produce, so it lands last. The critical path is B1 → B3 → B5 → F1 → F3. 
 | F2    | Pages grouping by taxonomy    | Frontend | Complete |
 | F3    | Hierarchy styling pass        | Frontend | Complete |
 | F4    | Tier colour and row density   | Frontend | Complete |
+| F5    | Palette reduction             | Frontend | Complete |
 
 ## Backend Phases
 
@@ -216,6 +217,24 @@ grouping a reader actually scans.
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
 
 **Commit:** `PM-040: Colour the tier and drop the repeated page type`
+
+---
+
+### Phase F5: Palette Reduction
+
+Second review pass: the hierarchy was legible but carried too much colour.
+
+**Deliverables:**
+
+- [x] Bucket heading moves from indigo to the accent orange, mixed toward `--text` for AA.
+- [x] Area heading drops the accent and becomes plain `--text`, still bold.
+- [x] Page titles are no longer bold.
+- [x] Remaining blue retired from hover, the active landing-page icon, and the selected-row wash.
+- [x] Contrast re-measured in both themes; bucket 4.97 and 4.98, everything else unchanged or better.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/features/knowledge`
+
+**Commit:** `PM-040: Quieten the tree palette`
 
 ## Post-Implementation Checklist
 
