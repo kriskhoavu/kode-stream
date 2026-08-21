@@ -313,7 +313,7 @@ body.is-resizing-panel .knowledge-browser {
 }
 
 .knowledge-domain-link:hover {
-  color: var(--blue);
+  color: color-mix(in srgb, var(--button-accent) 70%, var(--text));
 }
 
 .knowledge-domain-link.active {
@@ -321,7 +321,7 @@ body.is-resizing-panel .knowledge-browser {
 }
 
 .knowledge-domain-link.active svg {
-  color: var(--blue);
+  color: var(--selection-accent);
 }
 
 .knowledge-page-row {
@@ -348,7 +348,9 @@ body.is-resizing-panel .knowledge-browser {
 
 .knowledge-page-row.active {
   border-color: transparent;
-  background: color-mix(in srgb, var(--blue) 7%, var(--panel));
+  /* The row already marks selection with --selection-accent on its edge; a blue
+     wash beside it was the only blue left in the tree. */
+  background: color-mix(in srgb, var(--selection-accent) 7%, var(--panel));
   color: var(--text);
   box-shadow: inset 3px 0 0 var(--selection-accent);
 }
@@ -1239,7 +1241,10 @@ body.is-resizing-panel .knowledge-browser {
    for a tier. */
 
 .knowledge-domain-bucket > .knowledge-domain-header h3 {
-  color: var(--blue);
+  /* Bare --button-accent measures 4.14:1 on light and 4.25:1 on dark, both
+     below AA. Mixing toward --text lifts it past 4.9 in each theme while
+     keeping the accent identity. */
+  color: color-mix(in srgb, var(--button-accent) 85%, var(--text));
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -1247,10 +1252,9 @@ body.is-resizing-panel .knowledge-browser {
 }
 
 .knowledge-domain-area > .knowledge-domain-header h3 {
-  /* Bare --button-accent measures 4.14:1 on light and 4.25:1 on dark, both
-     below AA for 13px text. Mixing toward --text lifts it past 5:1 in each
-     theme while keeping the accent identity. */
-  color: color-mix(in srgb, var(--button-accent) 85%, var(--text));
+  /* An area reads as the level below a bucket through weight and case, not a
+     third colour. Only the bucket and the tier are coloured. */
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0;
@@ -1258,11 +1262,11 @@ body.is-resizing-panel .knowledge-browser {
 }
 
 .knowledge-domain-bucket > .knowledge-domain-header .knowledge-domain-link:hover {
-  color: color-mix(in srgb, var(--blue) 78%, var(--text));
+  color: color-mix(in srgb, var(--button-accent) 65%, var(--text));
 }
 
 .knowledge-domain-area > .knowledge-domain-header .knowledge-domain-link:hover {
-  color: color-mix(in srgb, var(--button-accent) 78%, var(--text));
+  color: color-mix(in srgb, var(--button-accent) 70%, var(--text));
 }
 
 /* A tier partitions an area's pages; it is a label with a rule, never a row
@@ -1337,4 +1341,11 @@ body.is-resizing-panel .knowledge-browser {
 .knowledge-flow-node-tier.tier-reference {
   background: color-mix(in srgb, var(--purple) 16%, var(--panel));
   color: color-mix(in srgb, var(--purple) 88%, var(--text));
+}
+
+/* A page title sits inside <strong>, which browsers bold by default. The row is
+   the leaf of the hierarchy and needs no emphasis on top of the bucket, area,
+   and tier treatments above it. */
+.knowledge-page-title {
+  font-weight: 450;
 }
