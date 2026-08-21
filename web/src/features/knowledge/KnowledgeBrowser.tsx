@@ -91,7 +91,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		const renderPage = (page: KnowledgePage) => {
 			const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length;
 			return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}>
-				<span><strong className="knowledge-page-title">{page.title}</strong><small><span className="knowledge-page-type">{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span>
+				<span><strong className="knowledge-page-title">{page.title}</strong><small><span className={pageTypeClass(page.pageType)}>{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span>
 			</button>;
 		};
 		return <section className={`knowledge-domain knowledge-domain-${depth}`} key={node.path}>
@@ -193,6 +193,16 @@ function buildDomainTree(visiblePages: KnowledgePage[], allPages: KnowledgePage[
 function nodeKeyOf(page: KnowledgePage): string {
 	const grouping = groupingOf(page);
 	return areaKey(grouping) ?? bucketKey(grouping);
+}
+
+// Only the page types that actually vary inside a tier are marked. CONCEPT is
+// the default and DECISION is vanishingly rare, so both stay neutral rather
+// than turning the list into a rainbow.
+const markedPageTypes: Record<string, string> = { HOW_TO: 'page-type-how-to', REFERENCE: 'page-type-reference' };
+
+function pageTypeClass(pageType?: string): string {
+	const marker = pageType ? markedPageTypes[pageType] : undefined;
+	return marker ? `knowledge-page-type ${marker}` : 'knowledge-page-type';
 }
 
 function displayPageType(pageType?: string): string {

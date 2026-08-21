@@ -1301,3 +1301,30 @@ body.is-resizing-panel .knowledge-browser {
   font-weight: 700;
   letter-spacing: 0.06em;
 }
+
+/* The green needs a heavier mix toward --text than the purple: at 88% it
+   measured 4.32:1 on light, just under AA. At 80% it reaches 4.90.
+
+   Page type carries the colour, because it is what varies inside a tier: the
+   reference tier is 100% REFERENCE pages, but the concepts tier mixes CONCEPT,
+   HOW_TO and DECISION. Tier labels stay muted so colour means one thing per
+   axis — level for headings, kind for badges. CONCEPT and DECISION stay
+   neutral; only the two types worth scanning for are marked. */
+
+.knowledge-page-type.page-type-how-to {
+  color: color-mix(in srgb, var(--green) 80%, var(--text));
+}
+
+.knowledge-page-type.page-type-reference {
+  color: color-mix(in srgb, var(--purple) 88%, var(--text));
+}
+
+/* Same marking on a graph node. The tier badge inside keeps its own muted
+   treatment so the two facts stay separable. */
+.knowledge-flow-node-card > span.knowledge-flow-node-meta.page-type-how-to {
+  color: color-mix(in srgb, var(--green) 80%, var(--text));
+}
+
+.knowledge-flow-node-card > span.knowledge-flow-node-meta.page-type-reference {
+  color: color-mix(in srgb, var(--purple) 88%, var(--text));
+}

@@ -20,6 +20,13 @@ interface KnowledgeNodeData {
 	onCloseTooltip: (slug: string) => void;
 }
 
+const markedGraphPageTypes: Record<string, string> = { HOW_TO: 'page-type-how-to', REFERENCE: 'page-type-reference' };
+
+function graphPageTypeClass(pageType?: string): string {
+	const marker = pageType ? markedGraphPageTypes[pageType] : undefined;
+	return marker ? `knowledge-flow-node-meta ${marker}` : 'knowledge-flow-node-meta';
+}
+
 function KnowledgeNode({ data }: NodeProps) {
 	const nodeData = data as unknown as KnowledgeNodeData;
 	const node = nodeData.node;
@@ -42,7 +49,7 @@ function KnowledgeNode({ data }: NodeProps) {
 		<Handle type="target" position={Position.Top} />
 		<div className="knowledge-flow-node-card" role={nodeData.isDomain ? undefined : 'button'} tabIndex={nodeData.isDomain ? -1 : 0} onClick={(event) => { event.stopPropagation(); if (!nodeData.isDomain) nodeData.onSelect(node.id); }} onKeyDown={onKeyDown}>
 			<div className="knowledge-flow-node-heading"><strong>{node.title}</strong><span className="knowledge-flow-node-role">{roleLabel}</span></div>
-			<span>{node.pageType || 'PAGE'}{node.tier ? <span className="knowledge-flow-node-tier">{node.tier}</span> : null}</span>
+			<span className={graphPageTypeClass(node.pageType)}>{node.pageType || 'PAGE'}{node.tier ? <span className="knowledge-flow-node-tier">{node.tier}</span> : null}</span>
 		</div>
 		{!nodeData.isDomain && nodeData.isTooltipOpen && <div className="knowledge-node-tooltip" role="tooltip">
 			<button type="button" className="knowledge-node-tooltip-close nodrag nopan" aria-label="Close node tooltip" onClick={closeTooltip}><X size={13} /></button>

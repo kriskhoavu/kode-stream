@@ -217,3 +217,35 @@ describe('taxonomy grouping', () => {
 		expect(screen.getByRole('button', { name: /Article Fields/i })).toBeInTheDocument();
 	});
 });
+
+describe('page type badges', () => {
+	const typedPages: KnowledgePage[] = [
+		{ slug: 'how-to', title: 'Offer Approval', path: 'domains/offer/concepts/approval.md', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts', pageType: 'HOW_TO', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'concept', title: 'Offer Overview', path: 'domains/offer/concepts/overview.md', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts', pageType: 'CONCEPT', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'ref', title: 'Offer Permissions', path: 'domains/offer/reference/perms.md', domain: 'domains/offer/reference', bucket: 'domains', area: 'offer', tier: 'reference', pageType: 'REFERENCE', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
+		{ slug: 'decision', title: 'Offer Decision', path: 'domains/offer/concepts/decision.md', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts', pageType: 'DECISION', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }
+	];
+
+	const badgeFor = (title: string) =>
+		screen.getByRole('button', { name: new RegExp(title, 'i') }).querySelector('.knowledge-page-type');
+
+	// Page type is what varies inside a tier, so it carries the colour. Tier
+	// labels stay muted, keeping colour meaning one thing per axis.
+	it('marks the page types that vary within a group', () => {
+		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
+		fireEvent.click(screen.getByRole('button', { name: /^offer$/i }));
+
+		expect(badgeFor('Offer Approval')).toHaveClass('page-type-how-to');
+		expect(badgeFor('Offer Permissions')).toHaveClass('page-type-reference');
+	});
+
+	it('leaves the default and rare page types neutral', () => {
+		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
+		fireEvent.click(screen.getByRole('button', { name: /^offer$/i }));
+
+		expect(badgeFor('Offer Overview')?.className).toBe('knowledge-page-type');
+		expect(badgeFor('Offer Decision')?.className).toBe('knowledge-page-type');
+	});
+});
