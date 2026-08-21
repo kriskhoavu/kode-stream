@@ -218,34 +218,54 @@ describe('taxonomy grouping', () => {
 	});
 });
 
-describe('page type badges', () => {
+describe('tier colour and page type suppression', () => {
 	const typedPages: KnowledgePage[] = [
 		{ slug: 'how-to', title: 'Offer Approval', path: 'domains/offer/concepts/approval.md', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts', pageType: 'HOW_TO', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
 		{ slug: 'concept', title: 'Offer Overview', path: 'domains/offer/concepts/overview.md', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts', pageType: 'CONCEPT', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
 		{ slug: 'ref', title: 'Offer Permissions', path: 'domains/offer/reference/perms.md', domain: 'domains/offer/reference', bucket: 'domains', area: 'offer', tier: 'reference', pageType: 'REFERENCE', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
-		{ slug: 'decision', title: 'Offer Decision', path: 'domains/offer/concepts/decision.md', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts', pageType: 'DECISION', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }
+		{ slug: 'untiered', title: 'Base Setup', path: 'e2e-testing/base-setup.md', domain: 'e2e-testing', bucket: 'e2e-testing', area: '', tier: '', pageType: 'HOW_TO', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }
 	];
 
-	const badgeFor = (title: string) =>
-		screen.getByRole('button', { name: new RegExp(title, 'i') }).querySelector('.knowledge-page-type');
-
-	// Page type is what varies inside a tier, so it carries the colour. Tier
-	// labels stay muted, keeping colour meaning one thing per axis.
-	it('marks the page types that vary within a group', () => {
-		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
+	const openOffer = () => {
 		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
 		fireEvent.click(screen.getByRole('button', { name: /^offer$/i }));
+	};
+	const rowFor = (title: string) => screen.getByRole('button', { name: new RegExp(title, 'i') });
 
-		expect(badgeFor('Offer Approval')).toHaveClass('page-type-how-to');
-		expect(badgeFor('Offer Permissions')).toHaveClass('page-type-reference');
+	// The tier is the grouping a reader scans, so it carries the colour.
+	it('marks each tier label distinctly', () => {
+		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
+		openOffer();
+
+		const labels = screen.getAllByTestId('knowledge-tier-label');
+		const byText = new Map(labels.map((label) => [label.textContent?.trim(), label]));
+		expect(byText.get('concepts')).toHaveClass('tier-concepts');
+		expect(byText.get('reference')).toHaveClass('tier-reference');
 	});
 
-	it('leaves the default and rare page types neutral', () => {
+	// A tier label already states what the pages under it are, so repeating the
+	// page type on every row is noise.
+	it('drops the page type on rows inside a tier', () => {
 		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
-		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
-		fireEvent.click(screen.getByRole('button', { name: /^offer$/i }));
+		openOffer();
 
-		expect(badgeFor('Offer Overview')?.className).toBe('knowledge-page-type');
-		expect(badgeFor('Offer Decision')?.className).toBe('knowledge-page-type');
+		expect(rowFor('Offer Approval').querySelector('.knowledge-page-type')).toBeNull();
+		expect(rowFor('Offer Permissions').querySelector('.knowledge-page-type')).toBeNull();
+	});
+
+	// A page with no tier has no label above it, so its type is the only
+	// classification it has and must stay.
+	it('keeps the page type on rows with no tier', () => {
+		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: /^e2e-testing$/i }));
+
+		expect(rowFor('Base Setup').querySelector('.knowledge-page-type')).not.toBeNull();
+	});
+
+	it('no longer colours page types', () => {
+		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: /^e2e-testing$/i }));
+
+		expect(rowFor('Base Setup').querySelector('.page-type-how-to')).toBeNull();
 	});
 });

@@ -88,10 +88,10 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		};
 		const depth = node.path.includes('/') ? 'area' : 'bucket';
 		const Marker = depth === 'bucket' ? Library : BookMarked;
-		const renderPage = (page: KnowledgePage) => {
+		const renderPage = (page: KnowledgePage, tier: string) => {
 			const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length;
 			return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}>
-				<span><strong className="knowledge-page-title">{page.title}</strong><small><span className={pageTypeClass(page.pageType)}>{displayPageType(page.pageType)}</span>{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span>
+				<span><strong className="knowledge-page-title">{page.title}</strong><small>{tier ? null : <span className="knowledge-page-type">{displayPageType(page.pageType)}</span>}{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span>
 			</button>;
 		};
 		return <section className={`knowledge-domain knowledge-domain-${depth}`} key={node.path}>
@@ -103,8 +103,8 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 				{collapsible && <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>}
 			</div>
 			{expanded && tiers.map((group) => <div className="knowledge-tier" key={group.tier || '_'}>
-				{group.tier && <p className="knowledge-tier-label" data-testid="knowledge-tier-label">{group.tier}</p>}
-				{group.pages.map(renderPage)}
+				{group.tier && <p className={tierLabelClass(group.tier)} data-testid="knowledge-tier-label">{group.tier}</p>}
+				{group.pages.map((page) => renderPage(page, group.tier))}
 			</div>)}
 			{expanded && node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map(renderDomain)}</div>}
 		</section>;
@@ -195,14 +195,14 @@ function nodeKeyOf(page: KnowledgePage): string {
 	return areaKey(grouping) ?? bucketKey(grouping);
 }
 
-// Only the page types that actually vary inside a tier are marked. CONCEPT is
-// the default and DECISION is vanishingly rare, so both stay neutral rather
-// than turning the list into a rainbow.
-const markedPageTypes: Record<string, string> = { HOW_TO: 'page-type-how-to', REFERENCE: 'page-type-reference' };
+// The tier is the grouping a reader scans, so it carries the colour. Any tier
+// beyond the two the corpus uses falls back to the muted default rather than
+// being assigned a colour nobody chose.
+const markedTiers: Record<string, string> = { concepts: 'tier-concepts', reference: 'tier-reference' };
 
-function pageTypeClass(pageType?: string): string {
-	const marker = pageType ? markedPageTypes[pageType] : undefined;
-	return marker ? `knowledge-page-type ${marker}` : 'knowledge-page-type';
+function tierLabelClass(tier: string): string {
+	const marker = markedTiers[tier.toLowerCase()];
+	return marker ? `knowledge-tier-label ${marker}` : 'knowledge-tier-label';
 }
 
 function displayPageType(pageType?: string): string {

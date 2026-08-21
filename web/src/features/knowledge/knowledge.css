@@ -1302,29 +1302,39 @@ body.is-resizing-panel .knowledge-browser {
   letter-spacing: 0.06em;
 }
 
-/* The green needs a heavier mix toward --text than the purple: at 88% it
-   measured 4.32:1 on light, just under AA. At 80% it reaches 4.90.
+/* The tier label carries the colour, because the tier is the grouping a reader
+   scans. Page type is not coloured and, inside a tier, is not repeated at all:
+   the reference tier is REFERENCE for 27 of 27 pages, so the badge restated the
+   label above it.
 
-   Page type carries the colour, because it is what varies inside a tier: the
-   reference tier is 100% REFERENCE pages, but the concepts tier mixes CONCEPT,
-   HOW_TO and DECISION. Tier labels stay muted so colour means one thing per
-   axis — level for headings, kind for badges. CONCEPT and DECISION stay
-   neutral; only the two types worth scanning for are marked. */
+   --orange and --warning are unusable here; both resolve to #f9b98c in dark
+   mode, which is exactly the bucket heading colour. The green also needs a
+   heavier mix toward --text than the purple: at 88% it measured 4.32:1 on
+   light, so it sits at 80%. */
 
-.knowledge-page-type.page-type-how-to {
+.knowledge-tier-label.tier-concepts {
   color: color-mix(in srgb, var(--green) 80%, var(--text));
 }
 
-.knowledge-page-type.page-type-reference {
+.knowledge-tier-label.tier-concepts::after {
+  background: color-mix(in srgb, var(--green) 30%, transparent);
+}
+
+.knowledge-tier-label.tier-reference {
   color: color-mix(in srgb, var(--purple) 88%, var(--text));
 }
 
-/* Same marking on a graph node. The tier badge inside keeps its own muted
-   treatment so the two facts stay separable. */
-.knowledge-flow-node-card > span.knowledge-flow-node-meta.page-type-how-to {
+.knowledge-tier-label.tier-reference::after {
+  background: color-mix(in srgb, var(--purple) 30%, transparent);
+}
+
+/* Same marking on a graph node's tier badge, so both views agree. */
+.knowledge-flow-node-tier.tier-concepts {
+  background: color-mix(in srgb, var(--green) 16%, var(--panel));
   color: color-mix(in srgb, var(--green) 80%, var(--text));
 }
 
-.knowledge-flow-node-card > span.knowledge-flow-node-meta.page-type-reference {
+.knowledge-flow-node-tier.tier-reference {
+  background: color-mix(in srgb, var(--purple) 16%, var(--panel));
   color: color-mix(in srgb, var(--purple) 88%, var(--text));
 }
