@@ -7,7 +7,7 @@
 | Aspect        | Value                                                                     |
 |---------------|---------------------------------------------------------------------------|
 | Type          | `'neon' \| 'lattice' \| 'none'`                                             |
-| Default       | `lattice`                                                                 |
+| Default       | `lattice`, flipped from `neon` in F3 once the variant exists              |
 | Storage       | Existing `planManager.appSettings` object, under the `kodeStream.` prefix |
 | Normalization | Any value not in the variant list becomes the default                     |
 | Persistence   | The existing `useAppSettings` effect; no new write path                   |

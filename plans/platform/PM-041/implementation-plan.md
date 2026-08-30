@@ -52,16 +52,19 @@ All code, CSS classes, custom properties and TS types must use:
 Pure and testable with no UI. The fallback behaviour is the part that matters: every existing install reaches this
 code with the field absent.
 
+The default stays `neon` here and flips in F3. Defaulting to `lattice` before the variant exists would leave the
+band blank for two phases, which is not a state any phase should be able to ship in.
+
 **Deliverables:**
 
-- [ ] `components/HeaderBackdrop.tsx` — export `BackdropVariant` and the variant list.
-- [ ] `features/settings/appSettings.ts` — `headerBackdrop` on `AppSettings`, defaulting to `lattice`.
-- [ ] `normalizeAppSettings` validates the variant against the list and falls back to the default.
-- [ ] Test that absent settings yield `lattice`.
-- [ ] Test that an unknown string such as `"aurora"` falls back to `lattice`.
-- [ ] Test that a non-string value falls back without throwing.
-- [ ] Test that each of the three valid variants round-trips through normalization.
-- [ ] Test that adding the field leaves `visibleWorkstreamStatuses` untouched.
+- [x] `components/HeaderBackdrop.tsx` — export `BackdropVariant` and the variant list.
+- [x] `features/settings/appSettings.ts` — `headerBackdrop` on `AppSettings`, defaulting to `neon`.
+- [x] `normalizeAppSettings` validates the variant against the list and falls back to the default.
+- [x] Test that absent settings yield the built-in default.
+- [x] Test that an unknown string such as `"aurora"` falls back to the default.
+- [x] Test that a non-string value falls back without throwing.
+- [x] Test that each of the three valid variants round-trips through normalization.
+- [x] Test that adding the field leaves `visibleWorkstreamStatuses` untouched.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/settings`
 
@@ -114,6 +117,8 @@ the acceptance criteria, since they are what make the grid and the network read 
 - [ ] Test that no edge has zero length.
 - [ ] Test that two renders produce identical geometry.
 - [ ] Test that at least one node carries the pulse class.
+- [ ] Flip `defaultBackdropVariant` to `lattice`, now that the variant it names exists.
+- [ ] Update the F1 default test, which asserts the constant rather than a literal.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/components`
 

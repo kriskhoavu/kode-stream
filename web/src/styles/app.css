@@ -2079,6 +2079,18 @@ select {
     var(--bg);
 }
 
+/*
+ * #app-main is focused programmatically on every route change so screen readers
+ * announce the new page. Chrome counts that scripted focus as keyboard modality
+ * and paints its UA focus ring around the whole scroll container. The element is
+ * tabindex="-1", so it is never a tab stop and suppressing the ring costs no
+ * keyboard affordance.
+ */
+.main-content:focus,
+.main-content:focus-visible {
+  outline: none;
+}
+
 .page-title,
 .workspace-header {
   display: flex;
