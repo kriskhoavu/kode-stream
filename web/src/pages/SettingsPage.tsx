@@ -5,6 +5,18 @@ import type { AppSettings } from '../features/settings/appSettings';
 import { useAISettings } from '../features/ai-settings/useAISettings';
 import type { AICapabilityKind, AILaunchTemplate, AISettings } from '../lib/types';
 import { StorageSettings } from '../features/settings/StorageSettings';
+import { backdropVariants } from '../components/HeaderBackdrop';
+import type { BackdropVariant } from '../components/HeaderBackdrop';
+
+/*
+ * Settings is not a backdrop route, so choosing a variant shows no immediate
+ * change here. The copy has to do the work a preview would.
+ */
+const backdropLabels: Record<BackdropVariant, { name: string; description: string }> = {
+  lattice: { name: 'Lattice', description: 'A blueprint grid with a node network drawn along it.' },
+  neon: { name: 'Neon', description: 'A scattered field of glowing tool icons.' },
+  none: { name: 'None', description: 'No backdrop. The topbar keeps its own background and border.' }
+};
 
 export function SettingsPage({ settings, onChange }: { settings: AppSettings; onChange: (settings: AppSettings) => void }) {
   const visible = new Set(settings.visibleWorkstreamStatuses);
@@ -45,6 +57,34 @@ export function SettingsPage({ settings, onChange }: { settings: AppSettings; on
                 checked={visible.has(status)}
                 onChange={() => toggleStatus(status)}
                 aria-label={`Show ${statusLabels[status]} status`}
+              />
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <header>
+          <div>
+            <span className="settings-group-label">Appearance</span>
+            <h2>Header backdrop</h2>
+            <p>The decoration behind the topbar and filter rows on Workstream, Workbench and Knowledge.</p>
+          </div>
+        </header>
+        <div className="settings-toggle-list" role="radiogroup" aria-label="Header backdrop">
+          {backdropVariants.map((variant) => (
+            <label className="settings-toggle-row" key={variant}>
+              <span>
+                <strong>{backdropLabels[variant].name}</strong>
+                <small>{backdropLabels[variant].description}</small>
+              </span>
+              <input
+                type="radio"
+                name="header-backdrop"
+                value={variant}
+                checked={settings.headerBackdrop === variant}
+                onChange={() => onChange({ ...settings, headerBackdrop: variant })}
+                aria-label={backdropLabels[variant].name}
               />
             </label>
           ))}

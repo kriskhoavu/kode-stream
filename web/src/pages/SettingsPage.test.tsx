@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../shared/api';
 import { defaultAppSettings } from '../features/settings/appSettings';
@@ -46,5 +46,34 @@ describe('SettingsPage AI settings', () => {
 
     expect(await screen.findByText('Codex')).toBeInTheDocument();
     expect(screen.getAllByLabelText('Arguments, one per line')[0]).toHaveValue('');
+  });
+});
+
+describe('SettingsPage header backdrop', () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it('offers every variant with the current one selected', () => {
+    vi.mocked(api.aiSettings).mockResolvedValue(null as never);
+    vi.mocked(api.aiCapabilities).mockResolvedValue([]);
+    render(<SettingsPage settings={{ ...defaultAppSettings, headerBackdrop: 'neon' }} onChange={vi.fn()} />);
+
+    const group = screen.getByRole('radiogroup', { name: 'Header backdrop' });
+    const options = within(group).getAllByRole('radio');
+
+    expect(options).toHaveLength(3);
+    expect(within(group).getByRole('radio', { name: /neon/i })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: /lattice/i })).not.toBeChecked();
+  });
+
+  it('reports the chosen variant without disturbing the other settings', () => {
+    vi.mocked(api.aiSettings).mockResolvedValue(null as never);
+    vi.mocked(api.aiCapabilities).mockResolvedValue([]);
+    const onChange = vi.fn();
+    const settings = { ...defaultAppSettings, headerBackdrop: 'lattice' as const, visibleWorkstreamStatuses: ['draft' as const] };
+    render(<SettingsPage settings={settings} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('radio', { name: /none/i }));
+
+    expect(onChange).toHaveBeenCalledWith({ ...settings, headerBackdrop: 'none' });
   });
 });

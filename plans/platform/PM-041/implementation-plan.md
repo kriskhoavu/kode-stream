@@ -134,14 +134,16 @@ therefore has no live preview to explain itself.
 
 **Deliverables:**
 
-- [ ] `pages/SettingsPage.tsx` — an Appearance section with a radio group over the three variants.
-- [ ] Each option names what it paints in one line.
-- [ ] Section copy states that the backdrop appears on Workstream, Workbench and Knowledge.
-- [ ] Radio group styling reuses `settings-section` and `settings-toggle-row`; add rules only where the radio
+- [x] `pages/SettingsPage.tsx` — an Appearance section with a radio group over the three variants.
+- [x] Each option names what it paints in one line.
+- [x] Section copy states that the backdrop appears on Workstream, Workbench and Knowledge.
+- [x] Radio group styling reuses `settings-section` and `settings-toggle-row`; add rules only where the radio
       differs from the existing checkbox rows.
-- [ ] Test that three options render with the current one selected.
-- [ ] Test that selecting an option calls `onChange` with that variant and preserves the other settings.
-- [ ] Keyboard: arrow keys move within the group and the group takes one tab stop.
+- [x] Test that three options render with the current one selected.
+- [x] Test that selecting an option calls `onChange` with that variant and preserves the other settings.
+- [x] Keyboard: native radios sharing one `name`, so the group is one tab stop and arrows move within it.
+      Arrow navigation could not be exercised through the browser automation layer, which does not trigger the
+      native default action; the pre-existing Storage option group behaves identically under it.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/SettingsPage.test.tsx`
 
