@@ -1,3 +1,6 @@
+import { NeonBackdrop } from './NeonBackdrop';
+import './header-backdrop.css';
+
 /**
  * The header backdrop is the decorative layer filling the band that runs from
  * the topbar down through each page's toolbar and filter rows.
@@ -24,4 +27,30 @@ export function toBackdropVariant(value: unknown): BackdropVariant {
   return (backdropVariants as readonly string[]).includes(value as string)
     ? (value as BackdropVariant)
     : defaultBackdropVariant;
+}
+
+/** Routes whose header-to-filter band carries a backdrop. */
+export const backdropRoutes = ['workstream', 'canvas', 'knowledge'] as const;
+
+/** True when this route and this variant together produce a visible band. */
+export function paintsBand(routeName: string, variant: BackdropVariant): boolean {
+  return variant !== 'none' && (backdropRoutes as readonly string[]).includes(routeName);
+}
+
+/**
+ * The band, filled by the chosen variant. Presentational only: hidden from
+ * assistive technology and transparent to pointer events.
+ *
+ * Renders nothing for `none`. The shell must drop the band class in that case
+ * too — the class also strips the topbar's fill, blur and border, so an empty
+ * band would leave the topbar with no chrome and nothing behind it.
+ */
+export function HeaderBackdrop({ variant }: { variant: BackdropVariant }) {
+  if (variant === 'none') return null;
+
+  return (
+    <div className="header-backdrop" aria-hidden="true">
+      {variant === 'neon' && <NeonBackdrop />}
+    </div>
+  );
 }

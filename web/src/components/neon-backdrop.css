@@ -1,22 +1,5 @@
-/*
- * Neon icon band. Sits over the content column's top strip, spanning the
- * topbar down through the page toolbar/filter rows, and fades out at the
- * bottom so the exact band height never needs to be pixel-accurate.
- */
-.neon-backdrop {
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  height: var(--neon-band-height, 360px);
-  z-index: 1;
-  overflow: hidden;
-  pointer-events: none;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 46%, rgba(0, 0, 0, 0.55) 74%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 46%, rgba(0, 0, 0, 0.55) 74%, transparent 100%);
-}
-
-.neon-backdrop-icon {
+/* Neon variant: a scattered icon field. The band box itself is in header-backdrop.css. */
+.neon-icon {
   position: absolute;
   display: block;
   translate: -50% -50%;
@@ -32,7 +15,7 @@
   will-change: transform, opacity;
 }
 
-:root[data-theme="dark"] .neon-backdrop-icon {
+:root[data-theme="dark"] .neon-icon {
   color: hsl(var(--neon-hue) 95% 66%);
   opacity: 0.72;
 }
@@ -60,7 +43,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .neon-backdrop-icon {
+  .neon-icon {
     animation: none;
   }
 }

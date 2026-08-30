@@ -1,0 +1,21 @@
+/*
+ * The band every backdrop variant fills. It sits over the content column's top
+ * strip, spanning the topbar down through the page toolbar and filter rows, and
+ * fades out at the bottom so the exact band height never needs to be
+ * pixel-accurate.
+ *
+ * Variants paint contents only. Nothing about the box, its height or its mask
+ * belongs to a variant stylesheet.
+ */
+.header-backdrop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  height: var(--band-height, 360px);
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 46%, rgba(0, 0, 0, 0.55) 74%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 46%, rgba(0, 0, 0, 0.55) 74%, transparent 100%);
+}

@@ -1,5 +1,5 @@
-/* No background of its own: an opaque fill here covered the neon icon band
- * across the whole header, which is why Workbench showed far fewer icons than
+/* No background of its own: an opaque fill here covered the header backdrop
+ * across the whole header, which is why Workbench showed far less of it than
  * Workstream, whose page wrapper is transparent. .main-content already paints
  * --bg plus the header glows underneath. */
 .canvas-page { min-height: calc(100vh - 108px); display: flex; flex-direction: column; }

@@ -1,0 +1,48 @@
+import { cleanup, render } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { HeaderBackdrop, backdropRoutes, backdropVariants, paintsBand, toBackdropVariant } from './HeaderBackdrop';
+
+afterEach(cleanup);
+
+describe('HeaderBackdrop', () => {
+  it('renders a decorative layer hidden from assistive technology', () => {
+    const { container } = render(<HeaderBackdrop variant="neon" />);
+    const layer = container.querySelector('.header-backdrop');
+
+    expect(layer).toBeTruthy();
+    expect(layer).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('dispatches to the neon variant', () => {
+    const { container } = render(<HeaderBackdrop variant="neon" />);
+    expect(container.querySelectorAll('.neon-icon').length).toBeGreaterThan(0);
+  });
+
+  it('renders nothing at all for none', () => {
+    const { container } = render(<HeaderBackdrop variant="none" />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('decorates the workstream, workbench and knowledge routes only', () => {
+    expect([...backdropRoutes]).toEqual(['workstream', 'canvas', 'knowledge']);
+  });
+
+  /*
+   * The band class strips the topbar's fill, blur and border, so it must never
+   * be applied where nothing will paint. Both ways of getting there — an
+   * off-band route and the none variant — have to answer the same.
+   */
+  it('paints a band only for a backdrop route with a visible variant', () => {
+    expect(paintsBand('workstream', 'neon')).toBe(true);
+    expect(paintsBand('workstream', 'none')).toBe(false);
+    expect(paintsBand('settings', 'neon')).toBe(false);
+    expect(paintsBand('settings', 'none')).toBe(false);
+  });
+
+  it('narrows unknown stored values to a known variant', () => {
+    for (const variant of backdropVariants) expect(toBackdropVariant(variant)).toBe(variant);
+    for (const bad of [undefined, null, 'aurora', 7, {}]) {
+      expect(backdropVariants).toContain(toBackdropVariant(bad));
+    }
+  });
+});

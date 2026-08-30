@@ -79,18 +79,18 @@ makes this phase safe to review separately from F3.
 
 **Deliverables:**
 
-- [ ] Rename `NeonHeaderBackdrop.tsx` to `NeonBackdrop.tsx`, exporting `NeonBackdrop`.
-- [ ] Move `backdropRoutes` and the band box out of the neon module into `HeaderBackdrop.tsx` and
+- [x] Rename `NeonHeaderBackdrop.tsx` to `NeonBackdrop.tsx`, exporting `NeonBackdrop`.
+- [x] Move `backdropRoutes` and the band box out of the neon module into `HeaderBackdrop.tsx` and
       `header-backdrop.css`.
-- [ ] `HeaderBackdrop` renders the variant it is given and nothing for `none`.
-- [ ] `neon-backdrop.css` keeps only neon styling; `.neon-backdrop-icon` becomes `.neon-icon`.
-- [ ] `app-shell.css` — `.neon-band` to `.header-band`, per-route classes and `--band-height` renamed.
-- [ ] `App.tsx` — compute `showBand` once from the variant and the route, driving both class list and render.
-- [ ] Update the stale neon comment in `features/canvas/canvas.css`.
-- [ ] Retarget the existing neon tests at the new names; keep every assertion.
-- [ ] Test that `HeaderBackdrop` renders nothing for `none`.
-- [ ] Test that `backdropRoutes` is still exactly `workstream`, `canvas`, `knowledge`.
-- [ ] Confirm no `neon-band` or `neonBandRoutes` reference remains outside the Neon variant itself.
+- [x] `HeaderBackdrop` renders the variant it is given and nothing for `none`.
+- [x] `neon-backdrop.css` keeps only neon styling; `.neon-backdrop-icon` becomes `.neon-icon`.
+- [x] `app-shell.css` — `.neon-band` to `.header-band`, per-route classes and `--band-height` renamed.
+- [x] `App.tsx` — compute `showBand` once from the variant and the route, driving both class list and render.
+- [x] Update the stale neon comment in `features/canvas/canvas.css`.
+- [x] Retarget the existing neon tests at the new names; keep every assertion.
+- [x] Test that `HeaderBackdrop` renders nothing for `none`.
+- [x] Test that `backdropRoutes` is still exactly `workstream`, `canvas`, `knowledge`.
+- [x] Confirm no `neon-band` or `neonBandRoutes` reference remains outside the Neon variant itself.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/components web/src/App.test.tsx`
 

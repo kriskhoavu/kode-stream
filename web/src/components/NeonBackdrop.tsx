@@ -1,8 +1,5 @@
 import { Bot, Boxes, Database, FileCode2, GitBranch, KanbanSquare, Key, Layers, Plug, Sparkles, Terminal, Workflow, Wrench, BookOpen } from 'lucide-react';
-import './neon-header-backdrop.css';
-
-/** Routes whose header-to-filter band carries the neon icon decoration. */
-export const neonBandRoutes = ['workstream', 'canvas', 'knowledge'] as const;
+import './neon-backdrop.css';
 
 type NeonIcon = {
   Icon: typeof GitBranch;
@@ -63,16 +60,16 @@ const icons: NeonIcon[] = [
 ];
 
 /**
- * Decorative neon icon field for the band running from the topbar down through
- * each page's toolbar and filter rows. Presentational only: hidden from
- * assistive technology and transparent to pointer events.
+ * Neon variant: a scattered icon field, each icon carrying its own hue, drift
+ * and glow pulse. The band box, its height and its fade mask belong to
+ * `HeaderBackdrop`; this component paints contents only.
  */
-export function NeonHeaderBackdrop() {
+export function NeonBackdrop() {
   return (
-    <div className="neon-backdrop" aria-hidden="true">
+    <>
       {icons.map(({ Icon, x, y, size, hue, duration, delay }, index) => (
         <span
-          className="neon-backdrop-icon"
+          className="neon-icon"
           key={index}
           style={{
             left: `${x}%`,
@@ -85,6 +82,6 @@ export function NeonHeaderBackdrop() {
           <Icon size={size} strokeWidth={2} />
         </span>
       ))}
-    </div>
+    </>
   );
 }
