@@ -1,6 +1,6 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { HeaderBackdrop, backdropRoutes, backdropVariants, paintsBand, toBackdropVariant } from './HeaderBackdrop';
+import { HeaderBackdrop, backdropRoutes, backdropVariants, bandClasses, toBackdropVariant } from './HeaderBackdrop';
 
 afterEach(cleanup);
 
@@ -32,11 +32,19 @@ describe('HeaderBackdrop', () => {
    * be applied where nothing will paint. Both ways of getting there — an
    * off-band route and the none variant — have to answer the same.
    */
-  it('paints a band only for a backdrop route with a visible variant', () => {
-    expect(paintsBand('workstream', 'neon')).toBe(true);
-    expect(paintsBand('workstream', 'none')).toBe(false);
-    expect(paintsBand('settings', 'neon')).toBe(false);
-    expect(paintsBand('settings', 'none')).toBe(false);
+  it('claims no band class where nothing will paint', () => {
+    expect(bandClasses('workstream', 'none')).toBe('');
+    expect(bandClasses('settings', 'neon')).toBe('');
+    expect(bandClasses('settings', 'none')).toBe('');
+  });
+
+  /*
+   * The variant class is what lets the page beneath react to the treatment
+   * above it — `.main-content` drops its corner glows under the lattice.
+   */
+  it('names the route and the variant on the band class', () => {
+    expect(bandClasses('workstream', 'lattice')).toBe('header-band header-band-workstream backdrop-lattice');
+    expect(bandClasses('canvas', 'neon')).toBe('header-band header-band-canvas backdrop-neon');
   });
 
   it('narrows unknown stored values to a known variant', () => {

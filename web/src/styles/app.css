@@ -2080,6 +2080,16 @@ select {
 }
 
 /*
+ * The glows are tuned for Neon, whose icons are themselves soft points of
+ * colour: the wash reads as more of the same. The lattice is the opposite kind
+ * of mark — thin, even, structural — and an uneven colour wash behind it makes
+ * the grid look unevenly lit rather than lit at all. Flat ground under it.
+ */
+.app-shell.backdrop-lattice .main-content {
+  background: var(--bg);
+}
+
+/*
  * #app-main is focused programmatically on every route change so screen readers
  * announce the new page. Chrome counts that scripted focus as keyboard modality
  * and paints its UA focus ring around the whole scroll container. The element is

@@ -11,7 +11,7 @@ import { WorkspacesPage } from './pages/WorkspacesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { api, isExtensionSurface, localAPIOrigin } from './shared/api';
 import { ActivityPanel } from './components/ReliabilityPanels';
-import { HeaderBackdrop, paintsBand } from './components/HeaderBackdrop';
+import { HeaderBackdrop, bandClasses } from './components/HeaderBackdrop';
 import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';
 import { useAppSettings } from './features/settings/appSettings';
@@ -105,17 +105,12 @@ export function App() {
     return <LocalServerUnavailable status={localAPIStatus} apiOrigin={localAPIOrigin()} onRetry={() => void checkLocalAPI()} />;
   }
 
-  /*
-   * One condition drives both the class and the render. The band class also
-   * strips the topbar's fill, blur and border, so a rendered-but-empty band
-   * would leave the topbar with no chrome and nothing behind it.
-   */
-  const showBand = paintsBand(route.name, appSettings.headerBackdrop);
-  const shellClasses = ['app-shell', leftNavCollapsed ? 'left-nav-collapsed' : '', showBand ? `header-band header-band-${route.name}` : ''].filter(Boolean).join(' ');
+  const band = bandClasses(route.name, appSettings.headerBackdrop);
+  const shellClasses = ['app-shell', leftNavCollapsed ? 'left-nav-collapsed' : '', band].filter(Boolean).join(' ');
 
   return (
     <div className={shellClasses}>
-      {showBand && <HeaderBackdrop variant={appSettings.headerBackdrop} />}
+      {band && <HeaderBackdrop variant={appSettings.headerBackdrop} />}
       <aside className="left-nav">
         <div className="left-nav-brand-row">
           <button className="brand" onClick={() => navigate({ name: 'workstream' })} aria-label="Kode Stream home">

@@ -29,9 +29,20 @@ export function toBackdropVariant(value: unknown): BackdropVariant {
 /** Routes whose header-to-filter band carries a backdrop. */
 export const backdropRoutes = ['workstream', 'canvas', 'knowledge'] as const;
 
-/** True when this route and this variant together produce a visible band. */
-export function paintsBand(routeName: string, variant: BackdropVariant): boolean {
-  return variant !== 'none' && (backdropRoutes as readonly string[]).includes(routeName);
+/**
+ * The shell classes this route and variant call for, empty when nothing paints.
+ *
+ * One source for both the class list and whether the backdrop renders. The band
+ * class also strips the topbar's fill, blur and border, so a rendered-but-empty
+ * band would leave the topbar with no chrome and nothing behind it.
+ *
+ * The variant class is here because the page beneath the band sometimes has to
+ * know which treatment it is under: `.main-content`'s corner glows suit Neon
+ * and muddy the lattice.
+ */
+export function bandClasses(routeName: string, variant: BackdropVariant): string {
+  if (variant === 'none' || !(backdropRoutes as readonly string[]).includes(routeName)) return '';
+  return `header-band header-band-${routeName} backdrop-${variant}`;
 }
 
 /**

@@ -22,14 +22,15 @@ gates.
 
 ## Phases Summary
 
-| Phase | Name                         | Track    | Status   |
-|-------|------------------------------|----------|----------|
-| F1    | Preference and variant type  | Frontend | Complete |
-| F2    | Band contract generalisation | Frontend | Complete |
-| F3    | Lattice variant              | Frontend | Complete |
-| F4    | Settings control             | Frontend | Complete |
-| F5    | Cross-variant verification   | Frontend | Complete |
-| F6    | Monochrome lattice palette   | Frontend | Complete |
+| Phase | Name                          | Track    | Status   |
+|-------|-------------------------------|----------|----------|
+| F1    | Preference and variant type   | Frontend | Complete |
+| F2    | Band contract generalisation  | Frontend | Complete |
+| F3    | Lattice variant               | Frontend | Complete |
+| F4    | Settings control              | Frontend | Complete |
+| F5    | Cross-variant verification    | Frontend | Complete |
+| F6    | Monochrome lattice palette    | Frontend | Reverted |
+| F7    | Flat ground under the lattice | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -173,11 +174,15 @@ motion.
 
 ---
 
-### Phase F6: Monochrome Lattice Palette
+### Phase F6: Monochrome Lattice Palette — Reverted by F7
 
-Review pass. The lattice read as orange, worst in dark theme, and that was traced to token choice rather than to
-anything in the design: `--blue` is `#f9b98c` in the dark palette — a peach — so the grid, the network and the
-sweep all inherited it, on top of the deliberately orange `--button-accent` pulse.
+Review pass, and a misdiagnosis. The lattice read as orange, and `--blue` being `#f9b98c` in the dark palette
+looked like a sufficient explanation, so the whole field was redrawn in `--text`.
+
+It was the wrong layer. The orange came from `.main-content`'s corner glows behind the band, which read from the
+same token; the lattice's own blue was working, including in light theme where F6 discarded it for no reason.
+Left recorded rather than deleted, because the token trap it names is real and the next reader should see both
+the trap and the mistake it caused.
 
 **Deliverables:**
 
@@ -191,6 +196,34 @@ sweep all inherited it, on top of the deliberately orange `--button-accent` puls
 **Verification:** `npm run typecheck && npm test -- --run web/src/components`
 
 **Commit:** `PM-041: Draw the lattice in neutral ink`
+
+---
+
+### Phase F7: Flat Ground Under The Lattice
+
+Reverses F6. The orange was never in the lattice: it is `.main-content`'s two corner glows, which read from
+`--blue` and so go peach in dark theme. F6 recoloured the wrong layer, and lost the blue that was working.
+
+The glows suit Neon, whose icons are themselves soft points of colour — the wash reads as more of the same. The
+lattice is the opposite kind of mark: thin, even and structural. An uneven colour wash behind it makes the grid
+look unevenly lit rather than lit at all.
+
+The shell already knew the route; it now names the variant too, so the page beneath the band can respond to the
+treatment above it.
+
+**Deliverables:**
+
+- [x] Restore the lattice palette from F3 — `--blue` for the field, `--button-accent` for coarse junctions.
+- [x] `bandClasses` replaces `paintsBand`, returning the full class string including `backdrop-{variant}`.
+- [x] `App.tsx` derives both the class list and the render from that one string.
+- [x] `.app-shell.backdrop-lattice .main-content` drops to flat `--bg`.
+- [x] Neon and every non-band route keep the glows untouched.
+- [x] Test that the band class names both the route and the variant, and is empty where nothing paints.
+- [x] Confirm in both themes that the lattice sits on flat ground and Neon still has its wash.
+
+**Verification:** `npm run typecheck && npm test && npm run build`
+
+**Commit:** `PM-041: Give the lattice flat ground`
 
 ## Post-Implementation Checklist
 
