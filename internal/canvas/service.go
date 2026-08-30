@@ -542,7 +542,6 @@ func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceCo
 			}
 			node.Workspace = &view
 		case EntityPlan:
-			observedCommit := placement.EntityRef.ObservedCommit
 			item, ok := itemByID[placement.EntityRef.ItemID]
 			if !ok {
 				// Canvas only projects ticket roots under plans/{service}/{ticket}.
@@ -564,16 +563,11 @@ func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceCo
 					continue
 				}
 				// Adopt the placement: re-anchor it to the current identity so the
-				// drift check below compares against the commit we just resolved
-				// rather than one recorded under the previous ID scheme.
+				// node resolves under the ID scheme in use now rather than the one
+				// it was placed under.
 				placed[planNodeID(rebound.ID)] = true
 				item = rebound
-				observedCommit = item.Commit
 				node.EntityRef.ItemID = item.ID
-				node.EntityRef.ObservedCommit = item.Commit
-			}
-			if observedCommit != "" && item.Commit != "" && observedCommit != item.Commit {
-				node.State = NodeStale
 			}
 			node.Plan = &PlanNode{ItemID: item.ID, Identifier: item.Identifier, Title: item.Title, Service: canvasPlanService(item), Status: item.Status, Branch: item.Branch, Commit: item.Commit, Editable: item.Editable, Actions: actions}
 		case EntitySession:
@@ -665,7 +659,10 @@ func planNodeID(id string) string      { return "plan:" + id }
 func sessionNodeID(id string) string   { return "session:" + id }
 
 func planRef(item models.ItemSummary) EntityRef {
-	return EntityRef{Kind: EntityPlan, WorkspaceID: item.WorkspaceID, ItemID: item.ID, ItemPath: item.ItemPath, Identifier: item.Identifier, BranchKey: item.Branch, ObservedCommit: item.Commit}
+	// No ObservedCommit: every item on a branch carries that branch's tip, so
+	// recording it here marked each plan node stale on any commit to the repo.
+	// Plan nodes render the current checkout, and staleness means the plan is gone.
+	return EntityRef{Kind: EntityPlan, WorkspaceID: item.WorkspaceID, ItemID: item.ID, ItemPath: item.ItemPath, Identifier: item.Identifier, BranchKey: item.Branch}
 }
 
 func sessionRef(session ai.SessionRecordView) EntityRef {

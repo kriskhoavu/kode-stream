@@ -187,3 +187,32 @@ body.is-resizing-panel .canvas-workbench-resize-handle { opacity: 1; }
 @media (max-width: 900px) { .canvas-workbench.open { position: absolute; z-index: 8; inset: 0 0 0 auto; width: min(var(--canvas-workbench-width, 410px), 94vw); max-width: 94vw; box-shadow: -16px 0 36px rgb(0 0 0 / .18); } }
 @media (max-width: 800px) { .canvas-semantic-node.expanded.kind-session { width: 560px; } }
 @media (prefers-reduced-motion: reduce) { .canvas-semantic-node, .canvas-workbench { transition: none; } }
+
+/*
+ * Branch-vs-upstream reading in the page header, beside the checkout picker.
+ * Deliberately quiet: it is standing context, not an alert, so it borrows the
+ * muted palette and only the behind count takes a warning tint — being behind is
+ * the half that means someone else's work is missing from this checkout.
+ */
+.branch-upstream-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.branch-upstream-ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.branch-upstream-drift, .branch-upstream-synced { display: inline-flex; align-items: center; gap: 6px; }
+.branch-upstream-ahead, .branch-upstream-behind { display: inline-flex; align-items: center; gap: 2px; }
+.branch-upstream-behind { color: var(--warning); }
+.branch-upstream-synced { color: var(--green); }
+/* Nothing fetched yet: the counts have no basis, so this stays muted rather than
+ * borrowing the green that means "checked and level". */
+.branch-upstream-unknown { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }

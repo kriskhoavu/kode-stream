@@ -4,6 +4,7 @@ package git
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -375,5 +376,138 @@ func gitRun(t *testing.T, root string, args ...string) {
 	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, output)
+	}
+}
+
+// Ahead/behind counts are measured against the last-fetched remote-tracking ref,
+// so the UI needs to know how old that measurement is before presenting it.
+func TestStatusReportsWhenTheRemoteRefWasLastFetched(t *testing.T) {
+	remote := newGitRepo(t)
+	writeGitFile(t, remote, "README.md", "seed\n")
+	gitCommit(t, remote, "seed")
+
+	cloneRoot := t.TempDir()
+	local := filepath.Join(cloneRoot, "clone")
+	if err := New().Clone("file://"+remote, local); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, local, "config", "user.name", "Kode Stream")
+	gitRun(t, local, "config", "user.email", "kode-stream@example.test")
+
+	adapter := New()
+	fresh, err := adapter.Status("ws", local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fresh.FetchedAt.IsZero() {
+		t.Fatalf("a clone has not fetched since, FetchedAt = %v", fresh.FetchedAt)
+	}
+
+	before := time.Now().Add(-time.Second)
+	gitRun(t, local, "fetch", "origin")
+	fetched, err := adapter.Status("ws", local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fetched.FetchedAt.Before(before) {
+		t.Fatalf("FetchedAt = %v, expected at or after %v", fetched.FetchedAt, before)
+	}
+}
+
+// A worktree keeps .git as a file pointing at the real git dir, so FETCH_HEAD
+// must be located through git rather than assumed to sit under <root>/.git.
+func TestStatusReportsFetchTimeFromAWorktree(t *testing.T) {
+	remote := newGitRepo(t)
+	writeGitFile(t, remote, "README.md", "seed\n")
+	gitCommit(t, remote, "seed")
+
+	cloneRoot := t.TempDir()
+	local := filepath.Join(cloneRoot, "clone")
+	if err := New().Clone("file://"+remote, local); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, local, "config", "user.name", "Kode Stream")
+	gitRun(t, local, "config", "user.email", "kode-stream@example.test")
+	gitRun(t, local, "fetch", "origin")
+
+	// Branch from the remote-tracking ref so the worktree has an upstream, which
+	// is what makes a fetch age meaningful in the first place.
+	linked := filepath.Join(cloneRoot, "linked")
+	gitRun(t, local, "worktree", "add", "-b", "linked", linked, "origin/main")
+
+	status, err := New().Status("ws", linked)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.FetchedAt.IsZero() {
+		t.Fatal("worktree did not report the shared FETCH_HEAD time")
+	}
+}
+
+// time.Time is a struct, so `omitempty` does not drop a zero one: without
+// `omitzero` the API ships "0001-01-01T00:00:00Z", which a client reads as a
+// real timestamp and renders as a fetch that happened two millennia ago.
+func TestGitStatusOmitsAnUnknownFetchTimeFromItsJSON(t *testing.T) {
+	encoded, err := json.Marshal(models.GitStatus{WorkspaceID: "ws", Branch: "main", Upstream: "origin/main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "fetchedAt") {
+		t.Fatalf("zero fetch time was serialized: %s", encoded)
+	}
+	stamped, err := json.Marshal(models.GitStatus{WorkspaceID: "ws", Branch: "main", Upstream: "origin/main", FetchedAt: time.Unix(1700000000, 0).UTC()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(stamped), "fetchedAt") {
+		t.Fatalf("a known fetch time was dropped: %s", stamped)
+	}
+}
+
+// --path-format=absolute needs Git 2.31, and a repository can legitimately report
+// a relative common dir, so the fetch time must be located without depending on
+// either. Resolving against the workspace covers both.
+func TestStatusReportsFetchTimeWhenTheCommonDirIsRelative(t *testing.T) {
+	remote := newGitRepo(t)
+	writeGitFile(t, remote, "README.md", "seed\n")
+	gitCommit(t, remote, "seed")
+
+	cloneRoot := t.TempDir()
+	local := filepath.Join(cloneRoot, "clone")
+	if err := New().Clone("file://"+remote, local); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, local, "config", "user.name", "Kode Stream")
+	gitRun(t, local, "config", "user.email", "kode-stream@example.test")
+	gitRun(t, local, "fetch", "origin")
+
+	for name, commonDir := range map[string]string{"relative": ".git", "absolute": filepath.Join(local, ".git")} {
+		resolved := New().resolveFetchHead(local, commonDir)
+		if _, err := os.Stat(resolved); err != nil {
+			t.Fatalf("%s common dir resolved to %q, which does not exist: %v", name, resolved, err)
+		}
+	}
+	if resolved := New().resolveFetchHead(local, ""); resolved != "" {
+		t.Fatalf("an empty common dir resolved to %q", resolved)
+	}
+}
+
+// Status is called on request paths that can be cancelled; the fetch-age probe
+// must not keep forking git after the caller has gone away.
+func TestStatusContextStopsProbingFetchTimeWhenCancelled(t *testing.T) {
+	remote := newGitRepo(t)
+	writeGitFile(t, remote, "README.md", "seed\n")
+	gitCommit(t, remote, "seed")
+	cloneRoot := t.TempDir()
+	local := filepath.Join(cloneRoot, "clone")
+	if err := New().Clone("file://"+remote, local); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, local, "fetch", "origin")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if got := New().lastFetchedAtContext(ctx, local); !got.IsZero() {
+		t.Fatalf("cancelled context still probed the fetch time: %v", got)
 	}
 }

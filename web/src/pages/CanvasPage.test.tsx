@@ -35,6 +35,15 @@ describe('CanvasPage', () => {
 		expect(screen.getByRole('status')).toHaveTextContent('Saved');
 	});
 
+	// The workspace node is not drawn on the board, so the header is the only place
+	// the checkout's standing with its remote can be read.
+	it('shows how far the checkout has drifted from its upstream in the header', async () => {
+		canvasState.projection = upstreamProjection();
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		expect(await screen.findByText('origin/main')).toBeInTheDocument();
+		expect(screen.getByText('4 behind')).toBeInTheDocument();
+	});
+
 	it('keeps a selected terminal session in the Canvas instead of opening the Workbench', async () => {
 		canvasState.projection = sessionProjection();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
@@ -50,4 +59,10 @@ function projection(): CanvasProjection {
 
 function sessionProjection(): CanvasProjection {
 	return { ...projection(), nodes: [{ id: 'session:session-1', kind: 'session', state: 'resolved', entityRef: { kind: 'session', workspaceId: workspace.id, sessionId: 'session-1', branchKey: 'main' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, session: { record: { id: 'session-1', workspaceId: workspace.id, provider: 'codex', intent: 'card_context', requestedBranch: 'main', state: 'running', startedAt: '', lastKnownAt: '', live: true } } }] };
+}
+
+function upstreamProjection(): CanvasProjection {
+	const base = projection();
+	base.nodes = [...base.nodes, { id: `workspace:${workspace.id}`, kind: 'workspace', state: 'resolved', entityRef: { kind: 'workspace', workspaceId: workspace.id }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, workspace: { id: workspace.id, name: workspace.name, branch: 'main', providerAxes: { topology: 'local_application', contentProvider: 'local_checkout', executionProvider: 'local_process' }, actions: {}, git: { workspaceId: workspace.id, branch: 'main', upstream: 'origin/main', ahead: 0, behind: 4, fetchedAt: new Date().toISOString(), dirty: false, conflicted: false, changes: [] } } }];
+	return base;
 }

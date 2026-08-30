@@ -942,6 +942,8 @@ export interface GitStatus {
   upstream?: string;
   ahead: number;
   behind: number;
+  /** When the remote-tracking ref that `ahead`/`behind` are measured against was last fetched. Absent means nothing has fetched since the clone. */
+  fetchedAt?: string;
   dirty: boolean;
   conflicted: boolean;
   changes: GitChange[];

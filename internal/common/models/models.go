@@ -900,14 +900,18 @@ type GitActivityEntry struct {
 }
 
 type GitStatus struct {
-	WorkspaceID string      `json:"workspaceId" yaml:"workspaceId"`
-	Branch      string      `json:"branch" yaml:"branch"`
-	Upstream    string      `json:"upstream,omitempty" yaml:"upstream,omitempty"`
-	Ahead       int         `json:"ahead" yaml:"ahead"`
-	Behind      int         `json:"behind" yaml:"behind"`
-	Dirty       bool        `json:"dirty" yaml:"dirty"`
-	Conflicted  bool        `json:"conflicted" yaml:"conflicted"`
-	Changes     []GitChange `json:"changes" yaml:"changes"`
+	WorkspaceID string `json:"workspaceId" yaml:"workspaceId"`
+	Branch      string `json:"branch" yaml:"branch"`
+	Upstream    string `json:"upstream,omitempty" yaml:"upstream,omitempty"`
+	Ahead       int    `json:"ahead" yaml:"ahead"`
+	Behind      int    `json:"behind" yaml:"behind"`
+	// FetchedAt dates the remote-tracking ref that Ahead and Behind are measured
+	// against. Zero means nothing has fetched since the repository was cloned, so
+	// those counts describe a remote state of unknown age.
+	FetchedAt  time.Time   `json:"fetchedAt,omitzero" yaml:"fetchedAt,omitempty"`
+	Dirty      bool        `json:"dirty" yaml:"dirty"`
+	Conflicted bool        `json:"conflicted" yaml:"conflicted"`
+	Changes    []GitChange `json:"changes" yaml:"changes"`
 }
 
 type WorkspaceBranches struct {

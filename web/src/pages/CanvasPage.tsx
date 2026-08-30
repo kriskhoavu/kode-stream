@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CanvasLocation } from '../app/router';
 import { useCanvasState } from '../features/canvas/useCanvasState';
+import { BranchUpstreamIndicator } from '../features/canvas/BranchUpstreamIndicator';
 import { CanvasBoard } from '../features/canvas/CanvasBoard';
 import { CanvasWorkbench } from '../features/canvas/CanvasWorkbench';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -89,6 +90,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		<section className="canvas-page" aria-label="Workspace Canvas">
 			<header className="page-title workstream-title canvas-page-header">
 				<div className="workstream-heading"><div><h1><Workflow size={22} /> Workbench</h1><span><FolderGit2 size={15} /> {title}</span></div></div>
+				<BranchUpstreamIndicator git={canvas.projection?.nodes.find((node) => node.kind === 'workspace')?.workspace?.git} />
 				{workspace && <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={branches?.current ?? canvas.projection?.layout.branchKey ?? workspace.baselineBranch} branches={branches?.branches ?? []} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" disabled={canvas.loading} onSwitched={async () => { setSelectedId(undefined); await canvas.reload(); }} />}
 			</header>
 			{canvas.loading && <div className="canvas-state" role="status">Loading Canvas…</div>}

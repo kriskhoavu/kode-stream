@@ -350,7 +350,49 @@ func (g *GitAdapter) StatusContext(ctx context.Context, workspaceID, workspacePa
 			status.Dirty = true
 		}
 	}
+	if status.Upstream != "" {
+		status.FetchedAt = g.lastFetchedAtContext(ctx, workspacePath)
+	}
 	return status, nil
+}
+
+// lastFetchedAtContext dates the most recent fetch by FETCH_HEAD's modification
+// time. A repository that has never fetched since being cloned has no such file,
+// which reports as the zero time rather than an error: an unknown fetch age is a
+// fact about the remote-tracking ref, not a failure to read the status.
+func (g *GitAdapter) lastFetchedAtContext(ctx context.Context, workspacePath string) time.Time {
+	if ctx.Err() != nil {
+		return time.Time{}
+	}
+	// A linked worktree keeps a private git dir that holds no FETCH_HEAD; the
+	// fetch is recorded once in the common dir every worktree shares. Ask for it
+	// without --path-format, which needs Git 2.31, and resolve whatever comes back
+	// against the workspace so a relative answer works too.
+	out, err := g.runContextLimited(ctx, workspacePath, 1<<16, "rev-parse", "--git-common-dir")
+	if err != nil {
+		return time.Time{}
+	}
+	fetchHead := g.resolveFetchHead(workspacePath, strings.TrimSpace(string(out)))
+	if fetchHead == "" {
+		return time.Time{}
+	}
+	info, err := os.Stat(fetchHead)
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime().UTC()
+}
+
+// resolveFetchHead turns a git-common-dir answer, absolute or relative, into the
+// FETCH_HEAD path it implies. It returns "" when there is nothing to resolve.
+func (g *GitAdapter) resolveFetchHead(workspacePath, commonDir string) string {
+	if commonDir == "" {
+		return ""
+	}
+	if !filepath.IsAbs(commonDir) {
+		commonDir = filepath.Join(workspacePath, commonDir)
+	}
+	return filepath.Join(commonDir, "FETCH_HEAD")
 }
 
 func (g *GitAdapter) Activity(workspacePath, relPath string, limit int) ([]models.GitActivityEntry, error) {

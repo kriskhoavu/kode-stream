@@ -325,3 +325,35 @@ func stringsTrim(value string) string {
 	}
 	return value
 }
+
+// A commit on the branch moves every item's commit at once, so comparing it
+// against the one recorded at placement time marked the whole canvas stale for
+// unrelated work. Plan nodes now follow the current checkout unconditionally.
+func TestCanvasServiceKeepsPlanNodesResolvedAcrossCommitDrift(t *testing.T) {
+	repository, reg, items, git, workspaceConfig, initialItems, _ := canvasServiceFixture(t)
+	service := NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
+	projection, err := service.ResolveDefault("", workspaceConfig.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved := append([]models.ItemDetail(nil), initialItems...)
+	for i := range moved {
+		moved[i].Commit = "0000000000000000000000000000000000000000"
+	}
+	if err := items.ReplaceWorkspace(workspaceConfig.ID, moved, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	projection, err = service.Project("", projection.Layout.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range moved {
+		node := findProjectedNode(t, projection, planNodeID(item.ID))
+		if node.State != NodeResolved {
+			t.Fatalf("plan node %s after branch commit moved: state=%s", item.ID, node.State)
+		}
+		if node.Plan == nil || node.Plan.Commit != item.Commit {
+			t.Fatalf("plan node %s did not follow the current checkout: %#v", item.ID, node.Plan)
+		}
+	}
+}
