@@ -141,16 +141,51 @@ export function useCanvasState(workspaceId?: string) {
 			setSaveStatus('saving');
 			if (caught instanceof ApiError && caught.code === 'placement_conflict') {
 				const affected = caught.nodeIds?.length ? caught.nodeIds : batch.map((entry) => entry.patch.nodeId);
-				affected.forEach((nodeId) => dirtyRef.current.delete(nodeId));
 				setConflicts((previous) => previous.filter((id) => !affected.includes(id)));
+				// A conflict means the layout moved under us, not that the move was
+				// unwanted. Rebase onto the revision the server now reports and try
+				// again, so a deliberate arrangement (a reset moves every node at
+				// once) is not silently half-applied with the sections already drawn
+				// for the arrangement the nodes never reached.
+				let latest: CanvasProjection | undefined;
 				try {
-					setProjection(await api.canvasLayout(current.layout.id));
+					latest = await api.canvasLayout(current.layout.id);
+					setProjection(latest);
 				} catch {
 					// The next normal refresh will reconcile the layout; conflicts stay unobtrusive.
 				}
-				setError('');
+				let rebased = false;
+				let exhausted = false;
+				for (const nodeId of affected) {
+					const entry = dirtyRef.current.get(nodeId);
+					if (!entry) continue;
+					if (entry.retries >= 2) {
+						dirtyRef.current.delete(nodeId);
+						exhausted = true;
+						continue;
+					}
+					entry.retries += 1;
+					if (!latest) {
+						// No fresh layout to rebase onto. Keep the position pending on its
+						// current revision rather than dropping it: a failed refetch must
+						// not lose the move any more than a conflict does.
+						rebased = true;
+						continue;
+					}
+					const revision = latest.nodes.find((node) => node.id === nodeId)?.revision;
+					if (revision === undefined) {
+						// The node no longer exists in the layout, so there is nothing to place.
+						dirtyRef.current.delete(nodeId);
+						continue;
+					}
+					entry.patch = { ...entry.patch, expectedRevision: revision };
+					rebased = true;
+				}
+				setError(exhausted ? 'Some positions could not be saved because the layout changed elsewhere. Reload to see the current arrangement.' : '');
 				setSaveStatus(dirtyRef.current.size > 0 ? 'saving' : 'saved');
-				if (dirtyRef.current.size > 0) setDirtyVersion((version) => version + 1);
+				// `rebased` covers entries kept for another attempt; the size check keeps
+				// the queue moving for nodes in the batch that never conflicted.
+				if (rebased || dirtyRef.current.size > 0) setDirtyVersion((version) => version + 1);
 				return;
 			}
 			let retry = false;
