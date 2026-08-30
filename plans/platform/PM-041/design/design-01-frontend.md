@@ -36,14 +36,14 @@ belong to `header-backdrop.css` and are shared.
 
 ## Naming Migration
 
-| Today                 | After                  | Files                                  |
-|-----------------------|------------------------|----------------------------------------|
-| `neonBandRoutes`      | `backdropRoutes`       | `App.tsx`, backdrop components, tests  |
-| `.neon-band`          | `.header-band`         | `app-shell.css`, `App.tsx`             |
-| `.neon-band-{route}`  | `.header-band-{route}` | `app-shell.css`, `App.tsx`             |
-| `--neon-band-height`  | `--band-height`        | `app-shell.css`, `header-backdrop.css` |
-| `.neon-backdrop`      | `.header-backdrop`     | `header-backdrop.css`                  |
-| `.neon-backdrop-icon` | `.neon-icon`           | `neon-backdrop.css`                    |
+| Today                 | After              | Files                                  |
+|-----------------------|--------------------|----------------------------------------|
+| `neonBandRoutes`      | `backdropRoutes`   | `App.tsx`, backdrop components, tests  |
+| `.neon-band`          | `.header-band`     | `app-shell.css`, `App.tsx`             |
+| `.neon-band-{route}`  | dropped in F8      | `app-shell.css`, `App.tsx`             |
+| `--neon-band-height`  | `--band-height`    | `app-shell.css`, `header-backdrop.css` |
+| `.neon-backdrop`      | `.header-backdrop` | `header-backdrop.css`                  |
+| `.neon-backdrop-icon` | `.neon-icon`       | `neon-backdrop.css`                    |
 
 `--neon-hue`, the per-icon custom property, keeps its name. It is genuinely neon-specific.
 
@@ -108,26 +108,39 @@ to its start transform, so it does not strand a bright diagonal across the band.
 
 ## Colour
 
-Both variants read existing theme tokens. Lattice is monochrome, drawn entirely from `--text`.
+Both variants read existing theme tokens. Lattice uses `--blue` for the grid and the network, and
+`--button-accent` for the pulse. Grid lines mix to 14% and 6% for the coarse and fine rules; network strokes mix
+to 34% and nodes to 62%, raised to 46% and 78% under `:root[data-theme="dark"]`.
 
-`--blue` was the first choice and was wrong: it is `#f9b98c` in the dark palette — a peach, not a blue — so the
-whole field went orange in dark theme. `--text` is the only token that stays neutral ink on both sides.
+Worth knowing before reaching for `--blue` anywhere near this band: it is `#f9b98c` in the dark palette, a peach
+rather than a blue. That is fine inside the lattice, where it reads as a warm blueprint, and not fine behind it.
 
-| Layer         | Light            | Dark            |
-|---------------|------------------|-----------------|
-| Coarse grid   | `--text` at 13%  | `--text` at 10% |
-| Fine grid     | `--text` at 6%   | `--text` at 4%  |
-| Network edges | `--text` at 30%  | `--text` at 22% |
-| Nodes         | `--text` at 52%  | `--text` at 38% |
-| Coarse nodes  | `--text` at 100% | `--text` at 72% |
-| Sweep         | `--text` at 10%  | `--text` at 10% |
+### The ground beneath
 
-Dark takes less of the token at every step: ink on a near-black ground carries more weight per percent than the
-same ink on white. Coarse junctions are marked by size and full ink rather than by an accent colour.
+`.main-content` paints two symmetric corner glows, also from `--blue`. Under Neon they read as more of the same,
+since its icons are themselves soft points of colour. Under the lattice they do not: a thin, even, structural
+mark on an uneven colour wash looks unevenly lit rather than lit.
+
+`.app-shell.backdrop-lattice .main-content` therefore drops to flat `--bg`. That scoping is why the shell carries
+a `backdrop-{variant}` class at all — the page beneath the band has to know which treatment is above it.
 
 No new tokens. Nothing in the band ever carries text, so contrast ratios do not apply to the backdrop itself;
-what matters is that the page title, search field and filter chips stay legible above it, which the existing
-bottom fade mask and the reduced grid opacity both serve.
+what matters is that the page title, search field and filter chips stay legible above it, which the bottom fade
+mask and the low grid opacity both serve.
+
+## Band Height
+
+One height, `200px`, for every backdrop route. `header-backdrop.css` reads it through `--band-height`, set once
+on `.app-shell.header-band`.
+
+The band used to run 300 to 430px and vary by route, so the neon icon field would clear whatever each page put
+below the topbar. Two things made that unnecessary. The mask fades the band's lower third to nothing whatever its
+height, so most of the extra was paint area with nothing visible in it; and a band that changes height as you
+move between Workstream, Workbench and Knowledge is a difference nobody asked the UI to express.
+
+`.header-band-{route}` is gone with it. Nothing else ever styled a band by route, and an emitted class no rule
+consumes is dead weight. Bringing per-route heights back is one rule and one template literal if a page ever
+genuinely needs a different band.
 
 ## Settings Control
 

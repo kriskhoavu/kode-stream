@@ -493,8 +493,9 @@
       could exist and no switch anyone could reach.
     </p>
     <p>
-      After the plan the band contract is unchanged — same three routes, same per-route heights, same stacking
-      against the sticky left nav — but its contents come from a variant chosen in Settings. Lattice becomes
+      After the plan the band contract is unchanged — same three routes, same stacking against the sticky left
+      nav — but its contents come from a variant chosen in Settings, and it settles at one 200px height instead
+      of three per-route ones. Lattice becomes
       the default, Neon stays one click away, and a third option turns the band off and gives the topbar back
       its own fill, blur and border.
     </p>
@@ -804,10 +805,10 @@
 
   <section class="sec">
     <p class="eyebrow">Delivery</p>
-    <h2>Seven phases, and only one of them is the new backdrop</h2>
+    <h2>Eight phases, and only one of them is the new backdrop</h2>
     <p>
-      Five planned, two added after review — one of which was wrong and is left visible rather than tidied away.
-      F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
+      Five planned, three added after review — one of which was wrong and is left visible rather than tidied
+      away. F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
       by its fallback behaviour, F2 by Neon looking identical afterwards. One correction during delivery — F1
       keeps the default at <code>neon</code> and F3 flips it, because defaulting to a variant that does not
       exist yet would have left the band blank for two phases.
@@ -906,7 +907,7 @@
         <tbody>
           <tr><td><code>neonBandRoutes</code></td><td class="accent-a"><code>backdropRoutes</code></td><td>App.tsx, backdrop components, tests</td></tr>
           <tr><td><code>.neon-band</code></td><td class="accent-a"><code>.header-band</code></td><td>app-shell.css, App.tsx</td></tr>
-          <tr><td><code>.neon-band-{route}</code></td><td class="accent-a"><code>.header-band-{route}</code></td><td>app-shell.css, App.tsx</td></tr>
+          <tr><td><code>.neon-band-{route}</code></td><td class="accent-stop">dropped in F8</td><td>nothing styled a band by route</td></tr>
           <tr><td><code>--neon-band-height</code></td><td class="accent-a"><code>--band-height</code></td><td>app-shell.css, header-backdrop.css</td></tr>
           <tr><td><code>.neon-backdrop</code></td><td class="accent-a"><code>.header-backdrop</code></td><td>header-backdrop.css</td></tr>
           <tr><td><code>.neon-backdrop-icon</code></td><td class="accent-b"><code>.neon-icon</code></td><td>neon-backdrop.css</td></tr>

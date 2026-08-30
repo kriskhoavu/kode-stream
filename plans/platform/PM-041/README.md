@@ -8,8 +8,9 @@ PM-041 turns that one treatment into a chosen one. It adds a second variant, Lat
 keeps Neon available, and adds a third option that turns the band off entirely. The choice lives in Settings and
 persists per browser like every other app preference.
 
-The band contract itself — which routes carry it, how tall it is per route, how it stacks against the sticky left
-nav — is unchanged. Only its contents become pluggable.
+The band contract itself — which routes carry it, how it stacks against the sticky left nav — is unchanged. Only
+its contents become pluggable. Its height did change, late and separately: one 200px band everywhere, replacing
+three per-route heights that the bottom fade had always made mostly invisible.
 
 ## Related Plans
 
@@ -68,7 +69,7 @@ loadAppSettings → normalizeAppSettings → headerBackdrop
     ↓
 App: variant === 'none' or route not in backdropRoutes?
     ├── yes → no band class, topbar keeps its own fill, nothing rendered
-    └── no  → shell gets .header-band .header-band-{route}
+    └── no  → shell gets .header-band .backdrop-{variant}
               ↓
               HeaderBackdrop dispatches on variant
               ├── neon    → NeonBackdrop

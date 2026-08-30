@@ -40,11 +40,12 @@ describe('HeaderBackdrop', () => {
 
   /*
    * The variant class is what lets the page beneath react to the treatment
-   * above it — `.main-content` drops its corner glows under the lattice.
+   * above it — `.main-content` drops its corner glows under the lattice. The
+   * route does not appear: every band is the same height.
    */
-  it('names the route and the variant on the band class', () => {
-    expect(bandClasses('workstream', 'lattice')).toBe('header-band header-band-workstream backdrop-lattice');
-    expect(bandClasses('canvas', 'neon')).toBe('header-band header-band-canvas backdrop-neon');
+  it('names the variant on the band class, and not the route', () => {
+    expect(bandClasses('workstream', 'lattice')).toBe('header-band backdrop-lattice');
+    expect(bandClasses('canvas', 'neon')).toBe('header-band backdrop-neon');
   });
 
   it('narrows unknown stored values to a known variant', () => {

@@ -36,13 +36,14 @@ export const backdropRoutes = ['workstream', 'canvas', 'knowledge'] as const;
  * class also strips the topbar's fill, blur and border, so a rendered-but-empty
  * band would leave the topbar with no chrome and nothing behind it.
  *
- * The variant class is here because the page beneath the band sometimes has to
- * know which treatment it is under: `.main-content`'s corner glows suit Neon
- * and muddy the lattice.
+ * The variant class is here because the page beneath the band has to know which
+ * treatment it is under: `.main-content`'s corner glows suit Neon and muddy the
+ * lattice. There is no per-route class — the band is one height everywhere, and
+ * nothing else has ever needed to style a band by route.
  */
 export function bandClasses(routeName: string, variant: BackdropVariant): string {
   if (variant === 'none' || !(backdropRoutes as readonly string[]).includes(routeName)) return '';
-  return `header-band header-band-${routeName} backdrop-${variant}`;
+  return `header-band backdrop-${variant}`;
 }
 
 /**

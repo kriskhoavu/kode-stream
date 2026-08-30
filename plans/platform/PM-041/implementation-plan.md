@@ -31,6 +31,7 @@ gates.
 | F5    | Cross-variant verification    | Frontend | Complete |
 | F6    | Monochrome lattice palette    | Frontend | Reverted |
 | F7    | Flat ground under the lattice | Frontend | Complete |
+| F8    | One band height               | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -39,7 +40,8 @@ All code, CSS classes, custom properties and TS types must use:
 - `BackdropVariant` with members `neon`, `lattice`, `none`
 - `headerBackdrop` (not `backdropTheme`, not `bandStyle`)
 - `backdropRoutes` (not `neonBandRoutes`)
-- `.header-band`, `.header-band-{route}`, `.header-backdrop` (not `.neon-band`, `.neon-backdrop`)
+- `.header-band`, `.backdrop-{variant}`, `.header-backdrop` (not `.neon-band`, `.neon-backdrop`)
+  (`.header-band-{route}` existed from F2 until F8 dropped it)
 - `--band-height` (not `--neon-band-height`)
 - `NeonBackdrop`, `LatticeBackdrop`, `HeaderBackdrop`
 
@@ -224,6 +226,30 @@ treatment above it.
 **Verification:** `npm run typecheck && npm test && npm run build`
 
 **Commit:** `PM-041: Give the lattice flat ground`
+
+---
+
+### Phase F8: One Band Height
+
+The band ran 300 to 430px depending on route, inherited from the neon field's need to clear each page's content.
+It read as too tall, and the per-route variation read as arbitrary once anyone noticed it.
+
+Both go. One `200px` band on every backdrop route, which reaches the filter row and stops. The mask fades the
+lower third to nothing at any height, so the extra was paint area with nothing visible in it.
+
+**Deliverables:**
+
+- [x] `--band-height: 200px` set once on `.app-shell.header-band`.
+- [x] Remove the `header-band-knowledge` and `header-band-canvas` overrides.
+- [x] `bandClasses` stops emitting `header-band-{route}`; nothing consumed it once the overrides were gone.
+- [x] Update the band class test to assert the variant and the absence of the route.
+- [x] Confirm the same 200px band on Workstream, Workbench and Knowledge, both variants, both themes.
+- [x] Correct the design document's Colour section, which still described the reverted F6 palette because an
+      F7 edit silently failed to match after table reformatting.
+
+**Verification:** `npm run typecheck && npm test && npm run build`
+
+**Commit:** `PM-041: Settle the band at one height`
 
 ## Post-Implementation Checklist
 

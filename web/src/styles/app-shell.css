@@ -36,21 +36,13 @@
  */
 .app-shell.header-band {
   position: relative;
-  /* Reaches past the facet/filter row, where the mask has already faded out. */
-  --band-height: 360px;
-}
-
-.app-shell.header-band-knowledge {
-  --band-height: 300px;
-}
-
-/*
- * Workbench needs the tallest band: its board card starts higher up the page
- * than Workstream's bare search and facet rows, so a shorter band left barely
- * any of the backdrop visible above the card.
- */
-.app-shell.header-band-canvas {
-  --band-height: 430px;
+  /*
+   * One height for every route. The band used to run 300 to 430px and vary by
+   * route so the neon icon field would clear each page's content; the mask
+   * fades its lower third to nothing regardless, so most of that was paint
+   * area with nothing visible in it. 200px reaches the filter row and stops.
+   */
+  --band-height: 200px;
 }
 
 .app-shell.header-band .left-nav {

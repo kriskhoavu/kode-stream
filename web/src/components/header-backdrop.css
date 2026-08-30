@@ -12,7 +12,7 @@
   left: 0;
   top: 0;
   right: 0;
-  height: var(--band-height, 360px);
+  height: var(--band-height, 200px);
   z-index: 1;
   overflow: hidden;
   pointer-events: none;
