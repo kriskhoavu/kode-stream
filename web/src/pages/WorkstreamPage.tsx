@@ -1461,7 +1461,10 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   const docs = isDocumentationMetadataSource(plan.metadataSource);
   const showItem = plan.identifier.toLowerCase() !== plan.title.toLowerCase();
   const description = plan.description;
-  const tags = docs ? plan.tags.filter((tag) => tag !== source && tag !== plan.scope && tag !== plan.identifier) : plan.tags;
+  // A tag equal to the source badge is redundant on any card, not just a docs one:
+  // the default source-structure card tags every item with its own source name, so
+  // wiki items arrived as metadataSource "workspace-settings" and printed it twice.
+  const tags = (docs ? plan.tags.filter((tag) => tag !== plan.scope && tag !== plan.identifier) : plan.tags).filter((tag) => tag !== source);
   const draggable = isItemDraggable(plan) && !pending;
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();

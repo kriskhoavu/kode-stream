@@ -197,6 +197,45 @@ describe('WorkstreamPage', () => {
     expect(within(card as HTMLElement).queryByText('No date')).not.toBeInTheDocument();
   });
 
+  // Wiki folders are indexed through source-structure settings, whose default card
+  // tags every item with its own source name. The card already shows that name as
+  // the source badge, so rendering the tag too printed "wiki" twice.
+  it('does not repeat the source badge as a tag on settings-derived cards', async () => {
+    const wikiItem: ItemSummary = {
+      id: 'wiki-master-data',
+      workspaceId: 'r1',
+      workspaceName: 'Discovery',
+      branch: 'main',
+      scope: 'wiki',
+      identifier: 'master-data',
+      title: 'Master Data',
+      status: 'unsorted',
+      author: 'Khoa Đăng Vũ',
+      tags: ['wiki', 'reference'],
+      updatedAt: '2026-05-28T00:00:00Z',
+      metadataSource: 'workspace-settings',
+      itemPath: 'wiki/master-data'
+    };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/checkout') return Promise.resolve(response(workstreamBranchLoadResult([wikiItem], 'main')));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(<WorkstreamPage workspace={{ ...workspace, sources: ['items', 'wiki'] }} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    await screen.findByRole('button', { name: 'Master Data' });
+    const card = document.querySelector('.plan-card');
+    expect(card).toBeInstanceOf(HTMLElement);
+    expect(within(card as HTMLElement).getAllByText('wiki')).toHaveLength(1);
+    expect(within(card as HTMLElement).getByText('wiki')).toHaveClass('source-badge');
+    // Tags that say something the card does not already show must survive.
+    expect(within(card as HTMLElement).getByText('reference')).toBeInTheDocument();
+  });
+
   it('shows only configured Workstream status columns', async () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
