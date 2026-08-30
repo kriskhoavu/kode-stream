@@ -29,6 +29,7 @@ gates.
 | F3    | Lattice variant              | Frontend | Complete |
 | F4    | Settings control             | Frontend | Complete |
 | F5    | Cross-variant verification   | Frontend | Complete |
+| F6    | Monochrome lattice palette   | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -169,6 +170,27 @@ motion.
 **Verification:** `npm run typecheck && npm test && npm run build`
 
 **Commit:** `PM-041: Verify both backdrops across themes and motion settings`
+
+---
+
+### Phase F6: Monochrome Lattice Palette
+
+Review pass. The lattice read as orange, worst in dark theme, and that was traced to token choice rather than to
+anything in the design: `--blue` is `#f9b98c` in the dark palette — a peach — so the grid, the network and the
+sweep all inherited it, on top of the deliberately orange `--button-accent` pulse.
+
+**Deliverables:**
+
+- [x] Draw the whole field from `--text`, the one token that stays neutral ink in both themes.
+- [x] Coarse junctions keep their emphasis through size and full ink rather than colour.
+- [x] Separate dark-theme mixes for grid, strokes, nodes and pulse: ink on a near-black ground carries more
+      weight per percent than ink on white.
+- [x] Confirm every computed lattice colour is equal-RGB neutral in dark and the app's own ink in light.
+- [x] Re-check both themes on all three backdrop routes.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/components`
+
+**Commit:** `PM-041: Draw the lattice in neutral ink`
 
 ## Post-Implementation Checklist
 

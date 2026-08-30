@@ -108,9 +108,22 @@ to its start transform, so it does not strand a bright diagonal across the band.
 
 ## Colour
 
-Both variants read existing theme tokens. Lattice uses `--blue` for the grid and the network, and
-`--button-accent` for the pulse. Grid lines mix to 14% and 6% for the coarse and fine rules; network strokes mix
-to 34% and nodes to 62%, raised to 46% and 78% under `:root[data-theme="dark"]`.
+Both variants read existing theme tokens. Lattice is monochrome, drawn entirely from `--text`.
+
+`--blue` was the first choice and was wrong: it is `#f9b98c` in the dark palette — a peach, not a blue — so the
+whole field went orange in dark theme. `--text` is the only token that stays neutral ink on both sides.
+
+| Layer         | Light            | Dark            |
+|---------------|------------------|-----------------|
+| Coarse grid   | `--text` at 13%  | `--text` at 10% |
+| Fine grid     | `--text` at 6%   | `--text` at 4%  |
+| Network edges | `--text` at 30%  | `--text` at 22% |
+| Nodes         | `--text` at 52%  | `--text` at 38% |
+| Coarse nodes  | `--text` at 100% | `--text` at 72% |
+| Sweep         | `--text` at 10%  | `--text` at 10% |
+
+Dark takes less of the token at every step: ink on a near-black ground carries more weight per percent than the
+same ink on white. Coarse junctions are marked by size and full ink rather than by an accent colour.
 
 No new tokens. Nothing in the band ever carries text, so contrast ratios do not apply to the backdrop itself;
 what matters is that the page title, search field and filter chips stay legible above it, which the existing

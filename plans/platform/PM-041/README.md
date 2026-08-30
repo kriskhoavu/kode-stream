@@ -87,9 +87,13 @@ one to four cells per step, with a node at every turn. Every edge therefore lies
 two move locked together. Per-node drift, as the standalone constellation used, tears edges away from their
 endpoints.
 
-**The sweep is the shared beat.** One diagonal light pass crosses both layers on a 14s cycle, and the accent pulse
-runs on the same period. Only nodes landing on a coarse 96px intersection carry that pulse, so the accent marks
+**The sweep is the shared beat.** One diagonal light pass crosses both layers on a 14s cycle, and the node pulse
+runs on the same period. Only nodes landing on a coarse 96px intersection carry that pulse, so the emphasis marks
 real structure rather than arbitrary points.
+
+The field is monochrome, drawn from `--text` throughout. Colour is what the grid and the network least need, and
+the obvious token for it is a trap: `--blue` is `#f9b98c` in the dark palette, so reading from it turned the whole
+lattice orange.
 
 One walk is seeded per vertical band of the field, so coverage reaches the left nav, the page title and the right
 edge instead of clumping.
