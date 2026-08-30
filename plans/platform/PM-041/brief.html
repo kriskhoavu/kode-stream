@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PM-041: Selectable Header Backdrop</title>
+<style>
+  /* feature-brief page stylesheet — self-contained, no external assets.
+     Colour tokens carry meaning per page; declare that meaning in the legend.
+     accent-a / accent-b / accent-stop are the only three meaning-carrying colours. */
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body { margin: 0; }
+
+  img, svg { max-width: 100%; }
+
+  :root {
+    color-scheme: light dark;
+    --paper: #F5F6F4;
+    --paper-2: #EAECE8;
+    --card: #FFFFFF;
+    --ink: #151A1E;
+    --ink-2: #4A5560;
+    --ink-3: #77828C;
+    --rule: #D8DCD6;
+    --rule-soft: #E6E9E4;
+    --accent-a: #2C7A6B;
+    --accent-a-tint: #E4EFEC;
+    --accent-b: #9C6A18;
+    --accent-b-tint: #F6EEDF;
+    --accent-stop: #9E3B33;
+    --accent-stop-tint: #F6E6E4;
+
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+    --measure: 68ch;
+    --band: 1080px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161A;
+      --paper-2: #1A1F24;
+      --card: #191E23;
+      --ink: #E6EAE7;
+      --ink-2: #A8B2B8;
+      --ink-3: #7C868C;
+      --rule: #2C343A;
+      --rule-soft: #232A30;
+      --accent-a: #57AD9B;
+      --accent-a-tint: #17302C;
+      --accent-b: #D9A344;
+      --accent-b-tint: #33280F;
+      --accent-stop: #D07A6E;
+      --accent-stop-tint: #34211E;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #12161A;
+    --paper-2: #1A1F24;
+    --card: #191E23;
+    --ink: #E6EAE7;
+    --ink-2: #A8B2B8;
+    --ink-3: #7C868C;
+    --rule: #2C343A;
+    --rule-soft: #232A30;
+    --accent-a: #57AD9B;
+    --accent-a-tint: #17302C;
+    --accent-b: #D9A344;
+    --accent-b-tint: #33280F;
+    --accent-stop: #D07A6E;
+    --accent-stop-tint: #34211E;
+  }
+
+  :root[data-theme="light"] {
+    --paper: #F5F6F4;
+    --paper-2: #EAECE8;
+    --card: #FFFFFF;
+    --ink: #151A1E;
+    --ink-2: #4A5560;
+    --ink-3: #77828C;
+    --rule: #D8DCD6;
+    --rule-soft: #E6E9E4;
+    --accent-a: #2C7A6B;
+    --accent-a-tint: #E4EFEC;
+    --accent-b: #9C6A18;
+    --accent-b-tint: #F6EEDF;
+    --accent-stop: #9E3B33;
+    --accent-stop-tint: #F6E6E4;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: var(--band);
+    margin: 0 auto;
+    padding: 0 24px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 1px solid var(--rule);
+    padding: 40px 0 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .meta-row span strong {
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(28px, 4.4vw, 44px);
+    line-height: 1.12;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    max-width: var(--measure);
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--ink-2);
+    margin: 0;
+  }
+
+  /* ---------- sections ---------- */
+
+  .sec {
+    padding-top: 56px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-a);
+    margin: 0;
+  }
+
+  h2 {
+    font-family: var(--mono);
+    font-size: clamp(21px, 2.6vw, 27px);
+    line-height: 1.25;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  h3 {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0;
+    margin: 0;
+  }
+
+  .sec p,
+  .sec ul,
+  .sec ol {
+    max-width: var(--measure);
+    margin: 0;
+  }
+
+  .sec ul,
+  .sec ol {
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  li::marker {
+    color: var(--ink-3);
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--paper-2);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    padding: 1px 5px;
+    word-break: break-word;
+  }
+
+  a {
+    color: var(--accent-a);
+    text-underline-offset: 3px;
+  }
+
+  a:focus-visible,
+  .legend-key:focus-visible {
+    outline: 2px solid var(--accent-b);
+    outline-offset: 3px;
+  }
+
+  /* ---------- legend ---------- */
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    padding: 14px 18px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .legend-key {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--ink-2);
+  }
+
+  .swatch {
+    width: 22px;
+    height: 11px;
+    border-radius: 2px;
+    flex: none;
+  }
+
+  .swatch.a { background: var(--accent-a-tint); border: 1.5px solid var(--accent-a); }
+  .swatch.b { background: var(--accent-b-tint); border: 1.5px solid var(--accent-b); }
+  .swatch.stop { background: var(--accent-stop-tint); border: 1.5px dashed var(--accent-stop); }
+
+  /* ---------- figures ---------- */
+
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .frame {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 20px;
+    overflow-x: auto;
+  }
+
+  .frame svg {
+    display: block;
+    width: 100%;
+    min-width: 640px;
+    max-width: 100%;
+    height: auto;
+    color: var(--ink-2);
+  }
+
+  figcaption {
+    max-width: var(--measure);
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+
+  figcaption b {
+    color: var(--ink-2);
+    font-weight: 600;
+  }
+
+  /* ---------- tables ---------- */
+
+  .scroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--card);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+
+  thead th {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 500;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  td.accent-a { color: var(--accent-a); font-family: var(--mono); font-size: 12.5px; }
+  td.accent-b { color: var(--accent-b); font-family: var(--mono); font-size: 12.5px; }
+  td code { background: none; border: none; padding: 0; }
+
+  /* ---------- phase list ---------- */
+
+  .phases {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 100%;
+  }
+
+  .phase {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 18px;
+    padding: 18px 20px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent-a);
+    border-radius: 4px;
+  }
+
+  .phase-n {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent-a);
+    line-height: 1.2;
+  }
+
+  .phase-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .phase-body p,
+  .phase-body ul { max-width: 62ch; }
+
+  .phase-body p { font-size: 15px; color: var(--ink-2); }
+  .phase-body ul { font-size: 14.5px; color: var(--ink-2); }
+
+  /* ---------- callout ---------- */
+
+  .note {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px 20px;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent-b);
+    border-radius: 4px;
+    background: var(--card);
+    max-width: var(--measure);
+  }
+
+  .note h3 { color: var(--accent-b); }
+  .note p { font-size: 15px; color: var(--ink-2); }
+
+  .note.stop { border-left-color: var(--accent-stop); }
+  .note.stop h3 { color: var(--accent-stop); }
+
+  /* ---------- footer ---------- */
+
+  .foot {
+    margin-top: 72px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    color: var(--ink-3);
+    max-width: var(--measure);
+    line-height: 1.7;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a { transition: color 120ms ease; }
+  }
+
+  @media (max-width: 620px) {
+    .page { padding: 0 16px 72px; }
+    .phase { grid-template-columns: 1fr; gap: 8px; }
+  }
+
+  /* ---------- phase accent variants ---------- */
+  /* Default phase cards use accent-a. Use .b / .stop only when the page's legend
+     gives those accents a meaning that applies to a phase (e.g. per-track colour). */
+
+  .phase.b { border-left-color: var(--accent-b); }
+  .phase.b .phase-n { color: var(--accent-b); }
+  .phase.stop { border-left-color: var(--accent-stop); }
+  .phase.stop .phase-n { color: var(--accent-stop); }
+
+  /* ---------- status pill ---------- */
+
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--paper-2);
+    color: var(--ink-3);
+    vertical-align: 2px;
+    white-space: nowrap;
+  }
+
+  .pill.done { border-color: var(--accent-a); color: var(--accent-a); background: var(--accent-a-tint); }
+  .pill.active { border-color: var(--accent-b); color: var(--accent-b); background: var(--accent-b-tint); }
+  .pill.blocked { border-color: var(--accent-stop); color: var(--accent-stop); background: var(--accent-stop-tint); }
+
+  .phase-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="meta-row">
+      <span><strong>ticket</strong> PM-041</span>
+      <span><strong>service</strong> platform</span>
+      <span><strong>tracks</strong> frontend</span>
+      <span><strong>status</strong> draft</span>
+    </div>
+    <h1>The header band becomes a choice</h1>
+    <p class="standfirst">
+      Kode Stream paints a decorative band below the topbar on three routes, and today it paints exactly one
+      thing: a field of 29 drifting neon icons, hardcoded with no way to change or turn it off. PM-041 adds a
+      second treatment, Lattice, makes it the default, keeps Neon, and puts the choice in Settings.
+    </p>
+  </header>
+
+  <section class="sec">
+    <p class="eyebrow">The short version</p>
+    <h2>One treatment, wired straight into the shell</h2>
+    <p>
+      The neon field arrived as a single component that owns everything at once: the band geometry, the route
+      list, the mask, and the 29 icons with their per-icon hues and animated glow filters. Nothing separates
+      what the band <em>is</em> from what it <em>shows</em>, so there is no seam at which a second treatment
+      could exist and no switch anyone could reach.
+    </p>
+    <p>
+      After the plan the band contract is unchanged — same three routes, same per-route heights, same stacking
+      against the sticky left nav — but its contents come from a variant chosen in Settings. Lattice becomes
+      the default, Neon stays one click away, and a third option turns the band off and gives the topbar back
+      its own fill, blur and border.
+    </p>
+
+    <div class="legend">
+      <span class="legend-key"><span class="swatch a"></span> Lattice: the new variant and the modules it needs</span>
+      <span class="legend-key"><span class="swatch b"></span> Neon: preserved, renamed, otherwise untouched</span>
+      <span class="legend-key"><span class="swatch stop"></span> Where the band is refused, or a rule rejects</span>
+    </div>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">Figure 1</p>
+    <h2>The change is a seam, not a new backdrop</h2>
+    <p>
+      Adding Lattice beside Neon is the small half of this ticket. The load-bearing part is splitting the one
+      module into a band that any variant can fill and variants that know nothing about the band.
+    </p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 1020 356" role="img"
+             aria-label="Today one component holds the band, the route list and the icons together; after the plan a preference feeds a dispatcher that hands off to Neon, Lattice, or nothing.">
+          <defs>
+            <marker id="f1-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-a)"/>
+            </marker>
+            <marker id="f1-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <text x="30" y="34" font-size="11" font-weight="600" fill="currentColor" opacity="0.6" letter-spacing="1.1">TODAY</text>
+
+          <rect x="30" y="48" width="470" height="52" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1.5"/>
+          <text x="48" y="70" font-size="13" font-weight="600" fill="currentColor">App.tsx</text>
+          <text x="48" y="88" font-size="11.5" fill="currentColor" opacity="0.8">neonBandRoutes.includes(route.name)</text>
+
+          <line x1="265" y1="100" x2="265" y2="126" stroke="currentColor" stroke-width="1.6" marker-end="url(#f1-n)"/>
+
+          <rect x="30" y="132" width="470" height="104" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="2"/>
+          <text x="48" y="158" font-size="13.5" font-weight="600" fill="currentColor">NeonHeaderBackdrop.tsx</text>
+          <text x="48" y="182" font-size="11.5" fill="currentColor" opacity="0.85">band box, height variable and fade mask</text>
+          <text x="48" y="202" font-size="11.5" fill="currentColor" opacity="0.85">the route list</text>
+          <text x="48" y="222" font-size="11.5" fill="currentColor" opacity="0.85">29 icons, per-icon hue, drift and glow pulse</text>
+
+          <text x="30" y="266" font-size="11" font-weight="600" fill="var(--accent-stop)" letter-spacing="1.1">NO SEAM</text>
+          <rect x="30" y="278" width="470" height="48" rx="4"
+                fill="var(--accent-stop-tint)" stroke="var(--accent-stop)" stroke-width="1.4" stroke-dasharray="5 4"/>
+          <text x="48" y="300" font-size="11.5" fill="currentColor">A second treatment has nowhere to plug in, and</text>
+          <text x="48" y="318" font-size="11.5" fill="currentColor">nothing in Settings names the band at all.</text>
+
+          <text x="520" y="34" font-size="11" font-weight="600" fill="currentColor" opacity="0.6" letter-spacing="1.1">AFTER</text>
+
+          <rect x="520" y="48" width="470" height="52" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="538" y="70" font-size="13" font-weight="600" fill="currentColor">AppSettings.headerBackdrop</text>
+          <text x="538" y="88" font-size="11.5" fill="currentColor" opacity="0.8">chosen in Settings, stored per browser</text>
+
+          <line x1="755" y1="100" x2="755" y2="126" stroke="var(--accent-a)" stroke-width="1.6" marker-end="url(#f1-a)"/>
+
+          <rect x="520" y="132" width="470" height="52" rx="4" fill="var(--card)" stroke="var(--accent-a)" stroke-width="2"/>
+          <text x="538" y="154" font-size="13.5" font-weight="600" fill="currentColor">HeaderBackdrop.tsx</text>
+          <text x="538" y="172" font-size="11.5" fill="currentColor" opacity="0.85">variant type, backdropRoutes, the band box</text>
+
+          <path d="M 755 184 L 755 200 L 595 200 L 595 216" fill="none" stroke="var(--accent-a)" stroke-width="1.4" marker-end="url(#f1-a)"/>
+          <path d="M 755 200 L 755 216" fill="none" stroke="var(--accent-a)" stroke-width="1.4" marker-end="url(#f1-a)"/>
+          <path d="M 755 200 L 915 200 L 915 216" fill="none" stroke="var(--accent-a)" stroke-width="1.4" marker-end="url(#f1-a)"/>
+
+          <rect x="520" y="222" width="150" height="72" rx="4" fill="var(--accent-b-tint)" stroke="var(--accent-b)" stroke-width="1.5"/>
+          <text x="595" y="248" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">NeonBackdrop</text>
+          <text x="595" y="268" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.85">29 icons</text>
+          <text x="595" y="284" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.85">unchanged</text>
+
+          <rect x="680" y="222" width="150" height="72" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="755" y="248" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">LatticeBackdrop</text>
+          <text x="755" y="268" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.85">grid + network</text>
+          <text x="755" y="284" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.85">the new default</text>
+
+          <rect x="840" y="222" width="150" height="72" rx="4"
+                fill="var(--accent-stop-tint)" stroke="var(--accent-stop)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="915" y="248" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">none</text>
+          <text x="915" y="268" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.85">no band at all</text>
+          <text x="915" y="284" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.85">see Figure 2</text>
+        </svg>
+      </div>
+      <figcaption>
+        <b>Figure 1.</b> Neon does not change; it moves. Everything it used to own about the band moves up into
+        <code>HeaderBackdrop</code>, which is what makes a second variant possible at all.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">Figure 2</p>
+    <h2>Turning the band off is not the same as hiding it</h2>
+    <p>
+      The <code>.header-band</code> class does more than position the backdrop: it strips the topbar's
+      background, its blur and its bottom border, and it drops the sticky left nav to <code>z-index: 0</code>
+      so the backdrop can paint across it. Rendering an empty band would therefore leave a topbar with no
+      chrome and nothing behind it. One condition has to drive both the class and the render.
+    </p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 1020 302" role="img"
+             aria-label="Each render reads the variant, checks the route, checks for none, and only then applies the band class; either check failing skips the class entirely so the topbar keeps its own chrome.">
+          <defs>
+            <marker id="f2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-a)"/>
+            </marker>
+            <marker id="f2-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-stop)"/>
+            </marker>
+          </defs>
+
+          <text x="30" y="34" font-size="11" font-weight="600" fill="currentColor" opacity="0.6" letter-spacing="1.1">EVERY RENDER</text>
+
+          <rect x="30" y="48" width="225" height="96" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1.5"/>
+          <text x="48" y="72" font-size="12" font-weight="600" fill="var(--accent-a)">1</text>
+          <text x="48" y="94" font-size="13" font-weight="600" fill="currentColor">Read the variant</text>
+          <text x="48" y="116" font-size="11.5" fill="currentColor" opacity="0.85">headerBackdrop, from</text>
+          <text x="48" y="134" font-size="11.5" fill="currentColor" opacity="0.85">the stored AppSettings</text>
+
+          <line x1="261" y1="96" x2="269" y2="96" stroke="var(--accent-a)" stroke-width="1.6" marker-end="url(#f2-a)"/>
+
+          <rect x="275" y="48" width="225" height="96" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1.5"/>
+          <text x="293" y="72" font-size="12" font-weight="600" fill="var(--accent-a)">2</text>
+          <text x="293" y="94" font-size="13" font-weight="600" fill="currentColor">A backdrop route?</text>
+          <text x="293" y="116" font-size="11.5" fill="currentColor" opacity="0.85">workstream, canvas</text>
+          <text x="293" y="134" font-size="11.5" fill="currentColor" opacity="0.85">and knowledge only</text>
+
+          <line x1="506" y1="96" x2="514" y2="96" stroke="var(--accent-a)" stroke-width="1.6" marker-end="url(#f2-a)"/>
+
+          <rect x="520" y="48" width="225" height="96" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1.5"/>
+          <text x="538" y="72" font-size="12" font-weight="600" fill="var(--accent-a)">3</text>
+          <text x="538" y="94" font-size="13" font-weight="600" fill="currentColor">Variant not none?</text>
+          <text x="538" y="116" font-size="11.5" fill="currentColor" opacity="0.85">the off switch is a</text>
+          <text x="538" y="134" font-size="11.5" fill="currentColor" opacity="0.85">variant, not a flag</text>
+
+          <line x1="751" y1="96" x2="759" y2="96" stroke="var(--accent-a)" stroke-width="1.6" marker-end="url(#f2-a)"/>
+
+          <rect x="765" y="48" width="225" height="96" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="2"/>
+          <text x="783" y="72" font-size="12" font-weight="600" fill="var(--accent-a)">4</text>
+          <text x="783" y="94" font-size="13" font-weight="600" fill="currentColor">Paint the band</text>
+          <text x="783" y="116" font-size="11.5" fill="currentColor" opacity="0.85">shell takes the class,</text>
+          <text x="783" y="134" font-size="11.5" fill="currentColor" opacity="0.85">HeaderBackdrop renders</text>
+
+          <path d="M 387 144 L 387 172 L 500 172" fill="none" stroke="var(--accent-stop)" stroke-width="1.4"/>
+          <path d="M 632 144 L 632 172 L 512 172" fill="none" stroke="var(--accent-stop)" stroke-width="1.4"/>
+          <text x="399" y="164" font-size="11" fill="var(--accent-stop)">no</text>
+          <text x="608" y="164" font-size="11" fill="var(--accent-stop)" text-anchor="end">no</text>
+          <line x1="506" y1="172" x2="506" y2="196" stroke="var(--accent-stop)" stroke-width="1.6" marker-end="url(#f2-s)"/>
+
+          <rect x="150" y="202" width="712" height="70" rx="4"
+                fill="var(--accent-stop-tint)" stroke="var(--accent-stop)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="168" y="226" font-size="12.5" font-weight="600" fill="currentColor">No band class, and nothing rendered</text>
+          <text x="168" y="248" font-size="11.5" fill="currentColor" opacity="0.85">The topbar keeps its own background, blur and bottom border. The left nav keeps its</text>
+          <text x="168" y="266" font-size="11.5" fill="currentColor" opacity="0.85">normal stacking, and main-content children keep theirs. Nothing else on the page moves.</text>
+        </svg>
+      </div>
+      <figcaption>
+        <b>Figure 2.</b> Steps 2 and 3 fail into the same place. That is the point: an off backdrop and a route
+        that never had one must leave the shell in exactly the same state.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">Figure 3</p>
+    <h2>The lattice is generated, and four properties are what make it a lattice</h2>
+    <p>
+      Neon's placements are a literal array — 29 lines anyone can read in a diff. Lattice cannot work that way,
+      because its meaning is in the walk structure and a flat list of coordinates hides exactly that. So it is
+      generated from a seed, once at module load, and the properties a careless edit would break are asserted
+      instead.
+    </p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 1020 352" role="img"
+             aria-label="A seed and the grid dimensions feed a walk generator that emits edges and nodes, which are then checked against four geometric invariants.">
+          <defs>
+            <marker id="f3-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-a)"/>
+            </marker>
+          </defs>
+
+          <text x="30" y="34" font-size="11" font-weight="600" fill="currentColor" opacity="0.6" letter-spacing="1.1">INPUTS</text>
+
+          <rect x="30" y="48" width="196" height="38" rx="3" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.4"/>
+          <text x="42" y="72" font-size="11.5" fill="currentColor">one seed constant</text>
+          <rect x="30" y="98" width="196" height="38" rx="3" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.4"/>
+          <text x="42" y="122" font-size="11.5" fill="currentColor">field 1200 × 360</text>
+          <rect x="30" y="148" width="196" height="38" rx="3" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.4"/>
+          <text x="42" y="172" font-size="11.5" fill="currentColor">grid 24px, coarse 96px</text>
+
+          <path d="M 226 67 L 262 67 L 262 117" fill="none" stroke="var(--accent-a)" stroke-width="1.4"/>
+          <path d="M 226 117 L 262 117" fill="none" stroke="var(--accent-a)" stroke-width="1.4"/>
+          <path d="M 226 167 L 262 167 L 262 117" fill="none" stroke="var(--accent-a)" stroke-width="1.4"/>
+          <line x1="262" y1="117" x2="292" y2="117" stroke="var(--accent-a)" stroke-width="1.4" marker-end="url(#f3-a)"/>
+
+          <rect x="298" y="70" width="184" height="94" rx="4" fill="var(--card)" stroke="var(--accent-a)" stroke-width="2"/>
+          <text x="390" y="96" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">walk generator</text>
+          <text x="390" y="118" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">ten walks, one per band</text>
+          <text x="390" y="134" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">seven steps, 1–4 cells</text>
+          <text x="390" y="152" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--accent-a)">runs once, at module load</text>
+
+          <line x1="482" y1="117" x2="516" y2="117" stroke="var(--accent-a)" stroke-width="1.4" marker-end="url(#f3-a)"/>
+
+          <rect x="522" y="46" width="248" height="142" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="2"/>
+          <text x="540" y="72" font-size="13" font-weight="600" fill="currentColor">the field</text>
+          <text x="540" y="98" font-size="11.5" fill="currentColor">an edge per step taken</text>
+          <text x="540" y="120" font-size="11.5" fill="currentColor">a node at every turn</text>
+          <text x="540" y="142" font-size="11.5" fill="currentColor">nodes deduplicated by point</text>
+          <text x="540" y="170" font-size="10.5" font-weight="600" fill="var(--accent-a)">coarse-intersection nodes pulse</text>
+
+          <line x1="770" y1="117" x2="806" y2="117" stroke="var(--accent-a)" stroke-width="1.4" marker-end="url(#f3-a)"/>
+
+          <rect x="812" y="52" width="178" height="130" rx="4" fill="var(--card)" stroke="var(--rule)" stroke-width="1.5"/>
+          <text x="828" y="76" font-size="12" font-weight="600" fill="currentColor">what is asserted</text>
+          <text x="828" y="100" font-size="11" fill="currentColor" opacity="0.85">node on the 24px grid</text>
+          <text x="828" y="120" font-size="11" fill="currentColor" opacity="0.85">edge at 0°, 90° or 45°</text>
+          <text x="828" y="140" font-size="11" fill="currentColor" opacity="0.85">no zero-length edge</text>
+          <text x="828" y="160" font-size="11" fill="currentColor" opacity="0.85">two renders, one field</text>
+
+          <line x1="901" y1="182" x2="901" y2="216" stroke="var(--accent-a)" stroke-width="1.4" marker-end="url(#f3-a)"/>
+          <rect x="742" y="222" width="248" height="56" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="2"/>
+          <text x="866" y="246" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">grid and network as one</text>
+          <text x="866" y="266" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">all four hold, or it is a scatter</text>
+
+          <text x="30" y="240" font-size="11" font-weight="600" fill="var(--accent-stop)" letter-spacing="1.1">WHAT WOULD BREAK IT</text>
+          <rect x="30" y="252" width="680" height="70" rx="4"
+                fill="var(--accent-stop-tint)" stroke="var(--accent-stop)" stroke-width="1.4" stroke-dasharray="5 4"/>
+          <text x="48" y="274" font-size="11.5" fill="currentColor">A node off the grid, or an edge at an arbitrary angle: the network stops riding the grid</text>
+          <text x="48" y="292" font-size="11.5" fill="currentColor">and reads as scatter laid over it. Geometry rebuilt per render: the field reshuffles on</text>
+          <text x="48" y="310" font-size="11.5" fill="currentColor">every shell update, which is the guarantee Neon's literal array gives for free.</text>
+        </svg>
+      </div>
+      <figcaption>
+        <b>Figure 3.</b> The four assertions are not coverage for its own sake. Each one is a way the generator
+        can still render something plausible while no longer rendering a lattice.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">Figure 4</p>
+    <h2>Three layers move on two periods, and that is the whole effect</h2>
+    <p>
+      Stacking a grid and a node network gives you two decorations. They become one field only because the
+      network travels exactly as far as the grid does, in exactly the same time, and because a single light
+      pass crosses both on its own shared beat.
+    </p>
+
+    <figure>
+      <div class="frame">
+        <svg viewBox="0 0 1020 356" role="img"
+             aria-label="The grid and the network both pan 96 pixels over 60 seconds so they stay locked, while the sweep and the node pulse share a 14 second cycle.">
+          <defs>
+            <marker id="f4-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-a)"/>
+            </marker>
+          </defs>
+
+          <text x="210" y="34" font-size="11" font-weight="600" fill="currentColor" opacity="0.6" letter-spacing="1.1">ONE BAND, THREE LAYERS</text>
+
+          <rect x="210" y="48" width="780" height="64" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="228" y="74" font-size="13.5" font-weight="600" fill="currentColor">Grid</text>
+          <text x="228" y="96" font-size="11.5" fill="currentColor" opacity="0.85">two gradient scales, 96px coarse over 24px fine, panning one coarse cell</text>
+          <text x="972" y="74" text-anchor="end" font-size="11" font-weight="600" fill="var(--accent-a)">60s · linear</text>
+
+          <rect x="210" y="124" width="780" height="64" rx="4" fill="var(--accent-a-tint)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="228" y="150" font-size="13.5" font-weight="600" fill="currentColor">Network</text>
+          <text x="228" y="172" font-size="11.5" fill="currentColor" opacity="0.85">translated as one rigid body, so no edge parts from either of its two nodes</text>
+          <text x="972" y="150" text-anchor="end" font-size="11" font-weight="600" fill="var(--accent-a)">60s · linear</text>
+
+          <path d="M 196 80 L 180 80 L 180 156 L 196 156" fill="none" stroke="var(--accent-a)" stroke-width="1.6"/>
+          <text x="30" y="106" font-size="11" font-weight="600" fill="var(--accent-a)" letter-spacing="1.1">LOCKED</text>
+          <text x="30" y="126" font-size="11" fill="currentColor" opacity="0.85">same period and</text>
+          <text x="30" y="144" font-size="11" fill="currentColor" opacity="0.85">the same 96px of</text>
+          <text x="30" y="162" font-size="11" fill="currentColor" opacity="0.85">travel, both axes</text>
+
+          <rect x="210" y="200" width="780" height="64" rx="4" fill="var(--card)" stroke="var(--accent-a)" stroke-width="1.5"/>
+          <text x="228" y="226" font-size="13.5" font-weight="600" fill="currentColor">Sweep and pulse</text>
+          <text x="228" y="248" font-size="11.5" fill="currentColor" opacity="0.85">one diagonal pass; only nodes on a coarse intersection brighten with it</text>
+          <text x="972" y="226" text-anchor="end" font-size="11" font-weight="600" fill="var(--accent-a)">14s · ease-in-out</text>
+
+          <text x="30" y="226" font-size="11" font-weight="600" fill="var(--accent-a)" letter-spacing="1.1">SHARED BEAT</text>
+          <text x="30" y="246" font-size="11" fill="currentColor" opacity="0.85">the accent marks</text>
+          <text x="30" y="264" font-size="11" fill="currentColor" opacity="0.85">structure, not</text>
+          <text x="30" y="282" font-size="11" fill="currentColor" opacity="0.85">arbitrary points</text>
+
+          <text x="30" y="322" font-size="11" font-weight="600" fill="var(--accent-stop)" letter-spacing="1.1">REDUCED MOTION</text>
+          <rect x="210" y="280" width="780" height="46" rx="4"
+                fill="var(--accent-stop-tint)" stroke="var(--accent-stop)" stroke-width="1.4" stroke-dasharray="5 4"/>
+          <text x="228" y="302" font-size="11.5" fill="currentColor">All four animations stop, and the sweep is pinned to its start position. Frozen mid-travel</text>
+          <text x="228" y="320" font-size="11.5" fill="currentColor">it would strand a bright diagonal across the band.</text>
+        </svg>
+      </div>
+      <figcaption>
+        <b>Figure 4.</b> The 60s pairing is the rule that had to be discovered. Drifting nodes independently, as
+        a standalone constellation does, tears every edge away from its endpoints.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">Delivery</p>
+    <h2>Five phases, and only one of them is the new backdrop</h2>
+    <p>
+      F1 and F2 are the seam. They land before Lattice exists, and both are verifiable on their own terms:
+      F1 by its fallback behaviour, F2 by Neon looking identical afterwards. F4 needs nothing from F2 or F3, so
+      it can run alongside them. The critical path is F1 → F2 → F3 → F5.
+    </p>
+
+    <div class="phases">
+      <div class="phase">
+        <div class="phase-n">F1</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Preference and variant type</h3>
+            <span class="pill">pending</span>
+          </div>
+          <p>
+            Establishes the variant union and the stored preference, with no UI attached. The fallback is the
+            whole phase: every existing install reaches this code with the field absent, and a normalizer that
+            throws or returns <code>undefined</code> blanks the band with no error anyone would notice.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase b">
+        <div class="phase-n">F2</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Band contract generalisation</h3>
+            <span class="pill">pending</span>
+          </div>
+          <p>
+            Moves the band, the route list and the mask out of the neon module and renames the neon-specific
+            classes and variables. Nothing should look different afterwards, which is what makes it reviewable
+            separately from F3.
+          </p>
+          <ul>
+            <li>The existing neon tests are retargeted, not rewritten — keeping their assertions is the evidence the rename changed names only.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F3</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Lattice variant</h3>
+            <span class="pill">pending</span>
+          </div>
+          <p>
+            The new treatment, behind the dispatcher F2 built: the seeded walk generator, the grid and network
+            styling, and the two shared motion periods. Its acceptance criteria are the four geometric
+            invariants in Figure 3.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F4</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Settings control</h3>
+            <span class="pill">pending</span>
+          </div>
+          <p>
+            A radio group in an Appearance section — three mutually exclusive options, unlike the checkbox rows
+            above it. Copy carries real weight here, because Settings is not a backdrop route and the control
+            has no live preview to explain itself.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F5</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Cross-variant verification</h3>
+            <span class="pill">pending</span>
+          </div>
+          <p>
+            The join, and a phase rather than a checklist item because no unit test answers whether the result
+            is legible. Two variants across two themes and three routes, plus off, plus reduced motion, plus
+            keyboard focus over both fields.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">Reference</p>
+    <h2>What the rename touches</h2>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Today</th><th>After</th><th>Where</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>neonBandRoutes</code></td><td class="accent-a"><code>backdropRoutes</code></td><td>App.tsx, backdrop components, tests</td></tr>
+          <tr><td><code>.neon-band</code></td><td class="accent-a"><code>.header-band</code></td><td>app-shell.css, App.tsx</td></tr>
+          <tr><td><code>.neon-band-{route}</code></td><td class="accent-a"><code>.header-band-{route}</code></td><td>app-shell.css, App.tsx</td></tr>
+          <tr><td><code>--neon-band-height</code></td><td class="accent-a"><code>--band-height</code></td><td>app-shell.css, header-backdrop.css</td></tr>
+          <tr><td><code>.neon-backdrop</code></td><td class="accent-a"><code>.header-backdrop</code></td><td>header-backdrop.css</td></tr>
+          <tr><td><code>.neon-backdrop-icon</code></td><td class="accent-b"><code>.neon-icon</code></td><td>neon-backdrop.css</td></tr>
+          <tr><td><code>--neon-hue</code></td><td class="accent-b"><code>--neon-hue</code></td><td>kept — genuinely neon-specific</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <h3>The rename is not cosmetic</h3>
+      <p>
+        A route class reading <code>neon-band-canvas</code> while the band paints a lattice is a lie the next
+        reader has to decode. It is also the class that controls the topbar's chrome, so leaving it under a
+        variant name buries the coupling Figure 2 exists to make visible.
+      </p>
+    </div>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">Scope</p>
+    <h2>Deliberately not included</h2>
+    <ul>
+      <li><b>Per-route variants.</b> One setting covers the whole app. A per-route choice would need the
+        preference to become a map and the Settings control to become a table, for a distinction nobody has
+        asked to draw.</li>
+      <li><b>New backdrop routes.</b> <code>backdropRoutes</code> stays exactly Workstream, Workbench and
+        Knowledge. Widening it is a separate decision about which pages carry decoration, not about which
+        decoration they carry.</li>
+      <li><b>Colour or density controls.</b> Both variants read existing theme tokens. A control here would
+        mean new tokens and a contrast question on every combination.</li>
+      <li><b>Syncing the choice across browsers.</b> It is a local preference, like <code>theme</code>, and
+        would come back in only if app preferences as a whole move server-side.</li>
+    </ul>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">Open</p>
+    <h2>2 decisions still to make</h2>
+
+    <div class="note stop">
+      <h3>Which seed produces the field we actually ship?</h3>
+      <p>
+        The plan fixes the generator, not the constant it starts from. Different seeds give visibly different
+        coverage — some leave the left nav bare, some crowd the page title. Options: pick one at F3 review and
+        freeze it; or generate a handful and choose from screenshots, which costs one extra review round.
+        Khoa decides at F3.
+      </p>
+    </div>
+
+    <div class="note stop">
+      <h3>Does the Settings control need a preview?</h3>
+      <p>
+        Settings is not a backdrop route, so choosing a variant shows no immediate change — the user has to
+        navigate away to see what they picked. Options: ship with descriptive copy only, as planned; add a
+        small static thumbnail per option, which means maintaining a second rendering of each variant; or paint
+        the band on Settings too, which contradicts the scope decision above. Khoa decides at F4.
+      </p>
+    </div>
+  </section>
+
+  <p class="foot">
+    Rendered from plans/platform/PM-041/ · 2026-08-30 · 196cf36<br>
+    The markdown in that directory is the source of truth. Re-render this page after changing it.
+  </p>
+
+</div>
+
+</body>
+</html>
