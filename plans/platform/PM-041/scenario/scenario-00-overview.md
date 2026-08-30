@@ -133,6 +133,25 @@ recovers its own background, blur and bottom border — all three of which the b
 
 ---
 
+# Scenario 3b: Popups Over A Band
+
+## Starting State
+
+Any backdrop route with a variant active, and a topbar popup — the workspace switcher or the profile menu.
+
+## Flow
+
+The popup opens over the page and receives its own clicks.
+
+## Edge Cases
+
+- The band gives the topbar a stacking context, so a popup inside it cannot outrank the topbar however high its
+  own `z-index`. The topbar must therefore outrank page content, not merely match it.
+- Verify by hit test rather than by eye. A popup can be fully painted and still be losing clicks to the element
+  beneath, and a screenshot will not show that.
+
+---
+
 # Scenario 4: Routes Without A Band
 
 ## Starting State

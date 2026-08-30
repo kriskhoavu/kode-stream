@@ -805,10 +805,10 @@
 
   <section class="sec">
     <p class="eyebrow">Delivery</p>
-    <h2>Eight phases, and only one of them is the new backdrop</h2>
+    <h2>Nine phases, and only one of them is the new backdrop</h2>
     <p>
-      Five planned, three added after review — one of which was wrong and is left visible rather than tidied
-      away. F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
+      Five planned, four added after — one wrong and left visible rather than tidied away, one a bug the plan
+      never anticipated. F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
       by its fallback behaviour, F2 by Neon looking identical afterwards. One correction during delivery — F1
       keeps the default at <code>neon</code> and F3 flips it, because defaulting to a variant that does not
       exist yet would have left the band blank for two phases.
@@ -915,6 +915,16 @@
           <tr><td>—</td><td class="accent-a"><code>.backdrop-{variant}</code></td><td>added in F7, so the page can react to the band</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="note stop">
+      <h3>A z-index inside the band is not what it says</h3>
+      <p>
+        The band gives the topbar and the page content their own ranks, which makes each a stacking context.
+        Any popup inside either one is capped at its parent's rank, so raising a menu's own
+        <code>z-index</code> does nothing. Order the containers, not the popups — and verify with a hit test,
+        because a popup can be fully painted and still be losing its clicks.
+      </p>
     </div>
 
     <div class="note">

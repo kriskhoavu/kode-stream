@@ -28,11 +28,18 @@
  * across the dark left nav, behind the topbar, and down through each page's
  * toolbar and filter rows.
  *
- * Stacking inside the shell: nav surface 0, backdrop 1, real chrome 2. The
- * band has to out-rank the left nav because that nav is `position: sticky`,
- * which would otherwise paint its opaque fill over the backdrop. Every app
- * overlay (menus, dialogs, docks) lives at 20 or above, so nothing here
- * competes with them.
+ * Stacking inside the shell: nav surface 0, backdrop 1, page content 2,
+ * topbar 3. The band has to out-rank the left nav because that nav is
+ * `position: sticky`, which would otherwise paint its opaque fill over the
+ * backdrop. Every app overlay (dialogs, docks) lives at 20 or above, so
+ * nothing here competes with them.
+ *
+ * The topbar sits above page content rather than beside it at 2, because
+ * giving it a z-index makes it a stacking context and traps its popups
+ * inside. The workspace menu asks for 35 and gets the topbar's own rank
+ * instead; tied with page content at 2, the later element in the DOM wins and
+ * the menu loses both the paint and the clicks. The two never overlap as
+ * blocks — they are separate grid rows — so the topbar can simply outrank it.
  */
 .app-shell.header-band {
   position: relative;
@@ -56,7 +63,7 @@
 
 .app-shell.header-band .topbar {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   background: transparent;
   backdrop-filter: none;
   border-bottom-color: transparent;

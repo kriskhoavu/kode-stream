@@ -23,6 +23,7 @@ unit test.
 | Theme matrix        | Both variants in light and dark on Workstream, Workbench and Knowledge | Passed |
 | Reduced motion      | Both variants freeze, sweep pinned at its start position               | Passed |
 | Off-route unchanged | Settings and other non-band routes look identical under every variant  | Passed |
+| Topbar popups       | Workspace and profile menus hit-test on top over a band                | Passed |
 
 ## Latest Result
 

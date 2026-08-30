@@ -46,6 +46,22 @@ verified by inspecting the served stylesheet and applying its declarations, not 
 Settings under `lattice`: shell class is bare `app-shell`, no backdrop element, topbar keeps its own fill and
 blur, left nav `z-index: auto`. Identical to its appearance under `none`.
 
+## Topbar popups
+
+Added after a reported bug: the workspace menu drew behind the page and the page took its clicks.
+
+| Check                                              | Result                                          |
+|----------------------------------------------------|-------------------------------------------------|
+| Workspace menu, Workstream / Workbench / Knowledge | Pass — `elementFromPoint` lands inside the menu |
+| Workspace menu under Neon and under Lattice        | Pass                                            |
+| Workspace menu under `none`                        | Pass — no band class, so no stacking context    |
+| Profile menu, which shares the trap                | Pass                                            |
+| Search dialog, which does not                      | Pass — unchanged                                |
+| Topbar keeps its transparent fill under a band     | Pass — `rgba(0, 0, 0, 0)`                       |
+
+Verified by hit test rather than by screenshot: a popup can be fully painted and still be losing its clicks to
+the element beneath it, which is exactly what the original defect looked like at the bottom of the menu.
+
 ## Keyboard
 
 App chrome sits at `z-index: 2` above the backdrop, so focus indicators are never obscured by either field. The

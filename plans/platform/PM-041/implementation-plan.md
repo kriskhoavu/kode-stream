@@ -32,6 +32,7 @@ gates.
 | F6    | Monochrome lattice palette    | Frontend | Reverted |
 | F7    | Flat ground under the lattice | Frontend | Complete |
 | F8    | One band height               | Frontend | Complete |
+| F9    | Topbar popups above content   | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -250,6 +251,37 @@ lower third to nothing at any height, so the extra was paint area with nothing v
 **Verification:** `npm run typecheck && npm test && npm run build`
 
 **Commit:** `PM-041: Settle the band at one height`
+
+---
+
+### Phase F9: Topbar Popups Above Content
+
+Bug fix, reported against the workspace switcher: opening it drew the menu behind the page and the page took its
+clicks.
+
+The band gives the topbar `position: relative; z-index: 2`, which makes it a stacking context. Every popup
+inside it is then capped at the topbar's own rank no matter what it asks for — the workspace menu asks for 35 and
+gets 2. Page content is also 2 and comes later in the DOM, so it wins both the paint and the hit test.
+
+Predates PM-041: `dfe3e7d` introduced the rule with the original neon band. It reproduces under Neon and Lattice
+alike, on all three backdrop routes, and never under `none`, which applies no band class and so no stacking
+context.
+
+The topbar moves to 3. The two are separate grid rows and never overlap as blocks, so outranking page content
+costs nothing.
+
+**Deliverables:**
+
+- [x] `.app-shell.header-band .topbar` z-index 2 to 3.
+- [x] Rewrite the shell's stacking comment to record the order and the stacking-context trap behind it.
+- [x] Verify by hit test, not by eye: `elementFromPoint` over the open menu must land inside the menu.
+- [x] Confirm on Workstream, Workbench and Knowledge, under both variants and under `none`.
+- [x] Confirm the profile menu, which shares the trap, and the search dialog, which does not.
+- [x] Confirm the topbar keeps its transparent fill under a band — raising the rank must not restore its chrome.
+
+**Verification:** `npm run typecheck && npm test && npm run build`
+
+**Commit:** `PM-041: Lift the topbar above page content`
 
 ## Post-Implementation Checklist
 
