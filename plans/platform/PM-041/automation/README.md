@@ -18,11 +18,11 @@ unit test.
 
 | Playbook            | Covers                                                                 | Status |
 |---------------------|------------------------------------------------------------------------|--------|
-| Variant switching   | Settings control writes the preference; each variant paints its band   | Draft  |
-| Backdrop off        | None drops the band and restores the topbar fill, blur and border      | Draft  |
-| Theme matrix        | Both variants in light and dark on Workstream, Workbench and Knowledge | Draft  |
-| Reduced motion      | Both variants freeze, sweep pinned at its start position               | Draft  |
-| Off-route unchanged | Settings and other non-band routes look identical under every variant  | Draft  |
+| Variant switching   | Settings control writes the preference; each variant paints its band   | Passed |
+| Backdrop off        | None drops the band and restores the topbar fill, blur and border      | Passed |
+| Theme matrix        | Both variants in light and dark on Workstream, Workbench and Knowledge | Passed |
+| Reduced motion      | Both variants freeze, sweep pinned at its start position               | Passed |
+| Off-route unchanged | Settings and other non-band routes look identical under every variant  | Passed |
 
 ## Latest Result
 

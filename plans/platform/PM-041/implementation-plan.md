@@ -22,13 +22,13 @@ gates.
 
 ## Phases Summary
 
-| Phase | Name                         | Track    | Status  |
-|-------|------------------------------|----------|---------|
-| F1    | Preference and variant type  | Frontend | Pending |
-| F2    | Band contract generalisation | Frontend | Pending |
-| F3    | Lattice variant              | Frontend | Pending |
-| F4    | Settings control             | Frontend | Pending |
-| F5    | Cross-variant verification   | Frontend | Pending |
+| Phase | Name                         | Track    | Status   |
+|-------|------------------------------|----------|----------|
+| F1    | Preference and variant type  | Frontend | Complete |
+| F2    | Band contract generalisation | Frontend | Complete |
+| F3    | Lattice variant              | Frontend | Complete |
+| F4    | Settings control             | Frontend | Complete |
+| F5    | Cross-variant verification   | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -158,13 +158,13 @@ motion.
 
 **Deliverables:**
 
-- [ ] Lattice and Neon reviewed in light and dark on all three backdrop routes.
-- [ ] Confirm the page title, global search and filter chips stay legible over both variants.
-- [ ] Confirm None restores the topbar fill, blur and bottom border, and the left nav stacking.
-- [ ] Confirm no route outside `backdropRoutes` changed under any variant.
-- [ ] Confirm reduced motion freezes both variants with the sweep at its start.
-- [ ] Confirm keyboard focus rings remain visible over both variants.
-- [ ] Record the pass in `automation/results/latest.md`.
+- [x] Lattice and Neon reviewed in light and dark on all three backdrop routes.
+- [x] Confirm the page title, global search and filter chips stay legible over both variants.
+- [x] Confirm None restores the topbar fill, blur and bottom border, and the left nav stacking.
+- [x] Confirm no route outside `backdropRoutes` changed under any variant.
+- [x] Confirm reduced motion freezes both variants with the sweep at its start.
+- [x] Confirm keyboard focus rings remain visible over both variants.
+- [x] Record the pass in `automation/results/latest.md`.
 
 **Verification:** `npm run typecheck && npm test && npm run build`
 
@@ -172,11 +172,11 @@ motion.
 
 ## Post-Implementation Checklist
 
-- [ ] Full frontend suite: `npm run typecheck && npm test && npm run build`
-- [ ] No terminology drift: `grep -rn "neonBand\|neon-band\|NeonHeaderBackdrop" web/src`
-- [ ] Update PM-041 documents if naming drifted during implementation.
-- [ ] Re-render `brief.html` if the plan changed.
-- [ ] Keep phase commits separate.
+- [x] Full frontend suite: `npm run typecheck && npm test && npm run build`
+- [x] No terminology drift: `grep -rn "neonBand\|neon-band\|NeonHeaderBackdrop" web/src`
+- [x] Update PM-041 documents if naming drifted during implementation.
+- [x] Re-render `brief.html` if the plan changed.
+- [x] Keep phase commits separate.
 
 ## Testing Strategy
 

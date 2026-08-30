@@ -473,7 +473,7 @@
       <span><strong>ticket</strong> PM-041</span>
       <span><strong>service</strong> platform</span>
       <span><strong>tracks</strong> frontend</span>
-      <span><strong>status</strong> draft</span>
+      <span><strong>status</strong> done</span>
     </div>
     <h1>The header band becomes a choice</h1>
     <p class="standfirst">
@@ -735,7 +735,8 @@
       </div>
       <figcaption>
         <b>Figure 3.</b> The four assertions are not coverage for its own sake. Each one is a way the generator
-        can still render something plausible while no longer rendering a lattice.
+        can still render something plausible while no longer rendering a lattice — and the 45° assertion caught
+        exactly that during F3, when clamping each axis of a diagonal step bent it off the grid.
       </figcaption>
     </figure>
   </section>
@@ -805,9 +806,10 @@
     <p class="eyebrow">Delivery</p>
     <h2>Five phases, and only one of them is the new backdrop</h2>
     <p>
-      F1 and F2 are the seam. They land before Lattice exists, and both are verifiable on their own terms:
-      F1 by its fallback behaviour, F2 by Neon looking identical afterwards. F4 needs nothing from F2 or F3, so
-      it can run alongside them. The critical path is F1 → F2 → F3 → F5.
+      F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
+      by its fallback behaviour, F2 by Neon looking identical afterwards. One correction during delivery — F1
+      keeps the default at <code>neon</code> and F3 flips it, because defaulting to a variant that does not
+      exist yet would have left the band blank for two phases.
     </p>
 
     <div class="phases">
@@ -816,7 +818,7 @@
         <div class="phase-body">
           <div class="phase-head">
             <h3>Preference and variant type</h3>
-            <span class="pill">pending</span>
+            <span class="pill done">done</span>
           </div>
           <p>
             Establishes the variant union and the stored preference, with no UI attached. The fallback is the
@@ -831,7 +833,7 @@
         <div class="phase-body">
           <div class="phase-head">
             <h3>Band contract generalisation</h3>
-            <span class="pill">pending</span>
+            <span class="pill done">done</span>
           </div>
           <p>
             Moves the band, the route list and the mask out of the neon module and renames the neon-specific
@@ -849,7 +851,7 @@
         <div class="phase-body">
           <div class="phase-head">
             <h3>Lattice variant</h3>
-            <span class="pill">pending</span>
+            <span class="pill done">done</span>
           </div>
           <p>
             The new treatment, behind the dispatcher F2 built: the seeded walk generator, the grid and network
@@ -864,7 +866,7 @@
         <div class="phase-body">
           <div class="phase-head">
             <h3>Settings control</h3>
-            <span class="pill">pending</span>
+            <span class="pill done">done</span>
           </div>
           <p>
             A radio group in an Appearance section — three mutually exclusive options, unlike the checkbox rows
@@ -879,7 +881,7 @@
         <div class="phase-body">
           <div class="phase-head">
             <h3>Cross-variant verification</h3>
-            <span class="pill">pending</span>
+            <span class="pill done">done</span>
           </div>
           <p>
             The join, and a phase rather than a checklist item because no unit test answers whether the result
