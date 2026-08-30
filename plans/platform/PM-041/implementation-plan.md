@@ -105,20 +105,21 @@ the acceptance criteria, since they are what make the grid and the network read 
 
 **Deliverables:**
 
-- [ ] `components/LatticeBackdrop.tsx` — seeded walk generator, evaluated once at module load.
-- [ ] Ten walks, one seeded per vertical band, seven steps each, one to four cells per step.
-- [ ] Nodes deduplicated by coordinate; coarse-intersection nodes marked for the pulse.
-- [ ] `components/lattice-backdrop.css` — grid gradients, network strokes, sweep, pulse, dark-theme mixes.
-- [ ] Grid pan and network drift share the 60s period; sweep and pulse share the 14s period.
-- [ ] Reduced motion stops all four animations and pins the sweep to its start transform.
-- [ ] Test that the layer is `aria-hidden` and renders edges and nodes.
-- [ ] Test that every node coordinate is a multiple of 24.
-- [ ] Test that every edge is orthogonal or exactly 45°.
-- [ ] Test that no edge has zero length.
-- [ ] Test that two renders produce identical geometry.
-- [ ] Test that at least one node carries the pulse class.
-- [ ] Flip `defaultBackdropVariant` to `lattice`, now that the variant it names exists.
-- [ ] Update the F1 default test, which asserts the constant rather than a literal.
+- [x] `components/LatticeBackdrop.tsx` — seeded walk generator, evaluated once at module load.
+- [x] Ten walks, one seeded per vertical band, seven steps each, one to four cells per step.
+- [x] Nodes deduplicated by coordinate; coarse-intersection nodes marked for the pulse.
+- [x] `components/lattice-backdrop.css` — grid gradients, network strokes, sweep, pulse, dark-theme mixes.
+- [x] Grid pan and network drift share the 60s period; sweep and pulse share the 14s period.
+- [x] Reduced motion stops all four animations and pins the sweep to its start transform.
+- [x] Test that the layer is `aria-hidden` and renders edges and nodes.
+- [x] Test that every node coordinate is a multiple of 24.
+- [x] Test that every edge is orthogonal or exactly 45°.
+- [x] Test that no edge has zero length.
+- [x] Test that two renders produce identical geometry.
+- [x] Test that at least one node carries the pulse class.
+- [x] A diagonal step is shortened to fit the field, never clamped per axis, which would bend its angle.
+- [x] Flip `defaultBackdropVariant` to `lattice`, now that the variant it names exists.
+- [x] Update the F1 default test, which asserts the constant rather than a literal.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/components`
 

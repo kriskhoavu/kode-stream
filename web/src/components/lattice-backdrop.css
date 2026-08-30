@@ -1,0 +1,115 @@
+/*
+ * Lattice variant: a blueprint grid, a node network built along it, and one
+ * light sweep crossing both.
+ *
+ * Two periods carry the whole effect. The grid and the network share 60s and
+ * the same 96px of travel, so they stay locked and no edge parts from its
+ * nodes. The sweep and the node pulse share 14s, so the accent brightens where
+ * the light is rather than on a beat of its own.
+ */
+
+.lattice-grid,
+.lattice-network,
+.lattice-sweep {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.lattice-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--blue) 14%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--blue) 14%, transparent) 1px, transparent 1px),
+    linear-gradient(to right, color-mix(in srgb, var(--blue) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--blue) 6%, transparent) 1px, transparent 1px);
+  background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+  animation: lattice-pan 60s linear infinite;
+}
+
+/* Drifts as one rigid body, in step with the grid's pan. */
+.lattice-network {
+  animation: lattice-drift 60s linear infinite;
+}
+
+.lattice-network line {
+  stroke: color-mix(in srgb, var(--blue) 34%, transparent);
+  stroke-width: 1;
+}
+
+.lattice-node {
+  fill: color-mix(in srgb, var(--blue) 62%, transparent);
+}
+
+/* Only nodes on a coarse intersection carry the accent, so it marks structure. */
+.lattice-pulse {
+  fill: var(--button-accent);
+  animation: lattice-glow 14s ease-in-out infinite;
+}
+
+.lattice-sweep {
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    color-mix(in srgb, var(--blue) 12%, transparent) 50%,
+    transparent 58%
+  );
+  animation: lattice-sweep 14s ease-in-out infinite alternate;
+}
+
+:root[data-theme="dark"] .lattice-network line {
+  stroke: color-mix(in srgb, var(--blue) 46%, transparent);
+}
+
+:root[data-theme="dark"] .lattice-node {
+  fill: color-mix(in srgb, var(--blue) 78%, transparent);
+}
+
+@keyframes lattice-pan {
+  to {
+    background-position: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+  }
+}
+
+@keyframes lattice-drift {
+  to {
+    transform: translate3d(96px, 96px, 0);
+  }
+}
+
+@keyframes lattice-glow {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes lattice-sweep {
+  from {
+    transform: translateX(-60%);
+  }
+  to {
+    transform: translateX(60%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lattice-grid,
+  .lattice-network,
+  .lattice-pulse,
+  .lattice-sweep {
+    animation: none;
+  }
+
+  /*
+   * The sweep is a positioned gradient, not a fade. Stopping its animation
+   * alone leaves it centred, stranding a bright diagonal across the band, so
+   * it is pinned back to where it starts.
+   */
+  .lattice-sweep {
+    transform: translateX(-60%);
+  }
+}

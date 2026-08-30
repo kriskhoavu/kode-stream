@@ -1,3 +1,4 @@
+import { LatticeBackdrop } from './LatticeBackdrop';
 import { NeonBackdrop } from './NeonBackdrop';
 import './header-backdrop.css';
 
@@ -16,11 +17,7 @@ export type BackdropVariant = 'lattice' | 'neon' | 'none';
 /** Every valid variant, in the order Settings offers them. */
 export const backdropVariants = ['lattice', 'neon', 'none'] as const satisfies readonly BackdropVariant[];
 
-/*
- * Stays `neon` until the lattice variant exists, so no phase of PM-041 leaves
- * the band defaulting to a treatment that has not been built. F3 flips it.
- */
-export const defaultBackdropVariant: BackdropVariant = 'neon';
+export const defaultBackdropVariant: BackdropVariant = 'lattice';
 
 /** Narrow an unvalidated stored value to a variant, falling back to the default. */
 export function toBackdropVariant(value: unknown): BackdropVariant {
@@ -50,6 +47,7 @@ export function HeaderBackdrop({ variant }: { variant: BackdropVariant }) {
 
   return (
     <div className="header-backdrop" aria-hidden="true">
+      {variant === 'lattice' && <LatticeBackdrop />}
       {variant === 'neon' && <NeonBackdrop />}
     </div>
   );

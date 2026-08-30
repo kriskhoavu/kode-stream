@@ -83,13 +83,16 @@ start at a grid point inside this walk's vertical band
 repeat 7 times:
     pick a direction from the eight allowed
     pick a length of 1 to 4 cells
-    clamp the endpoint into the field
-    skip the step if it did not move
+    shorten the step so both axes stay in the field, keeping the angle
+    skip the step if no room is left in that direction
     emit an edge, record both endpoints as nodes
     the endpoint becomes the new position
 ```
 
 Nodes are deduplicated by coordinate, so walks crossing at a shared point yield one node, not two.
+
+Shortening rather than clamping is load-bearing. Clamping x and y independently keeps a diagonal step inside the
+field but leaves it at an arbitrary angle, which is precisely how the network stops riding the grid.
 
 ## Lattice Motion
 
