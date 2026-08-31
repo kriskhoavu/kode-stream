@@ -531,6 +531,8 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  /* Same action, same size as its twin in the left nav. */
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -2006,6 +2008,14 @@ select {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  /*
+   * 14px, not the inherited 16. The nav is 232px wide, which leaves 156px for
+   * the label once the icon, the gap and the padding are taken: at 16px the
+   * label needs 160 and wraps to two lines. 15px fits with 5px to spare, which
+   * a longer label or a different font would eat. This also puts the button a
+   * step below the three nav destinations, which is the hierarchy it wants.
+   */
+  font-size: 14px;
   font-weight: 700;
 }
 
