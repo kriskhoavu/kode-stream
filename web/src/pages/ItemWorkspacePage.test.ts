@@ -292,7 +292,20 @@ describe('ItemWorkspacePage', () => {
       onContentChanged: vi.fn()
     }));
 
-    fireEvent.click(await screen.findByRole('button', { name: /Quality/i }));
+    /*
+     * The Info/Jira/Quality tab bar renders in both branches of the page's
+     * `plan && workspaceConfig` gate, and the two branches are different
+     * elements at that position, so when the gate flips React replaces every
+     * node in the bar. A tab captured before the flip is detached by the time
+     * it is clicked, and the click dispatches into nothing.
+     *
+     * Waiting for the explorer proves the gate is true, so the tab queried
+     * after it is the one that survives. Asserting `active` then pins that the
+     * click landed, rather than leaving a downstream query to time out.
+     */
+    await screen.findByTestId('embedded-explorer');
+    fireEvent.click(screen.getByRole('button', { name: /Quality/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Quality/i })).toHaveClass('active'));
     const runAutomation = await screen.findByRole('button', { name: 'Run automation tests' });
     expect(runAutomation).toBeDisabled();
     expect(await screen.findByText('Suggested specs')).toBeInTheDocument();
