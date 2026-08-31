@@ -2,11 +2,34 @@
  * Lattice variant: a blueprint grid, a node network built along it, and one
  * light sweep crossing both.
  *
+ * Every layer draws from `--lattice-ink`, which is `--orange` lifted toward
+ * white in dark theme. On a near-black ground a paler tint reads as brighter
+ * light, where more of the base orange only reads as more orange. Weight is
+ * carried by the alpha of each layer, not by the ink, so the two can be tuned
+ * independently.
+ *
+ * The two themes want opposite things from `brighter`. Dark takes both a paler
+ * ink and much higher alphas, because both push it away from the ground. Light
+ * only takes a small lift: on white, a paler ink disappears and a heavier alpha
+ * turns the field bold, which is the opposite of what was asked for.
+ *
  * Two periods carry the whole effect. The grid and the network share 60s and
  * the same 96px of travel, so they stay locked and no edge parts from its
  * nodes. The sweep and the node pulse share 14s, so the accent brightens where
  * the light is rather than on a beat of its own.
  */
+
+/*
+ * Namespaced, so nothing outside the lattice picks it up. `--orange` is orange
+ * on both sides of the theme, unlike `--blue`; see design-01-frontend.md.
+ */
+:root {
+  --lattice-ink: var(--orange);
+}
+
+:root[data-theme="dark"] {
+  --lattice-ink: color-mix(in srgb, #fff 34%, var(--orange));
+}
 
 .lattice-grid,
 .lattice-network,
@@ -19,10 +42,10 @@
 
 .lattice-grid {
   background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--orange) 12%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--orange) 12%, transparent) 1px, transparent 1px),
-    linear-gradient(to right, color-mix(in srgb, var(--orange) 5%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--orange) 5%, transparent) 1px, transparent 1px);
+    linear-gradient(to right, color-mix(in srgb, var(--lattice-ink) 13%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--lattice-ink) 13%, transparent) 1px, transparent 1px),
+    linear-gradient(to right, color-mix(in srgb, var(--lattice-ink) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--lattice-ink) 5%, transparent) 1px, transparent 1px);
   background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
   animation: lattice-pan 60s linear infinite;
 }
@@ -33,12 +56,12 @@
 }
 
 .lattice-network line {
-  stroke: color-mix(in srgb, var(--orange) 24%, transparent);
+  stroke: color-mix(in srgb, var(--lattice-ink) 30%, transparent);
   stroke-width: 1;
 }
 
 .lattice-node {
-  fill: color-mix(in srgb, var(--orange) 44%, transparent);
+  fill: color-mix(in srgb, var(--lattice-ink) 52%, transparent);
 }
 
 /*
@@ -46,7 +69,7 @@
  * ~60 filter regions where a single group needs one.
  */
 .lattice-nodes {
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--orange) 38%, transparent));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--lattice-ink) 44%, transparent));
 }
 
 /*
@@ -55,7 +78,7 @@
  * what makes the field read as lit rather than drawn.
  */
 .lattice-pulse {
-  fill: var(--orange);
+  fill: var(--lattice-ink);
   animation: lattice-glow 14s ease-in-out infinite;
   will-change: filter, opacity;
 }
@@ -64,14 +87,14 @@
   background: linear-gradient(
     105deg,
     transparent 42%,
-    color-mix(in srgb, var(--orange) 9%, transparent) 50%,
+    color-mix(in srgb, var(--lattice-ink) 10%, transparent) 50%,
     transparent 58%
   );
   animation: lattice-sweep 14s ease-in-out infinite alternate;
 }
 
 :root[data-theme="dark"] .lattice-network line {
-  stroke: color-mix(in srgb, var(--orange) 30%, transparent);
+  stroke: color-mix(in srgb, var(--lattice-ink) 52%, transparent);
 }
 
 /*
@@ -81,12 +104,12 @@
  * the full-ink fill that makes them junctions.
  */
 :root[data-theme="dark"] .lattice-node:not(.lattice-pulse) {
-  fill: color-mix(in srgb, var(--orange) 52%, transparent);
+  fill: color-mix(in srgb, var(--lattice-ink) 88%, transparent);
 }
 
 /* A halo carries further on a dark ground, so it can afford to be wider. */
 :root[data-theme="dark"] .lattice-nodes {
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--orange) 45%, transparent));
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--lattice-ink) 65%, transparent));
 }
 
 @keyframes lattice-pan {
@@ -104,14 +127,14 @@
 @keyframes lattice-glow {
   0%,
   100% {
-    opacity: 0.45;
-    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--orange) 55%, transparent));
+    opacity: 0.6;
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--lattice-ink) 70%, transparent));
   }
   50% {
     opacity: 1;
     filter:
-      drop-shadow(0 0 4px var(--orange))
-      drop-shadow(0 0 11px color-mix(in srgb, var(--orange) 60%, transparent));
+      drop-shadow(0 0 5px var(--lattice-ink))
+      drop-shadow(0 0 14px color-mix(in srgb, var(--lattice-ink) 75%, transparent));
   }
 }
 
@@ -135,7 +158,7 @@
   /* Frozen mid-breath a junction would keep whichever halo it happened to hold. */
   .lattice-pulse {
     opacity: 1;
-    filter: drop-shadow(0 0 4px var(--orange));
+    filter: drop-shadow(0 0 5px var(--lattice-ink));
   }
 
   /*

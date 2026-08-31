@@ -37,6 +37,7 @@ gates.
 | F11   | Nav edge on the panel border  | Frontend | Complete |
 | F12   | Band height to 240px          | Frontend | Complete |
 | F13   | One orange for both themes    | Frontend | Complete |
+| F14   | Brighter constellation        | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -372,6 +373,30 @@ network it was meant to accent.
 **Verification:** `npm run typecheck && npm test && npm run build`
 
 **Commit:** `PM-041: Draw the lattice in one orange`
+
+---
+
+### Phase F14: Brighter Constellation
+
+F13 lightened the field by dropping alpha, which made it fainter rather than brighter — the opposite of what was
+wanted. Brightness on a dark ground comes from a paler ink, not a thinner one.
+
+Introduces `--lattice-ink`, namespaced in the variant's own stylesheet: `--orange` in light, and `--orange`
+lifted 34% toward white in dark. Every layer derives from it, so hue and weight tune independently.
+
+**Deliverables:**
+
+- [x] `--lattice-ink` defined per theme; every layer reads it, no direct `--orange` uses left in the variant.
+- [x] Dark: edges 30 to 52 percent, nodes 52 to 88, halo 45 to 65 and one pixel wider.
+- [x] Junction halo opens wider at the top of its breath, and its floor rises from 0.45 to 0.6 opacity.
+- [x] Light gets a small lift only — edges to 30 percent, nodes to 52 — after a first pass at 38 and 66 read as
+      bold and busy on white.
+- [x] Verify computed inks and fills per theme, not appearance alone.
+- [x] Confirm the page title, search field and filter rows stay legible over the brighter field in both themes.
+
+**Verification:** `npm run typecheck && npm test && npm run build`
+
+**Commit:** `PM-041: Brighten the constellation`
 
 ## Post-Implementation Checklist
 

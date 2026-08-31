@@ -108,19 +108,36 @@ to its start transform, so it does not strand a bright diagonal across the band.
 
 ## Colour
 
-Lattice is drawn entirely from `--orange`, which is orange on both sides of the theme: `#c2410c` in light,
-`#f9b98c` in dark. Junctions are the same hue as the network rather than a second one — they read as junctions
-through weight and halo, not through colour.
+Every lattice layer draws from `--lattice-ink`, a namespaced token defined in the variant's own stylesheet:
 
-| Layer         | Light             | Dark              |
-|---------------|-------------------|-------------------|
-| Coarse grid   | `--orange` at 12% | `--orange` at 9%  |
-| Fine grid     | `--orange` at 5%  | `--orange` at 4%  |
-| Network edges | `--orange` at 24% | `--orange` at 30% |
-| Nodes         | `--orange` at 44% | `--orange` at 52% |
-| Junctions     | `--orange` full   | `--orange` full   |
-| Node halo     | `--orange` at 38% | `--orange` at 45% |
-| Sweep         | `--orange` at 9%  | `--orange` at 9%  |
+| Theme | `--lattice-ink`                    | Why                                                 |
+|-------|------------------------------------|-----------------------------------------------------|
+| Light | `--orange`, `#c2410c`              | A paler ink on white disappears                     |
+| Dark  | `--orange` lifted 34% toward white | On near-black, a paler tint reads as brighter light |
+
+Weight is the alpha of each layer, kept separate from the ink so the two tune independently.
+
+| Layer         | Light                  | Dark                   |
+|---------------|------------------------|------------------------|
+| Coarse grid   | `--lattice-ink` at 13% | `--lattice-ink` at 13% |
+| Fine grid     | `--lattice-ink` at 5%  | `--lattice-ink` at 5%  |
+| Network edges | `--lattice-ink` at 30% | `--lattice-ink` at 52% |
+| Nodes         | `--lattice-ink` at 52% | `--lattice-ink` at 88% |
+| Junctions     | `--lattice-ink` full   | `--lattice-ink` full   |
+| Node halo     | `--lattice-ink` at 44% | `--lattice-ink` at 65% |
+| Sweep         | `--lattice-ink` at 10% | `--lattice-ink` at 10% |
+
+Junctions are the same hue as the network rather than a second one — they read as junctions through weight and
+halo, not through colour.
+
+### The two themes want opposite things from "brighter"
+
+Dark takes both a paler ink and much higher alphas, because both push the field away from its ground. Light takes
+only a small lift: a paler ink vanishes on white, and a heavier alpha turns the field bold, which is the opposite
+of lighter. F14 was asked for as "brighter, lighter" and is asymmetric for exactly that reason.
+
+A first pass at F14 raised light to 38% edges and 66% nodes to match the dark increase. On white that read as
+bold and busy, so light was pulled back to 30 and 52.
 
 ### Two tokens that look right and are not
 

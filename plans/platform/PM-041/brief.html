@@ -805,9 +805,9 @@
 
   <section class="sec">
     <p class="eyebrow">Delivery</p>
-    <h2>Thirteen phases, and only one of them is the new backdrop</h2>
+    <h2>Fourteen phases, and only one of them is the new backdrop</h2>
     <p>
-      Five planned and eight added after — one of them wrong, left visible rather than tidied away, and two of
+      Five planned and nine added after — one of them wrong, left visible rather than tidied away, and two of
       them bugs the plan never anticipated. F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
       by its fallback behaviour, F2 by Neon looking identical afterwards. One correction during delivery — F1
       keeps the default at <code>neon</code> and F3 flips it, because defaulting to a variant that does not
@@ -1014,6 +1014,23 @@
             both, and its dark value is the peach already in use, so only light changes. Everything drops in
             weight at the same time, and a specificity fix restores full-ink junctions in dark, which had silently
             never applied since F3.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F14</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Brighter constellation</h3>
+            <span class="pill done">done</span>
+          </div>
+          <p>
+            F13 had lightened the field by thinning its alpha, which made it fainter rather than brighter.
+            Brightness on a dark ground comes from a paler ink, not a thinner one, so
+            <code>--lattice-ink</code> now lifts <code>--orange</code> toward white in dark theme and every layer
+            derives from it. The two themes are asymmetric on purpose: on white a paler ink vanishes and a heavier
+            alpha reads as bold, so light takes only a small lift.
           </p>
         </div>
       </div>
