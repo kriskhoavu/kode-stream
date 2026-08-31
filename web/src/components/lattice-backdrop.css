@@ -2,37 +2,29 @@
  * Lattice variant: a blueprint grid, a node network built along it, and one
  * light sweep crossing both.
  *
- * Every layer draws from `--lattice-ink`, which is `--orange` lifted toward
- * white in dark theme. On a near-black ground a paler tint reads as brighter
- * light, where more of the base orange only reads as more orange. Weight is
- * carried by the alpha of each layer, not by the ink, so the two can be tuned
- * independently.
+ * Grid and network share one SVG group and one transform, so they are locked by
+ * construction. Only the sweep animates separately, on its own 14s beat, which
+ * the junction highlights share.
  *
- * The two themes want opposite things from `brighter`. Dark takes both a paler
- * ink and much higher alphas, because both push it away from the ground. Light
- * only takes a small lift: on white, a paler ink disappears and a heavier alpha
- * turns the field bold, which is the opposite of what was asked for.
+ * Every layer draws from `--lattice-ink`. In dark theme that is `--orange`
+ * lifted a little toward white — enough to read as light on a near-black
+ * ground, not enough to wash the orange out of it. Weight is the alpha of each
+ * layer, kept separate from the ink so the two tune independently.
  *
- * Two periods carry the whole effect. The grid and the network share 60s and
- * the same 96px of travel, so they stay locked and no edge parts from its
- * nodes. The sweep and the node pulse share 14s, so the accent brightens where
- * the light is rather than on a beat of its own.
+ * Per-mark opacity is set inline by the generator: walks fade along their
+ * length and the field fades toward its top and bottom, so a mark near a crop
+ * boundary is already faint and nothing ends on a hard edge.
  */
 
-/*
- * Namespaced, so nothing outside the lattice picks it up. `--orange` is orange
- * on both sides of the theme, unlike `--blue`; see design-01-frontend.md.
- */
 :root {
   --lattice-ink: var(--orange);
 }
 
 :root[data-theme="dark"] {
-  --lattice-ink: color-mix(in srgb, #fff 34%, var(--orange));
+  --lattice-ink: color-mix(in srgb, #fff 14%, var(--orange));
 }
 
-.lattice-grid,
-.lattice-network,
+.lattice-field,
 .lattice-sweep {
   position: absolute;
   inset: 0;
@@ -40,82 +32,76 @@
   height: 100%;
 }
 
-.lattice-grid {
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--lattice-ink) 13%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--lattice-ink) 13%, transparent) 1px, transparent 1px),
-    linear-gradient(to right, color-mix(in srgb, var(--lattice-ink) 5%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--lattice-ink) 5%, transparent) 1px, transparent 1px);
-  background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
-  animation: lattice-pan 60s linear infinite;
-}
-
-/* Drifts as one rigid body, in step with the grid's pan. */
-.lattice-network {
+/* Grid and network travel as one body: one cell of the coarse grid, seamlessly. */
+.lattice-drift {
   animation: lattice-drift 60s linear infinite;
 }
 
-.lattice-network line {
-  stroke: color-mix(in srgb, var(--lattice-ink) 30%, transparent);
+.lattice-rule-fine {
+  stroke: color-mix(in srgb, var(--lattice-ink) 7%, transparent);
   stroke-width: 1;
 }
 
+.lattice-rule-coarse {
+  stroke: color-mix(in srgb, var(--lattice-ink) 16%, transparent);
+  stroke-width: 1;
+}
+
+.lattice-edges line {
+  stroke: color-mix(in srgb, var(--lattice-ink) 46%, transparent);
+  stroke-width: 1.1;
+}
+
 .lattice-node {
-  fill: color-mix(in srgb, var(--lattice-ink) 52%, transparent);
+  fill: color-mix(in srgb, var(--lattice-ink) 72%, transparent);
 }
 
 /*
  * One halo for the whole node set. Applying drop-shadow per circle would mean
- * ~60 filter regions where a single group needs one.
+ * ~70 filter regions where a single group needs one.
  */
 .lattice-nodes {
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--lattice-ink) 44%, transparent));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--lattice-ink) 55%, transparent));
 }
 
 /*
- * Only nodes on a coarse intersection carry the accent, so it marks structure.
- * They also carry the light: the halo swells and fades with the sweep, which is
- * what makes the field read as lit rather than drawn.
+ * Junctions are the field's highlights: full ink, a brighter core, and a halo
+ * that swells and fades with the sweep, so the field reads as lit rather than
+ * drawn. They sit on coarse-grid intersections, so the light marks structure.
  */
 .lattice-pulse {
-  fill: var(--lattice-ink);
+  fill: color-mix(in srgb, #fff 22%, var(--lattice-ink));
   animation: lattice-glow 14s ease-in-out infinite;
-  will-change: filter, opacity;
+  will-change: filter;
 }
 
 .lattice-sweep {
   background: linear-gradient(
     105deg,
     transparent 42%,
-    color-mix(in srgb, var(--lattice-ink) 10%, transparent) 50%,
+    color-mix(in srgb, var(--lattice-ink) 12%, transparent) 50%,
     transparent 58%
   );
   animation: lattice-sweep 14s ease-in-out infinite alternate;
 }
 
-:root[data-theme="dark"] .lattice-network line {
-  stroke: color-mix(in srgb, var(--lattice-ink) 52%, transparent);
+:root[data-theme="dark"] .lattice-edges line {
+  stroke: color-mix(in srgb, var(--lattice-ink) 62%, transparent);
 }
 
 /*
  * `:not(.lattice-pulse)` is load-bearing. A junction carries both classes, and
  * this themed selector outranks the single-class `.lattice-pulse`, so without
  * the exclusion it repaints junctions at the ordinary node weight and they lose
- * the full-ink fill that makes them junctions.
+ * the brighter core that makes them junctions.
  */
 :root[data-theme="dark"] .lattice-node:not(.lattice-pulse) {
-  fill: color-mix(in srgb, var(--lattice-ink) 88%, transparent);
+  fill: color-mix(in srgb, var(--lattice-ink) 92%, transparent);
 }
 
 /* A halo carries further on a dark ground, so it can afford to be wider. */
 :root[data-theme="dark"] .lattice-nodes {
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--lattice-ink) 65%, transparent));
-}
-
-@keyframes lattice-pan {
-  to {
-    background-position: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
-  }
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--lattice-ink) 70%, transparent));
 }
 
 @keyframes lattice-drift {
@@ -127,14 +113,12 @@
 @keyframes lattice-glow {
   0%,
   100% {
-    opacity: 0.6;
     filter: drop-shadow(0 0 3px color-mix(in srgb, var(--lattice-ink) 70%, transparent));
   }
   50% {
-    opacity: 1;
     filter:
-      drop-shadow(0 0 5px var(--lattice-ink))
-      drop-shadow(0 0 14px color-mix(in srgb, var(--lattice-ink) 75%, transparent));
+      drop-shadow(0 0 4px var(--lattice-ink))
+      drop-shadow(0 0 13px color-mix(in srgb, var(--lattice-ink) 80%, transparent));
   }
 }
 
@@ -148,8 +132,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lattice-grid,
-  .lattice-network,
+  .lattice-drift,
   .lattice-pulse,
   .lattice-sweep {
     animation: none;
@@ -157,8 +140,7 @@
 
   /* Frozen mid-breath a junction would keep whichever halo it happened to hold. */
   .lattice-pulse {
-    opacity: 1;
-    filter: drop-shadow(0 0 5px var(--lattice-ink));
+    filter: drop-shadow(0 0 4px var(--lattice-ink));
   }
 
   /*

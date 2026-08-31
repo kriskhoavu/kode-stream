@@ -805,9 +805,9 @@
 
   <section class="sec">
     <p class="eyebrow">Delivery</p>
-    <h2>Fourteen phases, and only one of them is the new backdrop</h2>
+    <h2>Fifteen phases, and only one of them is the new backdrop</h2>
     <p>
-      Five planned and nine added after — one of them wrong, left visible rather than tidied away, and two of
+      Five planned and ten added after — one of them wrong, left visible rather than tidied away, and three of
       them bugs the plan never anticipated. F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
       by its fallback behaviour, F2 by Neon looking identical afterwards. One correction during delivery — F1
       keeps the default at <code>neon</code> and F3 flips it, because defaulting to a variant that does not
@@ -1031,6 +1031,24 @@
             <code>--lattice-ink</code> now lifts <code>--orange</code> toward white in dark theme and every layer
             derives from it. The two themes are asymmetric on purpose: on white a paler ink vanishes and a heavier
             alpha reads as bold, so light takes only a small lift.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase stop">
+        <div class="phase-n">F15</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Natural field, real junctions</h3>
+            <span class="pill done">done</span>
+          </div>
+          <p>
+            Reported as walks cut off mid-drift — which was two bugs, not styling. The viewBox was 360 units tall
+            inside a 240px band, so <code>slice</code> rendered it 384px and hard-clipped 40% of the field; and
+            the grid was a CSS background at device scale while the network was an SVG scaled by
+            <code>slice</code>, so the network only rode the grid at exactly 1200px wide. Both now share one SVG
+            group and one transform. Walks fade along their length and toward the field's edges, so nothing ends
+            on a cut, and highlights moved to nodes where edges actually converge.
           </p>
         </div>
       </div>

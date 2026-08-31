@@ -38,6 +38,7 @@ gates.
 | F12   | Band height to 240px          | Frontend | Complete |
 | F13   | One orange for both themes    | Frontend | Complete |
 | F14   | Brighter constellation        | Frontend | Complete |
+| F15   | Natural field, real junctions | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -397,6 +398,38 @@ lifted 34% toward white in dark. Every layer derives from it, so hue and weight 
 **Verification:** `npm run typecheck && npm test && npm run build`
 
 **Commit:** `PM-041: Brighten the constellation`
+
+---
+
+### Phase F15: Natural Field, Real Junctions
+
+Reported: the walks looked cut off as they drifted downwards, the variety was poor, and the field wanted better
+highlights and more vibrant colour. The first of those turned out to be two bugs rather than styling.
+
+**The field was hard-clipped.** The viewBox was 1200 × 360 inside a 240px band, so `slice` rendered it 384px tall
+and clipped 40% of it with no fade. Every walk crossing that boundary ended mid-edge.
+
+**The network never rode the grid.** The grid was a CSS background at device scale; the network was an SVG scaled
+by `slice`. At 1280px wide the SVG scaled 1.067, putting its 24-unit spacing at 25.6px against a 24px CSS grid.
+The premise only held at exactly 1200px band width.
+
+**Deliverables:**
+
+- [x] Move the grid into the SVG as two nested patterns, in the same group as the network, moved by one
+      transform. Grid and network are now locked by construction, not by two matching animations.
+- [x] Field height 360 to 240, matching the band, so `slice` has little left to crop.
+- [x] Fade each walk along its length, and fade the field's top and bottom 56 units, so a crop never cuts hard.
+- [x] Walk length varies from 4 to 10 steps; 12 walks rather than 10.
+- [x] Junctions are nodes where three or more edges meet, or coarse-grid landmarks — 9 rather than 3, and they
+      land where the drawing is dense. Radius grows with degree.
+- [x] Dark ink lift 34% to 14% for saturation, with higher alphas carrying the brightness instead.
+- [x] Junction core lifted toward white, so the highlight reads as light rather than a second hue.
+- [x] Tests for the fades, the opacity range, the varied walk length, the junction rule and degree-based radius.
+- [x] Confirm reduced motion still freezes the field with the sweep pinned off-field.
+
+**Verification:** `npm run typecheck && npm test && npm run build`
+
+**Commit:** `PM-041: Let the lattice fade instead of stopping`
 
 ## Post-Implementation Checklist
 

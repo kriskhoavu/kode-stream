@@ -67,68 +67,100 @@ and reviewable by changing one seed constant.
 
 | Parameter       | Value                                         |
 |-----------------|-----------------------------------------------|
-| Field viewBox   | 1200 × 360                                    |
+| Field viewBox   | 1200 × 240, matching the band's own height    |
 | Fine grid       | 24px                                          |
 | Coarse grid     | 96px                                          |
-| Walks           | 10, one seeded per vertical band of the field |
-| Steps per walk  | 7                                             |
+| Walks           | 12, one seeded per vertical band of the field |
+| Steps per walk  | 4 to 10, varied                               |
 | Step directions | 8 — four orthogonal, four diagonal            |
 | Step length     | 1 to 4 fine cells                             |
-| Node radius     | 2.2, or 3.2 on a coarse intersection          |
+| Edge fade band  | 56 units at the field's top and bottom        |
 
 Generation, per walk:
 
 ```text
-start at a grid point inside this walk's vertical band
-repeat 7 times:
+start at a grid point inside this walk's vertical band, clear of the fade band
+pick a step count between 4 and 10
+repeat that many times:
     pick a direction from the eight allowed
     pick a length of 1 to 4 cells
     shorten the step so both axes stay in the field, keeping the angle
     skip the step if no room is left in that direction
-    emit an edge, record both endpoints as nodes
+    emit an edge, and record both endpoints, counting how many edges touch each
     the endpoint becomes the new position
 ```
-
-Nodes are deduplicated by coordinate, so walks crossing at a shared point yield one node, not two.
 
 Shortening rather than clamping is load-bearing. Clamping x and y independently keeps a diagonal step inside the
 field but leaves it at an arbitrary angle, which is precisely how the network stops riding the grid.
 
+### One coordinate system
+
+Grid and network live in the same SVG group and are moved by one transform, so they cannot drift apart.
+
+They used not to. The grid was a CSS background painted at device scale while the network was an SVG scaled by
+`slice` to cover the band. At 1280px wide the SVG scaled by 1.067, so its 24-unit spacing rendered at 25.6px
+against a 24px CSS grid: the network only truly rode the grid when the band happened to be exactly 1200px wide.
+
+### Why nothing ends on a hard cut
+
+`slice` crops the field to the band, and the field is never exactly the band's shape. Two fades cover it:
+
+- **Along a walk.** Opacity falls to roughly 40% of its start by the walk's last edge, so a walk trails off
+  instead of stopping.
+- **Toward the field's edges.** Anything within 56 units of the top or bottom falls away to 18%, so whatever the
+  crop removes was nearly invisible already.
+
+Before these, the viewBox was 360 units tall inside a 240px band — with `slice` that rendered 384px tall and hard
+clipped 40% of the field, which is what read as walks being cut off as they drifted down.
+
+### Highlights follow the structure
+
+A highlight marks a node where three or more edges meet, or one sitting on a coarse-grid intersection where the
+network touches the blueprint's major rules. Radius grows with the number of edges converging.
+
+The rule was coarse-grid coincidence alone, which lit three nodes across the whole field, most of them where
+nothing was happening. Degree-based highlights land where the eye already goes.
+
 ## Lattice Motion
 
-| Layer   | Animation                       | Period | Notes                                          |
-|---------|---------------------------------|--------|------------------------------------------------|
-| Grid    | Background position 0 → 96px    | 60s    | Linear, so the pan is seamless                 |
-| Network | Translate 0 → 96px on both axes | 60s    | Same period, so the two stay locked            |
-| Sweep   | Diagonal gradient across        | 14s    | Ease-in-out, alternating                       |
-| Pulse   | Node radius and opacity         | 14s    | Matches the sweep; staggered per node by delay |
+| Layer            | Animation                   | Period | Notes                                          |
+|------------------|-----------------------------|--------|------------------------------------------------|
+| Grid and network | Translate 0 → 96px, one `g` | 60s    | One transform for both; locked by construction |
+| Sweep            | Diagonal gradient across    | 14s    | Ease-in-out, alternating                       |
+| Junction halo    | Drop-shadow radius          | 14s    | Matches the sweep; staggered per node by delay |
 
-Under `prefers-reduced-motion: reduce` all four are set to `animation: none` and the sweep is additionally pinned
-to its start transform, so it does not strand a bright diagonal across the band.
+The grid rect overhangs the field by two coarse cells, which is what keeps the pan seamless as the group travels.
+
+Under `prefers-reduced-motion: reduce` all three stop and the sweep is pinned to its start transform, so it does
+not strand a bright diagonal across the band.
 
 ## Colour
 
 Every lattice layer draws from `--lattice-ink`, a namespaced token defined in the variant's own stylesheet:
 
-| Theme | `--lattice-ink`                    | Why                                                 |
-|-------|------------------------------------|-----------------------------------------------------|
-| Light | `--orange`, `#c2410c`              | A paler ink on white disappears                     |
-| Dark  | `--orange` lifted 34% toward white | On near-black, a paler tint reads as brighter light |
+| Theme | `--lattice-ink`                    | Why                                        |
+|-------|------------------------------------|--------------------------------------------|
+| Light | `--orange`, `#c2410c`              | A paler ink on white disappears            |
+| Dark  | `--orange` lifted 14% toward white | Reads as light on near-black, still orange |
 
-Weight is the alpha of each layer, kept separate from the ink so the two tune independently.
+The dark lift was 34% in F14 and is 14% now. Thirty-four per cent bought brightness by washing the orange out of
+it; the same brightness comes from higher alphas at a saturated ink.
 
-| Layer         | Light                  | Dark                   |
-|---------------|------------------------|------------------------|
-| Coarse grid   | `--lattice-ink` at 13% | `--lattice-ink` at 13% |
-| Fine grid     | `--lattice-ink` at 5%  | `--lattice-ink` at 5%  |
-| Network edges | `--lattice-ink` at 30% | `--lattice-ink` at 52% |
-| Nodes         | `--lattice-ink` at 52% | `--lattice-ink` at 88% |
-| Junctions     | `--lattice-ink` full   | `--lattice-ink` full   |
-| Node halo     | `--lattice-ink` at 44% | `--lattice-ink` at 65% |
-| Sweep         | `--lattice-ink` at 10% | `--lattice-ink` at 10% |
+| Layer         | Light                   | Dark                    |
+|---------------|-------------------------|-------------------------|
+| Fine grid     | `--lattice-ink` at 7%   | `--lattice-ink` at 7%   |
+| Coarse grid   | `--lattice-ink` at 16%  | `--lattice-ink` at 16%  |
+| Network edges | `--lattice-ink` at 46%  | `--lattice-ink` at 62%  |
+| Nodes         | `--lattice-ink` at 72%  | `--lattice-ink` at 92%  |
+| Junctions     | ink lifted 22% to white | ink lifted 22% to white |
+| Node halo     | `--lattice-ink` at 55%  | `--lattice-ink` at 70%  |
+| Sweep         | `--lattice-ink` at 12%  | `--lattice-ink` at 12%  |
 
-Junctions are the same hue as the network rather than a second one — they read as junctions through weight and
-halo, not through colour.
+Those are ceilings. Each mark carries its own inline opacity from the generator's two fades, so the values above
+apply at a walk's start in the middle of the field and fall away from there.
+
+Junctions take a core lifted toward white rather than a second hue: one hue family throughout, and the highlight
+reads as light rather than as a different colour.
 
 ### The two themes want opposite things from "brighter"
 
