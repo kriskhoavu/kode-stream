@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Plus, Search, Sun, Boxes, FolderGit2, PanelLeftClose, PanelLeftOpen, Settings, Workflow } from 'lucide-react';
+import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Search, Sun, Boxes, FolderGit2, PanelLeftClose, PanelLeftOpen, Settings, Workflow } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
@@ -140,9 +140,9 @@ export function App() {
           ))}
           {workspaces.length === 0 && <span className="workspace-empty">No workspaces registered</span>}
         </div>
-        <button className="add-repository-button" type="button" onClick={() => navigate({ name: 'workspaces' })}>
-          <Plus size={16} />
-          <span>Add Workspace</span>
+        <button className="add-repository-button" type="button" onClick={() => navigate({ name: 'workspaces' })} aria-label="Manage workspaces" title="Manage workspaces">
+          <Settings size={16} />
+          <span>Manage Workspaces</span>
         </button>
         <div className="repo-status">
           <span className="repo-status-label">Last scan</span>
@@ -191,8 +191,8 @@ export function App() {
                 setWorkspaceMenuOpen(false);
                 navigate({ name: 'workspaces' });
               }}>
-                <Plus size={15} />
-                Add or manage workspaces
+                <Settings size={15} />
+                Manage Workspaces
               </button>
             </div>
           )}
