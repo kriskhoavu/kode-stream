@@ -113,7 +113,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [specPickerSelected, setSpecPickerSelected] = useState<string[]>([]);
   const [specPickerLoading, setSpecPickerLoading] = useState(false);
   const [specPickerError, setSpecPickerError] = useState('');
-  const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
   const [artifactPreview, setArtifactPreview] = useState<{ title: string; path: string; content: string; loading: boolean; error: string } | null>(null);
   const [workspaceExplorerLocation, setWorkspaceExplorerLocation] = useState<ExplorerLocation>();
   const [openTabs, setOpenTabs] = useState<OpenItemFileTab[]>([]);
@@ -266,14 +265,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     });
     void loadGitStatus(plan.workspaceId);
   }, [plan]);
-
-  useEffect(() => {
-    if (!plan) {
-      setWorkspaceConfig(null);
-      return;
-    }
-    setWorkspaceConfig(workspaces.find((workspace) => workspace.id === plan.workspaceId) ?? null);
-  }, [plan, workspaces]);
 
   useEffect(() => {
     if (!plan) {
@@ -448,6 +439,14 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const hasFiles = useMemo(() => hasFile(files), [files]);
   const visibleWarnings = useMemo(() => visibleItemWarnings(plan), [plan]);
   const fileStateByPath = useMemo(() => buildFileStateMap(plan, gitStatus, file, dirtyFile), [plan, gitStatus, file, dirtyFile]);
+  /*
+   * Derived, not stored in state. An effect would resolve the workspace one
+   * render after `plan` arrives, so the page would render the pre-explorer
+   * fallback for a frame and then swap layouts. That swap replaces every node
+   * in the right panel, including the Info/Jira/Quality tab bar, and a click
+   * landing in the window is dispatched into a detached button and lost.
+   */
+  const workspaceConfig = useMemo(() => plan ? workspaces.find((workspace) => workspace.id === plan.workspaceId) ?? null : null, [plan, workspaces]);
   const explorerWorkspaces = useMemo(() => workspaceConfig ? [workspaceConfig] : [], [workspaceConfig]);
 	const checkoutBranches = useWorkspaceBranches(explorerWorkspaces);
   const currentCheckoutBranch = gitStatus?.branch || plan?.branch || workspaceConfig?.baselineBranch || '';
@@ -1114,7 +1113,13 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     </>
   );
 
-  if (!plan) {
+  /*
+   * An empty workspace list means the app has not finished loading workspaces,
+   * not that this item's workspace is missing: an item always belongs to one.
+   * Keep showing the loading state until the lookup can actually succeed or
+   * fail, so the layout gate below settles on its first render.
+   */
+  if (!plan || (!workspaceConfig && workspaces.length === 0)) {
     return <section className="empty-state"><button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button>{error ? <p className="error">{error}</p> : <p>Loading item...</p>}</section>;
   }
 

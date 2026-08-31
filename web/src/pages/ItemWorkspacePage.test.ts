@@ -159,6 +159,51 @@ describe('ItemWorkspacePage', () => {
     expect(screen.getByLabelText('Quality')).toBeInTheDocument();
   });
 
+  it('keeps a right-panel tab selected when it is clicked as the panel first appears', async () => {
+    /*
+     * Regression: the page used to resolve the item's workspace in an effect,
+     * so `plan` landed one render before `workspaceConfig` and the layout gate
+     * flipped from the pre-explorer fallback to the explorer. That swap
+     * replaced every node in the Info/Jira/Quality bar, and a click arriving in
+     * the window hit a detached button and was dropped. Clicking the tab the
+     * instant it appears — without first waiting for the explorer — pins that
+     * the panel now mounts once and keeps the selection.
+     */
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/items/item-1') {
+        return Promise.resolve(response({
+          id: 'item-1', workspaceId: 'ws-1', workspaceName: 'Workspace', scope: 'platform', branch: 'main',
+          identifier: 'PM-041', title: 'Slow item', status: 'draft', tags: [], metadataSource: 'plan.yaml',
+          itemPath: 'plans/platform/PM-041', counts: { files: 0 }, warnings: []
+        }));
+      }
+      if (url === '/api/items/item-1/files') return Promise.resolve(response([]));
+      if (url === '/api/items/item-1/diff') return Promise.resolve(response({ diff: '' }));
+      if (url === '/api/items/item-1/jira') return Promise.resolve(response({ state: 'not_configured' }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(createElement(ItemWorkspacePage, {
+      itemId: 'item-1',
+      refreshKey: 0,
+      workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }],
+      onBack: vi.fn(),
+      onOpenItem: vi.fn(),
+      onContentChanged: vi.fn()
+    }));
+
+    const quality = await screen.findByRole('button', { name: /Quality/i });
+    fireEvent.click(quality);
+
+    expect(quality).toBeInTheDocument();
+    expect(quality).toHaveClass('active');
+    expect(screen.getByLabelText('Quality')).toBeInTheDocument();
+    await screen.findByTestId('embedded-explorer');
+    expect(screen.getByRole('button', { name: /Quality/i })).toHaveClass('active');
+    expect(screen.getByLabelText('Quality')).toBeInTheDocument();
+  });
+
   it('opens a Git changed path in the main explorer without leaving the Git panel', async () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
@@ -292,19 +337,7 @@ describe('ItemWorkspacePage', () => {
       onContentChanged: vi.fn()
     }));
 
-    /*
-     * The Info/Jira/Quality tab bar renders in both branches of the page's
-     * `plan && workspaceConfig` gate, and the two branches are different
-     * elements at that position, so when the gate flips React replaces every
-     * node in the bar. A tab captured before the flip is detached by the time
-     * it is clicked, and the click dispatches into nothing.
-     *
-     * Waiting for the explorer proves the gate is true, so the tab queried
-     * after it is the one that survives. Asserting `active` then pins that the
-     * click landed, rather than leaving a downstream query to time out.
-     */
-    await screen.findByTestId('embedded-explorer');
-    fireEvent.click(screen.getByRole('button', { name: /Quality/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Quality/i }));
     await waitFor(() => expect(screen.getByRole('button', { name: /Quality/i })).toHaveClass('active'));
     const runAutomation = await screen.findByRole('button', { name: 'Run automation tests' });
     expect(runAutomation).toBeDisabled();
