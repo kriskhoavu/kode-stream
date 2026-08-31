@@ -35,6 +35,7 @@ gates.
 | F9    | Topbar popups above content   | Frontend | Complete |
 | F10   | Lit lattice junctions         | Frontend | Complete |
 | F11   | Nav edge on the panel border  | Frontend | Complete |
+| F12   | Band height to 240px          | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -242,7 +243,7 @@ lower third to nothing at any height, so the extra was paint area with nothing v
 
 **Deliverables:**
 
-- [x] `--band-height: 200px` set once on `.app-shell.header-band`.
+- [x] `--band-height: 200px` set once on `.app-shell.header-band`. F12 later raised it to 240px.
 - [x] Remove the `header-band-knowledge` and `header-band-canvas` overrides.
 - [x] `bandClasses` stops emitting `header-band-{route}`; nothing consumed it once the overrides were gone.
 - [x] Update the band class test to assert the variant and the absence of the route.
@@ -323,6 +324,24 @@ this ticket has no reason to make.
 **Verification:** `npm run typecheck && npm test && npm run build`
 
 **Commit:** `PM-041: Rule the nav edge with the panel border`
+
+---
+
+### Phase F12: Band Height To 240px
+
+Follow-up to F8, which had cut the band from 300–430px to 200px. That went slightly too far: the fade landed
+through the filter row rather than below it.
+
+240px, still one height for every route, and a whole ten 24px lattice cells so the grid ends on a rule.
+
+**Deliverables:**
+
+- [x] `--band-height` 200px to 240px, and the `header-backdrop.css` fallback with it.
+- [x] Confirm on Workstream, Workbench and Knowledge under both variants.
+
+**Verification:** `npm run typecheck && npm test && npm run build`
+
+**Commit:** `PM-041: Reach the band to 240px`
 
 ## Post-Implementation Checklist
 

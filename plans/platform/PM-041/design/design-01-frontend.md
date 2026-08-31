@@ -148,7 +148,7 @@ viewport edges, and insetting the nav is a layout change with no bearing on the 
 
 ## Band Height
 
-One height, `200px`, for every backdrop route. `header-backdrop.css` reads it through `--band-height`, set once
+One height, `240px`, for every backdrop route. `header-backdrop.css` reads it through `--band-height`, set once
 on `.app-shell.header-band`.
 
 The band used to run 300 to 430px and vary by route, so the neon icon field would clear whatever each page put
@@ -156,9 +156,13 @@ below the topbar. Two things made that unnecessary. The mask fades the band's lo
 height, so most of the extra was paint area with nothing visible in it; and a band that changes height as you
 move between Workstream, Workbench and Knowledge is a difference nobody asked the UI to express.
 
-`.header-band-{route}` is gone with it. Nothing else ever styled a band by route, and an emitted class no rule
-consumes is dead weight. Bringing per-route heights back is one rule and one template literal if a page ever
-genuinely needs a different band.
+240px is a whole ten 24px lattice cells, so the grid ends on a rule rather than mid-cell. F8 first cut the band
+to 200px; F12 restored a little of that reach, which is what puts the fade below the filter row instead of
+through it.
+
+`.header-band-{route}` is gone with the per-route heights. Nothing else ever styled a band by route, and an
+emitted class no rule consumes is dead weight. Bringing per-route heights back is one rule and one template
+literal if a page ever genuinely needs a different band.
 
 ## Settings Control
 

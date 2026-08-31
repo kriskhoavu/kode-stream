@@ -494,7 +494,7 @@
     </p>
     <p>
       After the plan the band contract is unchanged — same three routes, same stacking against the sticky left
-      nav — but its contents come from a variant chosen in Settings, and it settles at one 200px height instead
+      nav — but its contents come from a variant chosen in Settings, and it settles at one 240px height instead
       of three per-route ones. Lattice becomes
       the default, Neon stays one click away, and a third option turns the band off and gives the topbar back
       its own fill, blur and border.
@@ -805,10 +805,10 @@
 
   <section class="sec">
     <p class="eyebrow">Delivery</p>
-    <h2>Nine phases, and only one of them is the new backdrop</h2>
+    <h2>Twelve phases, and only one of them is the new backdrop</h2>
     <p>
-      Five planned, four added after — one wrong and left visible rather than tidied away, one a bug the plan
-      never anticipated. F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
+      Five planned and seven added after — one of them wrong, left visible rather than tidied away, and one a
+      bug the plan never anticipated. F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
       by its fallback behaviour, F2 by Neon looking identical afterwards. One correction during delivery — F1
       keeps the default at <code>neon</code> and F3 flips it, because defaulting to a variant that does not
       exist yet would have left the band blank for two phases.
@@ -889,6 +889,114 @@
             The join, and a phase rather than a checklist item because no unit test answers whether the result
             is legible. Two variants across two themes and three routes, plus off, plus reduced motion, plus
             keyboard focus over both fields.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase stop">
+        <div class="phase-n">F6</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Monochrome lattice palette</h3>
+            <span class="pill blocked">reverted</span>
+          </div>
+          <p>
+            A misdiagnosis, kept on the record. The field read as orange, and <code>--blue</code> being
+            <code>#f9b98c</code> in the dark palette looked like explanation enough, so the lattice was redrawn
+            in <code>--text</code>. Wrong layer: its own blue was working, including in light theme where this
+            threw it away.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F7</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Flat ground under the lattice</h3>
+            <span class="pill done">done</span>
+          </div>
+          <p>
+            The orange was <code>.main-content</code>'s two corner glows behind the band, reading from that same
+            token. They suit Neon, whose icons are themselves soft points of colour; a thin, even, structural
+            mark on an uneven wash just looks unevenly lit. The shell now names the active variant so the page
+            beneath can drop them.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F8</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>One band height</h3>
+            <span class="pill done">done</span>
+          </div>
+          <p>
+            The band ran 300 to 430px by route, inherited from the neon field's need to clear each page's
+            content. It read as too tall, and the variation read as arbitrary. One height everywhere now; the
+            mask fades the lower third to nothing at any height, so the extra was paint area with nothing
+            visible in it. <code>.header-band-{route}</code> went with it — nothing consumed it.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase stop">
+        <div class="phase-n">F9</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Topbar popups above content</h3>
+            <span class="pill done">done</span>
+          </div>
+          <p>
+            A reported bug, and one the band caused from the start. Giving the topbar a <code>z-index</code>
+            makes it a stacking context, so a popup inside is capped at the topbar's rank however high it asks —
+            the workspace menu asks for 35, gets 2, ties with page content and loses on DOM order. It lost the
+            clicks too, not just the paint. The topbar moves to 3.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F10</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Lit lattice junctions</h3>
+            <span class="pill done">done</span>
+          </div>
+          <p>
+            The nodes were flat fills, so the sweep passing over them had nothing to catch and the field read as
+            drawn rather than lit. Every node takes a halo — hung on one group, not sixty circles — and coarse
+            junctions add a brighter one breathing on the sweep's own period.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F11</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Nav edge on the panel border</h3>
+            <span class="pill done">done</span>
+          </div>
+          <p>
+            The left nav drew its right edge from a darkened <code>--nav</code>, invisible against a near-black
+            nav in dark theme, so the nav and the page merged wherever the band crossed between them. It reads
+            from <code>--line</code> now, like every other panel in the app.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-n">F12</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>Band height to 240px</h3>
+            <span class="pill done">done</span>
+          </div>
+          <p>
+            F8 had cut a little too far: at 200px the fade landed through the filter row rather than below it.
+            240px is ten whole lattice cells, so the grid ends on a rule.
           </p>
         </div>
       </div>

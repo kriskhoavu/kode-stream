@@ -47,9 +47,11 @@
    * One height for every route. The band used to run 300 to 430px and vary by
    * route so the neon icon field would clear each page's content; the mask
    * fades its lower third to nothing regardless, so most of that was paint
-   * area with nothing visible in it. 200px reaches the filter row and stops.
+   * area with nothing visible in it. 240px reaches past the filter row and
+   * stops, and is a whole ten 24px lattice cells, so the grid ends on a rule
+   * rather than mid-cell.
    */
-  --band-height: 200px;
+  --band-height: 240px;
 }
 
 .app-shell.header-band .left-nav {
