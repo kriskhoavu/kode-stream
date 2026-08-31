@@ -805,10 +805,10 @@
 
   <section class="sec">
     <p class="eyebrow">Delivery</p>
-    <h2>Twelve phases, and only one of them is the new backdrop</h2>
+    <h2>Thirteen phases, and only one of them is the new backdrop</h2>
     <p>
-      Five planned and seven added after — one of them wrong, left visible rather than tidied away, and one a
-      bug the plan never anticipated. F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
+      Five planned and eight added after — one of them wrong, left visible rather than tidied away, and two of
+      them bugs the plan never anticipated. F1 and F2 are the seam. They landed before Lattice existed, and each was verifiable on its own terms: F1
       by its fallback behaviour, F2 by Neon looking identical afterwards. One correction during delivery — F1
       keeps the default at <code>neon</code> and F3 flips it, because defaulting to a variant that does not
       exist yet would have left the band blank for two phases.
@@ -1000,6 +1000,23 @@
           </p>
         </div>
       </div>
+
+      <div class="phase stop">
+        <div class="phase-n">F13</div>
+        <div class="phase-body">
+          <div class="phase-head">
+            <h3>One orange for both themes</h3>
+            <span class="pill done">done</span>
+          </div>
+          <p>
+            Reported as purple dots in light theme — because the field read from <code>--blue</code>, indigo in
+            light and peach in dark, so it only ever looked orange on one side. <code>--orange</code> is orange on
+            both, and its dark value is the peach already in use, so only light changes. Everything drops in
+            weight at the same time, and a specificity fix restores full-ink junctions in dark, which had silently
+            never applied since F3.
+          </p>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -1023,6 +1040,16 @@
           <tr><td>—</td><td class="accent-a"><code>.backdrop-{variant}</code></td><td>added in F7, so the page can react to the band</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="note stop">
+      <h3>Two theme tokens that are not what their names say</h3>
+      <p>
+        <code>--blue</code> is <code>#4f46e5</code> in light and <code>#f9b98c</code> in dark — a peach. Anything
+        reading it changes hue with the theme. <code>--button-accent</code> stays orange but its dark
+        <code>#b95f2e</code> is darker than the peach it would be accenting. This band was drawn from the first
+        and accented with the second, and both had to be corrected. Check a token on both sides before using it.
+      </p>
     </div>
 
     <div class="note stop">

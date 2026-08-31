@@ -19,10 +19,10 @@
 
 .lattice-grid {
   background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--blue) 14%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--blue) 14%, transparent) 1px, transparent 1px),
-    linear-gradient(to right, color-mix(in srgb, var(--blue) 6%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--blue) 6%, transparent) 1px, transparent 1px);
+    linear-gradient(to right, color-mix(in srgb, var(--orange) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--orange) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(to right, color-mix(in srgb, var(--orange) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--orange) 5%, transparent) 1px, transparent 1px);
   background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
   animation: lattice-pan 60s linear infinite;
 }
@@ -33,12 +33,12 @@
 }
 
 .lattice-network line {
-  stroke: color-mix(in srgb, var(--blue) 34%, transparent);
+  stroke: color-mix(in srgb, var(--orange) 24%, transparent);
   stroke-width: 1;
 }
 
 .lattice-node {
-  fill: color-mix(in srgb, var(--blue) 62%, transparent);
+  fill: color-mix(in srgb, var(--orange) 44%, transparent);
 }
 
 /*
@@ -46,7 +46,7 @@
  * ~60 filter regions where a single group needs one.
  */
 .lattice-nodes {
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--blue) 50%, transparent));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--orange) 38%, transparent));
 }
 
 /*
@@ -55,7 +55,7 @@
  * what makes the field read as lit rather than drawn.
  */
 .lattice-pulse {
-  fill: var(--button-accent);
+  fill: var(--orange);
   animation: lattice-glow 14s ease-in-out infinite;
   will-change: filter, opacity;
 }
@@ -64,23 +64,29 @@
   background: linear-gradient(
     105deg,
     transparent 42%,
-    color-mix(in srgb, var(--blue) 12%, transparent) 50%,
+    color-mix(in srgb, var(--orange) 9%, transparent) 50%,
     transparent 58%
   );
   animation: lattice-sweep 14s ease-in-out infinite alternate;
 }
 
 :root[data-theme="dark"] .lattice-network line {
-  stroke: color-mix(in srgb, var(--blue) 46%, transparent);
+  stroke: color-mix(in srgb, var(--orange) 30%, transparent);
 }
 
-:root[data-theme="dark"] .lattice-node {
-  fill: color-mix(in srgb, var(--blue) 78%, transparent);
+/*
+ * `:not(.lattice-pulse)` is load-bearing. A junction carries both classes, and
+ * this themed selector outranks the single-class `.lattice-pulse`, so without
+ * the exclusion it repaints junctions at the ordinary node weight and they lose
+ * the full-ink fill that makes them junctions.
+ */
+:root[data-theme="dark"] .lattice-node:not(.lattice-pulse) {
+  fill: color-mix(in srgb, var(--orange) 52%, transparent);
 }
 
 /* A halo carries further on a dark ground, so it can afford to be wider. */
 :root[data-theme="dark"] .lattice-nodes {
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--blue) 65%, transparent));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--orange) 45%, transparent));
 }
 
 @keyframes lattice-pan {
@@ -99,13 +105,13 @@
   0%,
   100% {
     opacity: 0.45;
-    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--button-accent) 55%, transparent));
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--orange) 55%, transparent));
   }
   50% {
     opacity: 1;
     filter:
-      drop-shadow(0 0 4px var(--button-accent))
-      drop-shadow(0 0 11px color-mix(in srgb, var(--button-accent) 60%, transparent));
+      drop-shadow(0 0 4px var(--orange))
+      drop-shadow(0 0 11px color-mix(in srgb, var(--orange) 60%, transparent));
   }
 }
 
@@ -129,7 +135,7 @@
   /* Frozen mid-breath a junction would keep whichever halo it happened to hold. */
   .lattice-pulse {
     opacity: 1;
-    filter: drop-shadow(0 0 4px var(--button-accent));
+    filter: drop-shadow(0 0 4px var(--orange));
   }
 
   /*

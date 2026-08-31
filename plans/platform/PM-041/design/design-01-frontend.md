@@ -108,12 +108,35 @@ to its start transform, so it does not strand a bright diagonal across the band.
 
 ## Colour
 
-Both variants read existing theme tokens. Lattice uses `--blue` for the grid and the network, and
-`--button-accent` for the pulse. Grid lines mix to 14% and 6% for the coarse and fine rules; network strokes mix
-to 34% and nodes to 62%, raised to 46% and 78% under `:root[data-theme="dark"]`.
+Lattice is drawn entirely from `--orange`, which is orange on both sides of the theme: `#c2410c` in light,
+`#f9b98c` in dark. Junctions are the same hue as the network rather than a second one — they read as junctions
+through weight and halo, not through colour.
 
-Worth knowing before reaching for `--blue` anywhere near this band: it is `#f9b98c` in the dark palette, a peach
-rather than a blue. That is fine inside the lattice, where it reads as a warm blueprint, and not fine behind it.
+| Layer         | Light             | Dark              |
+|---------------|-------------------|-------------------|
+| Coarse grid   | `--orange` at 12% | `--orange` at 9%  |
+| Fine grid     | `--orange` at 5%  | `--orange` at 4%  |
+| Network edges | `--orange` at 24% | `--orange` at 30% |
+| Nodes         | `--orange` at 44% | `--orange` at 52% |
+| Junctions     | `--orange` full   | `--orange` full   |
+| Node halo     | `--orange` at 38% | `--orange` at 45% |
+| Sweep         | `--orange` at 9%  | `--orange` at 9%  |
+
+### Two tokens that look right and are not
+
+`--blue` was the first choice and changed colour underneath the field: `#4f46e5` indigo in light, `#f9b98c` peach
+in dark. The lattice was therefore purple on one theme and orange on the other, which is what F13 was reported
+for. F6 had already misread the same token once, from the other direction.
+
+`--button-accent` is orange in both, and was the junction fill until F13. Its dark value is `#b95f2e`, darker
+than the peach network it was meant to accent — an accent that sits below what it accents.
+
+### The `:not(.lattice-pulse)` exclusion
+
+A junction circle carries both `.lattice-node` and `.lattice-pulse`. The themed `:root[data-theme="dark"]
+.lattice-node` selector outranks the single-class `.lattice-pulse`, so it repainted junctions at the ordinary node
+weight and the full-ink fill never applied in dark theme — from F3 until F13 found it. The dark node rule is now
+scoped `:not(.lattice-pulse)`.
 
 ### Lit, not drawn
 

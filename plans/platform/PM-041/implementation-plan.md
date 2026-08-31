@@ -36,6 +36,7 @@ gates.
 | F10   | Lit lattice junctions         | Frontend | Complete |
 | F11   | Nav edge on the panel border  | Frontend | Complete |
 | F12   | Band height to 240px          | Frontend | Complete |
+| F13   | One orange for both themes    | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -342,6 +343,35 @@ through the filter row rather than below it.
 **Verification:** `npm run typecheck && npm test && npm run build`
 
 **Commit:** `PM-041: Reach the band to 240px`
+
+---
+
+### Phase F13: One Orange For Both Themes
+
+Reported: the network and its dots were purple in light theme, and too heavy in both.
+
+Purple because the field read from `--blue`, which is `#4f46e5` indigo in light and `#f9b98c` peach in dark — the
+lattice changed hue with the theme and only looked orange on one side. F6 had misread the same token from the
+other direction and been reverted for it; this is the same trap, found from light theme instead of dark.
+
+`--orange` is orange on both sides, and its dark value is identical to the peach the lattice already used, so
+dark keeps its exact hue and only light changes. Every layer drops in weight at the same time.
+
+Junctions move to `--orange` too. They had been `--button-accent`, whose dark `#b95f2e` sits darker than the
+network it was meant to accent.
+
+**Deliverables:**
+
+- [x] Every lattice layer reads `--orange`; no `--blue` or `--button-accent` left in the variant.
+- [x] Lighter mixes throughout: edges 34 to 24 percent light and 46 to 30 dark, nodes 62 to 44 and 78 to 52.
+- [x] Scope the dark node rule `:not(.lattice-pulse)`. A junction carries both classes and the themed selector
+      outranks `.lattice-pulse`, so full-ink junctions had never applied in dark theme since F3.
+- [x] Verify computed fills, not appearance: junction fill must differ from node fill in both themes.
+- [x] Confirm no purple remains in light theme.
+
+**Verification:** `npm run typecheck && npm test && npm run build`
+
+**Commit:** `PM-041: Draw the lattice in one orange`
 
 ## Post-Implementation Checklist
 
