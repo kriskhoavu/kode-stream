@@ -115,6 +115,15 @@ to 34% and nodes to 62%, raised to 46% and 78% under `:root[data-theme="dark"]`.
 Worth knowing before reaching for `--blue` anywhere near this band: it is `#f9b98c` in the dark palette, a peach
 rather than a blue. That is fine inside the lattice, where it reads as a warm blueprint, and not fine behind it.
 
+### Lit, not drawn
+
+Nodes carry a halo, or the sweep passes over flat fills and the field reads as a diagram. One `drop-shadow` on a
+group wrapping every node, so the whole set costs one filter region rather than sixty. Coarse junctions add a
+second, brighter halo animated on the sweep's 14s period — the light and the thing it lights share a clock.
+
+Dark theme takes a wider halo than light: a glow carries further on a near-black ground, and on white the same
+radius reads as a smudge rather than a shine.
+
 ### The ground beneath
 
 `.main-content` paints two symmetric corner glows, also from `--blue`. Under Neon they read as more of the same,
@@ -127,6 +136,15 @@ a `backdrop-{variant}` class at all — the page beneath the band has to know wh
 No new tokens. Nothing in the band ever carries text, so contrast ratios do not apply to the backdrop itself;
 what matters is that the page title, search field and filter chips stay legible above it, which the bottom fade
 mask and the low grid opacity both serve.
+
+## Nav Edge
+
+`.left-nav` draws its right edge from `--line`, the border token every panel and card in the app shares. It
+previously used a darkened `--nav`, which is invisible against a near-black nav in dark theme — with the band
+crossing between the nav and the page, the two merged.
+
+The nav stays full-bleed and square-cornered. A 10px radius only reads as rounded on a panel inset from the
+viewport edges, and insetting the nav is a layout change with no bearing on the backdrop.
 
 ## Band Height
 

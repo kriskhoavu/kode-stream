@@ -41,10 +41,23 @@
   fill: color-mix(in srgb, var(--blue) 62%, transparent);
 }
 
-/* Only nodes on a coarse intersection carry the accent, so it marks structure. */
+/*
+ * One halo for the whole node set. Applying drop-shadow per circle would mean
+ * ~60 filter regions where a single group needs one.
+ */
+.lattice-nodes {
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--blue) 50%, transparent));
+}
+
+/*
+ * Only nodes on a coarse intersection carry the accent, so it marks structure.
+ * They also carry the light: the halo swells and fades with the sweep, which is
+ * what makes the field read as lit rather than drawn.
+ */
 .lattice-pulse {
   fill: var(--button-accent);
   animation: lattice-glow 14s ease-in-out infinite;
+  will-change: filter, opacity;
 }
 
 .lattice-sweep {
@@ -65,6 +78,11 @@
   fill: color-mix(in srgb, var(--blue) 78%, transparent);
 }
 
+/* A halo carries further on a dark ground, so it can afford to be wider. */
+:root[data-theme="dark"] .lattice-nodes {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--blue) 65%, transparent));
+}
+
 @keyframes lattice-pan {
   to {
     background-position: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
@@ -80,10 +98,14 @@
 @keyframes lattice-glow {
   0%,
   100% {
-    opacity: 0.3;
+    opacity: 0.45;
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--button-accent) 55%, transparent));
   }
   50% {
-    opacity: 0.95;
+    opacity: 1;
+    filter:
+      drop-shadow(0 0 4px var(--button-accent))
+      drop-shadow(0 0 11px color-mix(in srgb, var(--button-accent) 60%, transparent));
   }
 }
 
@@ -102,6 +124,12 @@
   .lattice-pulse,
   .lattice-sweep {
     animation: none;
+  }
+
+  /* Frozen mid-breath a junction would keep whichever halo it happened to hold. */
+  .lattice-pulse {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px var(--button-accent));
   }
 
   /*

@@ -33,6 +33,8 @@ gates.
 | F7    | Flat ground under the lattice | Frontend | Complete |
 | F8    | One band height               | Frontend | Complete |
 | F9    | Topbar popups above content   | Frontend | Complete |
+| F10   | Lit lattice junctions         | Frontend | Complete |
+| F11   | Nav edge on the panel border  | Frontend | Complete |
 
 ## Terminology Lock
 
@@ -282,6 +284,45 @@ costs nothing.
 **Verification:** `npm run typecheck && npm test && npm run build`
 
 **Commit:** `PM-041: Lift the topbar above page content`
+
+---
+
+### Phase F10: Lit Lattice Junctions
+
+Review pass. The nodes were flat fills, so the field read as drawn rather than lit and the sweep had nothing to
+catch.
+
+**Deliverables:**
+
+- [x] Group the nodes in one `<g>` and hang a single halo filter on it, rather than one filter per circle.
+- [x] Coarse junctions carry a second, brighter halo that swells and fades on the sweep's own 14s period.
+- [x] Wider halo in dark theme, where a glow carries further than it does on white.
+- [x] Reduced motion pins the junction halo open instead of freezing it mid-breath.
+- [x] Coarse node radius 3.2 to 3.4, so the brighter node reads as a node and not just as light.
+
+**Verification:** `npm run typecheck && npm test -- --run web/src/components`
+
+**Commit:** `PM-041: Light the lattice junctions`
+
+---
+
+### Phase F11: Nav Edge On The Panel Border
+
+The left nav drew its right edge from a darkened `--nav`, which is invisible against a near-black nav in dark
+theme. With the band crossing between nav and page, the two merged into one another.
+
+It now uses `--line`, the border every other panel and card in the app already reads from. The nav stays
+full-bleed and square: a radius only reads as one on an inset panel, and insetting the nav is a layout change
+this ticket has no reason to make.
+
+**Deliverables:**
+
+- [x] `.left-nav` `border-right` reads from `--line`.
+- [x] Confirm the edge is visible in both themes and that the nav keeps its full-height, flush-to-edge geometry.
+
+**Verification:** `npm run typecheck && npm test && npm run build`
+
+**Commit:** `PM-041: Rule the nav edge with the panel border`
 
 ## Post-Implementation Checklist
 

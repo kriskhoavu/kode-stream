@@ -125,16 +125,23 @@ export function LatticeBackdrop() {
         {lattice.edges.map((edge, index) => (
           <line key={index} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} />
         ))}
-        {lattice.nodes.map((node, index) => (
-          <circle
-            className={node.coarse ? 'lattice-node lattice-pulse' : 'lattice-node'}
-            key={index}
-            cx={node.x}
-            cy={node.y}
-            r={node.coarse ? 3.2 : 2.2}
-            style={node.coarse ? { animationDelay: `-${(index * 0.7).toFixed(1)}s` } : undefined}
-          />
-        ))}
+        {/*
+          * Nodes are grouped so their halo is one filter pass over the whole
+          * set rather than one per circle. Coarse junctions carry their own,
+          * brighter filter on top of it.
+          */}
+        <g className="lattice-nodes">
+          {lattice.nodes.map((node, index) => (
+            <circle
+              className={node.coarse ? 'lattice-node lattice-pulse' : 'lattice-node'}
+              key={index}
+              cx={node.x}
+              cy={node.y}
+              r={node.coarse ? 3.4 : 2.2}
+              style={node.coarse ? { animationDelay: `-${(index * 0.7).toFixed(1)}s` } : undefined}
+            />
+          ))}
+        </g>
       </svg>
       <div className="lattice-sweep" />
     </>
