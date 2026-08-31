@@ -1895,8 +1895,13 @@ select {
    * a vignette; wherever the content sits inset from the nav (the Workbench
    * card most of all) the same blur is exposed against the page background as a
    * grey band filling the gutter.
+   *
+   * The rule reads from `--line`, the same border every panel and card in the
+   * app uses, rather than from a darkened `--nav`. A near-black edge against a
+   * near-black nav is invisible in dark theme, which left the nav and the page
+   * merging into one another wherever the backdrop crossed between them.
    */
-  border-right: 1px solid color-mix(in srgb, var(--nav) 65%, #000);
+  border-right: 1px solid var(--line);
   box-shadow: 2px 0 10px rgba(2, 6, 23, 0.07);
   overflow: hidden;
 }
