@@ -103,6 +103,41 @@ policy, while the variable concerns use smaller abstractions: `StorageProvider` 
 `workspaceAccessAdapter` for Cloud workspace commands. The Chrome extension is a frontend API-origin adapter, not a
 server-side runtime mode. See the [deployment adapter class diagrams](deployment-adapters.md).
 
+## Code Layout
+
+`internal/` and `web/` hold the logic and every test. `cmd/` holds the composition root. Kode
+Stream ships one binary rather than a fleet, and the frontend is compiled into it — `internal/server`
+declares `//go:embed all:frontend` — so a single image and a single Homebrew formula carry the
+whole product.
+
+```text
+              web/src/                          internal/
+         (React frontend)          agent  ai  audit  canvas  filesystem  git  item
+                  │                jira  knowledge  navigation  provider  search
+                  │                server  storage  system  verification  workspace
+                  │                                     │
+                  │  npm run build → embedded           │
+                  └──────────────────┬──────────────────┘
+                                     ▼
+                                   cmd/
+                              kode-stream
+                                     │
+                     ┌───────────────┴───────────────┐
+                     ▼                               ▼
+              kode-stream image              Homebrew formula
+       deploy/docker/image/kode-stream/      cmd/scripts/distribution/
+```
+
+One deviation from the platform rule, deliberately: `cmd/scripts/distribution/` holds release
+automation rather than a deployable. It is invoked by CI, not by an operator standing in `deploy/`,
+which is why it stays with the code it releases — see [deploy/README.md](../../deploy/README.md).
+
+`internal/` domain packages take standard contexts and primitive parameters, never framework
+request objects, and Gin is confined to `internal/server/api`. That is what lets workspace, storage,
+and verification behaviour be tested without booting a server. `agent-plane` and `context-cellar`
+use the same two-kinds-of-directory split, with `packages/` in place of `internal/` on the
+TypeScript side.
+
 ## Backend Layers
 
 | Layer             | Package               | Role                                                                                   |
