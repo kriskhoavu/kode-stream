@@ -20,7 +20,7 @@ cp cmd/scripts/distribution/kode-stream.rb homebrew-tap/Formula/kode-stream.rb
 ```
 
 The template ships placeholder checksums and `v0.0.0` URLs. It is not installable until
-`update_formula.py` points it at a real release, which the release runbook does for you.
+`update_formula.py` points it at a real release, which the release procedure does for you.
 
 The formula class name is derived from the filename: `kode-stream.rb` must declare
 `class KodeStream`.

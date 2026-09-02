@@ -1,6 +1,6 @@
 # Homebrew Release Procedure
 
-Canonical runbook for publishing a Kode Stream release and updating the Homebrew tap.
+Canonical procedure for publishing a Kode Stream release and updating the Homebrew tap.
 
 Last exercised end to end on **v2.0.0**. The troubleshooting section records failures that
 actually occurred, not hypothetical ones.

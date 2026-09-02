@@ -41,9 +41,12 @@ Cloud snapshot: Browser -> Cloud API -> provider API -> immutable repository com
 Remote Snapshot currently provides the commit-pinned backend foundation for metadata, tree, and file reads. Its
 self-service registration and snapshot-backed board/search UI remain planned work.
 
-See [Architecture](docs/architecture/ARCHITECTURE.md) for the capability boundary, [Cloud modes](docs/domain/cloud/cloud-modes.md) for operating
+See [Architecture](docs/architecture/overview.md) for the capability boundary, [Cloud modes](docs/domain/cloud/cloud-modes.md) for operating
 guidance, [Storage](docs/domain/storage/storage-architecture.md) for the storage decision matrix, and the
 [Documentation map](docs/README.md) for the full documentation taxonomy.
+
+To build and test the repository, see [Development](docs/development.md). Operator procedures live under
+[`deploy/`](deploy/README.md). [AGENTS.md](AGENTS.md) is the operating context for AI coding agents.
 
 ## Tech Stack
 
@@ -166,27 +169,27 @@ kode-stream agent start|status|doctor
 For a local Agent-Backed Cloud smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy, and a foreground Cloud Agent:
 
 ```bash
-./deploy/docker/cloud-mode/run.sh
+./deploy/docker/local/cloud-mode/run.sh
 ```
 
 For the Agentless Remote Snapshot control-plane stack, use:
 
 ```bash
-KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./deploy/docker/cloud-mode/run.sh
+KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./deploy/docker/local/cloud-mode/run.sh
 ```
 
-See [Local Cloud Stack](deploy/docker/cloud-mode/README.md) for both flows.
+See [Local Cloud Stack](deploy/docker/local/cloud-mode/README.md) for both flows.
 
 ## Local Docker Mode
 
 Local mode can also run in Docker with either supported Local storage option:
 
 ```bash
-./deploy/docker/local-mode/run.sh
-KODE_STREAM_STORAGE_OPTION=database ./deploy/docker/local-mode/run.sh
+./deploy/docker/local/local-mode/run.sh
+KODE_STREAM_STORAGE_OPTION=database ./deploy/docker/local/local-mode/run.sh
 ```
 
-The selected host workspace is mounted at `/workspace`. See [Local Docker Stack](deploy/docker/local-mode/README.md) for the
+The selected host workspace is mounted at `/workspace`. See [Local Docker Stack](deploy/docker/local/local-mode/README.md) for the
 storage boundary and container limitations for Git credentials, terminal, AI, dialogs, and path reveal.
 
 ## Storage And Data Directory
@@ -293,6 +296,6 @@ cards:
 
 ## Architecture
 
-See [Architecture](docs/architecture/ARCHITECTURE.md) for system boundaries, storage design, data flow, and API structure.
+See [Architecture](docs/architecture/overview.md) for system boundaries, storage design, data flow, and API structure.
 
 For hosted deployment, see [Cloud Deployment](docs/domain/cloud/cloud-deployment.md).

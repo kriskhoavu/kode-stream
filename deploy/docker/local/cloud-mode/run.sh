@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-COMPOSE_FILE="${KODE_STREAM_CLOUD_COMPOSE_FILE:-$ROOT_DIR/deploy/docker/cloud-mode/compose.yaml}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+COMPOSE_FILE="${KODE_STREAM_CLOUD_COMPOSE_FILE:-$ROOT_DIR/deploy/docker/local/cloud-mode/compose.yaml}"
 CLOUD_URL="${KODE_STREAM_CLOUD_URL:-http://kode-stream.localhost:4318}"
 WORKSPACE_MODE="${KODE_STREAM_CLOUD_WORKSPACE_MODE:-agent_backed}"
 REPO_PATH="${KODE_STREAM_AGENT_REPO:-$ROOT_DIR}"

@@ -4,8 +4,8 @@ services:
   kode-stream:
     image: kode-stream:local
     build:
-      context: ../../..
-      dockerfile: Dockerfile
+      context: ../../../..
+      dockerfile: deploy/docker/image/kode-stream/Dockerfile
     ports:
       - "${KODE_STREAM_LOCAL_PORT:-4317}:4317"
     environment:

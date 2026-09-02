@@ -1,4 +1,4 @@
-# Chrome Extension Showcase Runbook
+# Chrome Extension Showcase
 
 Kode Stream can be built as an unpacked Chrome extension for Local mode showcases. The extension bundles the React UI
 and calls the local Kode Stream server for workspace files, Git operations, system dialogs, and guarded writes.

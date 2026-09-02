@@ -4,8 +4,8 @@ services:
   kode-stream:
     image: kode-stream:cloud-local
     build:
-      context: ../../..
-      dockerfile: Dockerfile
+      context: ../../../..
+      dockerfile: deploy/docker/image/kode-stream/Dockerfile
     expose:
       - "4317"
     environment:
