@@ -13,13 +13,13 @@ Cloud `database` storage. The mode determines whether the helper also starts a l
 
 | Helper mode               | Command                                                                          | What it validates                                                                                                 |
 |---------------------------|----------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
-| Agent-Backed              | `./runbooks/docker/cloud-mode/run.sh`                                            | Cloud control plane plus a foreground Agent for a local repository                                                |
-| Agentless Remote Snapshot | `KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./runbooks/docker/cloud-mode/run.sh` | Cloud control plane without an Agent; supports backend Remote Snapshot verification with preconfigured test state |
+| Agent-Backed              | `./deploy/docker/cloud-mode/run.sh`                                            | Cloud control plane plus a foreground Agent for a local repository                                                |
+| Agentless Remote Snapshot | `KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./deploy/docker/cloud-mode/run.sh` | Cloud control plane without an Agent; supports backend Remote Snapshot verification with preconfigured test state |
 
 ## Agent-Backed Run
 
 ```bash
-./runbooks/docker/cloud-mode/run.sh
+./deploy/docker/cloud-mode/run.sh
 ```
 
 By default, this starts the Docker stack, waits for `http://kode-stream.localhost:4318/api/health`, builds
@@ -32,10 +32,10 @@ Optional overrides:
 KODE_STREAM_STORAGE_OPTION=database \
 KODE_STREAM_AGENT_REPO=/path/to/repo \
 KODE_STREAM_AGENT_NAME="MacBook Agent" \
-./runbooks/docker/cloud-mode/run.sh
+./deploy/docker/cloud-mode/run.sh
 ```
 
-Cloud smoke runs always use `database` storage with Postgres. `runbooks/docker/cloud-mode/run.sh` fails early if
+Cloud smoke runs always use `database` storage with Postgres. `deploy/docker/cloud-mode/run.sh` fails early if
 `KODE_STREAM_STORAGE_OPTION=datadir` is supplied. Postgres persists shared metadata in `kode-stream-postgres`; the
 separate `kode-stream-cloud-data` volume persists Cloud diagnostics and rollback exports under `KODE_STREAM_DATA_DIR`.
 
@@ -46,18 +46,18 @@ The agent runs in the foreground. Press `Ctrl-C` to stop the agent; Docker servi
 Start only the Cloud control plane:
 
 ```bash
-KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./runbooks/docker/cloud-mode/run.sh
+KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./deploy/docker/cloud-mode/run.sh
 ```
 
 The helper waits for health and exits without building or starting an Agent. The current Remote Snapshot foundation
 requires preconfigured provider and workspace test state; the self-service provider connection, registration, and
 snapshot-backed UI are not yet available. Verify commit-pinned metadata, tree, and file responses and confirm that
-write, Git, terminal, AI, runtime, and verification actions are unavailable. See [Remote Snapshot operations](../../../docs/cloud/remote-snapshot-operations.md).
+write, Git, terminal, AI, runtime, and verification actions are unavailable. See [Remote Snapshot operations](../../../docs/domain/cloud/remote-snapshot-operations.md).
 
 Manual stack startup:
 
 ```bash
-docker compose -f runbooks/docker/cloud-mode/compose.yaml up -d --build
+docker compose -f deploy/docker/cloud-mode/compose.yaml up -d --build
 ```
 
 Open:
@@ -151,16 +151,16 @@ role mapping beyond the admin allowlist.
 Stop containers:
 
 ```bash
-docker compose -f runbooks/docker/cloud-mode/compose.yaml down
+docker compose -f deploy/docker/cloud-mode/compose.yaml down
 ```
 
 Reset local containers:
 
 ```bash
-docker compose -f runbooks/docker/cloud-mode/compose.yaml down -v
+docker compose -f deploy/docker/cloud-mode/compose.yaml down -v
 ```
 
-Use the reset command after changes to `runbooks/docker/cloud-mode/keycloak/kode-stream-realm.json`; Keycloak imports the local realm
+Use the reset command after changes to `deploy/docker/cloud-mode/keycloak/kode-stream-realm.json`; Keycloak imports the local realm
 only when the development server starts.
 
 ## Notes

@@ -41,8 +41,8 @@ Cloud snapshot: Browser -> Cloud API -> provider API -> immutable repository com
 Remote Snapshot currently provides the commit-pinned backend foundation for metadata, tree, and file reads. Its
 self-service registration and snapshot-backed board/search UI remain planned work.
 
-See [Architecture](docs/architecture/ARCHITECTURE.md) for the capability boundary, [Cloud modes](docs/cloud/cloud-modes.md) for operating
-guidance, [Storage](docs/storage/storage-architecture.md) for the storage decision matrix, and the
+See [Architecture](docs/architecture/ARCHITECTURE.md) for the capability boundary, [Cloud modes](docs/domain/cloud/cloud-modes.md) for operating
+guidance, [Storage](docs/domain/storage/storage-architecture.md) for the storage decision matrix, and the
 [Documentation map](docs/README.md) for the full documentation taxonomy.
 
 ## Tech Stack
@@ -89,8 +89,8 @@ Removing a node or resetting layout changes presentation only. Cancelling a live
 PM-037 supports this workflow for Local checkouts and local execution; groups, notes, custom links, multiple canvases,
 Cloud Agent execution, and Remote Snapshot Canvas UX remain future capabilities.
 
-See [Terminal Canvas sessions](docs/terminal/canvas-sessions.md) and
-[verification freshness](docs/verification/canvas-freshness.md) for the safety and lifecycle details.
+See [Terminal Canvas sessions](docs/domain/terminal/canvas-sessions.md) and
+[verification freshness](docs/domain/verification/canvas-freshness.md) for the safety and lifecycle details.
 
 ## Quick Start
 
@@ -166,27 +166,27 @@ kode-stream agent start|status|doctor
 For a local Agent-Backed Cloud smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy, and a foreground Cloud Agent:
 
 ```bash
-./runbooks/docker/cloud-mode/run.sh
+./deploy/docker/cloud-mode/run.sh
 ```
 
 For the Agentless Remote Snapshot control-plane stack, use:
 
 ```bash
-KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./runbooks/docker/cloud-mode/run.sh
+KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./deploy/docker/cloud-mode/run.sh
 ```
 
-See [Local Cloud Stack](runbooks/docker/cloud-mode/README.md) for both flows.
+See [Local Cloud Stack](deploy/docker/cloud-mode/README.md) for both flows.
 
 ## Local Docker Mode
 
 Local mode can also run in Docker with either supported Local storage option:
 
 ```bash
-./runbooks/docker/local-mode/run.sh
-KODE_STREAM_STORAGE_OPTION=database ./runbooks/docker/local-mode/run.sh
+./deploy/docker/local-mode/run.sh
+KODE_STREAM_STORAGE_OPTION=database ./deploy/docker/local-mode/run.sh
 ```
 
-The selected host workspace is mounted at `/workspace`. See [Local Docker Stack](runbooks/docker/local-mode/README.md) for the
+The selected host workspace is mounted at `/workspace`. See [Local Docker Stack](deploy/docker/local-mode/README.md) for the
 storage boundary and container limitations for Git credentials, terminal, AI, dialogs, and path reveal.
 
 ## Storage And Data Directory
@@ -254,7 +254,7 @@ KODE_STREAM_STORAGE_OPTION=datadir ./run.sh restart
 Settings can manually sync `datadir -> database` or `database -> datadir`. Each sync creates a target backup under
 `backups/storage-sync/`. Runtime writes go only to the selected storage option.
 
-See [Storage](docs/storage/storage-architecture.md) for supported storage options, performance comparison, backup,
+See [Storage](docs/domain/storage/storage-architecture.md) for supported storage options, performance comparison, backup,
 restore, manual sync, and Cloud Postgres operations.
 
 ## Workspace Files
@@ -295,4 +295,4 @@ cards:
 
 See [Architecture](docs/architecture/ARCHITECTURE.md) for system boundaries, storage design, data flow, and API structure.
 
-For hosted deployment, see [Cloud Deployment](docs/cloud/cloud-deployment.md).
+For hosted deployment, see [Cloud Deployment](docs/domain/cloud/cloud-deployment.md).

@@ -180,7 +180,7 @@ Storage is selected at server startup:
 | Local        | `database`     | SQLite   | `KODE_STREAM_STORAGE_OPTION=database` or optional SQLite override | Workspace metadata, derived item indexes, audit, navigation, settings |
 | Cloud        | `database`     | Postgres | `KODE_STREAM_STORAGE_DRIVER=postgres`, `KODE_STREAM_DATABASE_URL` | Shared control-plane metadata, branch indexes, audit, settings        |
 
-Local data-dir storage is a supported option, not a deprecated path. See [Storage](../storage/storage-architecture.md)
+Local data-dir storage is a supported option, not a deprecated path. See [Storage](../domain/storage/storage-architecture.md)
 for the option matrix, manual sync, backup, restore, and performance comparison.
 
 `internal/storage` resolves `KODE_STREAM_STORAGE_OPTION`, composes a provider-backed `RepositoryBundle`, opens SQL

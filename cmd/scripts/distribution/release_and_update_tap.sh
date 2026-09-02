@@ -34,7 +34,7 @@ NOTE: pushing a v* tag triggers .github/workflows/release.yml, which builds and
 publishes the release assets itself. This script also builds locally and uploads
 with --clobber, so running both against one tag races: whichever finishes last
 wins, and the tap can end up pointing at assets whose checksums came from the
-other build. Prefer the CI path in runbooks/homebrew/release.md. Use this script
+other build. Prefer the CI path in deploy/homebrew/release.md. Use this script
 only when Actions is unavailable, and let the workflow finish or cancel it first.
 WARNING
 

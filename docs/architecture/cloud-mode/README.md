@@ -30,7 +30,7 @@ Cloud always uses `KODE_STREAM_STORAGE_OPTION=database`, `KODE_STREAM_STORAGE_DR
 `KODE_STREAM_DATABASE_URL`. Cloud Agents never connect directly to Postgres.
 
 The full Remote Snapshot user workflow is not yet complete: provider connection/registration, snapshot-backed
-board/search, and durable provider operations remain planned work. See [Remote Snapshot operations](../../cloud/remote-snapshot-operations.md).
+board/search, and durable provider operations remain planned work. See [Remote Snapshot operations](../../domain/cloud/remote-snapshot-operations.md).
 
 Focused Mermaid diagrams: [Agent-Backed workspace](agent-backed.mmd),
 [Agentless Remote Snapshot](agentless-remote-snapshot.mmd), and [Cloud Postgres storage](postgres-storage.mmd).
@@ -41,6 +41,6 @@ Focused Mermaid diagrams: [Agent-Backed workspace](agent-backed.mmd),
 - Review a consistent, commit-pinned provider snapshot without creating a checkout.
 - Operate a shared control plane with concurrent writes, migrations, health checks, and managed backups.
 
-For authentication, environment configuration, deployment, and recovery, use [Cloud deployment](../../cloud/cloud-deployment.md).
-For the capability matrix and Remote Snapshot operations, use [Cloud deployment modes](../../cloud/cloud-modes.md) and
-[Remote Snapshot operations](../../cloud/remote-snapshot-operations.md).
+For authentication, environment configuration, deployment, and recovery, use [Cloud deployment](../../domain/cloud/cloud-deployment.md).
+For the capability matrix and Remote Snapshot operations, use [Cloud deployment modes](../../domain/cloud/cloud-modes.md) and
+[Remote Snapshot operations](../../domain/cloud/remote-snapshot-operations.md).

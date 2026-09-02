@@ -1,6 +1,6 @@
 # Homebrew Tap Bootstrap
 
-First-time tap setup only. Day-to-day releases live in `runbooks/homebrew/release.md`.
+First-time tap setup only. Day-to-day releases live in `deploy/homebrew/release.md`.
 
 ## 1) Create the tap repository
 
@@ -27,7 +27,7 @@ The formula class name is derived from the filename: `kode-stream.rb` must decla
 
 ## 3) First publish
 
-Publish a release first (`runbooks/homebrew/release.md` step 1), then point the tap at it:
+Publish a release first (`deploy/homebrew/release.md` step 1), then point the tap at it:
 
 ```bash
 cmd/scripts/distribution/update_homebrew_formula_from_release.sh <version> ../homebrew-tap

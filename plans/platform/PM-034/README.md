@@ -103,5 +103,5 @@ metadata, tree, file, and capability response. Board and search read models rema
 - [Pipeline Design](design/design-03-pipeline.md)
 - [Agentless Cloud Design](design/design-04-agentless-cloud.md)
 - [Implementation Plan](implementation-plan.md)
-- [Showcase Runbook](../../../runbooks/chrome-extension.md)
-- [Remote Snapshot Operations](../../../docs/cloud/remote-snapshot-operations.md)
+- [Showcase Runbook](../../../deploy/chrome-extension.md)
+- [Remote Snapshot Operations](../../../docs/domain/cloud/remote-snapshot-operations.md)

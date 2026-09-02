@@ -27,7 +27,7 @@ settings; it never changes ownership of the repository files or Git history.
 | `database` | SQLite | `<KODE_STREAM_DATA_DIR>/kode-stream.db` unless overridden | Indexed queries, transactional updates, and one-file database backup. |
 
 Source: [storage-options.mmd](storage-options.mmd). The detailed option matrix, sync, backup, restore, and performance
-guidance remains in [Storage architecture](../../storage/storage-architecture.md).
+guidance remains in [Storage architecture](../../domain/storage/storage-architecture.md).
 
 Each backend also has a focused Mermaid diagram: [data-directory storage](datadir-storage.mmd) and
 [SQLite storage](sqlite-storage.mmd).

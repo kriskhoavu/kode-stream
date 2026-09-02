@@ -67,21 +67,21 @@ read-only authorization and resolves every selected ref to a commit SHA before r
 npm run build
 go build -o ./bin/kode-stream ./cmd/kode-stream
 docker build -t kode-stream:cloud .
-docker compose -f runbooks/docker/cloud-mode/compose.yaml up -d
+docker compose -f deploy/docker/cloud-mode/compose.yaml up -d
 curl -fsS http://127.0.0.1:4318/api/health
 ```
 
 The repository Compose file is the self-contained local stack: local port `4318` is OAuth2Proxy and the app port is not
-published. After login, use the Agent-Backed or Agentless Remote Snapshot workflow described in [Local Cloud Stack](../../runbooks/docker/cloud-mode/README.md).
+published. After login, use the Agent-Backed or Agentless Remote Snapshot workflow described in [Local Cloud Stack](../../../deploy/docker/cloud-mode/README.md).
 
 ## Local OAuth2Proxy And Keycloak Stack
 
-For a full local login flow, use the Docker Compose stack in [Local Cloud Stack](../../runbooks/docker/cloud-mode/README.md). It starts
+For a full local login flow, use the Docker Compose stack in [Local Cloud Stack](../../../deploy/docker/cloud-mode/README.md). It starts
 Keycloak with an imported `kode-stream` realm, OAuth2Proxy on `http://kode-stream.localhost:4318`, and Kode Stream as a
 private upstream.
 
 ```bash
-docker compose -f runbooks/docker/cloud-mode/compose.yaml up -d --build
+docker compose -f deploy/docker/cloud-mode/compose.yaml up -d --build
 curl -fsS http://kode-stream.localhost:4318/api/health
 ```
 

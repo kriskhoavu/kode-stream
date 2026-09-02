@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-COMPOSE_FILE="${KODE_STREAM_LOCAL_COMPOSE_FILE:-$ROOT_DIR/runbooks/docker/local-mode/compose.yaml}"
+COMPOSE_FILE="${KODE_STREAM_LOCAL_COMPOSE_FILE:-$ROOT_DIR/deploy/docker/local-mode/compose.yaml}"
 STORAGE_OPTION="${KODE_STREAM_STORAGE_OPTION:-datadir}"
 WORKSPACE_PATH="${KODE_STREAM_LOCAL_WORKSPACE:-$ROOT_DIR}"
 

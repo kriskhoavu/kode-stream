@@ -197,4 +197,4 @@ is still running.
 - `cmd/scripts/distribution/update_homebrew_formula_from_release.sh` — tap update from a release
 - `cmd/scripts/distribution/release_and_update_tap.sh` — local-build fallback, races CI
 - `cmd/scripts/distribution/kode-stream.rb` — formula template for bootstrap
-- `runbooks/homebrew/homebrew-tap-bootstrap.md`
+- `deploy/homebrew/homebrew-tap-bootstrap.md`

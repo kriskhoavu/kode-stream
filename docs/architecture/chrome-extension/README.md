@@ -33,5 +33,5 @@ The extension defaults to `http://127.0.0.1:4317`; a developer may override that
 - No embedded terminal in the extension surface.
 - No Chrome Web Store distribution in this showcase.
 
-See the [Chrome extension runbook](../../../runbooks/chrome-extension.md) for build, load, acceptance, and
+See the [Chrome extension runbook](../../../deploy/chrome-extension.md) for build, load, acceptance, and
 troubleshooting steps. See [Local mode](../local-mode/README.md) for the server and storage architecture behind it.

@@ -12,5 +12,5 @@ runtime or distribution that matches the way Kode Stream is being used.
 | [Deployment adapters](deployment-adapters.md)  | Runtime policy, storage providers, Cloud workspace access, and extension API-origin seams | [Class diagrams](deployment-adapters.md)                  |
 
 Each README renders its primary Mermaid diagram inline; the adjacent `.mmd` file is the single source for every diagram.
-Detailed storage operation and deployment procedures stay in [Storage](../storage/storage-architecture.md), [Cloud](../cloud/cloud-modes.md), and
-[runbooks](../../runbooks/README.md).
+Detailed storage operation and deployment procedures stay in [Storage](../domain/storage/storage-architecture.md), [Cloud](../domain/cloud/cloud-modes.md), and
+[deployment and operations](../../deploy/README.md).
