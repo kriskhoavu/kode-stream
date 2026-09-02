@@ -5,6 +5,5 @@ node_modules
 bin
 release
 plans
-docs/specs/design.png
 npm-debug.log
 deploy

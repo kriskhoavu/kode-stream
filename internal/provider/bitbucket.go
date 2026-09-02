@@ -49,7 +49,8 @@ func (b *BitbucketServer) Repositories(ctx context.Context) ([]Repository, error
 func (b *BitbucketServer) Refs(ctx context.Context, repository string) ([]Ref, error) {
 	var page struct {
 		Values []struct {
-			DisplayID, LatestCommit string `json:"displayId"`
+			DisplayID    string `json:"displayId"`
+			LatestCommit string `json:"latestCommit"`
 		} `json:"values"`
 	}
 	if err := b.request(ctx, "rest/api/1.0/projects/"+project(repository)+"/repos/"+slug(repository)+"/branches?limit=100", &page); err != nil {
@@ -64,7 +65,8 @@ func (b *BitbucketServer) Refs(ctx context.Context, repository string) ([]Ref, e
 	}
 	var tags struct {
 		Values []struct {
-			DisplayID, LatestCommit string `json:"displayId"`
+			DisplayID    string `json:"displayId"`
+			LatestCommit string `json:"latestCommit"`
 		} `json:"values"`
 	}
 	if err := b.request(ctx, "rest/api/1.0/projects/"+project(repository)+"/repos/"+slug(repository)+"/tags?limit=100", &tags); err != nil {
