@@ -18,7 +18,7 @@ runtime state; use the app’s explicit storage sync before switching when state
 By default the repository root is mounted at `/workspace`. To mount another directory:
 
 ```bash
-KODE_STREAM_LOCAL_WORKSPACE=/absolute/path/to/repository ./deploy/docker/local/local-mode/run.sh
+KODE_STREAM_LOCAL_WORKSPACE=/absolute/path/to/repository make up
 ```
 
 Register `/workspace` or a subdirectory in Kode Stream. The container must have write access to the mounted directory
@@ -31,11 +31,14 @@ image and repository credentials must be made available to the container before 
 terminal, host AI CLI, native file dialogs, and host path-reveal behavior are not automatically available through the
 container boundary.
 
+`/api/health` reports database status only, so a `datadir` container answers 503 there and never reports healthy even
+while it serves normally. `make health` probes the app root for that reason.
+
 ## Stop Or Reset
 
 ```bash
-docker compose -f deploy/docker/local/local-mode/compose.yaml down
-docker compose -f deploy/docker/local/local-mode/compose.yaml down -v
+make down
+make clean FORCE=1
 ```
 
-The second command removes the Local app-state volume; it does not delete the mounted workspace directory.
+`make clean` removes the Local app-state volume; it does not delete the mounted workspace directory.

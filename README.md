@@ -97,14 +97,31 @@ See [Terminal Canvas sessions](docs/domain/terminal/canvas-sessions.md) and
 
 ## Quick Start
 
+Everything local runs through `make`, and the default is Docker:
+
+```bash
+make up
+```
+
+Open `http://localhost:4317`. `make down` stops it, `make logs` follows it, `make help`
+lists every target and stack.
+
+To run from source instead — no image rebuild between edits:
+
+```bash
+make dev
+```
+
+That builds the frontend and the Go binary and serves them in the background;
+`make dev-stop`, `make dev-status`, and `make dev-logs` manage it. By hand it is
+still just:
+
 ```bash
 npm install
 npm run build
 go build -o ./bin/kode-stream ./cmd/kode-stream
 ./bin/kode-stream serve -port 4317
 ```
-
-Open `http://localhost:4317`.
 
 The default port is `4317`. You can also set it with `KODE_STREAM_PORT`:
 
@@ -136,6 +153,13 @@ brew upgrade kode-stream
 ## Development
 
 ```bash
+make verify
+```
+
+That is `npm run typecheck`, `npm test`, `go test ./...`, and `npm run build`. Run the
+pieces directly when you want only one:
+
+```bash
 npm run typecheck
 npm test -- --run
 go test ./...
@@ -144,8 +168,7 @@ go test ./...
 Build the production assets and local binary:
 
 ```bash
-npm run build
-go build -o ./bin/kode-stream ./cmd/kode-stream
+make dev-build
 ```
 
 Run frontend development server:
@@ -169,13 +192,13 @@ kode-stream agent start|status|doctor
 For a local Agent-Backed Cloud smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy, and a foreground Cloud Agent:
 
 ```bash
-./deploy/docker/local/cloud-mode/run.sh
+make up STACK=cloud
 ```
 
 For the Agentless Remote Snapshot control-plane stack, use:
 
 ```bash
-KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless ./deploy/docker/local/cloud-mode/run.sh
+KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless make up STACK=cloud
 ```
 
 See [Local Cloud Stack](deploy/docker/local/cloud-mode/README.md) for both flows.
@@ -185,8 +208,8 @@ See [Local Cloud Stack](deploy/docker/local/cloud-mode/README.md) for both flows
 Local mode can also run in Docker with either supported Local storage option:
 
 ```bash
-./deploy/docker/local/local-mode/run.sh
-KODE_STREAM_STORAGE_OPTION=database ./deploy/docker/local/local-mode/run.sh
+make up
+KODE_STREAM_STORAGE_OPTION=database make up
 ```
 
 The selected host workspace is mounted at `/workspace`. See [Local Docker Stack](deploy/docker/local/local-mode/README.md) for the

@@ -20,6 +20,12 @@ npm ci --no-audit --no-fund
 Run these before every commit. They are the same checks CI runs in `.github/workflows/release.yml`.
 
 ```bash
+make verify
+```
+
+which is:
+
+```bash
 npm run typecheck && npm test && npm run build && go test ./...
 ```
 
@@ -42,10 +48,15 @@ KODE_STREAM_DATABASE_URL='postgres://kode_stream:kode_stream@127.0.0.1:5432/kode
 
 ## Run it
 
-`./run.sh` starts the local server from source. To run a containerized topology instead, use the procedures under
+`make up` starts the containerized Local-mode server and `make up STACK=cloud` the stack that mirrors the VM
+deployment shape; `make stacks` lists them. Both are thin front doors over the procedures under
 [`deploy/`](../deploy/README.md) — [Local mode](../deploy/docker/local/local-mode/README.md) for the single-user
-server, [Cloud mode](../deploy/docker/local/cloud-mode/README.md) for the stack that mirrors the VM deployment
-shape.
+server, [Cloud mode](../deploy/docker/local/cloud-mode/README.md) for the other — which remain the reference for
+what each stack contains and what it needs bootstrapped.
+
+`make dev` starts the same server from source instead, backgrounded, for the edit loop. It is `./run.sh start`
+underneath, and `./run.sh` still works; the Makefile exists so that starting this repository looks the same as
+starting `agent-plane` or `context-cellar`.
 
 ## Where things go
 
