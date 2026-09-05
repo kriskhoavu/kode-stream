@@ -109,11 +109,11 @@ lists every target and stack.
 To run from source instead — no image rebuild between edits:
 
 ```bash
-make dev
+make dev-up
 ```
 
 That builds the frontend and the Go binary and serves them in the background;
-`make dev-stop`, `make dev-status`, and `make dev-logs` manage it. By hand it is
+`make dev-down`, `make dev-ps`, and `make dev-logs` manage it. By hand it is
 still just:
 
 ```bash

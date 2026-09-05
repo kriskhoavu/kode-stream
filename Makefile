@@ -1,9 +1,9 @@
 # Front door for local work in kode-stream.
 #
-# Two lanes, the same shape as in agent-plane and context-cellar:
+# Two lanes, the same shape as in agent-plane, context-cellar, and audio-capture:
 #
 #   docker  the default. `make up` starts a stack from deploy/docker/local.
-#   native  `make dev` builds the frontend and the Go binary and serves them
+#   native  `make dev-up` builds the frontend and the Go binary and serves them
 #           from this checkout, backgrounded, with no image rebuild in the
 #           loop. This is what ./run.sh has always done; the Makefile is now
 #           the way in, and run.sh is the implementation.
@@ -58,7 +58,7 @@ include docker-local.mk
 DEV_START := ./run.sh start
 DEV_STOP := ./run.sh stop
 DEV_RESTART := ./run.sh restart
-DEV_STATUS := ./run.sh status
+DEV_PS := ./run.sh status
 DEV_LOGS := tail -f .run/kode-stream.log
 DEV_BUILD := $(NPM) run build && $(GO) build -o bin/kode-stream ./cmd/kode-stream
 

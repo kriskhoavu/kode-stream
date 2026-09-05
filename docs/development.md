@@ -54,7 +54,7 @@ deployment shape; `make stacks` lists them. Both are thin front doors over the p
 server, [Cloud mode](../deploy/docker/local/cloud-mode/README.md) for the other — which remain the reference for
 what each stack contains and what it needs bootstrapped.
 
-`make dev` starts the same server from source instead, backgrounded, for the edit loop. It is `./run.sh start`
+`make dev-up` starts the same server from source instead, backgrounded, for the edit loop. It is `./run.sh start`
 underneath, and `./run.sh` still works; the Makefile exists so that starting this repository looks the same as
 starting `agent-plane` or `context-cellar`.
 
