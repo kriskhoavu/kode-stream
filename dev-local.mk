@@ -1,7 +1,7 @@
 # Native lane — the project's own binaries and dev servers, no containers.
 #
-# Vendored copy, byte-identical across agent-plane, context-cellar,
-# kode-stream, and audio-capture, for the same reason as docker-local.mk.
+# Vendored copy, byte-identical across every kompas repository, for the same
+# reason as docker-local.mk; the source is control-tower/make/dev-local.mk.
 #
 # Docker is the default way to run a stack; this lane exists for the edit loop,
 # where an image rebuild per keystroke is not affordable. What a native process

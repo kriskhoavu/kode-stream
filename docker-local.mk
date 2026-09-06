@@ -1,9 +1,9 @@
 # Docker lane — every local stack in this repository runs as containers.
 #
-# Vendored copy. The same file sits at the root of agent-plane, context-cellar,
-# and kode-stream, and the three copies must stay byte-identical: the point of
-# the shared lane is that `make up` means the same thing everywhere. Change it
-# in one repository and copy it to the other two.
+# Vendored copy. The source of truth is control-tower/make/docker-local.mk; the
+# same bytes sit at the root of every kompas repository, and
+# `control-tower/scripts/sync-lane.sh --check` proves they still do. Change it
+# there and run the sync; never edit a vendored copy in place.
 #
 # The including Makefile declares the stack table:
 #
