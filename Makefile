@@ -1,6 +1,6 @@
 # Front door for local work in kode-stream.
 #
-# Two lanes, the same shape as in agent-plane, context-cellar, and audio-capture:
+# Two lanes, the same shape as in agent-plane, context-cellar, and etl-plane:
 #
 #   docker  the default. `make up` starts a stack from deploy/docker/local.
 #   native  `make dev-up` builds the frontend and the Go binary and serves them

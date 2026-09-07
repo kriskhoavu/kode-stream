@@ -1,8 +1,8 @@
 # Docker lane — every local stack in this repository runs as containers.
 #
-# Vendored copy. The source of truth is control-tower/make/docker-local.mk; the
+# Vendored copy. The source of truth is ground-plane/make/docker-local.mk; the
 # same bytes sit at the root of every kompas repository, and
-# `control-tower/scripts/sync-lane.sh --check` proves they still do. Change it
+# `ground-plane/scripts/sync-lane.sh --check` proves they still do. Change it
 # there and run the sync; never edit a vendored copy in place.
 #
 # The including Makefile declares the stack table:
