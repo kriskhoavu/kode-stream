@@ -26,10 +26,10 @@ for Markdown edits and Git operations.
 
 ## Capability Boundary
 
-Local Docker mode is still Local mode, but local process integrations run in the container. Git must be available in the
-image and repository credentials must be made available to the container before Git operations can authenticate. Host
-terminal, host AI CLI, native file dialogs, and host path-reveal behavior are not automatically available through the
-container boundary.
+Local Docker mode is still Local mode, but local process integrations run in the container. `git` is installed in the
+image; repository credentials are not, and must be made available to the container before any Git operation that
+authenticates. Host terminal, host AI CLI, native file dialogs, and host path-reveal behavior are not automatically
+available through the container boundary.
 
 `/api/health` reports database status only, so a `datadir` container answers 503 there and never reports healthy even
 while it serves normally. `make health` probes the app root for that reason.

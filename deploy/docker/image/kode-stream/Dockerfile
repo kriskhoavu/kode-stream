@@ -7,7 +7,7 @@ RUN CGO_ENABLED=0 go build -o /out/kode-stream ./cmd/kode-stream
 
 FROM debian:bookworm-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/* && useradd --system --uid 10001 --home /app --shell /usr/sbin/nologin kode-stream && mkdir -p /var/lib/kode-stream && chown kode-stream:kode-stream /var/lib/kode-stream
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git && rm -rf /var/lib/apt/lists/* && useradd --system --uid 10001 --home /app --shell /usr/sbin/nologin kode-stream && mkdir -p /var/lib/kode-stream && chown kode-stream:kode-stream /var/lib/kode-stream
 COPY --from=go-build /out/kode-stream /app/kode-stream
 ENV KODE_STREAM_MODE=cloud
 ENV KODE_STREAM_PORT=4317
