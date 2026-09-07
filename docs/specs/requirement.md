@@ -21,10 +21,12 @@ plans/{service}/{ticket-id}/
 ├── scenario/ # Business context and overall workflow
 │ ├── scenario-00-overview.md
 │ └── scenario-NN-{description}.md
-├── design/
-│ ├── design-0N-backend.md
-│ ├── design-0N-frontend.md
-│ └── design-0N-infrastructure.md
+├── solution/ # Technical design per track (current layout)
+│ ├── solution-0N-backend.md
+│ ├── solution-0N-frontend.md
+│ └── solution-0N-infrastructure.md
+├── design/ # Same role as solution/; earlier plans and UI/UX design documents
+│ └── design-0N-{description}.md
 └── implementation-plan.md # Phase-by-phase with draft commit per phase
 
 Repositories may define their own plan structure through a repository configuration file. When no custom configuration is provided, Kode Stream falls back to the default plans/ structure described above.

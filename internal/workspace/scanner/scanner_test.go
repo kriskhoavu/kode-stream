@@ -48,6 +48,42 @@ func TestNormalizeStatus(t *testing.T) {
 	}
 }
 
+func TestFallbackDocumentsTreatsSolutionFolderAsDesign(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "README.md", "# Test\n")
+	writeTestFile(t, root, "implementation-plan.md", "# Implementation\n")
+	writeTestFile(t, root, "scenario/scenario-00-overview.md", "# Scenario\n")
+	writeTestFile(t, root, "solution/solution-01-backend.md", "# Backend Design\n")
+	writeTestFile(t, root, "solution/solution-02-frontend.md", "# Frontend Design\n")
+	writeTestFile(t, root, "design/design-01-uiux.md", "# UI/UX Design\n")
+
+	reader := NewFilesystemSourceReader(root)
+	docs := fallbackDocuments(reader, "")
+	if len(docs) != 6 {
+		t.Fatalf("expected 6 docs, got %d", len(docs))
+	}
+	paths := []string{"README.md", "scenario/scenario-00-overview.md", "design/design-01-uiux.md", "solution/solution-01-backend.md", "solution/solution-02-frontend.md", "implementation-plan.md"}
+	for i, want := range paths {
+		if docs[i].Path != want {
+			t.Fatalf("document %d = %q, want %q (order %#v)", i, docs[i].Path, want, docs)
+		}
+	}
+	for _, doc := range docs[2:5] {
+		if doc.Role != "design" {
+			t.Fatalf("%s role = %q, want design", doc.Path, doc.Role)
+		}
+	}
+	if docs[3].Label != "Backend Design" || docs[3].Track != "backend" {
+		t.Fatalf("unexpected backend solution metadata: %#v", docs[3])
+	}
+	if docs[4].Label != "Frontend Design" || docs[4].Track != "frontend" {
+		t.Fatalf("unexpected frontend solution metadata: %#v", docs[4])
+	}
+	if docs[2].Label != "Uiux" || docs[2].Track != "" {
+		t.Fatalf("unexpected design folder metadata: %#v", docs[2])
+	}
+}
+
 func TestFallbackDocumentsOrdersKnownPlanFiles(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "README.md", "# Test\n")
