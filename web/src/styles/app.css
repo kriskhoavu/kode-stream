@@ -2095,13 +2095,44 @@ select {
 }
 
 /*
- * The glows are tuned for Neon, whose icons are themselves soft points of
- * colour: the wash reads as more of the same. The lattice is the opposite kind
- * of mark — thin, even, structural — and an uneven colour wash behind it makes
- * the grid look unevenly lit rather than lit at all. Flat ground under it.
+ * Under a band, the page's own glows come off `.main-content` and are repainted
+ * as a shell layer.
+ *
+ * `.main-content` is grid row 2, so its background starts on the topbar's
+ * bottom edge. Without a band that edge is a real one — the topbar has its fill
+ * and its border there — but a band erases the topbar's chrome and is meant to
+ * read as one field from the window's top down, and the wash cut a hard
+ * horizontal seam straight across it.
+ *
+ * The lattice wants no wash at all: its marks are thin, even and structural,
+ * and an uneven colour wash behind them makes the grid look unevenly lit rather
+ * than lit at all. Neon's icons are themselves soft points of colour, so the
+ * wash reads as more of the same — it just has to span the band rather than the
+ * page.
  */
-.app-shell.backdrop-lattice .main-content {
+.app-shell.backdrop-lattice .main-content,
+.app-shell.backdrop-neon .main-content {
   background: var(--bg);
+}
+
+/*
+ * The band's own rows, so it spans the topbar too and stops at `--band-height`;
+ * `align-self: start` is what holds it to that height rather than stretching
+ * down the whole column. Ranked with the backdrop at 1 and earlier in the DOM,
+ * so it paints over `.main-content`'s flat fill and under the icon field, the
+ * page and the topbar.
+ */
+.app-shell.backdrop-neon::before {
+  content: '';
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+  height: var(--band-height, 240px);
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 16% -12%, color-mix(in srgb, var(--blue) 9%, transparent), transparent 38%),
+    radial-gradient(circle at 84% -12%, color-mix(in srgb, var(--blue) 9%, transparent), transparent 38%);
 }
 
 /*
