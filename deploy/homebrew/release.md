@@ -25,7 +25,7 @@ so check it rather than assuming.
 ```bash
 go test ./...                 # must pass; see "macOS-only passes" in Troubleshooting
 npm ci && npm run typecheck && npm test -- --run && npm run build
-grep -c 'artifacts.mgm-tp.com' package-lock.json   # must be 0
+grep -o '"resolved": "https://[^/"]*' package-lock.json | sort -u  # only registry.npmjs.org
 git ls-files --error-unmatch package-lock.json     # must be tracked
 ```
 
@@ -131,7 +131,8 @@ fails before any build step. Commit it; do not switch the workflow to `npm insta
 
 **`npm error Exit handler never called!`** — npm's generic crash, almost never an npm bug here.
 Read the debug log it points at; the real error is inside. On v2.0.0 it was hundreds of
-`ENOTFOUND artifacts.mgm-tp.com` from a lockfile resolved against the internal mirror. Surface it
+`ENOTFOUND` on an internal mirror host, from a lockfile resolved against it rather than the
+public registry. Surface it
 with:
 
 ```yaml
