@@ -68,6 +68,22 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # A lockfile generated behind an internal mirror pins every tarball to
+      # that host: the build then fails wherever the mirror is unreachable, and
+      # the host and the whole dependency list are published with it. Allowlist
+      # rather than denylist, so a mirror nobody thought to name still fails.
+      - name: Lockfile resolves only from the public registry
+        run: |
+          hosts=$(grep -o '"resolved": "https://[^/"]*' package-lock.json \
+                  | sed 's|.*https://||' | sort -u)
+          if [ "$hosts" != "registry.npmjs.org" ]; then
+            echo "package-lock.json resolves from unexpected host(s):" >&2
+            printf '%s\n' "$hosts" >&2
+            echo "Regenerate it against https://registry.npmjs.org/ before releasing." >&2
+            exit 1
+          fi
+          echo "lockfile resolves only from registry.npmjs.org"
+
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
