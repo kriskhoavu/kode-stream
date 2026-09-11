@@ -43,6 +43,7 @@ type API struct {
 	navigation    navigationRoutes
 	system        systemRoutes
 	aiSessions    *aiController
+	sessions      *sessionsController
 	jira          *jiraController
 	knowledge     *knowledgeController
 	verification  *verificationController
@@ -144,6 +145,7 @@ func New(deps Dependencies) *API {
 	recorder := auditRecorder{repository: deps.Audit, reader: auditReader}
 	cloud := &cloudController{runtimeConfig: runtimeConfig, agents: newCloudAgentStore(time.Now, deps.CloudPersistence), workspaces: cloudWorkspaces, providers: newCloudProviderStore(deps.CloudPersistence, runtimeConfig.CookieSecret), audit: deps.Audit, available: true}
 	knowledge := &knowledgeController{knowledge: deps.Knowledge}
+	aiSessionsController := &aiController{aiSessions: deps.AISessions, runtimeConfig: runtimeConfig, cloudWorkspaces: cloudWorkspaces}
 	return &API{
 		workspace: &workspaceController{workspaces: workspaceService, workstream: workstreamService, health: deps.WorkspaceHealth, files: workspaceFiles, contentSearch: contentSearch, runtimeConfig: runtimeConfig, cloudWorkspaces: cloudWorkspaces, cloudProviders: cloud.providers, audit: recorder},
 		item:      &itemController{items: itemService, contentSearch: contentSearch, knowledge: deps.Knowledge, audit: recorder},
@@ -160,7 +162,8 @@ func New(deps Dependencies) *API {
 		}),
 		system:        system.NewController(deps.Dialog),
 		canvas:        &canvasController{canvas: deps.Canvas, workstream: appworkstream.New(deps.WorkspaceRepository, deps.ItemRepository, deps.Scanner, deps.Git)},
-		aiSessions:    &aiController{aiSessions: deps.AISessions, runtimeConfig: runtimeConfig, cloudWorkspaces: cloudWorkspaces},
+		aiSessions:    aiSessionsController,
+		sessions:      &sessionsController{aiController: aiSessionsController},
 		jira:          &jiraController{jira: deps.Jira},
 		knowledge:     knowledge,
 		verification:  &verificationController{workspaces: workspaceService, verification: verificationService},
@@ -211,6 +214,9 @@ func (a *API) initializeControllers() {
 	}
 	if a.aiSessions == nil {
 		a.aiSessions = &aiController{runtimeConfig: a.runtimeConfig, cloudWorkspaces: a.cloud.workspaces}
+	}
+	if a.sessions == nil {
+		a.sessions = &sessionsController{aiController: a.aiSessions}
 	}
 	if a.jira == nil {
 		a.jira = &jiraController{}

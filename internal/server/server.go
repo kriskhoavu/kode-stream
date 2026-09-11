@@ -73,7 +73,7 @@ func NewServer(port int) (*Server, error) {
 	searchService := appsearch.New(idx)
 	navigationStore := state.Navigation
 	sessionManager := ai.NewTerminalManager(ai.Config{})
-	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager).ConfigureSessionRecords(state.SessionRecords, git)
+	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager).ConfigureSessionRecords(state.SessionRecords, git).SetRuntimeMode(runtimeConfig.Mode)
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore).ConfigureCheckout(git)
 	verificationService := verification.NewService(reg, appruntime.NewService())

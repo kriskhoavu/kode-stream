@@ -418,6 +418,26 @@ func TestCommitExists(t *testing.T) {
 	}
 }
 
+// TestCommitExistsPassesThroughNonMissingFailures confirms CommitExistsContext
+// only reports *ErrUnknownCommit for a clean "no such commit" exit (cat-file
+// -e exiting 1); any other failure -- here, running the command outside a
+// Git repository at all, which exits 128 with "fatal: not a git repository"
+// -- must come back as a plain error so a caller can tell "corrupt
+// repository" apart from "commit missing".
+func TestCommitExistsPassesThroughNonMissingFailures(t *testing.T) {
+	root := t.TempDir() // deliberately not a Git repository
+
+	adapter := New()
+	err := adapter.CommitExists(root, "0000000000000000000000000000000000000000")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var unknown *ErrUnknownCommit
+	if errors.As(err, &unknown) {
+		t.Fatalf("err = %v, want a plain error (not a git repository), not *ErrUnknownCommit", err)
+	}
+}
+
 func gitRevParse(t *testing.T, root, ref string) string {
 	t.Helper()
 	out, err := New().run(root, "rev-parse", ref)

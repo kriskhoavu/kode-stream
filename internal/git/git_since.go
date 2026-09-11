@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -427,15 +428,80 @@ func (g *GitAdapter) CommitExists(workspacePath, commit string) error {
 	return g.CommitExistsContext(context.Background(), workspacePath, commit)
 }
 
+// CommitExistsContext checks that commit both exists and names a commit
+// object, using the bare (unpeeled) forms of `git cat-file -e <commit>` and
+// `git cat-file -t <commit>` -- deliberately not the `<commit>^{commit}`
+// peel expression the rest of this file uses, because peeling makes git fail
+// ref resolution itself on a missing object (`fatal: Not a valid object
+// name`, exit 128), which is indistinguishable by exit code from a corrupt
+// repository or any other resolution failure. The bare `-e` form instead
+// exits 1 -- cleanly, with no stderr -- exactly when the object is simply
+// absent, so that is the only case (together with the object existing but
+// not being a commit) that becomes a typed *ErrUnknownCommit; every other
+// outcome (a corrupt repository, a missing git binary, a timeout, a process
+// that could not even start) is returned unchanged so the caller can tell it
+// apart from a merely-absent commit.
 func (g *GitAdapter) CommitExistsContext(ctx context.Context, workspacePath, commit string) error {
 	clean, err := validateRef(commit)
 	if err != nil {
 		return err
 	}
-	if _, err := g.runContextLimited(ctx, workspacePath, 1<<16, "cat-file", "-e", clean+"^{commit}"); err != nil {
-		return &ErrUnknownCommit{Ref: clean, Err: err}
+	exitCode, runErr := g.runExitCode(ctx, workspacePath, "cat-file", "-e", clean)
+	if runErr != nil {
+		return runErr
+	}
+	switch exitCode {
+	case 0:
+		// falls through to the type check below
+	case 1:
+		return &ErrUnknownCommit{Ref: clean, Err: fmt.Errorf("object %q does not exist", clean)}
+	default:
+		return fmt.Errorf("git cat-file -e %s: exited with status %d", clean, exitCode)
+	}
+	objType, err := g.runContextLimited(ctx, workspacePath, 1<<10, "cat-file", "-t", clean)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(string(objType)) != "commit" {
+		return &ErrUnknownCommit{Ref: clean, Err: fmt.Errorf("object %q is not a commit", clean)}
 	}
 	return nil
+}
+
+// runExitCode runs `git <args...>` in dir and reports its exit code without
+// treating a non-zero exit as an error in itself: err is non-nil only when
+// the process could not be run or judged at all (a context cancellation or
+// timeout, or git failing to start), never merely because it exited
+// non-zero. Callers that need to tell "exited 1" apart from "exited 128"
+// apart from "could not run git at all" use this instead of
+// runContextLimited, which collapses all three into one opaque error.
+func (g *GitAdapter) runExitCode(ctx context.Context, dir string, args ...string) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	cctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+	cmd := exec.CommandContext(cctx, "git", args...)
+	cmd.Dir = dir
+	cmd.Stdout = io.Discard
+	stderr := &limitedBuffer{limit: 1 << 20}
+	cmd.Stderr = stderr
+	runErr := cmd.Run()
+	if runErr == nil {
+		return 0, nil
+	}
+	if errors.Is(cctx.Err(), context.Canceled) || errors.Is(cctx.Err(), context.DeadlineExceeded) {
+		return 0, cctx.Err()
+	}
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) {
+		return exitErr.ExitCode(), nil
+	}
+	message := strings.TrimSpace(stderr.String())
+	if message == "" {
+		message = runErr.Error()
+	}
+	return 0, errors.New(message)
 }
 
 // validateRef enforces the shared ref-argument shape: non-empty and never

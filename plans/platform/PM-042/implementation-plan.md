@@ -34,7 +34,7 @@ All code, fields, API params, and TS types must use:
 | Phase | Name                                         | Track      | Status   |
 |-------|----------------------------------------------|------------|----------|
 | B1    | Git since-commit readers                     | Backend    | Complete |
-| B2    | Session changes, global list, and API        | Backend    | Pending  |
+| B2    | Session changes, global list, and API        | Backend    | Complete |
 | F1    | Types, API client, and Focus mode            | Frontend   | Complete |
 | F2    | Workbench Sessions and Changes tabs          | Frontend   | Pending  |
 | F3    | Sessions page                                | Frontend   | Pending  |
@@ -60,11 +60,11 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] `ai.Service.SessionChanges` and `SessionFileDiff` with the availability rules from the design.
-- [ ] `ai.Service.SessionRecordsAcrossWorkspaces` with scope, per-workspace authorization, annotations, and the row cap.
-- [ ] `internal/server/api/sessions.go`: `GET /api/sessions`, `GET /api/sessions/{id}/changes`,
+- [x] `ai.Service.SessionChanges` and `SessionFileDiff` with the availability rules from the design.
+- [x] `ai.Service.SessionRecordsAcrossWorkspaces` with scope, per-workspace authorization, annotations, and the row cap.
+- [x] `internal/server/api/sessions.go`: `GET /api/sessions`, `GET /api/sessions/{id}/changes`,
   `GET /api/sessions/{id}/diff`; route inventory updated.
-- [ ] Tests: changes for each availability case; global list hides denied workspaces; scope filtering; path validation.
+- [x] Tests: changes for each availability case; global list hides denied workspaces; scope filtering; path validation.
 
 **Verification:** `go test ./internal/ai ./internal/server/...`
 
