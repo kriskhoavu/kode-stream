@@ -62,12 +62,12 @@ A successful first release proves this loop:
 
 ## Product Direction After PM-037
 
-| Stage | Direction                             | Candidate Capabilities                                                                |
-|-------|---------------------------------------|---------------------------------------------------------------------------------------|
-| 1     | Dependable personal workbench         | PM-037 MVP workflow                                                                   |
-| 2     | Execution orchestrator                | Cloud Agent execution, worktrees, richer session history, verification lineage        |
-| 3     | Knowledge and coordination surface    | Groups, notes, artifacts, derived relationships, Canvas-only links, multiple canvases |
-| 4     | Collaborative engineering environment | Shared layouts, presence, ownership, handoff, and multi-agent visibility              |
+| Stage | Direction                             | Candidate Capabilities                                                                                        |
+|-------|---------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| 1     | Dependable personal workbench         | PM-037 MVP workflow                                                                                           |
+| 2     | Execution orchestrator                | Cloud Agent execution, PM-042 Session Focus (visibility and cross-workspace management), verification lineage |
+| 3     | Knowledge and coordination surface    | Groups, notes, artifacts, derived relationships, Canvas-only links, multiple canvases                         |
+| 4     | Collaborative engineering environment | Shared layouts, presence, ownership, handoff, and multi-agent visibility                                      |
 
 Later stages must reuse the PM-037 provider, capability, placement, session, and verification contracts rather than add
 deployment-specific branches to Canvas components.

@@ -90,6 +90,28 @@ Sessions page
 - No Cloud Agent execution. The list and changes work for Local checkouts; other content providers report
   `unsupported` for changes.
 
+## Implementation Notes
+
+`web/src/features/sessions/SessionsTable.tsx` and `SessionChangesPanel.tsx` are not unified with
+`web/src/features/canvas/SessionsTable.tsx` and `SessionChangesPanel.tsx`, even though both pairs render a
+`GlobalSessionRow`/`SessionChanges` shape. They were kept separate because they solve different problems that only
+look alike at the type level:
+
+- **Tables.** The Sessions page's table is a flat, workspace-spanning view (Workspace, Branch, Plan, Provider, State,
+  Started, Duration, Changes columns) whose Stop action is caller-driven through a confirm dialog owned by
+  `SessionsPage`. The canvas table is workspace-scoped, ticks its own duration display every second while any row is
+  live, and owns Stop end-to-end (its own confirm dialog and cancel call) so both the Workbench Sessions tab and the
+  session node's Terminal-tab summary can reuse it without re-plumbing a stop flow.
+- **Changes panels.** The Sessions page's panel takes an already-fetched `SessionChanges` value and renders a flat
+  file list. The canvas panel takes a `SafeSessionRecord`, fetches and polls its own changes through
+  `useSessionChanges`, and groups files by status (Added/Modified/Deleted/Renamed/Copied/Untracked) for the
+  Workbench's Changes tab layout.
+
+Unifying them would mean generalizing both the data-fetching contract and the layout, which is more than the small,
+mechanical import change this phase's deliverables call for. If a future phase touches both tables or both panels
+again, that is the point to fold them into one shared component with the fetching and layout differences expressed
+as props.
+
 ## Related Plans
 
 | Ticket                        | Relationship             | Key Context                                                                         |

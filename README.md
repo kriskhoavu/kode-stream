@@ -19,6 +19,8 @@ clearer local Git operations.
 - Launches external or embedded terminal sessions with supported local AI CLIs.
 - Runs verification harness jobs and tracks their status and artifacts.
 - Provides a branch-scoped Canvas for arranging workspace, plan, and durable terminal-session nodes.
+- Lists every AI session across registered workspaces on a dedicated Sessions page, with each session's changes since
+  it launched.
 - Indexes LLM Wiki content and graph relationships for structured knowledge workflows.
 - Stores app registry, cache, audit log, filters, recents, and AI settings outside managed repositories.
 
@@ -94,6 +96,18 @@ Cloud Agent execution, and Remote Snapshot Canvas UX remain future capabilities.
 
 See [Terminal Canvas sessions](docs/domain/terminal/canvas-sessions.md) and
 [verification freshness](docs/domain/verification/canvas-freshness.md) for the safety and lifecycle details.
+
+## Sessions
+
+Choose **Sessions** from the left nav to see every AI session across every registered workspace, not only the one
+open in Canvas. A **Focus** toggle on the Canvas toolbar narrows the board to plans with an active session, their
+session nodes, and the edges between them — everything else dims in place rather than being hidden, so the layout
+never reflows. Each session has a **Changes** view: the files the checkout has changed since the session launched,
+committed history plus working tree, with a per-file diff. Changes are computed from Git on request and are never
+stored; a session carries no transcript.
+
+See [Session Focus](docs/domain/terminal/session-focus.md) for the availability rules and the cross-workspace
+authorization the Sessions page follows.
 
 ## Quick Start
 
@@ -260,14 +274,14 @@ Main files:
 
 Storage configuration:
 
-| Variable                     | Local default                         | Cloud requirement                   |
-|------------------------------|---------------------------------------|-------------------------------------|
-| `KODE_STREAM_STORAGE_OPTION` | `datadir`                             | `database`                          |
-| `KODE_STREAM_STORAGE_DRIVER` | derived from option                   | `postgres`                          |
-| `KODE_STREAM_SQLITE_PATH`    | `<effective-data-dir>/kode-stream.db` | unused                              |
-| `KODE_STREAM_DATABASE_URL`   | unused                                | secret-managed Postgres URL         |
-| `KODE_STREAM_MIGRATIONS`     | `auto`                                | `auto` or operator-managed `manual` |
-| `KODE_STREAM_TRUSTED_PROXY_CIDRS` | unused                           | non-catch-all CIDRs of the header-injecting OAuth proxy |
+| Variable                          | Local default                         | Cloud requirement                                       |
+|-----------------------------------|---------------------------------------|---------------------------------------------------------|
+| `KODE_STREAM_STORAGE_OPTION`      | `datadir`                             | `database`                                              |
+| `KODE_STREAM_STORAGE_DRIVER`      | derived from option                   | `postgres`                                              |
+| `KODE_STREAM_SQLITE_PATH`         | `<effective-data-dir>/kode-stream.db` | unused                                                  |
+| `KODE_STREAM_DATABASE_URL`        | unused                                | secret-managed Postgres URL                             |
+| `KODE_STREAM_MIGRATIONS`          | `auto`                                | `auto` or operator-managed `manual`                     |
+| `KODE_STREAM_TRUSTED_PROXY_CIDRS` | unused                                | non-catch-all CIDRs of the header-injecting OAuth proxy |
 
 Local examples:
 

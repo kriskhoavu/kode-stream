@@ -15,7 +15,7 @@ func TestGinImportsStayInTransportPackage(t *testing.T) {
 			return err
 		}
 		if entry.IsDir() {
-			if entry.Name() == ".git" || entry.Name() == "node_modules" || entry.Name() == "frontend" {
+			if entry.Name() == ".git" || entry.Name() == ".claude" || entry.Name() == "node_modules" || entry.Name() == "frontend" {
 				return filepath.SkipDir
 			}
 			return nil
