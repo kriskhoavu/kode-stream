@@ -363,3 +363,13 @@ function focusLayoutProjection(): CanvasProjection {
 		]
 	};
 }
+
+describe('CanvasBoard sessions entry point', () => {
+	it('offers a Sessions button that opens the workspace sessions view and counts live sessions', () => {
+		const onOpenSessions = vi.fn();
+		renderBoard(baseProjection(), { onOpenSessions });
+		const button = screen.getByRole('button', { name: /^Sessions/ });
+		fireEvent.click(button);
+		expect(onOpenSessions).toHaveBeenCalledTimes(1);
+	});
+});

@@ -22,6 +22,7 @@ interface CanvasNodeData extends Record<string, unknown> {
 	focusOn?: boolean;
 	section?: CanvasSection;
 	onRemoveSection?: (id: string) => void;
+	onOpenSessions?: () => void;
 	onMoveSection?: (id: string, position: CanvasPosition, delta: CanvasPosition) => void;
 }
 
@@ -51,12 +52,13 @@ type CanvasFlowNode = XYNode<CanvasNodeData>;
 
 const nodeTypes = { workspace: memo(WorkspaceCanvasNode), plan: memo(PlanCanvasNode), session: memo(SessionCanvasNode), section: memo(CanvasSectionNode) };
 
-export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onMoveNode, onSetCollapsed, onArrange, serviceGridColumns = 1, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onOpenAISession, aiSessionDisabled = true }: {
+export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onOpenSessions, onMoveNode, onSetCollapsed, onArrange, serviceGridColumns = 1, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onOpenAISession, aiSessionDisabled = true }: {
 	projection: CanvasProjection;
 	sections?: CanvasSection[];
 	conflicts: string[];
 	selectedId?: string;
 	onSelect: (id?: string) => void;
+	onOpenSessions?: () => void;
 	onMoveNode: (id: string, position: CanvasPosition) => void;
 	onSetCollapsed: (id: string, collapsed: boolean) => void;
 	onArrange: (grouping: 'status' | 'service' | 'service_status' | 'service_grid') => void;
@@ -87,6 +89,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	const layoutCapability = projection.nodes.find((node) => node.workspace)?.workspace?.actions['layout.move'];
 	const layoutAvailable = layoutCapability?.state === 'available';
 	const canvasNodes = useMemo(() => projection.nodes.filter((node) => node.kind !== 'workspace'), [projection.nodes]);
+	const liveSessionCount = useMemo(() => projection.nodes.filter((node) => node.session?.record.live && (node.session.record.state === 'starting' || node.session.record.state === 'running')).length, [projection.nodes]);
 	const focusActiveSet = useMemo(() => {
 		const sessionIds = new Set<string>();
 		const planIds = new Set<string>();
@@ -247,6 +250,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 			<div className="canvas-board-toolbar">
 				<CanvasSearch query={searchQuery} onQueryChange={setSearchQuery} />
 				<button className="primary" type="button" disabled={aiSessionDisabled} onClick={onOpenAISession}><Bot size={15} /> AI session</button>
+				{onOpenSessions && <button className="secondary" type="button" title="Browse this branch's sessions and watch one live" onClick={onOpenSessions}><TerminalSquare size={15} /> Sessions{liveSessionCount ? ` (${liveSessionCount})` : ''}</button>}
 				<div className="canvas-focus-control"><button className={focusOn ? 'secondary active' : 'secondary'} type="button" aria-pressed={focusOn} aria-describedby={focusOn ? 'canvas-focus-hint' : undefined} onClick={() => setFocusOn((value) => !value)}>{focusLabel}</button>{focusOn && focusActiveSet.sessionIds.size === 0 && <button className="link-button" type="button" onClick={() => setFocusOn(false)}>Turn off</button>}{focusOn && <span className="canvas-focus-hint" id="canvas-focus-hint">Layout is automatic while Focus is on</span>}</div>
 				{onCreateSection && <button className="secondary" type="button" disabled={sectionSelection.length < 2} title={sectionSelection.length < 2 ? 'Cmd/Ctrl-click or drag-select at least two nodes to create a section.' : 'Create a named section around the selected nodes.'} onClick={() => { onCreateSection(sectionSelection); setSectionSelection([]); }}>Create section{sectionSelection.length ? ` (${sectionSelection.length})` : ''}</button>}
 				{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
