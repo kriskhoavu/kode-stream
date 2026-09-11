@@ -1,8 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../shared/api';
 import type { GlobalSessionRow, GlobalSessionsResponse } from '../../lib/types';
 import { SessionsPage } from './SessionsPage';
+
+vi.mock('../ai-session/EmbeddedTerminal', () => ({
+	EmbeddedTerminal: () => <section data-testid="mock-page-terminal" />
+}));
 
 function row(overrides: Partial<GlobalSessionRow['record']> = {}, rowOverrides: Partial<GlobalSessionRow> = {}): GlobalSessionRow {
 	return {
@@ -30,13 +34,11 @@ function response(rows: GlobalSessionRow[]): GlobalSessionsResponse {
 	return { rows, truncated: false };
 }
 
-function workspaceRow(workspaceName: string, id: string, planTitle: string): GlobalSessionRow {
-	return row({ id, workspaceId: id }, { workspaceName, planTitle });
-}
-
 describe('SessionsPage', () => {
 	beforeEach(() => {
 		localStorage.clear();
+		vi.spyOn(api, 'embeddedAISession').mockResolvedValue({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' });
+		vi.spyOn(api, 'embeddedAISessionGrant').mockResolvedValue({ sessionId: 'session-1', token: 'grant', expiresAt: '' });
 	});
 	afterEach(() => {
 		vi.restoreAllMocks();
@@ -53,11 +55,19 @@ describe('SessionsPage', () => {
 		expect(localStorage.getItem('kodeStream.sessions.scope')).toBe('all');
 	});
 
+	it('renders the Session Browser grouped by workspace and plan', async () => {
+		vi.spyOn(api, 'listSessions').mockResolvedValue(response([row()]));
+		render(<SessionsPage onOpenSession={vi.fn()} onOpenWorkbench={vi.fn()} />);
+		expect(await screen.findByText('Workspace One · Ship the thing')).toBeInTheDocument();
+		await screen.findByTestId('mock-page-terminal');
+	});
+
 	it('opens the Workbench for a row with its session node selected', async () => {
 		vi.spyOn(api, 'listSessions').mockResolvedValue(response([row()]));
 		const onOpenSession = vi.fn();
 		render(<SessionsPage onOpenSession={onOpenSession} onOpenWorkbench={vi.fn()} />);
-		fireEvent.click(await screen.findByRole('button', { name: 'Open Ship the thing in the Workbench' }));
+		await screen.findByTestId('mock-page-terminal');
+		fireEvent.click(screen.getByRole('button', { name: 'Open on board' }));
 		expect(onOpenSession).toHaveBeenCalledWith('workspace-1', 'session:session-1');
 	});
 
@@ -65,23 +75,40 @@ describe('SessionsPage', () => {
 		vi.spyOn(api, 'listSessions').mockResolvedValue(response([row()]));
 		const cancel = vi.spyOn(api, 'cancelEmbeddedAISession').mockResolvedValue({} as never);
 		render(<SessionsPage onOpenSession={vi.fn()} onOpenWorkbench={vi.fn()} />);
-		fireEvent.click(await screen.findByRole('button', { name: 'Stop Ship the thing' }));
-		expect(await screen.findByRole('dialog', { name: 'Stop this session?' })).toBeInTheDocument();
+		await screen.findByTestId('mock-page-terminal');
+		fireEvent.click(screen.getByRole('button', { name: 'Stop Ship the thing session' }));
+		expect(await screen.findByRole('dialog', { name: 'Stop session?' })).toBeInTheDocument();
 		expect(cancel).not.toHaveBeenCalled();
 
 		fireEvent.click(screen.getByRole('button', { name: 'Stop session' }));
 		await waitFor(() => expect(cancel).toHaveBeenCalledWith('session-1'));
-		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Stop this session?' })).not.toBeInTheDocument());
+		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Stop session?' })).not.toBeInTheDocument());
 	});
 
 	it('cancels a stop confirmation without cancelling the session', async () => {
 		vi.spyOn(api, 'listSessions').mockResolvedValue(response([row()]));
 		const cancel = vi.spyOn(api, 'cancelEmbeddedAISession').mockResolvedValue({} as never);
 		render(<SessionsPage onOpenSession={vi.fn()} onOpenWorkbench={vi.fn()} />);
-		fireEvent.click(await screen.findByRole('button', { name: 'Stop Ship the thing' }));
-		fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
-		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Stop this session?' })).not.toBeInTheDocument());
+		await screen.findByTestId('mock-page-terminal');
+		fireEvent.click(screen.getByRole('button', { name: 'Stop Ship the thing session' }));
+		const dialog = await screen.findByRole('dialog');
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 		expect(cancel).not.toHaveBeenCalled();
+	});
+
+	it('shows a stop error and keeps the dialog open when stopping fails', async () => {
+		vi.spyOn(api, 'listSessions').mockResolvedValue(response([row()]));
+		const cancel = vi.spyOn(api, 'cancelEmbeddedAISession').mockRejectedValue(new Error('Could not stop the process.'));
+		render(<SessionsPage onOpenSession={vi.fn()} onOpenWorkbench={vi.fn()} />);
+		await screen.findByTestId('mock-page-terminal');
+		fireEvent.click(screen.getByRole('button', { name: 'Stop Ship the thing session' }));
+		const dialog = await screen.findByRole('dialog');
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Stop session' }));
+
+		expect(await within(dialog).findByRole('alert')).toHaveTextContent('Could not stop the process.');
+		expect(screen.getByRole('dialog')).toBeInTheDocument();
+		expect(cancel).toHaveBeenCalledWith('session-1');
 	});
 
 	it('renders the empty state with a link to the Workbench', async () => {
@@ -91,49 +118,5 @@ describe('SessionsPage', () => {
 		expect(await screen.findByText('No sessions running. Start one from a plan on the Workbench.')).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: /Go to Workbench/ }));
 		expect(onOpenWorkbench).toHaveBeenCalled();
-	});
-
-	it('shows a stop error and keeps the dialog open when stopping fails', async () => {
-		vi.spyOn(api, 'listSessions').mockResolvedValue(response([row()]));
-		const cancel = vi.spyOn(api, 'cancelEmbeddedAISession').mockRejectedValue(new Error('Could not stop the process.'));
-		render(<SessionsPage onOpenSession={vi.fn()} onOpenWorkbench={vi.fn()} />);
-		fireEvent.click(await screen.findByRole('button', { name: 'Stop Ship the thing' }));
-		fireEvent.click(await screen.findByRole('button', { name: 'Stop session' }));
-
-		expect(await screen.findByRole('alert')).toHaveTextContent('Could not stop the process.');
-		expect(screen.getByRole('dialog', { name: 'Stop this session?' })).toBeInTheDocument();
-		expect(cancel).toHaveBeenCalledWith('session-1');
-	});
-
-	it('prunes a workspace filter once its row disappears instead of leaving an invisible filter', async () => {
-		const listSessions = vi.spyOn(api, 'listSessions')
-			.mockResolvedValueOnce(response([workspaceRow('Workspace One', 'session-1', 'Plan One'), workspaceRow('Workspace Two', 'session-2', 'Plan Two')]))
-			.mockResolvedValueOnce(response([workspaceRow('Workspace One', 'session-1', 'Plan One')]));
-		render(<SessionsPage onOpenSession={vi.fn()} onOpenWorkbench={vi.fn()} />);
-		await waitFor(() => expect(listSessions).toHaveBeenCalledTimes(1));
-
-		fireEvent.click(await screen.findByRole('button', { name: 'Workspace Two' }));
-		expect(screen.getByRole('button', { name: 'Workspace Two' })).toHaveAttribute('aria-pressed', 'true');
-		expect(screen.queryByText('Plan One')).not.toBeInTheDocument();
-
-		// Re-query (a scope toggle triggers a reload) with Workspace Two's row gone.
-		fireEvent.click(screen.getByRole('button', { name: 'All' }));
-		await waitFor(() => expect(listSessions).toHaveBeenCalledTimes(2));
-
-		// The stale selection is pruned rather than leaving the table stuck empty.
-		await waitFor(() => expect(screen.queryByRole('button', { name: 'Workspace Two' })).not.toBeInTheDocument());
-		expect(await screen.findByText('Plan One')).toBeInTheDocument();
-	});
-
-	it('offers Clear filters when a filter empties the table, and restores the rows', async () => {
-		vi.spyOn(api, 'listSessions').mockResolvedValue(response([workspaceRow('Workspace One', 'session-1', 'Plan One')]));
-		render(<SessionsPage onOpenSession={vi.fn()} onOpenWorkbench={vi.fn()} />);
-		await screen.findByText('Plan One');
-
-		fireEvent.change(screen.getByRole('searchbox', { name: 'Search sessions' }), { target: { value: 'nonexistent' } });
-		expect(await screen.findByText('No sessions match the current filters.')).toBeInTheDocument();
-
-		fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
-		expect(await screen.findByText('Plan One')).toBeInTheDocument();
 	});
 });

@@ -41,7 +41,7 @@ All code, fields, API params, and TS types must use:
 | F2    | Workbench Sessions and Changes tabs          | Frontend   | Complete    |
 | F3    | Sessions page                                | Frontend   | Complete    |
 | F4    | Focus hides and lays out the active set      | Frontend   | Complete    |
-| F5    | Session browser with live terminal           | Frontend   | Pending     |
+| F5    | Session browser with live terminal           | Frontend   | Complete    |
 | I1    | Browser journey, docs, and final integration | Full stack | In progress |
 
 ## Backend Phases
@@ -148,13 +148,13 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] `features/sessions/SessionBrowser.tsx`: list of grouped cards with state glyphs, text filter, Live-only toggle,
+- [x] `features/sessions/SessionBrowser.tsx`: list of grouped cards with state glyphs, text filter, Live-only toggle,
   keyboard selection, detail pane with Terminal and Changes sub-tabs and Stop.
-- [ ] Workbench Sessions tab renders the browser and widens the panel to a browser width while active.
-- [ ] Sessions page renders the browser at page width grouped by workspace then plan.
-- [ ] Retire `SessionsTable` in both features and the Sessions page drawer; keep `SessionChangesPanel` as the shared
+- [x] Workbench Sessions tab renders the browser and widens the panel to a browser width while active.
+- [x] Sessions page renders the browser at page width grouped by workspace then plan.
+- [x] Retire `SessionsTable` in both features and the Sessions page drawer; keep `SessionChangesPanel` as the shared
   Changes view (one copy, under `features/sessions/`).
-- [ ] Tests: grouping and glyphs per state; filter and Live-only; keyboard selection; terminal attaches only for the
+- [x] Tests: grouping and glyphs per state; filter and Live-only; keyboard selection; terminal attaches only for the
   selected session; Stop confirms; Workbench panel widens on the tab; page renders the browser.
 
 **Verification:** `npm run typecheck && npm test -- --run`

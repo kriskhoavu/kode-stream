@@ -6,12 +6,13 @@ import { AISessionLaunchDialog } from '../ai-session/AISessionLaunchDialog';
 import { E2EQualityPanel } from '../e2e-testing/E2EQualityPanel';
 import { JiraItemPanel } from '../jira/JiraItemPanel';
 import { StatusMenu } from '../../components/StatusMenu';
-import { SessionChangesPanel } from './SessionChangesPanel';
-import { formatSessionDate, isSessionLive, SessionsTable, StopConfirmDialog } from './SessionsTable';
+import { SessionBrowser } from '../sessions/SessionBrowser';
+import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
+import { formatSessionDate, isSessionLive, StopConfirmDialog } from '../sessions/sessionDisplay';
 
 export type WorkbenchTab = 'info' | 'jira' | 'quality' | 'sessions' | 'terminal' | 'changes';
 
-export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen = false, onAISessionDialogOpenChange, onClose, onReload, onSelectNode, onPlaceSession, onOpenFullView, initialTab, onInitialTabApplied, onOpenSession, onViewSessionChanges }: { projection: CanvasProjection; selectedNode?: CanvasNode; aiSessionDialogOpen?: boolean; onAISessionDialogOpenChange?: (open: boolean) => void; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void; initialTab?: WorkbenchTab; onInitialTabApplied?: () => void; onOpenSession?: (sessionId: string) => void; onViewSessionChanges?: (sessionId: string) => void }) {
+export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen = false, onAISessionDialogOpenChange, onClose, onReload, onSelectNode, onPlaceSession, onOpenFullView, initialTab, onInitialTabApplied, onOpenSession }: { projection: CanvasProjection; selectedNode?: CanvasNode; aiSessionDialogOpen?: boolean; onAISessionDialogOpenChange?: (open: boolean) => void; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void; initialTab?: WorkbenchTab; onInitialTabApplied?: () => void; onOpenSession?: (sessionId: string) => void }) {
 	const [rightPanelTab, setRightPanelTab] = useState<WorkbenchTab>('info');
 	const [collapsed, setCollapsed] = useState(false);
 	const [panelWidth, setPanelWidth] = useState(410);
@@ -29,6 +30,17 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 	const verificationContext = selectedNode?.workspace ?? (selectedNode?.plan ? workspaceNode : undefined);
 	const verificationCapability = selectedNode?.plan?.actions['verification.run'] ?? verificationContext?.actions['verification.run'];
 	const itemId = selectedNode?.plan?.itemId;
+	const sessionsTabActive = Boolean(selectedNode?.workspace) && rightPanelTab === 'sessions';
+
+	// Phase F5: the Sessions tab needs room for a live terminal, so it defaults to
+	// 60vw when the tab activates; the resize handle can then widen it up to 90vw
+	// or narrow it down to 45vw (see canvas.css's clamp on .sessions-wide).
+	useEffect(() => {
+		if (!sessionsTabActive) return;
+		const defaultWidth = Math.round(window.innerWidth * 0.6);
+		setPanelWidth(defaultWidth);
+		workbenchRef.current?.style.setProperty('--canvas-workbench-width', `${defaultWidth}px`);
+	}, [sessionsTabActive]);
 
 	const refreshE2ERunbooks = useCallback(async () => {
 		runbooksAbortRef.current?.abort();
@@ -151,9 +163,11 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 		event.preventDefault();
 		const startX = event.clientX;
 		const startingWidth = panelWidth;
+		const maxWidth = sessionsTabActive ? Math.round(window.innerWidth * 0.9) : 520;
+		const minWidth = sessionsTabActive ? Math.round(window.innerWidth * 0.45) : 220;
 		let latestWidth = startingWidth;
 		const onPointerMove = (moveEvent: PointerEvent) => {
-			const nextWidth = Math.min(520, Math.max(220, startingWidth - (moveEvent.clientX - startX)));
+			const nextWidth = Math.min(maxWidth, Math.max(minWidth, startingWidth - (moveEvent.clientX - startX)));
 			latestWidth = nextWidth;
 			workbenchRef.current?.style.setProperty('--canvas-workbench-width', `${nextWidth}px`);
 		};
@@ -169,14 +183,14 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 	};
 	if (!selectedNode) return aiSessionDialogOpen && workspaceNode ? <AISessionLaunchDialog workspaceTarget={{ workspaceId: workspaceNode.id }} embeddedLaunchGuards={{ expectedWorkspaceId: projection.layout.workspaceId, expectedBranch: workspaceNode.branch || projection.layout.branchKey, observedCommit: workspaceNode.commit, idempotencyKey: newIdempotencyKey() }} onClose={() => onAISessionDialogOpenChange?.(false)} onLaunched={sessionLaunched} /> : null;
 
-	return <aside ref={workbenchRef} className={collapsed ? 'canvas-workbench open collapsed' : 'canvas-workbench open'} style={{ '--canvas-workbench-width': `${panelWidth}px` } as React.CSSProperties} aria-label="Canvas Workbench">
+	return <aside ref={workbenchRef} className={collapsed ? 'canvas-workbench open collapsed' : sessionsTabActive ? 'canvas-workbench open sessions-wide' : 'canvas-workbench open'} style={{ '--canvas-workbench-width': `${panelWidth}px` } as React.CSSProperties} aria-label="Canvas Workbench">
 		<header className="panel-header"><h2><Info size={16} /> Workbench</h2><div className="canvas-workbench-header-actions">{!collapsed && selectedNode && (selectedNode.workspace || selectedNode.plan) && onOpenFullView && <button className="primary canvas-workbench-view-details" type="button" onClick={() => onOpenFullView(selectedNode)}>View details</button>}<button type="button" className="icon-button" aria-label={collapsed ? 'Expand workbench' : 'Collapse workbench'} title={collapsed ? 'Expand workbench' : 'Collapse workbench'} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button></div></header>
 		{!collapsed && <>
 		{selectedNode && selectedNode.state !== 'resolved' && <section className="canvas-workbench-section canvas-reference-warning" role="status"><h2>{selectedNode.state === 'forbidden' ? 'Access restricted' : 'Reference unavailable'}</h2><p>{selectedNode.state === 'forbidden' ? 'You no longer have permission to view this entity. Cached titles are hidden.' : 'The entity no longer resolves on this workspace branch. Its placement is retained for recovery.'}</p><button type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh reference</button></section>}
 		{selectedNode?.workspace && <section className="canvas-item-panel canvas-workspace-tabs" aria-label="Workbench"><div className="side-panel-tabs" role="tablist" aria-label="Workbench tabs"><button type="button" className={rightPanelTab === 'info' ? 'active' : ''} aria-selected={rightPanelTab === 'info'} onClick={() => setRightPanelTab('info')}><Info size={14} /> Info</button><button type="button" className={rightPanelTab === 'sessions' ? 'active' : ''} aria-selected={rightPanelTab === 'sessions'} onClick={() => setRightPanelTab('sessions')}><TerminalSquare size={14} /> Sessions</button></div></section>}
 		{selectedNode?.workspace && rightPanelTab === 'info' && <section className="canvas-workbench-section"><h2>Git summary</h2><dl><dt>Branch</dt><dd>{selectedNode.workspace.branch || 'Unavailable'}</dd><dt>HEAD</dt><dd><code>{shortSHA(selectedNode.workspace.commit)}</code></dd><dt>Working tree</dt><dd>{selectedNode.workspace.git?.conflicted ? 'Conflicted' : selectedNode.workspace.git?.dirty ? `${selectedNode.workspace.git.changes.length} changed files` : 'Clean'}</dd></dl><button className="secondary" type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh Git status</button>{launchCapability && launchCapability.state !== 'available' && <p className="canvas-capability-message">{launchCapability.message}</p>}</section>}
 		{selectedNode?.workspace && verificationContext && rightPanelTab === 'info' && <section className="canvas-workbench-section canvas-verification"><h2>Verification</h2>{verificationJob ?? verificationContext.verification ? <VerificationSummary job={verificationJob ?? verificationContext.verification!} /> : <p>No verification result in this application run.</p>}<button className="primary" type="button" disabled={verificationCapability?.state !== 'available' || verifying} title={verificationCapability?.state !== 'available' ? verificationCapability?.message : undefined} onClick={() => void runVerification('smoke')}><Play size={14} /> {verifying ? 'Verifying…' : 'Run smoke verification'}</button></section>}
-		{selectedNode?.workspace && rightPanelTab === 'sessions' && <section className="canvas-workbench-section canvas-workspace-sessions"><CanvasWorkspaceSessionsTab workspaceId={selectedNode.workspace.id} workspaceName={selectedNode.workspace.name} checkoutBranch={selectedNode.workspace.branch} projection={projection} onOpen={(row) => onOpenSession?.(row.record.id)} onChanges={(row) => onViewSessionChanges?.(row.record.id)} onReload={onReload} /></section>}
+		{selectedNode?.workspace && rightPanelTab === 'sessions' && <section className="canvas-workbench-section canvas-workspace-sessions"><CanvasWorkspaceSessionsTab workspaceId={selectedNode.workspace.id} workspaceName={selectedNode.workspace.name} checkoutBranch={selectedNode.workspace.branch} projection={projection} onOpenOnBoard={onOpenSession ? (row) => onOpenSession(row.record.id) : undefined} onReload={onReload} /></section>}
 		{selectedNode?.plan && <section className="canvas-item-panel" aria-label="Workbench"><div className="side-panel-tabs" role="tablist" aria-label="Workbench tabs"><button type="button" className={rightPanelTab === 'info' ? 'active' : ''} aria-selected={rightPanelTab === 'info'} onClick={() => setRightPanelTab('info')}><Info size={14} /> Info</button><button type="button" className={rightPanelTab === 'jira' ? 'active' : ''} aria-selected={rightPanelTab === 'jira'} onClick={() => setRightPanelTab('jira')}><Ticket size={14} /> Jira</button><button type="button" className={rightPanelTab === 'quality' ? 'active' : ''} aria-selected={rightPanelTab === 'quality'} onClick={() => setRightPanelTab('quality')}><GitCompare size={14} /> Quality</button></div>{rightPanelTab === 'info' && <CanvasItemInfo itemId={selectedNode.plan.itemId} node={selectedNode} workspace={verificationContext} onSaved={() => void onReload()} />}{rightPanelTab === 'jira' && <JiraItemPanel itemId={selectedNode.plan.itemId} />}{rightPanelTab === 'quality' && <CanvasQualityPanel itemId={selectedNode.plan.itemId} workspaceId={verificationContext?.id} capability={verificationCapability} job={verificationJob ?? verificationContext?.verification} verifying={verifying} runbooks={e2eRunbooks} onRun={runVerification} onRunAutomation={runAutomationVerification} onRerun={rerunVerification} onRefresh={() => void refreshE2ERunbooks()} />}</section>}
 		{selectedNode?.session && <section className="canvas-item-panel" aria-label="Workbench"><div className="side-panel-tabs" role="tablist" aria-label="Workbench tabs"><button type="button" className={rightPanelTab === 'terminal' ? 'active' : ''} aria-selected={rightPanelTab === 'terminal'} onClick={() => setRightPanelTab('terminal')}><TerminalSquare size={14} /> Terminal</button><button type="button" className={rightPanelTab === 'changes' ? 'active' : ''} aria-selected={rightPanelTab === 'changes'} onClick={() => setRightPanelTab('changes')}><GitCompare size={14} /> Changes</button></div>{rightPanelTab === 'terminal' && <SessionTerminalSummary record={selectedNode.session.record} onReload={onReload} />}{rightPanelTab === 'changes' && <SessionChangesPanel session={selectedNode.session.record} />}</section>}
 		{error && <p className="canvas-workbench-error" role="alert">{error}</p>}
@@ -282,8 +296,8 @@ function SessionTerminalSummary({ record, onReload }: { record: SafeSessionRecor
 	</div>;
 }
 
-/** Workspace node Sessions tab: loads this workspace's checkout sessions and renders the shared SessionsTable. */
-function CanvasWorkspaceSessionsTab({ workspaceId, workspaceName, checkoutBranch, projection, onOpen, onChanges, onReload }: { workspaceId: string; workspaceName?: string; checkoutBranch?: string; projection: CanvasProjection; onOpen: (row: GlobalSessionRow) => void; onChanges: (row: GlobalSessionRow) => void; onReload: () => Promise<unknown> | void }) {
+/** Workspace node Sessions tab: loads this workspace's checkout sessions and renders the shared Session Browser. */
+function CanvasWorkspaceSessionsTab({ workspaceId, workspaceName, checkoutBranch, projection, onOpenOnBoard, onReload }: { workspaceId: string; workspaceName?: string; checkoutBranch?: string; projection: CanvasProjection; onOpenOnBoard?: (row: GlobalSessionRow) => void; onReload: () => Promise<unknown> | void }) {
 	const [records, setRecords] = useState<SafeSessionRecord[]>();
 	const [error, setError] = useState('');
 	const [reloadToken, setReloadToken] = useState(0);
@@ -297,7 +311,12 @@ function CanvasWorkspaceSessionsTab({ workspaceId, workspaceName, checkoutBranch
 	if (error) return <p className="error" role="alert">{error}</p>;
 	if (!records) return <p role="status">Loading sessions…</p>;
 	const rows: GlobalSessionRow[] = records.map((record) => ({ record, workspaceName: workspaceName ?? 'Workspace', checkoutBranch: checkoutBranch ?? '', planTitle: record.planRef ? projection.nodes.find((node) => node.plan?.itemId === record.planRef?.itemId)?.plan?.title : undefined }));
-	return <SessionsTable rows={rows} onOpen={onOpen} onChanges={onChanges} onStopped={() => { setReloadToken((token) => token + 1); void onReload(); }} emptyMessage="No sessions for this workspace and branch." />;
+	const stop = async (row: GlobalSessionRow) => {
+		await api.cancelEmbeddedAISession(row.record.id);
+		setReloadToken((token) => token + 1);
+		await Promise.resolve(onReload());
+	};
+	return <SessionBrowser rows={rows} grouping="plan" persistKey={`workbench:${workspaceId}`} onStop={stop} onReload={onReload} onOpenOnBoard={onOpenOnBoard} emptyMessage="No sessions for this workspace and branch." />;
 }
 
 function shortSHA(value?: string) { return value ? value.slice(0, 8) : 'Unavailable'; }

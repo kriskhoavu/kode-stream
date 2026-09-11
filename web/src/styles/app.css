@@ -8293,7 +8293,7 @@ body.is-resizing-panel {
   }
 }
 
-/* Sessions page (Phase F3) */
+/* Session Browser: Workbench Sessions tab + Sessions page (Phase F5) */
 
 .sessions-page-header {
   margin-bottom: 14px;
@@ -8306,41 +8306,6 @@ body.is-resizing-panel {
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 10px;
-}
-
-.sessions-search {
-  min-width: 240px;
-  max-width: 360px;
-  flex: 1;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  color: inherit;
-}
-
-.sessions-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
-.sessions-filter-chip {
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel);
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.sessions-filter-chip.active {
-  background: var(--button-accent);
-  color: #ffffff;
-  border-color: var(--button-accent);
 }
 
 .sessions-state,
@@ -8356,152 +8321,381 @@ body.is-resizing-panel {
   gap: 10px;
 }
 
-.sessions-table {
-  width: 100%;
-  border-collapse: collapse;
+.session-browser {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 0;
+  min-height: 420px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
+  border-radius: 10px;
   background: var(--panel);
+  overflow: hidden;
 }
 
-.sessions-table th,
-.sessions-table td {
-  text-align: left;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-  font-size: 13px;
-}
-
-.sessions-table th {
-  color: var(--muted);
-  font-weight: 600;
+.session-browser-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
   background: var(--panel-soft);
 }
 
-.sessions-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.sessions-table-actions {
+.session-browser-toolbar {
   display: flex;
-  gap: 6px;
-  justify-content: flex-end;
-  white-space: nowrap;
+  gap: 8px;
+  align-items: center;
 }
 
-.session-state {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
+.session-browser-filter {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: inherit;
+  font-size: 13px;
+}
+
+.session-browser-live-toggle {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--muted) 14%, var(--panel));
+  background: var(--panel);
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.session-state-running,
-.session-state-starting {
-  background: color-mix(in srgb, var(--blue) 16%, var(--panel));
-  color: var(--blue);
+.session-browser-live-toggle.active {
+  background: var(--button-accent);
+  color: var(--accent-contrast);
+  border-color: var(--button-accent);
 }
 
-.session-state-failed {
-  background: color-mix(in srgb, var(--danger) 16%, var(--panel));
-  color: var(--danger);
+.session-browser-empty {
+  margin: 0;
+  padding: 16px 4px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
-.session-changes-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgba(17, 24, 39, .28);
-}
-
-.session-changes-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 61;
-  width: min(520px, calc(100vw - 24px));
-  background: var(--panel);
-  border-left: 1px solid var(--line);
-  box-shadow: -18px 0 42px rgba(17, 24, 39, .16);
+.session-browser-group {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow-y: auto;
-  padding: 20px;
-  gap: 12px;
+  gap: 6px;
 }
 
-.session-changes-drawer header {
+.session-browser-group-title {
+  margin: 4px 2px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--muted);
+}
+
+.session-browser-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.session-card-item {
+  display: block;
+}
+
+.session-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  text-align: left;
+}
+
+.session-card:hover {
+  border-color: color-mix(in srgb, var(--button-accent) 40%, var(--line));
+}
+
+.session-card.selected,
+.session-card[aria-current="true"] {
+  border-color: var(--button-accent);
+  background: color-mix(in srgb, var(--button-accent) 8%, var(--panel));
+}
+
+.session-card-glyph {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+}
+
+.session-card-glyph.glyph-dot.tone-success { background: var(--green); }
+.session-card-glyph.glyph-dot.tone-danger { background: var(--danger); }
+.session-card-glyph.glyph-dot.tone-neutral { background: var(--muted); }
+
+.session-card-glyph.glyph-spinner {
+  border: 2px solid color-mix(in srgb, var(--blue) 30%, transparent);
+  border-top-color: var(--blue);
+  width: 10px;
+  height: 10px;
+  animation: session-card-spin .8s linear infinite;
+}
+
+@keyframes session-card-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-card-glyph.glyph-spinner {
+    animation: none;
+    border-top-color: color-mix(in srgb, var(--blue) 30%, transparent);
+    background: var(--blue);
+  }
+}
+
+.session-card-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.session-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.session-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.session-card-state {
+  font-weight: 600;
+}
+
+.session-browser-detail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.session-browser-detail-empty {
+  margin: auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.session-browser-detail-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.session-browser-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.session-browser-detail-header h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.session-browser-detail-header dl {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.session-browser-detail-header dt {
+  color: var(--muted);
+}
+
+.session-browser-detail-header dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.session-browser-detail-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.session-browser-terminal {
+  flex: 1;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.session-browser-terminal .embedded-terminal-panel.active {
+  height: 100%;
+  min-height: 320px;
+}
+
+.session-browser-terminal-lifecycle {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  color: var(--muted);
+}
+
+.session-browser-terminal-lifecycle strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.session-browser-terminal-lifecycle p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.session-browser-terminal-error {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 16px;
+  color: var(--danger);
 }
 
+.session-browser-terminal-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px;
+}
+
+.session-browser-terminal-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* SessionChangesPanel (moved to features/sessions in Phase F5): rendered both
+   inside the Canvas Workbench (where canvas.css also loads) and on the
+   Sessions page, which never loads canvas.css, so its styles live here. */
+
 .session-changes-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 18px;
+}
+
+.session-changes-header {
+  margin: 0;
+  font-weight: 600;
+}
+
+.session-changes-note,
+.session-changes-truncated {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.session-changes-body {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+  gap: 14px;
+  min-height: 0;
+}
+
+.session-changes-file-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: grid;
   gap: 10px;
   align-content: start;
 }
 
-.session-changes-summary {
+.session-changes-file-list h3 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .02em;
   color: var(--muted);
 }
 
-.session-changes-note {
-  color: var(--muted);
-}
-
-.session-changes-files {
-  list-style: none;
+.session-changes-file-list ul {
   margin: 0;
   padding: 0;
+  list-style: none;
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
-.session-changes-file {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.session-changes-file-list button {
   width: 100%;
-  min-height: 32px;
-  padding: 0 8px;
-  border: 1px solid transparent;
+  padding: 4px 6px;
+  border: none;
   border-radius: 6px;
-  background: transparent;
+  background: none;
+  color: var(--text);
+  font-size: 12px;
   text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
 }
 
-.session-changes-file:hover,
-.session-changes-file.active {
+.session-changes-file-list button:hover,
+.session-changes-file-list button.active {
   background: var(--panel-soft);
-  border-color: var(--line);
-}
-
-.session-file-status {
-  display: inline-flex;
-  min-width: 18px;
-  justify-content: center;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.session-changes-diff {
-  padding: 8px 8px 8px 26px;
 }
 
 .session-changes-diff pre {
-  max-height: 320px;
+  margin: 0;
+  max-height: 420px;
   overflow: auto;
-  background: var(--panel-soft);
-  border: 1px solid var(--line);
-  border-radius: 6px;
   padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  font-size: 11px;
+  white-space: pre;
+}
+
+.session-changes-unavailable p {
+  margin: 0;
+  padding: 16px;
+  color: var(--muted);
   font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .session-browser {
+    grid-template-columns: 1fr;
+  }
+
+  .session-browser-list {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    max-height: 40vh;
+  }
 }

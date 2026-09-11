@@ -1,99 +1,106 @@
-import { useEffect, useState } from 'react';
-import type { SessionChanges, SessionFile } from '../../lib/types';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../../shared/api';
+import type { SafeSessionRecord, SessionChanges, SessionFile, SessionFileStatus } from '../../lib/types';
+import { isSessionLive } from './sessionDisplay';
+import { useSessionChanges } from './useSessionChanges';
 
-const availabilityMessages: Record<SessionChanges['availability'], string> = {
-	available: '',
-	unavailable: 'Changes are not available for this session.',
-	unsupported: 'Changes are not supported for this workspace.'
-};
+const STATUS_ORDER: SessionFileStatus[] = ['A', 'M', 'D', 'R', 'C', '?'];
+const STATUS_LABEL: Record<SessionFileStatus, string> = { A: 'Added', M: 'Modified', D: 'Deleted', R: 'Renamed', C: 'Copied', '?': 'Untracked' };
 
-const reasonMessages: Record<NonNullable<SessionChanges['reason']>, string> = {
-	launch_commit_unknown: 'The session did not record a launch commit.',
-	launch_commit_missing: 'The launch commit no longer exists in this checkout.',
-	workspace_missing: 'The workspace checkout is missing.',
-	content_provider_unsupported: 'This workspace does not use a local checkout.'
-};
-
-/**
- * The changes panel for one session: what its checkout has done since the
- * session's launch commit. This duplicates the Workbench's own Changes tab
- * built in Phase F2 (both render a SessionChanges value); the two are meant
- * to be unified onto one shared component in Phase I1 once F2 lands.
- */
-export function SessionChangesPanel({ sessionId, changes }: { sessionId: string; changes: SessionChanges }) {
-	const [openPath, setOpenPath] = useState<string>();
-	const [diff, setDiff] = useState('');
-	const [diffTruncated, setDiffTruncated] = useState(false);
-	const [diffError, setDiffError] = useState('');
-	const [diffLoading, setDiffLoading] = useState(false);
-
-	useEffect(() => {
-		setOpenPath(undefined);
-		setDiff('');
-		setDiffError('');
-	}, [sessionId]);
-
-	useEffect(() => {
-		if (!openPath) return;
-		let cancelled = false;
-		setDiffLoading(true);
-		setDiffError('');
-		setDiffTruncated(false);
-		api.sessionFileDiff(sessionId, openPath).then((result) => {
-			if (cancelled) return;
-			setDiff(result.diff);
-			setDiffTruncated(result.truncated);
-		}).catch((caught: unknown) => {
-			if (cancelled) return;
-			setDiff('');
-			setDiffTruncated(false);
-			setDiffError(caught instanceof Error ? caught.message : 'Could not load the diff.');
-		}).finally(() => {
-			if (!cancelled) setDiffLoading(false);
-		});
-		return () => { cancelled = true; };
-	}, [sessionId, openPath]);
-
-	if (changes.availability !== 'available') {
-		return (
-			<div className="session-changes-panel">
-				<p className="session-changes-note">{availabilityMessages[changes.availability]} {changes.reason ? reasonMessages[changes.reason] : ''}</p>
-			</div>
-		);
-	}
-
-	return (
-		<div className="session-changes-panel">
-			<p className="session-changes-summary">
-				{changes.files.length} file{changes.files.length === 1 ? '' : 's'} changed since <code>{changes.launchCommit.slice(0, 12)}</code>
-				{changes.headMoved > 0 ? `, head has moved ${changes.headMoved} commit${changes.headMoved === 1 ? '' : 's'}` : ''}
-				{' · '}+{changes.additions} / -{changes.deletions}
-			</p>
-			{changes.truncated && <p className="session-changes-note">The file list was truncated.</p>}
-			{changes.files.length === 0 && <p className="session-changes-note">No changes since the session launched.</p>}
-			<ul className="session-changes-files">
-				{changes.files.map((file) => (
-					<li key={file.path}>
-						<button type="button" className={openPath === file.path ? 'session-changes-file active' : 'session-changes-file'} onClick={() => setOpenPath(file.path === openPath ? undefined : file.path)} aria-expanded={openPath === file.path}>
-							<span className={`session-file-status session-file-status-${file.status}`}>{file.status}</span>
-							<span>{fileLabel(file)}</span>
-						</button>
-						{openPath === file.path && (
-							<div className="session-changes-diff">
-								{diffLoading && <p className="session-changes-note">Loading diff…</p>}
-								{diffError && <p className="session-changes-note" role="alert">{diffError}</p>}
-								{!diffLoading && !diffError && <pre>{diff || 'No textual diff available.'}</pre>}
-								{diffTruncated && <p className="session-changes-note">The diff was truncated.</p>}
-							</div>
-						)}
-					</li>
-				))}
-			</ul>
-		</div>
-	);
+function pluralize(count: number, word: string): string {
+	return `${count} ${word}${count === 1 ? '' : 's'}`;
 }
 
-function fileLabel(file: SessionFile): string {
-	return file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
+function headerLine(changes: SessionChanges): string {
+	return `+${changes.additions ?? 0} −${changes.deletions ?? 0} · ${pluralize((changes.files ?? []).length, 'file')} · HEAD moved ${pluralize(changes.headMoved ?? 0, 'commit')}`;
+}
+
+function availabilityMessage(changes: SessionChanges): string {
+	if (changes.availability === 'unsupported') return "Changes are not available for this workspace's content provider.";
+	switch (changes.reason) {
+		case 'workspace_missing': return 'The workspace checkout is missing, so changes cannot be computed.';
+		case 'launch_commit_unknown': return "The session's launch commit is unknown, so changes cannot be computed.";
+		case 'launch_commit_missing': return "The session's launch commit is no longer in the checkout's history, so changes cannot be computed.";
+		default: return 'Changes are unavailable for this session.';
+	}
+}
+
+function groupFiles(files: SessionFile[]) {
+	return STATUS_ORDER.map((status) => ({ status, label: STATUS_LABEL[status], files: files.filter((file) => file.status === status) })).filter((group) => group.files.length > 0);
+}
+
+/**
+ * The session node's Changes tab: header stats, availability/reason text
+ * when changes cannot be computed, a truncation note, and a file list
+ * grouped by status whose selection loads a unified diff.
+ */
+export function SessionChangesPanel({ session }: { session: SafeSessionRecord }) {
+	const live = isSessionLive(session);
+	const { changes, loading, error } = useSessionChanges(session.id, live);
+	const [selectedPath, setSelectedPath] = useState<string>();
+	const [diff, setDiff] = useState<{ path: string; diff: string; truncated: boolean }>();
+	const [diffLoading, setDiffLoading] = useState(false);
+	const [diffError, setDiffError] = useState('');
+	const diffTokenRef = useRef(0);
+
+	useEffect(() => {
+		diffTokenRef.current += 1;
+		setSelectedPath(undefined);
+		setDiff(undefined);
+		setDiffError('');
+	}, [session.id]);
+
+	const openFile = (path: string) => {
+		setSelectedPath(path);
+		setDiff(undefined);
+		setDiffError('');
+		setDiffLoading(true);
+		const token = ++diffTokenRef.current;
+		api.sessionFileDiff(session.id, path).then((result) => {
+			if (diffTokenRef.current !== token) return;
+			setDiff(result);
+		}).catch((caught) => {
+			if (diffTokenRef.current !== token) return;
+			setDiffError(caught instanceof Error ? caught.message : 'The diff could not be loaded.');
+		}).finally(() => {
+			if (diffTokenRef.current !== token) return;
+			setDiffLoading(false);
+		});
+	};
+
+	if (loading && !changes) return <p role="status">Loading changes…</p>;
+	if (!changes) {
+		if (error) return <p className="error" role="alert">{error}</p>;
+		return null;
+	}
+
+	if (changes.availability !== 'available') {
+		return <div className="session-changes-panel session-changes-unavailable">
+			{error && <p className="error" role="alert">{error}</p>}
+			<p>{availabilityMessage(changes)}</p>
+		</div>;
+	}
+
+	const groups = groupFiles(changes.files ?? []);
+
+	return <div className="session-changes-panel">
+		{error && <p className="error" role="alert">{error}</p>}
+		<p className="session-changes-header">{headerLine(changes)}</p>
+		<p className="session-changes-note">Changes since launch include work by any session in this checkout.</p>
+		{changes.truncated && <p className="session-changes-truncated">Only the first files are shown; more files changed than are listed here.</p>}
+		<div className="session-changes-body">
+			<ul className="session-changes-file-list" aria-label="Changed files">
+				{groups.map((group) => <li key={group.status}><h3>{group.label}</h3><ul>{group.files.map((file) => <li key={file.path}><button type="button" aria-pressed={selectedPath === file.path} className={selectedPath === file.path ? 'active' : ''} onClick={() => openFile(file.path)}>{file.path}</button></li>)}</ul></li>)}
+			</ul>
+			<div className="session-changes-diff">
+				{!selectedPath && <p className="session-changes-note">Select a file to view its diff.</p>}
+				{selectedPath && diffLoading && <p role="status">Loading diff…</p>}
+				{selectedPath && diffError && <p className="error" role="alert">{diffError}</p>}
+				{selectedPath && diff && <>
+					{diff.truncated && <p className="session-changes-truncated">This diff is truncated.</p>}
+					<pre>{diff.diff}</pre>
+				</>}
+			</div>
+		</div>
+	</div>;
 }

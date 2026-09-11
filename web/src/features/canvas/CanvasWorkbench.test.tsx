@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../shared/api';
 import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult, SafeSessionRecord } from '../../lib/types';
@@ -10,6 +10,9 @@ vi.mock('../../shared/api', async () => {
 });
 vi.mock('../ai-session/AISessionLaunchDialog', () => ({
 	AISessionLaunchDialog: ({ onLaunched }: { onLaunched: (result: EmbeddedAISessionResult, input: { provider: string; terminal: string; contextMode: 'card_context'; surface: 'embedded' }) => void }) => <button type="button" aria-label="Complete embedded AI session" onClick={() => onLaunched({ session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }, grant: { sessionId: 'session-1', token: 'grant', expiresAt: '' } }, { provider: 'codex', terminal: 'terminal', contextMode: 'card_context', surface: 'embedded' })}>Complete embedded AI session</button>
+}));
+vi.mock('../ai-session/EmbeddedTerminal', () => ({
+	EmbeddedTerminal: ({ initial, visible }: { initial: EmbeddedAISessionResult; visible: boolean }) => <section data-testid={`workbench-terminal-${initial.session.id}`} data-visible={String(visible)} />
 }));
 describe('CanvasWorkbench', () => {
 	beforeEach(() => {
@@ -114,8 +117,38 @@ describe('CanvasWorkbench', () => {
 		expect(screen.getByRole('button', { name: 'Info' })).toHaveClass('active');
 		expect(screen.getByRole('button', { name: 'Sessions' })).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
-		expect(await screen.findByRole('table')).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Open codex session' })).toBeInTheDocument();
+		expect(await screen.findByRole('button', { name: 'card_context, Running' })).toBeInTheDocument();
+		await screen.findByTestId('workbench-terminal-session-1');
+	});
+
+	it('widens the Workbench panel while the Sessions tab is active, and reverts once another tab is selected', async () => {
+		vi.mocked(api.aiSessionRecords).mockResolvedValue([]);
+		const workspace = workspaceNode();
+		renderWorkbench(workspace);
+		expect(screen.getByLabelText('Canvas Workbench')).not.toHaveClass('sessions-wide');
+		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
+		await screen.findByText('No sessions for this workspace and branch.');
+		expect(screen.getByLabelText('Canvas Workbench')).toHaveClass('sessions-wide');
+		fireEvent.click(screen.getByRole('button', { name: 'Info' }));
+		expect(screen.getByLabelText('Canvas Workbench')).not.toHaveClass('sessions-wide');
+	});
+
+	it('lets the resize handle widen the panel past the usual pixel cap while the Sessions tab is active', async () => {
+		vi.mocked(api.aiSessionRecords).mockResolvedValue([]);
+		const workspace = workspaceNode();
+		renderWorkbench(workspace);
+		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
+		await screen.findByText('No sessions for this workspace and branch.');
+		const aside = screen.getByLabelText('Canvas Workbench');
+		const defaultWidth = parseInt(aside.style.getPropertyValue('--canvas-workbench-width'), 10);
+		expect(defaultWidth).toBeGreaterThan(520); // the Sessions tab already defaults wider than the old fixed cap.
+		const handle = screen.getByRole('button', { name: 'Resize Workbench panel' });
+		fireEvent(handle, pointerEventWithClientX('pointerdown', 500));
+		act(() => { window.dispatchEvent(pointerEventWithClientX('pointermove', 50)); });
+		act(() => { window.dispatchEvent(pointerEventWithClientX('pointerup', 50)); });
+		const widenedWidth = parseInt(aside.style.getPropertyValue('--canvas-workbench-width'), 10);
+		expect(widenedWidth).toBeGreaterThan(defaultWidth);
+		expect(widenedWidth).toBeGreaterThan(520);
 	});
 
 	it('opens the session node with Terminal selected by default and Changes available', async () => {
@@ -149,25 +182,37 @@ describe('CanvasWorkbench', () => {
 		const workspace = workspaceNode();
 		renderWorkbench(workspace);
 		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
-		expect(await screen.findByRole('button', { name: 'Open codex session' })).toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: 'Stop codex session' }));
+		expect(await screen.findByRole('button', { name: 'card_context, Running' })).toBeInTheDocument();
+		await screen.findByTestId('workbench-terminal-session-1');
+		fireEvent.click(screen.getByRole('button', { name: 'Stop card_context session' }));
 		const dialog = await screen.findByRole('dialog');
 		fireEvent.click(within(dialog).getByRole('button', { name: 'Stop session' }));
 		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
 		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalledTimes(2));
-		expect(screen.queryByRole('button', { name: 'Open codex session' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'card_context, Running' })).not.toBeInTheDocument();
 	});
 
-	it('opens a session from the Sessions tab and selects it', async () => {
+	it('opens a session on the board from the Sessions tab', async () => {
 		vi.mocked(api.aiSessionRecords).mockResolvedValue([sessionRecord()]);
 		const onOpenSession = vi.fn();
 		const workspace = workspaceNode();
 		renderWorkbench(workspace, { onOpenSession });
 		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
-		fireEvent.click(await screen.findByRole('button', { name: 'Open codex session' }));
+		await screen.findByRole('button', { name: 'card_context, Running' });
+		await screen.findByTestId('workbench-terminal-session-1');
+		fireEvent.click(screen.getByRole('button', { name: 'Open on board' }));
 		expect(onOpenSession).toHaveBeenCalledWith('session-1');
 	});
 });
+
+// jsdom has no PointerEvent constructor, so the resize drag (a plain
+// window pointermove/pointerup listener pair, not a React handler) is
+// exercised with a bare Event carrying a manually attached clientX.
+function pointerEventWithClientX(type: string, clientX: number) {
+	const event = new Event(type, { bubbles: true, cancelable: true });
+	Object.defineProperty(event, 'clientX', { value: clientX });
+	return event;
+}
 
 function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.ComponentProps<typeof CanvasWorkbench>> = {}) {
 	const projection = baseProjection([planNode(), selectedNode]);

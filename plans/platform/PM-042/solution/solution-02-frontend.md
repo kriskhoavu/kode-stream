@@ -80,7 +80,7 @@ list of cards on the left, the live terminal of the selected one on the right.
 | Element | Behaviour                                                                                                                       |
 |---------|---------------------------------------------------------------------------------------------------------------------------------|
 | Scope   | Segmented control Active / All; default Active; persisted per browser.                                                          |
-| Filters | Workspace multi-select; provider multi-select; text search over plan title and intent.                                          |
+| Filters | The Session Browser's own text filter (title, provider, plan) and its Live-only toggle, on by default when any session is live. |
 | Browser | The Session Browser at page width, grouped by workspace then plan; the selected session's terminal is live in the detail pane.  |
 | Actions | Open on the board navigates to the Workbench with the session selected; Stop confirms and cancels; Changes is a detail sub-tab. |
 | Live    | Polls every 5s while any row is live; a row that stops shows its exit code inline.                                              |
@@ -90,14 +90,16 @@ list of cards on the left, the live terminal of the selected one on the right.
 
 - Focus toggle is a button with `aria-pressed`; dimmed nodes stay in the accessibility tree with `aria-hidden` false
   but are marked "inactive" in their label.
-- Tables use `<table>` with header cells; row actions are buttons with explicit labels including the plan title.
+- The card list uses a roving `tabindex`: the selected card if it is visible, else the first visible card, so the
+  list stays keyboard-reachable when a filter hides the selection; the selected card also carries `aria-current`.
+  Each card pairs a state glyph with a text label rather than colour alone.
 - Stop confirmations are dialogs with focus trap and Cancel default.
 
 ## Design Decisions
 
-| Decision                                   | Rationale                                                                          |
-|--------------------------------------------|------------------------------------------------------------------------------------|
-| One `SessionsTable` for Workbench and page | Same columns and actions; the only difference is the data source.                  |
-| Dim, do not hide                           | Keeps positions and avoids React Flow re-layout, which is what made sections slow. |
-| Workbench opens for a session node         | Changes need a home; the terminal remains in the node to keep one process surface. |
-| Poll at 5s only while live                 | Matches existing Canvas behaviour; nothing polls when nothing runs.                |
+| Decision                                   | Rationale                                                                                                  |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| One Session Browser for Workbench and page | Same cards, filter and detail pane; only the grouping (plan vs. workspace-plan) and the row source differ. |
+| Dim, do not hide                           | Keeps positions and avoids React Flow re-layout, which is what made sections slow.                         |
+| Workbench opens for a session node         | Changes need a home; the terminal remains in the node to keep one process surface.                         |
+| Poll at 5s only while live                 | Matches existing Canvas behaviour; nothing polls when nothing runs.                                        |

@@ -436,13 +436,31 @@ function NodeFrame({ data, eyebrow, icon, children, addon, action, expanded = fa
 	</div>;
 }
 
-function CanvasSessionTerminal({ record, visible, onClose, onReload }: { record: SafeSessionRecord; visible: boolean; onClose: () => void; onReload: () => Promise<unknown> | void }) {
+/**
+ * Reattaches to a session's live terminal. Shared by the Canvas session
+ * node (a draggable graph node, hence the `nodrag nopan nowheel` classes and
+ * the click/pointerdown guards below) and the Session Browser's detail pane
+ * (via `SessionBrowserTerminal`, a thin wrapper that supplies its own
+ * `classPrefix`); `visible` follows the same shape in both so only the
+ * selected/expanded session ever attaches.
+ */
+export function CanvasSessionTerminal({ record, visible, onClose = () => {}, onReload, classPrefix = 'canvas-session-terminal', ariaLabel }: { record: SafeSessionRecord; visible: boolean; onClose?: () => void; onReload: () => Promise<unknown> | void; classPrefix?: string; ariaLabel?: string }) {
 	const [result, setResult] = useState<EmbeddedAISessionResult>();
 	const [attaching, setAttaching] = useState(false);
 	const [error, setError] = useState('');
 	const [retry, setRetry] = useState(0);
 	const attempted = useRef(-1);
 	const active = record.state === 'starting' || record.state === 'running';
+
+	// A different record (e.g. the Session Browser's selection changing to
+	// another session) re-attaches from scratch instead of carrying over the
+	// previous session's terminal state.
+	useEffect(() => {
+		setResult(undefined);
+		setError('');
+		attempted.current = -1;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [record.id]);
 
 	useEffect(() => {
 		if (!visible || !record.live || result || attempted.current === retry) return;
@@ -470,12 +488,12 @@ function CanvasSessionTerminal({ record, visible, onClose, onReload }: { record:
 		if (state !== 'starting' && state !== 'running') void onReload();
 	};
 
-	return <section className="canvas-session-terminal nodrag nopan nowheel" hidden={!visible} aria-label={`${record.provider} Canvas terminal`} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+	return <section className={`${classPrefix} nodrag nopan nowheel`} hidden={!visible} aria-label={ariaLabel ?? `${record.provider} Canvas terminal`} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
 		{result && <EmbeddedTerminal initial={result} visible={visible} mode="side_panel" title={`${record.provider} terminal`} subtitle={record.requestedBranch} cancelOnClose={false} compact onStartMove={() => {}} onToggleDockMode={() => {}} onToggleMinimize={() => {}} onToggleMaximize={() => {}} onClose={onClose} onStateChange={stateChanged} />}
 		{attaching && <p role="status">Connecting to terminal…</p>}
-		{!record.live && <div className="canvas-session-lifecycle"><strong>Terminal session {record.state}</strong><span>Branch {record.requestedBranch}</span>{record.exitCode !== undefined && <span>Exit code {record.exitCode}</span>}{record.state === 'interrupted' && <p>The application restarted without this process. Reconnect is unavailable; launch a new session.</p>}</div>}
-		{error && <div className="canvas-session-terminal-error" role="alert"><span>{error}</span>{record.live && <button type="button" onClick={() => { setError(''); setRetry((value) => value + 1); }}>Retry connection</button>}</div>}
-		{active && <div className="canvas-session-terminal-actions"><button className="danger-confirm" type="button" onClick={() => void cancel()}><Square size={13} /> Cancel process</button></div>}
+		{!record.live && <div className={`${classPrefix}-lifecycle`}><strong>Terminal session {record.state}</strong><span>Branch {record.requestedBranch}</span>{record.exitCode !== undefined && <span>Exit code {record.exitCode}</span>}{record.state === 'interrupted' && <p>The application restarted without this process. Reconnect is unavailable; launch a new session.</p>}</div>}
+		{error && <div className={`${classPrefix}-error`} role="alert"><span>{error}</span>{record.live && <button type="button" onClick={() => { setError(''); setRetry((value) => value + 1); }}>Retry connection</button>}</div>}
+		{active && <div className={`${classPrefix}-actions`}><button className="danger-confirm" type="button" onClick={() => void cancel()}><Square size={13} /> Cancel process</button></div>}
 	</section>;
 }
 
