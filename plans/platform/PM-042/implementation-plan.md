@@ -33,16 +33,16 @@ All code, fields, API params, and TS types must use:
 
 ## Phases Summary
 
-| Phase | Name                                         | Track      | Status      |
-|-------|----------------------------------------------|------------|-------------|
-| B1    | Git since-commit readers                     | Backend    | Complete    |
-| B2    | Session changes, global list, and API        | Backend    | Complete    |
-| F1    | Types, API client, and Focus mode            | Frontend   | Complete    |
-| F2    | Workbench Sessions and Changes tabs          | Frontend   | Complete    |
-| F3    | Sessions page                                | Frontend   | Complete    |
-| F4    | Focus hides and lays out the active set      | Frontend   | Complete    |
-| F5    | Session browser with live terminal           | Frontend   | Complete    |
-| I1    | Browser journey, docs, and final integration | Full stack | In progress |
+| Phase | Name                                         | Track      | Status   |
+|-------|----------------------------------------------|------------|----------|
+| B1    | Git since-commit readers                     | Backend    | Complete |
+| B2    | Session changes, global list, and API        | Backend    | Complete |
+| F1    | Types, API client, and Focus mode            | Frontend   | Complete |
+| F2    | Workbench Sessions and Changes tabs          | Frontend   | Complete |
+| F3    | Sessions page                                | Frontend   | Complete |
+| F4    | Focus hides and lays out the active set      | Frontend   | Complete |
+| F5    | Session browser with live terminal           | Frontend   | Complete |
+| I1    | Browser journey, docs, and final integration | Full stack | Complete |
 
 ## Backend Phases
 
@@ -169,7 +169,7 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] Run [Playbook 1](automation/scenario-01-session-focus-journey.md) against a local build; record the result.
+- [x] Run [Playbook 1](automation/scenario-01-session-focus-journey.md) against a local build; record the result.
       Not run in this phase — the orchestrator runs the browser journey against a live app and records the result in
       `automation/results/latest.md`.
 - [x] `docs/domain/terminal/session-focus.md`: what changes are, what they are not, and the availability rules.
