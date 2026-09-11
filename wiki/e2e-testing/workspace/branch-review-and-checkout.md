@@ -1,20 +1,21 @@
 ---
-slug: platform-branch-review-checkout-journey
+slug: e2e-testing-workspace-branch-review-checkout
 title: Review, Import, And Activate A Branch
 pageType: HOW_TO
-roles: TESTER, DEVELOPER
 topics: branch review, checkout, import, canvas, knowledge
 summary: Provider-neutral browser journey for pinned review, explicit plan import, guarded checkout, and cross-page synchronization.
-sourceRef: plans/platform/PM-038/automation/scenario-01-review-and-activate-branch.md
-sourceCount: 1
-lastTicket: PM-038
+sourceRef: |
+  plans/platform/PM-038/automation/scenario-01-review-and-activate-branch.md
+lastVerified: never
 ---
 
 ## Goal And Preconditions
-<!-- chunkId: platform-branch-review-checkout-journey-goal -->
+<!-- chunkId: e2e-testing-workspace-branch-review-checkout-goal -->
 <!-- keywords: goal, disposable workspace, branches, marker, plan -->
 
-Validate [[platform-branch-review-workflows]] in a non-production Local environment. Supply a base URL, authentication
+[open] Does the current implementation still satisfy the goal and preconditions behavior described below? This section has not yet been reverified.
+
+Validate [[workspace-branch-review-workflows]] in a non-production Local environment. Supply a base URL, authentication
 reference, and an isolated disposable Git workspace. Branch A is the checkout and contains a known reversible
 uncommitted marker; branch B contains a unique committed structured plan. Import and checkout are approved safe writes
 for this fixture only. Run import and checkout as isolated fixture phases: checkpoint or remove the imported target
@@ -24,8 +25,10 @@ Use Playwright MCP in a fresh context. Keep credentials, terminal content, and u
 evidence. Chrome DevTools may diagnose a failed Playwright step but is not the execution provider.
 
 ## Review Without Changing Checkout
-<!-- chunkId: platform-branch-review-checkout-journey-review -->
+<!-- chunkId: e2e-testing-workspace-branch-review-checkout-review -->
 <!-- keywords: workstream, branch review, read-only, commit, checkout -->
+
+[open] Does the current implementation still satisfy the review without changing checkout behavior described below? This section has not yet been reverified.
 
 1. Open Workstream and wait for the board; assert branch A is labeled **Checkout** and its plans are visible.
 2. Choose **Review branch**, select branch B, and wait for **Branch Review** and **Read-only committed snapshot**.
@@ -40,8 +43,10 @@ evidence. Chrome DevTools may diagnose a failed Playwright step but is not the e
 These steps are read-only. Capture the checkout label, review context, and committed file preview.
 
 ## Import Into Checkout
-<!-- chunkId: platform-branch-review-checkout-journey-import -->
+<!-- chunkId: e2e-testing-workspace-branch-review-checkout-import -->
 <!-- keywords: import, confirmation, branch A, marker, conflict -->
+
+[open] Does the current implementation still satisfy the import into checkout behavior described below? This section has not yet been reverified.
 
 1. Select the unique structured plan and choose **Import selected plan**.
 2. Confirm the preview names branch B, its pinned commit, branch A, and the selected plan.
@@ -52,8 +57,10 @@ Import is an isolated safe write. If the destination exists or the source moved,
 section; do not delete or overwrite content to force the journey through.
 
 ## Activate And Synchronize
-<!-- chunkId: platform-branch-review-checkout-journey-activate -->
+<!-- chunkId: e2e-testing-workspace-branch-review-checkout-activate -->
 <!-- keywords: guarded checkout, dirty confirmation, canvas, knowledge, synchronization -->
+
+[open] Does the current implementation still satisfy the activate and synchronize behavior described below? This section has not yet been reverified.
 
 1. Reset to the isolated switch phase, return to Branch Review, and choose **Switch workspace to this branch**.
 2. When the guarded dirty-tree prompt appears, verify its branch and local-change context, then confirm for the fixture.
@@ -66,12 +73,14 @@ overwritten; that is the expected fail-closed Git outcome, not a reason to force
 branch assertion because later actions would target an ambiguous repository context.
 
 ## Cleanup, Evidence, And Limits
-<!-- chunkId: platform-branch-review-checkout-journey-cleanup -->
+<!-- chunkId: e2e-testing-workspace-branch-review-checkout-cleanup -->
 <!-- keywords: cleanup, evidence, result, playwright, limitation -->
+
+[open] Does the current implementation still satisfy the cleanup, evidence, and limits behavior described below? This section has not yet been reverified.
 
 Record Workstream before and after switching, the review banner, import confirmation/result, and synchronized Canvas
 state. Restore or remove the disposable workspace through its normal test cleanup; stop only processes started for the
 run. Record passed, failed, blocked, and not-run sections in the ticket-local result.
 
 PM-038 introduces this Local branch journey. It does not cover remote provider snapshots, merge or overwrite behavior,
-arbitrary repository import, or Cloud Agent checkout. See [[platform-branch-context-reference]].
+arbitrary repository import, or Cloud Agent checkout. See [[workspace-branch-context-reference]].

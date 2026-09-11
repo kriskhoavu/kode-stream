@@ -1,20 +1,21 @@
 ---
-slug: platform-terminal-canvas-reference
+slug: workspace-terminal-canvas-reference
 title: Terminal Canvas Reference
 pageType: REFERENCE
-roles: DEVELOPER, TESTER, BA
 topics: canvas, api, storage, sessions, verification
 summary: Reference for Canvas ownership, branch-aware APIs, safe session records, and verification freshness.
-sourceRef: plans/platform/PM-037/design/design-01-backend.md
-sourceRef: plans/platform/PM-037/design/design-02-frontend.md
-sourceRef: plans/platform/PM-038/design/design-01-backend.md
-sourceCount: 2
-lastTicket: PM-038
+sourceRef: |
+  plans/platform/PM-037/design/design-01-backend.md
+  plans/platform/PM-037/design/design-02-frontend.md
+  plans/platform/PM-038/design/design-01-backend.md
+lastVerified: never
 ---
 
 ## Ownership
-<!-- chunkId: platform-terminal-canvas-reference-ownership -->
+<!-- chunkId: workspace-terminal-canvas-reference-ownership -->
 <!-- keywords: ownership, placements, entities, git, process -->
+
+[open] Does the current implementation still satisfy the ownership behavior described below? This section has not yet been reverified.
 
 | Data                                                             | Authority                 | Canvas storage  |
 |------------------------------------------------------------------|---------------------------|-----------------|
@@ -26,18 +27,22 @@ lastTicket: PM-038
 | PTY, grants, prompts, arguments, environment, bytes, credentials | Process manager           | Never           |
 
 ## APIs And Conflicts
-<!-- chunkId: platform-terminal-canvas-reference-api -->
+<!-- chunkId: workspace-terminal-canvas-reference-api -->
 <!-- keywords: api, resolve, placements, viewport, conflict -->
+
+[open] Does the current implementation still satisfy the apis and conflicts behavior described below? This section has not yet been reverified.
 
 `POST /api/canvas/default` resolves the current checkout through the Workstream loader before it creates or projects the
 default workspace/branch layout. A legacy request branch is accepted only when it matches the checkout; otherwise it
 returns `canvas_branch_mismatch`. `GET /api/canvas/layouts/{layoutId}` refreshes the projection. Placement and viewport
 PATCH operations use independent optimistic revisions; a placement conflict affects only reported nodes. References
-cannot cross workspaces or silently rebind stale plans. See [[platform-branch-context-reference]].
+cannot cross workspaces or silently rebind stale plans. See [[workspace-branch-context-reference]].
 
 ## Session Safety
-<!-- chunkId: platform-terminal-canvas-reference-session -->
+<!-- chunkId: workspace-terminal-canvas-reference-session -->
 <!-- keywords: session, metadata, process, branch, idempotency -->
+
+[open] Does the current implementation still satisfy the session safety behavior described below? This section has not yet been reverified.
 
 A launch includes expected workspace, branch, observed commit, and idempotency key. Repeated requests with one key start
 at most one process. Durable records retain bounded identity and lifecycle fields only. Live bindings, channel grants,
@@ -45,21 +50,41 @@ and xterm instances remain in memory; startup reconciliation marks records witho
 terminal disclosure are independent: a top-right action persists the placement's collapsed state, while terminal input,
 selection, and scrolling are excluded from node drag and Canvas pan handling. Newly discovered entities are placed
 silently during load or refresh; removed placements remain hidden and are excluded from that automatic placement. See
-[[platform-terminal-canvas-workflows]].
+[[workspace-terminal-canvas-workflows]].
 
 ## Verification Freshness
-<!-- chunkId: platform-terminal-canvas-reference-verification -->
+<!-- chunkId: workspace-terminal-canvas-reference-verification -->
 <!-- keywords: verification, fingerprint, fresh, stale, inconclusive -->
+
+[open] Does the current implementation still satisfy the verification freshness behavior described below? This section has not yet been reverified.
 
 The fingerprint covers branch, HEAD, index, relevant tracked and untracked worktree content, and verification
 configuration. `fresh` means start, finish, and current fingerprints match; `stale` means current inputs changed;
 `inconclusive` means inputs changed during execution or fingerprinting failed. Verification jobs are in-memory in PM-037.
 
 ## Limits
-<!-- chunkId: platform-terminal-canvas-reference-limits -->
+<!-- chunkId: workspace-terminal-canvas-reference-limits -->
 <!-- keywords: limits, placements, coordinates, sessions, deferred -->
+
+[open] Does the current implementation still satisfy the limits behavior described below? This section has not yet been reverified.
 
 The MVP bounds a layout to 300 placements, a patch to 50 placements, coordinate magnitude to 1,000,000, viewport zoom
 to 0.1–2.0, and safe records to 500 per workspace. Postgres Canvas persistence, Cloud Agent execution, snapshot-backed
 Canvas UX, groups, custom edges, and durable verification history are deferred. Local non-checkout review is provided
-by [[platform-branch-review-workflows]], not by Canvas.
+by [[workspace-branch-review-workflows]], not by Canvas.
+
+## Not supported
+<!-- chunkId: workspace-terminal-canvas-reference-not-supported -->
+<!-- keywords: capability boundary, exclusions, unsupported action -->
+
+[open] Which additional unsupported operations should this page name after implementation verification?
+
+## Known conflicts
+<!-- chunkId: workspace-terminal-canvas-reference-known-conflicts -->
+<!-- keywords: documentation drift, verification gap, competing description -->
+
+[open] Do the retained plan descriptions disagree with current behavior? Verify the sections above before relying on them.
+
+## Related pages
+
+See [[workspace-terminal-canvas]], [[workspace-index]], and [[e2e-testing-index]].

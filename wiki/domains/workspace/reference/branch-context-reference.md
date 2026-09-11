@@ -1,19 +1,20 @@
 ---
-slug: platform-branch-context-reference
+slug: workspace-branch-context-reference
 title: Checkout And Branch Review Reference
 pageType: REFERENCE
-roles: DEVELOPER, TESTER, BA
-topics: checkout loader, branch review API, import API, e2e runbooks, mutation audit, canvas, knowledge
+topics: checkout loader, branch review API, import API, e2e runbooks, mutation audit, canvas
 summary: API, synchronization, read-boundary, audit, and safety contracts for checkout-scoped operation and commit-pinned review.
-sourceRef: plans/platform/PM-038/design/design-01-backend.md
-sourceRef: plans/platform/PM-038/design/design-02-frontend.md
-sourceCount: 1
-lastTicket: PM-038
+sourceRef: |
+  plans/platform/PM-038/design/design-01-backend.md
+  plans/platform/PM-038/design/design-02-frontend.md
+lastVerified: never
 ---
 
 ## Context Matrix
-<!-- chunkId: platform-branch-context-reference-context-matrix -->
+<!-- chunkId: workspace-branch-context-reference-context-matrix -->
 <!-- keywords: route, source, editable, execution, branch -->
+
+[open] Does the current implementation still satisfy the context matrix behavior described below? This section has not yet been reverified.
 
 | Surface                        | Branch source                 | Content source  | Mutable or executable   |
 |--------------------------------|-------------------------------|-----------------|-------------------------|
@@ -22,11 +23,13 @@ lastTicket: PM-038
 | Agentless Remote Snapshot      | Provider snapshot contract    | Remote provider | Provider-dependent      |
 
 Local Branch Review does not replace Agentless Remote Snapshot provider behavior. Canvas continues to store layouts by
-workspace and checkout branch; see [[platform-terminal-canvas-reference]].
+workspace and checkout branch; see [[workspace-terminal-canvas-reference]].
 
 ## API Contracts
-<!-- chunkId: platform-branch-context-reference-apis -->
+<!-- chunkId: workspace-branch-context-reference-apis -->
 <!-- keywords: endpoint, checkout, review, import, commit -->
+
+[open] Does the current implementation still satisfy the api contracts behavior described below? This section has not yet been reverified.
 
 | Method | Endpoint                                   | Required request                                                     | Result                     |
 |--------|--------------------------------------------|----------------------------------------------------------------------|----------------------------|
@@ -55,8 +58,10 @@ can read checkout `plan.yaml`, ticket-local `automation/` files, latest results,
 endpoint has no reviewed-commit request contract, so it must not resolve review identities through checkout paths.
 
 ## Synchronization Rules
-<!-- chunkId: platform-branch-context-reference-synchronization -->
+<!-- chunkId: workspace-branch-context-reference-synchronization -->
 <!-- keywords: canvas, knowledge, index, focus, invalidation -->
+
+[open] Does the current implementation still satisfy the synchronization rules behavior described below? This section has not yet been reverified.
 
 The checkout loader compares branch commit, source configuration, and a working-tree hash before reusing an index.
 Canvas invokes it before resolving the default layout and rejects a legacy `branchKey` that differs from checkout.
@@ -88,8 +93,10 @@ snapshot bookmark therefore shows only a fail-closed message and Back action; it
 from the previously open checkout item.
 
 ## Mutation Audit Semantics
-<!-- chunkId: platform-branch-context-reference-mutation-audit -->
+<!-- chunkId: workspace-branch-context-reference-mutation-audit -->
 <!-- keywords: snapshot mutation, audit context, blocked status, workspace history -->
+
+[open] Does the current implementation still satisfy the mutation audit semantics behavior described below? This section has not yet been reverified.
 
 Rejected snapshot file, metadata, and status mutations resolve audit identity directly from the raw item index. This
 lookup supplies only workspace, item, and path context; it does not weaken the operational detail boundary or expose a
@@ -100,8 +107,10 @@ snapshot item ID.
 error remains on the event for diagnostics. Other errors retain the existing failed-or-recovery-hint classification.
 
 ## Conflict And Compatibility Codes
-<!-- chunkId: platform-branch-context-reference-conflicts -->
+<!-- chunkId: workspace-branch-context-reference-conflicts -->
 <!-- keywords: conflict code, snapshot read-only, branch mismatch, moved commit -->
+
+[open] Does the current implementation still satisfy the conflict and compatibility codes behavior described below? This section has not yet been reverified.
 
 | Condition                                      | Status | Code or behavior               |
 |------------------------------------------------|--------|--------------------------------|
@@ -121,8 +130,10 @@ error remains on the event for diagnostics. Other errors retain the existing fai
 scan rows and Canvas layouts remain reusable derived state.
 
 ## Safety Invariants
-<!-- chunkId: platform-branch-context-reference-safety -->
+<!-- chunkId: workspace-branch-context-reference-safety -->
 <!-- keywords: safe path, symlink, reset, overwrite, dirty tree -->
+
+[open] Does the current implementation still satisfy the safety invariants behavior described below? This section has not yet been reverified.
 
 Review reads Git objects by immutable commit SHA only. Import accepts structured plans within configured sources,
 requires the item to belong to the workspace named by the route, rejects traversal and symlink escape, revalidates both
@@ -133,3 +144,19 @@ target before returning the error. Review and import never reset, clean, stash, 
 guarded switch action may change the checkout, and it is serialized with import and review refresh for the same
 workspace. File-backed index replacement and deletion restore their complete prior in-memory state if persistence
 fails, preventing a rolled-back filesystem import from remaining visible as a ghost item.
+
+## Not supported
+<!-- chunkId: workspace-branch-context-reference-not-supported -->
+<!-- keywords: capability boundary, exclusions, unsupported action -->
+
+[open] Which additional unsupported operations should this page name after implementation verification?
+
+## Known conflicts
+<!-- chunkId: workspace-branch-context-reference-known-conflicts -->
+<!-- keywords: documentation drift, verification gap, competing description -->
+
+[open] Do the retained plan descriptions disagree with current behavior? Verify the sections above before relying on them.
+
+## Related pages
+
+See [[workspace-branch-context]], [[workspace-index]], and [[e2e-testing-index]].

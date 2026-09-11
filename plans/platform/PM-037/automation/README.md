@@ -30,7 +30,7 @@ branch-safe terminal launch, placement restoration, and visible verification fre
 
 Ticket-local playbooks are working sources. This plan introduces a reusable browser journey, so
 `plan.e2e-runbook` is true. No matching canonical journey existed in the configured `discovery-wiki` collection. PM-037
-therefore introduces the canonical [[platform-terminal-canvas-journey]] journey during implementation enrichment.
+therefore introduces the canonical [[e2e-testing-workspace-terminal-canvas]] journey during implementation enrichment.
 
 Agent-Backed Cloud and Agentless Remote Snapshot sections were removed from this MVP playbook. They require separate
 provider-capability delivery and future journey deltas.

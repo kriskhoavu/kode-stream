@@ -1,20 +1,21 @@
 ---
-slug: platform-terminal-canvas-journey
+slug: e2e-testing-workspace-terminal-canvas
 title: Operate The Focused Terminal Canvas
 pageType: HOW_TO
-roles: TESTER, DEVELOPER
 topics: canvas, terminal, branch, verification, accessibility
 summary: Browser journey for arranging Canvas nodes, launching safely, and observing verification staleness.
-sourceRef: plans/platform/PM-037/automation/scenario-01-orchestrate-plan-terminal.md
-sourceCount: 1
-lastTicket: PM-037
+sourceRef: |
+  plans/platform/PM-037/automation/scenario-01-orchestrate-plan-terminal.md
+lastVerified: never
 ---
 
 ## Goal And Preconditions
-<!-- chunkId: platform-terminal-canvas-journey-goal -->
+<!-- chunkId: e2e-testing-workspace-terminal-canvas-goal -->
 <!-- keywords: goal, local workspace, branch, provider, verification -->
 
-Validate [[platform-terminal-canvas-workflows]] in a non-production Local environment. Supply a base URL, authentication
+[open] Does the current implementation still satisfy the goal and preconditions behavior described below? This section has not yet been reverified.
+
+Validate [[workspace-terminal-canvas-workflows]] in a non-production Local environment. Supply a base URL, authentication
 reference, isolated writable Git workspace with an indexed plan, matching and mismatch branch fixtures, authenticated
 test-safe terminal provider, deterministic smoke verification, and reversible fingerprint-relevant mutation.
 
@@ -22,8 +23,10 @@ Use Playwright MCP in a fresh context. Do not substitute another browser provide
 never record credentials or terminal content.
 
 ## Arrange And Restore
-<!-- chunkId: platform-terminal-canvas-journey-arrange -->
+<!-- chunkId: e2e-testing-workspace-terminal-canvas-arrange -->
 <!-- keywords: arrange, restore, workspace, plan, session -->
+
+[open] Does the current implementation still satisfy the arrange and restore behavior described below? This section has not yet been reverified.
 
 1. Open **Canvas** for the supplied workspace and branch; wait for **Fit view**.
 2. Move the workspace; wait for **Saved** and assert the plan stayed fixed.
@@ -36,8 +39,10 @@ These placement operations are isolated safe writes and never mutate repository 
 restored layouts without terminal content.
 
 ## Launch And Branch Safety
-<!-- chunkId: platform-terminal-canvas-journey-launch -->
+<!-- chunkId: e2e-testing-workspace-terminal-canvas-launch -->
 <!-- keywords: launch terminal, idempotency, mismatch, interrupted, process -->
+
+[open] Does the current implementation still satisfy the launch and branch safety behavior described below? This section has not yet been reverified.
 
 1. Select the plan, confirm **Launch terminal**, **Run smoke verification**, and **Open full view** are present as
    capabilities allow, then choose **Launch terminal**.
@@ -58,8 +63,10 @@ Branch manipulation and process launch are safe writes only in the supplied isol
 first failed assertion and follow the documented cleanup.
 
 ## Git, Verification, And Accessibility
-<!-- chunkId: platform-terminal-canvas-journey-verification -->
+<!-- chunkId: e2e-testing-workspace-terminal-canvas-verification -->
 <!-- keywords: git, verification, stale, search, keyboard -->
+
+[open] Does the current implementation still satisfy the git, verification, and accessibility behavior described below? This section has not yet been reverified.
 
 1. Assert workspace branch, HEAD, clean/dirty/conflicted text, and changed-file count.
 2. Run smoke verification from the plan and assert result, freshness, and abbreviated revisions are separate.
@@ -72,17 +79,21 @@ Capture current/stale verification and visible keyboard focus. Diagnostics may u
 execution; Chrome is never the execution provider.
 
 ## Cleanup And Result
-<!-- chunkId: platform-terminal-canvas-journey-cleanup -->
+<!-- chunkId: e2e-testing-workspace-terminal-canvas-cleanup -->
 <!-- keywords: cleanup, cancel, revert, evidence, result -->
+
+[open] Does the current implementation still satisfy the cleanup and result behavior described below? This section has not yet been reverified.
 
 Cancel created processes through the normal control, revert the isolated mutation, and restore the original test branch
 through guarded controls. Record passed, failed, blocked, and not-run sections plus safe evidence references in the
 ticket-local latest result. The current PM-037 result is not run because runtime inputs were not supplied.
 
 ## Coverage Deltas And Limits
-<!-- chunkId: platform-terminal-canvas-journey-limits -->
+<!-- chunkId: e2e-testing-workspace-terminal-canvas-limits -->
 <!-- keywords: coverage, local, cloud agent, snapshot, limits -->
+
+[open] Does the current implementation still satisfy the coverage deltas and limits behavior described below? This section has not yet been reverified.
 
 PM-037 introduces this journey. It covers only Local content and execution. Cloud Agent execution, Agentless Remote
 Snapshot Canvas UX, groups, custom links, multiple canvases, and collaboration need separate capability delivery and
-future journey deltas. See [[platform-terminal-canvas-concept]] and [[platform-terminal-canvas-reference]].
+future journey deltas. See [[workspace-terminal-canvas]] and [[workspace-terminal-canvas-reference]].
