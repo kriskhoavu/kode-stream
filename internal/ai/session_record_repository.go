@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -250,7 +251,12 @@ func decodeSessionRecords(data []byte) ([]SessionRecord, error) {
 	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&records); err != nil {
-		return nil, err
+		stripped, dropped, stripErr := stripStaleSessionRecordFields(data)
+		if stripErr != nil || dropped == 0 {
+			return nil, err
+		}
+		log.Printf("ai: ignored %d stale session-record field(s) written by another build: %v", dropped, err)
+		return decodeSessionRecords(stripped)
 	}
 	var extra any
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
@@ -263,6 +269,42 @@ func decodeSessionRecords(data []byte) ([]SessionRecord, error) {
 		return nil, err
 	}
 	return records, nil
+}
+
+// staleSessionRecordFields names fields an abandoned or newer build may have
+// written on a session record. They carry no safety risk, so they are stripped
+// before strict decoding instead of failing the whole store. Any other unknown
+// field still fails: a record must never carry a prompt, arguments, or output.
+var staleSessionRecordFields = map[string]bool{"laneId": true}
+
+func stripStaleSessionRecordFields(data []byte) ([]byte, int, error) {
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return nil, 0, err
+	}
+	if root.Kind != yaml.DocumentNode || len(root.Content) != 1 || root.Content[0].Kind != yaml.SequenceNode {
+		return nil, 0, nil
+	}
+	dropped := 0
+	for _, record := range root.Content[0].Content {
+		if record.Kind != yaml.MappingNode {
+			continue
+		}
+		kept := make([]*yaml.Node, 0, len(record.Content))
+		for i := 0; i+1 < len(record.Content); i += 2 {
+			if staleSessionRecordFields[record.Content[i].Value] {
+				dropped++
+				continue
+			}
+			kept = append(kept, record.Content[i], record.Content[i+1])
+		}
+		record.Content = kept
+	}
+	if dropped == 0 {
+		return nil, 0, nil
+	}
+	out, err := yaml.Marshal(&root)
+	return out, dropped, err
 }
 
 func (r *FileSessionRecordRepository) save(records []SessionRecord) error {

@@ -93,3 +93,27 @@ func TestFileSessionRecordRepositoryRejectsInvalidCandidateYAMLWithoutReplacingP
 		})
 	}
 }
+
+// An abandoned build stamped laneId on session records. That field is harmless
+// and must be ignored on load, while a genuinely unsafe field still fails.
+func TestFileSessionRecordRepositoryIgnoresStaleLaneIDButRejectsUnsafeFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ai-session-records.yaml")
+	stale := "- id: s1\n  workspaceId: w1\n  provider: codex\n  intent: implement\n  requestedBranch: main\n  laneId: lane-1\n  state: exited\n  startedAt: 2026-09-11T00:00:00Z\n  lastKnownAt: 2026-09-11T00:00:00Z\n"
+	if err := os.WriteFile(path, []byte(stale), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	records, err := NewFileSessionRecordRepository(path).Snapshot()
+	if err != nil {
+		t.Fatalf("stale laneId bricked the store: %v", err)
+	}
+	if len(records) != 1 || records[0].ID != "s1" {
+		t.Fatalf("records=%#v", records)
+	}
+	unsafe := strings.Replace(stale, "laneId: lane-1", "prompt: secret", 1)
+	if err := os.WriteFile(path, []byte(unsafe), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewFileSessionRecordRepository(path).Snapshot(); err == nil {
+		t.Fatal("unsafe field was accepted")
+	}
+}
