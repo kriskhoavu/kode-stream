@@ -33,7 +33,7 @@ All code, fields, API params, and TS types must use:
 
 | Phase | Name                                         | Track      | Status   |
 |-------|----------------------------------------------|------------|----------|
-| B1    | Git since-commit readers                     | Backend    | Pending  |
+| B1    | Git since-commit readers                     | Backend    | Complete |
 | B2    | Session changes, global list, and API        | Backend    | Pending  |
 | F1    | Types, API client, and Focus mode            | Frontend   | Complete |
 | F2    | Workbench Sessions and Changes tabs          | Frontend   | Pending  |
@@ -46,9 +46,9 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] `NameStatusSince`, `ShortStatSince`, `DiffFileSince`, `RevListCount`, `CommitExists` on `GitAdapter` with
+- [x] `NameStatusSince`, `ShortStatSince`, `DiffFileSince`, `RevListCount`, `CommitExists` on `GitAdapter` with
   context variants, ref validation, `--` separators, and the existing byte bound on diffs.
-- [ ] Tests on a temporary repository: committed, staged, unstaged, untracked, rename, missing commit, bad ref.
+- [x] Tests on a temporary repository: committed, staged, unstaged, untracked, rename, missing commit, bad ref.
 
 **Verification:** `go test ./internal/git`
 
