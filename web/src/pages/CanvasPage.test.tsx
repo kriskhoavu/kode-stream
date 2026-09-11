@@ -44,11 +44,11 @@ describe('CanvasPage', () => {
 		expect(screen.getByText('4 behind')).toBeInTheDocument();
 	});
 
-	it('keeps a selected terminal session in the Canvas instead of opening the Workbench', async () => {
+	it('opens the Workbench for a selected terminal session, alongside the terminal kept in the Canvas node', async () => {
 		canvasState.projection = sessionProjection();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: 'Session: codex' }));
-		await waitFor(() => expect(screen.queryByLabelText('Canvas Workbench')).not.toBeInTheDocument());
+		await waitFor(() => expect(screen.getByLabelText('Canvas Workbench')).toBeInTheDocument());
 	});
 
 	// The Sessions page hands off a node id through the route so Open can select

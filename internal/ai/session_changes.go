@@ -42,10 +42,10 @@ type SessionChanges struct {
 	SessionID    string        `json:"sessionId"`
 	LaunchCommit string        `json:"launchCommit,omitempty"`
 	HeadCommit   string        `json:"headCommit,omitempty"`
-	HeadMoved    int           `json:"headMoved,omitempty"`
-	Files        []SessionFile `json:"files,omitempty"`
-	Additions    int           `json:"additions,omitempty"`
-	Deletions    int           `json:"deletions,omitempty"`
+	HeadMoved    int           `json:"headMoved"`
+	Files        []SessionFile `json:"files"`
+	Additions    int           `json:"additions"`
+	Deletions    int           `json:"deletions"`
 	Truncated    bool          `json:"truncated,omitempty"`
 	Availability string        `json:"availability"`
 	Reason       string        `json:"reason,omitempty"`
@@ -166,6 +166,7 @@ func (s *Service) SessionChanges(ctx context.Context, sessionID string) (Session
 	result := SessionChanges{
 		SessionID:    strings.TrimSpace(sessionID),
 		LaunchCommit: changeCtx.record.ObservedCommit,
+		Files:        []SessionFile{},
 		Availability: availability,
 		Reason:       reason,
 	}

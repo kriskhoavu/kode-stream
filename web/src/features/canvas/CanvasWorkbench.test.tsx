@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../shared/api';
 import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult, SafeSessionRecord } from '../../lib/types';
@@ -6,7 +6,7 @@ import { CanvasWorkbench } from './CanvasWorkbench';
 
 vi.mock('../../shared/api', async () => {
 	const actual = await vi.importActual<typeof import('../../shared/api')>('../../shared/api');
-	return { ...actual, api: { embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn(), itemE2ERunbooks: vi.fn(), item: vi.fn(), saveMetadata: vi.fn() } };
+	return { ...actual, api: { embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn(), itemE2ERunbooks: vi.fn(), item: vi.fn(), saveMetadata: vi.fn(), aiSessionRecords: vi.fn(), sessionChanges: vi.fn(), sessionFileDiff: vi.fn() } };
 });
 vi.mock('../ai-session/AISessionLaunchDialog', () => ({
 	AISessionLaunchDialog: ({ onLaunched }: { onLaunched: (result: EmbeddedAISessionResult, input: { provider: string; terminal: string; contextMode: 'card_context'; surface: 'embedded' }) => void }) => <button type="button" aria-label="Complete embedded AI session" onClick={() => onLaunched({ session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }, grant: { sessionId: 'session-1', token: 'grant', expiresAt: '' } }, { provider: 'codex', terminal: 'terminal', contextMode: 'card_context', surface: 'embedded' })}>Complete embedded AI session</button>
@@ -19,6 +19,8 @@ describe('CanvasWorkbench', () => {
 		vi.mocked(api.cancelEmbeddedAISession).mockResolvedValue({ ...sessionResult().session, state: 'cancelled' });
 		vi.mocked(api.itemE2ERunbooks).mockResolvedValue({ runbooks: [] });
 		vi.mocked(api.item).mockRejectedValue(new Error('Item details unavailable in this test.'));
+		vi.mocked(api.aiSessionRecords).mockResolvedValue([]);
+		vi.mocked(api.sessionChanges).mockResolvedValue({ sessionId: 'session-1', launchCommit: 'a', headCommit: 'b', headMoved: 0, files: [], additions: 0, deletions: 0, truncated: false, availability: 'available' });
 		vi.spyOn(window, 'confirm').mockReturnValue(true);
 	});
 
@@ -104,6 +106,67 @@ describe('CanvasWorkbench', () => {
 		unmount();
 		expect(signal?.aborted).toBe(true);
 	});
+
+	it('shows Info and Sessions tabs for a workspace node, and lists sessions under Sessions', async () => {
+		vi.mocked(api.aiSessionRecords).mockResolvedValue([sessionRecord()]);
+		const workspace = workspaceNode();
+		renderWorkbench(workspace);
+		expect(screen.getByRole('button', { name: 'Info' })).toHaveClass('active');
+		expect(screen.getByRole('button', { name: 'Sessions' })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
+		expect(await screen.findByRole('table')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Open codex session' })).toBeInTheDocument();
+	});
+
+	it('opens the session node with Terminal selected by default and Changes available', async () => {
+		renderWorkbench(sessionNode());
+		expect(screen.getByLabelText('Canvas Workbench')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Terminal' })).toHaveClass('active');
+		expect(screen.getByText('codex')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Changes' }));
+		expect(await screen.findByText('+0 −0 · 0 files · HEAD moved 0 commits')).toBeInTheDocument();
+	});
+
+	it('shows a stop failure inside the Terminal tab confirm dialog', async () => {
+		vi.mocked(api.cancelEmbeddedAISession).mockRejectedValue(new Error('The session could not be stopped.'));
+		renderWorkbench(sessionNode());
+		fireEvent.click(screen.getByRole('button', { name: 'Stop codex session' }));
+		const dialog = await screen.findByRole('dialog');
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Stop session' }));
+		expect(await within(dialog).findByRole('alert')).toHaveTextContent('The session could not be stopped.');
+		expect(screen.getAllByRole('alert')).toHaveLength(1);
+	});
+
+	it('applies an initial tab hint once and reports it back', async () => {
+		const onInitialTabApplied = vi.fn();
+		renderWorkbench(sessionNode(), { initialTab: 'changes', onInitialTabApplied });
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Changes' })).toHaveClass('active'));
+		expect(onInitialTabApplied).toHaveBeenCalled();
+	});
+
+	it('refetches the Sessions tab after a session is stopped', async () => {
+		vi.mocked(api.aiSessionRecords).mockResolvedValueOnce([sessionRecord()]).mockResolvedValueOnce([]);
+		const workspace = workspaceNode();
+		renderWorkbench(workspace);
+		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
+		expect(await screen.findByRole('button', { name: 'Open codex session' })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Stop codex session' }));
+		const dialog = await screen.findByRole('dialog');
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Stop session' }));
+		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
+		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalledTimes(2));
+		expect(screen.queryByRole('button', { name: 'Open codex session' })).not.toBeInTheDocument();
+	});
+
+	it('opens a session from the Sessions tab and selects it', async () => {
+		vi.mocked(api.aiSessionRecords).mockResolvedValue([sessionRecord()]);
+		const onOpenSession = vi.fn();
+		const workspace = workspaceNode();
+		renderWorkbench(workspace, { onOpenSession });
+		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
+		fireEvent.click(await screen.findByRole('button', { name: 'Open codex session' }));
+		expect(onOpenSession).toHaveBeenCalledWith('session-1');
+	});
 });
 
 function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.ComponentProps<typeof CanvasWorkbench>> = {}) {
@@ -129,6 +192,10 @@ function sessionRecord(): SafeSessionRecord {
 
 function sessionResult(): EmbeddedAISessionResult {
 	return { session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }, grant: { sessionId: 'session-1', token: 'grant', expiresAt: '' }, record: sessionRecord() };
+}
+
+function sessionNode(): CanvasNode {
+	return { id: 'session:session-1', kind: 'session', state: 'resolved', entityRef: { kind: 'session', workspaceId: 'workspace-1', sessionId: 'session-1', branchKey: 'main' }, position: { x: 0, y: 0 }, collapsed: false, revision: 1, session: { record: sessionRecord() } };
 }
 
 function workspaceNode(): CanvasNode {

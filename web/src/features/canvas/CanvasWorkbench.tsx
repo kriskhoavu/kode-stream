@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GitCompare, GripVertical, Info, PanelRightClose, PanelRightOpen, Play, RefreshCw, Ticket } from 'lucide-react';
+import { GitCompare, GripVertical, Info, PanelRightClose, PanelRightOpen, Play, RefreshCw, TerminalSquare, Ticket } from 'lucide-react';
 import { api } from '../../shared/api';
-import type { AISessionLaunchResult, AutomationDisplayMode, CanvasNode, CanvasProjection, E2ERunbook, EmbeddedAISessionResult, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile } from '../../lib/types';
+import type { AISessionLaunchResult, AutomationDisplayMode, CanvasNode, CanvasProjection, E2ERunbook, EmbeddedAISessionResult, GlobalSessionRow, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, SafeSessionRecord, VerificationJob, VerificationTestSelection, VerifyProfile } from '../../lib/types';
 import { AISessionLaunchDialog } from '../ai-session/AISessionLaunchDialog';
 import { E2EQualityPanel } from '../e2e-testing/E2EQualityPanel';
 import { JiraItemPanel } from '../jira/JiraItemPanel';
 import { StatusMenu } from '../../components/StatusMenu';
+import { SessionChangesPanel } from './SessionChangesPanel';
+import { formatSessionDate, isSessionLive, SessionsTable, StopConfirmDialog } from './SessionsTable';
 
-export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen = false, onAISessionDialogOpenChange, onClose, onReload, onSelectNode, onPlaceSession, onOpenFullView }: { projection: CanvasProjection; selectedNode?: CanvasNode; aiSessionDialogOpen?: boolean; onAISessionDialogOpenChange?: (open: boolean) => void; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void }) {
-	const [rightPanelTab, setRightPanelTab] = useState<'info' | 'jira' | 'quality'>('info');
+export type WorkbenchTab = 'info' | 'jira' | 'quality' | 'sessions' | 'terminal' | 'changes';
+
+export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen = false, onAISessionDialogOpenChange, onClose, onReload, onSelectNode, onPlaceSession, onOpenFullView, initialTab, onInitialTabApplied, onOpenSession, onViewSessionChanges }: { projection: CanvasProjection; selectedNode?: CanvasNode; aiSessionDialogOpen?: boolean; onAISessionDialogOpenChange?: (open: boolean) => void; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void; initialTab?: WorkbenchTab; onInitialTabApplied?: () => void; onOpenSession?: (sessionId: string) => void; onViewSessionChanges?: (sessionId: string) => void }) {
+	const [rightPanelTab, setRightPanelTab] = useState<WorkbenchTab>('info');
 	const [collapsed, setCollapsed] = useState(false);
 	const [panelWidth, setPanelWidth] = useState(410);
 	const [verifying, setVerifying] = useState(false);
@@ -42,14 +46,23 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 		}
 	}, [itemId]);
 
+	const onInitialTabAppliedRef = useRef(onInitialTabApplied);
+	onInitialTabAppliedRef.current = onInitialTabApplied;
+
 	useEffect(() => {
 		verificationPollRef.current += 1;
-		setRightPanelTab('info');
+		setRightPanelTab(selectedNode?.session ? 'terminal' : 'info');
 		setCollapsed(false);
 		setVerificationJob(undefined);
 		void refreshE2ERunbooks();
 		return () => { verificationPollRef.current += 1; runbooksAbortRef.current?.abort(); };
-	}, [itemId, refreshE2ERunbooks]);
+	}, [selectedNode?.id, itemId, refreshE2ERunbooks]);
+
+	useEffect(() => {
+		if (!initialTab) return;
+		setRightPanelTab(initialTab);
+		onInitialTabAppliedRef.current?.();
+	}, [initialTab, selectedNode?.id]);
 
 	const waitForVerification = async (job: VerificationJob, pollID: number) => {
 		let current = job;
@@ -160,9 +173,12 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 		<header className="panel-header"><h2><Info size={16} /> Workbench</h2><div className="canvas-workbench-header-actions">{!collapsed && selectedNode && (selectedNode.workspace || selectedNode.plan) && onOpenFullView && <button className="primary canvas-workbench-view-details" type="button" onClick={() => onOpenFullView(selectedNode)}>View details</button>}<button type="button" className="icon-button" aria-label={collapsed ? 'Expand workbench' : 'Collapse workbench'} title={collapsed ? 'Expand workbench' : 'Collapse workbench'} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button></div></header>
 		{!collapsed && <>
 		{selectedNode && selectedNode.state !== 'resolved' && <section className="canvas-workbench-section canvas-reference-warning" role="status"><h2>{selectedNode.state === 'forbidden' ? 'Access restricted' : 'Reference unavailable'}</h2><p>{selectedNode.state === 'forbidden' ? 'You no longer have permission to view this entity. Cached titles are hidden.' : 'The entity no longer resolves on this workspace branch. Its placement is retained for recovery.'}</p><button type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh reference</button></section>}
-		{selectedNode?.workspace && <section className="canvas-workbench-section"><h2>Git summary</h2><dl><dt>Branch</dt><dd>{selectedNode.workspace.branch || 'Unavailable'}</dd><dt>HEAD</dt><dd><code>{shortSHA(selectedNode.workspace.commit)}</code></dd><dt>Working tree</dt><dd>{selectedNode.workspace.git?.conflicted ? 'Conflicted' : selectedNode.workspace.git?.dirty ? `${selectedNode.workspace.git.changes.length} changed files` : 'Clean'}</dd></dl><button className="secondary" type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh Git status</button>{launchCapability && launchCapability.state !== 'available' && <p className="canvas-capability-message">{launchCapability.message}</p>}</section>}
-		{selectedNode?.workspace && verificationContext && <section className="canvas-workbench-section canvas-verification"><h2>Verification</h2>{verificationJob ?? verificationContext.verification ? <VerificationSummary job={verificationJob ?? verificationContext.verification!} /> : <p>No verification result in this application run.</p>}<button className="primary" type="button" disabled={verificationCapability?.state !== 'available' || verifying} title={verificationCapability?.state !== 'available' ? verificationCapability?.message : undefined} onClick={() => void runVerification('smoke')}><Play size={14} /> {verifying ? 'Verifying…' : 'Run smoke verification'}</button></section>}
+		{selectedNode?.workspace && <section className="canvas-item-panel canvas-workspace-tabs" aria-label="Workbench"><div className="side-panel-tabs" role="tablist" aria-label="Workbench tabs"><button type="button" className={rightPanelTab === 'info' ? 'active' : ''} aria-selected={rightPanelTab === 'info'} onClick={() => setRightPanelTab('info')}><Info size={14} /> Info</button><button type="button" className={rightPanelTab === 'sessions' ? 'active' : ''} aria-selected={rightPanelTab === 'sessions'} onClick={() => setRightPanelTab('sessions')}><TerminalSquare size={14} /> Sessions</button></div></section>}
+		{selectedNode?.workspace && rightPanelTab === 'info' && <section className="canvas-workbench-section"><h2>Git summary</h2><dl><dt>Branch</dt><dd>{selectedNode.workspace.branch || 'Unavailable'}</dd><dt>HEAD</dt><dd><code>{shortSHA(selectedNode.workspace.commit)}</code></dd><dt>Working tree</dt><dd>{selectedNode.workspace.git?.conflicted ? 'Conflicted' : selectedNode.workspace.git?.dirty ? `${selectedNode.workspace.git.changes.length} changed files` : 'Clean'}</dd></dl><button className="secondary" type="button" onClick={() => void onReload()}><RefreshCw size={13} /> Refresh Git status</button>{launchCapability && launchCapability.state !== 'available' && <p className="canvas-capability-message">{launchCapability.message}</p>}</section>}
+		{selectedNode?.workspace && verificationContext && rightPanelTab === 'info' && <section className="canvas-workbench-section canvas-verification"><h2>Verification</h2>{verificationJob ?? verificationContext.verification ? <VerificationSummary job={verificationJob ?? verificationContext.verification!} /> : <p>No verification result in this application run.</p>}<button className="primary" type="button" disabled={verificationCapability?.state !== 'available' || verifying} title={verificationCapability?.state !== 'available' ? verificationCapability?.message : undefined} onClick={() => void runVerification('smoke')}><Play size={14} /> {verifying ? 'Verifying…' : 'Run smoke verification'}</button></section>}
+		{selectedNode?.workspace && rightPanelTab === 'sessions' && <section className="canvas-workbench-section canvas-workspace-sessions"><CanvasWorkspaceSessionsTab workspaceId={selectedNode.workspace.id} workspaceName={selectedNode.workspace.name} checkoutBranch={selectedNode.workspace.branch} projection={projection} onOpen={(row) => onOpenSession?.(row.record.id)} onChanges={(row) => onViewSessionChanges?.(row.record.id)} onReload={onReload} /></section>}
 		{selectedNode?.plan && <section className="canvas-item-panel" aria-label="Workbench"><div className="side-panel-tabs" role="tablist" aria-label="Workbench tabs"><button type="button" className={rightPanelTab === 'info' ? 'active' : ''} aria-selected={rightPanelTab === 'info'} onClick={() => setRightPanelTab('info')}><Info size={14} /> Info</button><button type="button" className={rightPanelTab === 'jira' ? 'active' : ''} aria-selected={rightPanelTab === 'jira'} onClick={() => setRightPanelTab('jira')}><Ticket size={14} /> Jira</button><button type="button" className={rightPanelTab === 'quality' ? 'active' : ''} aria-selected={rightPanelTab === 'quality'} onClick={() => setRightPanelTab('quality')}><GitCompare size={14} /> Quality</button></div>{rightPanelTab === 'info' && <CanvasItemInfo itemId={selectedNode.plan.itemId} node={selectedNode} workspace={verificationContext} onSaved={() => void onReload()} />}{rightPanelTab === 'jira' && <JiraItemPanel itemId={selectedNode.plan.itemId} />}{rightPanelTab === 'quality' && <CanvasQualityPanel itemId={selectedNode.plan.itemId} workspaceId={verificationContext?.id} capability={verificationCapability} job={verificationJob ?? verificationContext?.verification} verifying={verifying} runbooks={e2eRunbooks} onRun={runVerification} onRunAutomation={runAutomationVerification} onRerun={rerunVerification} onRefresh={() => void refreshE2ERunbooks()} />}</section>}
+		{selectedNode?.session && <section className="canvas-item-panel" aria-label="Workbench"><div className="side-panel-tabs" role="tablist" aria-label="Workbench tabs"><button type="button" className={rightPanelTab === 'terminal' ? 'active' : ''} aria-selected={rightPanelTab === 'terminal'} onClick={() => setRightPanelTab('terminal')}><TerminalSquare size={14} /> Terminal</button><button type="button" className={rightPanelTab === 'changes' ? 'active' : ''} aria-selected={rightPanelTab === 'changes'} onClick={() => setRightPanelTab('changes')}><GitCompare size={14} /> Changes</button></div>{rightPanelTab === 'terminal' && <SessionTerminalSummary record={selectedNode.session.record} onReload={onReload} />}{rightPanelTab === 'changes' && <SessionChangesPanel session={selectedNode.session.record} />}</section>}
 		{error && <p className="canvas-workbench-error" role="alert">{error}</p>}
 		<button className="panel-resize-handle panel-resize-handle-right canvas-workbench-resize-handle" type="button" aria-label="Resize Workbench panel" onPointerDown={startResize}><GripVertical size={16} /></button>
 		</>}
@@ -231,6 +247,57 @@ function CanvasQualityPanel({ itemId, workspaceId, capability, job, verifying, r
 	const updateSpecs = (specs: string[]) => void saveSelection({ selectedSpecs: specs, environment, displayMode });
 	const addManualSpec = () => { const spec = manualSpec.trim(); if (!spec || selectedSpecs.includes(spec)) return; updateSpecs([...selectedSpecs, spec]); setManualSpec(''); };
 	return <section className="metadata-callout quality-panel canvas-quality-panel" aria-label="Quality"><div className="verification-header"><strong>Quality</strong>{job && <span className={`verification-trigger-badge ${job.status === 'passed' ? 'success' : job.status === 'failed' ? 'danger' : ''}`}>{job.profile ?? job.mode} · {job.status}</span>}</div><div className="verification-actions"><button className="secondary" type="button" disabled={!canVerify || verifying} title={!canVerify ? capability?.message : undefined} onClick={() => onRun('smoke')}>Run smoke verify</button><button className="secondary" type="button" disabled={!canVerify || verifying} title={!canVerify ? capability?.message : undefined} onClick={() => onRun('critical')}>Run critical verify</button><button className="secondary" type="button" disabled={!job || verifying} onClick={onRerun}>Re-run latest</button></div>{!workspaceId && <span className="verification-note">No workspace selected.</span>}{capability && !canVerify && <span className="verification-note">{capability.message || 'Verification is unavailable for this workspace.'}</span>}{workspaceId && <div className="automation-test-panel"><div className="quality-section-heading"><strong>Automation</strong><span>Environment and card-linked specs</span></div><label className="repo-field">Automation environment<input value={environment} onChange={(event) => setTests((current) => ({ selection: { selectedSpecs, environment: event.target.value, displayMode }, discoveredSpecs: current?.discoveredSpecs ?? [] }))} onBlur={() => void saveSelection({ selectedSpecs, environment, displayMode })} placeholder="local" /></label><div className="automation-mode-field"><span>Run mode</span><div className="segmented-control automation-mode-toggle" role="tablist" aria-label="Automation run mode"><button type="button" className={displayMode === 'silent' ? 'active' : ''} aria-selected={displayMode === 'silent'} onClick={() => void saveSelection({ selectedSpecs, environment, displayMode: 'silent' })}>Silent</button><button type="button" className={displayMode === 'visible' ? 'active' : ''} aria-selected={displayMode === 'visible'} onClick={() => void saveSelection({ selectedSpecs, environment, displayMode: 'visible' })}>Visible browser</button></div></div><div className="quality-section-heading compact"><strong>Selected specs</strong></div><div className="automation-spec-list" aria-label="Selected automation specs">{selectedSpecs.length ? selectedSpecs.map((spec) => <span className="automation-spec-chip" key={spec}>{spec}<button type="button" aria-label={`Remove ${spec}`} onClick={() => updateSpecs(selectedSpecs.filter((candidate) => candidate !== spec))}>×</button></span>) : <span className="verification-note">No selected specs.</span>}</div><div className="path-input-row manual-spec-row"><input aria-label="Manual automation spec" value={manualSpec} onChange={(event) => setManualSpec(event.target.value)} placeholder="Repo-relative spec path" /><button className="secondary" type="button" onClick={addManualSpec} disabled={!manualSpec.trim() || busy}>Add spec</button></div><div className="automation-action-row"><button className="secondary automation-run-action" type="button" onClick={() => onRunAutomation({ environment, displayMode, selectedSpecs })} disabled={!canVerify || verifying || busy || selectedSpecs.length === 0}>Run automation tests</button></div><div className="automation-suggestions"><div className="quality-subsection-heading"><strong>Suggested specs</strong><span>From automation-test in plan.yaml</span></div>{tests?.discoveredSpecs?.length ? <div className="automation-discovered-specs" aria-label="Suggested automation specs">{tests.discoveredSpecs.map((spec) => { const selected = selectedSpecs.includes(spec.path); return <article className={selected ? 'automation-suggestion-card selected' : 'automation-suggestion-card'} key={`${spec.path}-${spec.sourcePath ?? ''}`}><div><strong>{spec.path}</strong><span>{spec.runner}{spec.sourcePath ? ` · ${spec.sourcePath}` : ''}</span></div><button className="secondary" type="button" disabled={selected || busy} onClick={() => updateSpecs([...selectedSpecs, spec.path])}>{selected ? 'Selected' : 'Select'}</button></article>; })}</div> : <span className="verification-note">No suggested specs from plan.yaml.</span>}</div></div>}{verifying && <span className="verification-note" role="status">Starting verification...</span>}{job && <><VerificationSummary job={job} />{job.steps?.length ? <div className="verification-steps">{job.steps.map((step) => <span className={`verification-step ${step.status === 'ok' ? 'ok' : 'failed'}`} key={`${step.step}-${step.at}`}>{step.step}: {step.status}</span>)}</div> : null}</>}{workspaceId && <E2EQualityPanel variant="nested" workspaceId={workspaceId} runbooks={runbooks.runbooks} diagnostic={runbooks.diagnostic} onRefresh={onRefresh} />}{error && <p className="error" role="alert">{error}</p>}</section>;
+}
+
+/** Session node Terminal tab: the durable session summary and Stop; the live terminal itself stays in the Canvas node, never duplicated here. */
+function SessionTerminalSummary({ record, onReload }: { record: SafeSessionRecord; onReload: () => Promise<unknown> | void }) {
+	const [confirming, setConfirming] = useState(false);
+	const [stopping, setStopping] = useState(false);
+	const [error, setError] = useState('');
+	const live = isSessionLive(record);
+	const stop = async () => {
+		setStopping(true);
+		setError('');
+		try {
+			await api.cancelEmbeddedAISession(record.id);
+			await Promise.resolve(onReload());
+			setConfirming(false);
+		} catch (caught) {
+			setError(caught instanceof Error ? caught.message : 'The session could not be stopped.');
+		} finally {
+			setStopping(false);
+		}
+	};
+	return <div className="canvas-item-tab-content canvas-session-summary">
+		<dl>
+			<dt>Provider</dt><dd>{record.provider}</dd>
+			<dt>Branch</dt><dd>{record.requestedBranch}</dd>
+			<dt>State</dt><dd className={`canvas-session-state state-${record.state}`}>{record.state}</dd>
+			<dt>Started</dt><dd>{formatSessionDate(record.startedAt)}</dd>
+			{record.exitCode !== undefined && <><dt>Exit code</dt><dd>{record.exitCode}</dd></>}
+		</dl>
+		{live && <button className="danger-confirm" type="button" onClick={() => setConfirming(true)}>{`Stop ${record.provider} session`}</button>}
+		{error && !confirming && <p className="error" role="alert">{error}</p>}
+		{confirming && <StopConfirmDialog title="Stop session?" message={`Stop the ${record.provider} session on ${record.requestedBranch}? Its durable session metadata will remain available.`} busy={stopping} error={error} onCancel={() => setConfirming(false)} onConfirm={() => void stop()} />}
+	</div>;
+}
+
+/** Workspace node Sessions tab: loads this workspace's checkout sessions and renders the shared SessionsTable. */
+function CanvasWorkspaceSessionsTab({ workspaceId, workspaceName, checkoutBranch, projection, onOpen, onChanges, onReload }: { workspaceId: string; workspaceName?: string; checkoutBranch?: string; projection: CanvasProjection; onOpen: (row: GlobalSessionRow) => void; onChanges: (row: GlobalSessionRow) => void; onReload: () => Promise<unknown> | void }) {
+	const [records, setRecords] = useState<SafeSessionRecord[]>();
+	const [error, setError] = useState('');
+	const [reloadToken, setReloadToken] = useState(0);
+	useEffect(() => {
+		let cancelled = false;
+		setRecords(undefined);
+		setError('');
+		api.aiSessionRecords(workspaceId, checkoutBranch).then((result) => { if (!cancelled) setRecords(result); }).catch((caught) => { if (!cancelled) setError(caught instanceof Error ? caught.message : 'Sessions could not be loaded.'); });
+		return () => { cancelled = true; };
+	}, [workspaceId, checkoutBranch, reloadToken]);
+	if (error) return <p className="error" role="alert">{error}</p>;
+	if (!records) return <p role="status">Loading sessions…</p>;
+	const rows: GlobalSessionRow[] = records.map((record) => ({ record, workspaceName: workspaceName ?? 'Workspace', checkoutBranch: checkoutBranch ?? '', planTitle: record.planRef ? projection.nodes.find((node) => node.plan?.itemId === record.planRef?.itemId)?.plan?.title : undefined }));
+	return <SessionsTable rows={rows} onOpen={onOpen} onChanges={onChanges} onStopped={() => { setReloadToken((token) => token + 1); void onReload(); }} emptyMessage="No sessions for this workspace and branch." />;
 }
 
 function shortSHA(value?: string) { return value ? value.slice(0, 8) : 'Unavailable'; }

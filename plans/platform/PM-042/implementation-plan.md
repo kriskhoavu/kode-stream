@@ -36,7 +36,7 @@ All code, fields, API params, and TS types must use:
 | B1    | Git since-commit readers                     | Backend    | Complete |
 | B2    | Session changes, global list, and API        | Backend    | Complete |
 | F1    | Types, API client, and Focus mode            | Frontend   | Complete |
-| F2    | Workbench Sessions and Changes tabs          | Frontend   | Pending  |
+| F2    | Workbench Sessions and Changes tabs          | Frontend   | Complete |
 | F3    | Sessions page                                | Frontend   | Complete |
 | I1    | Browser journey, docs, and final integration | Full stack | Pending  |
 
@@ -93,11 +93,11 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] `SessionsTable` and `SessionChangesPanel` components; `useSessionChanges` hook.
-- [ ] Workspace node: Info and Sessions tabs; session node: Terminal and Changes tabs; Workbench opens for a session
+- [x] `SessionsTable` and `SessionChangesPanel` components; `useSessionChanges` hook.
+- [x] Workspace node: Info and Sessions tabs; session node: Terminal and Changes tabs; Workbench opens for a session
   node.
-- [ ] Open, Stop, and Changes actions wired through the page.
-- [ ] Tests: table renders states and actions; Changes panel renders each availability case and a file diff; Stop
+- [x] Open, Stop, and Changes actions wired through the page.
+- [x] Tests: table renders states and actions; Changes panel renders each availability case and a file diff; Stop
   confirms before cancelling.
 
 **Verification:** `npm run typecheck && npm test -- --run canvas`

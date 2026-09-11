@@ -2,9 +2,11 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -287,6 +289,43 @@ func TestSessionChangesAvailableComputesFullValue(t *testing.T) {
 	}
 	if len(result.Files) != 2 || result.Additions != 5 || result.Deletions != 2 || result.Truncated {
 		t.Fatalf("result=%#v", result)
+	}
+}
+
+// TestSessionChangesAvailableEmptyResultMarshalsFieldsPresent guards the
+// critical fix: an available result with no changes since launch must still
+// marshal files/additions/deletions/headMoved rather than omitting them, so
+// the frontend never has to treat a present-but-empty result as absent.
+func TestSessionChangesAvailableEmptyResultMarshalsFieldsPresent(t *testing.T) {
+	workspace := models.WorkspaceConfig{ID: "ws-1", Name: "Local", Path: t.TempDir()}
+	git := &fakeChangeGit{
+		currentBranch:  "main",
+		resolvedCommit: "launch-sha",
+		nameStatus:     nil,
+		additions:      0,
+		deletions:      0,
+		revListCount:   0,
+	}
+	service, _ := changesTestService(t, workspace, baseSessionRecord(workspace.ID, "launch-sha"), git)
+	result, err := service.SessionChanges(context.Background(), "session-1")
+	if err != nil {
+		t.Fatalf("err=%v", err)
+	}
+	if result.Availability != SessionChangesAvailable {
+		t.Fatalf("availability=%q reason=%q", result.Availability, result.Reason)
+	}
+	if result.Files == nil {
+		t.Fatalf("files should be an empty slice, not nil")
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal err=%v", err)
+	}
+	body := string(encoded)
+	for _, field := range []string{`"files":[]`, `"additions":0`, `"deletions":0`, `"headMoved":0`} {
+		if !strings.Contains(body, field) {
+			t.Fatalf("expected %s in %s", field, body)
+		}
 	}
 }
 

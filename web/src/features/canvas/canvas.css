@@ -225,3 +225,29 @@ body.is-resizing-panel .canvas-workbench-resize-handle { opacity: 1; }
 /* Nothing fetched yet: the counts have no basis, so this stays muted rather than
  * borrowing the green that means "checked and level". */
 .branch-upstream-unknown { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+
+/* Sessions tab and page share this table (F2 Workbench, F3 Sessions page). */
+.sessions-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sessions-table th, .sessions-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.sessions-table th { color: var(--muted); font-weight: 600; }
+.sessions-table-state { display: inline-flex; border-radius: 999px; padding: 2px 8px; background: var(--panel-soft); text-transform: capitalize; }
+.sessions-table-state.state-running, .sessions-table-state.state-starting { color: var(--green); }
+.sessions-table-state.state-failed { color: var(--danger); }
+.sessions-table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.sessions-table-actions button { display: inline-flex; align-items: center; gap: 5px; }
+.sessions-table-empty { margin: 0; padding: 16px; color: var(--muted); font-size: 12px; }
+
+.canvas-session-summary .canvas-session-state { text-transform: capitalize; }
+
+/* Session node Changes tab. */
+.session-changes-panel { display: grid; gap: 10px; padding: 14px 16px 18px; }
+.session-changes-header { margin: 0; font-weight: 600; }
+.session-changes-note, .session-changes-truncated { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.session-changes-body { display: grid; grid-template-columns: minmax(140px, 200px) minmax(0, 1fr); gap: 14px; min-height: 0; }
+.session-changes-file-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; align-content: start; }
+.session-changes-file-list h3 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; color: var(--muted); }
+.session-changes-file-list ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.session-changes-file-list button { width: 100%; padding: 4px 6px; border: none; border-radius: 6px; background: none; color: var(--text); font-size: 12px; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.session-changes-file-list button:hover, .session-changes-file-list button.active { background: var(--panel-soft); }
+.session-changes-diff pre { margin: 0; max-height: 420px; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-soft); font-size: 11px; white-space: pre; }
+.session-changes-unavailable p { margin: 0; padding: 16px; color: var(--muted); font-size: 12px; }
