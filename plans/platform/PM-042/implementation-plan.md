@@ -40,7 +40,7 @@ All code, fields, API params, and TS types must use:
 | F1    | Types, API client, and Focus mode            | Frontend   | Complete    |
 | F2    | Workbench Sessions and Changes tabs          | Frontend   | Complete    |
 | F3    | Sessions page                                | Frontend   | Complete    |
-| F4    | Focus hides and lays out the active set      | Frontend   | Pending     |
+| F4    | Focus hides and lays out the active set      | Frontend   | Complete    |
 | F5    | Session browser with live terminal           | Frontend   | Pending     |
 | I1    | Browser journey, docs, and final integration | Full stack | In progress |
 
@@ -129,13 +129,13 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] Focus removes inactive nodes, sections, and edges from the rendered graph instead of dimming them.
-- [ ] Virtual focus layout: active plans in a left column, each plan's sessions expanded in a row to its right, rows
+- [x] Focus removes inactive nodes, sections, and edges from the rendered graph instead of dimming them.
+- [x] Virtual focus layout: active plans in a left column, each plan's sessions expanded in a row to its right, rows
   spaced by the tallest node; positions override only while Focus is on; nodes not draggable in Focus; saved layout
   untouched.
-- [ ] Fit the viewport to the focus layout on toggle on; restore the saved viewport on toggle off.
-- [ ] Remove `.canvas-node-dimmed` and the dimmed data flag.
-- [ ] Tests: inactive nodes absent from the graph; layout positions per the rule; toggling off restores saved
+- [x] Fit the viewport to the focus layout on toggle on; restore the saved viewport on toggle off.
+- [x] Remove `.canvas-node-dimmed` and the dimmed data flag.
+- [x] Tests: inactive nodes absent from the graph; layout positions per the rule; toggling off restores saved
   positions; nodes not draggable in Focus.
 
 **Verification:** `npm run typecheck && npm test -- --run canvas`

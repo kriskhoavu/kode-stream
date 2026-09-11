@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { Background, Handle, NodeResizer, Position, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
 import type { Edge, Node as XYNode, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
 import { Bot, Box, ChevronDown, Expand, GitBranch, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Play, Plus, RotateCcw, Search, Square, TerminalSquare, Trash2, WandSparkles, Workflow, X } from 'lucide-react';
@@ -13,12 +14,12 @@ interface CanvasNodeData extends Record<string, unknown> {
 	selected: boolean;
 	sectionSelected?: boolean;
 	conflicted: boolean;
-	dimmed?: boolean;
 	onSelect: (id?: string, additive?: boolean) => void;
 	onKeyboardMove: (node: DomainNode, position: CanvasPosition) => void;
 	onSetCollapsed: (id: string, collapsed: boolean) => void;
 	onReload: () => Promise<unknown> | void;
 	layoutAvailable: boolean;
+	focusOn?: boolean;
 	section?: CanvasSection;
 	onRemoveSection?: (id: string) => void;
 	onMoveSection?: (id: string, position: CanvasPosition, delta: CanvasPosition) => void;
@@ -30,6 +31,20 @@ const focusPreferenceKey = 'canvas-focus';
 function isFocusActiveSession(node: DomainNode): boolean {
 	const record = node.session?.record;
 	return Boolean(record?.live) && (record?.state === 'starting' || record?.state === 'running');
+}
+
+/* Virtual focus layout constants. Plans stack in a left column at x = 0; each
+ * plan's sessions sit in a row to its right, expanded so the terminal shows.
+ * The session pitch is sized off the same node dimensions used elsewhere on
+ * the board (245x116 collapsed, 660x500 expanded); row height is derived per
+ * row from the tallest node it contains (see focusNodeSize). */
+const FOCUS_GUTTER = 40;
+const FOCUS_PLAN_WIDTH = 245;
+const FOCUS_SESSION_PITCH = 660 + FOCUS_GUTTER;
+
+function focusNodeSize(node: DomainNode, focusOn: boolean): { width: number; height: number } {
+	const expanded = Boolean(node.session) && (focusOn || !node.collapsed);
+	return expanded ? { width: 660, height: 500 } : { width: 245, height: 116 };
 }
 
 type CanvasFlowNode = XYNode<CanvasNodeData>;
@@ -86,10 +101,6 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 		}
 		return { sessionIds, planIds };
 	}, [projection.connections, projection.nodes]);
-	const focusDimmedIds = useMemo(() => {
-		if (!focusOn) return new Set<string>();
-		return new Set(canvasNodes.filter((node) => !focusActiveSet.sessionIds.has(node.id) && !focusActiveSet.planIds.has(node.id)).map((node) => node.id));
-	}, [canvasNodes, focusActiveSet, focusOn]);
 	const focusLabel = !focusOn ? 'Focus' : focusActiveSet.sessionIds.size > 0 ? `Focus · ${count(focusActiveSet.planIds.size, 'plan')} · ${count(focusActiveSet.sessionIds.size, 'session')}` : 'Focus · nothing running';
 	const statuses = useMemo(() => Array.from(new Set(canvasNodes.flatMap((node) => node.plan ? [node.plan.status] : []))), [canvasNodes]);
 	const services = useMemo(() => Array.from(new Set(canvasNodes.flatMap((node) => node.plan?.service ? [node.plan.service] : []))).sort(), [canvasNodes]);
@@ -101,33 +112,75 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 		return planMatches && typeMatches;
 		};
 		const directMatches = canvasNodes.filter((node) => baseMatches(node) && (!normalizedSearchQuery || nodeSearchText(node).toLowerCase().includes(normalizedSearchQuery)));
-		if (!normalizedSearchQuery) return directMatches;
-		const matchingIDs = new Set(directMatches.map((node) => node.id));
-		const linkedSessionIDs = new Set(projection.connections.flatMap((connection) => {
-			if (matchingIDs.has(connection.source)) return [connection.target];
-			if (matchingIDs.has(connection.target)) return [connection.source];
-			return [];
-		}).filter((id) => canvasNodes.some((node) => node.id === id && node.kind === 'session')));
-		return canvasNodes.filter((node) => baseMatches(node) && (matchingIDs.has(node.id) || linkedSessionIDs.has(node.id)));
-	}, [canvasNodes, nodeTypeFilters, normalizedSearchQuery, projection.connections, serviceFilters, statusFilters]);
+		const filteredMatches = !normalizedSearchQuery ? directMatches : (() => {
+			const matchingIDs = new Set(directMatches.map((node) => node.id));
+			const linkedSessionIDs = new Set(projection.connections.flatMap((connection) => {
+				if (matchingIDs.has(connection.source)) return [connection.target];
+				if (matchingIDs.has(connection.target)) return [connection.source];
+				return [];
+			}).filter((id) => canvasNodes.some((node) => node.id === id && node.kind === 'session')));
+			return canvasNodes.filter((node) => baseMatches(node) && (matchingIDs.has(node.id) || linkedSessionIDs.has(node.id)));
+		})();
+		if (!focusOn) return filteredMatches;
+		return filteredMatches.filter((node) => focusActiveSet.sessionIds.has(node.id) || focusActiveSet.planIds.has(node.id));
+	}, [canvasNodes, focusActiveSet, focusOn, nodeTypeFilters, normalizedSearchQuery, projection.connections, serviceFilters, statusFilters]);
 	const visibleIDs = useMemo(() => new Set(visibleDomainNodes.map((node) => node.id)), [visibleDomainNodes]);
 	const hiddenCount = canvasNodes.length - visibleDomainNodes.length;
+	/** Positions for the active set while Focus is on: plans in a left column,
+	 * each plan's sessions in a row to its right. Virtual only — never written
+	 * back to the projection. */
+	const focusLayout = useMemo(() => {
+		if (!focusOn) return undefined;
+		const visibleIdSet = new Set(visibleDomainNodes.map((node) => node.id));
+		const sessionsByPlan = new Map<string, DomainNode[]>();
+		const planlessSessions: DomainNode[] = [];
+		for (const node of visibleDomainNodes) {
+			if (node.kind !== 'session') continue;
+			const connection = projection.connections.find((candidate) => candidate.kind === 'session_launched_from' && candidate.target === node.id && visibleIdSet.has(candidate.source));
+			if (connection) {
+				const list = sessionsByPlan.get(connection.source) ?? [];
+				list.push(node);
+				sessionsByPlan.set(connection.source, list);
+			} else {
+				planlessSessions.push(node);
+			}
+		}
+		const positions = new Map<string, CanvasPosition>();
+		let y = 0;
+		for (const plan of visibleDomainNodes.filter((node) => node.kind === 'plan')) {
+			positions.set(plan.id, { x: 0, y });
+			let x = FOCUS_PLAN_WIDTH + FOCUS_GUTTER;
+			let rowHeight = focusNodeSize(plan, focusOn).height;
+			for (const session of sessionsByPlan.get(plan.id) ?? []) {
+				positions.set(session.id, { x, y });
+				x += FOCUS_SESSION_PITCH;
+				rowHeight = Math.max(rowHeight, focusNodeSize(session, focusOn).height);
+			}
+			y += rowHeight + FOCUS_GUTTER;
+		}
+		for (const session of planlessSessions) {
+			positions.set(session.id, { x: 0, y });
+			y += focusNodeSize(session, focusOn).height + FOCUS_GUTTER;
+		}
+		return positions;
+	}, [focusOn, projection.connections, visibleDomainNodes]);
+	const effectivePosition = useCallback((node: DomainNode) => (focusOn ? focusLayout?.get(node.id) : undefined) ?? node.position, [focusLayout, focusOn]);
 	const visibleSections = useMemo(() => {
 		const filtered = sections.filter((section) => section.id === 'workspace-group' ? visibleDomainNodes.length > 0 : section.nodeIds.some((id) => visibleIDs.has(id)));
-		const filtersActive = Boolean(normalizedSearchQuery || statusFilters.length || serviceFilters.length || nodeTypeFilters.length);
+		const filtersActive = Boolean(normalizedSearchQuery || statusFilters.length || serviceFilters.length || nodeTypeFilters.length || focusOn);
 		const tightened = !filtersActive ? filtered : filtered.map((section) => {
 			if (section.id === 'workspace-group') return section;
 			const members = visibleDomainNodes.filter((node) => section.nodeIds.includes(node.id));
 			if (members.length === 0) return section;
-			const left = Math.min(...members.map((node) => node.position.x));
-			const top = Math.min(...members.map((node) => node.position.y));
-			const right = Math.max(...members.map((node) => node.position.x + (node.session && !node.collapsed ? 660 : 245)));
-			const bottom = Math.max(...members.map((node) => node.position.y + (node.session && !node.collapsed ? 500 : 116)));
+			const left = Math.min(...members.map((node) => effectivePosition(node).x));
+			const top = Math.min(...members.map((node) => effectivePosition(node).y));
+			const right = Math.max(...members.map((node) => effectivePosition(node).x + focusNodeSize(node, focusOn).width));
+			const bottom = Math.max(...members.map((node) => effectivePosition(node).y + focusNodeSize(node, focusOn).height));
 			return { ...section, position: { x: left - 28, y: top - 32 }, width: Math.max(301, right - left + 56), height: bottom - top + 64 };
 		});
 		const enclosed = [
 			...tightened.filter((section) => section.id !== 'workspace-group').map((section) => ({ left: section.position.x, top: section.position.y, right: section.position.x + section.width, bottom: section.position.y + section.height })),
-			...visibleDomainNodes.map((node) => ({ left: node.position.x, top: node.position.y, right: node.position.x + (node.session && !node.collapsed ? 660 : 245), bottom: node.position.y + (node.session && !node.collapsed ? 500 : 116) }))
+			...visibleDomainNodes.map((node) => ({ left: effectivePosition(node).x, top: effectivePosition(node).y, right: effectivePosition(node).x + focusNodeSize(node, focusOn).width, bottom: effectivePosition(node).y + focusNodeSize(node, focusOn).height }))
 		];
 		if (enclosed.length === 0) return tightened;
 		const left = Math.min(...enclosed.map((bounds) => bounds.left));
@@ -135,27 +188,34 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 		const right = Math.max(...enclosed.map((bounds) => bounds.right));
 		const bottom = Math.max(...enclosed.map((bounds) => bounds.bottom));
 		return tightened.map((section) => section.id === 'workspace-group' ? { ...section, position: { x: left - 52, y: top - 82 }, width: right - left + 104, height: bottom - top + 126 } : section);
-	}, [nodeTypeFilters.length, normalizedSearchQuery, sections, serviceFilters.length, statusFilters.length, visibleDomainNodes, visibleIDs]);
-	const modelNodes = useMemo(() => [...visibleSections.map((section): CanvasFlowNode => ({
+	}, [effectivePosition, focusOn, nodeTypeFilters.length, normalizedSearchQuery, sections, serviceFilters.length, statusFilters.length, visibleDomainNodes, visibleIDs]);
+	const modelNodes = useMemo(() => [...(focusOn ? [] : visibleSections.map((section): CanvasFlowNode => ({
 		id: `section:${section.id}`,
 		type: 'section',
 		position: section.position,
 		draggable: false,
 		selectable: false,
 		style: { width: section.width, height: section.height, zIndex: 0, pointerEvents: 'none' },
-		data: { node: {} as DomainNode, section, selected: false, conflicted: false, dimmed: section.nodeIds.length > 0 && section.nodeIds.every((id) => focusDimmedIds.has(id)), onSelect: () => {}, onKeyboardMove: () => {}, onSetCollapsed: () => {}, onReload, layoutAvailable, onRemoveSection, onMoveSection }
-	})), ...visibleDomainNodes.map((node): CanvasFlowNode => ({
-		id: node.id,
-		type: node.kind,
-		position: node.position,
-		draggable: canMove(node, layoutAvailable),
-		selectable: true,
-		data: { node, selected: node.id === selectedId, sectionSelected: sectionSelection.includes(node.id), conflicted: conflicts.includes(node.id), dimmed: focusDimmedIds.has(node.id), onSelect: (id, additive) => additive && id ? toggleSectionSelection(id) : onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), onSetCollapsed, onReload, layoutAvailable }
-	}))], [conflicts, focusDimmedIds, layoutAvailable, onMoveNode, onReload, onRemoveSection, onSelect, onSetCollapsed, sectionSelection, selectedId, visibleDomainNodes, visibleSections]);
+		data: { node: {} as DomainNode, section, selected: false, conflicted: false, onSelect: () => {}, onKeyboardMove: () => {}, onSetCollapsed: () => {}, onReload, layoutAvailable, onRemoveSection, onMoveSection }
+	}))), ...visibleDomainNodes.map((node): CanvasFlowNode => {
+		const renderNode = focusOn && node.kind === 'session' ? { ...node, collapsed: false } : node;
+		return {
+			id: node.id,
+			type: node.kind,
+			position: effectivePosition(node),
+			draggable: focusOn ? false : canMove(node, layoutAvailable),
+			selectable: true,
+			data: { node: renderNode, selected: node.id === selectedId, sectionSelected: sectionSelection.includes(node.id), conflicted: conflicts.includes(node.id), onSelect: (id, additive) => additive && id ? toggleSectionSelection(id) : onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), onSetCollapsed, onReload, layoutAvailable, focusOn }
+		};
+	})], [conflicts, effectivePosition, focusOn, layoutAvailable, onMoveNode, onMoveSection, onReload, onRemoveSection, onSelect, onSetCollapsed, sectionSelection, selectedId, visibleDomainNodes, visibleSections]);
 	const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNode>(modelNodes);
 	useEffect(() => setNodes(modelNodes), [modelNodes, setNodes]);
-	const edges = useMemo(() => projection.connections.filter((connection) => visibleIDs.has(connection.source) && visibleIDs.has(connection.target) && !focusDimmedIds.has(connection.source) && !focusDimmedIds.has(connection.target)).map((connection): Edge => ({ id: connection.id, source: connection.source, target: connection.target, selectable: false, focusable: false, className: `canvas-edge canvas-edge-${connection.kind}` })), [focusDimmedIds, projection.connections, visibleIDs]);
+	const focusNodeIdsKey = useMemo(() => nodes.map((node) => node.id).join(','), [nodes]);
+	const focusSavedViewportRef = useRef<CanvasViewport | undefined>(undefined);
+	const focusPreviousOnRef = useRef(focusOn);
+	const edges = useMemo(() => projection.connections.filter((connection) => visibleIDs.has(connection.source) && visibleIDs.has(connection.target)).map((connection): Edge => ({ id: connection.id, source: connection.source, target: connection.target, selectable: false, focusable: false, className: `canvas-edge canvas-edge-${connection.kind}` })), [projection.connections, visibleIDs]);
 	const onDragStop: OnNodeDrag<CanvasFlowNode> = (_, node) => {
+		if (focusOn) return;
 		if (node.type === 'section') {
 			const id = node.id.replace(/^section:/, '');
 			const section = sections.find((candidate) => candidate.id === id);
@@ -164,7 +224,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 		}
 		onMoveNode(node.id, node.position);
 	};
-	const onMoveEnd: OnMoveEnd = (_, viewport) => onSaveViewport(viewport);
+	const onMoveEnd: OnMoveEnd = (_, viewport) => { if (!focusOn) onSaveViewport(viewport); };
 	const selected = projection.nodes.find((node) => node.id === selectedId);
 	useEffect(() => {
 		const syncFullscreen = () => setIsFullscreen(document.fullscreenElement === canvasShellRef.current);
@@ -187,7 +247,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 			<div className="canvas-board-toolbar">
 				<CanvasSearch query={searchQuery} onQueryChange={setSearchQuery} />
 				<button className="primary" type="button" disabled={aiSessionDisabled} onClick={onOpenAISession}><Bot size={15} /> AI session</button>
-				<div className="canvas-focus-control"><button className={focusOn ? 'secondary active' : 'secondary'} type="button" aria-pressed={focusOn} onClick={() => setFocusOn((value) => !value)}>{focusLabel}</button>{focusOn && focusActiveSet.sessionIds.size === 0 && <button className="link-button" type="button" onClick={() => setFocusOn(false)}>Turn off</button>}</div>
+				<div className="canvas-focus-control"><button className={focusOn ? 'secondary active' : 'secondary'} type="button" aria-pressed={focusOn} aria-describedby={focusOn ? 'canvas-focus-hint' : undefined} onClick={() => setFocusOn((value) => !value)}>{focusLabel}</button>{focusOn && focusActiveSet.sessionIds.size === 0 && <button className="link-button" type="button" onClick={() => setFocusOn(false)}>Turn off</button>}{focusOn && <span className="canvas-focus-hint" id="canvas-focus-hint">Layout is automatic while Focus is on</span>}</div>
 				{onCreateSection && <button className="secondary" type="button" disabled={sectionSelection.length < 2} title={sectionSelection.length < 2 ? 'Cmd/Ctrl-click or drag-select at least two nodes to create a section.' : 'Create a named section around the selected nodes.'} onClick={() => { onCreateSection(sectionSelection); setSectionSelection([]); }}>Create section{sectionSelection.length ? ` (${sectionSelection.length})` : ''}</button>}
 				{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
 			</div>
@@ -208,6 +268,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 			<ReactFlow key={projection.layout.id} nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onNodeDragStop={onDragStop} onNodeClick={(event, node) => { if (node.type === 'section' || event.metaKey || event.ctrlKey) return; onSelect(node.id); }} onSelectionStart={() => { boxSelectingRef.current = true; }} onSelectionEnd={() => { requestAnimationFrame(() => { boxSelectingRef.current = false; }); }} onSelectionChange={updateSectionSelection} onPaneClick={() => onSelect(undefined)} onMoveEnd={onMoveEnd} defaultViewport={projection.layout.viewport} minZoom={0.1} maxZoom={2} onlyRenderVisibleElements nodesDraggable elementsSelectable selectionOnDrag edgesFocusable={false} fitView={false}>
 				<Background color="var(--line)" gap={24} />
 				<CanvasSearchViewport query={normalizedSearchQuery} />
+				<CanvasFocusViewport focusOn={focusOn} nodeIdsKey={focusNodeIdsKey} savedViewportRef={focusSavedViewportRef} previousFocusOnRef={focusPreviousOnRef} />
 				<CanvasGraphControls layoutAvailable={layoutAvailable} layoutMessage={layoutCapability?.message} onArrange={onArrange} serviceGridColumns={serviceGridColumns} onReset={onReset} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
 			</ReactFlow>
 		</div>
@@ -224,6 +285,42 @@ function CanvasSearchViewport({ query }: { query: string }) {
 		const frame = requestAnimationFrame(() => void fitView({ padding: 0.22, maxZoom: 1.15, duration: reduceMotion ? 0 : 180 }));
 		return () => cancelAnimationFrame(frame);
 	}, [fitView, query]);
+	return null;
+}
+
+/** Saves the viewport that was current when Focus is switched on and restores
+ * it when Focus is switched off; the prior viewport is kept only in a ref
+ * hoisted into CanvasBoard, so it survives the `<ReactFlow key={layoutId}>`
+ * remount that would otherwise drop a ref living inside it. Focus never
+ * writes to the saved layout.
+ *
+ * Fitting the view is handled separately, keyed on the rendered node list:
+ * it re-runs (mount included) whenever that list changes while Focus is on,
+ * after a double requestAnimationFrame so the forced-expanded session nodes
+ * have been measured before the fit reads their size. */
+function CanvasFocusViewport({ focusOn, nodeIdsKey, savedViewportRef, previousFocusOnRef }: { focusOn: boolean; nodeIdsKey: string; savedViewportRef: RefObject<CanvasViewport | undefined>; previousFocusOnRef: RefObject<boolean> }) {
+	const { fitView, getViewport, setViewport } = useReactFlow();
+	useEffect(() => {
+		if (previousFocusOnRef.current === focusOn) return;
+		previousFocusOnRef.current = focusOn;
+		if (focusOn) {
+			savedViewportRef.current = getViewport();
+			return;
+		}
+		if (!savedViewportRef.current) return;
+		const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		void setViewport(savedViewportRef.current, { duration: reduceMotion ? 0 : 200 });
+	}, [focusOn, getViewport, previousFocusOnRef, savedViewportRef, setViewport]);
+	useEffect(() => {
+		if (!focusOn) return;
+		const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		const duration = reduceMotion ? 0 : 200;
+		let innerFrame = 0;
+		const outerFrame = requestAnimationFrame(() => {
+			innerFrame = requestAnimationFrame(() => void fitView({ padding: 0.15, maxZoom: 1.2, duration }));
+		});
+		return () => { cancelAnimationFrame(outerFrame); cancelAnimationFrame(innerFrame); };
+	}, [fitView, focusOn, nodeIdsKey]);
 	return null;
 }
 
@@ -260,7 +357,7 @@ function CanvasSectionNode({ data }: NodeProps<CanvasFlowNode>) {
 		if (event.key === 'ArrowDown') position.y += step;
 		data.onMoveSection?.(section.id, position, { x: position.x - section.position.x, y: position.y - section.position.y });
 	};
-	return <section className={`canvas-section-boundary ${sectionKind}${data.dimmed ? ' canvas-node-dimmed' : ''}`} aria-label={`Section: ${section.title}${data.dimmed ? ' (inactive)' : ''}`}><header className="nodrag nopan"><button className="canvas-section-move-handle nodrag nopan" type="button" aria-label={`Move section ${section.title}`} onPointerDown={startMove} onKeyDown={moveByKeyboard}><strong className={`canvas-section-title ${sectionKind}`}>{section.title}</strong><span>{section.nodeIds.length} nodes</span></button><button className="nodrag nopan" type="button" aria-label={`Remove section ${section.title}`} onClick={() => data.onRemoveSection?.(section.id)}><X size={13} /></button></header></section>;
+	return <section className={`canvas-section-boundary ${sectionKind}`} aria-label={`Section: ${section.title}`}><header className="nodrag nopan"><button className="canvas-section-move-handle nodrag nopan" type="button" aria-label={`Move section ${section.title}`} onPointerDown={startMove} onKeyDown={moveByKeyboard}><strong className={`canvas-section-title ${sectionKind}`}>{section.title}</strong><span>{section.nodeIds.length} nodes</span></button><button className="nodrag nopan" type="button" aria-label={`Remove section ${section.title}`} onClick={() => data.onRemoveSection?.(section.id)}><X size={13} /></button></header></section>;
 }
 
 function CanvasGraphControls({ layoutAvailable, layoutMessage, onArrange, serviceGridColumns, onReset, isFullscreen, onToggleFullscreen }: { layoutAvailable: boolean; layoutMessage?: string; onArrange: (grouping: 'status' | 'service' | 'service_status' | 'service_grid') => void; serviceGridColumns: number; onReset: () => void; isFullscreen: boolean; onToggleFullscreen: () => void }) {
@@ -302,8 +399,12 @@ function PlanCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	const record = data.node.session?.record;
 	const expanded = Boolean(record && !data.node.collapsed);
-	const disclosure = record ? <button className="icon-button canvas-node-action nodrag nopan" type="button" aria-label={expanded ? 'Collapse session terminal' : 'Expand session terminal'} title={expanded ? 'Collapse terminal' : 'Expand terminal'} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); data.onSetCollapsed(data.node.id, expanded); }}>{expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button> : undefined;
-	return <NodeFrame data={data} eyebrow="Session" icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => data.onSetCollapsed(data.node.id, true)} onReload={data.onReload} /> : undefined}>
+	// While Focus is on, sessions are force-expanded (see CanvasBoard's renderNode); the
+	// disclosure and the terminal's close action would otherwise persist that invented,
+	// virtual collapsed state through onSetCollapsed. Hide the disclosure and make close
+	// a no-op instead.
+	const disclosure = record && !data.focusOn ? <button className="icon-button canvas-node-action nodrag nopan" type="button" aria-label={expanded ? 'Collapse session terminal' : 'Expand session terminal'} title={expanded ? 'Collapse terminal' : 'Expand terminal'} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); data.onSetCollapsed(data.node.id, expanded); }}>{expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button> : undefined;
+	return <NodeFrame data={data} eyebrow="Session" icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => { if (!data.focusOn) data.onSetCollapsed(data.node.id, true); }} onReload={data.onReload} /> : undefined}>
 		<strong>{record?.provider || 'Unavailable session'}</strong>
 		<span className={`canvas-session-state state-${record?.state || 'stale'}`}><Play size={11} /> {record?.state || stateLabel(data.node)}</span>
 		<span>{record?.requestedBranch || data.node.entityRef.branchKey}</span>
@@ -311,13 +412,12 @@ function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 }
 
 function NodeFrame({ data, eyebrow, icon, children, addon, action, expanded = false, resizable = false }: { data: CanvasNodeData; eyebrow: string; icon: React.ReactNode; children: React.ReactNode; addon?: React.ReactNode; action?: React.ReactNode; expanded?: boolean; resizable?: boolean }) {
-	return <div className={`canvas-semantic-node kind-${data.node.kind} state-${data.node.state}${data.selected ? ' selected' : ''}${data.sectionSelected ? ' section-selected' : ''}${data.conflicted ? ' conflicted' : ''}${expanded ? ' expanded' : ''}${data.dimmed ? ' canvas-node-dimmed' : ''}`}>
+	return <div className={`canvas-semantic-node kind-${data.node.kind} state-${data.node.state}${data.selected ? ' selected' : ''}${data.sectionSelected ? ' section-selected' : ''}${data.conflicted ? ' conflicted' : ''}${expanded ? ' expanded' : ''}`}>
 		{resizable && <NodeResizer isVisible minWidth={520} minHeight={500} handleClassName="canvas-session-resize-handle" lineClassName="canvas-session-resize-line" />}
 		<Handle className="canvas-derived-handle" type="target" position={Position.Left} isConnectable={false} />
-		<div data-canvas-node-id={data.node.id} className="canvas-node-select-target" role="button" tabIndex={data.dimmed ? -1 : 0} aria-label={`${eyebrow}: ${nodeSearchText(data.node)}${data.dimmed ? ' (inactive)' : ''}`} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id, event.metaKey || event.ctrlKey); }} onKeyDown={(event) => {
-		if (data.dimmed) return;
+		<div data-canvas-node-id={data.node.id} className="canvas-node-select-target" role="button" tabIndex={0} aria-label={`${eyebrow}: ${nodeSearchText(data.node)}`} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id, event.metaKey || event.ctrlKey); }} onKeyDown={(event) => {
 		if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); data.onSelect(data.node.id); return; }
-		if (!canMove(data.node, data.layoutAvailable) || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+		if (data.focusOn || !canMove(data.node, data.layoutAvailable) || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
 		event.preventDefault();
 		const step = event.shiftKey ? 1 : 12;
 		const position = { ...data.node.position };

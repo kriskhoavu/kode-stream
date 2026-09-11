@@ -76,11 +76,7 @@
 .canvas-focus-control { display: inline-flex; align-items: center; gap: 8px; }
 .canvas-board-toolbar .secondary.active { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--panel)); color: var(--blue); }
 .canvas-focus-control .link-button { border: 0; background: transparent; color: var(--blue); font-size: 12px; text-decoration: underline; cursor: pointer; }
-/* Dim, do not hide: positions and layout stay put so Focus never triggers a
- * React Flow re-layout. Only the select target loses pointer events, so a
- * dimmed section boundary's own drag handle still works. */
-.canvas-node-dimmed { opacity: .35; }
-.canvas-node-dimmed .canvas-node-select-target { pointer-events: none; }
+.canvas-focus-hint { color: var(--muted); font-size: 12px; }
 .canvas-semantic-node { position: relative; width: 245px; min-height: 116px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 8px 24px rgb(0 0 0 / .09); color: var(--text); }
 .canvas-semantic-node.kind-workspace { border-color: color-mix(in srgb, var(--blue) 38%, var(--line)); background: color-mix(in srgb, var(--blue) 4%, var(--panel)); }
 .canvas-semantic-node.kind-workspace .canvas-node-select-target > header { border-bottom-color: color-mix(in srgb, var(--blue) 26%, var(--line)); background: color-mix(in srgb, var(--blue) 9%, var(--panel)); color: var(--blue); }

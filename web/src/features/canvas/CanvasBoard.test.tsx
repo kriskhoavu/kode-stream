@@ -6,6 +6,8 @@ import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult } from '../.
 import { CanvasBoard } from './CanvasBoard';
 
 const fitView = vi.fn();
+const setViewport = vi.fn();
+const getViewport = vi.fn(() => ({ x: 11, y: 22, zoom: 1.5 }));
 vi.mock('../../shared/api', async () => {
 	const actual = await vi.importActual<typeof import('../../shared/api')>('../../shared/api');
 	return { ...actual, api: { ...actual.api, embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn() } };
@@ -16,7 +18,7 @@ vi.mock('@xyflow/react', async () => {
 	const FlowContext = React.createContext(false);
 	return {
 		ReactFlowProvider: ({ children }: { children: ReactNode }) => <FlowContext.Provider value>{children}</FlowContext.Provider>,
-		ReactFlow: ({ nodes, edges, nodeTypes, onNodeDragStop, onNodeClick, onlyRenderVisibleElements, nodesDraggable, children }: { nodes: Array<{ id: string; type: string; data: Record<string, unknown>; position: { x: number; y: number }; draggable?: boolean }>; edges: Array<{ id: string }>; nodeTypes: Record<string, ComponentType<{ data: Record<string, unknown> }>>; onNodeDragStop: (event: unknown, node: unknown) => void; onNodeClick: (event: unknown, node: { id: string }) => void; onlyRenderVisibleElements: boolean; nodesDraggable: boolean; children: ReactNode }) => <div data-testid="react-flow" data-nodes={nodes.length} data-edges={edges.length} data-visible-only={String(onlyRenderVisibleElements)} data-draggable={String(nodesDraggable)}>{nodes.map((node) => { const Component = nodeTypes[node.type]; return <div key={node.id} data-draggable-node={String(node.draggable)} data-position={JSON.stringify(node.position)}><Component data={node.data} /><button type="button" onClick={() => onNodeDragStop({}, { ...node, position: { x: 999, y: 888 } })}>drag {node.id}</button><button type="button" onClick={() => onNodeClick({}, node)}>select {node.id}</button></div>; })}{children}</div>,
+		ReactFlow: ({ nodes, edges, nodeTypes, onNodeDragStop, onNodeClick, onMoveEnd, onlyRenderVisibleElements, nodesDraggable, children }: { nodes: Array<{ id: string; type: string; data: Record<string, unknown>; position: { x: number; y: number }; draggable?: boolean }>; edges: Array<{ id: string }>; nodeTypes: Record<string, ComponentType<{ data: Record<string, unknown> }>>; onNodeDragStop: (event: unknown, node: unknown) => void; onNodeClick: (event: unknown, node: { id: string }) => void; onMoveEnd: (event: unknown, viewport: { x: number; y: number; zoom: number }) => void; onlyRenderVisibleElements: boolean; nodesDraggable: boolean; children: ReactNode }) => <div data-testid="react-flow" data-nodes={nodes.length} data-edges={edges.length} data-visible-only={String(onlyRenderVisibleElements)} data-draggable={String(nodesDraggable)}>{nodes.map((node) => { const Component = nodeTypes[node.type]; return <div key={node.id} data-draggable-node={String(node.draggable)} data-position={JSON.stringify(node.position)}><Component data={node.data} /><button type="button" onClick={() => onNodeDragStop({}, { ...node, position: { x: 999, y: 888 } })}>drag {node.id}</button><button type="button" onClick={() => onNodeClick({}, node)}>select {node.id}</button></div>; })}<button type="button" onClick={() => onMoveEnd({}, { x: 5, y: 5, zoom: 1 })}>move viewport</button>{children}</div>,
 		Background: () => null,
 		Controls: () => <div data-testid="flow-controls" />,
 		Handle: () => null,
@@ -25,7 +27,7 @@ vi.mock('@xyflow/react', async () => {
 		useNodesState: <T,>(initial: T[]) => [initial, vi.fn(), vi.fn()],
 		useReactFlow: () => {
 			if (!React.useContext(FlowContext)) throw new Error('ReactFlowProvider is required');
-			return { fitView, getNode: (id: string) => ({ id }) };
+			return { fitView, getViewport, setViewport, getNode: (id: string) => ({ id }) };
 		}
 	};
 });
@@ -194,51 +196,89 @@ describe('CanvasBoard', () => {
 		expect(screen.getByRole('button', { name: /^Focus/ })).toHaveTextContent('Focus · 2 plans · 3 sessions');
 	});
 
-	it('dims non-active nodes without removing them from the board', () => {
+	it('removes inactive nodes and their edges from the graph when Focus is on', () => {
 		renderBoard(focusProjection());
 		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '4');
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '2');
 		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
-		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '4');
-		const dimmedPlan = screen.getByLabelText('Plan: PM-038 Focused Canvas main (inactive)');
-		expect(dimmedPlan.closest('.canvas-semantic-node')).toHaveClass('canvas-node-dimmed');
-		const dimmedSession = screen.getByLabelText('Session: codex main exited (inactive)');
-		expect(dimmedSession.closest('.canvas-semantic-node')).toHaveClass('canvas-node-dimmed');
-		const activePlan = screen.getByLabelText('Plan: PM-037 Focused Canvas main');
-		expect(activePlan.closest('.canvas-semantic-node')).not.toHaveClass('canvas-node-dimmed');
+		expect(screen.queryByLabelText('Plan: PM-038 Focused Canvas main')).not.toBeInTheDocument();
+		expect(screen.queryByLabelText('Session: codex main exited')).not.toBeInTheDocument();
+		expect(screen.getByLabelText('Plan: PM-037 Focused Canvas main')).toBeInTheDocument();
+		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
+		// No sections are rendered while Focus is on; one plan and one session left.
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '2');
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '1');
 	});
 
-	it('takes dimmed nodes out of the tab order and ignores their keyboard input', () => {
-		const onMoveNode = vi.fn();
-		renderBoard(focusProjection(), { onMoveNode });
+	it('lays out active plans in a left column and their sessions in a row to the right', () => {
+		renderBoard(focusLayoutProjection());
 		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
-		const dimmedPlan = screen.getByLabelText('Plan: PM-038 Focused Canvas main (inactive)');
-		expect(dimmedPlan).toHaveAttribute('tabIndex', '-1');
-		fireEvent.keyDown(dimmedPlan, { key: 'ArrowRight' });
-		expect(onMoveNode).not.toHaveBeenCalled();
-		const activePlan = screen.getByLabelText('Plan: PM-037 Focused Canvas main');
-		expect(activePlan).toHaveAttribute('tabIndex', '0');
+		const positionOf = (label: string) => JSON.parse(screen.getByLabelText(label).closest('[data-draggable-node]')!.getAttribute('data-position')!);
+		expect(positionOf('Plan: PM-037 Focused Canvas main')).toEqual({ x: 0, y: 0 });
+		expect(positionOf('Session: codex main running')).toEqual({ x: 285, y: 0 });
+		expect(positionOf('Plan: PM-038 Focused Canvas main')).toEqual({ x: 0, y: 540 });
+		expect(positionOf('Session: claude main running')).toEqual({ x: 285, y: 540 });
+		expect(positionOf('Session: gemini main running')).toEqual({ x: 985, y: 540 });
 	});
 
-	it('keeps node positions unchanged when Focus is toggled on for the same projection', () => {
-		renderBoard(focusProjection());
-		const before = screen.getByLabelText('Plan: PM-038 Focused Canvas main').closest('[data-draggable-node]')?.getAttribute('data-position');
+	it('sets nodes not draggable while Focus is on and restores draggability and projection positions when it turns off', () => {
+		renderBoard(focusLayoutProjection());
+		const before = screen.getByLabelText('Plan: PM-037 Focused Canvas main').closest('[data-draggable-node]')?.getAttribute('data-position');
 		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
-		const after = screen.getByLabelText('Plan: PM-038 Focused Canvas main (inactive)').closest('[data-draggable-node]')?.getAttribute('data-position');
-		expect(before).toBeTruthy();
+		expect(document.querySelectorAll('[data-draggable-node="true"]')).toHaveLength(0);
+		fireEvent.click(screen.getByRole('button', { name: /^Focus/ }));
+		const after = screen.getByLabelText('Plan: PM-037 Focused Canvas main').closest('[data-draggable-node]')?.getAttribute('data-position');
 		expect(after).toEqual(before);
+		expect(document.querySelectorAll('[data-draggable-node="true"]').length).toBeGreaterThan(0);
+	});
+
+	it('fits the view to the focus layout on toggle-on and restores the prior viewport on toggle-off', async () => {
+		renderBoard(focusLayoutProjection());
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		await waitFor(() => expect(fitView).toHaveBeenCalled());
+		fireEvent.click(screen.getByRole('button', { name: /^Focus/ }));
+		await waitFor(() => expect(setViewport).toHaveBeenCalledWith({ x: 11, y: 22, zoom: 1.5 }, expect.anything()));
+	});
+
+	it('hides the disclosure and ignores the terminal close action while Focus is on', async () => {
+		vi.mocked(api.embeddedAISession).mockResolvedValue({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' });
+		vi.mocked(api.embeddedAISessionGrant).mockResolvedValue({ sessionId: 'session-1', token: 'grant', expiresAt: '' });
+		const onSetCollapsed = vi.fn();
+		renderBoard(focusProjection(), { onSetCollapsed });
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		expect(screen.queryByRole('button', { name: /Expand session terminal|Collapse session terminal/ })).not.toBeInTheDocument();
+		expect(await screen.findByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');
+		fireEvent.click(screen.getByRole('button', { name: 'Hide terminal' }));
+		expect(onSetCollapsed).not.toHaveBeenCalled();
+	});
+
+	it('renders no sections while Focus is on and never calls onMoveSection, onMoveNode or onSaveViewport', () => {
+		const onMoveSection = vi.fn();
+		const onMoveNode = vi.fn();
+		const onSaveViewport = vi.fn();
+		renderBoard(focusProjection(), { sections: [{ id: 'section-1', title: 'Assistant work', position: { x: 320, y: -30 }, width: 620, height: 360, nodeIds: ['plan:item-1', 'session:session-1'] }], onMoveSection, onMoveNode, onSaveViewport });
+		expect(screen.getByLabelText('Section: Assistant work')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		expect(screen.queryByLabelText('Section: Assistant work')).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Move section/ })).not.toBeInTheDocument();
+		fireEvent.click(screen.getByText('drag plan:item-1'));
+		fireEvent.click(screen.getByRole('button', { name: 'move viewport' }));
+		expect(onMoveSection).not.toHaveBeenCalled();
+		expect(onMoveNode).not.toHaveBeenCalled();
+		expect(onSaveViewport).not.toHaveBeenCalled();
+	});
+
+	it('shows a hint that layout is automatic while Focus is on', () => {
+		renderBoard(focusProjection());
+		expect(screen.queryByText('Layout is automatic while Focus is on')).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		expect(screen.getByText('Layout is automatic while Focus is on')).toBeInTheDocument();
 	});
 
 	it('falls back to Focus off when the stored preference value is invalid', () => {
 		localStorage.setItem('kodeStream.canvas-focus', JSON.stringify('yes'));
 		renderBoard(baseProjection());
 		expect(screen.getByRole('button', { name: 'Focus' })).toHaveAttribute('aria-pressed', 'false');
-	});
-
-	it('drops edges touching a dimmed node when Focus is on', () => {
-		renderBoard(focusProjection());
-		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '2');
-		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
-		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '1');
 	});
 
 	it('shows a nothing-running label with a Turn off affordance when no session is active', () => {
@@ -301,5 +341,25 @@ function focusProjection(): CanvasProjection {
 		...base,
 		nodes: [...base.nodes, plan2, session2],
 		connections: [...base.connections, { id: 'three', source: 'plan:item-2', target: 'session:session-2', kind: 'session_launched_from', sourceOfTruth: 'derived' }]
+	};
+}
+
+/** Two active plans: item-1 with one active session, item-2 with two, so the
+ * column-and-row Focus layout rule can be asserted against exact positions. */
+function focusLayoutProjection(): CanvasProjection {
+	const base = baseProjection();
+	const plan1 = base.nodes[1];
+	const session1 = base.nodes[2];
+	const plan2: CanvasNode = { ...plan1, id: 'plan:item-2', entityRef: { ...plan1.entityRef, itemId: 'item-2' }, position: { x: 900, y: 900 }, plan: { ...plan1.plan!, itemId: 'item-2', identifier: 'PM-038' } };
+	const session2: CanvasNode = { ...session1, id: 'session:session-2', entityRef: { ...session1.entityRef, sessionId: 'session-2' }, position: { x: 1200, y: 900 }, session: { record: { ...session1.session!.record, id: 'session-2', provider: 'claude' } } };
+	const session3: CanvasNode = { ...session1, id: 'session:session-3', entityRef: { ...session1.entityRef, sessionId: 'session-3' }, position: { x: 1600, y: 900 }, session: { record: { ...session1.session!.record, id: 'session-3', provider: 'gemini' } } };
+	return {
+		...base,
+		nodes: [...base.nodes, plan2, session2, session3],
+		connections: [
+			...base.connections,
+			{ id: 'three', source: 'plan:item-2', target: 'session:session-2', kind: 'session_launched_from', sourceOfTruth: 'derived' },
+			{ id: 'four', source: 'plan:item-2', target: 'session:session-3', kind: 'session_launched_from', sourceOfTruth: 'derived' }
+		]
 	};
 }
