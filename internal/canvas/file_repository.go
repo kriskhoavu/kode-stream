@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -313,18 +314,59 @@ func (r *FileRepository) load() (Snapshot, error) {
 	if int64(len(data)) > maxCanvasFileBytes {
 		return Snapshot{}, errors.New("canvas file exceeds the read limit")
 	}
-	var state Snapshot
-	decoder := yaml.NewDecoder(bytes.NewReader(data))
-	decoder.KnownFields(true)
-	if err := decoder.Decode(&state); err != nil {
+	state, err := decodeCanvasSnapshot(data)
+	if err != nil {
 		return Snapshot{}, err
-	}
-	var extra any
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		return Snapshot{}, errors.New("canvas file contains multiple YAML documents")
 	}
 	state = normalizeSnapshot(state)
 	return state, ValidateSnapshot(state)
+}
+
+// decodeCanvasSnapshot decodes strictly first. When strict decoding fails, it
+// retries leniently and, if the only explanation is placements whose entity
+// kind this build does not know (written by a newer or abandoned build), drops
+// those placements with a warning instead of refusing the whole store. Any
+// other unknown field still fails, so the strict contract is kept for the
+// data this build owns.
+func decodeCanvasSnapshot(data []byte) (Snapshot, error) {
+	var state Snapshot
+	strict := yaml.NewDecoder(bytes.NewReader(data))
+	strict.KnownFields(true)
+	strictErr := strict.Decode(&state)
+	if strictErr == nil {
+		var extra any
+		if err := strict.Decode(&extra); !errors.Is(err, io.EOF) {
+			return Snapshot{}, errors.New("canvas file contains multiple YAML documents")
+		}
+		return state, nil
+	}
+	var lenient Snapshot
+	if err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&lenient); err != nil {
+		return Snapshot{}, strictErr
+	}
+	kept := make([]Placement, 0, len(lenient.Placements))
+	dropped := 0
+	for _, placement := range lenient.Placements {
+		if knownEntityKind(placement.EntityRef.Kind) {
+			kept = append(kept, placement)
+			continue
+		}
+		dropped++
+	}
+	if dropped == 0 {
+		return Snapshot{}, strictErr
+	}
+	log.Printf("canvas: dropped %d placement(s) with an entity kind this build does not know: %v", dropped, strictErr)
+	lenient.Placements = kept
+	return lenient, nil
+}
+
+func knownEntityKind(kind EntityKind) bool {
+	switch kind {
+	case EntityWorkspace, EntityPlan, EntitySession:
+		return true
+	}
+	return false
 }
 
 func (r *FileRepository) save(state Snapshot) error {

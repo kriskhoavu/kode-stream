@@ -186,3 +186,33 @@ func TestFileRepositoryKeepsViewportVersionIndependent(t *testing.T) {
 		t.Fatalf("placements = %#v err=%v", placements, err)
 	}
 }
+
+// A placement written by a build that knew more entity kinds (an abandoned
+// "lane" build left three of these behind) must not brick the store: the
+// unknown placements are dropped and everything else loads.
+func TestFileRepositoryDropsPlacementsOfUnknownEntityKind(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "canvases.yaml")
+	repository := NewFileRepository(path)
+	layout, _, err := repository.ResolveDefault("", "workspace-1", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.PatchPlacements(layout.ID, []PlacementPatch{{NodeID: "workspace:workspace-1", EntityRef: EntityRef{Kind: EntityWorkspace, WorkspaceID: "workspace-1"}, ExpectedRevision: 0}}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale := "    - layoutId: " + layout.ID + "\n      nodeId: lane:lane-1\n      entityRef:\n        kind: lane\n        workspaceId: workspace-1\n        laneId: lane-1\n      position:\n        x: 1\n        y: 2\n      collapsed: false\n      revision: 1\n      updatedAt: 2026-09-11T00:00:00Z\n"
+	if err := os.WriteFile(path, append(data, []byte(stale)...), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := NewFileRepository(path).Snapshot()
+	if err != nil {
+		t.Fatalf("stale lane placement bricked the store: %v", err)
+	}
+	if len(snapshot.Placements) != 1 || snapshot.Placements[0].NodeID != "workspace:workspace-1" {
+		t.Fatalf("placements=%#v", snapshot.Placements)
+	}
+}
