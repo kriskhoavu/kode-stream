@@ -174,6 +174,21 @@ describe('shared api facade', () => {
 		await expect(api.patchCanvasPlacements('layout', [])).rejects.toMatchObject({ name: 'ApiError', code: 'placement_conflict', nodeIds: ['plan:1'], status: 409 });
 	});
 
+	it('sends the scoped Sessions list, changes, and diff requests', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await api.listSessions('active');
+		await api.listSessions('all');
+		await api.sessionChanges('session/one');
+		await api.sessionFileDiff('session/one', 'src/App tsx');
+
+		expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/sessions?scope=active', expect.any(Object));
+		expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/sessions?scope=all', expect.any(Object));
+		expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/sessions/session%2Fone/changes', expect.any(Object));
+		expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/sessions/session%2Fone/diff?path=src%2FApp%20tsx', expect.any(Object));
+	});
+
   it('scopes provider capability discovery to the selected workspace', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

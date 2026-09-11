@@ -5,6 +5,7 @@ import { Bot, Box, ChevronDown, Expand, GitBranch, LayoutGrid, Maximize, Maximiz
 import { api } from '../../shared/api';
 import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasSection, CanvasViewport, EmbeddedAISessionResult, EmbeddedAISessionState, GitStatus, SafeSessionRecord } from '../../lib/types';
 import { EmbeddedTerminal } from '../ai-session/EmbeddedTerminal';
+import { readPreference, writePreference } from '../../shared/preferences/store';
 import '@xyflow/react/dist/style.css';
 
 interface CanvasNodeData extends Record<string, unknown> {
@@ -12,6 +13,7 @@ interface CanvasNodeData extends Record<string, unknown> {
 	selected: boolean;
 	sectionSelected?: boolean;
 	conflicted: boolean;
+	dimmed?: boolean;
 	onSelect: (id?: string, additive?: boolean) => void;
 	onKeyboardMove: (node: DomainNode, position: CanvasPosition) => void;
 	onSetCollapsed: (id: string, collapsed: boolean) => void;
@@ -20,6 +22,14 @@ interface CanvasNodeData extends Record<string, unknown> {
 	section?: CanvasSection;
 	onRemoveSection?: (id: string) => void;
 	onMoveSection?: (id: string, position: CanvasPosition, delta: CanvasPosition) => void;
+}
+
+const focusPreferenceKey = 'canvas-focus';
+
+/** Session nodes counted as active by Focus mode: launched and still live. */
+function isFocusActiveSession(node: DomainNode): boolean {
+	const record = node.session?.record;
+	return Boolean(record?.live) && (record?.state === 'starting' || record?.state === 'running');
 }
 
 type CanvasFlowNode = XYNode<CanvasNodeData>;
@@ -51,6 +61,8 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	const [statusFilters, setStatusFilters] = useState<string[]>([]);
 	const [serviceFilters, setServiceFilters] = useState<string[]>([]);
 	const [nodeTypeFilters, setNodeTypeFilters] = useState<string[]>([]);
+	const [focusOn, setFocusOn] = useState(() => readPreference<boolean>(focusPreferenceKey, (value) => typeof value === 'boolean' ? value : undefined, false));
+	useEffect(() => { writePreference(focusPreferenceKey, focusOn); }, [focusOn]);
 	const [sectionSelection, setSectionSelection] = useState<string[]>([]);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [openMenu, setOpenMenu] = useState('');
@@ -60,6 +72,25 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	const layoutCapability = projection.nodes.find((node) => node.workspace)?.workspace?.actions['layout.move'];
 	const layoutAvailable = layoutCapability?.state === 'available';
 	const canvasNodes = useMemo(() => projection.nodes.filter((node) => node.kind !== 'workspace'), [projection.nodes]);
+	const focusActiveSet = useMemo(() => {
+		const sessionIds = new Set<string>();
+		const planIds = new Set<string>();
+		for (const node of projection.nodes) {
+			if (node.kind !== 'session' || !isFocusActiveSession(node)) continue;
+			sessionIds.add(node.id);
+			const itemId = node.session?.record.planRef?.itemId;
+			if (itemId) planIds.add(`plan:${itemId}`);
+		}
+		for (const connection of projection.connections) {
+			if (connection.kind === 'session_launched_from' && sessionIds.has(connection.target)) planIds.add(connection.source);
+		}
+		return { sessionIds, planIds };
+	}, [projection.connections, projection.nodes]);
+	const focusDimmedIds = useMemo(() => {
+		if (!focusOn) return new Set<string>();
+		return new Set(canvasNodes.filter((node) => !focusActiveSet.sessionIds.has(node.id) && !focusActiveSet.planIds.has(node.id)).map((node) => node.id));
+	}, [canvasNodes, focusActiveSet, focusOn]);
+	const focusLabel = !focusOn ? 'Focus' : focusActiveSet.sessionIds.size > 0 ? `Focus · ${count(focusActiveSet.planIds.size, 'plan')} · ${count(focusActiveSet.sessionIds.size, 'session')}` : 'Focus · nothing running';
 	const statuses = useMemo(() => Array.from(new Set(canvasNodes.flatMap((node) => node.plan ? [node.plan.status] : []))), [canvasNodes]);
 	const services = useMemo(() => Array.from(new Set(canvasNodes.flatMap((node) => node.plan?.service ? [node.plan.service] : []))).sort(), [canvasNodes]);
 	const normalizedSearchQuery = searchQuery.trim().toLowerCase();
@@ -112,18 +143,18 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 		draggable: false,
 		selectable: false,
 		style: { width: section.width, height: section.height, zIndex: 0, pointerEvents: 'none' },
-		data: { node: {} as DomainNode, section, selected: false, conflicted: false, onSelect: () => {}, onKeyboardMove: () => {}, onSetCollapsed: () => {}, onReload, layoutAvailable, onRemoveSection, onMoveSection }
+		data: { node: {} as DomainNode, section, selected: false, conflicted: false, dimmed: section.nodeIds.length > 0 && section.nodeIds.every((id) => focusDimmedIds.has(id)), onSelect: () => {}, onKeyboardMove: () => {}, onSetCollapsed: () => {}, onReload, layoutAvailable, onRemoveSection, onMoveSection }
 	})), ...visibleDomainNodes.map((node): CanvasFlowNode => ({
 		id: node.id,
 		type: node.kind,
 		position: node.position,
 		draggable: canMove(node, layoutAvailable),
 		selectable: true,
-		data: { node, selected: node.id === selectedId, sectionSelected: sectionSelection.includes(node.id), conflicted: conflicts.includes(node.id), onSelect: (id, additive) => additive && id ? toggleSectionSelection(id) : onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), onSetCollapsed, onReload, layoutAvailable }
-	}))], [conflicts, layoutAvailable, onMoveNode, onReload, onRemoveSection, onSelect, onSetCollapsed, sectionSelection, selectedId, visibleDomainNodes, visibleSections]);
+		data: { node, selected: node.id === selectedId, sectionSelected: sectionSelection.includes(node.id), conflicted: conflicts.includes(node.id), dimmed: focusDimmedIds.has(node.id), onSelect: (id, additive) => additive && id ? toggleSectionSelection(id) : onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), onSetCollapsed, onReload, layoutAvailable }
+	}))], [conflicts, focusDimmedIds, layoutAvailable, onMoveNode, onReload, onRemoveSection, onSelect, onSetCollapsed, sectionSelection, selectedId, visibleDomainNodes, visibleSections]);
 	const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNode>(modelNodes);
 	useEffect(() => setNodes(modelNodes), [modelNodes, setNodes]);
-	const edges = useMemo(() => projection.connections.filter((connection) => visibleIDs.has(connection.source) && visibleIDs.has(connection.target)).map((connection): Edge => ({ id: connection.id, source: connection.source, target: connection.target, selectable: false, focusable: false, className: `canvas-edge canvas-edge-${connection.kind}` })), [projection.connections, visibleIDs]);
+	const edges = useMemo(() => projection.connections.filter((connection) => visibleIDs.has(connection.source) && visibleIDs.has(connection.target) && !focusDimmedIds.has(connection.source) && !focusDimmedIds.has(connection.target)).map((connection): Edge => ({ id: connection.id, source: connection.source, target: connection.target, selectable: false, focusable: false, className: `canvas-edge canvas-edge-${connection.kind}` })), [focusDimmedIds, projection.connections, visibleIDs]);
 	const onDragStop: OnNodeDrag<CanvasFlowNode> = (_, node) => {
 		if (node.type === 'section') {
 			const id = node.id.replace(/^section:/, '');
@@ -156,6 +187,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 			<div className="canvas-board-toolbar">
 				<CanvasSearch query={searchQuery} onQueryChange={setSearchQuery} />
 				<button className="primary" type="button" disabled={aiSessionDisabled} onClick={onOpenAISession}><Bot size={15} /> AI session</button>
+				<div className="canvas-focus-control"><button className={focusOn ? 'secondary active' : 'secondary'} type="button" aria-pressed={focusOn} onClick={() => setFocusOn((value) => !value)}>{focusLabel}</button>{focusOn && focusActiveSet.sessionIds.size === 0 && <button className="link-button" type="button" onClick={() => setFocusOn(false)}>Turn off</button>}</div>
 				{onCreateSection && <button className="secondary" type="button" disabled={sectionSelection.length < 2} title={sectionSelection.length < 2 ? 'Cmd/Ctrl-click or drag-select at least two nodes to create a section.' : 'Create a named section around the selected nodes.'} onClick={() => { onCreateSection(sectionSelection); setSectionSelection([]); }}>Create section{sectionSelection.length ? ` (${sectionSelection.length})` : ''}</button>}
 				{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
 			</div>
@@ -228,7 +260,7 @@ function CanvasSectionNode({ data }: NodeProps<CanvasFlowNode>) {
 		if (event.key === 'ArrowDown') position.y += step;
 		data.onMoveSection?.(section.id, position, { x: position.x - section.position.x, y: position.y - section.position.y });
 	};
-	return <section className={`canvas-section-boundary ${sectionKind}`} aria-label={`Section: ${section.title}`}><header className="nodrag nopan"><button className="canvas-section-move-handle nodrag nopan" type="button" aria-label={`Move section ${section.title}`} onPointerDown={startMove} onKeyDown={moveByKeyboard}><strong className={`canvas-section-title ${sectionKind}`}>{section.title}</strong><span>{section.nodeIds.length} nodes</span></button><button className="nodrag nopan" type="button" aria-label={`Remove section ${section.title}`} onClick={() => data.onRemoveSection?.(section.id)}><X size={13} /></button></header></section>;
+	return <section className={`canvas-section-boundary ${sectionKind}${data.dimmed ? ' canvas-node-dimmed' : ''}`} aria-label={`Section: ${section.title}${data.dimmed ? ' (inactive)' : ''}`}><header className="nodrag nopan"><button className="canvas-section-move-handle nodrag nopan" type="button" aria-label={`Move section ${section.title}`} onPointerDown={startMove} onKeyDown={moveByKeyboard}><strong className={`canvas-section-title ${sectionKind}`}>{section.title}</strong><span>{section.nodeIds.length} nodes</span></button><button className="nodrag nopan" type="button" aria-label={`Remove section ${section.title}`} onClick={() => data.onRemoveSection?.(section.id)}><X size={13} /></button></header></section>;
 }
 
 function CanvasGraphControls({ layoutAvailable, layoutMessage, onArrange, serviceGridColumns, onReset, isFullscreen, onToggleFullscreen }: { layoutAvailable: boolean; layoutMessage?: string; onArrange: (grouping: 'status' | 'service' | 'service_status' | 'service_grid') => void; serviceGridColumns: number; onReset: () => void; isFullscreen: boolean; onToggleFullscreen: () => void }) {
@@ -279,10 +311,11 @@ function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 }
 
 function NodeFrame({ data, eyebrow, icon, children, addon, action, expanded = false, resizable = false }: { data: CanvasNodeData; eyebrow: string; icon: React.ReactNode; children: React.ReactNode; addon?: React.ReactNode; action?: React.ReactNode; expanded?: boolean; resizable?: boolean }) {
-	return <div className={`canvas-semantic-node kind-${data.node.kind} state-${data.node.state}${data.selected ? ' selected' : ''}${data.sectionSelected ? ' section-selected' : ''}${data.conflicted ? ' conflicted' : ''}${expanded ? ' expanded' : ''}`}>
+	return <div className={`canvas-semantic-node kind-${data.node.kind} state-${data.node.state}${data.selected ? ' selected' : ''}${data.sectionSelected ? ' section-selected' : ''}${data.conflicted ? ' conflicted' : ''}${expanded ? ' expanded' : ''}${data.dimmed ? ' canvas-node-dimmed' : ''}`}>
 		{resizable && <NodeResizer isVisible minWidth={520} minHeight={500} handleClassName="canvas-session-resize-handle" lineClassName="canvas-session-resize-line" />}
 		<Handle className="canvas-derived-handle" type="target" position={Position.Left} isConnectable={false} />
-		<div data-canvas-node-id={data.node.id} className="canvas-node-select-target" role="button" tabIndex={0} aria-label={`${eyebrow}: ${nodeSearchText(data.node)}`} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id, event.metaKey || event.ctrlKey); }} onKeyDown={(event) => {
+		<div data-canvas-node-id={data.node.id} className="canvas-node-select-target" role="button" tabIndex={data.dimmed ? -1 : 0} aria-label={`${eyebrow}: ${nodeSearchText(data.node)}${data.dimmed ? ' (inactive)' : ''}`} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id, event.metaKey || event.ctrlKey); }} onKeyDown={(event) => {
+		if (data.dimmed) return;
 		if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); data.onSelect(data.node.id); return; }
 		if (!canMove(data.node, data.layoutAvailable) || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
 		event.preventDefault();
@@ -391,6 +424,7 @@ function nodeSearchText(node: DomainNode) {
 }
 
 function stateLabel(node: DomainNode) { return node.state === 'forbidden' ? 'Access restricted' : 'Reference unavailable'; }
+function count(n: number, noun: string) { return `${n} ${noun}${n === 1 ? '' : 's'}`; }
 function formatFacet(value: string) { return value.replaceAll('_', ' ').replace(/^./, (character) => character.toUpperCase()); }
 function toggleValue(values: string[], value: string) { return values.includes(value) ? values.filter((candidate) => candidate !== value) : [...values, value]; }
 function gitSummary(status?: GitStatus) {

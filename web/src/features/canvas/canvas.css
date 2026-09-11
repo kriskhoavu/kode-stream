@@ -61,9 +61,10 @@
     radial-gradient(140% 70% at 50% 0%, color-mix(in srgb, var(--blue) 4%, transparent), transparent 64%),
     color-mix(in srgb, var(--panel-soft) 88%, var(--line) 12%);
 }
-.canvas-board-toolbar { display: grid; grid-template-columns: minmax(240px, 1fr) auto auto; gap: 10px; align-items: center; }
+.canvas-board-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .canvas-board-toolbar .plan-search { min-height: 40px; box-shadow: var(--shadow-soft); }
-.canvas-search { min-width: 240px; }
+.canvas-board-toolbar > button, .canvas-board-toolbar > .canvas-focus-control { flex: 0 0 auto; }
+.canvas-search { flex: 1 1 240px; min-width: 240px; }
 .canvas-search input { width: 100%; border: 0; background: transparent; outline: 0; }
 .canvas-facet-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .canvas-facet-row .facet-bar { margin: 0; }
@@ -72,6 +73,14 @@
 .canvas-arrange-menu .facet-option-list button { min-height: 34px; border: 0; border-radius: 6px; background: transparent; color: var(--text); padding: 0 8px; text-align: left; }
 .canvas-arrange-menu .facet-option-list button:hover { background: var(--panel-soft); }
 .canvas-conflict-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--danger); font-size: 12px; }
+.canvas-focus-control { display: inline-flex; align-items: center; gap: 8px; }
+.canvas-board-toolbar .secondary.active { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--panel)); color: var(--blue); }
+.canvas-focus-control .link-button { border: 0; background: transparent; color: var(--blue); font-size: 12px; text-decoration: underline; cursor: pointer; }
+/* Dim, do not hide: positions and layout stay put so Focus never triggers a
+ * React Flow re-layout. Only the select target loses pointer events, so a
+ * dimmed section boundary's own drag handle still works. */
+.canvas-node-dimmed { opacity: .35; }
+.canvas-node-dimmed .canvas-node-select-target { pointer-events: none; }
 .canvas-semantic-node { position: relative; width: 245px; min-height: 116px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 8px 24px rgb(0 0 0 / .09); color: var(--text); }
 .canvas-semantic-node.kind-workspace { border-color: color-mix(in srgb, var(--blue) 38%, var(--line)); background: color-mix(in srgb, var(--blue) 4%, var(--panel)); }
 .canvas-semantic-node.kind-workspace .canvas-node-select-target > header { border-bottom-color: color-mix(in srgb, var(--blue) 26%, var(--line)); background: color-mix(in srgb, var(--blue) 9%, var(--panel)); color: var(--blue); }
@@ -182,8 +191,8 @@ body.is-resizing-panel .canvas-workbench-resize-handle { opacity: 1; }
 .canvas-session-lifecycle p { margin: 0; line-height: 1.5; }
 .canvas-session-terminal > p, .canvas-session-terminal-error { margin: 0; padding: 18px; color: var(--muted); font-size: 12px; }
 .canvas-session-terminal-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--danger); }
-@media (max-width: 1020px) { .canvas-board-toolbar { grid-template-columns: minmax(220px, 1fr) auto auto; } .canvas-board-toolbar .secondary.danger { grid-column: 2 / -1; } }
-@media (max-width: 800px) { .canvas-toolbar { min-height: 0; overflow-y: auto; } .canvas-search { min-width: 0; } .canvas-board-toolbar { grid-template-columns: 1fr; } .canvas-board-toolbar .secondary.danger { grid-column: auto; } .canvas-facet-row { align-items: stretch; flex-direction: column; } .canvas-facet-row .facet-bar { display: grid; grid-template-columns: 1fr; } .canvas-facet-row .facet-menu, .canvas-facet-row .facet-trigger { width: 100%; } .canvas-board { inset-block-start: 316px; } }
+@media (max-width: 1020px) { .canvas-search { flex-basis: 220px; min-width: 0; } }
+@media (max-width: 800px) { .canvas-toolbar { min-height: 0; overflow-y: auto; } .canvas-search { min-width: 0; } .canvas-board-toolbar > button, .canvas-board-toolbar > .canvas-focus-control { flex: 1 1 auto; } .canvas-facet-row { align-items: stretch; flex-direction: column; } .canvas-facet-row .facet-bar { display: grid; grid-template-columns: 1fr; } .canvas-facet-row .facet-menu, .canvas-facet-row .facet-trigger { width: 100%; } .canvas-board { inset-block-start: 316px; } }
 @media (max-width: 900px) { .canvas-workbench.open { position: absolute; z-index: 8; inset: 0 0 0 auto; width: min(var(--canvas-workbench-width, 410px), 94vw); max-width: 94vw; box-shadow: -16px 0 36px rgb(0 0 0 / .18); } }
 @media (max-width: 800px) { .canvas-semantic-node.expanded.kind-session { width: 560px; } }
 @media (prefers-reduced-motion: reduce) { .canvas-semantic-node, .canvas-workbench { transition: none; } }

@@ -562,6 +562,15 @@ export interface CanvasLayout { id: string; ownerUserId?: string; workspaceId: s
 export interface CanvasPlacementPatch { nodeId: string; entityRef: CanvasEntityRef; position: CanvasPosition; collapsed: boolean; expectedRevision: number; }
 export interface SafeSessionPlanRef { itemId: string; itemPath: string; identifier?: string; branchKey: string; observedCommit?: string; }
 export interface SafeSessionRecord { id: string; workspaceId: string; planRef?: SafeSessionPlanRef; provider: string; intent: string; requestedBranch: string; observedCommit?: string; state: EmbeddedAISessionState | 'interrupted'; startedAt: string; endedAt?: string; exitCode?: number; lastKnownAt: string; live?: boolean; }
+
+export type SessionFileStatus = 'A' | 'M' | 'D' | 'R' | 'C' | '?';
+export interface SessionFile { path: string; status: SessionFileStatus; oldPath?: string; }
+export type SessionChangesAvailability = 'available' | 'unavailable' | 'unsupported';
+export type SessionChangesReason = 'launch_commit_unknown' | 'launch_commit_missing' | 'workspace_missing' | 'content_provider_unsupported';
+export interface SessionChanges { sessionId: string; launchCommit: string; headCommit: string; headMoved: number; files: SessionFile[]; additions: number; deletions: number; truncated: boolean; availability: SessionChangesAvailability; reason?: SessionChangesReason; }
+export type SessionScope = 'active' | 'all';
+export interface GlobalSessionRow { record: SafeSessionRecord; workspaceName: string; checkoutBranch: string; planTitle?: string; changesCount?: number; }
+export interface GlobalSessionsResponse { rows: GlobalSessionRow[]; truncated: boolean; }
 export interface CanvasWorkspaceNode { id: string; name?: string; branch?: string; commit?: string; git?: GitStatus; providerAxes: WorkspaceProviderAxes; actions: Partial<Record<WorkspaceAction, ActionCapability>>; verification?: VerificationJob; }
 export interface CanvasPlanNode { itemId: string; identifier?: string; title?: string; service?: string; status: ItemStatus; branch?: string; commit?: string; editable: boolean; actions: Partial<Record<WorkspaceAction, ActionCapability>>; }
 export interface CanvasSessionNode { record: SafeSessionRecord; }

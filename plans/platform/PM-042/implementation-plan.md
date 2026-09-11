@@ -31,14 +31,14 @@ All code, fields, API params, and TS types must use:
 
 ## Phases Summary
 
-| Phase | Name                                         | Track      | Status  |
-|-------|----------------------------------------------|------------|---------|
-| B1    | Git since-commit readers                     | Backend    | Pending |
-| B2    | Session changes, global list, and API        | Backend    | Pending |
-| F1    | Types, API client, and Focus mode            | Frontend   | Pending |
-| F2    | Workbench Sessions and Changes tabs          | Frontend   | Pending |
-| F3    | Sessions page                                | Frontend   | Pending |
-| I1    | Browser journey, docs, and final integration | Full stack | Pending |
+| Phase | Name                                         | Track      | Status   |
+|-------|----------------------------------------------|------------|----------|
+| B1    | Git since-commit readers                     | Backend    | Pending  |
+| B2    | Session changes, global list, and API        | Backend    | Pending  |
+| F1    | Types, API client, and Focus mode            | Frontend   | Complete |
+| F2    | Workbench Sessions and Changes tabs          | Frontend   | Pending  |
+| F3    | Sessions page                                | Frontend   | Pending  |
+| I1    | Browser journey, docs, and final integration | Full stack | Pending  |
 
 ## Backend Phases
 
@@ -78,10 +78,10 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] Types and client methods from the frontend design.
-- [ ] Focus toggle in the Canvas toolbar, active-set computation memoised on the projection, `.canvas-node-dimmed`
+- [x] Types and client methods from the frontend design.
+- [x] Focus toggle in the Canvas toolbar, active-set computation memoised on the projection, `.canvas-node-dimmed`
   styling, edge filtering, persisted preference, empty label.
-- [ ] Tests: active set with live and non-live sessions; dimmed nodes keep positions; preference round trip.
+- [x] Tests: active set with live and non-live sessions; dimmed nodes keep positions; preference round trip.
 
 **Verification:** `npm run typecheck && npm test -- --run canvas`
 

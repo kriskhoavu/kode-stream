@@ -11,6 +11,9 @@ import type {
 	EmbeddedAISessionLaunchInput,
   EmbeddedAISessionResult,
 	SafeSessionRecord,
+	SessionChanges,
+	SessionScope,
+	GlobalSessionsResponse,
   E2ERunbookList,
   AppState,
   AgentConnectToken,
@@ -250,6 +253,9 @@ export const api = {
 		return (await request<SafeSessionRecord[] | null>(`/api/ai/session-records?${query.toString()}`, undefined, false)) ?? [];
 	},
   cancelEmbeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
+	listSessions: (scope: SessionScope) => request<GlobalSessionsResponse>(`/api/sessions?scope=${encodeURIComponent(scope)}`),
+	sessionChanges: (sessionId: string) => request<SessionChanges>(`/api/sessions/${encodeURIComponent(sessionId)}/changes`),
+	sessionFileDiff: (sessionId: string, path: string) => request<{ path: string; diff: string; truncated: boolean }>(`/api/sessions/${encodeURIComponent(sessionId)}/diff?path=${encodeURIComponent(path)}`),
   health: () => request<{ status?: string }>('/api/health', undefined, false),
   localServerReachable: async () => {
     try {

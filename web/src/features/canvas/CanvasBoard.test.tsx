@@ -16,7 +16,7 @@ vi.mock('@xyflow/react', async () => {
 	const FlowContext = React.createContext(false);
 	return {
 		ReactFlowProvider: ({ children }: { children: ReactNode }) => <FlowContext.Provider value>{children}</FlowContext.Provider>,
-		ReactFlow: ({ nodes, edges, nodeTypes, onNodeDragStop, onNodeClick, onlyRenderVisibleElements, nodesDraggable, children }: { nodes: Array<{ id: string; type: string; data: Record<string, unknown>; position: { x: number; y: number }; draggable?: boolean }>; edges: Array<{ id: string }>; nodeTypes: Record<string, ComponentType<{ data: Record<string, unknown> }>>; onNodeDragStop: (event: unknown, node: unknown) => void; onNodeClick: (event: unknown, node: { id: string }) => void; onlyRenderVisibleElements: boolean; nodesDraggable: boolean; children: ReactNode }) => <div data-testid="react-flow" data-nodes={nodes.length} data-edges={edges.length} data-visible-only={String(onlyRenderVisibleElements)} data-draggable={String(nodesDraggable)}>{nodes.map((node) => { const Component = nodeTypes[node.type]; return <div key={node.id} data-draggable-node={String(node.draggable)}><Component data={node.data} /><button type="button" onClick={() => onNodeDragStop({}, { ...node, position: { x: 999, y: 888 } })}>drag {node.id}</button><button type="button" onClick={() => onNodeClick({}, node)}>select {node.id}</button></div>; })}{children}</div>,
+		ReactFlow: ({ nodes, edges, nodeTypes, onNodeDragStop, onNodeClick, onlyRenderVisibleElements, nodesDraggable, children }: { nodes: Array<{ id: string; type: string; data: Record<string, unknown>; position: { x: number; y: number }; draggable?: boolean }>; edges: Array<{ id: string }>; nodeTypes: Record<string, ComponentType<{ data: Record<string, unknown> }>>; onNodeDragStop: (event: unknown, node: unknown) => void; onNodeClick: (event: unknown, node: { id: string }) => void; onlyRenderVisibleElements: boolean; nodesDraggable: boolean; children: ReactNode }) => <div data-testid="react-flow" data-nodes={nodes.length} data-edges={edges.length} data-visible-only={String(onlyRenderVisibleElements)} data-draggable={String(nodesDraggable)}>{nodes.map((node) => { const Component = nodeTypes[node.type]; return <div key={node.id} data-draggable-node={String(node.draggable)} data-position={JSON.stringify(node.position)}><Component data={node.data} /><button type="button" onClick={() => onNodeDragStop({}, { ...node, position: { x: 999, y: 888 } })}>drag {node.id}</button><button type="button" onClick={() => onNodeClick({}, node)}>select {node.id}</button></div>; })}{children}</div>,
 		Background: () => null,
 		Controls: () => <div data-testid="flow-controls" />,
 		Handle: () => null,
@@ -31,7 +31,7 @@ vi.mock('@xyflow/react', async () => {
 });
 
 describe('CanvasBoard', () => {
-	beforeEach(() => vi.clearAllMocks());
+	beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
 
 	it('uses an explicit disclosure action and keeps expansion independent from selection', async () => {
 		vi.mocked(api.embeddedAISession).mockResolvedValue({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' });
@@ -173,6 +173,96 @@ describe('CanvasBoard', () => {
 		expect(onMoveSection).toHaveBeenCalledWith('section-1', { x: 332, y: -30 }, { x: 12, y: 0 });
 	});
 
+	it('computes the Focus active set from live running sessions and ignores non-live ones', () => {
+		renderBoard(focusProjection());
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		expect(screen.getByRole('button', { name: /^Focus/ })).toHaveTextContent('Focus · 1 plan · 1 session');
+		expect(screen.getByLabelText('Plan: PM-037 Focused Canvas main')).toBeInTheDocument();
+		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
+	});
+
+	it('pluralizes the Focus label for more than one active plan and session', () => {
+		const projection = focusProjection();
+		const activeSession2 = projection.nodes.find((node) => node.id === 'session:session-2')!;
+		activeSession2.session = { record: { ...activeSession2.session!.record, state: 'running', live: true } };
+		const plan1 = projection.nodes.find((node) => node.id === 'plan:item-1')!;
+		const session3: CanvasNode = { ...activeSession2, id: 'session:session-3', entityRef: { ...activeSession2.entityRef, sessionId: 'session-3' }, session: { record: { ...activeSession2.session!.record, id: 'session-3' } } };
+		projection.nodes.push(session3);
+		projection.connections.push({ id: 'four', source: plan1.id, target: session3.id, kind: 'session_launched_from', sourceOfTruth: 'derived' });
+		renderBoard(projection);
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		expect(screen.getByRole('button', { name: /^Focus/ })).toHaveTextContent('Focus · 2 plans · 3 sessions');
+	});
+
+	it('dims non-active nodes without removing them from the board', () => {
+		renderBoard(focusProjection());
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '4');
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '4');
+		const dimmedPlan = screen.getByLabelText('Plan: PM-038 Focused Canvas main (inactive)');
+		expect(dimmedPlan.closest('.canvas-semantic-node')).toHaveClass('canvas-node-dimmed');
+		const dimmedSession = screen.getByLabelText('Session: codex main exited (inactive)');
+		expect(dimmedSession.closest('.canvas-semantic-node')).toHaveClass('canvas-node-dimmed');
+		const activePlan = screen.getByLabelText('Plan: PM-037 Focused Canvas main');
+		expect(activePlan.closest('.canvas-semantic-node')).not.toHaveClass('canvas-node-dimmed');
+	});
+
+	it('takes dimmed nodes out of the tab order and ignores their keyboard input', () => {
+		const onMoveNode = vi.fn();
+		renderBoard(focusProjection(), { onMoveNode });
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		const dimmedPlan = screen.getByLabelText('Plan: PM-038 Focused Canvas main (inactive)');
+		expect(dimmedPlan).toHaveAttribute('tabIndex', '-1');
+		fireEvent.keyDown(dimmedPlan, { key: 'ArrowRight' });
+		expect(onMoveNode).not.toHaveBeenCalled();
+		const activePlan = screen.getByLabelText('Plan: PM-037 Focused Canvas main');
+		expect(activePlan).toHaveAttribute('tabIndex', '0');
+	});
+
+	it('keeps node positions unchanged when Focus is toggled on for the same projection', () => {
+		renderBoard(focusProjection());
+		const before = screen.getByLabelText('Plan: PM-038 Focused Canvas main').closest('[data-draggable-node]')?.getAttribute('data-position');
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		const after = screen.getByLabelText('Plan: PM-038 Focused Canvas main (inactive)').closest('[data-draggable-node]')?.getAttribute('data-position');
+		expect(before).toBeTruthy();
+		expect(after).toEqual(before);
+	});
+
+	it('falls back to Focus off when the stored preference value is invalid', () => {
+		localStorage.setItem('kodeStream.canvas-focus', JSON.stringify('yes'));
+		renderBoard(baseProjection());
+		expect(screen.getByRole('button', { name: 'Focus' })).toHaveAttribute('aria-pressed', 'false');
+	});
+
+	it('drops edges touching a dimmed node when Focus is on', () => {
+		renderBoard(focusProjection());
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '2');
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '1');
+	});
+
+	it('shows a nothing-running label with a Turn off affordance when no session is active', () => {
+		const projection = baseProjection();
+		projection.nodes[2] = { ...projection.nodes[2], session: { record: { ...projection.nodes[2].session!.record, state: 'exited', live: false } } };
+		renderBoard(projection);
+		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		expect(screen.getByRole('button', { name: /^Focus/ })).toHaveTextContent('Focus · nothing running');
+		fireEvent.click(screen.getByRole('button', { name: 'Turn off' }));
+		expect(screen.getByRole('button', { name: 'Focus' })).toHaveAttribute('aria-pressed', 'false');
+	});
+
+	it('exposes aria-pressed on the Focus toggle and persists the preference across renders', () => {
+		const first = renderBoard(baseProjection());
+		const button = screen.getByRole('button', { name: 'Focus' });
+		expect(button).toHaveAttribute('aria-pressed', 'false');
+		fireEvent.click(button);
+		expect(button).toHaveAttribute('aria-pressed', 'true');
+		expect(JSON.parse(localStorage.getItem('kodeStream.canvas-focus') ?? 'null')).toBe(true);
+		first.unmount();
+		renderBoard(baseProjection());
+		expect(screen.getByRole('button', { name: /^Focus/ })).toHaveAttribute('aria-pressed', 'true');
+	});
+
 	it.each([25, 100, 300])('keeps %i placements virtualized', (count) => {
 		const template = baseProjection().nodes[1];
 		const nodes = Array.from({ length: count }, (_, index): CanvasNode => ({ ...template, id: `plan:${index}`, entityRef: { ...template.entityRef, itemId: String(index) }, position: { x: index * 10, y: index * 5 }, plan: { ...template.plan!, itemId: String(index), identifier: `PM-${index}` } }));
@@ -197,5 +287,19 @@ function baseProjection(): CanvasProjection {
 		],
 		connections: [{ id: 'one', source: 'workspace:workspace-1', target: 'plan:item-1', kind: 'repository_contains', sourceOfTruth: 'derived' }, { id: 'two', source: 'plan:item-1', target: 'session:session-1', kind: 'session_launched_from', sourceOfTruth: 'derived' }],
 		unplaced: []
+	};
+}
+
+/** Adds a second plan and a non-live, non-running session launched from it, so Focus mode has both an active pair (item-1/session-1) and an inactive one (item-2/session-2) to distinguish. */
+function focusProjection(): CanvasProjection {
+	const base = baseProjection();
+	const plan = base.nodes[1];
+	const session = base.nodes[2];
+	const plan2: CanvasNode = { ...plan, id: 'plan:item-2', entityRef: { ...plan.entityRef, itemId: 'item-2' }, position: { x: 900, y: 0 }, plan: { ...plan.plan!, itemId: 'item-2', identifier: 'PM-038' } };
+	const session2: CanvasNode = { ...session, id: 'session:session-2', entityRef: { ...session.entityRef, sessionId: 'session-2' }, position: { x: 1200, y: 420 }, session: { record: { ...session.session!.record, id: 'session-2', state: 'exited', live: false } } };
+	return {
+		...base,
+		nodes: [...base.nodes, plan2, session2],
+		connections: [...base.connections, { id: 'three', source: 'plan:item-2', target: 'session:session-2', kind: 'session_launched_from', sourceOfTruth: 'derived' }]
 	};
 }
