@@ -37,36 +37,54 @@ App.tsx                        # route 'sessions', left-nav entry "Sessions" bet
 
 ## Board: Focus Mode
 
-| Element     | Behaviour                                                                                                   |
-|-------------|-------------------------------------------------------------------------------------------------------------|
-| Toggle      | Toolbar button "Focus" with `aria-pressed`; label shows "Focus · n plans · m sessions" when on.             |
-| Active set  | Session nodes with state starting or running and `live`, their plans, and edges among them.                 |
-| Dimming     | Non-active nodes get `.canvas-node-dimmed` (opacity, no pointer events for selection); positions unchanged. |
-| Sections    | Unchanged; a section with no active member is dimmed with its members.                                      |
-| Persistence | Browser preference beside the node-type facet.                                                              |
-| Empty       | When nothing is active: "Focus · nothing running" and a one-click "Turn off".                               |
-| Cost        | The active set is one pass over `projection.nodes`, memoised on the projection; no extra fetch.             |
+The first cut dimmed inactive nodes in place. Trying it showed that dimming leaves the board just as crowded; Focus
+now removes everything inactive and lays out what remains.
+
+| Element      | Behaviour                                                                                                                                                                                                                                                                                                                                   |
+|--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Toggle       | Toolbar button "Focus" with `aria-pressed`; label shows "Focus · n plans · m sessions" when on.                                                                                                                                                                                                                                             |
+| Active set   | Session nodes with state starting or running and `live`, their plans, and edges among them.                                                                                                                                                                                                                                                 |
+| Hiding       | Every node, section, and edge outside the active set is removed from the rendered graph.                                                                                                                                                                                                                                                    |
+| Focus layout | Active plans stack in one column on the left; each plan's sessions sit in a row to its right, expanded so the terminal is visible; rows are spaced by the tallest node. The layout is virtual: it overrides positions only while Focus is on, nodes are not draggable, and the saved layout is untouched and restored when Focus turns off. |
+| Fit          | Turning Focus on fits the viewport to the focus layout; turning it off restores the saved viewport.                                                                                                                                                                                                                                         |
+| Persistence  | Browser preference for the toggle only; never the virtual positions.                                                                                                                                                                                                                                                                        |
+| Empty        | When nothing is active: "Focus · nothing running" and a one-click "Turn off".                                                                                                                                                                                                                                                               |
+| Cost         | The active set and the layout are one memoised pass over the projection; no extra fetch.                                                                                                                                                                                                                                                    |
 
 ## Workbench
 
-| Selection      | Tabs              | Content                                                                                                                                                                                                                         |
-|----------------|-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Workspace node | Info, Sessions    | Sessions: `SessionsTable` for this workspace and branch from the existing session-records endpoint. Open selects and expands the session node; Stop confirms then cancels; Changes selects the session node on its Changes tab. |
-| Session node   | Terminal, Changes | Terminal: existing embedded terminal. Changes: `SessionChangesPanel`.                                                                                                                                                           |
+| Selection      | Tabs              | Content                                                                                                                                                                                                      |
+|----------------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Workspace node | Info, Sessions    | Sessions: the Session Browser (below) for this workspace and branch. While this tab is active the panel widens to about 60vw, still resizable, so the live terminal is usable without leaving the Workbench. |
+| Session node   | Terminal, Changes | Terminal: session summary and Stop; the live terminal stays in the node. Changes: `SessionChangesPanel`.                                                                                                     |
 
-The Workbench currently hides itself for a session node; it now opens with the two tabs above. The terminal stays in
-the node and is not duplicated in the panel; the Terminal tab holds the session summary and Stop.
+## Session Browser
+
+One component serves the Workbench Sessions tab and the Sessions page. It follows the shape Orca uses for agents: a
+list of cards on the left, the live terminal of the selected one on the right.
+
+| Element     | Behaviour                                                                                                                                                                                                                                                |
+|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| List        | Cards grouped by plan (Workbench) or by workspace then plan (Sessions page). Each card: state glyph, title (plan title, else intent, else provider), provider, age since start, and for finished sessions the exit code. Sorted live first, then newest. |
+| State glyph | Spinner for starting or running, green dot for exited with code 0, red dot for a non-zero exit or interrupted, grey dot for cancelled. A text label always sits beside the glyph.                                                                        |
+| Filter      | One text filter over title, provider, plan; a "Live only" toggle, on by default when any session is live.                                                                                                                                                |
+| Detail      | Header with title, plan, branch, launch commit, started, duration; sub-tabs Terminal and Changes; Stop when live. Terminal reuses the Canvas session terminal component with `visible` true; Changes reuses `SessionChangesPanel`.                       |
+| Selection   | Arrow keys move the selection, Enter opens, the selected card is `aria-current`; remembered per browser per workspace.                                                                                                                                   |
+| Empty       | "No sessions yet. Start one from a plan on the Workbench." with a link on the Sessions page.                                                                                                                                                             |
+| Cost        | One list fetch, polled every 5 s while any row is live; the terminal attaches only for the selected session.                                                                                                                                             |
+
+`SessionsTable` is retired; both surfaces render the browser.
 
 ## Sessions Page
 
-| Element | Behaviour                                                                                                                                                                     |
-|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Scope   | Segmented control Active / All; default Active; persisted per browser.                                                                                                        |
-| Filters | Workspace multi-select; provider multi-select; text search over plan title and intent.                                                                                        |
-| Table   | Workspace, branch, plan, provider, state, started, duration, changes; sorted newest first.                                                                                    |
-| Actions | Open navigates to the Workbench for that workspace with the session selected and expanded; Stop confirms and cancels; Changes opens a side drawer with `SessionChangesPanel`. |
-| Live    | Polls every 5s while any row is live; a row that stops shows its exit code inline.                                                                                            |
-| Empty   | "No sessions running. Start one from a plan on the Workbench." with a link.                                                                                                   |
+| Element | Behaviour                                                                                                                       |
+|---------|---------------------------------------------------------------------------------------------------------------------------------|
+| Scope   | Segmented control Active / All; default Active; persisted per browser.                                                          |
+| Filters | Workspace multi-select; provider multi-select; text search over plan title and intent.                                          |
+| Browser | The Session Browser at page width, grouped by workspace then plan; the selected session's terminal is live in the detail pane.  |
+| Actions | Open on the board navigates to the Workbench with the session selected; Stop confirms and cancels; Changes is a detail sub-tab. |
+| Live    | Polls every 5s while any row is live; a row that stops shows its exit code inline.                                              |
+| Empty   | "No sessions running. Start one from a plan on the Workbench." with a link.                                                     |
 
 ## Accessibility
 

@@ -10,12 +10,14 @@ or launch path.
 
 ```text
 B1 Git since-commit readers ─> B2 Session changes + global list + API ─┬─> F2 Workbench tabs ──┐
-F1 Types, client, Focus mode ──────────────────────────────────────────┤                        ├─> I1 Journey + docs
-                                                                       └─> F3 Sessions page ───┘
+F1 Types, client, Focus mode ──────────────────────────────────────────┤                        ├─> F4 Focus hide + layout ─┬─> I1 Journey + docs
+                                                                       └─> F3 Sessions page ───┴─> F5 Session browser ─────┘
 ```
 
-Critical path is B1 -> B2 -> F2 -> I1. F1 depends only on the design and starts with B1. F2 and F3 both need B2 live
-and can run in parallel. There is no external gate.
+Critical path is B1 -> B2 -> F2 -> F5 -> I1. F1 depends only on the design and starts with B1. F2 and F3 both need B2
+live and can run in parallel. F4 and F5 were added after the first live trial: dimming did not declutter the board,
+and a session list without the live terminal was not worth opening. They are independent and run in parallel. There
+is no external gate.
 
 ## Terminology Lock
 
@@ -38,6 +40,8 @@ All code, fields, API params, and TS types must use:
 | F1    | Types, API client, and Focus mode            | Frontend   | Complete    |
 | F2    | Workbench Sessions and Changes tabs          | Frontend   | Complete    |
 | F3    | Sessions page                                | Frontend   | Complete    |
+| F4    | Focus hides and lays out the active set      | Frontend   | Pending     |
+| F5    | Session browser with live terminal           | Frontend   | Pending     |
 | I1    | Browser journey, docs, and final integration | Full stack | In progress |
 
 ## Backend Phases
@@ -118,6 +122,44 @@ All code, fields, API params, and TS types must use:
 **Verification:** `npm run typecheck && npm test -- --run sessions`
 
 **Commit:** `PM-042: Add the cross-workspace Sessions page`
+
+---
+
+### Phase F4: Focus Hides And Lays Out The Active Set
+
+**Deliverables:**
+
+- [ ] Focus removes inactive nodes, sections, and edges from the rendered graph instead of dimming them.
+- [ ] Virtual focus layout: active plans in a left column, each plan's sessions expanded in a row to its right, rows
+  spaced by the tallest node; positions override only while Focus is on; nodes not draggable in Focus; saved layout
+  untouched.
+- [ ] Fit the viewport to the focus layout on toggle on; restore the saved viewport on toggle off.
+- [ ] Remove `.canvas-node-dimmed` and the dimmed data flag.
+- [ ] Tests: inactive nodes absent from the graph; layout positions per the rule; toggling off restores saved
+  positions; nodes not draggable in Focus.
+
+**Verification:** `npm run typecheck && npm test -- --run canvas`
+
+**Commit:** `PM-042: Make Focus hide the inactive board and lay out the active set`
+
+---
+
+### Phase F5: Session Browser With Live Terminal
+
+**Deliverables:**
+
+- [ ] `features/sessions/SessionBrowser.tsx`: list of grouped cards with state glyphs, text filter, Live-only toggle,
+  keyboard selection, detail pane with Terminal and Changes sub-tabs and Stop.
+- [ ] Workbench Sessions tab renders the browser and widens the panel to a browser width while active.
+- [ ] Sessions page renders the browser at page width grouped by workspace then plan.
+- [ ] Retire `SessionsTable` in both features and the Sessions page drawer; keep `SessionChangesPanel` as the shared
+  Changes view (one copy, under `features/sessions/`).
+- [ ] Tests: grouping and glyphs per state; filter and Live-only; keyboard selection; terminal attaches only for the
+  selected session; Stop confirms; Workbench panel widens on the tab; page renders the browser.
+
+**Verification:** `npm run typecheck && npm test -- --run`
+
+**Commit:** `PM-042: Browse sessions with a live terminal in the Workbench and the Sessions page`
 
 ---
 
