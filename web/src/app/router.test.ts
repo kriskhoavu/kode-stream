@@ -33,6 +33,18 @@ describe('router', () => {
 		expect(canvasPath()).toBe('/canvas');
 	});
 
+	it('parses and builds a selected Canvas node for a Sessions page handoff', () => {
+		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&selectedNodeId=session%3Aembedded-1');
+		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', selectedNodeId: 'session:embedded-1' } });
+		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', selectedNodeId: 'session:embedded-1' } })).toBe('/canvas?workspaceId=ws+one&selectedNodeId=session%3Aembedded-1');
+	});
+
+	it('parses and builds the Sessions route', () => {
+		window.history.pushState(null, '', '/sessions');
+		expect(routeFromLocation()).toEqual({ name: 'sessions' });
+		expect(pathForRoute({ name: 'sessions' })).toBe('/sessions');
+	});
+
   it('parses and builds Branch Review selections', () => {
     window.history.pushState(null, '', '/review?workspaceId=ws+one&branch=feature%2Fone');
     expect(routeFromLocation()).toEqual({ name: 'review', location: { workspaceId: 'ws one', branch: 'feature/one' } });

@@ -2,10 +2,28 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { routeFromLocation } from './app/router';
 import { App, LocalServerUnavailable } from './App';
+import { api } from './shared/api';
+import type { WorkspaceConfig } from './lib/types';
+
+vi.mock('./pages/CanvasPage', () => ({
+  CanvasPage: ({ workspace }: { workspace?: WorkspaceConfig }) => <div data-testid="canvas-page">Canvas for {workspace?.name ?? 'none'}</div>
+}));
+
+vi.mock('./pages/SessionsPage', () => ({
+  SessionsPage: ({ onOpenSession }: { onOpenSession: (workspaceId: string, sessionNodeId: string) => void }) => (
+    <button type="button" onClick={() => onOpenSession('workspace-b', 'session:session-1')}>Open session in Workspace B</button>
+  )
+}));
+
+function workspace(id: string, name: string): WorkspaceConfig {
+  return { id, name, path: `/${id}`, baselineBranch: 'main', sources: [], createdAt: '2026-01-01T00:00:00.000Z' };
+}
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  localStorage.clear();
   window.history.replaceState(null, '', '/workstream');
 });
 
@@ -82,5 +100,25 @@ describe('App route transitions', () => {
     await waitFor(() => expect(document.title).toBe('Settings · Kode Stream'));
     expect(screen.getByText('Navigated to settings')).toBeInTheDocument();
     expect(document.getElementById('app-main')).toHaveFocus();
+  });
+});
+
+describe('App workspace routing', () => {
+  it('opening a session from a non-active workspace navigates to its canvas and selects that workspace', async () => {
+    vi.spyOn(api, 'state').mockResolvedValue({ mode: 'local' } as never);
+    vi.spyOn(api, 'workspaces').mockResolvedValue([workspace('workspace-a', 'Workspace A'), workspace('workspace-b', 'Workspace B')]);
+    localStorage.setItem('kodeStream.activeWorkspaceId', 'workspace-a');
+    window.history.replaceState(null, '', '/sessions');
+
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'Workspace A', expanded: false })).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open session in Workspace B' }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/canvas'));
+    expect(await screen.findByTestId('canvas-page')).toHaveTextContent('Canvas for Workspace B');
+    expect(screen.getByRole('button', { name: 'Workspace B', expanded: false })).toBeInTheDocument();
+    expect(localStorage.getItem('kodeStream.activeWorkspaceId')).toBe('workspace-b');
   });
 });

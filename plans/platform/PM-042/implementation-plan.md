@@ -37,7 +37,7 @@ All code, fields, API params, and TS types must use:
 | B2    | Session changes, global list, and API        | Backend    | Complete |
 | F1    | Types, API client, and Focus mode            | Frontend   | Complete |
 | F2    | Workbench Sessions and Changes tabs          | Frontend   | Pending  |
-| F3    | Sessions page                                | Frontend   | Pending  |
+| F3    | Sessions page                                | Frontend   | Complete |
 | I1    | Browser journey, docs, and final integration | Full stack | Pending  |
 
 ## Backend Phases
@@ -110,10 +110,10 @@ All code, fields, API params, and TS types must use:
 
 **Deliverables:**
 
-- [ ] `features/sessions/SessionsPage` with scope, filters, `SessionsTable`, changes drawer, empty state.
-- [ ] `useGlobalSessions` polling only while any row is live.
-- [ ] Route `sessions` and left-nav entry in `App.tsx`; Open navigates to the right workspace and node.
-- [ ] Tests: scope toggle changes the query; Open navigates; polling stops when nothing is live.
+- [x] `features/sessions/SessionsPage` with scope, filters, `SessionsTable`, changes drawer, empty state.
+- [x] `useGlobalSessions` polling only while any row is live.
+- [x] Route `sessions` and left-nav entry in `App.tsx`; Open navigates to the right workspace and node.
+- [x] Tests: scope toggle changes the query; Open navigates; polling stops when nothing is live.
 
 **Verification:** `npm run typecheck && npm test -- --run sessions`
 

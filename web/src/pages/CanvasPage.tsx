@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CanvasLocation } from '../app/router';
 import { useCanvasState } from '../features/canvas/useCanvasState';
 import { BranchUpstreamIndicator } from '../features/canvas/BranchUpstreamIndicator';
@@ -49,9 +49,21 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 
 	useEffect(() => {
 		if (workspaceId && location?.workspaceId !== workspaceId) {
-			onLocationChange({ workspaceId });
+			onLocationChange({ workspaceId, selectedNodeId: location?.selectedNodeId });
 		}
-	}, [location?.workspaceId, onLocationChange, workspaceId]);
+	}, [location?.selectedNodeId, location?.workspaceId, onLocationChange, workspaceId]);
+
+	// A Sessions page "Open" hands off a node id through the route; honour it
+	// exactly once against the loaded projection, then clear it so it never
+	// re-selects on a later refresh, checkout switch, or back navigation.
+	const consumedSelectionRef = useRef<string | undefined>(undefined);
+	useEffect(() => {
+		const target = location?.selectedNodeId;
+		if (!target || !canvas.projection || consumedSelectionRef.current === target) return;
+		consumedSelectionRef.current = target;
+		if (canvas.projection.nodes.some((node) => node.id === target)) setSelectedId(target);
+		onLocationChange({ ...location, selectedNodeId: undefined });
+	}, [canvas.projection, location, onLocationChange]);
 
 	const title = useMemo(() => canvas.projection?.nodes.find((node) => node.kind === 'workspace')?.workspace?.name ?? workspace?.name ?? 'Canvas', [canvas.projection, workspace?.name]);
 	const selectedNode = canvas.projection?.nodes.find((node) => node.id === selectedId);

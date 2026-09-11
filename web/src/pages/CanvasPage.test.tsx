@@ -50,6 +50,16 @@ describe('CanvasPage', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Session: codex' }));
 		await waitFor(() => expect(screen.queryByLabelText('Canvas Workbench')).not.toBeInTheDocument());
 	});
+
+	// The Sessions page hands off a node id through the route so Open can select
+	// the session there; it must apply once and then clear so a later refresh or
+	// checkout switch never re-selects it.
+	it('honours a selectedNodeId handed off through the route, once, then clears it', async () => {
+		canvasState.projection = sessionProjection();
+		const onLocationChange = vi.fn();
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, selectedNodeId: 'session:session-1' }} onLocationChange={onLocationChange} />);
+		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: workspace.id, selectedNodeId: undefined }));
+	});
 });
 
 const workspace: WorkspaceConfig = { id: 'workspace-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '' };
