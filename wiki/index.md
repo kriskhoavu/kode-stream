@@ -72,11 +72,11 @@ that matters is the `lastVerified` column below, which is each page's own.
 |------------------------------------------------|---------------------|-----------|--------|--------------|--------------------------------------------------------------------------------------|
 | [Browser Journey Index](e2e-testing/README.md) | `e2e-testing-index` | REFERENCE | anchor | never        | Canonical provider-neutral browser journeys maintained by implemented feature plans. |
 
-## e2e-testing/cross-domain
+## e2e-testing/quality
 
-| Page                                                                                        | Slug                           | Type   | Tier | lastVerified | Summary                                                                                                                    |
-|---------------------------------------------------------------------------------------------|--------------------------------|--------|------|--------------|----------------------------------------------------------------------------------------------------------------------------|
-| [Inspect And Launch E2E Quality Coverage](e2e-testing/cross-domain/e2e-quality-coverage.md) | `e2e-testing-quality-coverage` | HOW_TO | page | never        | Browser journey for finding local and canonical E2E coverage, inspecting results, and opening a constrained agent handoff. |
+| Page                                                                                   | Slug                           | Type   | Tier | lastVerified | Summary                                                                                                                    |
+|----------------------------------------------------------------------------------------|--------------------------------|--------|------|--------------|----------------------------------------------------------------------------------------------------------------------------|
+| [Inspect And Launch E2E Quality Coverage](e2e-testing/quality/e2e-quality-coverage.md) | `e2e-testing-quality-coverage` | HOW_TO | page | never        | Browser journey for finding local and canonical E2E coverage, inspecting results, and opening a constrained agent handoff. |
 
 ## e2e-testing/workspace
 
