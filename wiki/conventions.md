@@ -14,10 +14,12 @@ lastVerified: never
 <!-- chunkId: wiki-conventions-authority -->
 <!-- keywords: normative source, local mapping, corpus ownership -->
 
-The single normative specification is [Discovery Wiki Conventions](</Users/kdvu/Documents/0. CC/1. Discovery/main/wiki/conventions.md>).
-Read it there; this page does not reproduce it.
+The single normative specification is `wiki/conventions.md` in the main Discovery repository. Read it there; this page
+does not reproduce it.
 
-Repo-local mapping: workspace checkout, review, Canvas, and sessions belong to the workspace domain. Browser validation belongs to the workspace journey. Hosting, storage, and distribution are platform concerns.
+Repo-local mapping: workspace checkout, review, Canvas, and sessions belong to the `workspace` domain. Knowledge
+navigation belongs to the `knowledge` domain. Browser validation belongs to the workspace journey. Hosting, storage,
+and distribution are platform concerns. The corresponding valid slug prefixes are `workspace` and `knowledge`.
 
 ## Pending corpus decision
 <!-- chunkId: wiki-conventions-corpus-decision -->

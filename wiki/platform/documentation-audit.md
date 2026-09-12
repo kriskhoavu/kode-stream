@@ -80,7 +80,13 @@ The proposed boundary is: wiki pages own durable product behavior and current ev
 <!-- chunkId: platform-documentation-audit-known-conflicts -->
 <!-- keywords: documentation authority, local agent guide, normative standard -->
 
-[open] The repository agent guide currently describes `docs/domain/` as durable domain knowledge, while the requested standard assigns that role to the wiki. Consolidation needs an explicit repository-level decision after this audit.
+[live] `AGENTS.md` and the root `README.md` now route durable product behavior and implementation evidence to the wiki while retaining architecture and development material under `docs/`. Evidence: `AGENTS.md:3`, `AGENTS.md:39`, `README.md:46`.
+
+## Shared Lint Follow-up
+<!-- chunkId: platform-documentation-audit-shared-lint-follow-up -->
+<!-- keywords: shared lint, valid prefixes, workspace, knowledge -->
+
+[open] When should the shared `wiki_lint.py` add `workspace` and `knowledge` to `VALID_PREFIXES`? They are declared repo-local domains in [[wiki-conventions]], but the shared script still reports all 16 conforming slugs as unknown.
 
 ## Related pages
 

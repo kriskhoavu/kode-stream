@@ -31,21 +31,22 @@ Kode Stream has three supported deployment models. Storage is a separate choice 
 | Model                           | Install/run location                          | Workspace capability                                                                            | Storage                                  |
 |---------------------------------|-----------------------------------------------|-------------------------------------------------------------------------------------------------|------------------------------------------|
 | Local application               | User machine; Homebrew or local binary        | Full local reads, writes, Git, terminal, AI, runtime, and verification                          | `datadir` (default) or SQLite `database` |
-| Cloud Agent-Backed              | Cloud VM/container plus Agent on user machine | Cloud coordinates; Agent executes privileged actions locally                                    | Postgres `database`                      |
+| Cloud Agent-Backed              | Cloud VM/container plus Agent on user machine | Agent connection and metadata exist; durable command delivery remains pending                   | Postgres `database`                      |
 | Cloud Agentless Remote Snapshot | Cloud VM/container                            | Read-only provider snapshot pinned to a commit; no Agent, checkout, or hosted command execution | Postgres `database`                      |
 
 ```text
 Local: Browser -> loopback Kode Stream -> local repository
-Cloud + Agent: Browser -> Cloud API -> outbound Agent -> local repository
+Cloud + Agent: Browser -> Cloud API <-> outbound Agent metadata channel; commands pending
 Cloud snapshot: Browser -> Cloud API -> provider API -> immutable repository commit
 ```
 
 Remote Snapshot currently provides the commit-pinned backend foundation for metadata, tree, and file reads. Its
 self-service registration and snapshot-backed board/search UI remain planned work.
 
-See [Architecture](docs/architecture/overview.md) for the capability boundary, [Cloud modes](docs/domain/cloud/cloud-modes.md) for operating
-guidance, [Storage](docs/domain/storage/storage-architecture.md) for the storage decision matrix, and the
-[Documentation map](docs/README.md) for the full documentation taxonomy.
+See [Architecture](docs/architecture/overview.md) for the component boundary, the
+[Cloud runtime reference](wiki/platform/cloud-runtime-reference.md) and
+[storage reference](wiki/platform/storage-reference.md) for current behavior, and the [wiki index](wiki/index.md) for
+the authoritative knowledge corpus.
 
 To build and test the repository, see [Development](docs/development.md). Operator procedures live under
 [`deploy/`](deploy/README.md). [AGENTS.md](AGENTS.md) is the operating context for AI coding agents.
@@ -94,20 +95,22 @@ Removing a node or resetting layout changes presentation only. Cancelling a live
 PM-037 supports this workflow for Local checkouts and local execution; groups, notes, custom links, multiple canvases,
 Cloud Agent execution, and Remote Snapshot Canvas UX remain future capabilities.
 
-See [Terminal Canvas sessions](docs/domain/terminal/canvas-sessions.md) and
-[verification freshness](docs/domain/verification/canvas-freshness.md) for the safety and lifecycle details.
+See [Terminal Canvas concepts](wiki/domains/workspace/concepts/terminal-canvas.md) and the
+[Terminal Canvas reference](wiki/domains/workspace/reference/terminal-canvas-reference.md) for the safety and lifecycle
+details.
 
 ## Sessions
 
 Choose **Sessions** from the left nav to see every AI session across every registered workspace, not only the one
-open in Canvas. A **Focus** toggle on the Canvas toolbar narrows the board to plans with an active session, their
-session nodes, and the edges between them — everything else dims in place rather than being hidden, so the layout
-never reflows. Each session has a **Changes** view: the files the checkout has changed since the session launched,
+open in Canvas. A **Focus** toggle on the Canvas toolbar temporarily shows only plans with an active session, their
+session nodes, and the edges between them. The focused subset receives an automatic layout without changing saved node
+positions or the saved viewport. Each session has a **Changes** view: the files the checkout has changed since it launched,
 committed history plus working tree, with a per-file diff. Changes are computed from Git on request and are never
 stored; a session carries no transcript.
 
-See [Session Focus](docs/domain/terminal/session-focus.md) for the availability rules and the cross-workspace
-authorization the Sessions page follows.
+See [Session Focus](wiki/domains/workspace/concepts/session-focus.md) and its
+[reference](wiki/domains/workspace/reference/session-focus-reference.md) for availability and cross-workspace
+authorization rules.
 
 ## Quick Start
 

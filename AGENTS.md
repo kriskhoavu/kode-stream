@@ -1,7 +1,8 @@
 # Kode Stream Agent Context
 
-Read [README.md](README.md), [docs/architecture/overview.md](docs/architecture/overview.md), and
-[docs/development.md](docs/development.md) before making implementation changes.
+Read [README.md](README.md), [wiki/index.md](wiki/index.md),
+[docs/architecture/overview.md](docs/architecture/overview.md), and [docs/development.md](docs/development.md) before
+making implementation changes.
 
 ## Ownership
 
@@ -17,8 +18,8 @@ Read [README.md](README.md), [docs/architecture/overview.md](docs/architecture/o
 - Go backend, React frontend. Keep Gin in inbound HTTP adapters and composition roots only.
 - Storage goes through the storage abstraction, never directly to a driver. `datadir`, SQLite, and Postgres are
   selectable options, not parallel code paths.
-- App-owned state and repository-owned state stay separate; see
-  [storage architecture](docs/domain/storage/storage-architecture.md).
+- App-owned state and repository-owned state stay separate; see the
+  [storage reference](wiki/platform/storage-reference.md).
 - Deployment differences live behind adapters, not behind branches in feature code; see
   [deployment adapters](docs/architecture/deployment-adapters.md).
 - Avoid generic `common`, `utils`, or framework-centric packages.
@@ -35,7 +36,10 @@ Read [README.md](README.md), [docs/architecture/overview.md](docs/architecture/o
 ## Documentation Rules
 
 - Root `README.md` is the human entry point.
-- `docs/` holds durable reference only — [docs/README.md](docs/README.md) states the rule and routes by subject.
+- `wiki/` is the authoritative corpus for durable product behavior and implementation evidence; start at
+  [wiki/index.md](wiki/index.md).
+- `docs/` retains architecture and development material. Its overlapping domain pages are migration sources tracked by
+  the [documentation audit](wiki/platform/documentation-audit.md), not a second authority.
 - `deploy/` holds operator procedures beside the assets they drive — see [deploy/README.md](deploy/README.md).
 - `AGENTS.md` is operating context for agents, not a copy of plans.
 - Ticket-specific work lives in `plans/platform/PM-<NNN>/`.
