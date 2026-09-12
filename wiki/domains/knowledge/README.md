@@ -5,6 +5,7 @@ pageType: REFERENCE
 topics: knowledge, wiki, taxonomy, navigation
 summary: Knowledge pages are classified from their directory shape for browsing and journey discovery.
 sourceRef: |
+  plans/platform/PM-022/README.md
   PM-040 (plan retired) | Knowledge navigation
 lastVerified: 2026-09-12
 ---
@@ -15,7 +16,7 @@ lastVerified: 2026-09-12
 <!-- chunkId: knowledge-index-pages -->
 <!-- keywords: taxonomy concept, navigation reference, wiki structure -->
 
-[live] [[knowledge-wiki-taxonomy]] explains the browsing model and [[knowledge-wiki-taxonomy-reference]] records its classification and override rules. Evidence: `internal/knowledge/taxonomy.go:27`, `web/src/features/knowledge/taxonomy.ts:1`.
+[live] PM-022 [[knowledge-workspace]] and [[knowledge-workspace-reference]] describe discovery, reading, relationships, and refresh actions; [[knowledge-wiki-taxonomy]] and [[knowledge-wiki-taxonomy-reference]] record the later classification model. Evidence: `internal/knowledge/detector.go:50`, `internal/knowledge/taxonomy.go:27`, `web/src/features/knowledge/taxonomy.ts:1`.
 
 ## Not written yet
 <!-- chunkId: knowledge-index-not-written -->

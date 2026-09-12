@@ -19,11 +19,13 @@ that matters is the `lastVerified` column below, which is each page's own.
 
 ## domains/knowledge
 
-| Page                                                                              | Slug                                | Type      | Tier      | lastVerified | Summary                                                                                                                |
-|-----------------------------------------------------------------------------------|-------------------------------------|-----------|-----------|--------------|------------------------------------------------------------------------------------------------------------------------|
-| [Knowledge Navigation](domains/knowledge/README.md)                               | `knowledge-index`                   | REFERENCE | anchor    | 2026-09-12   | Knowledge pages are classified from their directory shape for browsing and journey discovery.                          |
-| [Wiki Taxonomy](domains/knowledge/concepts/wiki-taxonomy.md)                      | `knowledge-wiki-taxonomy`           | CONCEPT   | concepts  | 2026-09-12   | Wiki navigation derives buckets, areas, and reusable tiers from directory structure instead of product-specific names. |
-| [Wiki Taxonomy Reference](domains/knowledge/reference/wiki-taxonomy-reference.md) | `knowledge-wiki-taxonomy-reference` | REFERENCE | reference | 2026-09-12   | Reference for taxonomy inference, optional settings, warnings, and journey identification.                             |
+| Page                                                                                          | Slug                                | Type      | Tier      | lastVerified | Summary                                                                                                                                          |
+|-----------------------------------------------------------------------------------------------|-------------------------------------|-----------|-----------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Knowledge Navigation](domains/knowledge/README.md)                                           | `knowledge-index`                   | REFERENCE | anchor    | 2026-09-12   | Knowledge pages are classified from their directory shape for browsing and journey discovery.                                                    |
+| [Workspace Knowledge](domains/knowledge/concepts/knowledge-workspace.md)                      | `knowledge-workspace`               | CONCEPT   | concepts  | 2026-09-12   | Kode Stream discovers structured Markdown wikis in a workspace and turns their metadata and links into browsable pages and a relationship graph. |
+| [Wiki Taxonomy](domains/knowledge/concepts/wiki-taxonomy.md)                                  | `knowledge-wiki-taxonomy`           | CONCEPT   | concepts  | 2026-09-12   | Wiki navigation derives buckets, areas, and reusable tiers from directory structure instead of product-specific names.                           |
+| [Workspace Knowledge Reference](domains/knowledge/reference/knowledge-workspace-reference.md) | `knowledge-workspace-reference`     | REFERENCE | reference | 2026-09-12   | Reference for Knowledge discovery, metadata parsing, relationship resolution, query APIs, and guarded refresh actions.                           |
+| [Wiki Taxonomy Reference](domains/knowledge/reference/wiki-taxonomy-reference.md)             | `knowledge-wiki-taxonomy-reference` | REFERENCE | reference | 2026-09-12   | Reference for taxonomy inference, optional settings, warnings, and journey identification.                                                       |
 
 ## domains/workspace
 
@@ -82,7 +84,7 @@ that matters is the `lastVerified` column below, which is each page's own.
 
 ## Coverage
 
-33 pages in 6 groups. 22 carry a verification date; 11 carry `never`.
+35 pages in 6 groups. 24 carry a verification date; 11 carry `never`.
 
 Regenerate with:
 
