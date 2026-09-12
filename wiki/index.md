@@ -37,6 +37,7 @@ that matters is the `lastVerified` column below, which is each page's own.
 | [Automation Verification](domains/workspace/concepts/automation-verification.md)                           | `workspace-automation-verification`           | CONCEPT   | concepts  | 2026-09-12   | Automation verification runs selected browser specifications through a workspace-owned runtime contract.                                                       |
 | [Checkout And Branch Review Concepts](domains/workspace/concepts/branch-context.md)                        | `workspace-branch-context`                    | CONCEPT   | concepts  | never        | Kode Stream uses the Git checkout for every operational page and isolates other branches in commit-pinned read-only review.                                    |
 | [Review, Import, Or Activate Another Branch](domains/workspace/concepts/branch-review-workflows.md)        | `workspace-branch-review-workflows`           | HOW_TO    | concepts  | never        | How to inspect another branch safely, import one plan, or make the branch operational through guarded checkout.                                                |
+| [E2E Quality Coverage](domains/workspace/concepts/e2e-quality.md)                                          | `workspace-e2e-quality`                       | CONCEPT   | concepts  | 2026-09-12   | E2E Quality connects plan-local browser runbooks, reusable wiki journeys, recorded results, and an agent handoff.                                              |
 | [Jira-First Workstream Intake](domains/workspace/concepts/jira-workstream.md)                              | `workspace-jira-workstream`                   | CONCEPT   | concepts  | 2026-09-12   | A workspace can read Jira issue context and use it to seed a local Workstream item without mutating Jira.                                                      |
 | [Session Focus](domains/workspace/concepts/session-focus.md)                                               | `workspace-session-focus`                     | CONCEPT   | concepts  | 2026-09-12   | Session Focus connects active Canvas work, checkout changes, and the workspace session list.                                                                   |
 | [Use Terminal Canvas](domains/workspace/concepts/terminal-canvas-workflows.md)                             | `workspace-terminal-canvas-workflows`         | HOW_TO    | concepts  | never        | How to arrange work, launch a branch-safe terminal, and interpret Git and verification state in Canvas.                                                        |
@@ -47,6 +48,7 @@ that matters is the `lastVerified` column below, which is each page's own.
 | [Workspace Appearance Reference](domains/workspace/reference/appearance-reference.md)                      | `workspace-appearance-reference`              | REFERENCE | reference | 2026-09-12   | Reference for backdrop variants, route coverage, persistence, and reduced-motion behavior.                                                                     |
 | [Automation Verification Reference](domains/workspace/reference/automation-verification-reference.md)      | `workspace-automation-verification-reference` | REFERENCE | reference | 2026-09-12   | Reference for selecting, launching, and retaining browser automation verification jobs.                                                                        |
 | [Checkout And Branch Review Reference](domains/workspace/reference/branch-context-reference.md)            | `workspace-branch-context-reference`          | REFERENCE | reference | never        | API, synchronization, read-boundary, audit, and safety contracts for checkout-scoped operation and commit-pinned review.                                       |
+| [E2E Quality Coverage Reference](domains/workspace/reference/e2e-quality-reference.md)                     | `workspace-e2e-quality-reference`             | REFERENCE | reference | 2026-09-12   | Reference for E2E runbook discovery, canonical matching, result safety, and constrained AI launch.                                                             |
 | [Jira Workstream Reference](domains/workspace/reference/jira-workstream-reference.md)                      | `workspace-jira-workstream-reference`         | REFERENCE | reference | 2026-09-12   | Reference for workspace-scoped Jira configuration, read-only issue lookup, bounded attachment access, and local item creation.                                 |
 | [Session Focus Reference](domains/workspace/reference/session-focus-reference.md)                          | `workspace-session-focus-reference`           | REFERENCE | reference | 2026-09-12   | Reference for Workbench session listing, change availability, file diffs, and access controls.                                                                 |
 | [Terminal Canvas Reference](domains/workspace/reference/terminal-canvas-reference.md)                      | `workspace-terminal-canvas-reference`         | REFERENCE | reference | never        | Reference for Canvas ownership, branch-aware APIs, safe session records, and verification freshness.                                                           |
@@ -70,6 +72,12 @@ that matters is the `lastVerified` column below, which is each page's own.
 |------------------------------------------------|---------------------|-----------|--------|--------------|--------------------------------------------------------------------------------------|
 | [Browser Journey Index](e2e-testing/README.md) | `e2e-testing-index` | REFERENCE | anchor | never        | Canonical provider-neutral browser journeys maintained by implemented feature plans. |
 
+## e2e-testing/cross-domain
+
+| Page                                                                                        | Slug                           | Type   | Tier | lastVerified | Summary                                                                                                                    |
+|---------------------------------------------------------------------------------------------|--------------------------------|--------|------|--------------|----------------------------------------------------------------------------------------------------------------------------|
+| [Inspect And Launch E2E Quality Coverage](e2e-testing/cross-domain/e2e-quality-coverage.md) | `e2e-testing-quality-coverage` | HOW_TO | page | never        | Browser journey for finding local and canonical E2E coverage, inspecting results, and opening a constrained agent handoff. |
+
 ## e2e-testing/workspace
 
 | Page                                                                                         | Slug                                           | Type   | Tier | lastVerified | Summary                                                                                                                     |
@@ -85,7 +93,7 @@ that matters is the `lastVerified` column below, which is each page's own.
 
 ## Coverage
 
-36 pages in 6 groups. 25 carry a verification date; 11 carry `never`.
+39 pages in 7 groups. 27 carry a verification date; 12 carry `never`.
 
 Regenerate with:
 

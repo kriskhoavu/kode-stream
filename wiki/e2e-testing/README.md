@@ -26,6 +26,7 @@ environment-specific secrets out of durable documentation.
 
 - [[e2e-testing-workspace-branch-review-checkout]] validates review and checkout.
 - [[e2e-testing-workspace-terminal-canvas]] validates the spatial workbench.
+- [[e2e-testing-quality-coverage]] validates E2E coverage discovery, results, evidence, and agent handoff.
 - [[workspace-index]] holds the behavior and reference counterparts.
 
 ## Not written yet

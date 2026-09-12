@@ -19,6 +19,7 @@ lastVerified: never
 - [[workspace-terminal-canvas]], [[workspace-terminal-canvas-workflows]], and [[workspace-terminal-canvas-reference]] cover the spatial workbench.
 - [[workspace-session-focus]] and [[workspace-session-focus-reference]] cover active-session focus, the Workbench session list, and checkout-derived changes.
 - [[workspace-automation-verification]] and [[workspace-automation-verification-reference]] cover browser automation selection and execution.
+- [[workspace-e2e-quality]] and [[workspace-e2e-quality-reference]] cover agent-run browser journeys, results, and evidence.
 - [[workspace-appearance]] and [[workspace-appearance-reference]] cover the shared route backdrop and accessibility boundary.
 - [[workspace-lifecycle]] and [[workspace-lifecycle-reference]] cover registration, import, source structure, guarded changes, and reliability.
 - [[workspace-workstream-explorer]] and [[workspace-workstream-explorer-reference]] cover the primary planning surface, embedded repository context, search, and preview.
