@@ -1,8 +1,8 @@
 # Session Focus
 
 Session Focus makes the sessions a user already runs easier to see and act on: a Canvas filter that surfaces what is
-active right now, a per-session view of what the checkout has changed, and a page that lists sessions across every
-registered workspace. It adds no new kind of session, node, or launch path — everything hangs off the existing
+active right now, a per-session view of what the checkout has changed, and a Sessions list for the current Workbench
+checkout. It adds no new kind of session, node, or launch path — everything hangs off the existing
 `ai.SessionRecord` and the terminal manager that already owns its process.
 
 ## Session Changes
@@ -46,17 +46,23 @@ An infrastructure failure — a corrupt repository, a missing Git binary, or any
 exist" — is never reported as `launch_commit_missing`; it surfaces as a request failure instead, so a real outage is
 never mistaken for a routine unavailability.
 
-## The Global List's Authorization Rule
+## Session List Authorization
 
-The Sessions page lists sessions across every registered workspace, so it reuses the same workspace authorization
-the AI controller already applies to every other session endpoint (`authorizeWorkspace`), rather than a separate
-policy. A workspace the caller may not read is simply absent from the list — never a reported error — which keeps a
-denial indistinguishable from "no sessions here" and avoids turning the list into an oracle for workspace existence.
-The same rule extends to a session ID: `authorizeSession` resolves a session's owning workspace first and applies the
-identical check, so a session that does not exist gets the same 404 a denied workspace would.
+The Workbench Sessions view requests records for its current workspace and checkout, using the same workspace
+authorization the AI controller applies to every other session endpoint (`authorizeWorkspace`). The global session API
+retains the same boundary for API consumers: a workspace the caller may not read is absent rather than reported as an
+error. The same rule extends to a session ID: `authorizeSession` resolves a session's owning workspace first and applies
+the identical check, so a session that does not exist gets the same 404 a denied workspace would.
 
-This matters most in Cloud mode, where the global list must never leak another tenant's session names, workspace
-names, or changes across a workspace boundary the caller cannot otherwise see.
+This matters most in Cloud mode, where session APIs must never leak another tenant's session names, workspace names,
+or changes across a workspace boundary the caller cannot otherwise see.
+
+## Workbench Views
+
+Workbench has two checkout-scoped views. **Canvas** arranges plan and terminal-session nodes spatially. **Sessions**
+groups the same sessions by plan and shows Terminal or Changes detail in the main work area. **Open on board** switches
+back to Canvas and selects the session node. The selected-node panel remains a details surface; it does not host the
+workspace session list.
 
 ## Focus Mode's Active-Only Layout
 

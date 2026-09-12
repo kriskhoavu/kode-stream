@@ -3,7 +3,7 @@ slug: workspace-session-focus-reference
 title: Session Focus Reference
 pageType: REFERENCE
 topics: sessions, api, changes, authorization, polling
-summary: Reference for global session listing, change availability, file diffs, and access controls.
+summary: Reference for Workbench session listing, change availability, file diffs, and access controls.
 sourceRef: |
   PM-042 (plan retired) | Session APIs and Git computation
   PM-042 (plan retired) | Client state
@@ -37,11 +37,11 @@ Other Git failures remain server errors so corruption or missing infrastructure 
 
 An unavailable or unsupported diff returns conflict with its reason. Empty paths and paths beginning with `:` or `-` are rejected before Git is invoked.
 
-## Client Refresh
+## Workbench Session Loading
 <!-- chunkId: workspace-session-focus-reference-client-refresh -->
-<!-- keywords: polling interval, exponential backoff, request token, live session -->
+<!-- keywords: checkout filter, list reload, cancellation, projection refresh -->
 
-[live] The client polls every five seconds while live sessions exist and backs failures off through 5, 10, and 20 seconds while discarding stale request results. Evidence: `web/src/features/sessions/useGlobalSessions.ts:5`, `web/src/features/sessions/useGlobalSessions.ts:31`.
+[live] The Sessions Workbench view loads records for the current workspace and checkout. Stopping a session reloads both the list and the Canvas projection, while changing back to Canvas opens the selected session node without creating another process. Evidence: `web/src/features/canvas/CanvasSessionsView.tsx:20`, `web/src/features/canvas/CanvasSessionsView.tsx:37`, `web/src/pages/CanvasPage.tsx:76`.
 
 ## Not supported
 <!-- chunkId: workspace-session-focus-reference-not-supported -->
@@ -53,7 +53,9 @@ An unavailable or unsupported diff returns conflict with its reason. Empty paths
 <!-- chunkId: workspace-session-focus-reference-known-conflicts -->
 <!-- keywords: historical validation, two workspace, native keyboard -->
 
-[open] Has the full two-workspace journey, deterministic real edits, and native terminal keyboard interaction been rerun? The retired result used one throwaway workspace and did not complete that full coverage.
+[open] Has the full checkout-scoped Workbench view journey, deterministic real edits, and native terminal keyboard interaction been rerun? The retired result used one throwaway workspace and predates the two-view Workbench.
+
+[legacy] The former global Sessions client polled active sessions across workspaces. The active product surface is now the checkout-scoped Sessions view inside Workbench; `GET /api/sessions` remains available but has no top-level navigation entry. Evidence: `web/src/App.tsx:123`, `web/src/app/router.ts:49`, `web/src/features/canvas/CanvasSessionsView.tsx:24`.
 
 ## Related pages
 

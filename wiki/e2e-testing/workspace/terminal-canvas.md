@@ -81,17 +81,17 @@ first failed assertion and follow the documented cleanup.
 Capture current/stale verification and visible keyboard focus. Diagnostics may use Chrome DevTools only after Playwright
 execution; Chrome is never the execution provider.
 
-## Focus And Cross-workspace Sessions
+## Focus And Sessions View
 <!-- chunkId: e2e-testing-workspace-terminal-canvas-session-focus -->
-<!-- keywords: focus toggle, hidden nodes, sessions page, checkout changes -->
+<!-- keywords: focus toggle, hidden nodes, list mode, checkout changes -->
 
-[open] Can the current build complete the PM-042 journey with two isolated workspaces, deterministic edits, and native terminal keyboard interaction? Historical evidence covered only one throwaway workspace and left those checks incomplete.
+[open] Can the current build complete the revised PM-042 journey with an isolated workspace, deterministic edits, and native terminal keyboard interaction? Historical evidence covered one throwaway workspace but predates the Canvas and Sessions Workbench view switch.
 
-1. Start live sessions for plans in two isolated Local workspaces, open Canvas, and activate **Focus**.
+1. Start live sessions for plans in an isolated Local workspace, open Workbench in **Canvas**, and activate **Focus**.
 2. Assert only active plans, their live sessions, and their connecting edges remain; confirm dragging is unavailable and saved positions are unchanged after Focus is disabled.
-3. Open **Sessions**, verify both workspaces are grouped, switch between Terminal and Changes, and inspect one bounded file diff.
+3. Switch to **Sessions**, verify records are grouped by plan for the current checkout, switch between Terminal and Changes, and inspect one bounded file diff.
 4. Stop the selected session through the confirmation flow and assert the live-only filter relaxes while the selected record remains visible.
-5. Return to Canvas and assert the stopped session leaves the focused set without altering the restored layout.
+5. Choose **Open on board** and assert Workbench returns to Canvas with that session node selected. Activate Focus and assert the stopped session leaves the focused set without altering the restored layout.
 
 Treat session launch, cancellation, and repository edits as isolated safe writes. Use Playwright MCP in a fresh context, and retain only screenshots and safe identifiers as evidence.
 
@@ -113,5 +113,5 @@ ticket-local latest result. The current PM-037 result is not run because runtime
 
 PM-037 introduces this journey. It covers only Local content and execution. Cloud Agent execution, Agentless Remote
 Snapshot Canvas UX, groups, custom links, multiple canvases, and collaboration need separate capability delivery and
-future journey deltas. PM-042 adds Focus, cross-workspace session browsing, and checkout-derived changes. See
+future journey deltas. PM-042 adds Focus, checkout-scoped session browsing, and checkout-derived changes. See
 [[workspace-terminal-canvas]], [[workspace-session-focus]], and [[workspace-session-focus-reference]].

@@ -29,7 +29,7 @@ context rather than giving the process an unbounded application snapshot.
 [live] PM-018, PM-020, and PM-027 a session can launch through a configured external terminal or through the application-managed PTY. Evidence: `internal/ai/ai_launch_service.go:309`, `internal/ai/ai_terminal_repository.go:155`, `web/src/features/ai-session/AISessionLaunchControl.tsx:29`.
 
 External launch delegates the visible process to the selected terminal adapter. Embedded launch keeps terminal I/O in
-Kode Stream and records enough safe metadata for Canvas, Session Focus, and the global Sessions page.
+Kode Stream and records enough safe metadata for the Canvas and Sessions Workbench views.
 
 ## Embedded Presentation Does Not Change Session Identity
 <!-- chunkId: workspace-ai-session-launch-layout -->
@@ -37,8 +37,9 @@ Kode Stream and records enough safe metadata for Canvas, Session Focus, and the 
 
 [live] PM-027 an embedded session can be floating, docked to the right, maximized, or minimized without restarting the underlying process. Evidence: `web/src/features/ai-session/EmbeddedTerminalDock.tsx:8`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:81`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:131`.
 
-Canvas may also present a live session inside the Workbench. These are views over session state, not different launch
-contracts. See [[workspace-terminal-canvas]] and [[workspace-session-focus]].
+Canvas may present a live session as a spatial node, while Sessions presents the same terminal and changes in a list.
+These are Workbench views over session state, not different launch contracts. See [[workspace-terminal-canvas]] and
+[[workspace-session-focus]].
 
 ## Not supported
 <!-- chunkId: workspace-ai-session-launch-not-supported -->

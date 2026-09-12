@@ -17,7 +17,7 @@ lastVerified: never
 - [[workspace-branch-context]] and [[workspace-branch-context-reference]] explain checkout ownership.
 - [[workspace-branch-review-workflows]] describes review and import.
 - [[workspace-terminal-canvas]], [[workspace-terminal-canvas-workflows]], and [[workspace-terminal-canvas-reference]] cover the spatial workbench.
-- [[workspace-session-focus]] and [[workspace-session-focus-reference]] cover active-session focus, global browsing, and checkout-derived changes.
+- [[workspace-session-focus]] and [[workspace-session-focus-reference]] cover active-session focus, the Workbench session list, and checkout-derived changes.
 - [[workspace-automation-verification]] and [[workspace-automation-verification-reference]] cover browser automation selection and execution.
 - [[workspace-appearance]] and [[workspace-appearance-reference]] cover the shared route backdrop and accessibility boundary.
 - [[workspace-lifecycle]] and [[workspace-lifecycle-reference]] cover registration, import, source structure, guarded changes, and reliability.

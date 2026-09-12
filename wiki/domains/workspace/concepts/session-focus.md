@@ -3,7 +3,7 @@ slug: workspace-session-focus
 title: Session Focus
 pageType: CONCEPT
 topics: workspace, canvas, sessions, focus, changes
-summary: Session Focus connects active Canvas work, checkout changes, and the cross-workspace session inventory.
+summary: Session Focus connects active Canvas work, checkout changes, and the workspace session list.
 sourceRef: |
   PM-042 (plan retired) | Session Focus
   PM-042 (plan retired) | User experience
@@ -20,13 +20,15 @@ lastVerified: 2026-09-12
 
 Focus does not overwrite saved positions or the saved viewport. Dragging is disabled while focused, and leaving Focus restores the full saved Canvas. See [[workspace-terminal-canvas]].
 
-## Shared Session Browser
+[live] Focus is one Eye/EyeOff toggle. It does not add a status label, a separate Turn off link, or an automatic-layout hint beside the control. Evidence: `web/src/features/canvas/CanvasBoard.tsx:265`.
+
+## Workbench Session Views
 <!-- chunkId: workspace-session-focus-shared-session-browser -->
-<!-- keywords: sessions page, workbench, active filter, terminal changes -->
+<!-- keywords: list mode, plan grouping, active filter, terminal changes -->
 
-[live] The Sessions page and Canvas Workbench reuse one session browser with Terminal and Changes views, live-only filtering, and explicit cancellation. Evidence: `web/src/features/sessions/SessionBrowser.tsx:1`, `web/src/pages/SessionsPage.tsx:1`.
+[live] The Workbench has Canvas and Sessions views for the current workspace checkout. Sessions is a plan-grouped list with Terminal and Changes detail, live-only filtering, explicit cancellation, and an action that opens the session node back on Canvas. Evidence: `web/src/pages/CanvasPage.tsx:72`, `web/src/features/canvas/CanvasSessionsView.tsx:43`, `web/src/features/sessions/SessionBrowser.tsx:92`.
 
-The global page groups sessions by workspace and plan. When a selected live session stops, the live-only filter relaxes so the user's current context remains visible.
+When a selected live session stops, the live-only filter relaxes so the user's current context remains visible. The node-detail panel is reserved for the selected workspace, plan, or terminal session rather than hosting the workspace session list.
 
 ## Checkout-derived Changes
 <!-- chunkId: workspace-session-focus-checkout-derived-changes -->
@@ -47,6 +49,8 @@ This is checkout history, not attribution. Work by another session or person in 
 <!-- keywords: documentation drift, dim rule, hidden nodes -->
 
 [legacy] The original PM-042 narrative proposed dimming inactive Canvas nodes. The delivered component filters them out and lays out only the active subset, and the domain guide now describes that delivered behavior. Evidence: `web/src/features/canvas/CanvasBoard.tsx:128`, `web/src/features/canvas/CanvasBoard.tsx:135`, `docs/domain/terminal/session-focus.md:61`.
+
+[legacy] PM-042 shipped a top-level Sessions page and a workspace-node Sessions tab. Sessions is now a main Workbench view beside Canvas, while the node-detail panel remains specific to the selected node. Evidence: `web/src/app/router.ts:49`, `web/src/pages/CanvasPage.tsx:150`, `web/src/features/canvas/CanvasWorkbench.tsx:164`.
 
 ## Related pages
 
