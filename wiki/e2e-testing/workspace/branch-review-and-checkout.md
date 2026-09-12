@@ -5,7 +5,7 @@ pageType: HOW_TO
 topics: branch review, checkout, import, canvas, knowledge
 summary: Provider-neutral browser journey for pinned review, explicit plan import, guarded checkout, and cross-page synchronization.
 sourceRef: |
-  plans/platform/PM-038/automation/scenario-01-review-and-activate-branch.md
+  PM-038 (plan retired) | Browser journey
 lastVerified: never
 ---
 

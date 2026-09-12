@@ -5,8 +5,8 @@ pageType: HOW_TO
 topics: branch review, checkout, import, branch switch, read-only
 summary: How to inspect another branch safely, import one plan, or make the branch operational through guarded checkout.
 sourceRef: |
-  plans/platform/PM-038/scenario/scenario-00-overview.md
-  plans/platform/PM-038/design/design-02-frontend.md
+  PM-038 (plan retired) | Review and checkout scenarios
+  PM-038 (plan retired) | Review user experience
 lastVerified: never
 ---
 

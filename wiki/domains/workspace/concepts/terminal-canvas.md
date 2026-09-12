@@ -5,8 +5,8 @@ pageType: CONCEPT
 topics: canvas, workspace, plan, session, capabilities
 summary: Terminal Canvas is a branch-scoped projection for arranging and operating workspace, plan, and session state.
 sourceRef: |
-  plans/platform/PM-037/README.md
-  plans/platform/PM-038/README.md
+  PM-037 (plan retired) | Terminal Canvas
+  PM-038 (plan retired) | Checkout context
 lastVerified: never
 ---
 

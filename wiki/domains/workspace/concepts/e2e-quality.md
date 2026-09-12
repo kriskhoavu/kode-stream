@@ -5,8 +5,8 @@ pageType: CONCEPT
 topics: workspace, quality, browser journey, evidence, AI session
 summary: E2E Quality connects plan-local browser runbooks, reusable wiki journeys, recorded results, and an agent handoff.
 sourceRef: |
-  plans/platform/PM-036/README.md | Overview and design decisions
-  plans/platform/PM-036/scenario/scenario-00-overview.md | User flows
+  PM-036 (plan retired) | Overview and design decisions
+  PM-036 (plan retired) | User flows
 lastVerified: 2026-09-12
 ---
 

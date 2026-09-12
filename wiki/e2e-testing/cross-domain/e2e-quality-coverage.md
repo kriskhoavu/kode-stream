@@ -5,9 +5,9 @@ pageType: HOW_TO
 topics: quality, runbook, knowledge, evidence, AI session
 summary: Browser journey for finding local and canonical E2E coverage, inspecting results, and opening a constrained agent handoff.
 sourceRef: |
-  plans/platform/PM-036/automation/README.md | Reusable E2E coverage
-  plans/platform/PM-036/automation/scenario-01-run-e2e-coverage.md | Browser journey
-  plans/platform/PM-036/automation/results/latest.md | Historical result
+  PM-036 (plan retired) | Reusable E2E coverage
+  PM-036 (plan retired) | Browser journey
+  PM-036 (plan retired) | Historical result
 lastVerified: never
 ---
 

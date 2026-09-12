@@ -5,7 +5,7 @@ pageType: HOW_TO
 topics: canvas, terminal, branch, verification, accessibility
 summary: Browser journey for arranging Canvas nodes, launching safely, and observing verification staleness.
 sourceRef: |
-  plans/platform/PM-037/automation/scenario-01-orchestrate-plan-terminal.md
+  PM-037 (plan retired) | Browser journey
   PM-042 (plan retired) | Session Focus journey
   PM-042 (plan retired) | Visible actions and assertions
   PM-042 (plan retired) | Historical result

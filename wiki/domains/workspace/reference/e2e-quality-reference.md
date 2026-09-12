@@ -5,9 +5,9 @@ pageType: REFERENCE
 topics: runbook discovery, source reference, result parsing, evidence, AI capability
 summary: Reference for E2E runbook discovery, canonical matching, result safety, and constrained AI launch.
 sourceRef: |
-  plans/platform/PM-036/design/design-01-backend.md | Contracts and safety
-  plans/platform/PM-036/design/design-02-frontend.md | Quality surface and states
-  plans/platform/PM-036/implementation-plan.md | Delivery and verification
+  PM-036 (plan retired) | Contracts and safety
+  PM-036 (plan retired) | Quality surface and states
+  PM-036 (plan retired) | Delivery and verification
 lastVerified: 2026-09-12
 ---
 
@@ -47,7 +47,7 @@ Knowledge renders the Quality side panel only while reading a page under the E2E
 <!-- chunkId: workspace-e2e-quality-reference-known-conflicts -->
 <!-- keywords: historical report, markdown fields, unknown evidence, current schema -->
 
-[legacy] `plans/platform/PM-036/automation/results/latest.md` records colon-delimited Markdown fields, while the current parser requires a versioned structured result and matching runbook fingerprint. The historical pass is useful migration context but is not current runtime evidence. Evidence: `internal/e2eresult/result.go:56`, `internal/e2eresult/result_test.go:19`.
+[legacy] PM-036's retired result records colon-delimited Markdown fields, while the current parser requires a versioned structured result and matching runbook fingerprint. The historical pass is useful migration context but is not current runtime evidence. Evidence: `internal/e2eresult/result.go:56`, `internal/e2eresult/result_test.go:19`.
 
 ## Related pages
 

@@ -5,8 +5,8 @@ pageType: HOW_TO
 topics: canvas, drag, terminal, git, verification
 summary: How to arrange work, launch a branch-safe terminal, and interpret Git and verification state in Canvas.
 sourceRef: |
-  plans/platform/PM-037/scenario/scenario-00-overview.md
-  plans/platform/PM-038/scenario/scenario-00-overview.md
+  PM-037 (plan retired) | User workflows
+  PM-038 (plan retired) | Checkout workflows
 lastVerified: never
 ---
 

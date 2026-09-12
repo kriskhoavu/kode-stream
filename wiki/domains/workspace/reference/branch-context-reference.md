@@ -6,8 +6,8 @@ topics: checkout loader, branch review API, import API, e2e runbooks, mutation a
 summary: API, synchronization, read-boundary, audit, and safety contracts for checkout-scoped operation and commit-pinned review.
 sourceRef: |
   PM-013 (plan retired) | Historical materialization contract
-  plans/platform/PM-038/design/design-01-backend.md
-  plans/platform/PM-038/design/design-02-frontend.md
+  PM-038 (plan retired) | Backend contracts
+  PM-038 (plan retired) | Frontend contracts
 lastVerified: never
 ---
 

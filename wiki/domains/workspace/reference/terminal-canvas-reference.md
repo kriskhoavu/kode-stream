@@ -5,9 +5,9 @@ pageType: REFERENCE
 topics: canvas, api, storage, sessions, verification
 summary: Reference for Canvas ownership, branch-aware APIs, safe session records, and verification freshness.
 sourceRef: |
-  plans/platform/PM-037/design/design-01-backend.md
-  plans/platform/PM-037/design/design-02-frontend.md
-  plans/platform/PM-038/design/design-01-backend.md
+  PM-037 (plan retired) | Backend contracts
+  PM-037 (plan retired) | Frontend contracts
+  PM-038 (plan retired) | Checkout contracts
 lastVerified: never
 ---
 
