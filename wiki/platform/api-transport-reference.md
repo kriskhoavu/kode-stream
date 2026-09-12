@@ -5,13 +5,13 @@ pageType: REFERENCE
 topics: api, gin, middleware, authorization, performance
 summary: Reference for the single Gin API transport, route ownership, middleware, and migration measurements.
 sourceRef: |
-  plans/platform/PM-030/README.md | Gin migration
-  plans/platform/PM-030/proposal.md | Transport proposal
-  plans/platform/PM-030/route-inventory.md | Migration inventory
-  plans/platform/PM-030/performance-scorecard.md | Baseline measurements
-  plans/platform/PM-031/README.md | Gin-only transport
-  plans/platform/PM-031/route-inventory.md | Final route inventory
-  plans/platform/PM-031/performance-scorecard.md | Final measurements
+  PM-030 (plan retired) | Gin migration
+  PM-030 (plan retired) | Transport proposal
+  PM-030 (plan retired) | Migration inventory
+  PM-030 (plan retired) | Baseline measurements
+  PM-031 (plan retired) | Gin-only transport
+  PM-031 (plan retired) | Final route inventory
+  PM-031 (plan retired) | Final measurements
 lastVerified: 2026-09-12
 ---
 

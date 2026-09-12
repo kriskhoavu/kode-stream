@@ -5,13 +5,13 @@ pageType: REFERENCE
 topics: cloud, authentication, agent, snapshot, authorization
 summary: Reference for Cloud authentication, Agent-backed metadata, Remote Snapshot reads, and delivery boundaries.
 sourceRef: |
-  plans/platform/PM-032/README.md | Cloud runtime
-  plans/platform/PM-032/design/design-01-backend.md | Authentication and Agent protocol
-  plans/platform/PM-032/design/design-02-frontend.md | Cloud user flow
-  plans/platform/PM-032/design/design-03-infrastructure.md | Deployment
-  plans/platform/PM-032/design/design-04-pipeline.md | Release gates
-  plans/platform/PM-032/design/cloud-agent-component.mmd | Component boundary
-  plans/platform/PM-034/design/design-04-agentless-cloud.md | Remote Snapshot
+  PM-032 (plan retired) | Cloud runtime
+  PM-032 (plan retired) | Authentication and Agent protocol
+  PM-032 (plan retired) | Cloud user flow
+  PM-032 (plan retired) | Deployment
+  PM-032 (plan retired) | Release gates
+  PM-032 (plan retired) | Component boundary
+  PM-034 (plan retired) | Remote Snapshot
 lastVerified: 2026-09-12
 ---
 

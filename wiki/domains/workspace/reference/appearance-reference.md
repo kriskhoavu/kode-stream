@@ -5,8 +5,8 @@ pageType: REFERENCE
 topics: appearance, backdrop, lattice, settings, motion
 summary: Reference for backdrop variants, route coverage, persistence, and reduced-motion behavior.
 sourceRef: |
-  plans/platform/PM-041/design/design-01-frontend.md | Backdrop contract
-  plans/platform/PM-041/automation/results/latest.md | Historical validation
+  PM-041 (plan retired) | Backdrop contract
+  PM-041 (plan retired) | Historical validation
 lastVerified: 2026-09-12
 ---
 

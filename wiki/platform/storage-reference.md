@@ -5,11 +5,11 @@ pageType: REFERENCE
 topics: storage, sqlite, postgres, datadir, synchronization
 summary: Reference for app-owned storage selection, repository composition, and local manual synchronization.
 sourceRef: |
-  plans/platform/PM-033/README.md | Storage options
-  plans/platform/PM-033/design/design-01-backend.md | Repository composition
-  plans/platform/PM-033/design/design-02-infrastructure.md | Runtime configuration
-  plans/platform/PM-033/design/design-03-pipeline.md | Verification
-  plans/platform/PM-033/implementation-plan.md | Delivery
+  PM-033 (plan retired) | Storage options
+  PM-033 (plan retired) | Repository composition
+  PM-033 (plan retired) | Runtime configuration
+  PM-033 (plan retired) | Verification
+  PM-033 (plan retired) | Delivery
 lastVerified: 2026-09-12
 ---
 

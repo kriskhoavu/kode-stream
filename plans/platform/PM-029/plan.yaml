@@ -1,9 +1,0 @@
-plan:
-  status: done
-  tags:
-    - automation
-    - verification
-    - knowledge
-  wiki_enriched: true
-automation-test:
-  - path: ""

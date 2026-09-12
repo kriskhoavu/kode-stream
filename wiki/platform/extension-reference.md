@@ -5,11 +5,11 @@ pageType: REFERENCE
 topics: extension, browser, local, cors, packaging
 summary: Reference for the unpacked Chromium extension surface and its Local API boundary.
 sourceRef: |
-  plans/platform/PM-034/README.md | Extension surface
-  plans/platform/PM-034/design/design-01-frontend.md | Frontend build
-  plans/platform/PM-034/design/design-02-infrastructure.md | Local transport
-  plans/platform/PM-034/design/design-03-pipeline.md | Packaging
-  plans/platform/PM-034/implementation-plan.md | Delivery
+  PM-034 (plan retired) | Extension surface
+  PM-034 (plan retired) | Frontend build
+  PM-034 (plan retired) | Local transport
+  PM-034 (plan retired) | Packaging
+  PM-034 (plan retired) | Delivery
 lastVerified: 2026-09-12
 ---
 

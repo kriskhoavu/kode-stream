@@ -5,12 +5,12 @@ pageType: CONCEPT
 topics: workspace, appearance, backdrop, accessibility, settings
 summary: Workspace routes share a decorative header band whose treatment is user-selectable and motion-aware.
 sourceRef: |
-  plans/platform/PM-041/README.md | Appearance model
-  plans/platform/PM-041/design/design-01-frontend.md | Frontend behavior
-  plans/platform/PM-041/implementation-plan.md | Delivery
-  plans/platform/PM-041/brief.html | Visual brief
-  plans/platform/PM-041/automation/README.md | Validation approach
-  plans/platform/PM-041/automation/results/latest.md | Historical validation
+  PM-041 (plan retired) | Appearance model
+  PM-041 (plan retired) | Frontend behavior
+  PM-041 (plan retired) | Delivery
+  PM-041 (plan retired) | Visual brief
+  PM-041 (plan retired) | Validation approach
+  PM-041 (plan retired) | Historical validation
 lastVerified: 2026-09-12
 ---
 

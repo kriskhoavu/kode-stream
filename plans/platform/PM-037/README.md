@@ -74,14 +74,14 @@ deployment-specific branches to Canvas components.
 
 ## Related Plans
 
-| Item                          | Relationship                    | Key Context                                                                                   |
-|-------------------------------|---------------------------------|-----------------------------------------------------------------------------------------------|
-| [PM-020](../PM-020/README.md) | Embedded terminal foundation    | Reuse bounded PTYs, grants, reconnect leases, cancellation, and shutdown behavior.            |
-| [PM-027](../PM-027/README.md) | Session presentation foundation | Reuse the existing terminal surface without introducing a second process owner.               |
-| [PM-032](../PM-032/README.md) | Cloud execution boundary        | Future Agent execution stays on the user's machine and routes through the Agent.              |
-| [PM-033](../PM-033/README.md) | App-state storage boundary      | Add Canvas placements and session records through provider-selected repositories.             |
-| [PM-034](../PM-034/README.md) | Remote Snapshot boundary        | Snapshot content and missing execution are separate provider capabilities, not a Canvas mode. |
-| [PM-036](../PM-036/README.md) | E2E runbook surface             | Reuse provider-neutral playbooks and enrich durable journey coverage after implementation.    |
+| Item                                                        | Relationship                    | Key Context                                                                                   |
+|-------------------------------------------------------------|---------------------------------|-----------------------------------------------------------------------------------------------|
+| [PM-020](../PM-020/README.md)                               | Embedded terminal foundation    | Reuse bounded PTYs, grants, reconnect leases, cancellation, and shutdown behavior.            |
+| [PM-027](../PM-027/README.md)                               | Session presentation foundation | Reuse the existing terminal surface without introducing a second process owner.               |
+| [PM-032](../../../wiki/platform/cloud-runtime-reference.md) | Cloud execution boundary        | Future Agent execution stays on the user's machine and routes through the Agent.              |
+| [PM-033](../../../wiki/platform/storage-reference.md)       | App-state storage boundary      | Add Canvas placements and session records through provider-selected repositories.             |
+| [PM-034](../../../wiki/platform/cloud-runtime-reference.md) | Remote Snapshot boundary        | Snapshot content and missing execution are separate provider capabilities, not a Canvas mode. |
+| [PM-036](../PM-036/README.md)                               | E2E runbook surface             | Reuse provider-neutral playbooks and enrich durable journey coverage after implementation.    |
 
 ## Glossary
 

@@ -6,11 +6,11 @@ Make agent-driven browser runbooks visible and executable from the existing Qual
 
 ## Related Plans
 
-| Plan                          | Relationship          | Reused Decision                                                                      |
-|-------------------------------|-----------------------|--------------------------------------------------------------------------------------|
-| [PM-020](../PM-020/README.md) | AI session foundation | Reuse provider, terminal, and embedded-session launch behavior.                      |
-| [PM-022](../PM-022/README.md) | Knowledge foundation  | Reuse indexed wiki pages, frontmatter, and Knowledge Reader composition.             |
-| [PM-029](../PM-029/README.md) | Quality foundation    | Keep runtime verification and repository automation separate from runbook execution. |
+| Plan                                                                                     | Relationship          | Reused Decision                                                                      |
+|------------------------------------------------------------------------------------------|-----------------------|--------------------------------------------------------------------------------------|
+| [PM-020](../PM-020/README.md)                                                            | AI session foundation | Reuse provider, terminal, and embedded-session launch behavior.                      |
+| [PM-022](../PM-022/README.md)                                                            | Knowledge foundation  | Reuse indexed wiki pages, frontmatter, and Knowledge Reader composition.             |
+| [PM-029](../../../wiki/domains/workspace/reference/automation-verification-reference.md) | Quality foundation    | Keep runtime verification and repository automation separate from runbook execution. |
 
 ## Glossary
 

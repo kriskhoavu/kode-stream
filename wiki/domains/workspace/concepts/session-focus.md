@@ -5,10 +5,10 @@ pageType: CONCEPT
 topics: workspace, canvas, sessions, focus, changes
 summary: Session Focus connects active Canvas work, checkout changes, and the cross-workspace session inventory.
 sourceRef: |
-  plans/platform/PM-042/README.md | Session Focus
-  plans/platform/PM-042/scenario/scenario-00-overview.md | User experience
-  plans/platform/PM-042/solution/solution-02-frontend.md | Canvas and Sessions UI
-  plans/platform/PM-042/implementation-plan.md | Delivery
+  PM-042 (plan retired) | Session Focus
+  PM-042 (plan retired) | User experience
+  PM-042 (plan retired) | Canvas and Sessions UI
+  PM-042 (plan retired) | Delivery
 lastVerified: 2026-09-12
 ---
 

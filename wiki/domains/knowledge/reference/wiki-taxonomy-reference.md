@@ -5,10 +5,10 @@ pageType: REFERENCE
 topics: knowledge, taxonomy, settings, journeys, warnings
 summary: Reference for taxonomy inference, optional settings, warnings, and journey identification.
 sourceRef: |
-  plans/platform/PM-040/design/design-01-backend.md | Classification rules
-  plans/platform/PM-040/implementation-plan.md | Delivery and compatibility
-  plans/platform/PM-040/automation/README.md | Validation approach
-  plans/platform/PM-040/automation/results/latest.md | Historical validation
+  PM-040 (plan retired) | Classification rules
+  PM-040 (plan retired) | Delivery and compatibility
+  PM-040 (plan retired) | Validation approach
+  PM-040 (plan retired) | Historical validation
 lastVerified: 2026-09-12
 ---
 

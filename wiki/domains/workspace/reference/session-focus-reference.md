@@ -5,11 +5,11 @@ pageType: REFERENCE
 topics: sessions, api, changes, authorization, polling
 summary: Reference for global session listing, change availability, file diffs, and access controls.
 sourceRef: |
-  plans/platform/PM-042/solution/solution-01-backend.md | Session APIs and Git computation
-  plans/platform/PM-042/solution/solution-02-frontend.md | Client state
-  plans/platform/PM-042/automation/README.md | Browser journey
-  plans/platform/PM-042/automation/scenario-01-session-focus-journey.md | Visible actions and assertions
-  plans/platform/PM-042/automation/results/latest.md | Historical result
+  PM-042 (plan retired) | Session APIs and Git computation
+  PM-042 (plan retired) | Client state
+  PM-042 (plan retired) | Browser journey
+  PM-042 (plan retired) | Visible actions and assertions
+  PM-042 (plan retired) | Historical result
 lastVerified: 2026-09-12
 ---
 

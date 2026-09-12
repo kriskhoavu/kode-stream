@@ -1,5 +1,0 @@
-plan:
-  status: done
-  wiki_enriched: true
-automation-test:
-  - path: ""

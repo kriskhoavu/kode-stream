@@ -5,10 +5,10 @@ pageType: CONCEPT
 topics: knowledge, taxonomy, buckets, tiers, areas
 summary: Wiki navigation derives buckets, areas, and reusable tiers from directory structure instead of product-specific names.
 sourceRef: |
-  plans/platform/PM-040/README.md | Taxonomy model
-  plans/platform/PM-040/scenario/scenario-00-overview.md | User experience
-  plans/platform/PM-040/design/design-02-frontend.md | Navigation presentation
-  plans/platform/PM-040/brief.html | Visual brief
+  PM-040 (plan retired) | Taxonomy model
+  PM-040 (plan retired) | User experience
+  PM-040 (plan retired) | Navigation presentation
+  PM-040 (plan retired) | Visual brief
 lastVerified: 2026-09-12
 ---
 

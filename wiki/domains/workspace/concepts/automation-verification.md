@@ -5,8 +5,8 @@ pageType: CONCEPT
 topics: workspace, automation, verification, browser, evidence
 summary: Automation verification runs selected browser specifications through a workspace-owned runtime contract.
 sourceRef: |
-  plans/platform/PM-029/README.md | Runtime automation
-  plans/platform/PM-029/scenario/scenario-00-overview.md | User experience
+  PM-029 (plan retired) | Runtime automation
+  PM-029 (plan retired) | User experience
 lastVerified: 2026-09-12
 ---
 
