@@ -5,7 +5,7 @@ pageType: CONCEPT
 topics: checkout, branch review, snapshot, operational context, import
 summary: Kode Stream uses the Git checkout for every operational page and isolates other branches in commit-pinned read-only review.
 sourceRef: |
-  plans/platform/PM-013/README.md
+  PM-013 (plan retired) | Superseded snapshot materialization
   plans/platform/PM-038/README.md
 lastVerified: never
 ---

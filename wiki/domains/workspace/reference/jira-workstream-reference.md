@@ -5,10 +5,8 @@ pageType: REFERENCE
 topics: Jira connection, issue lookup, attachment proxy, cache, Workstream item
 summary: Reference for workspace-scoped Jira configuration, read-only issue lookup, bounded attachment access, and local item creation.
 sourceRef: |
-  plans/platform/PM-019/design/design-01-backend.md
-  plans/platform/PM-019/design/design-02-frontend.md
-  plans/platform/PM-025/design/design-01-backend.md
-  plans/platform/PM-025/design/design-02-frontend.md
+  PM-019 (plan retired) | Jira service and presentation contracts
+  PM-025 (plan retired) | Jira intake and Workstream contracts
 lastVerified: 2026-09-12
 ---
 

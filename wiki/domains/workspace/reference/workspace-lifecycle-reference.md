@@ -5,12 +5,12 @@ pageType: REFERENCE
 topics: workspace API, import preview, managed clone, source structure, git operations, reliability
 summary: Reference for workspace registration modes, import boundaries, source configuration, guarded writes, Git operations, and audit behavior.
 sourceRef: |
-  plans/platform/PM-001/design/design-01-backend.md
-  plans/platform/PM-002/design/design-01-backend.md
-  plans/platform/PM-004/design/design-01-backend.md
-  plans/platform/PM-014/design/design-01-backend.md
-  plans/platform/PM-016/design/design-01-backend.md
-  plans/platform/PM-024/design/design-01-backend.md
+  PM-001 (plan retired) | Backend workspace contract
+  PM-002 (plan retired) | Mutation and Git contract
+  PM-004 (plan retired) | Audit, health, and recovery contract
+  PM-014 (plan retired) | Source structure backend contract
+  PM-016 (plan retired) | Clone lifecycle contract
+  PM-024 (plan retired) | Import preview and apply contract
 lastVerified: 2026-09-12
 ---
 

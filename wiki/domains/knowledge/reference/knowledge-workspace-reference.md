@@ -5,8 +5,7 @@ pageType: REFERENCE
 topics: knowledge API, scan limits, metadata parser, graph limits, refresh actions
 summary: Reference for Knowledge discovery, metadata parsing, relationship resolution, query APIs, and guarded refresh actions.
 sourceRef: |
-  plans/platform/PM-022/design/design-01-backend.md
-  plans/platform/PM-022/design/design-02-frontend.md
+  PM-022 (plan retired) | Backend and frontend Knowledge contracts
 lastVerified: 2026-09-12
 ---
 

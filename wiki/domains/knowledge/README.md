@@ -5,7 +5,7 @@ pageType: REFERENCE
 topics: knowledge, wiki, taxonomy, navigation
 summary: Knowledge pages are classified from their directory shape for browsing and journey discovery.
 sourceRef: |
-  plans/platform/PM-022/README.md
+  PM-022 (plan retired) | Knowledge navigation
   PM-040 (plan retired) | Knowledge navigation
 lastVerified: 2026-09-12
 ---

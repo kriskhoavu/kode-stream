@@ -5,7 +5,7 @@ pageType: CONCEPT
 topics: knowledge, structured wiki, reader, relationships, graph
 summary: Kode Stream discovers structured Markdown wikis in a workspace and turns their metadata and links into browsable pages and a relationship graph.
 sourceRef: |
-  plans/platform/PM-022/README.md
+  PM-022 (plan retired) | Structured Knowledge model
 lastVerified: 2026-09-12
 ---
 

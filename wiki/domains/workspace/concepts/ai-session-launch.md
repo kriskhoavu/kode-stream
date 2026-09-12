@@ -5,9 +5,9 @@ pageType: CONCEPT
 topics: AI session, prompt composer, embedded terminal, external terminal, capabilities
 summary: AI sessions combine an explicit workspace or item context with a provider, prompt, optional capabilities, and either an embedded or external terminal surface.
 sourceRef: |
-  plans/platform/PM-018/README.md
-  plans/platform/PM-020/README.md
-  plans/platform/PM-027/README.md
+  PM-018 (plan retired) | External session launch
+  PM-020 (plan retired) | Embedded terminal
+  PM-027 (plan retired) | Launch composer and layouts
 lastVerified: 2026-09-12
 ---
 

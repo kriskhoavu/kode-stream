@@ -5,12 +5,12 @@ pageType: CONCEPT
 topics: workspace registration, import, source structure, editing, git, safety
 summary: Workspaces enter Kode Stream through local registration, managed cloning, or import, then expose guarded content and Git changes against the current checkout.
 sourceRef: |
-  plans/platform/PM-001/README.md
-  plans/platform/PM-002/README.md
-  plans/platform/PM-004/README.md
-  plans/platform/PM-014/README.md
-  plans/platform/PM-016/README.md
-  plans/platform/PM-024/README.md
+  PM-001 (plan retired) | Read-only workspace model
+  PM-002 (plan retired) | Guarded editing and Git operations
+  PM-004 (plan retired) | Reliability and safety model
+  PM-014 (plan retired) | Source structure proposals
+  PM-016 (plan retired) | Remote clone registration
+  PM-024 (plan retired) | Existing workspace import
 lastVerified: 2026-09-12
 ---
 

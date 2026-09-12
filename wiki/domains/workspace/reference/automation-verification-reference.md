@@ -5,8 +5,7 @@ pageType: REFERENCE
 topics: workspace, automation, verification, runtime, artifacts
 summary: Reference for selecting, launching, and retaining browser automation verification jobs.
 sourceRef: |
-  plans/platform/PM-026/design/design-01-backend.md
-  plans/platform/PM-026/design/design-02-frontend.md
+  PM-026 (plan retired) | Runtime, checkpoint, and frontend contracts
   PM-029 (plan retired) | Runtime automation
   PM-029 (plan retired) | Contracts and lifecycle
   PM-029 (plan retired) | User flow

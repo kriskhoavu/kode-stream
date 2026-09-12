@@ -5,15 +5,15 @@ pageType: CONCEPT
 topics: workstream, explorer, search, navigation, content viewer, drag and drop
 summary: Workstream is the primary planning surface, with repository exploration, scoped search, preview, and editing embedded in an item's workspace.
 sourceRef: |
-  plans/platform/PM-005/README.md
-  plans/platform/PM-006/README.md
-  plans/platform/PM-007/README.md
-  plans/platform/PM-008/README.md
-  plans/platform/PM-009/README.md
-  plans/platform/PM-010/README.md
-  plans/platform/PM-011/README.md
-  plans/platform/PM-012/README.md
-  plans/platform/PM-028/README.md
+  PM-005 (plan retired) | Search and navigation
+  PM-006 (plan retired) | Shared content viewer
+  PM-007 (plan retired) | Workspace Explorer
+  PM-008 (plan retired) | Explorer productivity
+  PM-009 (plan retired) | Scoped content search
+  PM-010 (plan retired) | Explorer branch selection
+  PM-011 (plan retired) | Primary navigation consolidation
+  PM-012 (plan retired) | Workstream card movement
+  PM-028 (plan retired) | Unified Workstream and Explorer
 lastVerified: 2026-09-12
 ---
 

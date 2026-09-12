@@ -5,8 +5,8 @@ pageType: CONCEPT
 topics: Jira, workstream, item creation, read-only integration, settings
 summary: A workspace can read Jira issue context and use it to seed a local Workstream item without mutating Jira.
 sourceRef: |
-  plans/platform/PM-019/README.md
-  plans/platform/PM-025/README.md
+  PM-019 (plan retired) | Read-only Jira integration
+  PM-025 (plan retired) | Jira-first Workstream
 lastVerified: 2026-09-12
 ---
 

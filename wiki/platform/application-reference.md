@@ -5,10 +5,10 @@ pageType: REFERENCE
 topics: application architecture, domain packages, frontend features, release, doctor
 summary: Reference for Kode Stream's current domain-service architecture, centralized API transport, embedded frontend, and packaged release boundary.
 sourceRef: |
-  plans/platform/PM-003/README.md
-  plans/platform/PM-015/README.md
-  plans/platform/PM-017/README.md
-  plans/platform/PM-023/README.md
+  PM-003 (plan retired) | Architecture refactor
+  PM-015 (plan retired) | Performance and render review
+  PM-017 (plan retired) | Rollout and distribution
+  PM-023 (plan retired) | Domain-oriented packaging
 lastVerified: 2026-09-12
 ---
 

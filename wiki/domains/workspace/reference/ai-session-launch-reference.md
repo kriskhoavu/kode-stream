@@ -5,11 +5,9 @@ pageType: REFERENCE
 topics: launch request, prompt resolution, capability discovery, PTY, terminal layout, launch guard
 summary: Reference for composing, validating, launching, presenting, and recording embedded and external AI sessions.
 sourceRef: |
-  plans/platform/PM-018/design/design-01-backend.md
-  plans/platform/PM-020/design/design-01-backend.md
-  plans/platform/PM-020/design/design-02-frontend.md
-  plans/platform/PM-027/design/design-01-backend.md
-  plans/platform/PM-027/design/design-02-frontend.md
+  PM-018 (plan retired) | External launch contract
+  PM-020 (plan retired) | Embedded PTY and presentation contracts
+  PM-027 (plan retired) | Prompt, capability, and layout contracts
 lastVerified: 2026-09-12
 ---
 

@@ -5,14 +5,14 @@ pageType: REFERENCE
 topics: workstream routes, search scopes, saved filters, recent items, content rendering, explorer
 summary: Reference for the unified Workstream and embedded Explorer routes, search boundaries, navigation state, card moves, and content rendering.
 sourceRef: |
-  plans/platform/PM-005/design/design-01-backend.md
-  plans/platform/PM-006/design/design-02-frontend.md
-  plans/platform/PM-007/design/design-02-frontend.md
-  plans/platform/PM-008/design/design-02-frontend.md
-  plans/platform/PM-009/design/design-01-backend.md
-  plans/platform/PM-010/design/design-02-frontend.md
-  plans/platform/PM-012/design/design-02-frontend.md
-  plans/platform/PM-028/design/design-02-frontend.md
+  PM-005 (plan retired) | Search and navigation contracts
+  PM-006 (plan retired) | Viewer presentation contract
+  PM-007 (plan retired) | Explorer interaction contract
+  PM-008 (plan retired) | Explorer search and mutation contract
+  PM-009 (plan retired) | Content-search scopes
+  PM-010 (plan retired) | Branch selector behavior
+  PM-012 (plan retired) | Drag-and-drop behavior
+  PM-028 (plan retired) | Surface unification
 lastVerified: 2026-09-12
 ---
 
