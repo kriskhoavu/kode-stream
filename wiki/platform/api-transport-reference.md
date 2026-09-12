@@ -53,4 +53,4 @@ The last recorded PM-031 samples reported health at 1,383 ns/op and 2,066 B/op, 
 
 ## Related pages
 
-See [[platform-cloud-runtime-reference]], [[platform-storage-reference]], and [[workspace-index]].
+See [[platform-application-reference]], [[platform-cloud-runtime-reference]], [[platform-storage-reference]], and [[workspace-index]].

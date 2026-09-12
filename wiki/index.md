@@ -55,13 +55,14 @@ that matters is the `lastVerified` column below, which is each page's own.
 
 ## platform
 
-| Page                                                           | Slug                               | Type      | Tier | lastVerified | Summary                                                                                                    |
-|----------------------------------------------------------------|------------------------------------|-----------|------|--------------|------------------------------------------------------------------------------------------------------------|
-| [API Transport Reference](platform/api-transport-reference.md) | `platform-api-transport-reference` | REFERENCE | page | 2026-09-12   | Reference for the single Gin API transport, route ownership, middleware, and migration measurements.       |
-| [Cloud Runtime Reference](platform/cloud-runtime-reference.md) | `platform-cloud-runtime-reference` | REFERENCE | page | 2026-09-12   | Reference for Cloud authentication, Agent-backed metadata, Remote Snapshot reads, and delivery boundaries. |
-| [Documentation Overlap Audit](platform/documentation-audit.md) | `platform-documentation-audit`     | REFERENCE | page | 2026-09-12   | Audit of the repository documentation surface and its intended boundary with the evidence-aware wiki.      |
-| [Browser Extension Reference](platform/extension-reference.md) | `platform-extension-reference`     | REFERENCE | page | 2026-09-12   | Reference for the unpacked Chromium extension surface and its Local API boundary.                          |
-| [Storage Reference](platform/storage-reference.md)             | `platform-storage-reference`       | REFERENCE | page | 2026-09-12   | Reference for app-owned storage selection, repository composition, and local manual synchronization.       |
+| Page                                                                                     | Slug                               | Type      | Tier | lastVerified | Summary                                                                                                                                       |
+|------------------------------------------------------------------------------------------|------------------------------------|-----------|------|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| [API Transport Reference](platform/api-transport-reference.md)                           | `platform-api-transport-reference` | REFERENCE | page | 2026-09-12   | Reference for the single Gin API transport, route ownership, middleware, and migration measurements.                                          |
+| [Application Architecture And Distribution Reference](platform/application-reference.md) | `platform-application-reference`   | REFERENCE | page | 2026-09-12   | Reference for Kode Stream's current domain-service architecture, centralized API transport, embedded frontend, and packaged release boundary. |
+| [Cloud Runtime Reference](platform/cloud-runtime-reference.md)                           | `platform-cloud-runtime-reference` | REFERENCE | page | 2026-09-12   | Reference for Cloud authentication, Agent-backed metadata, Remote Snapshot reads, and delivery boundaries.                                    |
+| [Documentation Overlap Audit](platform/documentation-audit.md)                           | `platform-documentation-audit`     | REFERENCE | page | 2026-09-12   | Audit of the repository documentation surface and its intended boundary with the evidence-aware wiki.                                         |
+| [Browser Extension Reference](platform/extension-reference.md)                           | `platform-extension-reference`     | REFERENCE | page | 2026-09-12   | Reference for the unpacked Chromium extension surface and its Local API boundary.                                                             |
+| [Storage Reference](platform/storage-reference.md)                                       | `platform-storage-reference`       | REFERENCE | page | 2026-09-12   | Reference for app-owned storage selection, repository composition, and local manual synchronization.                                          |
 
 ## e2e-testing
 
@@ -84,7 +85,7 @@ that matters is the `lastVerified` column below, which is each page's own.
 
 ## Coverage
 
-35 pages in 6 groups. 24 carry a verification date; 11 carry `never`.
+36 pages in 6 groups. 25 carry a verification date; 11 carry `never`.
 
 Regenerate with:
 

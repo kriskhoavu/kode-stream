@@ -5,6 +5,7 @@ pageType: REFERENCE
 topics: checkout loader, branch review API, import API, e2e runbooks, mutation audit, canvas
 summary: API, synchronization, read-boundary, audit, and safety contracts for checkout-scoped operation and commit-pinned review.
 sourceRef: |
+  plans/platform/PM-013/design/design-01-backend.md
   plans/platform/PM-038/design/design-01-backend.md
   plans/platform/PM-038/design/design-02-frontend.md
 lastVerified: never
@@ -128,6 +129,8 @@ error remains on the event for diagnostics. Other errors retain the existing fai
 
 `lastSelectedBranch` remains serialized for compatibility but is not read or written for navigation. Existing branch
 scan rows and Canvas layouts remain reusable derived state.
+
+[legacy] PM-013's operational branch materialization flags and first-edit copy behavior are not compatibility features; callers must use Branch Review and explicit import.
 
 ## Safety Invariants
 <!-- chunkId: workspace-branch-context-reference-safety -->

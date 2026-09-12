@@ -5,6 +5,7 @@ pageType: CONCEPT
 topics: workspace, automation, verification, browser, evidence
 summary: Automation verification runs selected browser specifications through a workspace-owned runtime contract.
 sourceRef: |
+  plans/platform/PM-026/README.md
   PM-029 (plan retired) | Runtime automation
   PM-029 (plan retired) | User experience
 lastVerified: 2026-09-12
@@ -14,7 +15,7 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-automation-verification-purpose -->
 <!-- keywords: browser specification, runtime contract, selected evidence -->
 
-[live] Automation verification lets a user choose discovered browser specifications and execute them through the workspace runtime without treating plan prose as executable input. Evidence: `internal/item/item_service.go:330`, `internal/verification/verification_service.go:500`.
+[live] PM-026 and PM-029 automation verification lets a user choose discovered browser specifications and execute them through the workspace runtime without treating plan prose as executable input. Evidence: `internal/item/item_service.go:330`, `internal/verification/verification_service.go:500`.
 
 The result keeps boot, health, test, teardown, logs, and retained artifacts visible as one bounded verification job. Exact fields and limits live in [[workspace-automation-verification-reference]].
 

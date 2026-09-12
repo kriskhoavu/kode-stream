@@ -5,6 +5,8 @@ pageType: REFERENCE
 topics: workspace, automation, verification, runtime, artifacts
 summary: Reference for selecting, launching, and retaining browser automation verification jobs.
 sourceRef: |
+  plans/platform/PM-026/design/design-01-backend.md
+  plans/platform/PM-026/design/design-02-frontend.md
   PM-029 (plan retired) | Runtime automation
   PM-029 (plan retired) | Contracts and lifecycle
   PM-029 (plan retired) | User flow
@@ -29,6 +31,16 @@ The selection is distinct from the reusable browser journey itself. Plan-local `
 
 The runner prepares and starts the application repository, waits for health, then runs the rendered command in the automation repository. Template values are shell-quoted before substitution. A failed start, health check, or test triggers teardown and records bounded runtime and automation logs.
 
+## Runtime Profiles And Checkpoints
+<!-- chunkId: workspace-automation-verification-reference-profiles -->
+<!-- keywords: smoke, critical, full, checkpoint, freshness -->
+
+[live] PM-026 runtime verification supports `smoke`, `critical`, and `full` profiles, while checkpoints record externally completed verification against a workspace and commit. Evidence: `internal/runtime/runtime_service.go:20`, `internal/server/api/gin_routes.go:180`.
+
+A verification fingerprint includes runtime configuration, mode, profile, environment, display mode, and checkout state.
+Canvas and other consumers can therefore distinguish a fresh result from one invalidated by configuration or source
+changes. A rerun creates another bounded job through the existing verification service.
+
 ## Job And Artifact Boundaries
 <!-- chunkId: workspace-automation-verification-reference-job-boundaries -->
 <!-- keywords: verification job, artifact retention, log bounds, teardown -->
@@ -41,7 +53,7 @@ The API exposes workspace runtime reads and updates, item selection reads and up
 <!-- chunkId: workspace-automation-verification-reference-not-supported -->
 <!-- keywords: unsupported capability, durable history, arbitrary path -->
 
-[live] Durable verification history and arbitrary filesystem artifact collection are not supported. Evidence: `internal/verification/verification_service.go:152`, `internal/verification/verification_service.go:695`.
+[live] PM-026 durable verification job history, automatic changed-service selection, and arbitrary filesystem artifact collection are not supported. Evidence: `internal/verification/verification_service.go:152`, `internal/verification/verification_service.go:695`.
 
 ## Known conflicts
 <!-- chunkId: workspace-automation-verification-reference-known-conflicts -->

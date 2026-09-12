@@ -5,6 +5,7 @@ pageType: CONCEPT
 topics: checkout, branch review, snapshot, operational context, import
 summary: Kode Stream uses the Git checkout for every operational page and isolates other branches in commit-pinned read-only review.
 sourceRef: |
+  plans/platform/PM-013/README.md
   plans/platform/PM-038/README.md
 lastVerified: never
 ---
@@ -52,6 +53,8 @@ A global selected snapshot made pages disagree about which branch was active whi
 working tree. Separating review from operation gives each route one clear promise: operational pages may act on the
 checkout, and review may only read a pinned commit. Branch-scoped indexes and Canvas layouts are retained as useful
 derived state, but they no longer drive application-wide navigation.
+
+[legacy] PM-013's first-edit materialization workflow was removed. PM-038 replaced it with explicit reviewed-plan import and kept non-checkout content read-only.
 
 ## Not supported
 <!-- chunkId: workspace-branch-context-not-supported -->
