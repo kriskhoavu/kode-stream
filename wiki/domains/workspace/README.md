@@ -22,6 +22,8 @@ lastVerified: never
 - [[workspace-appearance]] and [[workspace-appearance-reference]] cover the shared route backdrop and accessibility boundary.
 - [[workspace-lifecycle]] and [[workspace-lifecycle-reference]] cover registration, import, source structure, guarded changes, and reliability.
 - [[workspace-workstream-explorer]] and [[workspace-workstream-explorer-reference]] cover the primary planning surface, embedded repository context, search, and preview.
+- [[workspace-jira-workstream]] and [[workspace-jira-workstream-reference]] cover read-only Jira context and Jira-first local intake.
+- [[workspace-ai-session-launch]] and [[workspace-ai-launch-reference]] cover prompt composition and embedded or external session launch.
 - [[e2e-testing-index]] routes browser validation.
 
 ## Not written yet
