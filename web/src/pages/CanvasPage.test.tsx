@@ -27,6 +27,20 @@ describe('CanvasPage', () => {
 		await waitFor(() => expect(node).toHaveFocus());
 	});
 
+	it('closes the Workbench on Escape, but not while typing in a field', async () => {
+		canvasState.projection = projection();
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Plan: PM-037 Canvas main' }));
+		expect(screen.getByLabelText('Canvas Workbench')).toBeInTheDocument();
+		const input = document.createElement('input');
+		document.body.appendChild(input);
+		fireEvent.keyDown(input, { key: 'Escape' });
+		expect(screen.getByLabelText('Canvas Workbench')).toBeInTheDocument();
+		input.remove();
+		fireEvent.keyDown(window, { key: 'Escape' });
+		await waitFor(() => expect(screen.queryByLabelText('Canvas Workbench')).not.toBeInTheDocument());
+	});
+
 	it('shows checkout context and exposes a polite save-status region', async () => {
 		canvasState.projection = projection();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);

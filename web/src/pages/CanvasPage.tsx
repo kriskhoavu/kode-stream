@@ -88,6 +88,21 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		setWorkbenchTabHint(undefined);
 		if (focusID) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-canvas-node-id="${focusID.replaceAll('"', '\\"')}"]`)?.focus());
 	};
+	// Escape closes the Workbench, unless a dialog owns the key or the user is
+	// typing in a field or the embedded terminal, where Escape means something else.
+	useEffect(() => {
+		if (!workbenchNode) return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape' || event.defaultPrevented || aiSessionDialogOpen) return;
+			if (document.querySelector('[role="dialog"]')) return;
+			const target = event.target instanceof Element ? event.target : null;
+			if (target?.closest('input, textarea, select, [contenteditable="true"], .xterm')) return;
+			event.preventDefault();
+			closeWorkbench();
+		};
+		window.addEventListener('keydown', onKeyDown);
+		return () => window.removeEventListener('keydown', onKeyDown);
+	});
 	const createSection = useCallback((nodeIds: string[]) => {
 		const nodes = canvas.projection?.nodes.filter((node) => nodeIds.includes(node.id)) ?? [];
 		if (nodes.length < 2) return;
