@@ -4,6 +4,6 @@ plan:
     - automation
     - verification
     - knowledge
-  wiki_enriched: false
+  wiki_enriched: true
 automation-test:
   - path: ""

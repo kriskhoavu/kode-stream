@@ -17,17 +17,41 @@ makes no `[live]` claim of its own, so it has nothing to verify. The freshness
 that matters is the `lastVerified` column below, which is each page's own.
 
 
+## domains/knowledge
+
+| Page                                                                              | Slug                                | Type      | Tier      | lastVerified | Summary                                                                                                                |
+|-----------------------------------------------------------------------------------|-------------------------------------|-----------|-----------|--------------|------------------------------------------------------------------------------------------------------------------------|
+| [Knowledge Navigation](domains/knowledge/README.md)                               | `knowledge-index`                   | REFERENCE | anchor    | 2026-09-12   | Knowledge pages are classified from their directory shape for browsing and journey discovery.                          |
+| [Wiki Taxonomy](domains/knowledge/concepts/wiki-taxonomy.md)                      | `knowledge-wiki-taxonomy`           | CONCEPT   | concepts  | 2026-09-12   | Wiki navigation derives buckets, areas, and reusable tiers from directory structure instead of product-specific names. |
+| [Wiki Taxonomy Reference](domains/knowledge/reference/wiki-taxonomy-reference.md) | `knowledge-wiki-taxonomy-reference` | REFERENCE | reference | 2026-09-12   | Reference for taxonomy inference, optional settings, warnings, and journey identification.                             |
+
 ## domains/workspace
 
-| Page                                                                                                | Slug                                  | Type      | Tier      | lastVerified | Summary                                                                                                                     |
-|-----------------------------------------------------------------------------------------------------|---------------------------------------|-----------|-----------|--------------|-----------------------------------------------------------------------------------------------------------------------------|
-| [Workspace Knowledge](domains/workspace/README.md)                                                  | `workspace-index`                     | REFERENCE | anchor    | never        | Workspace behavior separates operational checkout state from review and spatial presentation.                               |
-| [Checkout And Branch Review Concepts](domains/workspace/concepts/branch-context.md)                 | `workspace-branch-context`            | CONCEPT   | concepts  | never        | Kode Stream uses the Git checkout for every operational page and isolates other branches in commit-pinned read-only review. |
-| [Review, Import, Or Activate Another Branch](domains/workspace/concepts/branch-review-workflows.md) | `workspace-branch-review-workflows`   | HOW_TO    | concepts  | never        | How to inspect another branch safely, import one plan, or make the branch operational through guarded checkout.             |
-| [Use Terminal Canvas](domains/workspace/concepts/terminal-canvas-workflows.md)                      | `workspace-terminal-canvas-workflows` | HOW_TO    | concepts  | never        | How to arrange work, launch a branch-safe terminal, and interpret Git and verification state in Canvas.                     |
-| [Terminal Canvas Concepts](domains/workspace/concepts/terminal-canvas.md)                           | `workspace-terminal-canvas`           | CONCEPT   | concepts  | never        | Terminal Canvas is a branch-scoped projection for arranging and operating workspace, plan, and session state.               |
-| [Checkout And Branch Review Reference](domains/workspace/reference/branch-context-reference.md)     | `workspace-branch-context-reference`  | REFERENCE | reference | never        | API, synchronization, read-boundary, audit, and safety contracts for checkout-scoped operation and commit-pinned review.    |
-| [Terminal Canvas Reference](domains/workspace/reference/terminal-canvas-reference.md)               | `workspace-terminal-canvas-reference` | REFERENCE | reference | never        | Reference for Canvas ownership, branch-aware APIs, safe session records, and verification freshness.                        |
+| Page                                                                                                  | Slug                                          | Type      | Tier      | lastVerified | Summary                                                                                                                     |
+|-------------------------------------------------------------------------------------------------------|-----------------------------------------------|-----------|-----------|--------------|-----------------------------------------------------------------------------------------------------------------------------|
+| [Workspace Knowledge](domains/workspace/README.md)                                                    | `workspace-index`                             | REFERENCE | anchor    | never        | Workspace behavior separates operational checkout state from review and spatial presentation.                               |
+| [Workspace Appearance](domains/workspace/concepts/appearance.md)                                      | `workspace-appearance`                        | CONCEPT   | concepts  | 2026-09-12   | Workspace routes share a decorative header band whose treatment is user-selectable and motion-aware.                        |
+| [Automation Verification](domains/workspace/concepts/automation-verification.md)                      | `workspace-automation-verification`           | CONCEPT   | concepts  | 2026-09-12   | Automation verification runs selected browser specifications through a workspace-owned runtime contract.                    |
+| [Checkout And Branch Review Concepts](domains/workspace/concepts/branch-context.md)                   | `workspace-branch-context`                    | CONCEPT   | concepts  | never        | Kode Stream uses the Git checkout for every operational page and isolates other branches in commit-pinned read-only review. |
+| [Review, Import, Or Activate Another Branch](domains/workspace/concepts/branch-review-workflows.md)   | `workspace-branch-review-workflows`           | HOW_TO    | concepts  | never        | How to inspect another branch safely, import one plan, or make the branch operational through guarded checkout.             |
+| [Session Focus](domains/workspace/concepts/session-focus.md)                                          | `workspace-session-focus`                     | CONCEPT   | concepts  | 2026-09-12   | Session Focus connects active Canvas work, checkout changes, and the cross-workspace session inventory.                     |
+| [Use Terminal Canvas](domains/workspace/concepts/terminal-canvas-workflows.md)                        | `workspace-terminal-canvas-workflows`         | HOW_TO    | concepts  | never        | How to arrange work, launch a branch-safe terminal, and interpret Git and verification state in Canvas.                     |
+| [Terminal Canvas Concepts](domains/workspace/concepts/terminal-canvas.md)                             | `workspace-terminal-canvas`                   | CONCEPT   | concepts  | never        | Terminal Canvas is a branch-scoped projection for arranging and operating workspace, plan, and session state.               |
+| [Workspace Appearance Reference](domains/workspace/reference/appearance-reference.md)                 | `workspace-appearance-reference`              | REFERENCE | reference | 2026-09-12   | Reference for backdrop variants, route coverage, persistence, and reduced-motion behavior.                                  |
+| [Automation Verification Reference](domains/workspace/reference/automation-verification-reference.md) | `workspace-automation-verification-reference` | REFERENCE | reference | 2026-09-12   | Reference for selecting, launching, and retaining browser automation verification jobs.                                     |
+| [Checkout And Branch Review Reference](domains/workspace/reference/branch-context-reference.md)       | `workspace-branch-context-reference`          | REFERENCE | reference | never        | API, synchronization, read-boundary, audit, and safety contracts for checkout-scoped operation and commit-pinned review.    |
+| [Session Focus Reference](domains/workspace/reference/session-focus-reference.md)                     | `workspace-session-focus-reference`           | REFERENCE | reference | 2026-09-12   | Reference for global session listing, change availability, file diffs, and access controls.                                 |
+| [Terminal Canvas Reference](domains/workspace/reference/terminal-canvas-reference.md)                 | `workspace-terminal-canvas-reference`         | REFERENCE | reference | never        | Reference for Canvas ownership, branch-aware APIs, safe session records, and verification freshness.                        |
+
+## platform
+
+| Page                                                           | Slug                               | Type      | Tier | lastVerified | Summary                                                                                                    |
+|----------------------------------------------------------------|------------------------------------|-----------|------|--------------|------------------------------------------------------------------------------------------------------------|
+| [API Transport Reference](platform/api-transport-reference.md) | `platform-api-transport-reference` | REFERENCE | page | 2026-09-12   | Reference for the single Gin API transport, route ownership, middleware, and migration measurements.       |
+| [Cloud Runtime Reference](platform/cloud-runtime-reference.md) | `platform-cloud-runtime-reference` | REFERENCE | page | 2026-09-12   | Reference for Cloud authentication, Agent-backed metadata, Remote Snapshot reads, and delivery boundaries. |
+| [Documentation Overlap Audit](platform/documentation-audit.md) | `platform-documentation-audit`     | REFERENCE | page | 2026-09-12   | Audit of the repository documentation surface and its intended boundary with the evidence-aware wiki.      |
+| [Browser Extension Reference](platform/extension-reference.md) | `platform-extension-reference`     | REFERENCE | page | 2026-09-12   | Reference for the unpacked Chromium extension surface and its Local API boundary.                          |
+| [Storage Reference](platform/storage-reference.md)             | `platform-storage-reference`       | REFERENCE | page | 2026-09-12   | Reference for app-owned storage selection, repository composition, and local manual synchronization.       |
 
 ## e2e-testing
 
@@ -50,7 +74,7 @@ that matters is the `lastVerified` column below, which is each page's own.
 
 ## Coverage
 
-11 pages in 4 groups. 0 carry a verification date; 11 carry `never`.
+25 pages in 6 groups. 14 carry a verification date; 11 carry `never`.
 
 Regenerate with:
 

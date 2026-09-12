@@ -6,6 +6,9 @@ topics: canvas, terminal, branch, verification, accessibility
 summary: Browser journey for arranging Canvas nodes, launching safely, and observing verification staleness.
 sourceRef: |
   plans/platform/PM-037/automation/scenario-01-orchestrate-plan-terminal.md
+  plans/platform/PM-042/automation/README.md | Session Focus journey
+  plans/platform/PM-042/automation/scenario-01-session-focus-journey.md | Visible actions and assertions
+  plans/platform/PM-042/automation/results/latest.md | Historical result
 lastVerified: never
 ---
 
@@ -78,6 +81,20 @@ first failed assertion and follow the documented cleanup.
 Capture current/stale verification and visible keyboard focus. Diagnostics may use Chrome DevTools only after Playwright
 execution; Chrome is never the execution provider.
 
+## Focus And Cross-workspace Sessions
+<!-- chunkId: e2e-testing-workspace-terminal-canvas-session-focus -->
+<!-- keywords: focus toggle, hidden nodes, sessions page, checkout changes -->
+
+[open] Can the current build complete the PM-042 journey with two isolated workspaces, deterministic edits, and native terminal keyboard interaction? Historical evidence covered only one throwaway workspace and left those checks incomplete.
+
+1. Start live sessions for plans in two isolated Local workspaces, open Canvas, and activate **Focus**.
+2. Assert only active plans, their live sessions, and their connecting edges remain; confirm dragging is unavailable and saved positions are unchanged after Focus is disabled.
+3. Open **Sessions**, verify both workspaces are grouped, switch between Terminal and Changes, and inspect one bounded file diff.
+4. Stop the selected session through the confirmation flow and assert the live-only filter relaxes while the selected record remains visible.
+5. Return to Canvas and assert the stopped session leaves the focused set without altering the restored layout.
+
+Treat session launch, cancellation, and repository edits as isolated safe writes. Use Playwright MCP in a fresh context, and retain only screenshots and safe identifiers as evidence.
+
 ## Cleanup And Result
 <!-- chunkId: e2e-testing-workspace-terminal-canvas-cleanup -->
 <!-- keywords: cleanup, cancel, revert, evidence, result -->
@@ -96,4 +113,5 @@ ticket-local latest result. The current PM-037 result is not run because runtime
 
 PM-037 introduces this journey. It covers only Local content and execution. Cloud Agent execution, Agentless Remote
 Snapshot Canvas UX, groups, custom links, multiple canvases, and collaboration need separate capability delivery and
-future journey deltas. See [[workspace-terminal-canvas]] and [[workspace-terminal-canvas-reference]].
+future journey deltas. PM-042 adds Focus, cross-workspace session browsing, and checkout-derived changes. See
+[[workspace-terminal-canvas]], [[workspace-session-focus]], and [[workspace-session-focus-reference]].

@@ -1,6 +1,6 @@
 plan:
   status: implemented
-  wiki_enriched: false
+  wiki_enriched: true
   e2e-runbook: true
 automation-test:
   - path: "automation/README.md"
