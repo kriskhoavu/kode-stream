@@ -1,8 +1,8 @@
 # Session Focus
 
 Session Focus makes the sessions a user already runs easier to see and act on: a Canvas filter that surfaces what is
-active right now, a per-session view of what the checkout has changed, and a Sessions list for the current Workbench
-checkout. It adds no new kind of session, node, or launch path — everything hangs off the existing
+active right now, a per-session view of what the checkout has changed, a checkout-scoped list in the Canvas Workbench,
+and a page that lists sessions across registered workspaces. It adds no new kind of session, node, or launch path — everything hangs off the existing
 `ai.SessionRecord` and the terminal manager that already owns its process.
 
 ## Session Changes
@@ -48,21 +48,21 @@ never mistaken for a routine unavailability.
 
 ## Session List Authorization
 
-The Workbench Sessions view requests records for its current workspace and checkout, using the same workspace
-authorization the AI controller applies to every other session endpoint (`authorizeWorkspace`). The global session API
-retains the same boundary for API consumers: a workspace the caller may not read is absent rather than reported as an
+The Workbench Sessions tab requests records for its current workspace and checkout. The top-level Sessions page lists
+sessions across registered workspaces. Both use the same workspace authorization the AI controller applies to every
+other session endpoint (`authorizeWorkspace`): a workspace the caller may not read is absent rather than reported as an
 error. The same rule extends to a session ID: `authorizeSession` resolves a session's owning workspace first and applies
 the identical check, so a session that does not exist gets the same 404 a denied workspace would.
 
 This matters most in Cloud mode, where session APIs must never leak another tenant's session names, workspace names,
 or changes across a workspace boundary the caller cannot otherwise see.
 
-## Workbench Views
+## Session Surfaces
 
-Workbench has two checkout-scoped views. **Canvas** arranges plan and terminal-session nodes spatially. **Sessions**
-groups the same sessions by plan and shows Terminal or Changes detail in the main work area. **Open on board** switches
-back to Canvas and selects the session node. The selected-node panel remains a details surface; it does not host the
-workspace session list.
+The top-level **Sessions** page groups authorized records by workspace and plan. Selecting a workspace node on Canvas
+also exposes a **Sessions** tab in the Workbench, scoped to that workspace and checkout and grouped by plan. Both reuse
+the same Terminal and Changes detail browser, live-only filter, cancellation flow, and **Open on board** action. Opening
+on the board selects and expands the existing session node without creating another process.
 
 ## Focus Mode's Active-Only Layout
 

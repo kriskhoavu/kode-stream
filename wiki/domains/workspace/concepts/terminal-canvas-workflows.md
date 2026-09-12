@@ -16,7 +16,7 @@ lastVerified: never
 
 [open] Does the current implementation still satisfy the arrange and restore work behavior described below? This section has not yet been reverified.
 
-Open **Workbench** for the active workspace checkout and keep the **Canvas** view selected. Canvas resolves Git before loading or seeding the branch-scoped
+Open **Canvas** for the active workspace checkout. Canvas resolves Git before loading or seeding the branch-scoped
 layout; it has no independent branch selector. Drag a workspace, plan, or session node independently, or
 focus it and use an arrow key to move 12 pixels; Shift plus an arrow moves one pixel. Wait for **Saved** before reloading.
 Canvas silently gives newly discovered plans and sessions deterministic positions without moving saved nodes or showing
