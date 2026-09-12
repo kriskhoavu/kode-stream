@@ -58,16 +58,14 @@ identical check, so a session that does not exist gets the same 404 a denied wor
 This matters most in Cloud mode, where the global list must never leak another tenant's session names, workspace
 names, or changes across a workspace boundary the caller cannot otherwise see.
 
-## Focus Mode's Dim-Not-Hide Rule
+## Focus Mode's Active-Only Layout
 
-Focus mode is a Canvas toolbar toggle, persisted per browser, that narrows attention to plans with an active session
-— one whose record is `starting` or `running` and whose process binding is live — their session nodes, and the edges
-between them. Everything else on the board is **dimmed, not hidden**: nodes keep their saved positions and the layout
-never reflows, because hiding a node would shift everything else and lose the user's spatial memory of the board.
-Dimmed nodes are also removed from keyboard tab order and are not clickable while dimmed, so focus is not just visual
-— an edge connecting a dimmed node to another dimmed node is dropped from the rendered set entirely, matching the
-"active plans, their sessions, and edges only" rule. Turning Focus on with nothing active shows a "Focus · nothing
-running" label and a one-click way to turn it back off.
+Focus mode is a Canvas toolbar toggle, persisted per browser, that shows only plans with an active session — one whose
+record is `starting` or `running` and whose process binding is live — their session nodes, and the edges between them.
+Inactive nodes, Canvas sections, and unrelated edges are filtered out. The active subset receives a temporary automatic
+layout, dragging is disabled, and viewport changes are not saved while Focus is on. Turning Focus off restores the full
+Canvas from its saved node positions and viewport, which Focus never overwrites. See the current
+[Session Focus wiki page](../../../wiki/domains/workspace/concepts/session-focus.md).
 
 ## Non-Goals
 

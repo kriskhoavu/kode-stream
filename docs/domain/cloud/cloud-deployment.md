@@ -5,8 +5,8 @@ control plane and Postgres metadata store; only the workspace access boundary di
 
 Cloud mode runs Kode Stream as a hosted control plane behind OAuth2Proxy. The public endpoint is OAuth2Proxy, which
 redirects users to Keycloak and forwards authenticated identity headers to Kode Stream. Kode Stream itself stays on a
-private VM/container port, stores metadata in Postgres, keeps optional exports under `KODE_STREAM_DATA_DIR`, and routes
-workspace commands to the user's Cloud Agent.
+private VM/container port, stores metadata in Postgres, and keeps optional exports under `KODE_STREAM_DATA_DIR`. Cloud
+Agents can connect, send heartbeats, and publish workspace metadata; workspace command delivery is not implemented.
 
 ## Required Environment
 
@@ -24,9 +24,8 @@ workspace commands to the user's Cloud Agent.
 | `KODE_STREAM_COOKIE_SECRET`                 | Random secret for signed fallback Cloud session cookies.                       |
 | `KODE_STREAM_ADMIN_USERS`                   | Comma-separated bootstrap admins by email or subject.                          |
 
-`KODE_STREAM_AUTH_MODE` defaults to `oauth2_proxy` in Cloud mode. App-owned OIDC remains available for development or
-alternate deployments by setting `KODE_STREAM_AUTH_MODE=app_oidc` and providing `KODE_STREAM_OIDC_ISSUER`,
-`KODE_STREAM_OIDC_CLIENT_ID`, and `KODE_STREAM_OIDC_CLIENT_SECRET`.
+`KODE_STREAM_AUTH_MODE` must be `oauth2_proxy` in Cloud mode. App-owned OIDC is not implemented; setting
+`KODE_STREAM_AUTH_MODE=app_oidc` causes startup validation to fail.
 
 ## OAuth2Proxy And Keycloak
 
@@ -44,7 +43,7 @@ Required OAuth2Proxy behavior:
 - Support WebSocket upgrade for `/api/agents/channel`.
 - Allow unauthenticated `GET /api/health` for deployment health checks and `GET /api/agents/channel` for agent
   token-authenticated WebSocket connections.
-- Use long idle timeouts for terminal, AI, runtime, and verification streams.
+- Use a long idle timeout for the Agent connection and heartbeat channel.
 - Forward `/api/health` for health checks.
 
 Only expose Kode Stream directly for local smoke tests. Direct access to `http://127.0.0.1:4317` or a Docker port mapped
@@ -100,11 +99,11 @@ Open `http://kode-stream.localhost:4318` and sign in with `admin` / `admin`.
 | Agent cannot connect                 | Confirm `/api/agents/channel` supports WebSocket upgrade and the connect token has not expired.           |
 | Deep link does nothing               | Confirm `kodestream://connect` is registered by the installed Cloud Agent package.                        |
 | Role denial                          | Confirm `KODE_STREAM_ADMIN_USERS` and the user's OIDC email or subject. Viewers cannot mutate workspaces. |
-| WebSocket closes during commands     | Increase reverse proxy idle/read timeouts.                                                                |
+| Agent channel disconnects            | Increase reverse proxy idle/read timeouts and confirm heartbeats arrive.                                  |
 | Private deployment cannot be reached | Use an operator VPN such as Tailscale for browser and agent outbound access.                              |
-| Command button disabled              | Confirm the workspace owner Cloud Agent is connected and the user's role has the required capability.     |
+| Command request returns unavailable  | Expected until durable Cloud Agent command delivery is implemented.                                       |
 
 ## Upgrade And Rollback
 
-Back up Postgres and `KODE_STREAM_DATA_DIR`, deploy the new image, run `/api/health`, then smoke Cloud Agent connection
-and an agent-backed workspace. Roll back by restoring the previous image plus database and metadata backups.
+Back up Postgres and `KODE_STREAM_DATA_DIR`, deploy the new image, run `/api/health`, then smoke Cloud Agent connection,
+heartbeat, and metadata publication. Roll back by restoring the previous image plus database and metadata backups.

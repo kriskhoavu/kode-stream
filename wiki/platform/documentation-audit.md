@@ -62,7 +62,7 @@ The proposed boundary is: wiki pages own durable product behavior and current ev
 <!-- chunkId: platform-documentation-audit-confirmed-conflicts -->
 <!-- keywords: stale oidc, cloud commands, focus hiding, postgres persistence -->
 
-[live] Four material conflicts require correction before any consolidation: app-owned OIDC is unavailable, Agent commands return 503, Focus hides inactive nodes, and SQL storage includes Canvas and session repositories. Evidence: `internal/system/runtime_config.go:117`, `internal/server/api/cloud_workspace_access.go:48`, `web/src/features/canvas/CanvasBoard.tsx:128`, `internal/storage/storage.go:226`.
+[live] The app-owned OIDC and Focus contradictions have been corrected in their existing docs. Cloud Agent command capability and Postgres Canvas/session persistence remain overstated or understated elsewhere in `docs/domain/`. Evidence: `docs/domain/cloud/cloud-deployment.md:27`, `docs/domain/terminal/session-focus.md:61`, `internal/server/api/cloud_workspace_access.go:48`, `internal/storage/storage.go:226`.
 
 ## Migration Gate
 <!-- chunkId: platform-documentation-audit-migration-gate -->
@@ -80,7 +80,7 @@ The proposed boundary is: wiki pages own durable product behavior and current ev
 <!-- chunkId: platform-documentation-audit-known-conflicts -->
 <!-- keywords: documentation authority, local agent guide, normative standard -->
 
-[live] `AGENTS.md` and the root `README.md` now route durable product behavior and implementation evidence to the wiki while retaining architecture and development material under `docs/`. Evidence: `AGENTS.md:3`, `AGENTS.md:39`, `README.md:46`.
+[live] Repository routing is resolved, but `docs/domain/cloud/cloud-modes.md` still advertises Agent-backed commands that return 503, `remote-snapshot-operations.md` calls encrypted connection persistence future work, and `storage-architecture.md` marks implemented Postgres Canvas/session repositories as deferred. Evidence: `docs/domain/cloud/cloud-modes.md:21`, `docs/domain/cloud/remote-snapshot-operations.md:10`, `docs/domain/storage/storage-architecture.md:64`, `internal/server/api/cloud_workspace_access.go:48`, `internal/server/api/cloud_provider.go:70`, `internal/storage/storage.go:226`.
 
 ## Shared Lint Follow-up
 <!-- chunkId: platform-documentation-audit-shared-lint-follow-up -->
