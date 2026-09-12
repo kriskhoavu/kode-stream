@@ -86,7 +86,7 @@ The proposed boundary is: wiki pages own durable product behavior and current ev
 <!-- chunkId: platform-documentation-audit-shared-lint-follow-up -->
 <!-- keywords: shared lint, valid prefixes, workspace, knowledge -->
 
-[open] When should the shared `wiki_lint.py` add `workspace` and `knowledge` to `VALID_PREFIXES`? They are declared repo-local domains in [[wiki-conventions]], but the shared script still reports all 16 conforming slugs as unknown.
+[open] When should the shared `wiki_lint.py` add `workspace` and `knowledge` to `VALID_PREFIXES`? They are declared repo-local domains in [[wiki-conventions]], but the shared script still reports all 26 conforming slugs as unknown.
 
 ## Related pages
 
