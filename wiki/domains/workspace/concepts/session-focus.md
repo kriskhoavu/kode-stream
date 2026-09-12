@@ -46,7 +46,7 @@ This is checkout history, not attribution. Work by another session or person in 
 <!-- chunkId: workspace-session-focus-known-conflicts -->
 <!-- keywords: documentation drift, dim rule, hidden nodes -->
 
-[live] `docs/domain/terminal/session-focus.md` and the retired plan narrative say inactive Canvas nodes are dimmed, but the delivered component filters them out and lays out only the active subset. Evidence: `web/src/features/canvas/CanvasBoard.tsx:128`, `web/src/features/canvas/CanvasBoard.tsx:135`.
+[legacy] The original PM-042 narrative proposed dimming inactive Canvas nodes. The delivered component filters them out and lays out only the active subset, and the domain guide now describes that delivered behavior. Evidence: `web/src/features/canvas/CanvasBoard.tsx:128`, `web/src/features/canvas/CanvasBoard.tsx:135`, `docs/domain/terminal/session-focus.md:61`.
 
 ## Related pages
 
