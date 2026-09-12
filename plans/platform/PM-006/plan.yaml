@@ -5,6 +5,7 @@ plan:
   title: Rich Content Viewer
   service: platform
   status: done
+  wiki_enriched: true
   owner: null
   tags:
     - kode-stream

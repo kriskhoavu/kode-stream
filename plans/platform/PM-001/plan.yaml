@@ -5,6 +5,7 @@ plan:
   title: Kode Stream Read-Only MVP
   service: platform
   status: done
+  wiki_enriched: true
   owner: null
   tags:
     - kode-stream

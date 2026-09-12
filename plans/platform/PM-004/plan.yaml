@@ -5,6 +5,7 @@ plan:
   title: Reliability, Safety, And Observability
   service: platform
   status: done
+  wiki_enriched: true
   owner: null
   tags:
     - kode-stream
@@ -36,4 +37,3 @@ documents:
     role: implementation
     path: implementation-plan.md
     label: Implementation Plan
-
