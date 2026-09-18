@@ -19,6 +19,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	const branches = workspace ? branchState.states[workspace.id] : undefined;
 	const [selectedId, setSelectedId] = useState<string>();
 	const [confirmation, setConfirmation] = useState<'reset' | 'remove'>();
+	const [resetBusy, setResetBusy] = useState(false);
 	const [aiSessionDialogOpen, setAISessionDialogOpen] = useState(false);
 	const [workbenchTabHint, setWorkbenchTabHint] = useState<WorkbenchTab>();
 	const [sections, setSections] = useState<CanvasSection[]>([]);
@@ -72,6 +73,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	const terminalLaunch = selectedNode?.plan?.actions['terminal.launch'] ?? workspaceNode?.workspace?.actions['terminal.launch'];
 	const canOpenAISession = terminalLaunch?.state === 'available';
 	const workbenchNode = selectedNode;
+	const stalePlanCount = canvas.projection?.nodes.filter((node) => node.kind === 'plan' && node.state === 'stale').length ?? 0;
 	const openSession = (sessionId: string) => { canvas.setNodeCollapsed(`session:${sessionId}`, false); setSelectedId(`session:${sessionId}`); };
 	const arrangeGroupedSections = useCallback((grouping: 'status' | 'service' | 'service_status' | 'service_grid') => {
 		if (!canvas.projection) return;
@@ -115,6 +117,22 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		setSections((current) => [...current, { id: globalThis.crypto?.randomUUID?.() ?? `section-${Date.now()}`, title, position: { x: left, y: top }, width: right - left, height: bottom - top, nodeIds }]);
 	}, [canvas.projection]);
 	const onResetLayout = useCallback(() => setConfirmation('reset'), []);
+	const confirmResetLayout = useCallback(async () => {
+		setResetBusy(true);
+		try {
+			const next = await canvas.removeStalePlans();
+			if (!next) { setConfirmation(undefined); return; }
+			const groups = defaultServiceSections(next.nodes);
+			canvas.resetPositions();
+			setServiceGridColumns(1);
+			setSections(groups.sections);
+			groups.positions.forEach(({ id, position }) => canvas.moveNode(id, position));
+			setSelectedId(undefined);
+			setConfirmation(undefined);
+		} finally {
+			setResetBusy(false);
+		}
+	}, [canvas.removeStalePlans, canvas.resetPositions, canvas.moveNode]);
 	const onRemoveNode = useCallback((node: CanvasNode) => { setSelectedId(node.id); setConfirmation('remove'); }, []);
 	const onReloadPosition = useCallback((id: string) => void canvas.reloadPosition(id), [canvas.reloadPosition]);
 	const onReapplyPosition = useCallback((id: string) => void canvas.reapplyPosition(id), [canvas.reapplyPosition]);
@@ -144,7 +162,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 			{canvas.error && <div className="canvas-state error" role="alert">{canvas.error}<button type="button" onClick={() => void canvas.reload()}>Retry</button></div>}
 			{canvas.projection && <span className="sr-only" role="status" aria-live="polite">{canvas.saveStatus === 'saving' ? `Saving ${canvas.dirtyCount} position${canvas.dirtyCount === 1 ? '' : 's'}…` : canvas.saveStatus === 'saved' ? 'Saved' : ''}</span>}
 			{canvas.projection && <div className={`canvas-work-area${workbenchNode ? ' workbench-open' : ''}`}><CanvasBoard projection={canvas.projection} sections={sections} conflicts={canvas.conflicts} selectedId={selectedId} onSelect={setSelectedId} onMoveNode={canvas.moveNode} onSetCollapsed={canvas.setNodeCollapsed} onArrange={arrangeGroupedSections} serviceGridColumns={serviceGridColumns} onSaveViewport={canvas.saveViewport} onReload={canvas.refresh} onReloadPosition={onReloadPosition} onReapplyPosition={onReapplyPosition} onReset={onResetLayout} onRemove={onRemoveNode} onCreateSection={createSection} onMoveSection={onMoveSection} onRemoveSection={onRemoveSection} onOpenAISession={onOpenAISession} onOpenSessions={onOpenSessions} aiSessionDisabled={!canOpenAISession} /><CanvasWorkbench projection={canvas.projection} selectedNode={workbenchNode} aiSessionDialogOpen={aiSessionDialogOpen} onAISessionDialogOpenChange={setAISessionDialogOpen} onClose={closeWorkbench} onReload={canvas.refresh} onSelectNode={setSelectedId} onPlaceSession={canvas.placeSession} onOpenFullView={(node) => node.plan ? onOpenItem?.(node.plan.itemId) : node.workspace ? onOpenWorkspaces?.() : undefined} initialTab={workbenchTabHint} onInitialTabApplied={() => setWorkbenchTabHint(undefined)} onOpenSession={openSession} /></div>}
-			{confirmation === 'reset' && <ConfirmDialog title="Reset Canvas layout?" message="Restore the default workspace and service groups, then return plans and terminal sessions to their grouped layout. This changes presentation only; repository entities and terminal processes are untouched." confirmLabel="Reset layout" onCancel={() => setConfirmation(undefined)} onConfirm={() => { canvas.resetPositions(); setServiceGridColumns(1); setSections(defaultServiceGroups.sections); defaultServiceGroups.positions.forEach(({ id, position }) => canvas.moveNode(id, position)); setConfirmation(undefined); }} />}
+			{confirmation === 'reset' && <ConfirmDialog title="Reset Canvas layout?" message={`Restore the default groups and arrange current plans and terminal sessions. ${stalePlanCount ? `Remove ${stalePlanCount} stale plan placement${stalePlanCount === 1 ? '' : 's'} from this Canvas after checking the current checkout. ` : ''}Repository files and terminal processes are untouched.`} confirmLabel="Reset layout" busy={resetBusy} onCancel={() => setConfirmation(undefined)} onConfirm={() => { void confirmResetLayout(); }} />}
 			{confirmation === 'remove' && selectedNode && <ConfirmDialog title="Remove node from Canvas?" message={`Remove ${selectedNode.kind} from this layout? The underlying ${selectedNode.kind} and any live terminal process continue unchanged.`} confirmLabel="Remove from Canvas" danger onCancel={() => setConfirmation(undefined)} onConfirm={() => { void canvas.removeNode(selectedNode.id); setSelectedId(undefined); setConfirmation(undefined); }} />}
 		</section>
 	);

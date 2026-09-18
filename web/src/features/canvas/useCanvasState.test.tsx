@@ -156,6 +156,30 @@ describe('useCanvasState', () => {
 		expect(result.current.projection?.nodes).toHaveLength(2);
 	});
 
+	it('resolves the checkout again and removes only plans that are still stale', async () => {
+		const first = { ...projection().nodes[0], id: 'plan:retired-1', state: 'stale' as const, plan: undefined };
+		const second = { ...first, id: 'plan:retired-2', entityRef: { ...first.entityRef, itemId: 'retired-2' } };
+		const third = { ...first, id: 'plan:retired-3', entityRef: { ...first.entityRef, itemId: 'retired-3' } };
+		const session = { ...first, id: 'session:missing', kind: 'session' as const, entityRef: { kind: 'session' as const, workspaceId: 'workspace-1', sessionId: 'missing', branchKey: 'main' } };
+		const initial = { ...projection(), nodes: [first, second, third, session] };
+		const recovered = { ...first, state: 'resolved' as const, plan: projection().nodes[0].plan };
+		const fresh = { ...initial, nodes: [recovered, second, third, session] };
+		vi.mocked(api.resolveDefaultCanvas).mockResolvedValueOnce(initial).mockResolvedValueOnce(fresh);
+		let remaining = fresh;
+		vi.mocked(api.removeCanvasPlacement).mockImplementation(async (_layout, id) => {
+			remaining = { ...remaining, nodes: remaining.nodes.filter((node) => node.id !== id) };
+			return remaining;
+		});
+		const { result } = renderHook(() => useCanvasState('workspace-1'));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		await act(async () => { await result.current.removeStalePlans(); });
+		expect(api.resolveDefaultCanvas).toHaveBeenCalledTimes(2);
+		expect(api.removeCanvasPlacement).toHaveBeenCalledTimes(2);
+		expect(api.removeCanvasPlacement).toHaveBeenNthCalledWith(1, 'layout-1', 'plan:retired-2', 1, expect.any(AbortSignal));
+		expect(api.removeCanvasPlacement).toHaveBeenNthCalledWith(2, 'layout-1', 'plan:retired-3', 1, expect.any(AbortSignal));
+		expect(result.current.projection?.nodes.map((node) => node.id)).toEqual(['plan:retired-1', 'session:missing']);
+	});
+
 	it('discards unsaved moves when refresh resolves a different checkout layout', async () => {
 		const feature = { ...projection(1), layout: { ...projection().layout, id: 'layout-feature', branchKey: 'feature' }, nodes: [{ ...projection().nodes[0], position: { x: 30, y: 40 }, entityRef: { ...projection().nodes[0].entityRef, branchKey: 'feature' }, plan: { ...projection().nodes[0].plan!, branch: 'feature' } }] };
 		vi.mocked(api.resolveDefaultCanvas).mockResolvedValueOnce(projection()).mockResolvedValueOnce(feature);

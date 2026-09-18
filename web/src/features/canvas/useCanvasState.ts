@@ -341,6 +341,43 @@ export function useCanvasState(workspaceId?: string) {
 		for (const [index, node] of ordered.entries()) moveNode(node.id, deterministicPosition(index, node.kind));
 	}, [moveNode]);
 
+	const removeStalePlans = useCallback(async (): Promise<CanvasProjection | undefined> => {
+		const current = projectionRef.current;
+		if (!current || !workspaceId) return;
+		if (dirtyRef.current.size > 0) {
+			setError('Wait for Canvas positions to finish saving before resetting the layout.');
+			return;
+		}
+		loadAbortRef.current?.abort();
+		const controller = new AbortController();
+		loadAbortRef.current = controller;
+		const generation = ++requestRef.current;
+		try {
+			// Re-resolve the checkout before hiding placements: a stale reference
+			// may have recovered since the confirmation was opened.
+			let next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId, controller.signal), controller.signal);
+			if (controller.signal.aborted || generation !== requestRef.current) return;
+			if (next.layout.id !== current.layout.id) {
+				discardPendingChangesFor(next);
+				setProjection(next);
+				setError('The checkout changed. Review this Canvas before resetting its layout.');
+				return;
+			}
+			for (const id of next.nodes.filter((node) => node.kind === 'plan' && node.state === 'stale').map((node) => node.id)) {
+				const node = next.nodes.find((candidate) => candidate.id === id);
+				if (!node || node.kind !== 'plan' || node.state !== 'stale') continue;
+				next = await api.removeCanvasPlacement(next.layout.id, id, node.revision, controller.signal);
+				if (controller.signal.aborted || generation !== requestRef.current) return;
+				setProjection(next);
+			}
+			setProjection(next);
+			setError('');
+			return next;
+		} catch (caught) {
+			if (!controller.signal.aborted && generation === requestRef.current) setError(messageFrom(caught));
+		}
+	}, [discardPendingChangesFor, placeNewNodes, setProjection, workspaceId]);
+
 	const arrangePlans = useCallback((grouping: 'status' | 'service' | 'service_status') => {
 		const current = projectionRef.current;
 		if (!current) return;
@@ -370,7 +407,7 @@ export function useCanvasState(workspaceId?: string) {
 		}
 	}, [moveNode]);
 
-	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, setNodeCollapsed, arrangePlans, saveViewport, reloadPosition, reapplyPosition, placeSession, removeNode, resetPositions, reload: load, refresh };
+	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, setNodeCollapsed, arrangePlans, saveViewport, reloadPosition, reapplyPosition, placeSession, removeNode, removeStalePlans, resetPositions, reload: load, refresh };
 }
 
 function overlayDirty(projection: CanvasProjection, dirty: Map<string, DirtyPlacement>): CanvasProjection {

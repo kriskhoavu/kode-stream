@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CanvasProjection, WorkspaceConfig } from '../lib/types';
 import { CanvasPage } from './CanvasPage';
 
-const canvasState = vi.hoisted(() => ({ projection: undefined as CanvasProjection | undefined }));
-vi.mock('../features/canvas/useCanvasState', () => ({ useCanvasState: () => ({ projection: canvasState.projection, loading: false, error: '', conflicts: [], dirtyCount: 0, saveStatus: 'saved', hasUnsavedChanges: false, moveNode: vi.fn(), setNodeCollapsed: vi.fn(), saveViewport: vi.fn(), reloadPosition: vi.fn(), reapplyPosition: vi.fn(), placeSession: vi.fn(), removeNode: vi.fn(), resetPositions: vi.fn(), reload: vi.fn(), refresh: vi.fn() }) }));
-vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, onSelect }: { projection: CanvasProjection; onSelect: (id?: string) => void }) => <>{projection.nodes.map((node) => <button key={node.id} data-canvas-node-id={node.id} aria-label={node.session ? `Session: ${node.session.record.provider}` : 'Plan: PM-037 Canvas main'} type="button" onClick={() => onSelect(node.id)}>{node.session ? 'Session node' : 'Plan node'}</button>)}</> }));
+const canvasState = vi.hoisted(() => ({ projection: undefined as CanvasProjection | undefined, removeStalePlans: vi.fn(), resetPositions: vi.fn(), moveNode: vi.fn() }));
+vi.mock('../features/canvas/useCanvasState', () => ({ useCanvasState: () => ({ projection: canvasState.projection, loading: false, error: '', conflicts: [], dirtyCount: 0, saveStatus: 'saved', hasUnsavedChanges: false, moveNode: canvasState.moveNode, setNodeCollapsed: vi.fn(), saveViewport: vi.fn(), reloadPosition: vi.fn(), reapplyPosition: vi.fn(), placeSession: vi.fn(), removeNode: vi.fn(), removeStalePlans: canvasState.removeStalePlans, resetPositions: canvasState.resetPositions, reload: vi.fn(), refresh: vi.fn() }) }));
+vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, onSelect, onReset }: { projection: CanvasProjection; onSelect: (id?: string) => void; onReset: () => void }) => <><button type="button" onClick={onReset}>Reset board</button>{projection.nodes.map((node) => <button key={node.id} data-canvas-node-id={node.id} aria-label={node.session ? `Session: ${node.session.record.provider}` : 'Plan: PM-037 Canvas main'} type="button" onClick={() => onSelect(node.id)}>{node.session ? 'Session node' : 'Plan node'}</button>)}</> }));
 vi.mock('../features/canvas/CanvasWorkbench', () => ({ CanvasWorkbench: ({ selectedNode, onClose }: { selectedNode?: unknown; onClose: () => void }) => selectedNode ? <aside aria-label="Canvas Workbench"><button type="button" onClick={onClose}>Close Workbench</button></aside> : null }));
 
 describe('CanvasPage', () => {
@@ -47,6 +47,21 @@ describe('CanvasPage', () => {
 		await waitFor(() => expect(screen.getByLabelText('Checkout: main')).toBeInTheDocument());
 		expect(screen.queryByTestId('canvas-ready')).not.toBeInTheDocument();
 		expect(screen.getByRole('status')).toHaveTextContent('Saved');
+	});
+
+	it('confirms stale plan cleanup before resetting the remaining layout', async () => {
+		canvasState.removeStalePlans.mockClear();
+		canvasState.resetPositions.mockClear();
+		const stale = { ...projection().nodes[0], state: 'stale' as const, plan: undefined };
+		canvasState.projection = { ...projection(), nodes: [stale] };
+		canvasState.removeStalePlans.mockResolvedValueOnce({ ...projection(), nodes: [] });
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Reset board' }));
+		expect(screen.getByRole('dialog')).toHaveTextContent('Remove 1 stale plan placement');
+		fireEvent.click(screen.getByRole('button', { name: 'Reset layout' }));
+		await waitFor(() => expect(canvasState.removeStalePlans).toHaveBeenCalledTimes(1));
+		await waitFor(() => expect(canvasState.resetPositions).toHaveBeenCalledTimes(1));
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 	});
 
 	// The workspace node is not drawn on the board, so the header is the only place
