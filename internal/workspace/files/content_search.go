@@ -3,6 +3,7 @@ package workspacefiles
 // Package workspacefiles provides bounded workspace file operations.
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -217,6 +218,8 @@ func contentLineMatches(ctx context.Context, content []byte, query string, caseS
 	}
 	results := make([]models.WorkspaceContentSearchResult, 0, remaining)
 	queryRunes := []rune(query)
+	queryBytes := []byte(query)
+	asciiQuery := asciiOnly(queryBytes)
 	lineNumber := 1
 	for startByte := 0; startByte <= len(content); lineNumber++ {
 		if err := ctx.Err(); err != nil {
@@ -229,6 +232,33 @@ func contentLineMatches(ctx context.Context, content []byte, query string, caseS
 		line := content[startByte:endByte]
 		if len(line) > 0 && line[len(line)-1] == '\r' {
 			line = line[:len(line)-1]
+		}
+		if asciiQuery && asciiOnly(line) {
+			for start := 0; start+len(queryBytes) <= len(line); {
+				if err := ctx.Err(); err != nil {
+					return nil, false, err
+				}
+				match := findASCIIMatch(ctx, line, queryBytes, start, caseSensitive)
+				if match < 0 {
+					if err := ctx.Err(); err != nil {
+						return nil, false, err
+					}
+					break
+				}
+				results = append(results, models.WorkspaceContentSearchResult{
+					LineNumber: lineNumber, ColumnStart: match + 1, ColumnEnd: match + len(queryBytes) + 1,
+					Snippet: boundedASCIISnippet(line, match, match+len(queryBytes), maxSnippet),
+				})
+				if len(results) > remaining {
+					return results[:remaining], true, nil
+				}
+				start = match + len(queryBytes)
+			}
+			if endByte == len(content) {
+				break
+			}
+			startByte = endByte + 1
+			continue
 		}
 		lineRunes := []rune(string(line))
 		for start := 0; start+len(queryRunes) <= len(lineRunes); start++ {
@@ -258,6 +288,70 @@ func contentLineMatches(ctx context.Context, content []byte, query string, caseS
 		startByte = endByte + 1
 	}
 	return results, false, nil
+}
+
+func asciiOnly(value []byte) bool {
+	for _, character := range value {
+		if character >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
+}
+
+func findASCIIMatch(ctx context.Context, line, query []byte, start int, caseSensitive bool) int {
+	if caseSensitive {
+		if offset := bytes.Index(line[start:], query); offset >= 0 {
+			return start + offset
+		}
+		return -1
+	}
+	for index := start; index+len(query) <= len(line); index++ {
+		if index&4095 == 0 && ctx.Err() != nil {
+			return -1
+		}
+		if asciiFoldEqual(line[index], query[0]) && bytes.EqualFold(line[index:index+len(query)], query) {
+			return index
+		}
+	}
+	return -1
+}
+
+func asciiFoldEqual(left, right byte) bool {
+	if left == right {
+		return true
+	}
+	if left >= 'A' && left <= 'Z' {
+		left += 'a' - 'A'
+	}
+	if right >= 'A' && right <= 'Z' {
+		right += 'a' - 'A'
+	}
+	return left == right
+}
+
+func boundedASCIISnippet(line []byte, matchStart, matchEnd, limit int) string {
+	if limit <= 0 || len(line) <= limit {
+		return string(line)
+	}
+	start := matchStart - (limit-(matchEnd-matchStart))/2
+	if start < 0 {
+		start = 0
+	}
+	if start+limit > len(line) {
+		start = len(line) - limit
+	}
+	end := start + limit
+	prefix, suffix := "", ""
+	if start > 0 {
+		prefix = "…"
+		start++
+	}
+	if end < len(line) {
+		suffix = "…"
+		end--
+	}
+	return prefix + string(line[start:end]) + suffix
 }
 
 func boundedSnippet(line []rune, matchStart, matchEnd, limit int) string {

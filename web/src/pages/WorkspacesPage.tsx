@@ -132,15 +132,13 @@ const busy = pendingOperations.length > 0;
   }, [allSelected, selectedWorkspaces.length]);
 
   useEffect(() => {
-    let active = true;
-    void api.systemConfigPaths().then((result) => {
-      if (!active) return;
+    const controller = new AbortController();
+    void api.systemConfigPaths(controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
       setSystemConfig(result);
       setCloneRoot((current) => current || result.cloneRootDir);
     }).catch(() => undefined);
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, []);
 
   useEffect(() => () => registrationController.current?.abort(), []);
@@ -1533,12 +1531,12 @@ function RuntimeSettingsFields({ value, onChange }: { value: WorkspaceRuntimeCon
 function KnowledgeRoots({ workspaceId, enabled }: { workspaceId: string; enabled: boolean }) {
 	const [roots, setRoots] = useState<string[]>([]);
 	useEffect(() => {
-		let active = true;
+		const controller = new AbortController();
 		if (!enabled) { setRoots([]); return; }
 		const loadWikis = api.knowledgeWikis;
 		if (typeof loadWikis !== 'function') { setRoots([]); return; }
-		void loadWikis(workspaceId).then((wikis) => { if (active) setRoots(wikis.map((wiki) => wiki.root)); }).catch(() => { if (active) setRoots([]); });
-		return () => { active = false; };
+		void loadWikis(workspaceId, controller.signal).then((wikis) => { if (!controller.signal.aborted) setRoots(wikis.map((wiki) => wiki.root)); }).catch(() => { if (!controller.signal.aborted) setRoots([]); });
+		return () => controller.abort();
 	}, [enabled, workspaceId]);
 	return <small>{enabled ? roots.length ? `Detected: ${roots.join(', ')}` : 'No compatible Wiki roots detected yet.' : 'Detection is disabled.'}</small>;
 }

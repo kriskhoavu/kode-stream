@@ -60,6 +60,7 @@ func (h HTTPIntegration) raw(ctx context.Context, suffix string) ([]byte, error)
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 64<<10))
 		return nil, fmt.Errorf("%s provider request failed: %s", h.Provider, res.Status)
 	}
 	return readBounded(res.Body, MaxFileBytes, "file")
@@ -87,6 +88,7 @@ func (h HTTPIntegration) request(ctx context.Context, suffix string, target any)
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 64<<10))
 		return fmt.Errorf("%s provider request failed: %s", h.Provider, res.Status)
 	}
 	data, err := readBounded(res.Body, MaxResponseBytes, "response")

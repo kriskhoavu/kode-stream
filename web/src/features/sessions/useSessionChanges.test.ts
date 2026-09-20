@@ -86,6 +86,21 @@ describe('useSessionChanges', () => {
 		expect(result.current.error).toBe('');
 	});
 
+	it('waits for a slow changes request before starting another poll', async () => {
+		let finishFirst: (value: SessionChanges) => void = () => {};
+		vi.mocked(api.sessionChanges)
+			.mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }))
+			.mockResolvedValue(changes({ headMoved: 2 }));
+		const { result } = renderHook(() => useSessionChanges('session-1', true));
+		await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+		expect(api.sessionChanges).toHaveBeenCalledTimes(1);
+		await act(async () => finishFirst(changes()));
+		expect(result.current.changes?.headMoved).toBe(1);
+		await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+		expect(api.sessionChanges).toHaveBeenCalledTimes(2);
+		expect(result.current.changes?.headMoved).toBe(2);
+	});
+
 	it('drops an in-flight response when the session id changes before it resolves', async () => {
 		let resolveFirst: (value: SessionChanges) => void = () => {};
 		vi.mocked(api.sessionChanges).mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));

@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../shared/api';
 import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult } from '../../lib/types';
-import { CanvasBoard } from './CanvasBoard';
+import { CanvasBoard, CanvasSessionTerminal } from './CanvasBoard';
 
 const fitView = vi.fn();
 const setViewport = vi.fn();
@@ -34,6 +34,26 @@ vi.mock('@xyflow/react', async () => {
 
 describe('CanvasBoard', () => {
 	beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
+
+	it('ignores a stale terminal attachment after the selected session changes', async () => {
+		let resolveFirst: (session: EmbeddedAISessionResult['session']) => void = () => {};
+		const firstSession = new Promise<EmbeddedAISessionResult['session']>((resolve) => { resolveFirst = resolve; });
+		vi.mocked(api.embeddedAISession).mockImplementation((id) => id === 'session-1'
+			? firstSession
+			: Promise.resolve({ id, itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }));
+		vi.mocked(api.embeddedAISessionGrant).mockImplementation((id) => Promise.resolve({ sessionId: id, token: `grant-${id}`, expiresAt: '' }));
+		const firstRecord = baseProjection().nodes[2].session!.record;
+		const secondRecord = { ...firstRecord, id: 'session-2' };
+		const view = render(<CanvasSessionTerminal record={firstRecord} visible onReload={vi.fn()} />);
+		await waitFor(() => expect(api.embeddedAISession).toHaveBeenCalledWith('session-1'));
+
+		view.rerender(<CanvasSessionTerminal record={secondRecord} visible onReload={vi.fn()} />);
+		expect(await screen.findByTestId('canvas-terminal-session-2')).toBeInTheDocument();
+		await act(async () => { resolveFirst({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }); });
+
+		expect(screen.queryByTestId('canvas-terminal-session-1')).not.toBeInTheDocument();
+		expect(screen.getByTestId('canvas-terminal-session-2')).toBeInTheDocument();
+	});
 
 	it('uses an explicit disclosure action and keeps expansion independent from selection', async () => {
 		vi.mocked(api.embeddedAISession).mockResolvedValue({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' });
@@ -84,6 +104,14 @@ describe('CanvasBoard', () => {
 	it('provides React Flow context to toolbar search', () => {
 		expect(() => renderBoard(baseProjection())).not.toThrow();
 		expect(screen.getByLabelText('Search Canvas nodes')).toBeInTheDocument();
+	});
+
+	it('keeps section and removal actions together in a right-aligned row when a node is selected', () => {
+		renderBoard(baseProjection(), { selectedId: 'plan:item-1', onCreateSection: vi.fn() });
+		const actions = screen.getByRole('group', { name: 'Canvas actions' });
+		expect(actions).toHaveClass('with-selection');
+		expect(actions).toContainElement(screen.getByRole('button', { name: 'Create section' }));
+		expect(actions).toContainElement(screen.getByRole('button', { name: 'Remove from Canvas' }));
 	});
 
 	it('renders plans and terminal sessions without a separate workspace card', () => {
@@ -178,12 +206,12 @@ describe('CanvasBoard', () => {
 	it('computes the Focus active set from live running sessions and ignores non-live ones', () => {
 		renderBoard(focusProjection());
 		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
-		expect(screen.getByRole('button', { name: /^Focus/ })).toHaveTextContent('Focus · 1 plan · 1 session');
+		expect(screen.getByRole('button', { name: 'Focus' })).toHaveAttribute('aria-pressed', 'true');
 		expect(screen.getByLabelText('Plan: PM-037 Focused Canvas main')).toBeInTheDocument();
 		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
 	});
 
-	it('pluralizes the Focus label for more than one active plan and session', () => {
+	it('keeps the Focus label concise for more than one active plan and session', () => {
 		const projection = focusProjection();
 		const activeSession2 = projection.nodes.find((node) => node.id === 'session:session-2')!;
 		activeSession2.session = { record: { ...activeSession2.session!.record, state: 'running', live: true } };
@@ -193,7 +221,7 @@ describe('CanvasBoard', () => {
 		projection.connections.push({ id: 'four', source: plan1.id, target: session3.id, kind: 'session_launched_from', sourceOfTruth: 'derived' });
 		renderBoard(projection);
 		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
-		expect(screen.getByRole('button', { name: /^Focus/ })).toHaveTextContent('Focus · 2 plans · 3 sessions');
+		expect(screen.getByRole('button', { name: 'Focus' })).toHaveTextContent('Focus');
 	});
 
 	it('removes inactive nodes and their edges from the graph when Focus is on', () => {
@@ -268,27 +296,24 @@ describe('CanvasBoard', () => {
 		expect(onSaveViewport).not.toHaveBeenCalled();
 	});
 
-	it('shows a hint that layout is automatic while Focus is on', () => {
-		renderBoard(focusProjection());
-		expect(screen.queryByText('Layout is automatic while Focus is on')).not.toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
-		expect(screen.getByText('Layout is automatic while Focus is on')).toBeInTheDocument();
-	});
-
 	it('falls back to Focus off when the stored preference value is invalid', () => {
 		localStorage.setItem('kodeStream.canvas-focus', JSON.stringify('yes'));
 		renderBoard(baseProjection());
 		expect(screen.getByRole('button', { name: 'Focus' })).toHaveAttribute('aria-pressed', 'false');
 	});
 
-	it('shows a nothing-running label with a Turn off affordance when no session is active', () => {
+	it('keeps only the Focus toggle when no session is active', () => {
 		const projection = baseProjection();
 		projection.nodes[2] = { ...projection.nodes[2], session: { record: { ...projection.nodes[2].session!.record, state: 'exited', live: false } } };
 		renderBoard(projection);
-		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
-		expect(screen.getByRole('button', { name: /^Focus/ })).toHaveTextContent('Focus · nothing running');
-		fireEvent.click(screen.getByRole('button', { name: 'Turn off' }));
-		expect(screen.getByRole('button', { name: 'Focus' })).toHaveAttribute('aria-pressed', 'false');
+		const button = screen.getByRole('button', { name: 'Focus' });
+		expect(button.querySelector('.lucide-eye-off')).toBeInTheDocument();
+		fireEvent.click(button);
+		expect(button).toHaveAttribute('aria-pressed', 'true');
+		expect(button.querySelector('.lucide-eye')).toBeInTheDocument();
+		expect(screen.queryByText('nothing running')).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Turn off' })).not.toBeInTheDocument();
+		expect(screen.queryByText('Layout is automatic while Focus is on')).not.toBeInTheDocument();
 	});
 
 	it('exposes aria-pressed on the Focus toggle and persists the preference across renders', () => {
@@ -365,10 +390,15 @@ function focusLayoutProjection(): CanvasProjection {
 }
 
 describe('CanvasBoard sessions entry point', () => {
-	it('offers a Sessions button that opens the workspace sessions view and counts live sessions', () => {
+	it('presents Canvas and Sessions as Workbench views and opens the Sessions view', () => {
 		const onOpenSessions = vi.fn();
 		renderBoard(baseProjection(), { onOpenSessions });
-		const button = screen.getByRole('button', { name: /^Sessions/ });
+		expect(screen.getByRole('button', { name: 'Canvas' })).toHaveAttribute('aria-pressed', 'true');
+		const switcher = screen.getByRole('group', { name: 'Workbench view' });
+		expect(switcher.compareDocumentPosition(screen.getByLabelText('Search Canvas nodes')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		const nodeType = screen.getByRole('button', { name: 'Node type' });
+		expect(nodeType.compareDocumentPosition(screen.getByRole('button', { name: 'Focus' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		const button = screen.getByRole('button', { name: 'Sessions (1)' });
 		fireEvent.click(button);
 		expect(onOpenSessions).toHaveBeenCalledTimes(1);
 	});

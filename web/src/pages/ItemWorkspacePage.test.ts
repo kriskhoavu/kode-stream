@@ -64,6 +64,50 @@ rename to docs/new.md
 });
 
 describe('ItemWorkspacePage', () => {
+  it('cancels item-scoped reads when the selected item changes', async () => {
+    const firstItemSignals: AbortSignal[] = [];
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/items/item-1' || url === '/api/items/item-2') {
+        const id = url.endsWith('item-1') ? 'item-1' : 'item-2';
+        return Promise.resolve(response({
+          id,
+          workspaceId: 'ws-1',
+          workspaceName: 'Workspace',
+          scope: 'platform',
+          branch: 'main',
+          identifier: id === 'item-1' ? 'PM-101' : 'PM-102',
+          title: id,
+          status: 'draft',
+          tags: [],
+          metadataSource: 'plan.yaml',
+          itemPath: `plans/platform/${id}`,
+          counts: { files: 0 },
+          warnings: []
+        }));
+      }
+      if (url === '/api/items/item-1/verification-tests' || url === '/api/items/item-1/e2e-runbooks') {
+        if (init?.signal) firstItemSignals.push(init.signal);
+        return new Promise<Response>(() => undefined);
+      }
+      if (url.endsWith('/files')) return Promise.resolve(response([]));
+      if (url.endsWith('/diff')) return Promise.resolve(response({ diff: '' }));
+      return Promise.resolve(response({}));
+    }));
+    const props = {
+      refreshKey: 0,
+      workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }],
+      onBack: vi.fn(),
+      onOpenItem: vi.fn()
+    };
+    const view = render(createElement(ItemWorkspacePage, { ...props, itemId: 'item-1' }));
+
+    await waitFor(() => expect(firstItemSignals).toHaveLength(2));
+    view.rerender(createElement(ItemWorkspacePage, { ...props, itemId: 'item-2' }));
+
+    await waitFor(() => expect(firstItemSignals.every((signal) => signal.aborted)).toBe(true));
+  });
+
   it('removes operational controls when a stale snapshot route is rejected', async () => {
     const requests: string[] = [];
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {

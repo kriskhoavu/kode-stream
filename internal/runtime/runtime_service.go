@@ -384,6 +384,7 @@ func executeHTTPHealth(ctx context.Context, target string) error {
 		return err
 	}
 	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
 	if response.StatusCode >= 500 {
 		return fmt.Errorf("status %d", response.StatusCode)
 	}

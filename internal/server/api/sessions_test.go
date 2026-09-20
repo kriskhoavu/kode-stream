@@ -339,6 +339,20 @@ func TestGlobalSessionsScopeAllListsExitedSession(t *testing.T) {
 	}
 }
 
+func TestDeleteSessionRemovesFinishedRecord(t *testing.T) {
+	fixture := newSessionsTestFixture(t, models.RuntimeModeLocal)
+	req := httptest.NewRequest(http.MethodDelete, "/api/sessions/session-1", nil)
+	req.SetPathValue("id", "session-1")
+	recorder := httptest.NewRecorder()
+	fixture.controller.deleteSession(recorder, req)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if _, found, err := fixture.records.Get("session-1"); err != nil || found {
+		t.Fatalf("found=%v err=%v", found, err)
+	}
+}
+
 func TestGlobalSessionsHidesWorkspacesCloudCallerMayNotRead(t *testing.T) {
 	fixture := newSessionsTestFixture(t, models.RuntimeModeCloud)
 	req := httptest.NewRequest(http.MethodGet, "/api/sessions?scope=all", nil)

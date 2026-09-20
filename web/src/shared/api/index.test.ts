@@ -174,19 +174,21 @@ describe('shared api facade', () => {
 		await expect(api.patchCanvasPlacements('layout', [])).rejects.toMatchObject({ name: 'ApiError', code: 'placement_conflict', nodeIds: ['plan:1'], status: 409 });
 	});
 
-	it('sends the scoped Sessions list, changes, and diff requests', async () => {
+	it('sends the scoped Sessions list, removal, changes, and diff requests', async () => {
 		const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
 		vi.stubGlobal('fetch', fetchMock);
 
 		await api.listSessions('active');
 		await api.listSessions('all');
+		await api.deleteSession('session/one');
 		await api.sessionChanges('session/one');
 		await api.sessionFileDiff('session/one', 'src/App tsx');
 
 		expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/sessions?scope=active', expect.any(Object));
 		expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/sessions?scope=all', expect.any(Object));
-		expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/sessions/session%2Fone/changes', expect.any(Object));
-		expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/sessions/session%2Fone/diff?path=src%2FApp%20tsx', expect.any(Object));
+		expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/sessions/session%2Fone', expect.objectContaining({ method: 'DELETE' }));
+		expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/sessions/session%2Fone/changes', expect.any(Object));
+		expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/sessions/session%2Fone/diff?path=src%2FApp%20tsx', expect.any(Object));
 	});
 
   it('scopes provider capability discovery to the selected workspace', async () => {
@@ -304,6 +306,21 @@ describe('shared api facade', () => {
     await api.workspaceFile('w1', 'docs/a b.md');
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/workspaces/w1/tree?path=&includeIgnored=true', expect.any(Object));
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/workspaces/w1/files?path=docs%2Fa%20b.md', expect.any(Object));
+  });
+
+  it('fetches a forced workspace directory independently of an earlier request', async () => {
+    let resolveFirst: (value: unknown) => void = () => {};
+    const fetchMock = vi.fn()
+      .mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ workspaceId: 'w1', path: 'docs', entries: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = api.workspaceTree('w1', 'docs');
+    const refreshed = api.workspaceTree('w1', 'docs', false, true);
+    await refreshed;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    resolveFirst({ ok: true, json: async () => ({ workspaceId: 'w1', path: 'docs', entries: [] }) });
+    await first;
   });
 
   it('normalizes Explorer productivity responses', async () => {

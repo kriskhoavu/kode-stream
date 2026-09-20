@@ -505,6 +505,7 @@ func TestCloudModeDoesNotAllowChromeExtensionCORS(t *testing.T) {
 func TestGinHealthRouteIncludesDatabaseReadiness(t *testing.T) {
 	handler := New(Dependencies{DatabaseHealth: fakeDatabaseHealth{health: storage.DatabaseHealth{
 		Driver:           storage.StorageDriverSQLite,
+		Configured:       true,
 		OK:               true,
 		MigrationVersion: 1,
 	}}}).Routes()
@@ -524,6 +525,18 @@ func TestGinHealthRouteIncludesDatabaseReadiness(t *testing.T) {
 	}
 	if !payload.OK || payload.Database.Driver != storage.StorageDriverSQLite || payload.Database.MigrationVersion != 1 {
 		t.Fatalf("payload = %#v", payload)
+	}
+}
+
+func TestGinHealthRouteIgnoresAnUnconfiguredDatabase(t *testing.T) {
+	var database *storage.SQLStore
+	handler := New(Dependencies{DatabaseHealth: database}).Routes()
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+
+	if response.Code != http.StatusOK || response.Body.String() != "{\"ok\":true}\n" {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
 	}
 }
 

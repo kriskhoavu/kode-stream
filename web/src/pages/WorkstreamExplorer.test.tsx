@@ -44,7 +44,7 @@ describe('WorkstreamExplorer', () => {
   it('loads one directory when a workspace root expands', async () => {
 		const { container } = render(<WorkstreamExplorer workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} />);
     fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
-    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', '', false));
+    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', '', false, false, expect.anything()));
     expect(await screen.findByText('README.md')).toBeInTheDocument();
   });
 
@@ -63,7 +63,7 @@ describe('WorkstreamExplorer', () => {
     expect(workspaceButton.closest('[role="treeitem"]')).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.doubleClick(docsButton);
-    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
+    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false, false, expect.anything()));
     expect(await screen.findByText('guide.md')).toBeInTheDocument();
 
     fireEvent.doubleClick(docsButton);
@@ -128,7 +128,7 @@ describe('WorkstreamExplorer', () => {
     expect(folderButton).not.toHaveTextContent('DI-170');
     expect(folderButton.closest('.explorer-tree-row')?.querySelector('.item-status-dot')).toBeNull();
     fireEvent.doubleClick(folderButton);
-    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
+    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false, false, expect.anything()));
     expect(await screen.findByText('guide.md')).toBeInTheDocument();
     expect(screen.getByText('guide.md')).toHaveClass('explorer-row-label', 'file');
     expect(screen.getByLabelText('Modified file not committed')).toHaveClass('tree-state-icon', 'modified');
@@ -176,7 +176,7 @@ describe('WorkstreamExplorer', () => {
 
     const folderButton = screen.getByRole('button', { name: 'docs' });
     fireEvent.doubleClick(folderButton);
-    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
+    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false, false, expect.anything()));
     fireEvent.click(folderButton);
 
     await waitFor(() => expect((container.querySelector('.raw-editor') as HTMLTextAreaElement).value).toContain('# Guide'));
@@ -234,7 +234,7 @@ describe('WorkstreamExplorer', () => {
 
     expect(await screen.findByRole('button', { name: 'docs' })).toBeInTheDocument();
     fireEvent.doubleClick(screen.getByRole('button', { name: 'docs' }));
-    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
+    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false, false, expect.anything()));
     expect(await screen.findByText('guide.md')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse files panel' }));

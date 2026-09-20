@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	apperrors "kode-stream/internal/common"
@@ -65,7 +64,7 @@ type ScanService struct {
 	registry registry.Repository
 	index    itemindex.Repository
 	scanner  *scanner.Scanner
-	locks    sync.Map
+	locks    scanLocks
 }
 
 // SourceSettingsService owns validated source settings and refresh compensation.

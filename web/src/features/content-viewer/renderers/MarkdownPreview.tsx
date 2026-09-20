@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import rehypeExternalLinks from 'rehype-external-links';
 import rehypeHighlight from 'rehype-highlight';
@@ -14,6 +14,9 @@ import { unified } from 'unified';
 import 'katex/dist/katex.min.css';
 
 const markdownCache = new Map<string, string>();
+const maxMarkdownCacheChars = 2 << 20;
+const maxMarkdownCacheEntryChars = 512 << 10;
+let markdownCacheChars = 0;
 
 const markdownSchema: SanitizeSchema = {
   ...defaultSchema,
@@ -45,22 +48,40 @@ export async function renderMarkdown(content: string): Promise<string> {
     .use(rehypeStringify)
     .process(content);
   const html = decorateCodeBlocks(String(result));
-  markdownCache.set(content, html);
-  if (markdownCache.size > 20) markdownCache.delete(markdownCache.keys().next().value ?? '');
+  const entryChars = content.length + html.length;
+  if (entryChars <= maxMarkdownCacheEntryChars) {
+    const previous = markdownCache.get(content);
+    if (previous !== undefined) {
+      markdownCacheChars -= content.length + previous.length;
+      markdownCache.delete(content);
+    }
+    markdownCache.set(content, html);
+    markdownCacheChars += entryChars;
+    while (markdownCache.size > 20 || markdownCacheChars > maxMarkdownCacheChars) {
+      const oldest = markdownCache.keys().next().value;
+      if (oldest === undefined) break;
+      markdownCacheChars -= oldest.length + markdownCache.get(oldest)!.length;
+      markdownCache.delete(oldest);
+    }
+  }
   return html;
 }
 
 export function MarkdownPreview({ content }: { content: string }) {
-  const [html, setHtml] = useState('');
-  const [error, setError] = useState('');
+  const [view, setView] = useState<{ source: string; html: string; error: string }>();
+	const copyTimers = useRef(new Set<number>());
+
+	useEffect(() => () => {
+		for (const timer of copyTimers.current) window.clearTimeout(timer);
+		copyTimers.current.clear();
+	}, []);
 
   useEffect(() => {
     let active = true;
-    setError('');
     void renderMarkdown(content).then((rendered) => {
-      if (active) setHtml(rendered);
+      if (active) setView({ source: content, html: rendered, error: '' });
     }).catch(() => {
-      if (active) setError('Markdown preview could not be rendered.');
+      if (active) setView({ source: content, html: '', error: 'Markdown preview could not be rendered.' });
     });
     return () => {
       active = false;
@@ -72,13 +93,16 @@ export function MarkdownPreview({ content }: { content: string }) {
     if (!button) return;
     void navigator.clipboard.writeText(button.dataset.code ?? '');
     button.textContent = 'Copied';
-    window.setTimeout(() => {
+		const timer = window.setTimeout(() => {
+			copyTimers.current.delete(timer);
       button.textContent = 'Copy';
     }, 1200);
+		copyTimers.current.add(timer);
   };
 
-  if (error) return <p className="viewer-error">{error}</p>;
-  return <article className="content-viewer-markdown" onClick={copyCode} dangerouslySetInnerHTML={{ __html: html }} />;
+  if (view?.source !== content) return <div className="viewer-loading">Rendering preview...</div>;
+  if (view.error) return <p className="viewer-error">{view.error}</p>;
+  return <article className="content-viewer-markdown" onClick={copyCode} dangerouslySetInnerHTML={{ __html: view.html }} />;
 }
 
 function decorateCodeBlocks(html: string): string {

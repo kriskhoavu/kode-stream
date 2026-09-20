@@ -383,6 +383,35 @@ func TestVerificationShutdownCancelsRunningJob(t *testing.T) {
 	}
 }
 
+func TestVerificationBoundsRuntimeCleanupAfterTimeout(t *testing.T) {
+	workspacePath := t.TempDir()
+	runtimeConfig := verificationRuntime("sleep 5", nil)
+	runtimeConfig.Commands.Down = "sleep 5"
+	reg := verificationRegistry(t, models.WorkspaceConfig{
+		ID:             "workspace-1",
+		Name:           "Workspace",
+		Path:           workspacePath,
+		BaselineBranch: "main",
+		Sources:        []string{"plans"},
+		Runtime:        runtimeConfig,
+	})
+	service := NewServiceWithPolicy(reg, appruntime.NewService(), 1, 50*time.Millisecond)
+	defer service.Close()
+
+	job, err := service.Start("workspace-1", CreateInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	job = waitVerificationJob(t, service, "workspace-1", job.ID)
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("timed out cleanup ran too long: %s", elapsed)
+	}
+	if job.Status != JobStatusFailed {
+		t.Fatalf("job = %#v", job)
+	}
+}
+
 func verificationRuntime(verify string, automation *models.RuntimeAutomationConfig) *models.WorkspaceRuntimeConfig {
 	return &models.WorkspaceRuntimeConfig{
 		Type: models.RuntimeTypeCustom,

@@ -10,6 +10,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 	const [sidePanelWidth, setSidePanelWidth] = useState(300);
 	const [expandedDomains, setExpandedDomains] = useState<Set<string>>(() => new Set(['root']));
 	const navigationRef = useRef<HTMLElement | null>(null);
+	const resizeCleanupRef = useRef<(() => void) | null>(null);
 	const filtered = useMemo(() => {
 		const needle = query.trim().toLowerCase();
 		return needle ? pages.filter((page) => [page.title, page.slug, page.summary ?? '', ...page.roles, ...page.topics].some((value) => value.toLowerCase().includes(needle))) : pages;
@@ -36,6 +37,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		entry.scrollIntoView?.({ block: 'nearest' });
 		entry.focus({ preventScroll: true });
 	}, [expandedDomains, query, selectedSlug]);
+	useEffect(() => () => resizeCleanupRef.current?.(), []);
 	const moveFocus = (event: React.KeyboardEvent<HTMLButtonElement>, slug: string) => {
 		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
 			event.preventDefault();
@@ -47,17 +49,21 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 	};
 	const startSidePanelResize = (event: React.PointerEvent<HTMLButtonElement>) => {
 		event.preventDefault();
+		resizeCleanupRef.current?.();
 		const startX = event.clientX;
 		const startingWidth = sidePanelWidth;
 		const resize = (moveEvent: PointerEvent) => setSidePanelWidth(Math.max(260, Math.min(640, startingWidth - (moveEvent.clientX - startX))));
-		const finish = () => {
+		const cleanup = () => {
 			document.body.classList.remove('is-resizing-panel');
 			window.removeEventListener('pointermove', resize);
 			window.removeEventListener('pointerup', finish);
+			if (resizeCleanupRef.current === cleanup) resizeCleanupRef.current = null;
 		};
+		function finish() { cleanup(); }
 		document.body.classList.add('is-resizing-panel');
 		window.addEventListener('pointermove', resize);
-		window.addEventListener('pointerup', finish);
+		window.addEventListener('pointerup', finish, { once: true });
+		resizeCleanupRef.current = cleanup;
 	};
 	const renderDomain = (node: DomainNode): ReactNode => {
 		const tiers = node.tiers

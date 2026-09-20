@@ -124,6 +124,7 @@ describe('SessionBrowser', () => {
 	it('shows the Changes sub-tab using the shared SessionChangesPanel', () => {
 		const rows = [row({ id: 'a' }, { planTitle: 'Plan A' })];
 		render(<SessionBrowser rows={rows} grouping="plan" persistKey="test-changes" onStop={vi.fn()} onReload={vi.fn()} />);
+		expect(screen.getByRole('tablist', { name: 'Session detail tabs' })).toHaveClass('session-browser-detail-tabs');
 		fireEvent.click(screen.getByRole('button', { name: 'Changes' }));
 		expect(screen.getByTestId('mock-changes')).toHaveAttribute('data-session', 'a');
 	});
@@ -148,6 +149,23 @@ describe('SessionBrowser', () => {
 		const dialog = await screen.findByRole('dialog');
 		fireEvent.click(within(dialog).getByRole('button', { name: 'Stop session' }));
 		expect(await within(dialog).findByRole('alert')).toHaveTextContent('Could not stop.');
+	});
+
+	it('confirms before removing a finished session and never offers removal for a live one', async () => {
+		const onRemove = vi.fn().mockResolvedValue(undefined);
+		const rows = [
+			row({ id: 'live', state: 'running', live: true }, { planTitle: 'Live plan' }),
+			row({ id: 'finished', state: 'cancelled', live: false }, { planTitle: 'Finished plan' })
+		];
+		render(<SessionBrowser rows={rows} grouping="plan" persistKey="test-remove" onStop={vi.fn()} onRemove={onRemove} onReload={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Live only' }));
+		expect(screen.queryByRole('button', { name: 'Remove Live plan session' })).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Remove Finished plan session' }));
+		const dialog = screen.getByRole('dialog');
+		expect(onRemove).not.toHaveBeenCalled();
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Remove session' }));
+		await waitFor(() => expect(onRemove).toHaveBeenCalledWith(rows[1]));
+		await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 	});
 
 	it('offers Open on board only when the callback is given', () => {

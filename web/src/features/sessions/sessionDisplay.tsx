@@ -41,10 +41,10 @@ export function formatAge(startedAt: string): string {
 }
 
 /**
- * A Cancel-default confirmation dialog with a focus trap, shared by every
- * Stop action across the Canvas Workbench and the Session Browser.
+ * A Cancel-default confirmation dialog with a focus trap, shared by destructive
+ * session actions across the Canvas Workbench and the Session Browser.
  */
-export function StopConfirmDialog({ title, message, busy, error, onCancel, onConfirm }: { title: string; message: string; busy: boolean; error?: string; onCancel: () => void; onConfirm: () => void }) {
+export function SessionConfirmDialog({ title, message, confirmLabel, busyLabel, busy, error, onCancel, onConfirm }: { title: string; message: string; confirmLabel: string; busyLabel: string; busy: boolean; error?: string; onCancel: () => void; onConfirm: () => void }) {
 	const dialog = useModalDialog(onCancel, !busy);
 	return <div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}>
 		<section ref={dialog.ref} className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby={dialog.titleId}>
@@ -53,7 +53,7 @@ export function StopConfirmDialog({ title, message, busy, error, onCancel, onCon
 			{error && <p className="error" role="alert">{error}</p>}
 			<footer>
 				<button data-autofocus className="ghost" type="button" disabled={busy} onClick={onCancel}>Cancel</button>
-				<button className="danger-confirm" type="button" disabled={busy} onClick={onConfirm}>{busy ? 'Stopping…' : 'Stop session'}</button>
+				<button className="danger-confirm" type="button" disabled={busy} onClick={onConfirm}>{busy ? busyLabel : confirmLabel}</button>
 			</footer>
 		</section>
 	</div>;

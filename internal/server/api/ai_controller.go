@@ -224,10 +224,19 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 	}
 	defer connection.Close()
 	connection.SetReadLimit(maxTerminalFrameBytes)
+	const terminalReadTimeout = time.Minute
+	const terminalWriteTimeout = 10 * time.Second
+	_ = connection.SetReadDeadline(time.Now().Add(terminalReadTimeout))
+	connection.SetPongHandler(func(string) error {
+		return connection.SetReadDeadline(time.Now().Add(terminalReadTimeout))
+	})
 	var writeMu sync.Mutex
 	writeChannel := func(payload channelOutput) error {
 		writeMu.Lock()
 		defer writeMu.Unlock()
+		if err := connection.SetWriteDeadline(time.Now().Add(terminalWriteTimeout)); err != nil {
+			return err
+		}
 		return connection.WriteJSON(payload)
 	}
 	output, buffered, unsubscribe, err := manager.Subscribe(id)
@@ -236,12 +245,14 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 	}
 	defer unsubscribe()
 	if len(buffered) > 0 {
-		_ = writeChannel(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(buffered), Encoding: "base64"})
+		if err := writeChannel(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(buffered), Encoding: "base64"}); err != nil {
+			return
+		}
 	}
 	state, _ := manager.Get(id)
-	_ = writeChannel(channelOutput{Type: "state", State: state.State, ExitCode: state.ExitCode})
-	done := make(chan struct{})
-	defer close(done)
+	if err := writeChannel(channelOutput{Type: "state", State: state.State, ExitCode: state.ExitCode}); err != nil {
+		return
+	}
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
@@ -310,6 +321,8 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 	}()
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
+	pingTicker := time.NewTicker(30 * time.Second)
+	defer pingTicker.Stop()
 	lastState := state.State
 	for {
 		select {
@@ -334,8 +347,10 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 					return
 				}
 			}
-		case <-done:
-			return
+		case <-pingTicker.C:
+			if err := connection.WriteControl(websocket.PingMessage, nil, time.Now().Add(terminalWriteTimeout)); err != nil {
+				return
+			}
 		case <-readDone:
 			return
 		}

@@ -224,7 +224,7 @@ export const api = {
 	knowledgeWikis: async (workspaceId: string, signal?: AbortSignal) => (await request<KnowledgeWiki[] | null>(`/api/knowledge/wikis?workspaceId=${encodeURIComponent(workspaceId)}`, { signal }, !signal)) ?? [],
 	knowledgePages: (workspaceId: string, root: string, signal?: AbortSignal) => request<KnowledgePagesResponse>(knowledgeURL(workspaceId, root, 'pages'), { signal }, !signal),
 	knowledgePage: (workspaceId: string, root: string, slug: string, signal?: AbortSignal) => request<KnowledgePageDetail>(`${knowledgeURL(workspaceId, root, 'pages')}/${encodeURIComponent(slug)}`, { signal }, !signal),
-	knowledgeE2ERunbook: (workspaceId: string, root: string, slug: string) => request<E2ERunbookList>(`${knowledgeURL(workspaceId, root, 'pages')}/${encodeURIComponent(slug)}/e2e-runbook`),
+	knowledgeE2ERunbook: (workspaceId: string, root: string, slug: string, signal?: AbortSignal) => request<E2ERunbookList>(`${knowledgeURL(workspaceId, root, 'pages')}/${encodeURIComponent(slug)}/e2e-runbook`, { signal }, !signal),
 	knowledgeGraph: (workspaceId: string, root: string, signal?: AbortSignal) => request<KnowledgeGraph>(knowledgeURL(workspaceId, root, 'graph'), { signal }, !signal),
 	rescanKnowledge: (workspaceId: string, root: string) => request<KnowledgeActionResult>(knowledgeURL(workspaceId, root, 'rescan'), { method: 'POST' }),
 	syncKnowledge: (workspaceId: string, confirm = false) => request<KnowledgeActionResult>(`/api/knowledge/workspaces/${encodeURIComponent(workspaceId)}/sync`, { method: 'POST', body: JSON.stringify({ confirm }) }),
@@ -247,15 +247,16 @@ export const api = {
 	startEmbeddedWorkspaceAISession: (workspaceId: string, input: EmbeddedAISessionLaunchInput & { contextPath: string }) => request<EmbeddedAISessionResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/ai-sessions/embedded`, { method: 'POST', body: JSON.stringify(input) }, false),
 	embeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
 	embeddedAISessionGrant: (sessionId: string) => request<EmbeddedAISessionResult['grant']>(`/api/ai/sessions/${encodeURIComponent(sessionId)}/grant`, { method: 'POST' }, false),
-	aiSessionRecords: async (workspaceId: string, branch?: string) => {
+	aiSessionRecords: async (workspaceId: string, branch?: string, signal?: AbortSignal) => {
 		const query = new URLSearchParams({ workspaceId });
 		if (branch) query.set('branch', branch);
-		return (await request<SafeSessionRecord[] | null>(`/api/ai/session-records?${query.toString()}`, undefined, false)) ?? [];
+		return (await request<SafeSessionRecord[] | null>(`/api/ai/session-records?${query.toString()}`, { signal }, false)) ?? [];
 	},
   cancelEmbeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
 	listSessions: (scope: SessionScope) => request<GlobalSessionsResponse>(`/api/sessions?scope=${encodeURIComponent(scope)}`),
-	sessionChanges: (sessionId: string) => request<SessionChanges>(`/api/sessions/${encodeURIComponent(sessionId)}/changes`),
-	sessionFileDiff: (sessionId: string, path: string) => request<{ path: string; diff: string; truncated: boolean }>(`/api/sessions/${encodeURIComponent(sessionId)}/diff?path=${encodeURIComponent(path)}`),
+	deleteSession: (sessionId: string) => request<void>(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
+	sessionChanges: (sessionId: string, signal?: AbortSignal) => request<SessionChanges>(`/api/sessions/${encodeURIComponent(sessionId)}/changes`, { signal }, !signal),
+	sessionFileDiff: (sessionId: string, path: string, signal?: AbortSignal) => request<{ path: string; diff: string; truncated: boolean }>(`/api/sessions/${encodeURIComponent(sessionId)}/diff?path=${encodeURIComponent(path)}`, { signal }, !signal),
   health: () => request<{ status?: string }>('/api/health', undefined, false),
   localServerReachable: async () => {
     try {
@@ -276,18 +277,18 @@ export const api = {
     if (params.limit) query.set('limit', String(params.limit));
     return ((await request<SearchResult[] | null>(`/api/search?${query.toString()}`, params.signal ? { signal: params.signal } : undefined, !params.signal)) ?? []).map(normalizeSearchResult);
   },
-  savedFilters: async () => ((await request<SavedFilter[] | null>('/api/saved-filters')) ?? []).map(normalizeSavedFilter),
+  savedFilters: async (signal?: AbortSignal) => ((await request<SavedFilter[] | null>('/api/saved-filters', { signal }, !signal)) ?? []).map(normalizeSavedFilter),
   saveFilter: (filter: Pick<SavedFilter, 'name' | 'route' | 'filters'> & Partial<Pick<SavedFilter, 'id' | 'workspaceId'>>) =>
     request<SavedFilter>('/api/saved-filters', { method: 'POST', body: JSON.stringify(filter) }).then(normalizeSavedFilter),
   deleteFilter: (id: string) => request<{ ok: boolean }>(`/api/saved-filters/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   recentItems: async (limit = 10) => ((await request<RecentItem[] | null>(`/api/recent-items?limit=${limit}`)) ?? []).map(normalizeRecentItem),
   recordRecentItem: (itemId: string) => request<{ ok: boolean }>('/api/recent-items', { method: 'POST', body: JSON.stringify({ itemId }) }),
-  auditEvents: async (params: { workspaceId?: string; limit?: number } = {}) => {
+  auditEvents: async (params: { workspaceId?: string; limit?: number; signal?: AbortSignal } = {}) => {
     const query = new URLSearchParams();
     if (params.workspaceId) query.set('workspaceId', params.workspaceId);
     if (params.limit) query.set('limit', String(params.limit));
     const suffix = query.size ? `?${query.toString()}` : '';
-    return ((await request<AuditEvent[] | null>(`/api/audit-events${suffix}`)) ?? []).map(normalizeAuditEvent);
+    return ((await request<AuditEvent[] | null>(`/api/audit-events${suffix}`, { signal: params.signal }, !params.signal)) ?? []).map(normalizeAuditEvent);
   },
   workspaces: async (signal?: AbortSignal) => ((await request<WorkspaceConfig[] | null>('/api/workspaces', { signal }, !signal)) ?? []).map(normalizeWorkspace),
 	previewWorkspaceImport: (sourcePath: string) => request<WorkspaceImportPreview>('/api/workspaces/import-preview', { method: 'POST', body: JSON.stringify({ sourcePath }) }).then(normalizeWorkspaceImportPreview),
@@ -378,16 +379,16 @@ export const api = {
     return payload;
   }),
   saveWorkspaceRuntime: (workspaceId: string, input: WorkspaceRuntimeConfig) => request<WorkspaceRuntimeConfig>(`/api/workspaces/${encodeURIComponent(workspaceId)}/runtime`, { method: 'PUT', body: JSON.stringify(input) }),
-  createVerificationJob: (workspaceId: string, input: CreateVerificationJobInput = {}) =>
-    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs`, { method: 'POST', body: JSON.stringify(input) }, false),
+  createVerificationJob: (workspaceId: string, input: CreateVerificationJobInput = {}, signal?: AbortSignal) =>
+    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs`, { method: 'POST', body: JSON.stringify(input), signal }, false),
   ingestVerificationCheckpoint: (workspaceId: string, input: { eventType: string; profile?: VerifyProfile; provider?: string; sessionId?: string; terminalMode?: string }) =>
     request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-checkpoints`, { method: 'POST', body: JSON.stringify(input) }, false),
-  verificationJob: (workspaceId: string, jobId: string) =>
-    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}`, undefined, false),
+  verificationJob: (workspaceId: string, jobId: string, signal?: AbortSignal) =>
+    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}`, { signal }, false),
   verificationArtifacts: (workspaceId: string, jobId: string) =>
     request<RunArtifact[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}/artifacts`, undefined, false),
-  rerunVerificationJob: (workspaceId: string, jobId: string, profile?: VerifyProfile) =>
-    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}/rerun`, { method: 'POST', body: JSON.stringify({ profile }) }, false),
+  rerunVerificationJob: (workspaceId: string, jobId: string, profile?: VerifyProfile, signal?: AbortSignal) =>
+    request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs/${encodeURIComponent(jobId)}/rerun`, { method: 'POST', body: JSON.stringify({ profile }), signal }, false),
   itemVerificationTests: (itemId: string, signal?: AbortSignal) =>
     request<ItemVerificationTests>(`/api/items/${encodeURIComponent(itemId)}/verification-tests`, { signal }, !signal).then(normalizeItemVerificationTests),
   saveItemVerificationTests: (itemId: string, input: VerificationTestSelection) =>
@@ -403,19 +404,19 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(input)
     }, true).then(normalizeWorkstreamBranchLoadResult),
-	loadWorkstreamCheckout: (workspaceId: string, input: { force?: boolean } = {}) =>
+	loadWorkstreamCheckout: (workspaceId: string, input: { force?: boolean } = {}, signal?: AbortSignal) =>
 		request<WorkstreamBranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/workstream/checkout`, {
-			method: 'POST', body: JSON.stringify(input)
-		}, true).then(normalizeWorkstreamBranchLoadResult),
-	loadBranchReview: (workspaceId: string, input: { branch: string; force?: boolean }) =>
+			method: 'POST', body: JSON.stringify(input), signal
+		}, !signal).then(normalizeWorkstreamBranchLoadResult),
+	loadBranchReview: (workspaceId: string, input: { branch: string; force?: boolean }, signal?: AbortSignal) =>
 		request<WorkstreamBranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/reviews/branch`, {
-			method: 'POST', body: JSON.stringify(input)
-		}, true).then(normalizeWorkstreamBranchLoadResult),
+			method: 'POST', body: JSON.stringify(input), signal
+		}, !signal).then(normalizeWorkstreamBranchLoadResult),
 	importReviewedPlan: (workspaceId: string, input: ReviewedPlanImportInput) =>
 		request<WriteResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/reviews/import`, {
 			method: 'POST', body: JSON.stringify(input)
 		}),
-  workspaceHealth: (workspaceId: string) => request<WorkspaceHealth>(`/api/workspaces/${workspaceId}/health`).then(normalizeWorkspaceHealth),
+  workspaceHealth: (workspaceId: string, signal?: AbortSignal) => request<WorkspaceHealth>(`/api/workspaces/${workspaceId}/health`, { signal }, !signal).then(normalizeWorkspaceHealth),
   sourceStructure: (workspaceId: string, directory: string) =>
     request<SourceSettingsResult>(`/api/workspaces/${workspaceId}/source-structure?directory=${encodeURIComponent(directory)}`),
   saveSourceStructure: (workspaceId: string, directory: string, settings: SourceStructureSettings) =>
@@ -425,10 +426,10 @@ export const api = {
     }),
   resetSourceStructure: (workspaceId: string, directory: string) =>
     request<SourceSettingsResult>(`/api/workspaces/${workspaceId}/source-structure?directory=${encodeURIComponent(directory)}`, { method: 'DELETE' }),
-  workspaceTree: async (workspaceId: string, path = '', includeIgnored = false) => {
+  workspaceTree: async (workspaceId: string, path = '', includeIgnored = false, force = false, signal?: AbortSignal) => {
     const query = new URLSearchParams({ path });
     if (includeIgnored) query.set('includeIgnored', 'true');
-    const listing = await request<WorkspaceDirectoryListing>(`/api/workspaces/${encodeURIComponent(workspaceId)}/tree?${query.toString()}`);
+		const listing = await request<WorkspaceDirectoryListing>(`/api/workspaces/${encodeURIComponent(workspaceId)}/tree?${query.toString()}`, { signal }, !force && !signal);
     return normalizeWorkspaceDirectoryListing(listing);
   },
   searchWorkspacePaths: async (params: { q: string; workspaceId?: string; includeIgnored?: boolean; signal?: AbortSignal }) => {
@@ -445,8 +446,8 @@ export const api = {
 		if (params.includeIgnored) query.set('includeIgnored', 'true');
 		return normalizeContentSearchResponse(await request<WorkspaceContentSearchResponse>(`/api/workspaces/files/content-search?${query.toString()}`, params.signal ? { signal: params.signal } : undefined, !params.signal));
 	},
-  workspacePathGitStates: async (workspaceId: string) =>
-    (await request<WorkspacePathGitState[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/path-status`) ?? []).map(normalizeWorkspacePathGitState),
+  workspacePathGitStates: async (workspaceId: string, signal?: AbortSignal) =>
+    (await request<WorkspacePathGitState[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/path-status`, { signal }, !signal) ?? []).map(normalizeWorkspacePathGitState),
   createWorkspaceFile: (workspaceId: string, input: WorkspaceFileCreateInput) =>
     request<WorkspacePathMutationResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/files`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeWorkspacePathMutationResult),
   createWorkspaceDirectory: (workspaceId: string, input: WorkspaceDirectoryCreateInput) =>
@@ -464,25 +465,25 @@ export const api = {
   selectDirectory: () => request<PathSelection>('/api/system/select-directory', { method: 'POST' }),
 	selectYAMLFile: () => request<PathSelection>('/api/system/select-file', { method: 'POST', body: JSON.stringify({ extensions: ['yaml', 'yml'] }) }),
   openPath: (path: string) => request<{ ok: boolean }>('/api/system/open-path', { method: 'POST', body: JSON.stringify({ path }) }),
-  systemConfigPaths: () => request<SystemConfigPaths>('/api/system/config-paths').then(normalizeSystemConfigPaths),
+  systemConfigPaths: (signal?: AbortSignal) => request<SystemConfigPaths>('/api/system/config-paths', { signal }, !signal).then(normalizeSystemConfigPaths),
   updateSystemConfigPaths: (input: { dataDir: string }) =>
     request<SystemConfigPaths>('/api/system/config-paths', { method: 'PUT', body: JSON.stringify(input) }).then(normalizeSystemConfigPaths),
-  storageStatus: () => request<StorageStatus>('/api/storage/status').then(normalizeStorageStatus),
+  storageStatus: (signal?: AbortSignal) => request<StorageStatus>('/api/storage/status', { signal }, !signal).then(normalizeStorageStatus),
   saveStorageOption: (storageOption: StorageOption) =>
     request<{ storageOption: StorageOption; restartRequired: boolean }>('/api/storage/option', { method: 'PUT', body: JSON.stringify({ storageOption }) }),
   syncStorage: (direction: StorageSyncDirection) =>
     request<StorageSyncResult>('/api/storage/sync', { method: 'POST', body: JSON.stringify({ direction, confirm: true }) }).then(normalizeStorageSyncResult),
-  items: async (params: URLSearchParams) => ((await request<ItemSummary[] | null>(`/api/items?${params.toString()}`)) ?? []).map(normalizeItem),
+  items: async (params: URLSearchParams, signal?: AbortSignal) => ((await request<ItemSummary[] | null>(`/api/items?${params.toString()}`, { signal }, !signal)) ?? []).map(normalizeItem),
   item: async (id: string, signal?: AbortSignal) => normalizeItemDetail(await request<ItemDetail>(`/api/items/${id}`, { signal }, !signal)),
-  files: async (id: string, expectedCommit?: string) => {
+  files: async (id: string, expectedCommit?: string, signal?: AbortSignal) => {
 		const query = expectedCommit ? `?expectedCommit=${encodeURIComponent(expectedCommit)}` : '';
-		return (await request<FileNode[] | null>(`/api/items/${encodeURIComponent(id)}/files${query}`)) ?? [];
+		return (await request<FileNode[] | null>(`/api/items/${encodeURIComponent(id)}/files${query}`, { signal }, !signal)) ?? [];
 	},
 	searchItemContent: async (id: string, params: { q: string; caseSensitive?: boolean; signal?: AbortSignal }) =>
 		normalizeContentSearchResponse(await request<WorkspaceContentSearchResponse>(`/api/items/${encodeURIComponent(id)}/content-search?${contentSearchQuery(params).toString()}`, params.signal ? { signal: params.signal } : undefined, !params.signal)),
-  file: (id: string, fileId: string, expectedCommit?: string) => {
+  file: (id: string, fileId: string, expectedCommit?: string, signal?: AbortSignal) => {
 		const query = expectedCommit ? `?expectedCommit=${encodeURIComponent(expectedCommit)}` : '';
-		return request<FileContent>(`/api/items/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}${query}`);
+		return request<FileContent>(`/api/items/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}${query}`, { signal }, !signal);
 	},
   saveFile: (id: string, fileId: string, input: FileSaveInput) =>
     request<FileContent>(`/api/items/${id}/files/${fileId}`, { method: 'POST', body: JSON.stringify(input) }),
@@ -493,18 +494,18 @@ export const api = {
   updateStatus: (id: string, input: ItemStatusUpdateInput) =>
     request<WriteResult>(`/api/items/${id}/status`, { method: 'PATCH', body: JSON.stringify(input) }),
   createItem: (input: NewItemInput) => request<WriteResult>('/api/items', { method: 'POST', body: JSON.stringify(input) }),
-  diff: (id: string) => request<{ diff: string }>(`/api/items/${id}/diff`),
-  gitStatus: (workspaceId: string) => request<GitStatus>(`/api/workspaces/${workspaceId}/git/status`).then(normalizeGitStatus),
-  gitActivity: async (workspaceId: string, params: { path?: string; limit?: number } = {}) => {
+  diff: (id: string, signal?: AbortSignal) => request<{ diff: string }>(`/api/items/${id}/diff`, { signal }, !signal),
+  gitStatus: (workspaceId: string, signal?: AbortSignal) => request<GitStatus>(`/api/workspaces/${workspaceId}/git/status`, { signal }, !signal).then(normalizeGitStatus),
+  gitActivity: async (workspaceId: string, params: { path?: string; limit?: number; signal?: AbortSignal } = {}) => {
     const query = new URLSearchParams();
     if (params.path) query.set('path', params.path);
     if (params.limit) query.set('limit', String(params.limit));
     const suffix = query.size ? `?${query.toString()}` : '';
-    const payload = await request<GitActivityEntry[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/activity${suffix}`);
+    const payload = await request<GitActivityEntry[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/activity${suffix}`, { signal: params.signal }, !params.signal);
     return (Array.isArray(payload) ? payload : []).map(normalizeGitActivityEntry);
   },
-  workspaceBranches: async (workspaceId: string) => {
-    const response = await request<WorkspaceBranches>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/branches`);
+  workspaceBranches: async (workspaceId: string, signal?: AbortSignal) => {
+    const response = await request<WorkspaceBranches>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/branches`, { signal }, !signal);
     return { ...response, current: response.current ?? '', branches: Array.isArray(response.branches) ? response.branches : [] };
   },
   gitFetch: (workspaceId: string, input: GitOperationInput = {}) =>
@@ -519,7 +520,7 @@ export const api = {
     request<GitOperationResult>(`/api/workspaces/${workspaceId}/git/branches`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
   switchBranch: (workspaceId: string, input: BranchSwitchInput) =>
     request<GitOperationResult>(`/api/workspaces/${workspaceId}/git/switch`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
-  stashes: (workspaceId: string) => request<GitStashEntry[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/stashes`),
+  stashes: (workspaceId: string, signal?: AbortSignal) => request<GitStashEntry[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/stashes`, { signal }, !signal),
   applyStash: (workspaceId: string, ref: string) => request<GitOperationResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/stashes/${encodeURIComponent(ref)}/apply`, { method: 'POST' }).then(normalizeGitResult)
 };
 

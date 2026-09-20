@@ -89,8 +89,8 @@ describe('BranchReviewPage', () => {
     expect(await screen.findByText('# Content from new commit')).toBeInTheDocument();
     expect(screen.queryByText('# Content from old commit')).not.toBeInTheDocument();
     expect(mocks.files).toHaveBeenCalledTimes(2);
-    expect(mocks.files).toHaveBeenNthCalledWith(1, 'snapshot-1', 'oldcommit123456');
-    expect(mocks.files).toHaveBeenNthCalledWith(2, 'snapshot-1', 'newcommit654321');
+    expect(mocks.files).toHaveBeenNthCalledWith(1, 'snapshot-1', 'oldcommit123456', expect.anything());
+    expect(mocks.files).toHaveBeenNthCalledWith(2, 'snapshot-1', 'newcommit654321', expect.anything());
     expect(mocks.file).toHaveBeenCalledTimes(2);
   });
 
@@ -120,23 +120,26 @@ describe('BranchReviewPage', () => {
     await act(async () => { finishManual(file('# Late old manual content')); });
     expect(screen.getByText('# Refreshed new content')).toBeInTheDocument();
     expect(screen.queryByText('# Late old manual content')).not.toBeInTheDocument();
-    expect(mocks.file).toHaveBeenCalledWith('snapshot-1', 'README_md', 'oldcommit123456');
-    expect(mocks.file).toHaveBeenCalledWith('snapshot-1', 'README_md', 'newcommit654321');
+    expect(mocks.file).toHaveBeenCalledWith('snapshot-1', 'README_md', 'oldcommit123456', expect.anything());
+    expect(mocks.file).toHaveBeenCalledWith('snapshot-1', 'README_md', 'newcommit654321', expect.anything());
   });
 
   it('ignores a superseded branch response that resolves after the current request', async () => {
     let finishSlow!: (result: WorkstreamBranchLoadResult) => void;
     let finishFast!: (result: WorkstreamBranchLoadResult) => void;
-    mocks.loadBranchReview.mockImplementation((_workspaceId: string, input: { branch: string }) => new Promise((resolve) => {
+    let slowSignal: AbortSignal | undefined;
+    mocks.loadBranchReview.mockImplementation((_workspaceId: string, input: { branch: string }, signal: AbortSignal) => new Promise((resolve) => {
+      if (input.branch === 'feature/slow') slowSignal = signal;
       if (input.branch === 'feature/slow') finishSlow = resolve;
       if (input.branch === 'feature/fast') finishFast = resolve;
     }));
     vi.stubGlobal('confirm', vi.fn(() => true));
     renderReview('feature/slow');
-    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/slow', force: false }));
+    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/slow', force: false }, expect.anything()));
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Review branch' }), { target: { value: 'feature/fast' } });
-    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/fast', force: false }));
+    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/fast', force: false }, expect.anything()));
+    expect(slowSignal?.aborted).toBe(true);
     await act(async () => { finishFast(reviewResultFor('feature/fast', 'FAST-001')); });
     expect(await screen.findAllByText('FAST-001')).not.toHaveLength(0);
 
@@ -155,9 +158,9 @@ describe('BranchReviewPage', () => {
       if (input.branch === 'feature/fast') finishFast = resolve;
     }));
     renderReview('feature/slow');
-    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/slow', force: false }));
+    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/slow', force: false }, expect.anything()));
     fireEvent.change(screen.getByRole('combobox', { name: 'Review branch' }), { target: { value: 'feature/fast' } });
-    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/fast', force: false }));
+    await waitFor(() => expect(mocks.loadBranchReview).toHaveBeenCalledWith('ws-1', { branch: 'feature/fast', force: false }, expect.anything()));
 
     await act(async () => { finishSlow(reviewResultFor('feature/slow', 'SLOW-001')); });
     expect(screen.getByRole('status')).toHaveTextContent('Loading committed snapshot…');

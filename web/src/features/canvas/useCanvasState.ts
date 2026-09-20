@@ -20,9 +20,11 @@ export function useCanvasState(workspaceId?: string) {
 	const mutationRef = useRef(0);
 	const viewportTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const placementTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const placementRetryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const requestRef = useRef(0);
 	const loadAbortRef = useRef<AbortController | undefined>(undefined);
 	const viewportAbortRef = useRef<AbortController | undefined>(undefined);
+	const placementAbortRef = useRef<AbortController | undefined>(undefined);
 	const viewportMutationRef = useRef(0);
 
 	const setProjection = useCallback((next: CanvasProjection | undefined) => {
@@ -38,6 +40,8 @@ export function useCanvasState(workspaceId?: string) {
 		const discarded = dirtyRef.current.size > 0;
 		dirtyRef.current.clear();
 		if (placementTimer.current) clearTimeout(placementTimer.current);
+		if (placementRetryTimer.current) clearTimeout(placementRetryTimer.current);
+		placementAbortRef.current?.abort();
 		if (viewportTimer.current) clearTimeout(viewportTimer.current);
 		setConflicts([]);
 		setSaveStatus('idle');
@@ -109,8 +113,10 @@ export function useCanvasState(workspaceId?: string) {
 		return () => {
 			loadAbortRef.current?.abort();
 			viewportAbortRef.current?.abort();
+			placementAbortRef.current?.abort();
 			if (viewportTimer.current) clearTimeout(viewportTimer.current);
 			if (placementTimer.current) clearTimeout(placementTimer.current);
+			if (placementRetryTimer.current) clearTimeout(placementRetryTimer.current);
 		};
 	}, [load]);
 
@@ -126,9 +132,14 @@ export function useCanvasState(workspaceId?: string) {
 	const flushPlacements = useCallback(async () => {
 		const current = projectionRef.current;
 		if (!current || dirtyRef.current.size === 0) return;
+		placementAbortRef.current?.abort();
+		const controller = new AbortController();
+		placementAbortRef.current = controller;
+		if (placementRetryTimer.current) clearTimeout(placementRetryTimer.current);
 		const batch = Array.from(dirtyRef.current.values()).slice(0, 50);
 		try {
-			const saved = await api.patchCanvasPlacements(current.layout.id, batch.map((entry) => entry.patch));
+			const saved = await api.patchCanvasPlacements(current.layout.id, batch.map((entry) => entry.patch), controller.signal);
+			if (controller.signal.aborted || projectionRef.current?.layout.id !== current.layout.id) return;
 			for (const entry of batch) {
 				if (dirtyRef.current.get(entry.patch.nodeId)?.mutation === entry.mutation) dirtyRef.current.delete(entry.patch.nodeId);
 			}
@@ -138,6 +149,7 @@ export function useCanvasState(workspaceId?: string) {
 			setProjection(saved);
 			if (dirtyRef.current.size > 0) setDirtyVersion((version) => version + 1);
 		} catch (caught) {
+			if (controller.signal.aborted) return;
 			setSaveStatus('saving');
 			if (caught instanceof ApiError && caught.code === 'placement_conflict') {
 				const affected = caught.nodeIds?.length ? caught.nodeIds : batch.map((entry) => entry.patch.nodeId);
@@ -149,9 +161,11 @@ export function useCanvasState(workspaceId?: string) {
 				// for the arrangement the nodes never reached.
 				let latest: CanvasProjection | undefined;
 				try {
-					latest = await api.canvasLayout(current.layout.id);
+					latest = await api.canvasLayout(current.layout.id, controller.signal);
+					if (controller.signal.aborted || projectionRef.current?.layout.id !== current.layout.id) return;
 					setProjection(latest);
 				} catch {
+					if (controller.signal.aborted) return;
 					// The next normal refresh will reconcile the layout; conflicts stay unobtrusive.
 				}
 				let rebased = false;
@@ -196,7 +210,9 @@ export function useCanvasState(workspaceId?: string) {
 				retry = true;
 			}
 			setError(retry ? 'Could not save positions yet. Retrying…' : messageFrom(caught));
-			if (retry) setTimeout(() => setDirtyVersion((version) => version + 1), 300 * (batch[0]?.retries + 1));
+			if (retry) placementRetryTimer.current = setTimeout(() => setDirtyVersion((version) => version + 1), 300 * (batch[0]?.retries + 1));
+		} finally {
+			if (placementAbortRef.current === controller) placementAbortRef.current = undefined;
 		}
 	}, [setProjection]);
 

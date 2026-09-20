@@ -42,28 +42,34 @@ export function SessionChangesPanel({ session }: { session: SafeSessionRecord })
 	const [diffLoading, setDiffLoading] = useState(false);
 	const [diffError, setDiffError] = useState('');
 	const diffTokenRef = useRef(0);
+	const diffAbortRef = useRef<AbortController | null>(null);
 
 	useEffect(() => {
+		diffAbortRef.current?.abort();
 		diffTokenRef.current += 1;
 		setSelectedPath(undefined);
 		setDiff(undefined);
 		setDiffError('');
 	}, [session.id]);
+	useEffect(() => () => diffAbortRef.current?.abort(), []);
 
 	const openFile = (path: string) => {
 		setSelectedPath(path);
 		setDiff(undefined);
 		setDiffError('');
 		setDiffLoading(true);
+		diffAbortRef.current?.abort();
+		const controller = new AbortController();
+		diffAbortRef.current = controller;
 		const token = ++diffTokenRef.current;
-		api.sessionFileDiff(session.id, path).then((result) => {
-			if (diffTokenRef.current !== token) return;
+		api.sessionFileDiff(session.id, path, controller.signal).then((result) => {
+			if (controller.signal.aborted || diffTokenRef.current !== token) return;
 			setDiff(result);
 		}).catch((caught) => {
-			if (diffTokenRef.current !== token) return;
+			if (controller.signal.aborted || diffTokenRef.current !== token) return;
 			setDiffError(caught instanceof Error ? caught.message : 'The diff could not be loaded.');
 		}).finally(() => {
-			if (diffTokenRef.current !== token) return;
+			if (controller.signal.aborted || diffTokenRef.current !== token) return;
 			setDiffLoading(false);
 		});
 	};

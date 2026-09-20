@@ -24,6 +24,8 @@ type cachedEvents struct {
 	events    []models.AuditEvent
 }
 
+const maxCachedAuditQueries = 128
+
 type CacheStats struct {
 	Hits          int
 	Misses        int
@@ -68,6 +70,20 @@ func (r *CachedEventReader) QueryContext(ctx context.Context, query Query) ([]mo
 		return nil, err
 	}
 	r.mu.Lock()
+	now = r.now()
+	if _, exists := r.items[query]; !exists && len(r.items) >= maxCachedAuditQueries {
+		for key, entry := range r.items {
+			if !now.Before(entry.expiresAt) {
+				delete(r.items, key)
+			}
+		}
+		if len(r.items) >= maxCachedAuditQueries {
+			for key := range r.items {
+				delete(r.items, key)
+				break
+			}
+		}
+	}
 	r.items[query] = cachedEvents{expiresAt: now.Add(r.ttl), events: cloneEvents(events)}
 	r.mu.Unlock()
 	return events, nil

@@ -46,4 +46,13 @@ const value = 1;
     fireEvent.click(await screen.findByRole('button', { name: 'Copy code block' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('const value = 1;\n'));
   });
+
+  it('does not show a previous file while rendering new Markdown', async () => {
+    const { rerender } = render(<MarkdownPreview content="First document" />);
+    expect(await screen.findByText('First document')).toBeInTheDocument();
+
+    rerender(<MarkdownPreview content="Second document" />);
+    expect(screen.queryByText('First document')).not.toBeInTheDocument();
+    expect(await screen.findByText('Second document')).toBeInTheDocument();
+  });
 });

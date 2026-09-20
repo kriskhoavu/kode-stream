@@ -11,6 +11,9 @@ func (a *healthController) healthPayload(ctx context.Context) (map[string]any, i
 		return payload, http.StatusOK
 	}
 	database := a.database.Health(ctx)
+	if !database.Configured {
+		return payload, http.StatusOK
+	}
 	payload["database"] = database
 	if !database.OK {
 		payload["ok"] = false

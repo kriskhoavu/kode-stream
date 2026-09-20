@@ -24,6 +24,27 @@ afterEach(() => {
 });
 
 describe('WorkstreamPage', () => {
+  it('does not reload Git metadata when the same workspace object is refreshed', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/workstream/checkout') return Promise.resolve(response(workstreamBranchLoadResult([], 'main')));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      return Promise.resolve(response([]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const props = { refreshKey: 0, onOpenPlan: () => undefined, onWorkspacesChanged: () => undefined };
+    const view = render(<WorkstreamPage workspace={workspace} {...props} />);
+
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/workspaces/r1/git/branches')).toHaveLength(1));
+    view.rerender(<WorkstreamPage workspace={{ ...workspace, name: 'Discovery refreshed' }} {...props} />);
+    await act(async () => undefined);
+
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/workspaces/r1/git/status')).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/workspaces/r1/git/branches')).toHaveLength(1);
+  });
+
   it('renders status columns from cached plan summaries', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -273,7 +294,7 @@ describe('WorkstreamPage', () => {
 
     await waitFor(() => expect(screen.getByPlaceholderText('Search items...')).toHaveValue('PM-012'));
     expect(await screen.findByLabelText('Item preview')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Drag cards' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Drag cards' })).toBeInTheDocument();
   });
 
   it('shows Jira next to Git in the item preview drawer', async () => {

@@ -5,7 +5,8 @@ import { CanvasPage } from './CanvasPage';
 
 const canvasState = vi.hoisted(() => ({ projection: undefined as CanvasProjection | undefined, removeStalePlans: vi.fn(), resetPositions: vi.fn(), moveNode: vi.fn() }));
 vi.mock('../features/canvas/useCanvasState', () => ({ useCanvasState: () => ({ projection: canvasState.projection, loading: false, error: '', conflicts: [], dirtyCount: 0, saveStatus: 'saved', hasUnsavedChanges: false, moveNode: canvasState.moveNode, setNodeCollapsed: vi.fn(), saveViewport: vi.fn(), reloadPosition: vi.fn(), reapplyPosition: vi.fn(), placeSession: vi.fn(), removeNode: vi.fn(), removeStalePlans: canvasState.removeStalePlans, resetPositions: canvasState.resetPositions, reload: vi.fn(), refresh: vi.fn() }) }));
-vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, onSelect, onReset }: { projection: CanvasProjection; onSelect: (id?: string) => void; onReset: () => void }) => <><button type="button" onClick={onReset}>Reset board</button>{projection.nodes.map((node) => <button key={node.id} data-canvas-node-id={node.id} aria-label={node.session ? `Session: ${node.session.record.provider}` : 'Plan: PM-037 Canvas main'} type="button" onClick={() => onSelect(node.id)}>{node.session ? 'Session node' : 'Plan node'}</button>)}</> }));
+vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, onSelect, onOpenSessions, onReset }: { projection: CanvasProjection; onSelect: (id?: string) => void; onOpenSessions: () => void; onReset: () => void }) => <><button type="button" onClick={onOpenSessions}>Sessions view</button><button type="button" onClick={onReset}>Reset board</button>{projection.nodes.map((node) => <button key={node.id} data-canvas-node-id={node.id} aria-label={node.session ? `Session: ${node.session.record.provider}` : 'Plan: PM-037 Canvas main'} type="button" onClick={() => onSelect(node.id)}>{node.session ? 'Session node' : 'Plan node'}</button>)}</> }));
+vi.mock('../features/canvas/CanvasSessionsView', () => ({ CanvasSessionsView: ({ onViewChange, onOpenOnBoard }: { onViewChange: (view: 'canvas') => void; onOpenOnBoard: (sessionId: string) => void }) => <section aria-label="Sessions view"><button type="button" onClick={() => onViewChange('canvas')}>Canvas view</button><button type="button" onClick={() => onOpenOnBoard('session-1')}>Open session on Canvas</button></section> }));
 vi.mock('../features/canvas/CanvasWorkbench', () => ({ CanvasWorkbench: ({ selectedNode, onClose }: { selectedNode?: unknown; onClose: () => void }) => selectedNode ? <aside aria-label="Canvas Workbench"><button type="button" onClick={onClose}>Close Workbench</button></aside> : null }));
 
 describe('CanvasPage', () => {
@@ -64,13 +65,11 @@ describe('CanvasPage', () => {
 		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 	});
 
-	// The workspace node is not drawn on the board, so the header is the only place
-	// the checkout's standing with its remote can be read.
-	it('shows how far the checkout has drifted from its upstream in the header', async () => {
+	it('shows upstream drift on the Git icon inside the checkout picker', async () => {
 		canvasState.projection = upstreamProjection();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
-		expect(await screen.findByText('origin/main')).toBeInTheDocument();
-		expect(screen.getByText('4 behind')).toBeInTheDocument();
+		expect(await screen.findByRole('img', { name: 'Git not in sync with origin/main: 4 behind' })).toHaveClass('is-not-synced');
+		expect(screen.queryByText('origin/main')).not.toBeInTheDocument();
 	});
 
 	it('opens the Workbench for a selected terminal session, alongside the terminal kept in the Canvas node', async () => {
@@ -80,7 +79,19 @@ describe('CanvasPage', () => {
 		await waitFor(() => expect(screen.getByLabelText('Canvas Workbench')).toBeInTheDocument());
 	});
 
-	// The Sessions page hands off a node id through the route so Open can select
+	it('switches Sessions into the main Workbench area and returns to Canvas through the route', async () => {
+		canvasState.projection = sessionProjection();
+		const onLocationChange = vi.fn();
+		const view = render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={onLocationChange} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Sessions view' }));
+		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: workspace.id, view: 'sessions' }));
+		view.rerender(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'sessions' }} onLocationChange={onLocationChange} />);
+		expect(screen.getByLabelText('Sessions view')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Canvas view' }));
+		await waitFor(() => expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: workspace.id, view: undefined }));
+	});
+
+	// A session link hands off a node id through the route so Open can select
 	// the session there; it must apply once and then clear so a later refresh or
 	// checkout switch never re-selects it.
 	it('honours a selectedNodeId handed off through the route, once, then clears it', async () => {

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SourceCodeView } from './SourceCodeView';
 
 describe('SourceCodeView', () => {
@@ -9,6 +9,7 @@ describe('SourceCodeView', () => {
     writeText.mockClear();
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
   });
+	afterEach(() => vi.restoreAllMocks());
 
   it('highlights known source and escapes unknown source', () => {
     const { rerender } = render(<SourceCodeView content="const value = 1;" language="typescript" />);
@@ -42,5 +43,15 @@ describe('SourceCodeView', () => {
 		fireEvent(window, new Event('resize'));
 		await waitFor(() => expect(document.querySelector('.source-code-line.selected')).toHaveAttribute('aria-current', 'true'));
 		expect(document.querySelectorAll('.source-code-line').length).toBeLessThanOrEqual(240);
+	});
+
+	it('replaces measured row heights when the source changes', async () => {
+		vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+			return { height: this.textContent?.includes('tall') ? 40 : 20 } as DOMRect;
+		});
+		const { rerender } = render(<SourceCodeView content={'tall\nsmall'} language="text" />);
+		await waitFor(() => expect(document.querySelector('.source-code-scroll code')).toHaveStyle({ height: '60px' }));
+		rerender(<SourceCodeView content={'small\nsmall'} language="text" />);
+		await waitFor(() => expect(document.querySelector('.source-code-scroll code')).toHaveStyle({ height: '40px' }));
 	});
 });

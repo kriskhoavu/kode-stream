@@ -12,7 +12,7 @@ function byLiveThenNewest(a: GlobalSessionRow, b: GlobalSessionRow): number {
 /**
  * Remembers which session a Session Browser has selected, scoped by
  * `persistKey` (one browser instance per workspace, e.g. a Workbench
- * Sessions tab keyed by workspace id, or the cross-workspace Sessions page).
+ * Sessions view keyed by workspace id).
  * Falls back to the live-first, newest-next visible row whenever nothing is
  * stored or the stored id no longer matches a visible row. When the stored
  * id still names a real row but the Live-only filter is the only thing
@@ -23,7 +23,7 @@ export function useSessionBrowserSelection(persistKey: string, rows: GlobalSessi
 	const storageKey = `sessionBrowser.selection.${persistKey}`;
 	const [selectedId, setSelectedId] = useState<string | undefined>(() => readStringPreference(storageKey, '') || undefined);
 
-	// A different browser scope (e.g. the Workbench Sessions tab pointed at a
+	// A different browser scope (e.g. the Workbench Sessions view pointed at a
 	// new workspace) re-reads its own stored selection instead of carrying
 	// over the previous scope's id.
 	useEffect(() => {

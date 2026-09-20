@@ -117,6 +117,30 @@ func (a *sessionsController) sessionDiff(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, diff)
 }
 
+func (a *sessionsController) deleteSession(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session records are unavailable")
+		return
+	}
+	id := r.PathValue("id")
+	if !a.authorizeSession(w, r, id) {
+		return
+	}
+	if err := a.aiSessions.DeleteSessionRecord(id); err != nil {
+		if errors.Is(err, appaisession.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		if errors.Is(err, appaisession.ErrSessionStillRunning) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "Stop the session before removing it.", "code": "session_still_running"})
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Session could not be removed.")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // authorizeSession resolves the session's workspace and applies the same
 // Cloud-denial-looks-like-404 rule authorizeWorkspace already gives every
 // other AI session endpoint. A session that does not exist gets the same

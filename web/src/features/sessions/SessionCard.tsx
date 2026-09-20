@@ -1,4 +1,5 @@
 import type { GlobalSessionRow, SafeSessionRecord } from '../../lib/types';
+import { Trash2 } from 'lucide-react';
 import { formatAge, isSessionLive } from './sessionDisplay';
 
 export type SessionGlyph = { kind: 'spinner' | 'dot'; tone: 'live' | 'success' | 'danger' | 'neutral'; label: string };
@@ -24,12 +25,13 @@ export function sessionTitle(row: GlobalSessionRow): string {
 	return row.planTitle || row.record.intent || row.record.provider;
 }
 
-export function SessionCard({ row, selected, tabIndex, cardRef, onSelect, onKeyDown }: {
+export function SessionCard({ row, selected, tabIndex, cardRef, onSelect, onRemove, onKeyDown }: {
 	row: GlobalSessionRow;
 	selected: boolean;
 	tabIndex: number;
 	cardRef: (element: HTMLButtonElement | null) => void;
 	onSelect: () => void;
+	onRemove?: () => void;
 	onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
 }) {
 	const glyph = sessionGlyph(row.record);
@@ -57,5 +59,6 @@ export function SessionCard({ row, selected, tabIndex, cardRef, onSelect, onKeyD
 				</span>
 			</span>
 		</button>
+		{finished && onRemove && <button type="button" className="session-card-remove" aria-label={`Remove ${title} session`} title="Remove session" onClick={onRemove}><Trash2 size={14} /></button>}
 	</li>;
 }

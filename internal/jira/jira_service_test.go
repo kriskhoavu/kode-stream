@@ -164,6 +164,11 @@ func TestIssueMatchesCachesAndRefreshesExactKey(t *testing.T) {
 	if requests != 2 {
 		t.Fatalf("refresh requests=%d", requests)
 	}
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	if len(service.generation) != 0 || len(service.refreshes) != 0 {
+		t.Fatalf("completed issue fetches retained generation state: generations=%d refreshes=%d", len(service.generation), len(service.refreshes))
+	}
 }
 
 func TestIssueReturnsTypedStatesWithoutUnrelatedLookup(t *testing.T) {

@@ -118,17 +118,21 @@ export function useAppState() {
   }, [refreshAppData]);
 
   useEffect(() => {
+    if (dataStatus !== 'ready') return;
     if (workspaces.length === 0) {
       setActiveWorkspaceId('');
       removePreference('activeWorkspaceId');
       return;
     }
-    if (!workspaces.some((repo) => repo.id === activeWorkspaceId)) {
-      const nextId = workspaces[0].id;
+    const routeWorkspaceId = workspaceIdFromRoute(route);
+    const routeWorkspaceExists = Boolean(routeWorkspaceId && workspaces.some((repo) => repo.id === routeWorkspaceId));
+    const activeWorkspaceExists = workspaces.some((repo) => repo.id === activeWorkspaceId);
+    const nextId = routeWorkspaceExists ? routeWorkspaceId : activeWorkspaceExists ? activeWorkspaceId : workspaces[0].id;
+    if (nextId && nextId !== activeWorkspaceId) {
       setActiveWorkspaceId(nextId);
       writePreference('activeWorkspaceId', nextId);
     }
-  }, [activeWorkspaceId, workspaces]);
+  }, [activeWorkspaceId, dataStatus, route, workspaces]);
 
   const selectWorkspace = (repo: WorkspaceConfig) => {
     setActiveWorkspaceId(repo.id);
@@ -148,7 +152,10 @@ export function useAppState() {
     navigate({ name: 'workstream' });
   };
 
-  const activeRepo = workspaces.find((repo) => repo.id === activeWorkspaceId) ?? workspaces[0];
+  const routedWorkspaceId = workspaceIdFromRoute(route);
+  const activeRepo = workspaces.find((repo) => repo.id === routedWorkspaceId)
+    ?? workspaces.find((repo) => repo.id === activeWorkspaceId)
+    ?? workspaces[0];
   const lastSync = useMemo(() => {
     if (!activeRepo?.lastScannedAt) return 'Not scanned';
     return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(
@@ -172,4 +179,9 @@ export function useAppState() {
     refreshAppStateOnly,
     lastSync
   };
+}
+
+function workspaceIdFromRoute(route: Route): string | undefined {
+  if (route.name === 'canvas' || route.name === 'knowledge' || route.name === 'review') return route.location?.workspaceId;
+  return undefined;
 }

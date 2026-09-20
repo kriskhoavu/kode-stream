@@ -90,4 +90,10 @@ func TestReplaceExistingAllowsOnlyOneConcurrentExpectedHash(t *testing.T) {
 	if succeeded != 1 {
 		t.Fatalf("successful writes=%d", succeeded)
 	}
+	pathLocks.mu.Lock()
+	remaining := len(pathLocks.entries)
+	pathLocks.mu.Unlock()
+	if remaining != 0 {
+		t.Fatalf("path locks retained after concurrent writes: %d", remaining)
+	}
 }

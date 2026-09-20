@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../shared/api';
 import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult, SafeSessionRecord } from '../../lib/types';
@@ -6,7 +6,7 @@ import { CanvasWorkbench } from './CanvasWorkbench';
 
 vi.mock('../../shared/api', async () => {
 	const actual = await vi.importActual<typeof import('../../shared/api')>('../../shared/api');
-	return { ...actual, api: { embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn(), itemE2ERunbooks: vi.fn(), item: vi.fn(), saveMetadata: vi.fn(), aiSessionRecords: vi.fn(), sessionChanges: vi.fn(), sessionFileDiff: vi.fn() } };
+	return { ...actual, api: { embeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn(), cancelEmbeddedAISession: vi.fn(), createVerificationJob: vi.fn(), verificationJob: vi.fn(), itemE2ERunbooks: vi.fn(), item: vi.fn(), saveMetadata: vi.fn(), sessionChanges: vi.fn(), sessionFileDiff: vi.fn() } };
 });
 vi.mock('../ai-session/AISessionLaunchDialog', () => ({
 	AISessionLaunchDialog: ({ onLaunched }: { onLaunched: (result: EmbeddedAISessionResult, input: { provider: string; terminal: string; contextMode: 'card_context'; surface: 'embedded' }) => void }) => <button type="button" aria-label="Complete embedded AI session" onClick={() => onLaunched({ session: { id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }, grant: { sessionId: 'session-1', token: 'grant', expiresAt: '' } }, { provider: 'codex', terminal: 'terminal', contextMode: 'card_context', surface: 'embedded' })}>Complete embedded AI session</button>
@@ -22,7 +22,6 @@ describe('CanvasWorkbench', () => {
 		vi.mocked(api.cancelEmbeddedAISession).mockResolvedValue({ ...sessionResult().session, state: 'cancelled' });
 		vi.mocked(api.itemE2ERunbooks).mockResolvedValue({ runbooks: [] });
 		vi.mocked(api.item).mockRejectedValue(new Error('Item details unavailable in this test.'));
-		vi.mocked(api.aiSessionRecords).mockResolvedValue([]);
 		vi.mocked(api.sessionChanges).mockResolvedValue({ sessionId: 'session-1', launchCommit: 'a', headCommit: 'b', headMoved: 0, files: [], additions: 0, deletions: 0, truncated: false, availability: 'available' });
 		vi.spyOn(window, 'confirm').mockReturnValue(true);
 	});
@@ -77,9 +76,26 @@ describe('CanvasWorkbench', () => {
 		render(<CanvasWorkbench {...defaultProps(projection, plan)} onOpenFullView={openFullView} />);
 		fireEvent.click(screen.getByRole('button', { name: 'Quality' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Run smoke verify' }));
-		await waitFor(() => expect(api.createVerificationJob).toHaveBeenCalledWith('workspace-1', { profile: 'smoke', trigger: 'manual_checkpoint', terminalMode: 'embedded' }));
+		await waitFor(() => expect(api.createVerificationJob).toHaveBeenCalledWith('workspace-1', { profile: 'smoke', trigger: 'manual_checkpoint', terminalMode: 'embedded' }, expect.any(AbortSignal)));
 		fireEvent.click(screen.getByRole('button', { name: 'View details' }));
 		expect(openFullView).toHaveBeenCalledWith(plan);
+	});
+
+	it('aborts a pending verification request when the Workbench unmounts', async () => {
+		const plan = planNode();
+		plan.plan!.actions['verification.run'] = { action: 'verification.run', state: 'available', recoveryActions: [] };
+		let signal: AbortSignal | undefined;
+		vi.mocked(api.createVerificationJob).mockImplementation((_workspaceId, _input, nextSignal) => {
+			signal = nextSignal;
+			return new Promise(() => {});
+		});
+		const view = render(<CanvasWorkbench {...defaultProps(baseProjection([workspaceNode(), plan]), plan)} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Quality' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Run smoke verify' }));
+		await waitFor(() => expect(signal).toBeDefined());
+
+		view.unmount();
+		expect(signal?.aborted).toBe(true);
 	});
 
 	it('provides the same left-edge resize control as the Workstream item panel', async () => {
@@ -110,45 +126,10 @@ describe('CanvasWorkbench', () => {
 		expect(signal?.aborted).toBe(true);
 	});
 
-	it('shows Info and Sessions tabs for a workspace node, and lists sessions under Sessions', async () => {
-		vi.mocked(api.aiSessionRecords).mockResolvedValue([sessionRecord()]);
-		const workspace = workspaceNode();
-		renderWorkbench(workspace);
-		expect(screen.getByRole('button', { name: 'Info' })).toHaveClass('active');
-		expect(screen.getByRole('button', { name: 'Sessions' })).toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
-		expect(await screen.findByRole('button', { name: 'card_context, Running' })).toBeInTheDocument();
-		await screen.findByTestId('workbench-terminal-session-1');
-	});
-
-	it('widens the Workbench panel while the Sessions tab is active, and reverts once another tab is selected', async () => {
-		vi.mocked(api.aiSessionRecords).mockResolvedValue([]);
-		const workspace = workspaceNode();
-		renderWorkbench(workspace);
-		expect(screen.getByLabelText('Canvas Workbench')).not.toHaveClass('sessions-wide');
-		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
-		await screen.findByText('No sessions for this workspace and branch.');
-		expect(screen.getByLabelText('Canvas Workbench')).toHaveClass('sessions-wide');
-		fireEvent.click(screen.getByRole('button', { name: 'Info' }));
-		expect(screen.getByLabelText('Canvas Workbench')).not.toHaveClass('sessions-wide');
-	});
-
-	it('lets the resize handle widen the panel past the usual pixel cap while the Sessions tab is active', async () => {
-		vi.mocked(api.aiSessionRecords).mockResolvedValue([]);
-		const workspace = workspaceNode();
-		renderWorkbench(workspace);
-		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
-		await screen.findByText('No sessions for this workspace and branch.');
-		const aside = screen.getByLabelText('Canvas Workbench');
-		const defaultWidth = parseInt(aside.style.getPropertyValue('--canvas-workbench-width'), 10);
-		expect(defaultWidth).toBeGreaterThan(520); // the Sessions tab already defaults wider than the old fixed cap.
-		const handle = screen.getByRole('button', { name: 'Resize Workbench panel' });
-		fireEvent(handle, pointerEventWithClientX('pointerdown', 500));
-		act(() => { window.dispatchEvent(pointerEventWithClientX('pointermove', 50)); });
-		act(() => { window.dispatchEvent(pointerEventWithClientX('pointerup', 50)); });
-		const widenedWidth = parseInt(aside.style.getPropertyValue('--canvas-workbench-width'), 10);
-		expect(widenedWidth).toBeGreaterThan(defaultWidth);
-		expect(widenedWidth).toBeGreaterThan(520);
+	it('keeps workspace details in the node panel without a Sessions tab', () => {
+		renderWorkbench(workspaceNode());
+		expect(screen.getByText('Git summary')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Sessions' })).not.toBeInTheDocument();
 	});
 
 	it('opens the session node with Terminal selected by default and Changes available', async () => {
@@ -170,49 +151,7 @@ describe('CanvasWorkbench', () => {
 		expect(screen.getAllByRole('alert')).toHaveLength(1);
 	});
 
-	it('applies an initial tab hint once and reports it back', async () => {
-		const onInitialTabApplied = vi.fn();
-		renderWorkbench(sessionNode(), { initialTab: 'changes', onInitialTabApplied });
-		await waitFor(() => expect(screen.getByRole('button', { name: 'Changes' })).toHaveClass('active'));
-		expect(onInitialTabApplied).toHaveBeenCalled();
-	});
-
-	it('refetches the Sessions tab after a session is stopped', async () => {
-		vi.mocked(api.aiSessionRecords).mockResolvedValueOnce([sessionRecord()]).mockResolvedValueOnce([]);
-		const workspace = workspaceNode();
-		renderWorkbench(workspace);
-		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
-		expect(await screen.findByRole('button', { name: 'card_context, Running' })).toBeInTheDocument();
-		await screen.findByTestId('workbench-terminal-session-1');
-		fireEvent.click(screen.getByRole('button', { name: 'Stop card_context session' }));
-		const dialog = await screen.findByRole('dialog');
-		fireEvent.click(within(dialog).getByRole('button', { name: 'Stop session' }));
-		await waitFor(() => expect(api.cancelEmbeddedAISession).toHaveBeenCalledWith('session-1'));
-		await waitFor(() => expect(api.aiSessionRecords).toHaveBeenCalledTimes(2));
-		expect(screen.queryByRole('button', { name: 'card_context, Running' })).not.toBeInTheDocument();
-	});
-
-	it('opens a session on the board from the Sessions tab', async () => {
-		vi.mocked(api.aiSessionRecords).mockResolvedValue([sessionRecord()]);
-		const onOpenSession = vi.fn();
-		const workspace = workspaceNode();
-		renderWorkbench(workspace, { onOpenSession });
-		fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
-		await screen.findByRole('button', { name: 'card_context, Running' });
-		await screen.findByTestId('workbench-terminal-session-1');
-		fireEvent.click(screen.getByRole('button', { name: 'Open on board' }));
-		expect(onOpenSession).toHaveBeenCalledWith('session-1');
-	});
 });
-
-// jsdom has no PointerEvent constructor, so the resize drag (a plain
-// window pointermove/pointerup listener pair, not a React handler) is
-// exercised with a bare Event carrying a manually attached clientX.
-function pointerEventWithClientX(type: string, clientX: number) {
-	const event = new Event(type, { bubbles: true, cancelable: true });
-	Object.defineProperty(event, 'clientX', { value: clientX });
-	return event;
-}
 
 function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.ComponentProps<typeof CanvasWorkbench>> = {}) {
 	const projection = baseProjection([planNode(), selectedNode]);

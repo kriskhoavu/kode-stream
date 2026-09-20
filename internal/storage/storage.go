@@ -120,6 +120,7 @@ type Migration struct {
 
 type DatabaseHealth struct {
 	Driver           string `json:"driver"`
+	Configured       bool   `json:"configured"`
 	OK               bool   `json:"ok"`
 	MigrationVersion int    `json:"migrationVersion"`
 	Error            string `json:"error,omitempty"`
@@ -290,9 +291,9 @@ func (s *SQLStore) Close() error {
 
 func (s *SQLStore) Health(ctx context.Context) DatabaseHealth {
 	if s == nil || s.db == nil {
-		return DatabaseHealth{OK: false, Error: "database is not configured"}
+		return DatabaseHealth{}
 	}
-	health := DatabaseHealth{Driver: s.driver, OK: false, MigrationVersion: s.migrationVersion}
+	health := DatabaseHealth{Driver: s.driver, Configured: true, OK: false, MigrationVersion: s.migrationVersion}
 	if err := s.db.PingContext(ctx); err != nil {
 		health.Error = err.Error()
 		return health

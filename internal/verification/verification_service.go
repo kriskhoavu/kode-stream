@@ -36,6 +36,7 @@ const (
 	maxArtifactDepth                  = 12
 	defaultMaxTerminalJobs            = 100
 	defaultTerminalJobRetention       = 24 * time.Hour
+	maxRuntimeCleanupDuration         = time.Minute
 )
 
 type FailureType string
@@ -421,7 +422,7 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	if err := s.runStep(jobID, "up", runtimeLog, func() error {
 		return s.runtime.Up(ctx, workspace.Path, config, runtimeLog)
 	}); err != nil {
-		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
+		_ = s.cleanupRuntime(workspace.Path, config, runtimeLog)
 		s.failJob(jobID, FailureTypeBoot, 10, "startup failed", err)
 		s.collectArtifacts(jobID, artifactRoot)
 		return
@@ -429,7 +430,7 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	if err := s.runStep(jobID, "health", runtimeLog, func() error {
 		return s.runtime.Health(ctx, workspace.Path, config, runtimeLog)
 	}); err != nil {
-		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
+		_ = s.cleanupRuntime(workspace.Path, config, runtimeLog)
 		s.failJob(jobID, FailureTypeBoot, 10, "health checks failed", err)
 		s.collectArtifacts(jobID, artifactRoot)
 		return
@@ -440,20 +441,27 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 		}
 		return s.runtime.Verify(ctx, workspace.Path, config, job.Profile, verifyLog)
 	}); err != nil {
-		_ = s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
+		_ = s.cleanupRuntime(workspace.Path, config, runtimeLog)
 		s.failJob(jobID, FailureTypeTest, 20, "verification failed", err)
 		s.collectArtifacts(jobID, artifactRoot)
 		s.collectAutomationArtifacts(jobID)
 		return
 	}
 	_ = s.runStep(jobID, "down", runtimeLog, func() error {
-		return s.runtime.Down(context.Background(), workspace.Path, config, runtimeLog)
+		return s.cleanupRuntime(workspace.Path, config, runtimeLog)
 	})
 
 	s.collectArtifacts(jobID, artifactRoot)
 	s.collectAutomationArtifacts(jobID)
 	finalStatus = JobStatusPassed
 	s.mutate(jobID, func(state *Job) { state.ExitCode = 0 })
+}
+
+func (s *Service) cleanupRuntime(workspacePath string, config *models.WorkspaceRuntimeConfig, out *os.File) error {
+	timeout := min(s.timeout, maxRuntimeCleanupDuration)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return s.runtime.Down(ctx, workspacePath, config, out)
 }
 
 func (s *Service) captureFinishFingerprint(jobID string, workspace models.WorkspaceConfig) {

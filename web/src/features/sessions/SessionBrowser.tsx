@@ -3,7 +3,7 @@ import type { GlobalSessionRow } from '../../lib/types';
 import { SessionBrowserTerminal } from './SessionBrowserTerminal';
 import { SessionChangesPanel } from './SessionChangesPanel';
 import { SessionCard, sessionTitle } from './SessionCard';
-import { formatDuration, formatSessionDate, isSessionLive, StopConfirmDialog } from './sessionDisplay';
+import { formatDuration, formatSessionDate, isSessionLive, SessionConfirmDialog } from './sessionDisplay';
 import { useSessionBrowserSelection } from './useSessionBrowserSelection';
 
 export type SessionBrowserGrouping = 'plan' | 'workspace-plan';
@@ -42,20 +42,24 @@ function buildGroups(rows: GlobalSessionRow[], grouping: SessionBrowserGrouping)
 /**
  * The session browser: a filterable, grouped card list on the left and the
  * selected session's live terminal (or its Changes) on the right. Shared by
- * the Workbench Sessions tab (grouped by plan) and the Sessions page
- * (grouped by workspace then plan).
+ * the Workbench Sessions view (grouped by plan). The grouping option remains
+ * reusable for callers that aggregate more than one workspace.
  */
-export function SessionBrowser({ rows, grouping, persistKey, onStop, onReload, onOpenOnBoard, emptyMessage = 'No sessions yet. Start one from a plan on the Workbench.' }: {
+export function SessionBrowser({ rows, grouping, persistKey, onStop, onRemove, onReload, onOpenOnBoard, emptyMessage = 'No sessions yet. Start one from a plan on the Workbench.' }: {
 	rows: GlobalSessionRow[];
 	grouping: SessionBrowserGrouping;
 	persistKey: string;
 	onStop: (row: GlobalSessionRow) => Promise<unknown>;
+	onRemove?: (row: GlobalSessionRow) => Promise<unknown>;
 	onReload: () => Promise<unknown> | void;
 	onOpenOnBoard?: (row: GlobalSessionRow) => void;
 	emptyMessage?: string;
 }) {
 	const [query, setQuery] = useState('');
 	const [liveOnly, setLiveOnly] = useState(() => rows.some((row) => isSessionLive(row.record)));
+	const [removeTarget, setRemoveTarget] = useState<GlobalSessionRow>();
+	const [removing, setRemoving] = useState(false);
+	const [removeError, setRemoveError] = useState('');
 	const cardRefs = useRef(new Map<string, HTMLButtonElement>());
 
 	const filteredRows = useMemo(() => {
@@ -88,6 +92,19 @@ export function SessionBrowser({ rows, grouping, persistKey, onStop, onReload, o
 		else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(row.record.id, -1); }
 		else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(row.record.id); }
 	};
+	const remove = async () => {
+		if (!removeTarget || !onRemove) return;
+		setRemoving(true);
+		setRemoveError('');
+		try {
+			await onRemove(removeTarget);
+			setRemoveTarget(undefined);
+		} catch (caught) {
+			setRemoveError(caught instanceof Error ? caught.message : 'The session could not be removed.');
+		} finally {
+			setRemoving(false);
+		}
+	};
 
 	return <div className="session-browser">
 		<div className="session-browser-list">
@@ -100,13 +117,14 @@ export function SessionBrowser({ rows, grouping, persistKey, onStop, onReload, o
 			{groups.map((group) => <section key={group.key} className="session-browser-group">
 				<h3 className="session-browser-group-title">{group.title}</h3>
 				<ul className="session-browser-cards">
-					{group.rows.map((row) => <SessionCard key={row.record.id} row={row} selected={row.record.id === selectedId} tabIndex={row.record.id === rovingId ? 0 : -1} cardRef={(element) => { if (element) cardRefs.current.set(row.record.id, element); else cardRefs.current.delete(row.record.id); }} onSelect={() => select(row.record.id)} onKeyDown={onCardKeyDown(row)} />)}
+					{group.rows.map((row) => <SessionCard key={row.record.id} row={row} selected={row.record.id === selectedId} tabIndex={row.record.id === rovingId ? 0 : -1} cardRef={(element) => { if (element) cardRefs.current.set(row.record.id, element); else cardRefs.current.delete(row.record.id); }} onSelect={() => select(row.record.id)} onRemove={onRemove ? () => { setRemoveError(''); setRemoveTarget(row); } : undefined} onKeyDown={onCardKeyDown(row)} />)}
 				</ul>
 			</section>)}
 		</div>
 		<div className="session-browser-detail">
 			{selectedRow ? <SessionDetail row={selectedRow} onStop={onStop} onReload={onReload} onOpenOnBoard={onOpenOnBoard} /> : <p className="session-browser-detail-empty">Select a session to see its terminal.</p>}
 		</div>
+		{removeTarget && <SessionConfirmDialog title="Remove session?" message={`Remove ${sessionTitle(removeTarget)} from session history? This removes its saved terminal metadata; workspace files and Git changes are untouched.`} confirmLabel="Remove session" busyLabel="Removing…" busy={removing} error={removeError} onCancel={() => { setRemoveTarget(undefined); setRemoveError(''); }} onConfirm={() => void remove()} />}
 	</div>;
 }
 
@@ -159,13 +177,13 @@ function SessionDetail({ row, onStop, onReload, onOpenOnBoard }: { row: GlobalSe
 				{live && <button type="button" className="danger-confirm" onClick={() => setConfirming(true)}>{`Stop ${title} session`}</button>}
 			</div>
 		</header>
-		<div className="side-panel-tabs" role="tablist" aria-label="Session detail tabs">
+		<div className="side-panel-tabs session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
 			<button type="button" className={tab === 'terminal' ? 'active' : ''} aria-selected={tab === 'terminal'} onClick={() => setTab('terminal')}>Terminal</button>
 			<button type="button" className={tab === 'changes' ? 'active' : ''} aria-selected={tab === 'changes'} onClick={() => setTab('changes')}>Changes</button>
 		</div>
 		{tab === 'terminal' && <SessionBrowserTerminal record={row.record} visible onReload={onReload} />}
 		{tab === 'changes' && <SessionChangesPanel session={row.record} />}
-		{confirming && <StopConfirmDialog title="Stop session?" message={`Stop the ${title} session on ${row.record.requestedBranch}? Its durable session metadata will remain available.`} busy={stopping} error={stopError} onCancel={() => { setConfirming(false); setStopError(''); }} onConfirm={() => void stop()} />}
+		{confirming && <SessionConfirmDialog title="Stop session?" message={`Stop the ${title} session on ${row.record.requestedBranch}? Its durable session metadata will remain available.`} confirmLabel="Stop session" busyLabel="Stopping…" busy={stopping} error={stopError} onCancel={() => { setConfirming(false); setStopError(''); }} onConfirm={() => void stop()} />}
 	</div>;
 }
 

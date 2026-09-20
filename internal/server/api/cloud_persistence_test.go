@@ -32,6 +32,18 @@ type cloudPersistenceDouble struct {
 	connections map[string]string
 }
 
+type blockingAgentListRepository struct {
+	*cloudPersistenceDouble
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (r *blockingAgentListRepository) ListAgents(ctx context.Context, owner string) ([]models.CloudAgent, error) {
+	close(r.entered)
+	<-r.release
+	return r.cloudPersistenceDouble.ListAgents(ctx, owner)
+}
+
 func TestCloudPostgresPersistenceAcrossAPIReconstruction(t *testing.T) {
 	databaseURL := os.Getenv(storage.EnvDatabaseURL)
 	if databaseURL == "" {
@@ -335,6 +347,82 @@ func TestCloudPersistenceErrorsAreCallScopedAndDoNotPublishConnectedAgent(t *tes
 	}
 	if _, err := providers.registry.memory.Integration("github", "token"); err == nil {
 		t.Fatal("failed durable provider write leaked into process-local registry")
+	}
+}
+
+func TestCloudAgentStoreReleasesDisconnectedDurableAgents(t *testing.T) {
+	persistence := newCloudPersistenceDouble()
+	agents := newCloudAgentStore(time.Now, persistence)
+	connected := models.CloudAgent{ID: "agent", UserID: "owner", Status: "connected"}
+	if _, err := agents.Upsert(context.Background(), connected); err != nil {
+		t.Fatal(err)
+	}
+	if !agents.HasConnected("owner", "agent") {
+		t.Fatal("connected agent was not tracked locally")
+	}
+	connected.Status = "offline"
+	if _, err := agents.Upsert(context.Background(), connected); err != nil {
+		t.Fatal(err)
+	}
+	if len(agents.agents) != 0 {
+		t.Fatalf("offline durable agent retained in memory: %#v", agents.agents)
+	}
+	listed, err := agents.List(context.Background(), "owner")
+	if err != nil || len(listed) != 1 || listed[0].Status != "offline" {
+		t.Fatalf("durable offline agent was not listed: %#v, %v", listed, err)
+	}
+	connected.Status = "connected"
+	if _, err := agents.Upsert(context.Background(), connected); err != nil {
+		t.Fatal(err)
+	}
+	persistence.mu.Lock()
+	persistence.errByOwner["owner"] = errors.New("database unavailable")
+	persistence.mu.Unlock()
+	connected.Status = "offline"
+	if _, err := agents.Upsert(context.Background(), connected); err == nil {
+		t.Fatal("failed durable disconnect was not reported")
+	}
+	if agents.HasConnected("owner", "agent") || len(agents.agents) != 0 {
+		t.Fatalf("disconnected agent remained live after a durable write failure: %#v", agents.agents)
+	}
+}
+
+func TestCloudAgentStoreKeepsLiveStateReadableDuringDurableList(t *testing.T) {
+	repository := &blockingAgentListRepository{cloudPersistenceDouble: newCloudPersistenceDouble(), entered: make(chan struct{}), release: make(chan struct{})}
+	defer func() {
+		select {
+		case <-repository.release:
+		default:
+			close(repository.release)
+		}
+	}()
+	agents := newCloudAgentStore(time.Now, repository)
+	if _, err := agents.Upsert(context.Background(), models.CloudAgent{ID: "agent", UserID: "owner", Status: "connected"}); err != nil {
+		t.Fatal(err)
+	}
+	listed := make(chan error, 1)
+	go func() {
+		_, err := agents.List(context.Background(), "owner")
+		listed <- err
+	}()
+	select {
+	case <-repository.entered:
+	case <-time.After(time.Second):
+		t.Fatal("durable list did not start")
+	}
+	connected := make(chan bool, 1)
+	go func() { connected <- agents.HasConnected("owner", "agent") }()
+	select {
+	case value := <-connected:
+		if !value {
+			t.Fatal("live agent became unavailable during durable list")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("durable list blocked the live agent check")
+	}
+	close(repository.release)
+	if err := <-listed; err != nil {
+		t.Fatal(err)
 	}
 }
 

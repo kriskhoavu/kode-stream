@@ -22,7 +22,37 @@ var (
 	ErrUnsafePath   = errors.New("file path is not safe for replacement")
 )
 
-var pathLocks sync.Map
+type pathLock struct {
+	mu    sync.Mutex
+	users int
+}
+
+var pathLocks = struct {
+	mu      sync.Mutex
+	entries map[string]*pathLock
+}{entries: make(map[string]*pathLock)}
+
+func lockPath(path string) func() {
+	pathLocks.mu.Lock()
+	entry := pathLocks.entries[path]
+	if entry == nil {
+		entry = &pathLock{}
+		pathLocks.entries[path] = entry
+	}
+	entry.users++
+	pathLocks.mu.Unlock()
+
+	entry.mu.Lock()
+	return func() {
+		entry.mu.Unlock()
+		pathLocks.mu.Lock()
+		entry.users--
+		if entry.users == 0 {
+			delete(pathLocks.entries, path)
+		}
+		pathLocks.mu.Unlock()
+	}
+}
 
 type Result struct {
 	Path string
@@ -56,10 +86,7 @@ func replaceExisting(root, relative string, content []byte, expectedHash string,
 	if err != nil {
 		return Result{}, err
 	}
-	lockValue, _ := pathLocks.LoadOrStore(full, &sync.Mutex{})
-	lock := lockValue.(*sync.Mutex)
-	lock.Lock()
-	defer lock.Unlock()
+	defer lockPath(full)()
 	initial, err := os.Lstat(full)
 	if err != nil {
 		return Result{}, err

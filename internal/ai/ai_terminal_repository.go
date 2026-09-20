@@ -19,11 +19,12 @@ import (
 )
 
 const (
-	StateStarting  = "starting"
-	StateRunning   = "running"
-	StateExited    = "exited"
-	StateCancelled = "cancelled"
-	StateFailed    = "failed"
+	StateStarting               = "starting"
+	StateRunning                = "running"
+	StateExited                 = "exited"
+	StateCancelled              = "cancelled"
+	StateFailed                 = "failed"
+	maxRetainedTerminalSessions = 32
 )
 
 var ErrNotFound = errors.New("session not found")
@@ -159,6 +160,7 @@ func (m *Manager) Start(request StartRequest) (Session, Grant, error) {
 		s.mu.Unlock()
 		failed := s.snapshot()
 		m.notify(failed)
+		m.pruneCompleted()
 		return failed, Grant{}, err
 	}
 	s.mu.Lock()
@@ -248,12 +250,15 @@ func (m *Manager) Authenticate(id, token string) error {
 }
 
 func (m *Manager) Subscribe(id string) (<-chan []byte, []byte, func(), error) {
-	s := m.lookup(id)
+	m.mu.RLock()
+	s := m.sessions[id]
 	if s == nil {
+		m.mu.RUnlock()
 		return nil, nil, nil, ErrNotFound
 	}
 	ch := make(chan []byte, 32)
 	s.mu.Lock()
+	m.mu.RUnlock()
 	if s.disconnect != nil {
 		s.disconnect.Stop()
 		s.disconnect = nil
@@ -332,6 +337,7 @@ func (m *Manager) stop(id, state string) (Session, error) {
 	s.mu.Unlock()
 	result := s.snapshot()
 	m.notify(result)
+	m.pruneCompleted()
 	return result, nil
 }
 
@@ -364,6 +370,7 @@ func (m *Manager) wait(s *managed) {
 	result := s.info
 	s.mu.Unlock()
 	m.notify(result)
+	m.pruneCompleted()
 }
 
 func (m *Manager) publish(s *managed, data []byte) {
@@ -392,6 +399,35 @@ func (m *Manager) unsubscribe(s *managed, ch chan []byte) {
 		s.disconnect = time.AfterFunc(m.config.GracePeriod, func() { _, _ = m.stop(s.info.ID, StateCancelled) })
 	}
 	s.mu.Unlock()
+	m.pruneCompleted()
+}
+
+// Durable session records hold history; the manager only needs a small recent
+// reconnect buffer. Keep subscribed sessions until their client disconnects.
+func (m *Manager) pruneCompleted() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	type candidate struct {
+		id      string
+		started time.Time
+	}
+	completed := make([]candidate, 0)
+	for id, session := range m.sessions {
+		session.mu.Lock()
+		eligible := session.info.State != StateStarting && session.info.State != StateRunning && len(session.subs) == 0
+		started := session.info.StartedAt
+		session.mu.Unlock()
+		if eligible {
+			completed = append(completed, candidate{id: id, started: started})
+		}
+	}
+	if len(completed) <= maxRetainedTerminalSessions {
+		return
+	}
+	sort.Slice(completed, func(i, j int) bool { return completed[i].started.Before(completed[j].started) })
+	for _, expired := range completed[:len(completed)-maxRetainedTerminalSessions] {
+		delete(m.sessions, expired.id)
+	}
 }
 
 func (m *Manager) lookup(id string) *managed {

@@ -23,10 +23,14 @@ export function useSessionChanges(sessionId: string | undefined, live: boolean) 
 			return;
 		}
 		let cancelled = false;
+		let inFlight = false;
+		const controller = new AbortController();
 		const token = ++tokenRef.current;
 		const load = () => {
+			if (inFlight) return;
+			inFlight = true;
 			setLoading(true);
-			api.sessionChanges(sessionId).then((result) => {
+			api.sessionChanges(sessionId, controller.signal).then((result) => {
 				if (cancelled || tokenRef.current !== token) return;
 				setChanges(result);
 				setError('');
@@ -34,14 +38,15 @@ export function useSessionChanges(sessionId: string | undefined, live: boolean) 
 				if (cancelled || tokenRef.current !== token) return;
 				setError(caught instanceof Error ? caught.message : 'Session changes could not be loaded.');
 			}).finally(() => {
+				inFlight = false;
 				if (cancelled || tokenRef.current !== token) return;
 				setLoading(false);
 			});
 		};
 		load();
-		if (!live) return () => { cancelled = true; };
+		if (!live) return () => { cancelled = true; controller.abort(); };
 		const timer = window.setInterval(load, POLL_INTERVAL_MS);
-		return () => { cancelled = true; window.clearInterval(timer); };
+		return () => { cancelled = true; controller.abort(); window.clearInterval(timer); };
 	}, [sessionId, live]);
 
 	return { changes, loading, error };

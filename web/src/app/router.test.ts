@@ -25,7 +25,7 @@ describe('router', () => {
 		expect(knowledgePath()).toBe('/knowledge');
 	});
 
-	it('parses and builds checkout-derived Canvas context', () => {
+	it('parses and builds checkout-derived Workbench context', () => {
 		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&branch=feature%2FPM-037');
 		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one' } });
 		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one' } })).toBe('/canvas?workspaceId=ws+one');
@@ -33,16 +33,21 @@ describe('router', () => {
 		expect(canvasPath()).toBe('/canvas');
 	});
 
-	it('parses and builds a selected Canvas node for a Sessions page handoff', () => {
+	it('parses and builds the Sessions Workbench view', () => {
+		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&view=sessions');
+		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', view: 'sessions' } });
+		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', view: 'sessions' } })).toBe('/canvas?workspaceId=ws+one&view=sessions');
+	});
+
+	it('parses and builds a selected Canvas node for a session handoff', () => {
 		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&selectedNodeId=session%3Aembedded-1');
 		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', selectedNodeId: 'session:embedded-1' } });
 		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', selectedNodeId: 'session:embedded-1' } })).toBe('/canvas?workspaceId=ws+one&selectedNodeId=session%3Aembedded-1');
 	});
 
-	it('parses and builds the Sessions route', () => {
+	it('redirects the legacy Sessions route into the Workbench Sessions view', () => {
 		window.history.pushState(null, '', '/sessions');
-		expect(routeFromLocation()).toEqual({ name: 'sessions' });
-		expect(pathForRoute({ name: 'sessions' })).toBe('/sessions');
+		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { view: 'sessions' } });
 	});
 
   it('parses and builds Branch Review selections', () => {

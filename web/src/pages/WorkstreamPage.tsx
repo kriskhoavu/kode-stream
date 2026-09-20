@@ -132,6 +132,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 	const workspaceGenerationRef = useRef(0);
 	const activeWorkspaceRef = useRef<string | undefined>(workspace?.id);
 	const jiraLookupAbortRef = useRef<AbortController | null>(null);
+	const checkoutAbortRef = useRef<AbortController | undefined>(undefined);
 	const closeNewPlan = () => {
 		jiraLookupAbortRef.current?.abort();
 		jiraLookupAbortRef.current = null;
@@ -143,7 +144,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 	useEffect(() => {
 		activeWorkspaceRef.current = workspace?.id;
 		workspaceGenerationRef.current += 1;
-		return () => { workspaceGenerationRef.current += 1; jiraLookupAbortRef.current?.abort(); };
+		return () => { workspaceGenerationRef.current += 1; jiraLookupAbortRef.current?.abort(); checkoutAbortRef.current?.abort(); };
 	}, [workspace?.id]);
   const text = query;
 
@@ -161,32 +162,37 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   // never blanks the columns the user is already looking at.
   const loadCheckout = async (force = false, { silent = false }: { silent?: boolean } = {}) => {
     if (!workspace) return;
+		checkoutAbortRef.current?.abort();
+		const controller = new AbortController();
+		checkoutAbortRef.current = controller;
 		const workspaceID = workspace.id;
 		const generation = workspaceGenerationRef.current;
 		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
     if (!silent) setLoading(true);
     setError('');
     try {
-      const result = await api.loadWorkstreamCheckout(workspace.id, { force });
-			if (!active()) return;
+      const result = await api.loadWorkstreamCheckout(workspace.id, { force }, controller.signal);
+			if (controller.signal.aborted || !active()) return;
       setBranchContext(result);
       setSelectedBranch(result.branch);
       setPlans(withPendingCreated(result.items));
     } catch (err) {
+			if (controller.signal.aborted) return;
       try {
-        const fallbackItems = await api.items(new URLSearchParams({ workspaceId: workspace.id }));
-			if (!active()) return;
+        const fallbackItems = await api.items(new URLSearchParams({ workspaceId: workspace.id }), controller.signal);
+			if (controller.signal.aborted || !active()) return;
         setBranchContext(null);
         setSelectedBranch(workspace.baselineBranch);
         setPlans(fallbackItems);
         setError('');
       } catch {
-			if (!active()) return;
+			if (controller.signal.aborted || !active()) return;
         setError(err instanceof Error ? err.message : 'Failed to load checkout');
         setPlans([]);
       }
     } finally {
-		if (active()) setLoading(false);
+		if (!controller.signal.aborted && active()) setLoading(false);
+		if (checkoutAbortRef.current === controller) checkoutAbortRef.current = undefined;
     }
   };
 
@@ -248,9 +254,15 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   }, [newPlanOpen]);
 
   useEffect(() => {
-    api.savedFilters()
-      .then((saved) => setSavedFilters(saved.filter((filter) => !filter.workspaceId || filter.workspaceId === workspace?.id)))
-      .catch(() => setSavedFilters([]));
+    const controller = new AbortController();
+    api.savedFilters(controller.signal)
+      .then((saved) => {
+        if (!controller.signal.aborted) setSavedFilters(saved.filter((filter) => !filter.workspaceId || filter.workspaceId === workspace?.id));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSavedFilters([]);
+      });
+    return () => controller.abort();
   }, [workspace?.id]);
 
   useEffect(() => {
@@ -260,27 +272,27 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       setWorkspaceBranchList([]);
       return;
     }
-    let active = true;
-    api.gitStatus(workspace.id)
+    const controller = new AbortController();
+    api.gitStatus(workspace.id, controller.signal)
       .then((status) => {
-        if (active) setWorkspaceGitStatus(status);
+        if (!controller.signal.aborted) setWorkspaceGitStatus(status);
       })
       .catch(() => {
-        if (active) setWorkspaceGitStatus(null);
+        if (!controller.signal.aborted) setWorkspaceGitStatus(null);
       });
-    api.workspaceBranches(workspace.id)
+    api.workspaceBranches(workspace.id, controller.signal)
       .then((response) => {
-        if (!active) return;
+        if (controller.signal.aborted) return;
         setWorkspaceBranchCurrent(response.current);
         setWorkspaceBranchList(response.branches);
       })
       .catch(() => {
-        if (!active) return;
+        if (controller.signal.aborted) return;
         setWorkspaceBranchCurrent('');
         setWorkspaceBranchList([]);
       });
-    return () => { active = false; };
-  }, [workspace]);
+    return () => controller.abort();
+  }, [workspace?.id]);
 
   const sourceOptions = useMemo(() => sourceFacetOptions(items, workspace), [items, workspace]);
   const filteredPlans = useMemo(() => filterPlans(items, filters, text, workspace), [items, filters, text, workspace]);
@@ -337,13 +349,16 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   const scan = async () => {
     if (!workspace) return;
+		checkoutAbortRef.current?.abort();
+		const controller = new AbortController();
+		checkoutAbortRef.current = controller;
 		const workspaceID = workspace.id;
 		const generation = workspaceGenerationRef.current;
 		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
     setScanState('Refreshing');
     try {
-      const result = await api.loadWorkstreamCheckout(workspace.id, { force: true });
-			if (!active()) return;
+      const result = await api.loadWorkstreamCheckout(workspace.id, { force: true }, controller.signal);
+			if (controller.signal.aborted || !active()) return;
       notifyReliabilityChanged();
       setScanState(`${result.itemCount} items indexed`);
       setBranchContext(result);
@@ -351,7 +366,9 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       setPlans(result.items);
       onWorkspacesChanged();
     } catch (err) {
-		if (active()) setScanState(err instanceof Error ? err.message : 'Refresh failed');
+		if (!controller.signal.aborted && active()) setScanState(err instanceof Error ? err.message : 'Refresh failed');
+	} finally {
+		if (checkoutAbortRef.current === controller) checkoutAbortRef.current = undefined;
     }
   };
 
@@ -652,7 +669,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         </div>
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
-            <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await loadCheckout(true); await onWorkspacesChanged(); }} />
+            <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} gitStatus={workspaceGitStatus} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await loadCheckout(true); await onWorkspacesChanged(); }} />
             {onOpenReview && <button className="secondary" type="button" onClick={onOpenReview}>Review branch</button>}
             {workspace.sources.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
@@ -1531,6 +1548,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitActivity, setGitActivity] = useState<GitActivityEntry[]>([]);
   const [gitActivityLoading, setGitActivityLoading] = useState(false);
+  const [gitActivityRefreshKey, setGitActivityRefreshKey] = useState(0);
   const [gitMessage, setGitMessage] = useState('');
   const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
   const [branchName, setBranchName] = useState('');
@@ -1542,6 +1560,10 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   const autoSaveTimerRef = useRef<number | null>(null);
   const autoSaveSettledTimerRef = useRef<number | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
+  const drawerGenerationRef = useRef(0);
+  const fileLoadAbortRef = useRef<AbortController | null>(null);
+  const autoSaveRefreshAbortRef = useRef<AbortController | null>(null);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
   const drawerStyle = {
     '--drawer-width': `${width}px`,
     '--drawer-top': `${topOffset}px`,
@@ -1587,51 +1609,57 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   }, []);
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
+    const generation = ++drawerGenerationRef.current;
+    fileLoadAbortRef.current?.abort();
+    autoSaveRefreshAbortRef.current?.abort();
     setPlan(null);
     setFile(null);
     setFiles([]);
     setDiff('');
     setGitStatus(null);
     setError('');
-    api.item(itemId).then((payload) => {
-      if (!active) return;
+    api.item(itemId, controller.signal).then((payload) => {
+      if (controller.signal.aborted) return;
       setPlan(payload);
-      api.gitStatus(payload.workspaceId).then((status) => {
-        if (active) setGitStatus(status);
+      api.gitStatus(payload.workspaceId, controller.signal).then((status) => {
+        if (!controller.signal.aborted) setGitStatus(status);
       }).catch(() => {
-        if (active) setGitStatus(null);
+        if (!controller.signal.aborted) setGitStatus(null);
       });
     }).catch((err: Error) => {
-      if (active) setError(err.message);
+      if (!controller.signal.aborted) setError(err.message);
     });
-    api.files(itemId).then(async (tree) => {
-      if (!active) return;
+    api.files(itemId, undefined, controller.signal).then(async (tree) => {
+      if (controller.signal.aborted) return;
       setFiles(tree);
       const previewFile = preferredPreviewFile(tree);
       if (previewFile) {
         try {
-          const content = await api.file(itemId, previewFile.id);
-          if (active) {
+          const content = await api.file(itemId, previewFile.id, undefined, controller.signal);
+          if (!controller.signal.aborted) {
             setFile(content);
             setEditorContent(content.content);
             setSavedContent(content.content);
             setAutoSaveState('idle');
           }
         } catch (err) {
-          if (active) setError(err instanceof Error ? err.message : 'File failed to load');
+          if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'File failed to load');
         }
       }
     }).catch((err: Error) => {
-      if (active) setError(err.message);
+      if (!controller.signal.aborted) setError(err.message);
     });
-    api.diff(itemId).then((payload) => {
-      if (active) setDiff(payload.diff || 'No local changes.');
+    api.diff(itemId, controller.signal).then((payload) => {
+      if (!controller.signal.aborted) setDiff(payload.diff || 'No local changes.');
     }).catch(() => {
-      if (active) setDiff('No diff available.');
+      if (!controller.signal.aborted) setDiff('No diff available.');
     });
     return () => {
-      active = false;
+      controller.abort();
+      if (drawerGenerationRef.current === generation) drawerGenerationRef.current += 1;
+      fileLoadAbortRef.current?.abort();
+      autoSaveRefreshAbortRef.current?.abort();
       clearDrawerAutoSaveTimers();
     };
   }, [itemId, refreshKey]);
@@ -1675,42 +1703,73 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   };
 
   const saveDrawerFile = async (targetFile: FileContent, content: string) => {
+    const generation = drawerGenerationRef.current;
+    const activeItemId = itemId;
+    const workspaceId = plan?.workspaceId;
+    const isCurrent = () => drawerGenerationRef.current === generation;
     clearTimeoutRef(autoSaveTimerRef);
     clearTimeoutRef(autoSaveSettledTimerRef);
     setSavingFile(true);
     setAutoSaveState('saving');
     setError('');
     try {
-      const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash });
+      const updated = await api.saveFile(activeItemId, targetFile.id, { content, expectedHash: targetFile.hash });
       notifyReliabilityChanged();
+      if (!isCurrent()) return false;
       setFile(updated);
       setSavedContent(content);
       setAutoSaveState('saved');
       autoSaveSettledTimerRef.current = window.setTimeout(() => setAutoSaveState('idle'), 1400);
       clearTimeoutRef(autoSaveRefreshTimerRef);
       autoSaveRefreshTimerRef.current = window.setTimeout(() => {
-        api.diff(itemId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
-        if (plan) void loadGitStatus(plan.workspaceId);
+        if (!isCurrent()) return;
+        autoSaveRefreshAbortRef.current?.abort();
+        const controller = new AbortController();
+        autoSaveRefreshAbortRef.current = controller;
+        api.diff(activeItemId, controller.signal)
+          .then((payload) => {
+            if (!controller.signal.aborted && isCurrent()) setDiff(payload.diff || 'No local changes.');
+          })
+          .catch(() => {
+            if (!controller.signal.aborted && isCurrent()) setDiff('No diff available.');
+          });
+        if (workspaceId) {
+          api.gitStatus(workspaceId, controller.signal)
+            .then((status) => {
+              if (!controller.signal.aborted && isCurrent()) setGitStatus(status);
+            })
+            .catch(() => {
+              if (!controller.signal.aborted && isCurrent()) setGitStatus(null);
+            });
+        }
       }, 600);
       return true;
     } catch (err) {
+      if (!isCurrent()) return false;
       setError(operationErrorMessage(err, 'File save failed'));
       setAutoSaveState('error');
       return false;
     } finally {
-      setSavingFile(false);
+      if (isCurrent()) setSavingFile(false);
     }
   };
 
   const loadDrawerFile = async (fileId: string) => {
+    fileLoadAbortRef.current?.abort();
+    const controller = new AbortController();
+    fileLoadAbortRef.current = controller;
+    const generation = drawerGenerationRef.current;
     try {
-      const content = await api.file(itemId, fileId);
+      const content = await api.file(itemId, fileId, undefined, controller.signal);
+      if (controller.signal.aborted || drawerGenerationRef.current !== generation) return;
       setFile(content);
       setEditorContent(content.content);
       setSavedContent(content.content);
       setAutoSaveState('idle');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'File failed to load');
+      if (!controller.signal.aborted && drawerGenerationRef.current === generation) setError(err instanceof Error ? err.message : 'File failed to load');
+    } finally {
+      if (fileLoadAbortRef.current === controller) fileLoadAbortRef.current = null;
     }
   };
 
@@ -1740,22 +1799,12 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     });
   };
 
-  const loadGitStatus = async (workspaceId: string) => {
+  const loadGitStatus = async (workspaceId: string, generation = drawerGenerationRef.current) => {
     try {
-      setGitStatus(await api.gitStatus(workspaceId));
+      const status = await api.gitStatus(workspaceId);
+      if (drawerGenerationRef.current === generation) setGitStatus(status);
     } catch {
-      setGitStatus(null);
-    }
-  };
-
-  const loadGitActivity = async (workspaceId: string, path: string) => {
-    setGitActivityLoading(true);
-    try {
-      setGitActivity(await api.gitActivity(workspaceId, { path: path || undefined, limit: 8 }));
-    } catch {
-      setGitActivity([]);
-    } finally {
-      setGitActivityLoading(false);
+      if (drawerGenerationRef.current === generation) setGitStatus(null);
     }
   };
 
@@ -1765,28 +1814,46 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
       setGitActivityLoading(false);
       return;
     }
-    void loadGitActivity(plan.workspaceId, activityPath);
-  }, [plan?.workspaceId, activityPath]);
+    const controller = new AbortController();
+    setGitActivityLoading(true);
+    api.gitActivity(plan.workspaceId, { path: activityPath || undefined, limit: 8, signal: controller.signal })
+      .then((activity) => {
+        if (!controller.signal.aborted) setGitActivity(activity);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setGitActivity([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setGitActivityLoading(false);
+      });
+    return () => controller.abort();
+  }, [plan?.workspaceId, activityPath, gitActivityRefreshKey]);
 
   const saveMetadata = async () => {
     if (!plan) return;
+    const generation = drawerGenerationRef.current;
+    const isCurrent = () => drawerGenerationRef.current === generation;
     setSavingMetadata(true);
     setError('');
     try {
 		const result = await api.saveMetadata(itemId, { ...metadataDraft, expectedRevision: plan.metadataRevision });
       notifyReliabilityChanged();
+      if (!isCurrent()) return;
       setPlan(result.item);
-      await loadGitStatus(plan.workspaceId);
+      await loadGitStatus(plan.workspaceId, generation);
+      if (!isCurrent()) return;
       await onChanged();
     } catch (err) {
-      setError(operationErrorMessage(err, 'Metadata save failed'));
+      if (isCurrent()) setError(operationErrorMessage(err, 'Metadata save failed'));
     } finally {
-      setSavingMetadata(false);
+      if (isCurrent()) setSavingMetadata(false);
     }
   };
 
   const runGitOperation = async (operation: 'fetch' | 'pull' | 'push') => {
     if (!plan) return;
+    const generation = drawerGenerationRef.current;
+    const isCurrent = () => drawerGenerationRef.current === generation;
     setGitBusy(operation);
     setError('');
     try {
@@ -1796,15 +1863,16 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
 			? await api.gitPull(plan.workspaceId, {})
           : await api.gitPush(plan.workspaceId);
       notifyReliabilityChanged();
+      if (!isCurrent()) return;
       setGitStatus(result.status);
       if (operation === 'pull') {
         await onChanged();
       }
       if (!result.ok && result.message) setError(result.message);
     } catch (err) {
-      setError(operationErrorMessage(err, `${operation} failed`));
+      if (isCurrent()) setError(operationErrorMessage(err, `${operation} failed`));
     } finally {
-      setGitBusy('');
+      if (isCurrent()) setGitBusy('');
     }
   };
 
@@ -1814,45 +1882,57 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
 
   const commitSelectedPaths = async () => {
     if (!plan) return;
+    const generation = drawerGenerationRef.current;
+    const isCurrent = () => drawerGenerationRef.current === generation;
     setGitBusy('commit');
     setError('');
     try {
       const result = await api.gitCommit(plan.workspaceId, { message: gitMessage, paths: selectedGitPaths });
       notifyReliabilityChanged();
+      if (!isCurrent()) return;
       setGitStatus(result.status);
-      await loadGitActivity(plan.workspaceId, activityPath);
+      setGitActivityRefreshKey((current) => current + 1);
       setGitMessage('');
       setSelectedGitPaths([]);
       await onChanged();
-      api.diff(itemId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
+      if (!isCurrent()) return;
+      api.diff(itemId).then((payload) => {
+        if (isCurrent()) setDiff(payload.diff || 'No local changes.');
+      }).catch(() => {
+        if (isCurrent()) setDiff('No diff available.');
+      });
       if (!result.ok && result.message) setError(result.message);
     } catch (err) {
-      setError(operationErrorMessage(err, 'Commit failed'));
+      if (isCurrent()) setError(operationErrorMessage(err, 'Commit failed'));
     } finally {
-      setGitBusy('');
+      if (isCurrent()) setGitBusy('');
     }
   };
 
   const createAndSwitchBranch = async () => {
     if (!plan || !branchName.trim()) return;
+    const generation = drawerGenerationRef.current;
+    const isCurrent = () => drawerGenerationRef.current === generation;
     setGitBusy('branch');
     setError('');
     try {
       const result = await api.createBranch(plan.workspaceId, { name: branchName.trim(), checkout: true });
       notifyReliabilityChanged();
+      if (!isCurrent()) return;
       setGitStatus(result.status);
       setBranchName('');
       await onChanged();
       if (!result.ok && result.message) setError(result.message);
     } catch (err) {
-      setError(operationErrorMessage(err, 'Branch operation failed'));
+      if (isCurrent()) setError(operationErrorMessage(err, 'Branch operation failed'));
     } finally {
-      setGitBusy('');
+      if (isCurrent()) setGitBusy('');
     }
   };
 
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
+    resizeCleanupRef.current?.();
     const startX = event.clientX;
     const startingWidth = width;
 
@@ -1861,16 +1941,21 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
       setWidth(Math.min(1120, Math.max(460, startingWidth + delta)));
     };
 
-    const onPointerUp = () => {
+    const cleanup = () => {
       document.body.classList.remove('is-resizing-drawer');
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      if (resizeCleanupRef.current === cleanup) resizeCleanupRef.current = null;
     };
+    function onPointerUp() { cleanup(); }
 
     document.body.classList.add('is-resizing-drawer');
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp, { once: true });
+    resizeCleanupRef.current = cleanup;
   };
+
+  useEffect(() => () => resizeCleanupRef.current?.(), []);
 
   return (
     <>

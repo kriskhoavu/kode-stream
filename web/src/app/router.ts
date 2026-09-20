@@ -1,6 +1,7 @@
 export type KnowledgeView = 'browse' | 'read' | 'graph';
 export interface KnowledgeLocation { workspaceId?: string; root?: string; slug?: string; view?: KnowledgeView; }
-export interface CanvasLocation { workspaceId?: string; selectedNodeId?: string; }
+export type WorkbenchView = 'canvas' | 'sessions';
+export interface CanvasLocation { workspaceId?: string; selectedNodeId?: string; view?: WorkbenchView; }
 export interface ReviewLocation { workspaceId?: string; branch?: string; }
 
 export type Route =
@@ -9,7 +10,6 @@ export type Route =
   | { name: 'settings' }
   | { name: 'knowledge'; location?: KnowledgeLocation }
   | { name: 'canvas'; location?: CanvasLocation }
-  | { name: 'sessions' }
   | { name: 'review'; location?: ReviewLocation }
   | { name: 'item'; itemId: string }
   | { name: 'not-found'; path: string };
@@ -20,7 +20,6 @@ export const routeDescriptors: Record<Route['name'], { title: string; mainId: st
   settings: { title: 'Settings · Kode Stream', mainId: 'app-main' },
   knowledge: { title: 'Knowledge · Kode Stream', mainId: 'app-main' },
   canvas: { title: 'Workbench · Kode Stream', mainId: 'app-main' },
-  sessions: { title: 'Sessions · Kode Stream', mainId: 'app-main' },
   review: { title: 'Branch Review · Kode Stream', mainId: 'app-main' },
   item: { title: 'Item · Kode Stream', mainId: 'app-main' },
   'not-found': { title: 'Page not found · Kode Stream', mainId: 'app-main' }
@@ -48,7 +47,7 @@ export function routeFromPath(path: string, search = ''): Route {
     return { name: 'canvas', location: canvasLocationFromSearch(search) };
 	}
   if (path === '/sessions') {
-    return { name: 'sessions' };
+    return { name: 'canvas', location: { view: 'sessions' } };
   }
   if (path === '/review') {
     return { name: 'review', location: reviewLocationFromSearch(search) };
@@ -62,7 +61,6 @@ export function routeFromPath(path: string, search = ''): Route {
 export function pathForRoute(route: Route): string {
 	if (route.name === 'knowledge') return knowledgePath(route.location);
 	if (route.name === 'canvas') return canvasPath(route.location);
-  if (route.name === 'sessions') return '/sessions';
   if (route.name === 'review') return reviewPath(route.location);
   return route.name === 'not-found' ? route.path
     : route.name === 'item'
@@ -78,13 +76,15 @@ export function canvasLocationFromSearch(search: string): CanvasLocation | undef
 	const query = new URLSearchParams(search);
 	const workspaceId = query.get('workspaceId')?.trim() || undefined;
 	const selectedNodeId = query.get('selectedNodeId')?.trim() || undefined;
-	return workspaceId || selectedNodeId ? { workspaceId, selectedNodeId } : undefined;
+	const view = query.get('view') === 'sessions' ? 'sessions' : undefined;
+	return workspaceId || selectedNodeId || view ? { workspaceId, selectedNodeId, view } : undefined;
 }
 
 export function canvasPath(location?: CanvasLocation): string {
 	const query = new URLSearchParams();
 	if (location?.workspaceId) query.set('workspaceId', location.workspaceId);
 	if (location?.selectedNodeId) query.set('selectedNodeId', location.selectedNodeId);
+	if (location?.view === 'sessions') query.set('view', 'sessions');
 	return query.size ? `/canvas?${query.toString()}` : '/canvas';
 }
 

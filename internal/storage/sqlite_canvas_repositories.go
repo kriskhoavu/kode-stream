@@ -501,6 +501,15 @@ func (r *SQLiteSessionRecordRepository) Upsert(record ai.SessionRecord) (ai.Sess
 	return record, err
 }
 
+func (r *SQLiteSessionRecordRepository) Delete(id string) (bool, error) {
+	result, err := execSQL(r.db, r.driver, `DELETE FROM ai_session_records WHERE id = ?`, strings.TrimSpace(id))
+	if err != nil {
+		return false, err
+	}
+	rows, err := result.RowsAffected()
+	return rows > 0, err
+}
+
 func (r *SQLiteSessionRecordRepository) Snapshot() ([]ai.SessionRecord, error) {
 	return r.List("", "")
 }

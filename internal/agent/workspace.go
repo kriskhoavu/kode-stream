@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -170,6 +171,7 @@ func PublishWorkspaceMetadata(ctx context.Context, httpClient *http.Client, clou
 		return err
 	}
 	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("workspace metadata publish failed: %s", response.Status)
 	}

@@ -45,6 +45,7 @@ type SessionRecordRepository interface {
 	FindByIdempotency(workspaceID, key string) (SessionRecord, bool, error)
 	List(workspaceID, branch string) ([]SessionRecord, error)
 	Upsert(SessionRecord) (SessionRecord, error)
+	Delete(id string) (bool, error)
 	Snapshot() ([]SessionRecord, error)
 	ReplaceAll([]SessionRecord) error
 }
@@ -142,6 +143,29 @@ func (r *FileSessionRecordRepository) Upsert(record SessionRecord) (SessionRecor
 	}
 	records = append(records, record)
 	return record, r.save(records)
+}
+
+func (r *FileSessionRecordRepository) Delete(id string) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	records, err := r.load()
+	if err != nil {
+		return false, err
+	}
+	id = strings.TrimSpace(id)
+	filtered := make([]SessionRecord, 0, len(records))
+	found := false
+	for _, record := range records {
+		if record.ID == id {
+			found = true
+			continue
+		}
+		filtered = append(filtered, record)
+	}
+	if !found {
+		return false, nil
+	}
+	return true, r.save(filtered)
 }
 
 func (r *FileSessionRecordRepository) Snapshot() ([]SessionRecord, error) {

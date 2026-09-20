@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../../shared/api';
 import type { WorkspaceBranches, WorkspaceConfig } from '../../lib/types';
 
@@ -14,13 +14,26 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
   const [states, setStates] = useState<Record<string, WorkspaceBranchState>>({});
 	const [decision, setDecision] = useState<BranchSwitchDecision | null>(null);
   const workspaceKey = workspaces.map((workspace) => workspace.id).join('\u0000');
+	const activeIDs = useRef(new Set(workspaces.map((workspace) => workspace.id)));
+	const requestVersions = useRef(new Map<string, number>());
+	const requestControllers = useRef(new Map<string, AbortController>());
+	const nextRequestVersion = useRef(0);
+	activeIDs.current = new Set(workspaces.map((workspace) => workspace.id));
 
   const load = useCallback(async (workspace: WorkspaceConfig) => {
+		if (!activeIDs.current.has(workspace.id)) return;
+		requestControllers.current.get(workspace.id)?.abort();
+		const controller = new AbortController();
+		requestControllers.current.set(workspace.id, controller);
+		const version = ++nextRequestVersion.current;
+		requestVersions.current.set(workspace.id, version);
     setStates((current) => ({ ...current, [workspace.id]: { ...fallbackState(workspace), ...current[workspace.id], loading: true, error: '', recoveryHint: '' } }));
     try {
-      const response = await api.workspaceBranches(workspace.id);
+      const response = await api.workspaceBranches(workspace.id, controller.signal);
+			if (controller.signal.aborted || !activeIDs.current.has(workspace.id) || requestVersions.current.get(workspace.id) !== version) return;
       setStates((current) => ({ ...current, [workspace.id]: { ...response, loading: false, switching: current[workspace.id]?.switching ?? false, error: '', recoveryHint: '' } }));
 		} catch (caught) {
+			if (controller.signal.aborted || !activeIDs.current.has(workspace.id) || requestVersions.current.get(workspace.id) !== version) return;
       setStates((current) => ({
         ...current,
         [workspace.id]: {
@@ -32,14 +45,27 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
           recoveryHint: caught instanceof ApiError ? caught.recoveryHint ?? '' : ''
         }
       }));
+		} finally {
+			if (requestControllers.current.get(workspace.id) === controller) requestControllers.current.delete(workspace.id);
     }
   }, []);
 
   useEffect(() => {
     const ids = new Set(workspaces.map((workspace) => workspace.id));
+		for (const id of requestVersions.current.keys()) {
+			if (ids.has(id)) continue;
+			requestVersions.current.delete(id);
+			requestControllers.current.get(id)?.abort();
+			requestControllers.current.delete(id);
+		}
     setStates((current) => Object.fromEntries(Object.entries(current).filter(([workspaceId]) => ids.has(workspaceId))));
     workspaces.forEach((workspace) => void load(workspace));
   }, [load, workspaceKey]);
+
+	useEffect(() => () => {
+		for (const controller of requestControllers.current.values()) controller.abort();
+		requestControllers.current.clear();
+	}, []);
 
   useEffect(() => {
     const refreshBranches = () => workspaces.forEach((workspace) => void load(workspace));
@@ -57,6 +83,8 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
   const switchBranch = useCallback(async (workspace: WorkspaceConfig, branch: string) => {
     const current = states[workspace.id];
     if (!branch || branch === current?.current || current?.switching) return branch === current?.current;
+		requestVersions.current.delete(workspace.id);
+		requestControllers.current.get(workspace.id)?.abort();
     setStates((value) => ({ ...value, [workspace.id]: { ...(value[workspace.id] ?? fallbackState(workspace)), switching: true, error: '', recoveryHint: '' } }));
     try {
 		const result = await api.switchBranch(workspace.id, { name: branch });
@@ -101,6 +129,8 @@ export function useWorkspaceBranches(workspaces: WorkspaceConfig[], onSwitched?:
 	const resolveDecision = useCallback(async (strategy: 'carry' | 'stash', stashMessage: string) => {
 		if (!decision) return false;
 		const { workspace, target } = decision;
+		requestVersions.current.delete(workspace.id);
+		requestControllers.current.get(workspace.id)?.abort();
 		setDecision(null);
 		setStates((value) => ({ ...value, [workspace.id]: { ...(value[workspace.id] ?? fallbackState(workspace)), switching: true, error: '', recoveryHint: '' } }));
 		try {

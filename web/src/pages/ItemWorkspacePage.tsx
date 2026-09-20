@@ -95,6 +95,12 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [renamingPath, setRenamingPath] = useState(false);
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
+  const verificationTestsAbortRef = useRef<AbortController | undefined>(undefined);
+  const e2eRunbooksAbortRef = useRef<AbortController | undefined>(undefined);
+  const specPickerAbortRef = useRef<AbortController | undefined>(undefined);
+  const gitStatusAbortRef = useRef<AbortController | undefined>(undefined);
+  const gitActivityAbortRef = useRef<AbortController | undefined>(undefined);
   const [contentSearchIndex, setContentSearchIndex] = useState(0);
   const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const fileTreeRef = useRef<HTMLDivElement | null>(null);
@@ -219,7 +225,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   }, [openTabs]);
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
     setError('');
     setRecoveryHint('');
     setPlan(null);
@@ -230,27 +236,33 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
     setActiveTabId('');
     void (async () => {
       try {
-        const nextPlan = await api.item(itemId);
-        if (!active) return;
+        const nextPlan = await api.item(itemId, controller.signal);
+        if (controller.signal.aborted) return;
         setPlan(nextPlan);
-        const tree = await api.files(itemId);
-        if (!active) return;
+        const tree = await api.files(itemId, undefined, controller.signal);
+        if (controller.signal.aborted) return;
         setFiles(tree);
         const first = preferredFile(tree);
+        const diffPromise = api.diff(itemId, controller.signal)
+          .then((nextDiff) => { if (!controller.signal.aborted) setDiff(nextDiff.diff); })
+          .catch((err) => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Diff failed to load'); });
         if (first) {
           setSelectedDirectoryPath('');
           setSelectedTreeNode({ path: first.path, type: 'file' });
-          void openFile(first.id);
+          const nextFile = await api.file(itemId, first.id, undefined, controller.signal);
+          if (controller.signal.aborted) return;
+          editor.open(nextFile);
+          rememberOpenTab(nextFile);
         } else {
           setSelectedDirectoryPath('');
           setSelectedTreeNode(null);
         }
-        void loadDiff();
+        await diffPromise;
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Item failed to load');
+        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Item failed to load');
       }
     })();
-    return () => { active = false; };
+    return () => controller.abort();
   }, [itemId, refreshKey]);
 
   useEffect(() => {
@@ -264,36 +276,58 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       tags: plan.tags
     });
     void loadGitStatus(plan.workspaceId);
+    return () => gitStatusAbortRef.current?.abort();
   }, [plan]);
 
   useEffect(() => {
+    verificationTestsAbortRef.current?.abort();
     if (!plan) {
       setVerificationTests(null);
+      setVerificationTestsBusy(false);
       return;
     }
-    let active = true;
+    const controller = new AbortController();
+    verificationTestsAbortRef.current = controller;
     setVerificationTestsBusy(true);
     const loadVerificationTests = api.itemVerificationTests;
     if (typeof loadVerificationTests !== 'function') {
       setVerificationTests(null);
       setVerificationTestsBusy(false);
+      verificationTestsAbortRef.current = undefined;
       return;
     }
-    void loadVerificationTests(plan.id)
-      .then((tests) => { if (active) setVerificationTests(tests); })
-      .catch(() => { if (active) setVerificationTests(null); })
-      .finally(() => { if (active) setVerificationTestsBusy(false); });
-    return () => { active = false; };
+    void loadVerificationTests(plan.id, controller.signal)
+      .then((tests) => { if (!controller.signal.aborted) setVerificationTests(tests); })
+      .catch(() => { if (!controller.signal.aborted) setVerificationTests(null); })
+      .finally(() => {
+        if (!controller.signal.aborted) setVerificationTestsBusy(false);
+        if (verificationTestsAbortRef.current === controller) verificationTestsAbortRef.current = undefined;
+      });
+    return () => controller.abort();
   }, [plan?.id]);
 
   const loadE2ERunbooks = () => {
-    if (!plan) return;
+    e2eRunbooksAbortRef.current?.abort();
+    if (!plan) {
+      setE2ERunbooks({ runbooks: [] });
+      return;
+    }
     const load = api.itemE2ERunbooks;
     if (typeof load !== 'function') { setE2ERunbooks({ runbooks: [] }); return; }
-    void load(plan.id).then((result) => setE2ERunbooks(result ?? { runbooks: [] })).catch(() => setE2ERunbooks({ runbooks: [], diagnostic: 'E2E coverage could not be loaded.' }));
+    const controller = new AbortController();
+    e2eRunbooksAbortRef.current = controller;
+    void load(plan.id, controller.signal)
+      .then((result) => { if (!controller.signal.aborted) setE2ERunbooks(result ?? { runbooks: [] }); })
+      .catch(() => { if (!controller.signal.aborted) setE2ERunbooks({ runbooks: [], diagnostic: 'E2E coverage could not be loaded.' }); })
+      .finally(() => {
+        if (e2eRunbooksAbortRef.current === controller) e2eRunbooksAbortRef.current = undefined;
+      });
   };
 
-  useEffect(() => { loadE2ERunbooks(); }, [plan?.id]);
+  useEffect(() => {
+    loadE2ERunbooks();
+    return () => e2eRunbooksAbortRef.current?.abort();
+  }, [plan?.id]);
 
   useEffect(() => {
     if (!plan) {
@@ -311,20 +345,24 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
 
   useEffect(() => {
     if (!plan || !verificationJob || verificationJob.status === 'failed' || verificationJob.status === 'passed') return;
-    let active = true;
+    const controller = new AbortController();
+    let inFlight = false;
     const timer = window.setInterval(() => {
-      void api.verificationJob(plan.workspaceId, verificationJob.id)
+      if (inFlight) return;
+      inFlight = true;
+      void api.verificationJob(plan.workspaceId, verificationJob.id, controller.signal)
         .then((job) => {
-          if (!active) return;
+          if (controller.signal.aborted) return;
           setVerificationJob(job);
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => { inFlight = false; });
     }, 1000);
     return () => {
-      active = false;
+      controller.abort();
       window.clearInterval(timer);
     };
-  }, [plan, verificationJob]);
+  }, [plan?.workspaceId, verificationJob?.id, verificationJob?.status]);
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -459,10 +497,12 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
 
   useEffect(() => () => {
     clearTimer(autoSaveRefreshTimerRef);
+    resizeCleanupRef.current?.();
   }, []);
 
   const startResize = (side: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
+    resizeCleanupRef.current?.();
     const startX = event.clientX;
     const startingWidth = side === 'left' ? leftWidth : rightWidth;
     let latestWidth = startingWidth;
@@ -475,41 +515,57 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       workspaceGridRef.current?.style.setProperty(side === 'left' ? '--left-panel-width' : '--right-panel-width', `${boundedWidth}px`);
     };
 
-    const onPointerUp = () => {
+    const cleanup = (commit: boolean) => {
       document.body.classList.remove('is-resizing-panel');
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
-      if (side === 'left') {
-        setLeftWidth(latestWidth);
-      } else {
-        setRightWidth(latestWidth);
+      if (commit) {
+        if (side === 'left') {
+          setLeftWidth(latestWidth);
+        } else {
+          setRightWidth(latestWidth);
+        }
       }
+      if (resizeCleanupRef.current === cancel) resizeCleanupRef.current = null;
     };
+    const cancel = () => cleanup(false);
+    function onPointerUp() { cleanup(true); }
 
     document.body.classList.add('is-resizing-panel');
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp, { once: true });
+    resizeCleanupRef.current = cancel;
   };
 
   const loadGitStatus = async (workspaceId: string) => {
+    gitStatusAbortRef.current?.abort();
+    const controller = new AbortController();
+    gitStatusAbortRef.current = controller;
     setGitLoading(true);
     try {
-      setGitStatus(await api.gitStatus(workspaceId));
+      const status = await api.gitStatus(workspaceId, controller.signal);
+      if (!controller.signal.aborted) setGitStatus(status);
     } catch {
-      setGitStatus(null);
+      if (!controller.signal.aborted) setGitStatus(null);
     } finally {
-      setGitLoading(false);
+      if (!controller.signal.aborted) setGitLoading(false);
+      if (gitStatusAbortRef.current === controller) gitStatusAbortRef.current = undefined;
     }
   };
 
   const loadGitActivity = async (workspaceId: string, path: string) => {
+    gitActivityAbortRef.current?.abort();
+    const controller = new AbortController();
+    gitActivityAbortRef.current = controller;
     setGitActivityLoading(true);
     try {
-      setGitActivity(await api.gitActivity(workspaceId, { path: path || undefined, limit: 8 }));
+      const activity = await api.gitActivity(workspaceId, { path: path || undefined, limit: 8, signal: controller.signal });
+      if (!controller.signal.aborted) setGitActivity(activity);
     } catch {
-      setGitActivity([]);
+      if (!controller.signal.aborted) setGitActivity([]);
     } finally {
-      setGitActivityLoading(false);
+      if (!controller.signal.aborted) setGitActivityLoading(false);
+      if (gitActivityAbortRef.current === controller) gitActivityAbortRef.current = undefined;
     }
   };
 
@@ -520,6 +576,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       return;
     }
     void loadGitActivity(plan.workspaceId, activityPath);
+    return () => gitActivityAbortRef.current?.abort();
   }, [plan?.workspaceId, activityPath]);
 
   const loadDiff = async () => {
@@ -787,16 +844,21 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   };
   const loadSpecPickerDirectory = async (path: string) => {
     if (!automationWorkspace) return;
+    specPickerAbortRef.current?.abort();
+    const controller = new AbortController();
+    specPickerAbortRef.current = controller;
     setSpecPickerLoading(true);
     setSpecPickerError('');
     try {
-      const listing = await api.workspaceTree(automationWorkspace.id, path);
+      const listing = await api.workspaceTree(automationWorkspace.id, path, false, false, controller.signal);
+      if (controller.signal.aborted) return;
       setSpecPickerPath(listing.path);
       setSpecPickerEntries(listing.entries.filter((entry) => entry.type === 'directory' || isAutomationSpecPath(entry.path)));
     } catch (err) {
-      setSpecPickerError(err instanceof Error ? err.message : 'Failed to browse automation specs');
+      if (!controller.signal.aborted) setSpecPickerError(err instanceof Error ? err.message : 'Failed to browse automation specs');
     } finally {
-      setSpecPickerLoading(false);
+      if (!controller.signal.aborted) setSpecPickerLoading(false);
+      if (specPickerAbortRef.current === controller) specPickerAbortRef.current = undefined;
     }
   };
   const togglePickerSpec = (path: string) => {
@@ -813,8 +875,13 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   };
 
   useEffect(() => {
-    if (!specPickerOpen || !automationWorkspace) return;
+    if (!specPickerOpen || !automationWorkspace) {
+      specPickerAbortRef.current?.abort();
+      setSpecPickerLoading(false);
+      return;
+    }
     void loadSpecPickerDirectory(specPickerPath);
+    return () => specPickerAbortRef.current?.abort();
   }, [specPickerOpen, automationWorkspace?.id, specPickerPath]);
 
   const runAutomationVerification = async () => {
@@ -1134,7 +1201,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           <div className="workspace-item-path" aria-label="Item location">
             <span className="workspace-item-path-segment">{plan?.scope ?? '...'}</span>
             <span className="workspace-item-path-separator">/</span>
-            {workspaceConfig ? <><span className="sr-only">Checkout: {currentCheckoutBranch || workspaceConfig.baselineBranch}</span><BranchCheckoutPicker workspaceId={workspaceConfig.id} currentCheckoutBranch={currentCheckoutBranch || workspaceConfig.baselineBranch} branches={checkoutBranches.states[workspaceConfig.id]?.branches ?? []} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await onContentChanged?.(); }} /></> : <span className="workspace-item-path-segment">Checkout: {currentCheckoutBranch || '...'}</span>}
+            {workspaceConfig ? <><span className="sr-only">Checkout: {currentCheckoutBranch || workspaceConfig.baselineBranch}</span><BranchCheckoutPicker workspaceId={workspaceConfig.id} currentCheckoutBranch={currentCheckoutBranch || workspaceConfig.baselineBranch} branches={checkoutBranches.states[workspaceConfig.id]?.branches ?? []} gitStatus={gitStatus} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await onContentChanged?.(); }} /></> : <span className="workspace-item-path-segment">Checkout: {currentCheckoutBranch || '...'}</span>}
             <span className="workspace-item-path-separator">/</span>
             <span className="workspace-item-path-segment">{plan?.identifier ?? '...'}</span>
           </div>

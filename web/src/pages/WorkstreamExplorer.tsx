@@ -72,6 +72,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
 	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const treeRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
   const openTabsRef = useRef<OpenWorkspaceFileTab[]>([]);
   const workspace = workspaces.find((item) => item.id === location?.workspaceId);
   const rightPanelOpen = rightPanel ? !rightPanel.collapsed : inspectorOpen;
@@ -329,6 +330,8 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   };
 
   const startResize = (side: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    resizeCleanupRef.current?.();
     const start = event.clientX;
     const initial = side === 'left' ? leftWidth : rightWidth;
     let latest = initial;
@@ -340,13 +343,19 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
       gridRef.current?.style.setProperty(side === 'left' ? '--explorer-left-width' : '--explorer-right-width', `${width}px`);
       if (side === 'left') setLeftWidth(width); else setRightWidth(width);
     };
-    const up = () => {
+    const cleanup = () => {
       window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
       writePreference(side === 'left' ? 'workstreamExplorer.leftWidth' : 'workstreamExplorer.rightWidth', String(latest));
+      if (resizeCleanupRef.current === cleanup) resizeCleanupRef.current = null;
     };
+    function up() { cleanup(); }
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up, { once: true });
+    resizeCleanupRef.current = cleanup;
   };
+
+  useEffect(() => () => resizeCleanupRef.current?.(), []);
 
   const gridStyle = {
     '--explorer-left-width': `${leftCollapsed ? 44 : leftWidth}px`,
@@ -524,8 +533,10 @@ function ExplorerInspector({ workspace, row, file }: { workspace?: WorkspaceConf
   useEffect(() => {
     setGit(null); setHealth(null);
     if (!workspace) return;
-    void api.gitStatus(workspace.id).then(setGit).catch(() => setGit(null));
-    void api.workspaceHealth(workspace.id).then(setHealth).catch(() => setHealth(null));
+    const controller = new AbortController();
+    void api.gitStatus(workspace.id, controller.signal).then((value) => { if (!controller.signal.aborted) setGit(value); }).catch(() => { if (!controller.signal.aborted) setGit(null); });
+    void api.workspaceHealth(workspace.id, controller.signal).then((value) => { if (!controller.signal.aborted) setHealth(value); }).catch(() => { if (!controller.signal.aborted) setHealth(null); });
+    return () => controller.abort();
   }, [workspace?.id]);
   useEffect(() => {
     if (!workspace) {
@@ -533,25 +544,28 @@ function ExplorerInspector({ workspace, row, file }: { workspace?: WorkspaceConf
       setActivityLoading(false);
       return;
     }
-    let active = true;
+    const controller = new AbortController();
     setActivityLoading(true);
-    api.gitActivity(workspace.id, { path: activityPath || undefined, limit: 8 })
+    api.gitActivity(workspace.id, { path: activityPath || undefined, limit: 8, signal: controller.signal })
       .then((entries) => {
-        if (active) setActivity(entries);
+        if (!controller.signal.aborted) setActivity(entries);
       })
       .catch(() => {
-        if (active) setActivity([]);
+        if (!controller.signal.aborted) setActivity([]);
       })
       .finally(() => {
-        if (active) setActivityLoading(false);
+        if (!controller.signal.aborted) setActivityLoading(false);
       });
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, [workspace?.id, activityPath]);
   useEffect(() => {
     setItem(null);
-    if (row?.item) void api.items(new URLSearchParams()).then((items) => setItem(items.find((candidate) => candidate.id === row.item?.itemId) ?? null));
+    if (!row?.item) return;
+    const controller = new AbortController();
+    void api.items(new URLSearchParams(), controller.signal)
+      .then((items) => { if (!controller.signal.aborted) setItem(items.find((candidate) => candidate.id === row.item?.itemId) ?? null); })
+      .catch(() => undefined);
+    return () => controller.abort();
   }, [row?.item?.itemId]);
   if (!workspace) return <p className="explorer-empty">Select a workspace or file.</p>;
   return <div className="inspector-content">

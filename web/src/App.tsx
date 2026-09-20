@@ -1,14 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, ListChecks, Moon, Search, Sun, Boxes, FolderGit2, PanelLeftClose, PanelLeftOpen, Settings, Workflow } from 'lucide-react';
+import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Search, Sun, Boxes, FolderGit2, PanelLeftClose, PanelLeftOpen, Settings, Workflow } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
 export { routeFromLocation } from './app/router';
 import { routeFromPath } from './app/router';
-import { WorkstreamPage } from './pages/WorkstreamPage';
-import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
-import { WorkspacesPage } from './pages/WorkspacesPage';
-import { SettingsPage } from './pages/SettingsPage';
 import { api, isExtensionSurface, localAPIOrigin } from './shared/api';
 import { ActivityPanel } from './components/ReliabilityPanels';
 import { HeaderBackdrop, bandClasses } from './components/HeaderBackdrop';
@@ -18,9 +14,12 @@ import { useAppSettings } from './features/settings/appSettings';
 import { EmbeddedTerminalDock } from './features/ai-session/EmbeddedTerminalDock';
 import { readStringPreference, writePreference } from './shared/preferences/store';
 
+const WorkstreamPage = lazy(() => import('./pages/WorkstreamPage').then((module) => ({ default: module.WorkstreamPage })));
+const ItemWorkspacePage = lazy(() => import('./pages/ItemWorkspacePage').then((module) => ({ default: module.ItemWorkspacePage })));
+const WorkspacesPage = lazy(() => import('./pages/WorkspacesPage').then((module) => ({ default: module.WorkspacesPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
 const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((module) => ({ default: module.KnowledgePage })));
 const CanvasPage = lazy(() => import('./pages/CanvasPage').then((module) => ({ default: module.CanvasPage })));
-const SessionsPage = lazy(() => import('./pages/SessionsPage').then((module) => ({ default: module.SessionsPage })));
 const BranchReviewPage = lazy(() => import('./pages/BranchReviewPage').then((module) => ({ default: module.BranchReviewPage })));
 
 export function App() {
@@ -124,7 +123,6 @@ export function App() {
           <span className="nav-section-label">Workspace</span>
           <NavButton active={route.name === 'workstream'} onClick={() => navigate({ name: 'workstream' })} icon={<WorkstreamIcon size={18} />} label="Workstream" />
 					{!extensionSurface && <NavButton active={route.name === 'canvas'} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })} icon={<Workflow size={18} />} label="Workbench" />}
-          {!extensionSurface && <NavButton active={route.name === 'sessions'} onClick={() => navigate({ name: 'sessions' })} icon={<ListChecks size={18} />} label="Sessions" />}
           <NavButton active={route.name === 'knowledge'} onClick={() => navigate({ name: 'knowledge' })} icon={<BookOpen size={18} />} label="Knowledge" />
         </div>
         <div className="workspace-list">
@@ -278,7 +276,7 @@ export function App() {
       <main id="app-main" className="main-content" tabIndex={-1}>
         <div className="sr-only" aria-live="polite">{dataStatus === 'unavailable' ? 'Application data is unavailable. Retry to continue.' : `Navigated to ${route.name}`}</div>
         {dataStatus === 'unavailable' && <section className="empty-state" role="alert"><p>Application data is unavailable. Your existing workspace view is retained.</p><button type="button" className="primary" onClick={() => void refreshAppData()}>Retry</button></section>}
-        {route.name === 'workstream' && (
+        {route.name === 'workstream' && <Suspense fallback={<section className="empty-state">Loading Workstream...</section>}>
           <WorkstreamPage
             workspace={activeRepo}
             refreshKey={contentRefreshKey}
@@ -289,17 +287,12 @@ export function App() {
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
             onOpenReview={() => navigate({ name: 'review', location: { workspaceId: activeRepo?.id } })}
           />
-        )}
-        {route.name === 'item' && <ItemWorkspacePage key={route.itemId} itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} allowEmbeddedAISessions={!extensionSurface} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={async () => { await refreshAppStateOnly(); }} />}
-        {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={async () => { await refreshAppData(); }} />}
-        {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
+        </Suspense>}
+        {route.name === 'item' && <Suspense fallback={<section className="empty-state">Loading item...</section>}><ItemWorkspacePage key={route.itemId} itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} allowEmbeddedAISessions={!extensionSurface} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={async () => { await refreshAppStateOnly(); }} /></Suspense>}
+        {route.name === 'workspaces' && <Suspense fallback={<section className="empty-state">Loading workspaces...</section>}><WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={async () => { await refreshAppData(); }} /></Suspense>}
+        {route.name === 'settings' && <Suspense fallback={<section className="empty-state">Loading settings...</section>}><SettingsPage settings={appSettings} onChange={setAppSettings} /></Suspense>}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} activeWorkspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
-		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Canvas...</section>}><CanvasPage workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
-        {route.name === 'sessions' && <Suspense fallback={<section className="empty-state">Loading Sessions...</section>}><SessionsPage onOpenSession={(workspaceId, sessionNodeId) => {
-          const target = workspaces.find((candidate) => candidate.id === workspaceId);
-          if (target) selectWorkspace(target);
-          navigate({ name: 'canvas', location: { workspaceId, selectedNodeId: sessionNodeId } });
-        }} onOpenWorkbench={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })} /></Suspense>}
+		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Workbench...</section>}><CanvasPage workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
         {route.name === 'review' && <Suspense fallback={<section className="empty-state">Loading Branch Review...</section>}><BranchReviewPage
           workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo}
           location={route.location}
@@ -315,7 +308,6 @@ export function App() {
         <button className={route.name === 'workstream' ? 'active' : ''} onClick={() => navigate({ name: 'workstream' })}><WorkstreamIcon size={18} />Workstream</button>
         <button className={route.name === 'knowledge' ? 'active' : ''} onClick={() => navigate({ name: 'knowledge' })}><BookOpen size={18} />Knowledge</button>
 		{!extensionSurface && <button className={route.name === 'canvas' ? 'active' : ''} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })}><Workflow size={18} />Workbench</button>}
-        <button className={route.name === 'sessions' ? 'active' : ''} onClick={() => navigate({ name: 'sessions' })}><ListChecks size={18} />Sessions</button>
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}><Settings size={18} />Settings</button>
       </nav>

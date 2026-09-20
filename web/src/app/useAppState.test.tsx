@@ -6,6 +6,7 @@ describe('useAppState runtime context', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     localStorage.clear();
+		window.history.replaceState(null, '', '/workstream');
   });
 
   it('normalizes Cloud runtime state from the API', async () => {
@@ -49,6 +50,20 @@ describe('useAppState runtime context', () => {
     expect(result.current.contentRefreshKey).toBe(before);
     expect(result.current.activeRepo?.id).toBe('first');
   });
+
+	it('keeps the saved workspace while data loads and lets a valid workspace URL take precedence', async () => {
+		localStorage.setItem('kodeStream.activeWorkspaceId', 'first');
+		window.history.replaceState(null, '', '/canvas?workspaceId=second');
+		vi.stubGlobal('fetch', vi.fn((path: string) => Promise.resolve({ ok: true, json: async () => path === '/api/state' ? { mode: 'local' } : [
+			{ id: 'first', name: 'First', path: '/first', baselineBranch: 'main', createdAt: '' },
+			{ id: 'second', name: 'Second', path: '/second', baselineBranch: 'main', createdAt: '' }
+		] })));
+
+		const { result } = renderHook(() => useAppState());
+		expect(localStorage.getItem('kodeStream.activeWorkspaceId')).toBe('first');
+		await waitFor(() => expect(result.current.activeRepo?.id).toBe('second'));
+		expect(localStorage.getItem('kodeStream.activeWorkspaceId')).toBe('second');
+	});
 
   it('ignores an obsolete refresh success after a newer Cloud snapshot is accepted', async () => {
     const pending: Array<(response: unknown) => void> = [];

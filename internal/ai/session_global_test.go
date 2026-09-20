@@ -53,6 +53,15 @@ func (f *fakeSessionRecordRepository) Upsert(record SessionRecord) (SessionRecor
 	f.records = append(f.records, record)
 	return record, nil
 }
+func (f *fakeSessionRecordRepository) Delete(id string) (bool, error) {
+	for index, record := range f.records {
+		if record.ID == id {
+			f.records = append(f.records[:index], f.records[index+1:]...)
+			return true, nil
+		}
+	}
+	return false, nil
+}
 func (f *fakeSessionRecordRepository) Snapshot() ([]SessionRecord, error) {
 	return append([]SessionRecord(nil), f.records...), nil
 }

@@ -44,13 +44,14 @@ type JiraService struct {
 	cache      map[string]cacheEntry
 	inFlight   map[string]*inFlightIssue
 	generation map[string]uint64
+	refreshes  map[string]int
 	now        func() time.Time
 }
 
 type Service = JiraService
 
 func NewService(reg registry.Repository, index itemindex.Repository, client *Client) *JiraService {
-	return &JiraService{registry: reg, index: index, client: client, cache: map[string]cacheEntry{}, inFlight: map[string]*inFlightIssue{}, generation: map[string]uint64{}, now: time.Now}
+	return &JiraService{registry: reg, index: index, client: client, cache: map[string]cacheEntry{}, inFlight: map[string]*inFlightIssue{}, generation: map[string]uint64{}, refreshes: map[string]int{}, now: time.Now}
 }
 
 // InvalidateWorkspace drops only process-local values after a workspace change
@@ -156,16 +157,26 @@ func (s *Service) issueByKey(ctx context.Context, workspace models.WorkspaceConf
 	s.mu.Lock()
 	s.generation[cacheKey]++
 	generation := s.generation[cacheKey]
+	s.refreshes[cacheKey]++
 	s.mu.Unlock()
 	state := s.fetchIssue(ctx, *workspace.Jira, key)
-	if state.State == "available" || state.State == "not_found" {
-		s.mu.Lock()
-		if s.generation[cacheKey] == generation {
-			s.putCacheLocked(cacheKey, state)
-		}
-		s.mu.Unlock()
+	s.mu.Lock()
+	if s.generation[cacheKey] == generation && (state.State == "available" || state.State == "not_found") {
+		s.putCacheLocked(cacheKey, state)
 	}
+	s.refreshes[cacheKey]--
+	s.releaseGenerationLocked(cacheKey)
+	s.mu.Unlock()
 	return state, nil
+}
+
+// A generation only needs to exist while a request can still publish a result.
+// Retaining one for every issue key ever requested grows without a bound.
+func (s *Service) releaseGenerationLocked(key string) {
+	if s.inFlight[key] == nil && s.refreshes[key] == 0 {
+		delete(s.generation, key)
+		delete(s.refreshes, key)
+	}
 }
 
 func (s *Service) waitForFlight(ctx context.Context, cacheKey string, flight *inFlightIssue) (IssueState, error) {
@@ -195,6 +206,7 @@ func (s *Service) completeFlight(ctx context.Context, cacheKey string, flight *i
 	if !flight.abandoned && s.generation[cacheKey] == flight.generation && (state.State == "available" || state.State == "not_found") {
 		s.putCacheLocked(cacheKey, state)
 	}
+	s.releaseGenerationLocked(cacheKey)
 	close(flight.done)
 }
 

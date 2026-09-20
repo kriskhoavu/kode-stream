@@ -21,6 +21,8 @@ import (
 )
 
 const agentConnectTokenTTL = 30 * time.Minute
+const cloudAgentReadTimeout = time.Minute
+const cloudAgentWriteTimeout = 10 * time.Second
 
 const (
 	maxAgentConnectBodyBytes int64 = 16 << 10
@@ -56,14 +58,7 @@ func newCloudAgentStore(now func() time.Time, persistence ...cloudstate.Reposito
 }
 
 func (s *cloudAgentStore) ConsumeEnrollment(ctx context.Context, token agentConnectToken) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	now := s.now().UTC()
-	for id, expiry := range s.consumed {
-		if now.After(expiry) {
-			delete(s.consumed, id)
-		}
-	}
 	if token.ID == "" {
 		// Signed credentials minted by pre-protocol clients did not have a jti.
 		// Treat their full stable identity as a one-time identifier so they are
@@ -75,6 +70,17 @@ func (s *cloudAgentStore) ConsumeEnrollment(ctx context.Context, token agentConn
 	}
 	if durable, ok := s.persistence.(cloudstate.EnrollmentTokenRepository); ok {
 		return durable.ConsumeEnrollmentToken(ctx, token.ID, token.ExpiresAt)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now = s.now().UTC()
+	if now.After(token.ExpiresAt) {
+		return false, nil
+	}
+	for id, expiry := range s.consumed {
+		if now.After(expiry) {
+			delete(s.consumed, id)
+		}
 	}
 	if _, used := s.consumed[token.ID]; used {
 		return false, nil
@@ -90,9 +96,16 @@ func (s *cloudAgentStore) Upsert(ctx context.Context, agent models.CloudAgent) (
 	if s.persistence != nil {
 		persisted, err := s.persistence.UpsertAgent(ctx, agent.UserID, agent)
 		if err != nil {
+			if agent.Status != "connected" {
+				s.forgetAgent(agent.UserID, agent.ID)
+			}
 			return models.CloudAgent{}, err
 		}
 		agent = persisted
+	}
+	if s.persistence != nil && agent.Status != "connected" {
+		s.forgetAgent(agent.UserID, agent.ID)
+		return agent, nil
 	}
 	if s.agents[agent.UserID] == nil {
 		s.agents[agent.UserID] = map[string]models.CloudAgent{}
@@ -101,14 +114,23 @@ func (s *cloudAgentStore) Upsert(ctx context.Context, agent models.CloudAgent) (
 	return agent, nil
 }
 
+// forgetAgent is called with s.mu held. A disconnected socket must stop
+// authorizing live workspace requests even if its durable status write fails.
+func (s *cloudAgentStore) forgetAgent(userID, agentID string) {
+	delete(s.agents[userID], agentID)
+	if len(s.agents[userID]) == 0 {
+		delete(s.agents, userID)
+	}
+}
+
 func (s *cloudAgentStore) List(ctx context.Context, userID string) ([]models.CloudAgent, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.persistence != nil {
 		persisted, err := s.persistence.ListAgents(ctx, userID)
 		if err != nil {
 			return nil, err
 		}
+		s.mu.RLock()
+		defer s.mu.RUnlock()
 		for index := range persisted {
 			live, ok := s.agents[userID][persisted[index].ID]
 			if ok && live.Status == "connected" && s.now().Sub(live.LastSeenAt) <= 2*time.Minute {
@@ -119,6 +141,8 @@ func (s *cloudAgentStore) List(ctx context.Context, userID string) ([]models.Clo
 		}
 		return persisted, nil
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	owned := s.agents[userID]
 	if len(owned) == 0 {
 		return []models.CloudAgent{}, nil
@@ -237,31 +261,47 @@ func (a *cloudController) cloudAgentChannel(w http.ResponseWriter, r *http.Reque
 	}
 	defer connection.Close()
 	connection.SetReadLimit(appagent.MaxFrameBytes)
+	_ = connection.SetReadDeadline(time.Now().Add(cloudAgentReadTimeout))
+	writeFrame := func(frame appagent.Frame) error {
+		if err := connection.SetWriteDeadline(time.Now().Add(cloudAgentWriteTimeout)); err != nil {
+			return err
+		}
+		return connection.WriteJSON(frame)
+	}
 	agent, err := a.agents.Upsert(r.Context(), models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "connected"})
 	if err != nil {
-		_ = connection.WriteJSON(appagent.Frame{Type: "error", Error: "Cloud agent persistence is unavailable"})
+		_ = writeFrame(appagent.Frame{Type: "error", Error: "Cloud agent persistence is unavailable"})
 		return
 	}
-	_ = connection.WriteJSON(appagent.Frame{Type: appagent.FrameConnected, Agent: agent})
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cloudAgentWriteTimeout)
+		defer cancel()
+		if _, persistErr := a.agents.Upsert(ctx, models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "offline"}); persistErr != nil {
+			log.Printf("cloud_agent_persistence_failure operation=%q owner_user_id=%q agent_id=%q error=%q", "disconnect", token.UserID, token.AgentID, persistErr)
+		}
+	}()
+	if err := writeFrame(appagent.Frame{Type: appagent.FrameConnected, Agent: agent}); err != nil {
+		return
+	}
 	for {
 		var frame appagent.Frame
 		if err := connection.ReadJSON(&frame); err != nil {
-			if _, persistErr := a.agents.Upsert(context.Background(), models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "offline"}); persistErr != nil {
-				log.Printf("cloud_agent_persistence_failure operation=%q owner_user_id=%q agent_id=%q error=%q", "disconnect", token.UserID, token.AgentID, persistErr)
-			}
 			return
 		}
 		if err := appagent.ValidateFrame(frame, token.AgentID, token.UserID); err != nil || frame.Type != appagent.FrameHeartbeat {
-			_ = connection.WriteJSON(appagent.Frame{Type: "error", Error: "invalid agent frame"})
+			_ = writeFrame(appagent.Frame{Type: "error", Error: "invalid agent frame"})
 			return
 		}
 		if frame.Type == appagent.FrameHeartbeat {
+			_ = connection.SetReadDeadline(time.Now().Add(cloudAgentReadTimeout))
 			agent, err = a.agents.Upsert(r.Context(), models.CloudAgent{ID: token.AgentID, UserID: token.UserID, Name: token.Name, Platform: token.Platform, Status: "connected"})
 			if err != nil {
-				_ = connection.WriteJSON(appagent.Frame{Type: "error", Error: "Cloud agent persistence is unavailable"})
+				_ = writeFrame(appagent.Frame{Type: "error", Error: "Cloud agent persistence is unavailable"})
 				return
 			}
-			_ = connection.WriteJSON(appagent.Frame{Type: appagent.FrameHeartbeatAck, Agent: agent})
+			if err := writeFrame(appagent.Frame{Type: appagent.FrameHeartbeatAck, Agent: agent}); err != nil {
+				return
+			}
 		}
 	}
 }

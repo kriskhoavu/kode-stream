@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CanvasLocation } from '../app/router';
 import { useCanvasState } from '../features/canvas/useCanvasState';
-import { BranchUpstreamIndicator } from '../features/canvas/BranchUpstreamIndicator';
 import { CanvasBoard } from '../features/canvas/CanvasBoard';
-import { CanvasWorkbench, type WorkbenchTab } from '../features/canvas/CanvasWorkbench';
+import { CanvasSessionsView } from '../features/canvas/CanvasSessionsView';
+import { CanvasWorkbench } from '../features/canvas/CanvasWorkbench';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
@@ -21,7 +21,6 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	const [confirmation, setConfirmation] = useState<'reset' | 'remove'>();
 	const [resetBusy, setResetBusy] = useState(false);
 	const [aiSessionDialogOpen, setAISessionDialogOpen] = useState(false);
-	const [workbenchTabHint, setWorkbenchTabHint] = useState<WorkbenchTab>();
 	const [sections, setSections] = useState<CanvasSection[]>([]);
 	const [sectionsLoadedFor, setSectionsLoadedFor] = useState('');
 	const [serviceGridColumns, setServiceGridColumns] = useState(1);
@@ -51,11 +50,11 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 
 	useEffect(() => {
 		if (workspaceId && location?.workspaceId !== workspaceId) {
-			onLocationChange({ workspaceId, selectedNodeId: location?.selectedNodeId });
+			onLocationChange({ workspaceId, selectedNodeId: location?.selectedNodeId, view: location?.view });
 		}
-	}, [location?.selectedNodeId, location?.workspaceId, onLocationChange, workspaceId]);
+	}, [location?.selectedNodeId, location?.view, location?.workspaceId, onLocationChange, workspaceId]);
 
-	// A Sessions page "Open" hands off a node id through the route; honour it
+	// A session link can hand off a node id through the route; honour it
 	// exactly once against the loaded projection, then clear it so it never
 	// re-selects on a later refresh, checkout switch, or back navigation.
 	const consumedSelectionRef = useRef<string | undefined>(undefined);
@@ -70,11 +69,21 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	const title = useMemo(() => canvas.projection?.nodes.find((node) => node.kind === 'workspace')?.workspace?.name ?? workspace?.name ?? 'Canvas', [canvas.projection, workspace?.name]);
 	const selectedNode = canvas.projection?.nodes.find((node) => node.id === selectedId);
 	const workspaceNode = canvas.projection?.nodes.find((node) => node.kind === 'workspace');
+	const view = location?.view ?? 'canvas';
 	const terminalLaunch = selectedNode?.plan?.actions['terminal.launch'] ?? workspaceNode?.workspace?.actions['terminal.launch'];
 	const canOpenAISession = terminalLaunch?.state === 'available';
 	const workbenchNode = selectedNode;
 	const stalePlanCount = canvas.projection?.nodes.filter((node) => node.kind === 'plan' && node.state === 'stale').length ?? 0;
-	const openSession = (sessionId: string) => { canvas.setNodeCollapsed(`session:${sessionId}`, false); setSelectedId(`session:${sessionId}`); };
+	const changeView = useCallback((nextView: 'canvas' | 'sessions') => {
+		setAISessionDialogOpen(false);
+		setSelectedId(undefined);
+		onLocationChange({ workspaceId, view: nextView === 'sessions' ? 'sessions' : undefined });
+	}, [onLocationChange, workspaceId]);
+	const openSession = (sessionId: string) => {
+		canvas.setNodeCollapsed(`session:${sessionId}`, false);
+		setSelectedId(`session:${sessionId}`);
+		onLocationChange({ workspaceId });
+	};
 	const arrangeGroupedSections = useCallback((grouping: 'status' | 'service' | 'service_status' | 'service_grid') => {
 		if (!canvas.projection) return;
 		const columns = grouping === 'service_grid' ? serviceGridColumns === 4 ? 1 : serviceGridColumns + 1 : 1;
@@ -87,7 +96,6 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		const focusID = selectedId;
 		setAISessionDialogOpen(false);
 		setSelectedId(undefined);
-		setWorkbenchTabHint(undefined);
 		if (focusID) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-canvas-node-id="${focusID.replaceAll('"', '\\"')}"]`)?.focus());
 	};
 	// Escape closes the Workbench, unless a dialog owns the key or the user is
@@ -143,25 +151,20 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	}, [canvas.moveNode, canvas.projection, sections]);
 	const onRemoveSection = useCallback((id: string) => setSections((current) => current.filter((section) => section.id !== id)), []);
 	const onOpenAISession = useCallback(() => setAISessionDialogOpen(true), []);
-	const onOpenSessions = useCallback(() => {
-		const workspaceNode = canvas.projection?.nodes.find((node) => node.kind === 'workspace');
-		if (!workspaceNode) return;
-		setSelectedId(workspaceNode.id);
-		setWorkbenchTabHint('sessions');
-	}, [canvas.projection]);
+	const onOpenSessions = useCallback(() => changeView('sessions'), [changeView]);
 	if (!workspaceId) return <section className="empty-state"><h1>Workbench</h1><p>Select a workspace to arrange plans and terminal sessions.</p></section>;
 
 	return (
 		<section className="canvas-page" aria-label="Workspace Canvas">
 			<header className="page-title workstream-title canvas-page-header">
 				<div className="workstream-heading"><div><h1><Workflow size={22} /> Workbench</h1><span><FolderGit2 size={15} /> {title}</span></div></div>
-				<BranchUpstreamIndicator git={canvas.projection?.nodes.find((node) => node.kind === 'workspace')?.workspace?.git} />
-				{workspace && <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={branches?.current ?? canvas.projection?.layout.branchKey ?? workspace.baselineBranch} branches={branches?.branches ?? []} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" disabled={canvas.loading} onSwitched={async () => { setSelectedId(undefined); await canvas.reload(); }} />}
+				{workspace && <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={branches?.current ?? canvas.projection?.layout.branchKey ?? workspace.baselineBranch} branches={branches?.branches ?? []} gitStatus={workspaceNode?.workspace?.git} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" disabled={canvas.loading} onSwitched={async () => { setSelectedId(undefined); await canvas.reload(); }} />}
 			</header>
 			{canvas.loading && <div className="canvas-state" role="status">Loading Canvas…</div>}
 			{canvas.error && <div className="canvas-state error" role="alert">{canvas.error}<button type="button" onClick={() => void canvas.reload()}>Retry</button></div>}
 			{canvas.projection && <span className="sr-only" role="status" aria-live="polite">{canvas.saveStatus === 'saving' ? `Saving ${canvas.dirtyCount} position${canvas.dirtyCount === 1 ? '' : 's'}…` : canvas.saveStatus === 'saved' ? 'Saved' : ''}</span>}
-			{canvas.projection && <div className={`canvas-work-area${workbenchNode ? ' workbench-open' : ''}`}><CanvasBoard projection={canvas.projection} sections={sections} conflicts={canvas.conflicts} selectedId={selectedId} onSelect={setSelectedId} onMoveNode={canvas.moveNode} onSetCollapsed={canvas.setNodeCollapsed} onArrange={arrangeGroupedSections} serviceGridColumns={serviceGridColumns} onSaveViewport={canvas.saveViewport} onReload={canvas.refresh} onReloadPosition={onReloadPosition} onReapplyPosition={onReapplyPosition} onReset={onResetLayout} onRemove={onRemoveNode} onCreateSection={createSection} onMoveSection={onMoveSection} onRemoveSection={onRemoveSection} onOpenAISession={onOpenAISession} onOpenSessions={onOpenSessions} aiSessionDisabled={!canOpenAISession} /><CanvasWorkbench projection={canvas.projection} selectedNode={workbenchNode} aiSessionDialogOpen={aiSessionDialogOpen} onAISessionDialogOpenChange={setAISessionDialogOpen} onClose={closeWorkbench} onReload={canvas.refresh} onSelectNode={setSelectedId} onPlaceSession={canvas.placeSession} onOpenFullView={(node) => node.plan ? onOpenItem?.(node.plan.itemId) : node.workspace ? onOpenWorkspaces?.() : undefined} initialTab={workbenchTabHint} onInitialTabApplied={() => setWorkbenchTabHint(undefined)} onOpenSession={openSession} /></div>}
+			{canvas.projection && view === 'canvas' && <div className={`canvas-work-area${workbenchNode ? ' workbench-open' : ''}`}><CanvasBoard projection={canvas.projection} sections={sections} conflicts={canvas.conflicts} selectedId={selectedId} onSelect={setSelectedId} onMoveNode={canvas.moveNode} onSetCollapsed={canvas.setNodeCollapsed} onArrange={arrangeGroupedSections} serviceGridColumns={serviceGridColumns} onSaveViewport={canvas.saveViewport} onReload={canvas.refresh} onReloadPosition={onReloadPosition} onReapplyPosition={onReapplyPosition} onReset={onResetLayout} onRemove={onRemoveNode} onCreateSection={createSection} onMoveSection={onMoveSection} onRemoveSection={onRemoveSection} onOpenAISession={onOpenAISession} onOpenSessions={onOpenSessions} aiSessionDisabled={!canOpenAISession} /><CanvasWorkbench projection={canvas.projection} selectedNode={workbenchNode} aiSessionDialogOpen={aiSessionDialogOpen} onAISessionDialogOpenChange={setAISessionDialogOpen} onClose={closeWorkbench} onReload={canvas.refresh} onSelectNode={setSelectedId} onPlaceSession={canvas.placeSession} onOpenFullView={(node) => node.plan ? onOpenItem?.(node.plan.itemId) : node.workspace ? onOpenWorkspaces?.() : undefined} /></div>}
+			{canvas.projection && view === 'sessions' && <CanvasSessionsView workspaceId={workspaceId} workspaceName={workspaceNode?.workspace?.name ?? title} checkoutBranch={workspaceNode?.workspace?.branch ?? canvas.projection.layout.branchKey} projection={canvas.projection} onViewChange={changeView} onOpenOnBoard={openSession} onReload={canvas.refresh} />}
 			{confirmation === 'reset' && <ConfirmDialog title="Reset Canvas layout?" message={`Restore the default groups and arrange current plans and terminal sessions. ${stalePlanCount ? `Remove ${stalePlanCount} stale plan placement${stalePlanCount === 1 ? '' : 's'} from this Canvas after checking the current checkout. ` : ''}Repository files and terminal processes are untouched.`} confirmLabel="Reset layout" busy={resetBusy} onCancel={() => setConfirmation(undefined)} onConfirm={() => { void confirmResetLayout(); }} />}
 			{confirmation === 'remove' && selectedNode && <ConfirmDialog title="Remove node from Canvas?" message={`Remove ${selectedNode.kind} from this layout? The underlying ${selectedNode.kind} and any live terminal process continue unchanged.`} confirmLabel="Remove from Canvas" danger onCancel={() => setConfirmation(undefined)} onConfirm={() => { void canvas.removeNode(selectedNode.id); setSelectedId(undefined); setConfirmation(undefined); }} />}
 		</section>

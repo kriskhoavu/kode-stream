@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,6 +33,51 @@ func TestFileSessionRecordRepositoryPersistsSafeMetadata(t *testing.T) {
 	loaded, ok, err := repository.Get(record.ID)
 	if err != nil || !ok || loaded.State != StateInterrupted {
 		t.Fatalf("loaded = %#v ok=%v err=%v", loaded, ok, err)
+	}
+}
+
+func TestFileSessionRecordRepositoryDeletesOneRecord(t *testing.T) {
+	repository := NewFileSessionRecordRepository(filepath.Join(t.TempDir(), "ai-session-records.yaml"))
+	now := time.Now().UTC()
+	for _, id := range []string{"session-1", "session-2"} {
+		if _, err := repository.Upsert(SessionRecord{ID: id, WorkspaceID: "workspace-1", Provider: "codex", Intent: "implement", RequestedBranch: "main", State: StateExited, StartedAt: now, LastKnownAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if deleted, err := repository.Delete("session-1"); err != nil || !deleted {
+		t.Fatalf("deleted=%v err=%v", deleted, err)
+	}
+	if _, found, err := repository.Get("session-1"); err != nil || found {
+		t.Fatalf("deleted record found=%v err=%v", found, err)
+	}
+	if _, found, err := repository.Get("session-2"); err != nil || !found {
+		t.Fatalf("remaining record found=%v err=%v", found, err)
+	}
+	if deleted, err := repository.Delete("missing"); err != nil || deleted {
+		t.Fatalf("missing deleted=%v err=%v", deleted, err)
+	}
+}
+
+func TestServiceDeletesFinishedSessionButRejectsRunningSession(t *testing.T) {
+	repository := NewFileSessionRecordRepository(filepath.Join(t.TempDir(), "ai-session-records.yaml"))
+	service := New(NewSettingsRepository(filepath.Join(t.TempDir(), "ai-settings.yaml")))
+	service.records = repository
+	now := time.Now().UTC()
+	finished := SessionRecord{ID: "finished", WorkspaceID: "workspace-1", Provider: "codex", Intent: "implement", RequestedBranch: "main", State: StateExited, StartedAt: now, LastKnownAt: now}
+	running := SessionRecord{ID: "running", WorkspaceID: "workspace-1", Provider: "codex", Intent: "implement", RequestedBranch: "main", State: StateRunning, StartedAt: now, LastKnownAt: now}
+	for _, record := range []SessionRecord{finished, running} {
+		if _, err := repository.Upsert(record); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := service.DeleteSessionRecord(finished.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.DeleteSessionRecord(running.ID); !errors.Is(err, ErrSessionStillRunning) {
+		t.Fatalf("err=%v, want ErrSessionStillRunning", err)
+	}
+	if _, found, err := repository.Get(running.ID); err != nil || !found {
+		t.Fatalf("running record found=%v err=%v", found, err)
 	}
 }
 

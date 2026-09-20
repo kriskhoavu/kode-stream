@@ -87,3 +87,15 @@ func TestValidateContentSearchQuery(t *testing.T) {
 		t.Fatal("expected long query error")
 	}
 }
+
+func BenchmarkContentLineMatchesNoHits(b *testing.B) {
+	data := []byte(strings.Repeat("a", int(MaxContentSearchFileSize)))
+	b.SetBytes(int64(len(data)))
+	b.ReportAllocs()
+	for b.Loop() {
+		_, _, err := contentLineMatches(context.Background(), data, "zz", false, MaxContentSearchSnippetLength, MaxContentSearchResults)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}

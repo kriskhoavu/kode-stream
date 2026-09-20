@@ -26,6 +26,8 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
   const [error, setError] = useState('');
   const reviewRequestId = useRef(0);
   const fileRequestId = useRef(0);
+  const reviewAbortRef = useRef<AbortController | undefined>(undefined);
+  const fileAbortRef = useRef<AbortController | undefined>(undefined);
   const branchState = useWorkspaceBranches(workspace ? [workspace] : [], async () => {
     await onCheckoutSwitched();
   });
@@ -43,7 +45,11 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
 
   const loadReview = async (force = false) => {
     if (!workspace || !branch) return;
+    reviewAbortRef.current?.abort();
+    const controller = new AbortController();
+    reviewAbortRef.current = controller;
     if (force) {
+      fileAbortRef.current?.abort();
       fileRequestId.current += 1;
       setFileLoading(false);
     }
@@ -59,16 +65,17 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
     setLoading(true);
     setError('');
     try {
-      const result = await api.loadBranchReview(workspace.id, { branch, force });
-      if (!isCurrentRequest()) return;
+      const result = await api.loadBranchReview(workspace.id, { branch, force }, controller.signal);
+      if (controller.signal.aborted || !isCurrentRequest()) return;
       setReview(result);
       setSelectedItemId((current) => result.items.some((item) => item.id === current) ? current : result.items[0]?.id ?? '');
     } catch (caught) {
-      if (!isCurrentRequest()) return;
+      if (controller.signal.aborted || !isCurrentRequest()) return;
       setReview(null);
       setError(caught instanceof Error ? caught.message : 'Branch review failed to load');
     } finally {
-      if (isCurrentRequest()) setLoading(false);
+      if (!controller.signal.aborted && isCurrentRequest()) setLoading(false);
+      if (reviewAbortRef.current === controller) reviewAbortRef.current = undefined;
     }
   };
 
@@ -80,10 +87,14 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
     setFile(null);
     setLoading(false);
     if (branch) void loadReview(false);
-    return () => { reviewRequestId.current += 1; };
+    return () => {
+      reviewRequestId.current += 1;
+      reviewAbortRef.current?.abort();
+    };
   }, [workspace?.id, branch, workspaceState?.current]);
 
   useEffect(() => {
+    fileAbortRef.current?.abort();
     const requestId = ++fileRequestId.current;
     const expectedCommit = review?.commit ?? '';
     const isCurrentRequest = () => requestId === fileRequestId.current;
@@ -91,21 +102,25 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
     setFile(null);
     setFileLoading(false);
     if (!selectedItemId || !expectedCommit) return;
+    const controller = new AbortController();
+    fileAbortRef.current = controller;
     setFileLoading(true);
-    api.files(selectedItemId, expectedCommit).then((tree) => {
-      if (!isCurrentRequest()) return;
+    api.files(selectedItemId, expectedCommit, controller.signal).then((tree) => {
+      if (controller.signal.aborted || !isCurrentRequest()) return;
       setFiles(tree);
       const first = flattenFiles(tree)[0];
       if (!first) return;
-      return api.file(selectedItemId, first.id, expectedCommit).then((content) => {
-        if (isCurrentRequest()) setFile(content);
+      return api.file(selectedItemId, first.id, expectedCommit, controller.signal).then((content) => {
+        if (!controller.signal.aborted && isCurrentRequest()) setFile(content);
       });
     }).catch((caught) => {
-      if (isCurrentRequest()) setError(caught instanceof Error ? caught.message : 'Reviewed files failed to load');
+      if (!controller.signal.aborted && isCurrentRequest()) setError(caught instanceof Error ? caught.message : 'Reviewed files failed to load');
     }).finally(() => {
-      if (isCurrentRequest()) setFileLoading(false);
+      if (!controller.signal.aborted && isCurrentRequest()) setFileLoading(false);
+      if (fileAbortRef.current === controller) fileAbortRef.current = undefined;
     });
     return () => {
+      fileAbortRef.current?.abort();
       if (isCurrentRequest()) fileRequestId.current += 1;
     };
   }, [selectedItemId, review?.commit]);
@@ -113,17 +128,21 @@ export function BranchReviewPage({ workspace, location, onLocationChange, onExit
   const openFile = async (node: FileNode) => {
     const expectedCommit = review?.commit ?? '';
     if (!selectedItemId || !expectedCommit || node.type !== 'file') return;
+    fileAbortRef.current?.abort();
+    const controller = new AbortController();
+    fileAbortRef.current = controller;
     const requestId = ++fileRequestId.current;
     const isCurrentRequest = () => requestId === fileRequestId.current;
     setFileLoading(true);
     setError('');
     try {
-      const content = await api.file(selectedItemId, node.id, expectedCommit);
-      if (isCurrentRequest()) setFile(content);
+      const content = await api.file(selectedItemId, node.id, expectedCommit, controller.signal);
+      if (!controller.signal.aborted && isCurrentRequest()) setFile(content);
     } catch (caught) {
-      if (isCurrentRequest()) setError(caught instanceof Error ? caught.message : 'Reviewed file failed to load');
+      if (!controller.signal.aborted && isCurrentRequest()) setError(caught instanceof Error ? caught.message : 'Reviewed file failed to load');
     } finally {
-      if (isCurrentRequest()) setFileLoading(false);
+      if (!controller.signal.aborted && isCurrentRequest()) setFileLoading(false);
+      if (fileAbortRef.current === controller) fileAbortRef.current = undefined;
     }
   };
 

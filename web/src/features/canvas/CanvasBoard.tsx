@@ -2,11 +2,12 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { Background, Handle, NodeResizer, Position, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
 import type { Edge, Node as XYNode, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
-import { Bot, Box, ChevronDown, Expand, GitBranch, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Play, Plus, RotateCcw, Search, Square, TerminalSquare, Trash2, WandSparkles, Workflow, X } from 'lucide-react';
+import { Bot, Box, ChevronDown, Expand, Eye, EyeOff, GitBranch, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Play, Plus, RotateCcw, Search, Square, TerminalSquare, Trash2, WandSparkles, Workflow, X } from 'lucide-react';
 import { api } from '../../shared/api';
 import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasSection, CanvasViewport, EmbeddedAISessionResult, EmbeddedAISessionState, GitStatus, SafeSessionRecord } from '../../lib/types';
 import { EmbeddedTerminal } from '../ai-session/EmbeddedTerminal';
 import { readPreference, writePreference } from '../../shared/preferences/store';
+import { WorkbenchViewSwitcher } from './WorkbenchViewSwitcher';
 import '@xyflow/react/dist/style.css';
 
 interface CanvasNodeData extends Record<string, unknown> {
@@ -104,7 +105,6 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 		}
 		return { sessionIds, planIds };
 	}, [projection.connections, projection.nodes]);
-	const focusLabel = !focusOn ? 'Focus' : focusActiveSet.sessionIds.size > 0 ? `Focus · ${count(focusActiveSet.planIds.size, 'plan')} · ${count(focusActiveSet.sessionIds.size, 'session')}` : 'Focus · nothing running';
 	const statuses = useMemo(() => Array.from(new Set(canvasNodes.flatMap((node) => node.plan ? [node.plan.status] : []))), [canvasNodes]);
 	const services = useMemo(() => Array.from(new Set(canvasNodes.flatMap((node) => node.plan?.service ? [node.plan.service] : []))).sort(), [canvasNodes]);
 	const normalizedSearchQuery = searchQuery.trim().toLowerCase();
@@ -248,12 +248,13 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	return <ReactFlowProvider><div className="canvas-board-shell" ref={canvasShellRef}>
 		<div className="canvas-toolbar" aria-label="Canvas tools">
 			<div className="canvas-board-toolbar">
+				{onOpenSessions && <WorkbenchViewSwitcher view="canvas" sessionCount={liveSessionCount} onChange={(view) => { if (view === 'sessions') onOpenSessions(); }} />}
 				<CanvasSearch query={searchQuery} onQueryChange={setSearchQuery} />
 				<button className="primary" type="button" disabled={aiSessionDisabled} onClick={onOpenAISession}><Bot size={15} /> AI session</button>
-				{onOpenSessions && <button className="secondary" type="button" title="Browse this branch's sessions and watch one live" onClick={onOpenSessions}><TerminalSquare size={15} /> Sessions{liveSessionCount ? ` (${liveSessionCount})` : ''}</button>}
-				<div className="canvas-focus-control"><button className={focusOn ? 'secondary active' : 'secondary'} type="button" aria-pressed={focusOn} aria-describedby={focusOn ? 'canvas-focus-hint' : undefined} onClick={() => setFocusOn((value) => !value)}>{focusLabel}</button>{focusOn && focusActiveSet.sessionIds.size === 0 && <button className="link-button" type="button" onClick={() => setFocusOn(false)}>Turn off</button>}{focusOn && <span className="canvas-focus-hint" id="canvas-focus-hint">Layout is automatic while Focus is on</span>}</div>
-				{onCreateSection && <button className="secondary" type="button" disabled={sectionSelection.length < 2} title={sectionSelection.length < 2 ? 'Cmd/Ctrl-click or drag-select at least two nodes to create a section.' : 'Create a named section around the selected nodes.'} onClick={() => { onCreateSection(sectionSelection); setSectionSelection([]); }}>Create section{sectionSelection.length ? ` (${sectionSelection.length})` : ''}</button>}
-				{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
+				{(onCreateSection || selected) && <div className={`canvas-board-actions${selected ? ' with-selection' : ''}`} role="group" aria-label="Canvas actions">
+					{onCreateSection && <button className="secondary" type="button" disabled={sectionSelection.length < 2} title={sectionSelection.length < 2 ? 'Cmd/Ctrl-click or drag-select at least two nodes to create a section.' : 'Create a named section around the selected nodes.'} onClick={() => { onCreateSection(sectionSelection); setSectionSelection([]); }}>Create section{sectionSelection.length ? ` (${sectionSelection.length})` : ''}</button>}
+					{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
+				</div>}
 			</div>
 			<div className="canvas-facet-row">
 				<div className="facet-bar">
@@ -261,6 +262,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 					<CanvasFacetMenu title="Service" options={services.map((value) => ({ value, label: value }))} selected={serviceFilters} open={openMenu === 'service'} onOpen={() => setOpenMenu(openMenu === 'service' ? '' : 'service')} onClose={() => setOpenMenu('')} onToggle={(value) => setServiceFilters((current) => toggleValue(current, value))} onClear={() => setServiceFilters([])} />
 					<CanvasArrangeMenu open={openMenu === 'group'} disabled={!layoutAvailable} onOpen={() => setOpenMenu(openMenu === 'group' ? '' : 'group')} onClose={() => setOpenMenu('')} onArrange={onArrange} />
 					<CanvasFacetMenu title="Node type" options={[{ value: 'plan', label: 'Plans' }, { value: 'session', label: 'Terminal sessions' }]} selected={nodeTypeFilters} open={openMenu === 'nodeType'} onOpen={() => setOpenMenu(openMenu === 'nodeType' ? '' : 'nodeType')} onClose={() => setOpenMenu('')} onToggle={(value) => setNodeTypeFilters((current) => toggleValue(current, value))} onClear={() => setNodeTypeFilters([])} />
+					<button className={focusOn ? 'secondary canvas-focus-toggle active' : 'secondary canvas-focus-toggle'} type="button" aria-pressed={focusOn} onClick={() => setFocusOn((value) => !value)}>{focusOn ? <Eye size={15} /> : <EyeOff size={15} />} Focus</button>
 				</div>
 				<span className="filter-summary">{visibleDomainNodes.length} of {canvasNodes.length} nodes{hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}</span>
 			</div>
@@ -335,19 +337,29 @@ function CanvasNodeLegend() {
 function CanvasSectionNode({ data }: NodeProps<CanvasFlowNode>) {
 	const section = data.section;
 	const { screenToFlowPosition } = useReactFlow();
+	const moveCleanupRef = useRef<(() => void) | null>(null);
+	useEffect(() => () => moveCleanupRef.current?.(), []);
 	if (!section) return null;
 	const startMove = (event: React.PointerEvent<HTMLElement>) => {
+		if (!section) return;
+		const movingSection = section;
 		if (!data.layoutAvailable || (event.target as HTMLElement).closest('button')) return;
 		event.preventDefault();
 		event.stopPropagation();
+		moveCleanupRef.current?.();
 		const start = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-		const finish = (upEvent: PointerEvent) => {
+		function cleanup() {
+			window.removeEventListener('pointerup', finish);
+			if (moveCleanupRef.current === cleanup) moveCleanupRef.current = null;
+		}
+		function finish(upEvent: PointerEvent) {
+			cleanup();
 			const end = screenToFlowPosition({ x: upEvent.clientX, y: upEvent.clientY });
 			const delta = { x: end.x - start.x, y: end.y - start.y };
-			if (delta.x || delta.y) data.onMoveSection?.(section.id, { x: section.position.x + delta.x, y: section.position.y + delta.y }, delta);
-			window.removeEventListener('pointerup', finish);
-		};
-		window.addEventListener('pointerup', finish);
+			if (delta.x || delta.y) data.onMoveSection?.(movingSection.id, { x: movingSection.position.x + delta.x, y: movingSection.position.y + delta.y }, delta);
+		}
+		window.addEventListener('pointerup', finish, { once: true });
+		moveCleanupRef.current = cleanup;
 	};
 	const sectionKind = section.id === 'workspace-group' ? 'workspace' : section.id.startsWith('service-') ? 'service' : 'custom';
 	const moveByKeyboard = (event: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -454,7 +466,15 @@ export function CanvasSessionTerminal({ record, visible, onClose = () => {}, onR
 	const [error, setError] = useState('');
 	const [retry, setRetry] = useState(0);
 	const attempted = useRef(-1);
+	const currentRecord = useRef(record);
+	const mounted = useRef(true);
+	currentRecord.current = record;
 	const active = record.state === 'starting' || record.state === 'running';
+
+	useEffect(() => {
+		mounted.current = true;
+		return () => { mounted.current = false; };
+	}, []);
 
 	// A different record (e.g. the Session Browser's selection changing to
 	// another session) re-attaches from scratch instead of carrying over the
@@ -469,22 +489,32 @@ export function CanvasSessionTerminal({ record, visible, onClose = () => {}, onR
 	useEffect(() => {
 		if (!visible || !record.live || result || attempted.current === retry) return;
 		attempted.current = retry;
+		let current = true;
+		let settled = false;
 		setAttaching(true);
 		setError('');
 		void Promise.all([api.embeddedAISession(record.id), api.embeddedAISessionGrant(record.id)]).then(([session, grant]) => {
-			setResult({ session, grant, record });
-		}).catch(() => setError('The live process could not be reattached.')).finally(() => setAttaching(false));
-	}, [record, result, retry, visible]);
+			if (current) setResult({ session, grant, record: currentRecord.current });
+		}).catch(() => { if (current) setError('The live process could not be reattached.'); }).finally(() => {
+			settled = true;
+			if (current) setAttaching(false);
+		});
+		return () => {
+			current = false;
+			if (!settled && attempted.current === retry) attempted.current = -1;
+		};
+	}, [record.id, record.live, result, retry, visible]);
 
 	const cancel = async () => {
 		if (!window.confirm('Cancel this terminal process? Its durable session metadata will remain available.')) return;
 		setError('');
 		try {
 			const session = await api.cancelEmbeddedAISession(record.id);
+			if (!mounted.current || currentRecord.current.id !== record.id) return;
 			setResult((current) => current ? { ...current, session } : current);
 			await Promise.resolve(onReload());
 		} catch (caught) {
-			setError(caught instanceof Error ? caught.message : 'Could not cancel the terminal process.');
+			if (mounted.current && currentRecord.current.id === record.id) setError(caught instanceof Error ? caught.message : 'Could not cancel the terminal process.');
 		}
 	};
 	const stateChanged = (state: EmbeddedAISessionState, exitCode?: number) => {
@@ -546,7 +576,6 @@ function nodeSearchText(node: DomainNode) {
 }
 
 function stateLabel(node: DomainNode) { return node.state === 'forbidden' ? 'Access restricted' : 'Reference unavailable'; }
-function count(n: number, noun: string) { return `${n} ${noun}${n === 1 ? '' : 's'}`; }
 function formatFacet(value: string) { return value.replaceAll('_', ' ').replace(/^./, (character) => character.toUpperCase()); }
 function toggleValue(values: string[], value: string) { return values.includes(value) ? values.filter((candidate) => candidate !== value) : [...values, value]; }
 function gitSummary(status?: GitStatus) {

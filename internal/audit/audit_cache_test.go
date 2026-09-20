@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -60,5 +61,19 @@ func TestCachedEventReaderUsesTTLAndInvalidation(t *testing.T) {
 	stats := cache.Stats()
 	if stats.Hits != 1 || stats.Misses != 3 || stats.Invalidations != 1 {
 		t.Fatalf("stats = %#v", stats)
+	}
+}
+
+func TestCachedEventReaderBoundsDistinctQueries(t *testing.T) {
+	store := New(filepath.Join(t.TempDir(), "audit.jsonl"))
+	cache := NewCachedEventReader(store, time.Minute, time.Now)
+	for index := range maxCachedAuditQueries + 20 {
+		query := Query{OwnerUserID: strconv.Itoa(index), Limit: 1}
+		if _, err := cache.QueryContext(context.Background(), query); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(cache.items) > maxCachedAuditQueries {
+		t.Fatalf("cached audit queries grew beyond the bound: %d", len(cache.items))
 	}
 }

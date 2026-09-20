@@ -14,15 +14,15 @@ export function StorageSettings() {
   const [syncResult, setSyncResult] = useState<StorageSyncResult | null>(null);
 
   useEffect(() => {
-    let active = true;
-    void Promise.all([api.systemConfigPaths(), api.storageStatus()]).then(([paths, storage]) => {
-      if (!active) return;
+    const controller = new AbortController();
+    void Promise.all([api.systemConfigPaths(controller.signal), api.storageStatus(controller.signal)]).then(([paths, storage]) => {
+      if (controller.signal.aborted) return;
       setConfig(paths);
       setStatus(storage);
       setDataDir(paths.dataDir);
       setSelectedOption(storage.storageOption);
-    }).catch((caught) => active && setError(errorMessage(caught)));
-    return () => { active = false; };
+    }).catch((caught) => { if (!controller.signal.aborted) setError(errorMessage(caught)); });
+    return () => controller.abort();
   }, []);
 
   const optionChanged = Boolean(status && selectedOption !== status.storageOption);

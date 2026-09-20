@@ -63,20 +63,23 @@
 }
 .canvas-board-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .canvas-board-toolbar .plan-search { min-height: 40px; box-shadow: var(--shadow-soft); }
-.canvas-board-toolbar > button, .canvas-board-toolbar > .canvas-focus-control { flex: 0 0 auto; }
+.canvas-board-toolbar > button { flex: 0 0 auto; }
+.workbench-view-switcher { flex: 0 0 auto; width: auto; min-width: 220px; padding: 2px; }
+.workbench-view-switcher button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0 12px; white-space: nowrap; }
+.canvas-board-actions { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 10px; margin-left: auto; }
+.canvas-board-actions.with-selection { flex-basis: 100%; }
+.canvas-board-actions > button { flex: 0 0 auto; }
 .canvas-search { flex: 1 1 240px; min-width: 240px; }
 .canvas-search input { width: 100%; border: 0; background: transparent; outline: 0; }
 .canvas-facet-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .canvas-facet-row .facet-bar { margin: 0; }
 .canvas-facet-row .facet-trigger { min-height: 38px; min-width: 128px; }
+.canvas-focus-toggle { min-height: 38px; }
 .canvas-facet-row .filter-summary { margin: 10px 0 0; white-space: nowrap; }
 .canvas-arrange-menu .facet-option-list button { min-height: 34px; border: 0; border-radius: 6px; background: transparent; color: var(--text); padding: 0 8px; text-align: left; }
 .canvas-arrange-menu .facet-option-list button:hover { background: var(--panel-soft); }
 .canvas-conflict-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--danger); font-size: 12px; }
-.canvas-focus-control { display: inline-flex; align-items: center; gap: 8px; }
-.canvas-board-toolbar .secondary.active { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--panel)); color: var(--blue); }
-.canvas-focus-control .link-button { border: 0; background: transparent; color: var(--blue); font-size: 12px; text-decoration: underline; cursor: pointer; }
-.canvas-focus-hint { color: var(--muted); font-size: 12px; }
+.canvas-toolbar .secondary.active { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--panel)); color: var(--blue); }
 .canvas-semantic-node { position: relative; width: 245px; min-height: 116px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 8px 24px rgb(0 0 0 / .09); color: var(--text); }
 .canvas-semantic-node.kind-workspace { border-color: color-mix(in srgb, var(--blue) 38%, var(--line)); background: color-mix(in srgb, var(--blue) 4%, var(--panel)); }
 .canvas-semantic-node.kind-workspace .canvas-node-select-target > header { border-bottom-color: color-mix(in srgb, var(--blue) 26%, var(--line)); background: color-mix(in srgb, var(--blue) 9%, var(--panel)); color: var(--blue); }
@@ -134,8 +137,6 @@
 .canvas-board-shell:fullscreen { width: 100%; height: 100%; background: var(--panel); }
 .canvas-workbench { flex: 0 0 0; width: 0; min-width: 0; overflow: hidden; border-left: 0 solid var(--line); background: var(--panel); transition: flex-basis .18s ease; }
 .canvas-workbench.open { display: flex; flex-direction: column; flex-basis: min(var(--canvas-workbench-width, 410px), 38vw); width: min(var(--canvas-workbench-width, 410px), 38vw); border-left-width: 1px; overflow-y: auto; }
-/* Phase F5: the Sessions tab needs room for a live terminal, so it widens the panel past the usual 38vw cap while it's active and reverts once another tab is selected. Clamped (not maxed) so the resize handle can still narrow it down to 45vw instead of being pinned to the drag width. */
-.canvas-workbench.open.sessions-wide { flex-basis: clamp(45vw, var(--canvas-workbench-width, 60vw), 90vw); width: clamp(45vw, var(--canvas-workbench-width, 60vw), 90vw); }
 .canvas-workbench > header { flex: 0 0 auto; position: sticky; z-index: 4; top: 0; min-height: 58px; margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .canvas-workbench.collapsed { flex: 0 0 52px; width: 52px; min-width: 52px; overflow: hidden; }
 .canvas-workbench.collapsed > header { justify-content: center; padding: 10px; }
@@ -189,42 +190,16 @@ body.is-resizing-panel .canvas-workbench-resize-handle { opacity: 1; }
 .canvas-session-terminal-lifecycle p { margin: 0; line-height: 1.5; }
 .canvas-session-terminal > p, .canvas-session-terminal-error { margin: 0; padding: 18px; color: var(--muted); font-size: 12px; }
 .canvas-session-terminal-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--danger); }
+.canvas-sessions-view { flex-direction: column; }
+.canvas-sessions-toolbar { display: flex; align-items: center; justify-content: flex-start; padding: 10px 12px; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); background: var(--panel); }
+.canvas-sessions-view .session-browser { flex: 1 1 auto; min-height: 0; margin: 12px; }
 @media (max-width: 1020px) { .canvas-search { flex-basis: 220px; min-width: 0; } }
-@media (max-width: 800px) { .canvas-toolbar { min-height: 0; overflow-y: auto; } .canvas-search { min-width: 0; } .canvas-board-toolbar > button, .canvas-board-toolbar > .canvas-focus-control { flex: 1 1 auto; } .canvas-facet-row { align-items: stretch; flex-direction: column; } .canvas-facet-row .facet-bar { display: grid; grid-template-columns: 1fr; } .canvas-facet-row .facet-menu, .canvas-facet-row .facet-trigger { width: 100%; } .canvas-board { inset-block-start: 316px; } }
+@media (max-width: 800px) { .canvas-toolbar { min-height: 0; overflow-y: auto; } .canvas-search { min-width: 0; } .canvas-board-toolbar > button, .workbench-view-switcher { flex: 1 1 auto; } .canvas-facet-row { align-items: stretch; flex-direction: column; } .canvas-facet-row .facet-bar { display: grid; grid-template-columns: 1fr; } .canvas-facet-row .facet-menu, .canvas-facet-row .facet-trigger, .canvas-focus-toggle { width: 100%; } .canvas-board { inset-block-start: 316px; } }
 @media (max-width: 900px) { .canvas-workbench.open { position: absolute; z-index: 8; inset: 0 0 0 auto; width: min(var(--canvas-workbench-width, 410px), 94vw); max-width: 94vw; box-shadow: -16px 0 36px rgb(0 0 0 / .18); } }
 @media (max-width: 800px) { .canvas-semantic-node.expanded.kind-session { width: 560px; } }
 @media (prefers-reduced-motion: reduce) { .canvas-semantic-node, .canvas-workbench { transition: none; } }
 
-/*
- * Branch-vs-upstream reading in the page header, beside the checkout picker.
- * Deliberately quiet: it is standing context, not an alert, so it borrows the
- * muted palette and only the behind count takes a warning tint — being behind is
- * the half that means someone else's work is missing from this checkout.
- */
-.branch-upstream-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  margin-right: 12px;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel-soft);
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.branch-upstream-ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.branch-upstream-drift, .branch-upstream-synced { display: inline-flex; align-items: center; gap: 6px; }
-.branch-upstream-ahead, .branch-upstream-behind { display: inline-flex; align-items: center; gap: 2px; }
-.branch-upstream-behind { color: var(--warning); }
-.branch-upstream-synced { color: var(--green); }
-/* Nothing fetched yet: the counts have no basis, so this stays muted rather than
- * borrowing the green that means "checked and level". */
-.branch-upstream-unknown { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
-
-/* Sessions tab and page share this table (F2 Workbench, F3 Sessions page). */
+/* Compact session tables remain available to Workbench session surfaces. */
 .sessions-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .sessions-table th, .sessions-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .sessions-table th { color: var(--muted); font-weight: 600; }

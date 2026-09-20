@@ -92,4 +92,18 @@ describe('useWorkspaceBranches', () => {
     await waitFor(() => expect(result.current.states.ws?.current).toBe('feature/a'));
     expect(api.workspaceBranches).toHaveBeenCalledTimes(2);
   });
+
+	it('keeps the newest branch response when an earlier refresh finishes late', async () => {
+		let finishFirst!: (value: { workspaceId: string; current: string; branches: string[] }) => void;
+		let firstSignal: AbortSignal | undefined;
+		vi.spyOn(api, 'workspaceBranches')
+			.mockImplementationOnce((_workspaceId, signal) => new Promise((resolve) => { firstSignal = signal; finishFirst = resolve; }))
+			.mockResolvedValueOnce({ workspaceId: 'ws', current: 'feature/a', branches: ['feature/a', 'main'] });
+		const { result } = renderHook(() => useWorkspaceBranches([workspace]));
+		act(() => window.dispatchEvent(new FocusEvent('focus')));
+		await waitFor(() => expect(result.current.states.ws?.current).toBe('feature/a'));
+		expect(firstSignal?.aborted).toBe(true);
+		await act(async () => finishFirst({ workspaceId: 'ws', current: 'main', branches: ['main'] }));
+		expect(result.current.states.ws?.current).toBe('feature/a');
+	});
 });

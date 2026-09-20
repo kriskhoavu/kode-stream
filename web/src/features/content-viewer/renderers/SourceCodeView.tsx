@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, Copy, ListOrdered, WrapText } from 'lucide-react';
 import hljs from 'highlight.js/lib/core';
 import bash from 'highlight.js/lib/languages/bash';
@@ -33,11 +33,14 @@ export function SourceCodeView({ content, language, truncated = false, selection
   const [wrap, setWrap] = useState(false);
   const [lineNumbers, setLineNumbers] = useState(true);
   const [copied, setCopied] = useState(false);
-  const rich = new TextEncoder().encode(content).length <= richPreviewThresholdBytes;
+  const rich = content.length <= richPreviewThresholdBytes && new TextEncoder().encode(content).length <= richPreviewThresholdBytes;
   const lines = useMemo(() => content.split('\n'), [content]);
   const scrollRef = useRef<HTMLPreElement>(null);
+	const copyResetTimer = useRef<number | undefined>(undefined);
+	const mounted = useRef(true);
   const [windowStart, setWindowStart] = useState(0);
-	const [rowHeights, setRowHeights] = useState<Record<number, number>>({});
+	const [measurements, setMeasurements] = useState<{ content: string; wrap: boolean; lineNumbers: boolean; heights: Record<number, number> }>(() => ({ content, wrap, lineNumbers, heights: {} }));
+	const rowHeights = measurements.content === content && measurements.wrap === wrap && measurements.lineNumbers === lineNumbers ? measurements.heights : {};
   const selectedLine = selection?.lineNumber ?? 0;
   const windowEnd = Math.min(lines.length, windowStart + renderedLineWindow);
 	const offsets = useMemo(() => {
@@ -47,7 +50,15 @@ export function SourceCodeView({ content, language, truncated = false, selection
 	}, [lines.length, rowHeights]);
 
 	useEffect(() => {
-		const invalidateMeasurements = () => setRowHeights({});
+		mounted.current = true;
+		return () => {
+			mounted.current = false;
+			if (copyResetTimer.current !== undefined) window.clearTimeout(copyResetTimer.current);
+		};
+	}, []);
+
+	useEffect(() => {
+		const invalidateMeasurements = () => setMeasurements({ content, wrap, lineNumbers, heights: {} });
 		window.addEventListener('resize', invalidateMeasurements);
 		const target = scrollRef.current;
 		if (target && typeof ResizeObserver !== 'undefined') {
@@ -56,13 +67,30 @@ export function SourceCodeView({ content, language, truncated = false, selection
 			return () => { window.removeEventListener('resize', invalidateMeasurements); observer.disconnect(); };
 		}
 		return () => window.removeEventListener('resize', invalidateMeasurements);
-	}, [content, wrap]);
+	}, [content, wrap, lineNumbers]);
+
+	useLayoutEffect(() => {
+		const measured: Record<number, number> = {};
+		for (const node of scrollRef.current?.querySelectorAll<HTMLSpanElement>('.source-code-line') ?? []) {
+			const index = Number(node.dataset.lineIndex);
+			const height = node.getBoundingClientRect().height;
+			if (height > 0) measured[index] = height;
+		}
+		if (Object.keys(measured).length === 0) return;
+		setMeasurements((current) => {
+			const sameSource = current.content === content && current.wrap === wrap && current.lineNumbers === lineNumbers;
+			const heights = sameSource ? current.heights : {};
+			if (Object.entries(measured).every(([index, height]) => heights[Number(index)] === height)) return current;
+			return { content, wrap, lineNumbers, heights: { ...heights, ...measured } };
+		});
+	});
 
   useEffect(() => {
     if (!selectedLine || selectedLine > lines.length) return;
     const start = Math.max(0, Math.min(Math.max(0, lines.length - renderedLineWindow), selectedLine - Math.floor(renderedLineWindow / 2) - 1));
-    setWindowStart(start);
-    requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, offsets[selectedLine - 1] - scrollRef.current.clientHeight / 2); });
+    setWindowStart((current) => current === start ? current : start);
+    const frame = requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, offsets[selectedLine - 1] - scrollRef.current.clientHeight / 2); });
+    return () => cancelAnimationFrame(frame);
   }, [lines.length, offsets, selectedLine]);
 
   const updateWindow = () => {
@@ -72,12 +100,13 @@ export function SourceCodeView({ content, language, truncated = false, selection
     const start = Math.max(0, Math.min(Math.max(0, lines.length - renderedLineWindow), low - 40));
     setWindowStart((current) => current === start ? current : start);
   };
-	const measure = (index: number, node: HTMLSpanElement | null) => {
-		if (!node) return;
-		const height = node.getBoundingClientRect().height;
-		if (height > 0) setRowHeights((current) => current[index] === height ? current : { ...current, [index]: height });
+  const copy = async () => {
+		await navigator.clipboard.writeText(content);
+		if (!mounted.current) return;
+		setCopied(true);
+		if (copyResetTimer.current !== undefined) window.clearTimeout(copyResetTimer.current);
+		copyResetTimer.current = window.setTimeout(() => { copyResetTimer.current = undefined; setCopied(false); }, 1200);
 	};
-  const copy = async () => { await navigator.clipboard.writeText(content); setCopied(true); window.setTimeout(() => setCopied(false), 1200); };
 
   return <div className={`source-code-view ${wrap ? 'wrap' : ''}`}>
     <div className="viewer-toolbar source-toolbar" aria-label="Source controls">
@@ -93,7 +122,7 @@ export function SourceCodeView({ content, language, truncated = false, selection
       {lines.slice(windowStart, windowEnd).map((line, index) => {
         const lineIndex = windowStart + index;
         const selected = lineIndex + 1 === selectedLine;
-        return <span ref={(node) => measure(lineIndex, node)} className={`source-code-line${selected ? ' selected' : ''}`} key={lineIndex} aria-current={selected ? 'true' : undefined}>
+        return <span data-line-index={lineIndex} className={`source-code-line${selected ? ' selected' : ''}`} key={lineIndex} aria-current={selected ? 'true' : undefined}>
           {lineNumbers && <span className="source-line-number" aria-hidden="true">{lineIndex + 1}</span>}
           <span className="source-line-content" dangerouslySetInnerHTML={{ __html: (rich ? highlightLine(line, language) : escapeHTML(line)) || ' ' }} />
         </span>;

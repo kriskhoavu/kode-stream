@@ -26,6 +26,8 @@ type SessionRecordView struct {
 	Live bool `json:"live"`
 }
 
+var ErrSessionStillRunning = errors.New("session is still running")
+
 func (s *Service) ConfigureSessionRecords(records SessionRecordRepository, branches sessionBranchResolver) *Service {
 	s.records = records
 	s.branches = branches
@@ -36,6 +38,34 @@ func (s *Service) ConfigureSessionRecords(records SessionRecordRepository, branc
 
 func (s *Service) SessionRecords(workspaceID, branch string) ([]SessionRecordView, error) {
 	return s.SessionRecordsContext(context.Background(), workspaceID, branch)
+}
+
+// DeleteSessionRecord removes finished session history only. Running sessions
+// must be stopped first so deleting a row can never orphan a live process.
+func (s *Service) DeleteSessionRecord(id string) error {
+	if s.records == nil {
+		return ErrNotFound
+	}
+	s.sessionRecordMu.Lock()
+	defer s.sessionRecordMu.Unlock()
+	record, found, err := s.records.Get(strings.TrimSpace(id))
+	if err != nil {
+		return err
+	}
+	if !found {
+		return ErrNotFound
+	}
+	if record.State == StateStarting || record.State == StateRunning {
+		return ErrSessionStillRunning
+	}
+	deleted, err := s.records.Delete(record.ID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+	return nil
 }
 func (s *Service) SessionRecordsContext(ctx context.Context, workspaceID, branch string) ([]SessionRecordView, error) {
 	if err := ctx.Err(); err != nil {

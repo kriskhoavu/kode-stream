@@ -57,4 +57,10 @@ func TestSQLiteCanvasAndSessionRepositoryContract(t *testing.T) {
 	if err != nil || !ok || loaded.State != ai.StateInterrupted {
 		t.Fatalf("record = %#v ok=%v err=%v", loaded, ok, err)
 	}
+	if deleted, err := state.SessionRecords.Delete(record.ID); err != nil || !deleted {
+		t.Fatalf("deleted = %v err=%v", deleted, err)
+	}
+	if _, ok, err := state.SessionRecords.Get(record.ID); err != nil || ok {
+		t.Fatalf("deleted record ok=%v err=%v", ok, err)
+	}
 }

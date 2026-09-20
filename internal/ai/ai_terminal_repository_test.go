@@ -3,6 +3,7 @@ package ai
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -52,6 +53,28 @@ func TestSessionStreamsInputOutputAndReconnectBuffer(t *testing.T) {
 	defer disconnectAgain()
 	if !bytes.Contains(buffered, []byte("reply:hello")) {
 		t.Fatalf("buffer=%q", buffered)
+	}
+}
+
+func TestCompletedSessionBuffersAreBoundedWhileSubscribersRemain(t *testing.T) {
+	manager := NewTerminalManager(Config{})
+	started := time.Now().Add(-time.Hour)
+	for index := range maxRetainedTerminalSessions {
+		id := fmt.Sprintf("old-%02d", index)
+		manager.sessions[id] = &managed{info: Session{ID: id, State: StateExited, StartedAt: started.Add(time.Duration(index) * time.Second)}, buffer: make([]byte, manager.config.BufferBytes), subs: map[chan []byte]struct{}{}}
+	}
+	connected := make(chan []byte, 1)
+	manager.sessions["connected"] = &managed{info: Session{ID: "connected", State: StateExited, StartedAt: started}, buffer: make([]byte, manager.config.BufferBytes), subs: map[chan []byte]struct{}{connected: {}}}
+	manager.sessions["new"] = &managed{info: Session{ID: "new", State: StateRunning, StartedAt: time.Now()}, subs: map[chan []byte]struct{}{}}
+	if _, err := manager.Cancel("new"); err != nil {
+		t.Fatal(err)
+	}
+	if len(manager.sessions) != maxRetainedTerminalSessions+1 || manager.sessions["old-00"] != nil || manager.sessions["new"] == nil || manager.sessions["connected"] == nil {
+		t.Fatalf("completed sessions were not pruned safely: count=%d", len(manager.sessions))
+	}
+	manager.unsubscribe(manager.sessions["connected"], connected)
+	if len(manager.sessions) != maxRetainedTerminalSessions {
+		t.Fatalf("disconnected session buffer was retained: count=%d", len(manager.sessions))
 	}
 }
 

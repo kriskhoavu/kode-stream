@@ -3,6 +3,7 @@ package jira
 // Client is the Jira HTTP repository used by JiraService.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -824,5 +825,24 @@ func attachmentRedirectPolicy(connection models.JiraConnection) func(*http.Reque
 
 func decodeBounded(response *http.Response, target any) error {
 	defer response.Body.Close()
-	return json.NewDecoder(io.LimitReader(response.Body, 2*1024*1024)).Decode(target)
+	const maxResponseBytes = 2 * 1024 * 1024
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(data) > maxResponseBytes {
+		return errors.New("Jira response exceeds the size limit")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return errors.New("Jira response contains multiple JSON values")
+		}
+		return err
+	}
+	return nil
 }

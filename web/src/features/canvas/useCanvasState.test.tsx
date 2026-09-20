@@ -36,7 +36,7 @@ describe('useCanvasState', () => {
 		expect(result.current.dirtyCount).toBe(1);
 		expect(result.current.saveStatus).toBe('saving');
 		await act(async () => { await vi.advanceTimersByTimeAsync(351); });
-		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', position: { x: 90, y: 80 }, expectedRevision: 1 })]);
+		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', position: { x: 90, y: 80 }, expectedRevision: 1 })], expect.any(AbortSignal));
 		await act(async () => { await Promise.resolve(); });
 		expect(result.current.dirtyCount).toBe(0);
 		expect(result.current.saveStatus).toBe('saved');
@@ -55,11 +55,11 @@ describe('useCanvasState', () => {
 		// Each settle covers one flush: the conflict, then the rebased retry it schedules.
 		await act(async () => { await vi.runAllTimersAsync(); });
 		await act(async () => { await vi.runAllTimersAsync(); });
-		expect(api.patchCanvasPlacements).toHaveBeenNthCalledWith(1, 'layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', position: { x: 50, y: 60 }, expectedRevision: 1 })]);
-		expect(api.canvasLayout).toHaveBeenCalledWith('layout-1');
+		expect(api.patchCanvasPlacements).toHaveBeenNthCalledWith(1, 'layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', position: { x: 50, y: 60 }, expectedRevision: 1 })], expect.any(AbortSignal));
+		expect(api.canvasLayout).toHaveBeenCalledWith('layout-1', expect.any(AbortSignal));
 		// Retried against the revision the refetched layout reports, carrying the
 		// position the user actually asked for.
-		expect(api.patchCanvasPlacements).toHaveBeenNthCalledWith(2, 'layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', position: { x: 50, y: 60 }, expectedRevision: 2 })]);
+		expect(api.patchCanvasPlacements).toHaveBeenNthCalledWith(2, 'layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', position: { x: 50, y: 60 }, expectedRevision: 2 })], expect.any(AbortSignal));
 		expect(result.current.projection?.nodes[0].position).toEqual({ x: 50, y: 60 });
 		expect(result.current.dirtyCount).toBe(0);
 		expect(result.current.conflicts).toEqual([]);
@@ -126,6 +126,38 @@ describe('useCanvasState', () => {
 		await act(async () => { await vi.advanceTimersByTimeAsync(351); });
 		expect(api.patchCanvasPlacements).toHaveBeenCalledTimes(2);
 		expect(result.current.dirtyCount).toBe(0);
+	});
+
+	it('cancels a pending placement and ignores its late result when the workspace changes', async () => {
+		let settlePlacement: ((value: CanvasProjection) => void) | undefined;
+		const feature = { ...projection(), layout: { ...projection().layout, id: 'layout-feature', workspaceId: 'workspace-2', branchKey: 'feature' } };
+		vi.mocked(api.resolveDefaultCanvas).mockResolvedValueOnce(projection()).mockResolvedValueOnce(feature);
+		vi.mocked(api.patchCanvasPlacements).mockImplementationOnce(() => new Promise((resolve) => { settlePlacement = resolve; }));
+		const { result, rerender } = renderHook(({ workspaceId }) => useCanvasState(workspaceId), { initialProps: { workspaceId: 'workspace-1' } });
+		await act(async () => { await vi.runAllTimersAsync(); });
+		act(() => result.current.moveNode('plan:item-1', { x: 70, y: 75 }));
+		await act(async () => { await vi.advanceTimersByTimeAsync(351); });
+		const placementSignal = vi.mocked(api.patchCanvasPlacements).mock.calls[0][2];
+
+		rerender({ workspaceId: 'workspace-2' });
+		await act(async () => { await Promise.resolve(); });
+		expect(placementSignal?.aborted).toBe(true);
+		expect(result.current.projection?.layout.id).toBe('layout-feature');
+		await act(async () => { settlePlacement?.(projection(2)); });
+		expect(result.current.projection?.layout.id).toBe('layout-feature');
+	});
+
+	it('clears a scheduled placement retry when the Canvas unmounts', async () => {
+		vi.mocked(api.patchCanvasPlacements).mockRejectedValueOnce(new Error('offline'));
+		const { result, unmount } = renderHook(() => useCanvasState('workspace-1'));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		act(() => result.current.moveNode('plan:item-1', { x: 70, y: 75 }));
+		await act(async () => { await vi.advanceTimersByTimeAsync(351); });
+		expect(api.patchCanvasPlacements).toHaveBeenCalledTimes(1);
+
+		unmount();
+		await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+		expect(api.patchCanvasPlacements).toHaveBeenCalledTimes(1);
 	});
 
 	it('places newly discovered entities automatically, resets deterministically, and preserves removal', async () => {
@@ -203,7 +235,7 @@ describe('useCanvasState', () => {
 		act(() => result.current.setNodeCollapsed(session.id, false));
 		expect(result.current.projection?.nodes[0]).toMatchObject({ collapsed: false, position: { x: 30, y: 40 } });
 		await act(async () => { await vi.advanceTimersByTimeAsync(351); });
-		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: session.id, collapsed: false, position: { x: 30, y: 40 }, expectedRevision: 1 })]);
+		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: session.id, collapsed: false, position: { x: 30, y: 40 }, expectedRevision: 1 })], expect.any(AbortSignal));
 	});
 
 	it('opens a newly launched session when automatic placement observed it first', async () => {

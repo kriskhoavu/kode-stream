@@ -205,6 +205,7 @@ func routeManifest(a *API) []routeSpec {
 		{http.MethodGet, "/sessions", "ai", protectedRoute, ginHTTPHandler(a.sessions.globalSessions)},
 		{http.MethodGet, "/sessions/:id/changes", "ai", protectedRoute, ginHTTPHandler(a.sessions.sessionChanges)},
 		{http.MethodGet, "/sessions/:id/diff", "ai", protectedRoute, ginHTTPHandler(a.sessions.sessionDiff)},
+		{http.MethodDelete, "/sessions/:id", "ai", protectedRoute, ginHTTPHandler(a.sessions.deleteSession)},
 	}
 }
 

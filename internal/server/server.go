@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"kode-stream/internal/ai"
 	"kode-stream/internal/audit"
@@ -140,12 +141,26 @@ func (s *Server) Serve() error {
 	}
 	url := "http://" + listener.Addr().String()
 	fmt.Printf("Kode Stream running at %s\n", url)
+	httpServer := &http.Server{
+		Handler:           s.app,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
 	stopping := make(chan os.Signal, 1)
 	signal.Notify(stopping, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(stopping)
-	go func() { <-stopping; _ = s.Close(); _ = listener.Close() }()
-	err = http.Serve(listener, s.app)
-	if errors.Is(err, net.ErrClosed) {
+	serveDone := make(chan struct{})
+	defer close(serveDone)
+	go func() {
+		select {
+		case <-stopping:
+			_ = s.Close()
+			_ = httpServer.Close()
+		case <-serveDone:
+		}
+	}()
+	err = httpServer.Serve(listener)
+	if errors.Is(err, http.ErrServerClosed) || errors.Is(err, net.ErrClosed) {
 		return nil
 	}
 	return err

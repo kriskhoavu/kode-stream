@@ -26,56 +26,109 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
   const [gitStateByPath, setGitStateByPath] = useState<Map<string, WorkspacePathGitState>>(new Map());
   const lastAutoExpandedLocation = useRef('');
   const cacheRef = useRef(cache);
+  const requestID = useRef(0);
+  const inFlightDirectories = useRef(new Map<string, number>());
+  const directoryAbortControllers = useRef(new Map<string, AbortController>());
+  const decorationsAbortRef = useRef<AbortController | undefined>(undefined);
+  const gitStatesAbortRef = useRef<AbortController | undefined>(undefined);
+
+  const abortDirectoryRequests = useCallback((matches: (key: string) => boolean = () => true) => {
+    for (const [key, controller] of directoryAbortControllers.current) {
+      if (!matches(key)) continue;
+      controller.abort();
+      directoryAbortControllers.current.delete(key);
+      inFlightDirectories.current.delete(key);
+    }
+  }, []);
 
   useEffect(() => {
     cacheRef.current = cache;
   }, [cache]);
 
+  useEffect(() => {
+    const activeWorkspaceIDs = new Set(workspaces.map((workspace) => workspace.id));
+    const belongsToActiveWorkspace = (key: string) => activeWorkspaceIDs.has(key.slice(0, key.indexOf(':')));
+    abortDirectoryRequests((key) => !belongsToActiveWorkspace(key));
+    setCache((current) => {
+      const next = new Map([...current].filter(([key]) => belongsToActiveWorkspace(key)));
+      return next.size === current.size ? current : next;
+    });
+  }, [abortDirectoryRequests, workspaceKey]);
+
   const loadDecorations = useCallback(async () => {
+    decorationsAbortRef.current?.abort();
+    const controller = new AbortController();
+    decorationsAbortRef.current = controller;
     try {
-      setDecorations(buildItemDecorations(await api.items(new URLSearchParams())));
+      const items = await api.items(new URLSearchParams(), controller.signal);
+      if (!controller.signal.aborted) setDecorations(buildItemDecorations(items));
     } catch {
-      setDecorations(new Map());
+      if (!controller.signal.aborted) setDecorations(new Map());
+    } finally {
+      if (decorationsAbortRef.current === controller) decorationsAbortRef.current = undefined;
     }
   }, []);
 
-  useEffect(() => { void loadDecorations(); }, [loadDecorations]);
+  useEffect(() => {
+    void loadDecorations();
+    return () => decorationsAbortRef.current?.abort();
+  }, [loadDecorations]);
 
   const loadGitStates = useCallback(async () => {
+    gitStatesAbortRef.current?.abort();
+    const controller = new AbortController();
+    gitStatesAbortRef.current = controller;
     const maps = await Promise.all(workspaces.map(async (workspace) => {
       try {
-        return buildWorkspaceGitStateMap(workspace.id, await api.workspacePathGitStates(workspace.id));
+        return buildWorkspaceGitStateMap(workspace.id, await api.workspacePathGitStates(workspace.id, controller.signal));
       } catch {
         return new Map<string, WorkspacePathGitState>();
       }
     }));
-    setGitStateByPath(new Map(maps.flatMap((map) => [...map.entries()])));
+    if (!controller.signal.aborted) setGitStateByPath(new Map(maps.flatMap((map) => [...map.entries()])));
+    if (gitStatesAbortRef.current === controller) gitStatesAbortRef.current = undefined;
   }, [workspaceKey]);
 
-  useEffect(() => { void loadGitStates(); }, [loadGitStates]);
+  useEffect(() => {
+    void loadGitStates();
+    return () => gitStatesAbortRef.current?.abort();
+  }, [loadGitStates]);
 
   const selection = useMemo<ExplorerSelection | undefined>(() => {
     if (!location?.workspaceId) return undefined;
     const path = location.path ?? '';
-    const cachedEntry = [...cache.values()].flatMap((entry) => entry.entries).find((entry) => entry.path === path);
+    const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+    const cachedEntry = cache.get(directoryCacheKey(location.workspaceId, parentPath, showIgnored, mode))?.entries.find((entry) => entry.path === path);
     return {
       nodeId: explorerNodeId(location.workspaceId, path),
       kind: path ? (cachedEntry?.type ?? 'file') : 'workspace',
       workspaceId: location.workspaceId,
       path
     };
-  }, [cache, location]);
+  }, [cache, location, mode, showIgnored]);
 
   const loadDirectory = useCallback(async (workspaceId: string, path: string, force = false) => {
 		if (mode === 'sources' && path === '') return;
 		const key = directoryCacheKey(workspaceId, path, showIgnored, mode);
-    if (!force && ['loading', 'loaded'].includes(cacheRef.current.get(key)?.state ?? '')) return;
+    if (!force && (inFlightDirectories.current.has(key) || ['loading', 'loaded'].includes(cacheRef.current.get(key)?.state ?? ''))) return;
+    if (force) directoryAbortControllers.current.get(key)?.abort();
+    const id = ++requestID.current;
+    const controller = new AbortController();
+    inFlightDirectories.current.set(key, id);
+    directoryAbortControllers.current.set(key, controller);
     setCache((current) => new Map(current).set(key, { state: 'loading', entries: [], hiddenCount: 0 }));
     try {
-      const listing = await api.workspaceTree(workspaceId, path, showIgnored);
+      const listing = force
+        ? await api.workspaceTree(workspaceId, path, showIgnored, true, controller.signal)
+        : await api.workspaceTree(workspaceId, path, showIgnored, false, controller.signal);
+      if (controller.signal.aborted || inFlightDirectories.current.get(key) !== id) return;
       setCache((current) => new Map(current).set(key, { state: 'loaded', entries: listing.entries, hiddenCount: listing.hiddenCount }));
     } catch (error) {
+      if (controller.signal.aborted || inFlightDirectories.current.get(key) !== id) return;
       setCache((current) => new Map(current).set(key, { state: 'error', entries: [], hiddenCount: 0, error: error instanceof Error ? error.message : 'Directory failed to load' }));
+    } finally {
+      if (inFlightDirectories.current.get(key) === id) inFlightDirectories.current.delete(key);
+      if (directoryAbortControllers.current.get(key) === controller) directoryAbortControllers.current.delete(key);
     }
 	}, [mode, showIgnored]);
 
@@ -104,20 +157,23 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
   const setShowIgnored = useCallback((value: boolean) => {
     setShowIgnoredState(value);
     writePreference(ignoredStorageKey, String(value));
+    abortDirectoryRequests();
     setCache(new Map());
-  }, []);
+  }, [abortDirectoryRequests]);
 
   const refresh = useCallback(() => {
+    abortDirectoryRequests();
     setCache(new Map());
     for (const id of expandedNodeIds) {
       const separator = id.indexOf(':');
       void loadDirectory(id.slice(0, separator), id.slice(separator + 1), true);
     }
     void loadGitStates();
-  }, [expandedNodeIds, loadDirectory, loadGitStates]);
+  }, [abortDirectoryRequests, expandedNodeIds, loadDirectory, loadGitStates]);
 
   const refreshWorkspaceBranch = useCallback(async (workspaceId: string) => {
     const prefix = `${workspaceId}:`;
+    abortDirectoryRequests((key) => key.startsWith(prefix));
     setCache((current) => new Map([...current].filter(([key]) => !key.startsWith(prefix))));
     setGitStateByPath((current) => new Map([...current].filter(([key]) => !key.startsWith(prefix))));
     const paths = [...expandedNodeIds]
@@ -125,11 +181,21 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
       .map((id) => id.slice(prefix.length));
     await Promise.all(paths.map((path) => loadDirectory(workspaceId, path, true)));
     await Promise.all([loadGitStates(), loadDecorations()]);
-  }, [expandedNodeIds, loadDecorations, loadDirectory, loadGitStates]);
+  }, [abortDirectoryRequests, expandedNodeIds, loadDecorations, loadDirectory, loadGitStates]);
 
   const select = useCallback((workspaceId: string, path: string) => onLocationChange?.({ workspaceId, path: path || undefined }), [onLocationChange]);
 
   const invalidateDirectories = useCallback(async (workspaceId: string, paths: string[]) => {
+    for (const path of paths) {
+      for (const treeMode of ['sources', 'all'] as const) {
+        inFlightDirectories.current.delete(directoryCacheKey(workspaceId, path, false, treeMode));
+        inFlightDirectories.current.delete(directoryCacheKey(workspaceId, path, true, treeMode));
+        directoryAbortControllers.current.get(directoryCacheKey(workspaceId, path, false, treeMode))?.abort();
+        directoryAbortControllers.current.delete(directoryCacheKey(workspaceId, path, false, treeMode));
+        directoryAbortControllers.current.get(directoryCacheKey(workspaceId, path, true, treeMode))?.abort();
+        directoryAbortControllers.current.delete(directoryCacheKey(workspaceId, path, true, treeMode));
+      }
+    }
     setCache((current) => {
       const next = new Map(current);
       for (const path of paths) {
@@ -143,6 +209,8 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
     await Promise.all(paths.filter((path) => expandedNodeIds.has(explorerNodeId(workspaceId, path))).map((path) => loadDirectory(workspaceId, path, true)));
     await loadGitStates();
   }, [expandedNodeIds, loadDirectory, loadGitStates]);
+
+  useEffect(() => () => abortDirectoryRequests(), [abortDirectoryRequests]);
 
   const expandToPath = useCallback(async (workspaceId: string, path: string, type: 'file' | 'directory' = 'file') => {
     const ancestors = ancestorDirectoryPaths(path, type);

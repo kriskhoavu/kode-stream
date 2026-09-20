@@ -6,13 +6,7 @@ import { api } from './shared/api';
 import type { WorkspaceConfig } from './lib/types';
 
 vi.mock('./pages/CanvasPage', () => ({
-  CanvasPage: ({ workspace }: { workspace?: WorkspaceConfig }) => <div data-testid="canvas-page">Canvas for {workspace?.name ?? 'none'}</div>
-}));
-
-vi.mock('./pages/SessionsPage', () => ({
-  SessionsPage: ({ onOpenSession }: { onOpenSession: (workspaceId: string, sessionNodeId: string) => void }) => (
-    <button type="button" onClick={() => onOpenSession('workspace-b', 'session:session-1')}>Open session in Workspace B</button>
-  )
+  CanvasPage: ({ workspace, location }: { workspace?: WorkspaceConfig; location?: { view?: string } }) => <div data-testid="canvas-page">{location?.view === 'sessions' ? 'Sessions' : 'Canvas'} for {workspace?.name ?? 'none'}</div>
 }));
 
 function workspace(id: string, name: string): WorkspaceConfig {
@@ -104,7 +98,21 @@ describe('App route transitions', () => {
 });
 
 describe('App workspace routing', () => {
-  it('opening a session from a non-active workspace navigates to its canvas and selects that workspace', async () => {
+	it('restores the URL-selected workspace in the page, sidebar, and header after reload', async () => {
+		vi.spyOn(api, 'state').mockResolvedValue({ mode: 'local' } as never);
+		vi.spyOn(api, 'workspaces').mockResolvedValue([workspace('workspace-a', 'Workspace A'), workspace('workspace-b', 'Workspace B')]);
+		localStorage.setItem('kodeStream.activeWorkspaceId', 'workspace-a');
+		window.history.replaceState(null, '', '/canvas?workspaceId=workspace-b');
+
+		render(<App />);
+
+		expect(await screen.findByTestId('canvas-page')).toHaveTextContent('Canvas for Workspace B');
+		expect(await screen.findByRole('button', { name: 'Workspace B', expanded: false })).toBeInTheDocument();
+		await waitFor(() => expect(screen.getAllByRole('button', { name: 'Workspace B' }).find((button) => button.classList.contains('workspace-button'))).toHaveClass('active'));
+		expect(localStorage.getItem('kodeStream.activeWorkspaceId')).toBe('workspace-b');
+	});
+
+  it('opens the legacy Sessions URL as the active workspace Sessions view', async () => {
     vi.spyOn(api, 'state').mockResolvedValue({ mode: 'local' } as never);
     vi.spyOn(api, 'workspaces').mockResolvedValue([workspace('workspace-a', 'Workspace A'), workspace('workspace-b', 'Workspace B')]);
     localStorage.setItem('kodeStream.activeWorkspaceId', 'workspace-a');
@@ -114,11 +122,7 @@ describe('App workspace routing', () => {
 
     expect(await screen.findByRole('button', { name: 'Workspace A', expanded: false })).toBeInTheDocument();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open session in Workspace B' }));
-
-    await waitFor(() => expect(window.location.pathname).toBe('/canvas'));
-    expect(await screen.findByTestId('canvas-page')).toHaveTextContent('Canvas for Workspace B');
-    expect(screen.getByRole('button', { name: 'Workspace B', expanded: false })).toBeInTheDocument();
-    expect(localStorage.getItem('kodeStream.activeWorkspaceId')).toBe('workspace-b');
+    expect(await screen.findByTestId('canvas-page')).toHaveTextContent('Sessions for Workspace A');
+    expect(screen.queryByRole('button', { name: 'Sessions' })).not.toBeInTheDocument();
   });
 });
