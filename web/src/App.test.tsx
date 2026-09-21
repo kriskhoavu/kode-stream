@@ -65,7 +65,7 @@ describe('LocalServerUnavailable', () => {
 });
 
 describe('App route transitions', () => {
-  it('navigates from quick search and announces browser back/forward transitions', async () => {
+  it('navigates from quick search, focuses the page, and omits the redundant Workstream announcement', async () => {
     vi.stubGlobal('fetch', vi.fn((path: string) => {
       const payload = path.includes('/api/state')
         ? { mode: 'local' }
@@ -86,7 +86,7 @@ describe('App route transitions', () => {
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe('/workstream'));
     await waitFor(() => expect(document.title).toBe('Workstream · Kode Stream'));
-    expect(screen.getByText('Navigated to workstream')).toBeInTheDocument();
+    expect(screen.queryByText('Navigated to workstream')).not.toBeInTheDocument();
     expect(document.getElementById('app-main')).toHaveFocus();
 
     window.history.forward();

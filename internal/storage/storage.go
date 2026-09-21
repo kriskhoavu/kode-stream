@@ -594,6 +594,10 @@ DELETE FROM scan_warnings WHERE workspace_id NOT IN (SELECT id FROM workspaces);
 		Version: 10,
 		Name:    "cloud_workspace_publication_revisions",
 		SQL:     `ALTER TABLE cloud_workspaces ADD COLUMN publication_revision INTEGER NOT NULL DEFAULT 0;`,
+	}, {
+		Version: 11,
+		Name:    "canvas_terminal_dimensions",
+		SQL:     `ALTER TABLE canvas_placements ADD COLUMN width REAL; ALTER TABLE canvas_placements ADD COLUMN height REAL;`,
 	}}
 }
 
@@ -607,7 +611,8 @@ func postgresMigrations() []Migration {
 		{Version: 7, Name: "repair_orphan_workspace_projections", SQL: repairOrphanWorkspaceProjectionsDDL},
 		{Version: 8, Name: "legacy_import_coordination", SQL: `CREATE TABLE IF NOT EXISTS import_locks (source_name TEXT PRIMARY KEY, acquired_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP);`},
 		{Version: 9, Name: "cloud_agent_enrollment_tokens", SQL: `CREATE TABLE IF NOT EXISTS cloud_agent_enrollment_tokens (id TEXT PRIMARY KEY, expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ NOT NULL);`},
-		{Version: 10, Name: "cloud_workspace_publication_revisions", SQL: `ALTER TABLE cloud_workspaces ADD COLUMN IF NOT EXISTS publication_revision BIGINT NOT NULL DEFAULT 0;`}}
+		{Version: 10, Name: "cloud_workspace_publication_revisions", SQL: `ALTER TABLE cloud_workspaces ADD COLUMN IF NOT EXISTS publication_revision BIGINT NOT NULL DEFAULT 0;`},
+		{Version: 11, Name: "canvas_terminal_dimensions", SQL: `ALTER TABLE canvas_placements ADD COLUMN IF NOT EXISTS width DOUBLE PRECISION; ALTER TABLE canvas_placements ADD COLUMN IF NOT EXISTS height DOUBLE PRECISION;`}}
 
 }
 

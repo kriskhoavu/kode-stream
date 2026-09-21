@@ -99,7 +99,7 @@
 .canvas-section-boundary .canvas-section-move-handle { display: flex; align-items: center; gap: 8px; width: auto; height: auto; padding: 0; color: var(--muted); cursor: grab; }
 .canvas-section-boundary .canvas-section-move-handle:hover, .canvas-section-boundary .canvas-section-move-handle:focus-visible { background: transparent; color: var(--muted); outline: 2px solid var(--focus); outline-offset: 3px; }
 .canvas-section-boundary .canvas-section-move-handle:active { cursor: grabbing; }
-.canvas-semantic-node.expanded.kind-session { display: flex; flex-direction: column; width: 660px; min-height: 500px; }
+.canvas-semantic-node.expanded.kind-session { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 500px; overflow: visible; }
 .canvas-node-select-target { cursor: grab; }
 .canvas-node-select-target:active { cursor: grabbing; }
 .canvas-semantic-node.selected { border-color: var(--orange); box-shadow: 0 0 0 2px color-mix(in srgb, var(--orange) 32%, transparent), 0 10px 28px rgb(0 0 0 / .12); }
@@ -175,7 +175,7 @@ body.is-resizing-panel .canvas-workbench-resize-handle { opacity: 1; }
 .canvas-reference-warning { border-left: 4px solid var(--danger); }
 .canvas-verification .verification-summary.freshness-stale, .canvas-verification .verification-summary.freshness-inconclusive { padding: 9px; border: 1px dashed var(--line); border-radius: 8px; background: var(--panel-soft); }
 .canvas-verification .verification-summary.freshness-fresh.result-passed { padding: 9px; border: 1px solid color-mix(in srgb, var(--green) 40%, var(--line)); border-radius: 8px; }
-.canvas-session-terminal { border-top: 1px solid var(--line); background: var(--panel); cursor: default; }
+.canvas-session-terminal { overflow: hidden; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; background: var(--panel); cursor: default; }
 .canvas-semantic-node.expanded.kind-session .canvas-session-terminal { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
 .canvas-session-terminal[hidden] { display: none; }
 .canvas-session-terminal .embedded-terminal-panel.active { height: 430px; }
@@ -196,7 +196,6 @@ body.is-resizing-panel .canvas-workbench-resize-handle { opacity: 1; }
 @media (max-width: 1020px) { .canvas-search { flex-basis: 220px; min-width: 0; } }
 @media (max-width: 800px) { .canvas-toolbar { min-height: 0; overflow-y: auto; } .canvas-search { min-width: 0; } .canvas-board-toolbar > button, .workbench-view-switcher { flex: 1 1 auto; } .canvas-facet-row { align-items: stretch; flex-direction: column; } .canvas-facet-row .facet-bar { display: grid; grid-template-columns: 1fr; } .canvas-facet-row .facet-menu, .canvas-facet-row .facet-trigger, .canvas-focus-toggle { width: 100%; } .canvas-board { inset-block-start: 316px; } }
 @media (max-width: 900px) { .canvas-workbench.open { position: absolute; z-index: 8; inset: 0 0 0 auto; width: min(var(--canvas-workbench-width, 410px), 94vw); max-width: 94vw; box-shadow: -16px 0 36px rgb(0 0 0 / .18); } }
-@media (max-width: 800px) { .canvas-semantic-node.expanded.kind-session { width: 560px; } }
 @media (prefers-reduced-motion: reduce) { .canvas-semantic-node, .canvas-workbench { transition: none; } }
 
 /* Compact session tables remain available to Workbench session surfaces. */

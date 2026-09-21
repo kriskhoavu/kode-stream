@@ -43,6 +43,7 @@ describe('WorkstreamPage', () => {
 
     expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/workspaces/r1/git/status')).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/workspaces/r1/git/branches')).toHaveLength(1);
+    expect(screen.queryByText('Discovery refreshed')).not.toBeInTheDocument();
   });
 
   it('renders status columns from cached plan summaries', async () => {

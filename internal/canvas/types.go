@@ -21,6 +21,11 @@ type Position struct {
 	Y float64 `json:"y" yaml:"y"`
 }
 
+type Size struct {
+	Width  float64 `json:"width" yaml:"width"`
+	Height float64 `json:"height" yaml:"height"`
+}
+
 type EntityRef struct {
 	Kind           EntityKind `json:"kind" yaml:"kind"`
 	WorkspaceID    string     `json:"workspaceId" yaml:"workspaceId"`
@@ -48,6 +53,7 @@ type Placement struct {
 	NodeID    string    `json:"nodeId" yaml:"nodeId"`
 	EntityRef EntityRef `json:"entityRef" yaml:"entityRef"`
 	Position  Position  `json:"position" yaml:"position"`
+	Size      *Size     `json:"size,omitempty" yaml:"size,omitempty"`
 	Collapsed bool      `json:"collapsed" yaml:"collapsed"`
 	Hidden    bool      `json:"hidden,omitempty" yaml:"hidden,omitempty"`
 	Revision  int64     `json:"revision" yaml:"revision"`
@@ -58,6 +64,7 @@ type PlacementPatch struct {
 	NodeID           string    `json:"nodeId"`
 	EntityRef        EntityRef `json:"entityRef,omitempty"`
 	Position         Position  `json:"position"`
+	Size             *Size     `json:"size,omitempty"`
 	Collapsed        bool      `json:"collapsed"`
 	ExpectedRevision int64     `json:"expectedRevision"`
 }

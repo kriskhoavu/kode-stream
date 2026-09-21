@@ -4,7 +4,7 @@ import { Background, Handle, NodeResizer, Position, ReactFlow, ReactFlowProvider
 import type { Edge, Node as XYNode, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
 import { Bot, Box, ChevronDown, Expand, Eye, EyeOff, GitBranch, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Play, Plus, RotateCcw, Search, Square, TerminalSquare, Trash2, WandSparkles, Workflow, X } from 'lucide-react';
 import { api } from '../../shared/api';
-import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasSection, CanvasViewport, EmbeddedAISessionResult, EmbeddedAISessionState, GitStatus, SafeSessionRecord } from '../../lib/types';
+import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasSection, CanvasSize, CanvasViewport, EmbeddedAISessionResult, EmbeddedAISessionState, GitStatus, SafeSessionRecord } from '../../lib/types';
 import { EmbeddedTerminal } from '../ai-session/EmbeddedTerminal';
 import { readPreference, writePreference } from '../../shared/preferences/store';
 import { WorkbenchViewSwitcher } from './WorkbenchViewSwitcher';
@@ -17,6 +17,7 @@ interface CanvasNodeData extends Record<string, unknown> {
 	conflicted: boolean;
 	onSelect: (id?: string, additive?: boolean) => void;
 	onKeyboardMove: (node: DomainNode, position: CanvasPosition) => void;
+	onResizeNode: (id: string, size: CanvasSize) => void;
 	onSetCollapsed: (id: string, collapsed: boolean) => void;
 	onReload: () => Promise<unknown> | void;
 	layoutAvailable: boolean;
@@ -42,18 +43,18 @@ function isFocusActiveSession(node: DomainNode): boolean {
  * row from the tallest node it contains (see focusNodeSize). */
 const FOCUS_GUTTER = 40;
 const FOCUS_PLAN_WIDTH = 245;
-const FOCUS_SESSION_PITCH = 660 + FOCUS_GUTTER;
+const DEFAULT_SESSION_SIZE = { width: 660, height: 500 };
 
 function focusNodeSize(node: DomainNode, focusOn: boolean): { width: number; height: number } {
 	const expanded = Boolean(node.session) && (focusOn || !node.collapsed);
-	return expanded ? { width: 660, height: 500 } : { width: 245, height: 116 };
+	return expanded ? node.size ?? DEFAULT_SESSION_SIZE : { width: 245, height: 116 };
 }
 
 type CanvasFlowNode = XYNode<CanvasNodeData>;
 
 const nodeTypes = { workspace: memo(WorkspaceCanvasNode), plan: memo(PlanCanvasNode), session: memo(SessionCanvasNode), section: memo(CanvasSectionNode) };
 
-export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onOpenSessions, onMoveNode, onSetCollapsed, onArrange, serviceGridColumns = 1, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onOpenAISession, aiSessionDisabled = true }: {
+export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onOpenSessions, onMoveNode, onResizeNode = () => {}, onSetCollapsed, onArrange, serviceGridColumns = 1, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onOpenAISession, aiSessionDisabled = true }: {
 	projection: CanvasProjection;
 	sections?: CanvasSection[];
 	conflicts: string[];
@@ -61,6 +62,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	onSelect: (id?: string) => void;
 	onOpenSessions?: () => void;
 	onMoveNode: (id: string, position: CanvasPosition) => void;
+	onResizeNode?: (id: string, size: CanvasSize) => void;
 	onSetCollapsed: (id: string, collapsed: boolean) => void;
 	onArrange: (grouping: 'status' | 'service' | 'service_status' | 'service_grid') => void;
 	serviceGridColumns?: number;
@@ -156,8 +158,9 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 			let rowHeight = focusNodeSize(plan, focusOn).height;
 			for (const session of sessionsByPlan.get(plan.id) ?? []) {
 				positions.set(session.id, { x, y });
-				x += FOCUS_SESSION_PITCH;
-				rowHeight = Math.max(rowHeight, focusNodeSize(session, focusOn).height);
+				const size = focusNodeSize(session, focusOn);
+				x += size.width + FOCUS_GUTTER;
+				rowHeight = Math.max(rowHeight, size.height);
 			}
 			y += rowHeight + FOCUS_GUTTER;
 		}
@@ -199,18 +202,21 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 		draggable: false,
 		selectable: false,
 		style: { width: section.width, height: section.height, zIndex: 0, pointerEvents: 'none' },
-		data: { node: {} as DomainNode, section, selected: false, conflicted: false, onSelect: () => {}, onKeyboardMove: () => {}, onSetCollapsed: () => {}, onReload, layoutAvailable, onRemoveSection, onMoveSection }
+		data: { node: {} as DomainNode, section, selected: false, conflicted: false, onSelect: () => {}, onKeyboardMove: () => {}, onResizeNode: () => {}, onSetCollapsed: () => {}, onReload, layoutAvailable, onRemoveSection, onMoveSection }
 	}))), ...visibleDomainNodes.map((node): CanvasFlowNode => {
 		const renderNode = focusOn && node.kind === 'session' ? { ...node, collapsed: false } : node;
+		const expandedSession = renderNode.kind === 'session' && !renderNode.collapsed;
+		const size = expandedSession ? focusNodeSize(renderNode, focusOn) : undefined;
 		return {
 			id: node.id,
 			type: node.kind,
 			position: effectivePosition(node),
 			draggable: focusOn ? false : canMove(node, layoutAvailable),
 			selectable: true,
-			data: { node: renderNode, selected: node.id === selectedId, sectionSelected: sectionSelection.includes(node.id), conflicted: conflicts.includes(node.id), onSelect: (id, additive) => additive && id ? toggleSectionSelection(id) : onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), onSetCollapsed, onReload, layoutAvailable, focusOn }
+			style: size,
+			data: { node: renderNode, selected: node.id === selectedId, sectionSelected: sectionSelection.includes(node.id), conflicted: conflicts.includes(node.id), onSelect: (id, additive) => additive && id ? toggleSectionSelection(id) : onSelect(id), onKeyboardMove: (candidate, position) => onMoveNode(candidate.id, position), onResizeNode, onSetCollapsed, onReload, layoutAvailable, focusOn }
 		};
-	})], [conflicts, effectivePosition, focusOn, layoutAvailable, onMoveNode, onMoveSection, onReload, onRemoveSection, onSelect, onSetCollapsed, sectionSelection, selectedId, visibleDomainNodes, visibleSections]);
+	})], [conflicts, effectivePosition, focusOn, layoutAvailable, onMoveNode, onMoveSection, onReload, onRemoveSection, onResizeNode, onSelect, onSetCollapsed, sectionSelection, selectedId, visibleDomainNodes, visibleSections]);
 	const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNode>(modelNodes);
 	useEffect(() => setNodes(modelNodes), [modelNodes, setNodes]);
 	const focusNodeIdsKey = useMemo(() => nodes.map((node) => node.id).join(','), [nodes]);
@@ -420,7 +426,7 @@ function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	// virtual collapsed state through onSetCollapsed. Hide the disclosure and make close
 	// a no-op instead.
 	const disclosure = record && !data.focusOn ? <button className="icon-button canvas-node-action nodrag nopan" type="button" aria-label={expanded ? 'Collapse session terminal' : 'Expand session terminal'} title={expanded ? 'Collapse terminal' : 'Expand terminal'} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); data.onSetCollapsed(data.node.id, expanded); }}>{expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button> : undefined;
-	return <NodeFrame data={data} eyebrow="Session" icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => { if (!data.focusOn) data.onSetCollapsed(data.node.id, true); }} onReload={data.onReload} /> : undefined}>
+	return <NodeFrame data={data} eyebrow="Session" icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded && !data.focusOn} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => { if (!data.focusOn) data.onSetCollapsed(data.node.id, true); }} onReload={data.onReload} /> : undefined}>
 		<strong>{record?.provider || 'Unavailable session'}</strong>
 		<span className={`canvas-session-state state-${record?.state || 'stale'}`}><Play size={11} /> {record?.state || stateLabel(data.node)}</span>
 		<span>{record?.requestedBranch || data.node.entityRef.branchKey}</span>
@@ -429,7 +435,7 @@ function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 
 function NodeFrame({ data, eyebrow, icon, children, addon, action, expanded = false, resizable = false }: { data: CanvasNodeData; eyebrow: string; icon: React.ReactNode; children: React.ReactNode; addon?: React.ReactNode; action?: React.ReactNode; expanded?: boolean; resizable?: boolean }) {
 	return <div className={`canvas-semantic-node kind-${data.node.kind} state-${data.node.state}${data.selected ? ' selected' : ''}${data.sectionSelected ? ' section-selected' : ''}${data.conflicted ? ' conflicted' : ''}${expanded ? ' expanded' : ''}`}>
-		{resizable && <NodeResizer isVisible minWidth={520} minHeight={500} handleClassName="canvas-session-resize-handle" lineClassName="canvas-session-resize-line" />}
+		{resizable && <NodeResizer isVisible minWidth={520} minHeight={500} maxWidth={5000} maxHeight={5000} handleClassName="canvas-session-resize-handle nodrag nopan" lineClassName="canvas-session-resize-line" onResizeEnd={(_, size) => data.onResizeNode(data.node.id, { width: Math.round(size.width), height: Math.round(size.height) })} />}
 		<Handle className="canvas-derived-handle" type="target" position={Position.Left} isConnectable={false} />
 		<div data-canvas-node-id={data.node.id} className="canvas-node-select-target" role="button" tabIndex={0} aria-label={`${eyebrow}: ${nodeSearchText(data.node)}`} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id, event.metaKey || event.ctrlKey); }} onKeyDown={(event) => {
 		if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); data.onSelect(data.node.id); return; }

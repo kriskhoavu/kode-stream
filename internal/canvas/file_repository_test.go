@@ -51,6 +51,26 @@ func TestFileRepositoryResolvesAndPatchesIndependentPlacements(t *testing.T) {
 	}
 }
 
+func TestFileRepositoryPersistsTerminalDimensionsAcrossOtherPlacementEdits(t *testing.T) {
+	repository := NewFileRepository(filepath.Join(t.TempDir(), "canvases.yaml"))
+	layout, _, err := repository.ResolveDefault("", "workspace-1", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	size := &Size{Width: 840, Height: 620}
+	created, err := repository.PatchPlacements(layout.ID, []PlacementPatch{{NodeID: "session:one", EntityRef: EntityRef{Kind: EntitySession, WorkspaceID: "workspace-1", SessionID: "one", BranchKey: "main"}, Position: Position{X: 10, Y: 20}, Size: size}})
+	if err != nil || len(created) != 1 || created[0].Size == nil || *created[0].Size != *size {
+		t.Fatalf("created = %#v err=%v", created, err)
+	}
+	updated, err := repository.PatchPlacements(layout.ID, []PlacementPatch{{NodeID: "session:one", Position: Position{X: 30, Y: 40}, ExpectedRevision: 1}})
+	if err != nil || len(updated) != 1 || updated[0].Size == nil || *updated[0].Size != *size {
+		t.Fatalf("updated = %#v err=%v", updated, err)
+	}
+	if _, err := repository.PatchPlacements(layout.ID, []PlacementPatch{{NodeID: "plan:one", EntityRef: EntityRef{Kind: EntityPlan, WorkspaceID: "workspace-1", ItemID: "one", ItemPath: "plans/one", BranchKey: "main"}, Size: size}}); err == nil {
+		t.Fatal("plan placement accepted terminal dimensions")
+	}
+}
+
 func TestFileRepositoryInitializesLayoutAndSeedAtomically(t *testing.T) {
 	repository := NewFileRepository(filepath.Join(t.TempDir(), "canvases.yaml"))
 	_, created, err := repository.InitializeDefault("owner", "workspace-1", "main", []Placement{{NodeID: "invalid", EntityRef: EntityRef{Kind: EntityPlan, WorkspaceID: "workspace-1"}, Revision: 1, UpdatedAt: time.Now()}})

@@ -22,7 +22,7 @@ vi.mock('@xyflow/react', async () => {
 		Background: () => null,
 		Controls: () => <div data-testid="flow-controls" />,
 		Handle: () => null,
-		NodeResizer: ({ handleClassName }: { handleClassName?: string }) => <div data-testid="node-resizer" className={handleClassName} />,
+		NodeResizer: ({ handleClassName, onResizeEnd }: { handleClassName?: string; onResizeEnd?: (event: unknown, size: { width: number; height: number }) => void }) => <button type="button" data-testid="node-resizer" className={handleClassName} onClick={() => onResizeEnd?.({}, { width: 840, height: 620 })}>Resize terminal</button>,
 		Position: { Left: 'left', Right: 'right' },
 		useNodesState: <T,>(initial: T[]) => [initial, vi.fn(), vi.fn()],
 		useReactFlow: () => {
@@ -60,16 +60,19 @@ describe('CanvasBoard', () => {
 		vi.mocked(api.embeddedAISessionGrant).mockResolvedValue({ sessionId: 'session-1', token: 'grant', expiresAt: '' });
 		const onSelect = vi.fn();
 		const onSetCollapsed = vi.fn();
-		const view = renderBoard(baseProjection(), { selectedId: 'session:session-1', onSelect, onSetCollapsed });
+		const onResizeNode = vi.fn();
+		const view = renderBoard(baseProjection(), { selectedId: 'session:session-1', onSelect, onSetCollapsed, onResizeNode });
 		expect(screen.queryByTestId('canvas-terminal-session-1')).not.toBeInTheDocument();
 		expect(api.embeddedAISession).not.toHaveBeenCalled();
 		fireEvent.click(screen.getByRole('button', { name: 'Expand session terminal' }));
 		expect(onSetCollapsed).toHaveBeenCalledWith('session:session-1', false);
 		const expanded = baseProjection();
 		expanded.nodes[2] = { ...expanded.nodes[2], collapsed: false };
-		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} selectedId="session:session-1" onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
+		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} selectedId="session:session-1" onSelect={onSelect} onMoveNode={vi.fn()} onResizeNode={onResizeNode} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
 		expect(await screen.findByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');
 		expect(screen.getByTestId('node-resizer')).toHaveClass('canvas-session-resize-handle');
+		fireEvent.click(screen.getByTestId('node-resizer'));
+		expect(onResizeNode).toHaveBeenCalledWith('session:session-1', { width: 840, height: 620 });
 		fireEvent.change(screen.getByLabelText('Terminal prompt'), { target: { value: 'review this change' } });
 		view.rerender(<CanvasBoard projection={expanded} conflicts={[]} onSelect={onSelect} onMoveNode={vi.fn()} onSetCollapsed={onSetCollapsed} onArrange={vi.fn()} onSaveViewport={vi.fn()} onReload={vi.fn()} onReloadPosition={vi.fn()} onReapplyPosition={vi.fn()} onReset={vi.fn()} onRemove={vi.fn()} />);
 		expect(screen.getByTestId('canvas-terminal-session-1')).toHaveAttribute('data-visible', 'true');

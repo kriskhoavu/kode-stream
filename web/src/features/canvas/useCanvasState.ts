@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../shared/api';
-import type { CanvasNode, CanvasPlacementPatch, CanvasPosition, CanvasProjection, CanvasViewport } from '../../lib/types';
+import type { CanvasNode, CanvasPlacementPatch, CanvasPosition, CanvasProjection, CanvasSize, CanvasViewport } from '../../lib/types';
 
 interface DirtyPlacement {
 	patch: CanvasPlacementPatch;
@@ -238,9 +238,21 @@ export function useCanvasState(workspaceId?: string) {
 		if (!current || !node) return;
 		const existing = dirtyRef.current.get(nodeId);
 		const mutation = ++mutationRef.current;
-		dirtyRef.current.set(nodeId, { patch: { nodeId, entityRef: node.entityRef, position, collapsed: node.collapsed, expectedRevision: existing?.patch.expectedRevision ?? node.revision }, mutation, retries: 0 });
+		dirtyRef.current.set(nodeId, { patch: { nodeId, entityRef: node.entityRef, position, size: node.size, collapsed: node.collapsed, expectedRevision: existing?.patch.expectedRevision ?? node.revision }, mutation, retries: 0 });
 		setSaveStatus('saving');
 		setProjection({ ...current, nodes: current.nodes.map((candidate) => candidate.id === nodeId ? { ...candidate, position } : candidate) });
+		setDirtyVersion((version) => version + 1);
+	}, [setProjection]);
+
+	const resizeNode = useCallback((nodeId: string, size: CanvasSize) => {
+		const current = projectionRef.current;
+		const node = current?.nodes.find((candidate) => candidate.id === nodeId);
+		if (!current || !node || node.kind !== 'session') return;
+		const existing = dirtyRef.current.get(nodeId);
+		const mutation = ++mutationRef.current;
+		dirtyRef.current.set(nodeId, { patch: { nodeId, entityRef: node.entityRef, position: node.position, size, collapsed: node.collapsed, expectedRevision: existing?.patch.expectedRevision ?? node.revision }, mutation, retries: 0 });
+		setSaveStatus('saving');
+		setProjection({ ...current, nodes: current.nodes.map((candidate) => candidate.id === nodeId ? { ...candidate, size } : candidate) });
 		setDirtyVersion((version) => version + 1);
 	}, [setProjection]);
 
@@ -294,9 +306,9 @@ export function useCanvasState(workspaceId?: string) {
 			const latest = server.nodes.find((node) => node.id === nodeId);
 			if (!latest) throw new Error('The node is no longer placed.');
 			const mutation = ++mutationRef.current;
-			dirtyRef.current.set(nodeId, { patch: { nodeId, entityRef: latest.entityRef, position: local.position, collapsed: local.collapsed, expectedRevision: latest.revision }, mutation, retries: 0 });
+			dirtyRef.current.set(nodeId, { patch: { nodeId, entityRef: latest.entityRef, position: local.position, size: local.size, collapsed: local.collapsed, expectedRevision: latest.revision }, mutation, retries: 0 });
 			setConflicts((previous) => previous.filter((id) => id !== nodeId));
-			setProjection({ ...server, nodes: server.nodes.map((node) => node.id === nodeId ? { ...node, position: local.position } : node) });
+			setProjection({ ...server, nodes: server.nodes.map((node) => node.id === nodeId ? { ...node, position: local.position, size: local.size } : node) });
 			setDirtyVersion((version) => version + 1);
 		} catch (caught) {
 			setError(messageFrom(caught));
@@ -344,7 +356,7 @@ export function useCanvasState(workspaceId?: string) {
 		if (!current || !node || node.collapsed === collapsed) return;
 		const existing = dirtyRef.current.get(nodeId);
 		const mutation = ++mutationRef.current;
-		dirtyRef.current.set(nodeId, { patch: { nodeId, entityRef: node.entityRef, position: node.position, collapsed, expectedRevision: existing?.patch.expectedRevision ?? node.revision }, mutation, retries: 0 });
+		dirtyRef.current.set(nodeId, { patch: { nodeId, entityRef: node.entityRef, position: node.position, size: node.size, collapsed, expectedRevision: existing?.patch.expectedRevision ?? node.revision }, mutation, retries: 0 });
 		setSaveStatus('saving');
 		setProjection({ ...current, nodes: current.nodes.map((candidate) => candidate.id === nodeId ? { ...candidate, collapsed } : candidate) });
 		setDirtyVersion((version) => version + 1);
@@ -423,14 +435,14 @@ export function useCanvasState(workspaceId?: string) {
 		}
 	}, [moveNode]);
 
-	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, setNodeCollapsed, arrangePlans, saveViewport, reloadPosition, reapplyPosition, placeSession, removeNode, removeStalePlans, resetPositions, reload: load, refresh };
+	return { projection, loading, error, conflicts, dirtyCount, saveStatus, hasUnsavedChanges: dirtyCount > 0, moveNode, resizeNode, setNodeCollapsed, arrangePlans, saveViewport, reloadPosition, reapplyPosition, placeSession, removeNode, removeStalePlans, resetPositions, reload: load, refresh };
 }
 
 function overlayDirty(projection: CanvasProjection, dirty: Map<string, DirtyPlacement>): CanvasProjection {
 	if (dirty.size === 0) return projection;
 	return { ...projection, nodes: projection.nodes.map((node) => {
 		const entry = dirty.get(node.id);
-		return entry ? { ...node, position: entry.patch.position, collapsed: entry.patch.collapsed } : node;
+		return entry ? { ...node, position: entry.patch.position, size: entry.patch.size ?? node.size, collapsed: entry.patch.collapsed } : node;
 	}) };
 }
 

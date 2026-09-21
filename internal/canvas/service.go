@@ -59,6 +59,7 @@ type ProjectedNode struct {
 	State     NodeState      `json:"state"`
 	EntityRef EntityRef      `json:"entityRef"`
 	Position  Position       `json:"position"`
+	Size      *Size          `json:"size,omitempty"`
 	Collapsed bool           `json:"collapsed"`
 	Revision  int64          `json:"revision"`
 	Workspace *WorkspaceNode `json:"workspace,omitempty"`
@@ -524,7 +525,7 @@ func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceCo
 		if placement.Hidden {
 			continue
 		}
-		node := ProjectedNode{ID: placement.NodeID, Kind: placement.EntityRef.Kind, State: NodeResolved, EntityRef: placement.EntityRef, Position: placement.Position, Collapsed: placement.Collapsed, Revision: placement.Revision}
+		node := ProjectedNode{ID: placement.NodeID, Kind: placement.EntityRef.Kind, State: NodeResolved, EntityRef: placement.EntityRef, Position: placement.Position, Size: placement.Size, Collapsed: placement.Collapsed, Revision: placement.Revision}
 		if readForbidden {
 			node.State = NodeForbidden
 			node.EntityRef.Identifier = ""

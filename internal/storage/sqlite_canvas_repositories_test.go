@@ -64,3 +64,29 @@ func TestSQLiteCanvasAndSessionRepositoryContract(t *testing.T) {
 		t.Fatalf("deleted record ok=%v err=%v", ok, err)
 	}
 }
+
+func TestSQLiteCanvasRepositoryPersistsTerminalDimensions(t *testing.T) {
+	paths := testPaths(t.TempDir())
+	state, err := OpenAppOwnedState(paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil, databaseEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer state.SQLStore.Close()
+	layout, _, err := state.Canvas.ResolveDefault("", "workspace-1", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	size := &canvas.Size{Width: 840, Height: 620}
+	created, err := state.Canvas.PatchPlacements(layout.ID, []canvas.PlacementPatch{{NodeID: "session:one", EntityRef: canvas.EntityRef{Kind: canvas.EntitySession, WorkspaceID: "workspace-1", SessionID: "one", BranchKey: "main"}, Size: size}})
+	if err != nil || len(created) != 1 || created[0].Size == nil || *created[0].Size != *size {
+		t.Fatalf("created = %#v err=%v", created, err)
+	}
+	loaded, err := state.Canvas.Placements(layout.ID)
+	if err != nil || len(loaded) != 1 || loaded[0].Size == nil || *loaded[0].Size != *size {
+		t.Fatalf("loaded = %#v err=%v", loaded, err)
+	}
+	updated, err := state.Canvas.PatchPlacements(layout.ID, []canvas.PlacementPatch{{NodeID: "session:one", Position: canvas.Position{X: 60, Y: 70}, ExpectedRevision: loaded[0].Revision}})
+	if err != nil || len(updated) != 1 || updated[0].Size == nil || *updated[0].Size != *size {
+		t.Fatalf("updated = %#v err=%v", updated, err)
+	}
+}

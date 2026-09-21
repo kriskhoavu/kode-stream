@@ -15,6 +15,9 @@ const (
 	MaxPlacements          = 300
 	MaxPlacementBatch      = 50
 	MaxCoordinate          = 1_000_000
+	MinTerminalWidth       = 520
+	MinTerminalHeight      = 500
+	MaxTerminalDimension   = 5_000
 	MinZoom                = 0.1
 	MaxZoom                = 2.0
 	CurrentSnapshotVersion = 2
@@ -152,6 +155,14 @@ func validatePlacement(layout Layout, placement Placement) error {
 	if !finiteCoordinate(placement.Position.X) || !finiteCoordinate(placement.Position.Y) {
 		return errors.New("canvas position is outside allowed limits")
 	}
+	if placement.Size != nil {
+		if placement.EntityRef.Kind != EntitySession {
+			return errors.New("only canvas terminal sessions can have a custom size")
+		}
+		if !finiteDimension(placement.Size.Width, MinTerminalWidth) || !finiteDimension(placement.Size.Height, MinTerminalHeight) {
+			return errors.New("canvas terminal size is outside allowed limits")
+		}
+	}
 	return validateEntityRef(layout, placement.EntityRef)
 }
 
@@ -193,6 +204,10 @@ func validateViewport(viewport Viewport) error {
 
 func finiteCoordinate(value float64) bool {
 	return !math.IsNaN(value) && !math.IsInf(value, 0) && math.Abs(value) <= MaxCoordinate
+}
+
+func finiteDimension(value, minimum float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= minimum && value <= MaxTerminalDimension
 }
 
 func normalizeSnapshot(snapshot Snapshot) Snapshot {

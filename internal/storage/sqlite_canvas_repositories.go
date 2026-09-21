@@ -98,7 +98,7 @@ func (r *SQLiteCanvasRepository) InitializeDefaultContext(ctx context.Context, o
 			return canvas.Layout{}, false, err
 		}
 		refJSON, _ := json.Marshal(placement.EntityRef)
-		if _, err := tx.ExecContext(ctx, rebindSQL(r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`), placement.LayoutID, placement.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, databaseBoolValue(r.driver, placement.Collapsed), databaseBoolValue(r.driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt)); err != nil {
+		if _, err := tx.ExecContext(ctx, rebindSQL(r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, width, height, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`), placement.LayoutID, placement.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, canvasSizeWidth(placement.Size), canvasSizeHeight(placement.Size), databaseBoolValue(r.driver, placement.Collapsed), databaseBoolValue(r.driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt)); err != nil {
 			return canvas.Layout{}, false, err
 		}
 	}
@@ -165,7 +165,7 @@ func (r *SQLiteCanvasRepository) Placements(layoutID string) ([]canvas.Placement
 	} else if !ok {
 		return nil, canvas.ErrNotFound
 	}
-	rows, err := querySQL(r.db, r.driver, `SELECT layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at FROM canvas_placements WHERE layout_id = ? ORDER BY node_id`, layoutID)
+	rows, err := querySQL(r.db, r.driver, `SELECT layout_id, node_id, entity_ref_json, x, y, width, height, collapsed, hidden, revision, updated_at FROM canvas_placements WHERE layout_id = ? ORDER BY node_id`, layoutID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (r *SQLiteCanvasRepository) PlacementsContext(ctx context.Context, layoutID
 	} else if !found {
 		return nil, canvas.ErrNotFound
 	}
-	rows, err := r.db.QueryContext(ctx, rebindSQL(r.driver, `SELECT layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at FROM canvas_placements WHERE layout_id = ? ORDER BY node_id`), layoutID)
+	rows, err := r.db.QueryContext(ctx, rebindSQL(r.driver, `SELECT layout_id, node_id, entity_ref_json, x, y, width, height, collapsed, hidden, revision, updated_at FROM canvas_placements WHERE layout_id = ? ORDER BY node_id`), layoutID)
 	if err != nil {
 		return nil, err
 	}
@@ -260,11 +260,14 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 		if exists && current.Revision != patch.ExpectedRevision || !exists && patch.ExpectedRevision != 0 {
 			return nil, &canvas.PlacementConflictError{NodeIDs: []string{patch.NodeID}}
 		}
-		placement := canvas.Placement{LayoutID: layoutID, NodeID: patch.NodeID, EntityRef: patch.EntityRef, Position: patch.Position, Collapsed: patch.Collapsed, Revision: 1, UpdatedAt: r.now().UTC()}
+		placement := canvas.Placement{LayoutID: layoutID, NodeID: patch.NodeID, EntityRef: patch.EntityRef, Position: patch.Position, Size: patch.Size, Collapsed: patch.Collapsed, Revision: 1, UpdatedAt: r.now().UTC()}
 		if exists {
 			placement.Revision = current.Revision + 1
 			placement.EntityRef = current.EntityRef
 			placement.Hidden = current.Hidden
+			if patch.Size == nil {
+				placement.Size = current.Size
+			}
 		} else {
 			count++
 			if count > canvas.MaxPlacements {
@@ -276,7 +279,7 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 		}
 		refJSON, _ := json.Marshal(placement.EntityRef)
 		if exists {
-			result, err := execTx(tx, r.driver, `UPDATE canvas_placements SET entity_ref_json = ?, x = ?, y = ?, collapsed = ?, hidden = ?, revision = ?, updated_at = ? WHERE layout_id = ? AND node_id = ? AND revision = ?`, string(refJSON), placement.Position.X, placement.Position.Y, databaseBoolValue(r.driver, placement.Collapsed), databaseBoolValue(r.driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt), layoutID, patch.NodeID, patch.ExpectedRevision)
+			result, err := execTx(tx, r.driver, `UPDATE canvas_placements SET entity_ref_json = ?, x = ?, y = ?, width = ?, height = ?, collapsed = ?, hidden = ?, revision = ?, updated_at = ? WHERE layout_id = ? AND node_id = ? AND revision = ?`, string(refJSON), placement.Position.X, placement.Position.Y, canvasSizeWidth(placement.Size), canvasSizeHeight(placement.Size), databaseBoolValue(r.driver, placement.Collapsed), databaseBoolValue(r.driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt), layoutID, patch.NodeID, patch.ExpectedRevision)
 			if err != nil {
 				return nil, err
 			}
@@ -284,7 +287,7 @@ func (r *SQLiteCanvasRepository) PatchPlacements(layoutID string, patches []canv
 				return nil, &canvas.PlacementConflictError{NodeIDs: []string{patch.NodeID}}
 			}
 		} else {
-			_, err := execTx(tx, r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, layoutID, patch.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, databaseBoolValue(r.driver, placement.Collapsed), databaseBoolValue(r.driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt))
+			_, err := execTx(tx, r.driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, width, height, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, layoutID, patch.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, canvasSizeWidth(placement.Size), canvasSizeHeight(placement.Size), databaseBoolValue(r.driver, placement.Collapsed), databaseBoolValue(r.driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt))
 			if err != nil {
 				return nil, err
 			}
@@ -381,7 +384,7 @@ func replaceCanvasSnapshotTx(tx *sql.Tx, driver string, snapshot canvas.Snapshot
 	}
 	for _, placement := range snapshot.Placements {
 		refJSON, _ := json.Marshal(placement.EntityRef)
-		if _, err := execTx(tx, driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, placement.LayoutID, placement.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, databaseBoolValue(driver, placement.Collapsed), databaseBoolValue(driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt)); err != nil {
+		if _, err := execTx(tx, driver, `INSERT INTO canvas_placements (layout_id, node_id, entity_ref_json, x, y, width, height, collapsed, hidden, revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, placement.LayoutID, placement.NodeID, string(refJSON), placement.Position.X, placement.Position.Y, canvasSizeWidth(placement.Size), canvasSizeHeight(placement.Size), databaseBoolValue(driver, placement.Collapsed), databaseBoolValue(driver, placement.Hidden), placement.Revision, formatTime(placement.UpdatedAt)); err != nil {
 			return err
 		}
 	}
@@ -406,7 +409,8 @@ func scanCanvasPlacement(row sqlRow) (canvas.Placement, error) {
 	var placement canvas.Placement
 	var refJSON, updatedAt string
 	var collapsed, hidden any
-	err := row.Scan(&placement.LayoutID, &placement.NodeID, &refJSON, &placement.Position.X, &placement.Position.Y, &collapsed, &hidden, &placement.Revision, &updatedAt)
+	var width, height sql.NullFloat64
+	err := row.Scan(&placement.LayoutID, &placement.NodeID, &refJSON, &placement.Position.X, &placement.Position.Y, &width, &height, &collapsed, &hidden, &placement.Revision, &updatedAt)
 	if err != nil {
 		return canvas.Placement{}, err
 	}
@@ -415,17 +419,34 @@ func scanCanvasPlacement(row sqlRow) (canvas.Placement, error) {
 	}
 	placement.Collapsed = databaseBool(collapsed)
 	placement.Hidden = databaseBool(hidden)
+	if width.Valid && height.Valid {
+		placement.Size = &canvas.Size{Width: width.Float64, Height: height.Float64}
+	}
 	placement.UpdatedAt = parseTime(updatedAt)
 	return placement, nil
 }
 
 func getPlacementTx(tx *sql.Tx, driver, layoutID, nodeID string) (canvas.Placement, bool, error) {
-	row := tx.QueryRow(rebindSQL(driver, `SELECT layout_id, node_id, entity_ref_json, x, y, collapsed, hidden, revision, updated_at FROM canvas_placements WHERE layout_id = ? AND node_id = ?`), layoutID, nodeID)
+	row := tx.QueryRow(rebindSQL(driver, `SELECT layout_id, node_id, entity_ref_json, x, y, width, height, collapsed, hidden, revision, updated_at FROM canvas_placements WHERE layout_id = ? AND node_id = ?`), layoutID, nodeID)
 	placement, err := scanCanvasPlacement(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return canvas.Placement{}, false, nil
 	}
 	return placement, err == nil, err
+}
+
+func canvasSizeWidth(size *canvas.Size) any {
+	if size == nil {
+		return nil
+	}
+	return size.Width
+}
+
+func canvasSizeHeight(size *canvas.Size) any {
+	if size == nil {
+		return nil
+	}
+	return size.Height
 }
 
 func databaseBool(value any) bool {

@@ -497,12 +497,15 @@ func applyPlacementPatches(state Snapshot, layout Layout, patches []PlacementPat
 	}
 	updated := make([]Placement, 0, len(patches))
 	for _, patch := range patches {
-		placement := Placement{LayoutID: layout.ID, NodeID: patch.NodeID, EntityRef: patch.EntityRef, Position: patch.Position, Collapsed: patch.Collapsed, Revision: 1, UpdatedAt: now}
+		placement := Placement{LayoutID: layout.ID, NodeID: patch.NodeID, EntityRef: patch.EntityRef, Position: patch.Position, Size: patch.Size, Collapsed: patch.Collapsed, Revision: 1, UpdatedAt: now}
 		if index, ok := existing[patch.NodeID]; ok {
 			current := state.Placements[index]
 			placement.Revision = current.Revision + 1
 			placement.EntityRef = current.EntityRef
 			placement.Hidden = current.Hidden
+			if patch.Size == nil {
+				placement.Size = current.Size
+			}
 			if err := validatePlacement(layout, placement); err != nil {
 				return nil, state, err
 			}

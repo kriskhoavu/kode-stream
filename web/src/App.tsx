@@ -274,7 +274,7 @@ export function App() {
       {quickSwitcher.open && <SearchDialog workspaceId={activeRepo?.id} onClose={quickSwitcher.close} onNavigate={(path) => navigate(routeFromNavigationPath(path))} />}
 
       <main id="app-main" className="main-content" tabIndex={-1}>
-        <div className="sr-only" aria-live="polite">{dataStatus === 'unavailable' ? 'Application data is unavailable. Retry to continue.' : `Navigated to ${route.name}`}</div>
+        {(dataStatus === 'unavailable' || route.name !== 'workstream') && <div className="sr-only" aria-live="polite">{dataStatus === 'unavailable' ? 'Application data is unavailable. Retry to continue.' : `Navigated to ${route.name}`}</div>}
         {dataStatus === 'unavailable' && <section className="empty-state" role="alert"><p>Application data is unavailable. Your existing workspace view is retained.</p><button type="button" className="primary" onClick={() => void refreshAppData()}>Retry</button></section>}
         {route.name === 'workstream' && <Suspense fallback={<section className="empty-state">Loading Workstream...</section>}>
           <WorkstreamPage

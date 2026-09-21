@@ -1,6 +1,6 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
-import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { useModalDialog } from '../components/overlay';
 import { readStringPreference, writePreference } from '../shared/preferences/store';
@@ -662,10 +662,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     <section className="workstream-page">
       <div className="page-title workstream-title">
         <div className="workstream-heading">
-          <div>
-            <h1><WorkstreamIcon size={22} /> Workstream</h1>
-            <span><FolderGit2 size={15} /> {workspace?.name ?? 'No workspace selected'}</span>
-          </div>
+          <div><h1><WorkstreamIcon size={22} /> Workstream</h1></div>
         </div>
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">

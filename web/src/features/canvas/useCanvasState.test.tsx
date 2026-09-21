@@ -42,6 +42,20 @@ describe('useCanvasState', () => {
 		expect(result.current.saveStatus).toBe('saved');
 	});
 
+	it('resizes only terminal placements and persists the dimensions', async () => {
+		const session = { id: 'session:one', kind: 'session' as const, state: 'resolved' as const, entityRef: { kind: 'session' as const, workspaceId: 'workspace-1', sessionId: 'one', branchKey: 'main' }, position: { x: 40, y: 50 }, collapsed: false, revision: 1, session: { record: { id: 'one', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', requestedBranch: 'main', state: 'running' as const, startedAt: '', lastKnownAt: '', live: true } } };
+		const current = { ...projection(), nodes: [session] };
+		vi.mocked(api.resolveDefaultCanvas).mockResolvedValue(current);
+		vi.mocked(api.patchCanvasPlacements).mockResolvedValue({ ...current, nodes: [{ ...session, size: { width: 840, height: 620 }, revision: 2 }] });
+		const { result } = renderHook(() => useCanvasState('workspace-1'));
+		await act(async () => { await vi.runAllTimersAsync(); });
+
+		act(() => result.current.resizeNode('session:one', { width: 840, height: 620 }));
+		expect(result.current.projection?.nodes[0].size).toEqual({ width: 840, height: 620 });
+		await act(async () => { await vi.advanceTimersByTimeAsync(351); });
+		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'session:one', size: { width: 840, height: 620 }, expectedRevision: 1 })], expect.any(AbortSignal));
+	});
+
 	// A conflict means the layout moved under us, not that the move was unwanted.
 	// Discarding it silently dropped the position and left Canvas sections drawn
 	// for an arrangement the nodes never reached.
