@@ -395,17 +395,20 @@ const busy = pendingOperations.length > 0;
     setBusy(true);
     setNotice(null);
     try {
-      await api.updateWorkspace(repo.id, {
-        name: editDraft.name,
-        path: editDraft.path,
-        baselineBranch: editDraft.baselineBranch,
-        sources: parseSources(editDraft.sources),
-        registrationMode: repo.registrationMode,
-        remoteUrl: repo.remoteUrl,
-        jira: editDraft.jira ?? undefined,
-        knowledge: normalizeKnowledgeSettings(editDraft.knowledge),
-        runtime: editDraft.runtime ?? undefined
-      });
+      if (editingSection === 'runtime') {
+        await api.saveWorkspaceRuntime(repo.id, editDraft.runtime);
+      } else {
+        await api.updateWorkspace(repo.id, {
+          name: editDraft.name,
+          path: editDraft.path,
+          baselineBranch: editDraft.baselineBranch,
+          sources: parseSources(editDraft.sources),
+          registrationMode: repo.registrationMode,
+          remoteUrl: repo.remoteUrl,
+          jira: editDraft.jira ?? undefined,
+          knowledge: normalizeKnowledgeSettings(editDraft.knowledge)
+        });
+      }
       setEditingId('');
       setEditingSection('');
       setNotice({ tone: 'success', title: 'Workspace updated', details: [editDraft.name || repo.name] });
@@ -1520,7 +1523,7 @@ function RuntimeSettingsFields({ value, onChange }: { value: WorkspaceRuntimeCon
         </div>
         <div className="repo-field-grid">
           <label className="repo-field">Default environment<input value={automation.defaultEnvironment ?? 'local'} onChange={(event) => updateAutomation({ defaultEnvironment: event.target.value })} placeholder="local" /></label>
-          <label className="repo-field">Automation command template<input value={automation.commandTemplate ?? ''} onChange={(event) => updateAutomation({ commandTemplate: event.target.value })} placeholder={'CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec "{specs}"'} /></label>
+          <label className="repo-field">Automation command template<input value={automation.commandTemplate ?? ''} onChange={(event) => updateAutomation({ commandTemplate: event.target.value })} placeholder={'CYPRESS_EPSAP_ENVIRONMENT={env} npx cypress run --spec {specs}'} /></label>
         </div>
         <div className="repo-field"><span>Automation artifact paths</span>{automationArtifactPaths.map((artifactPath, index) => <div className="path-input-row" key={`automation-${artifactPath}-${index}`}><input value={artifactPath} onChange={(event) => updateAutomation({ artifactPaths: automationArtifactPaths.map((current, currentIndex) => currentIndex === index ? event.target.value : current) })} placeholder="cypress/videos" /><button className="secondary icon-action" type="button" aria-label={`Remove automation artifact path ${index + 1}`} onClick={() => updateAutomation({ artifactPaths: automationArtifactPaths.filter((_, currentIndex) => currentIndex !== index) })}>×</button></div>)}<button className="secondary" type="button" onClick={() => updateAutomation({ artifactPaths: [...automationArtifactPaths, ''] })}>Add automation artifact path</button></div>
       </fieldset>

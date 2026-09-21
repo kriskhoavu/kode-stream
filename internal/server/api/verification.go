@@ -44,11 +44,11 @@ func (a *verificationController) saveWorkspaceRuntime(w http.ResponseWriter, r *
 		writeError(w, http.StatusServiceUnavailable, "workspace service unavailable")
 		return
 	}
-	var input models.WorkspaceRuntimeConfig
+	var input *models.WorkspaceRuntimeConfig
 	if !decodeLimitedJSON(w, r, &input, maxVerificationMutationBodyBytes, true) {
 		return
 	}
-	runtimeConfig, err := a.workspaces.SaveRuntime(r.PathValue("id"), &input)
+	runtimeConfig, err := a.workspaces.SaveRuntime(r.PathValue("id"), input)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrWorkspaceNotFound) {
 			writeError(w, http.StatusNotFound, "workspace not found")

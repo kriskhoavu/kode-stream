@@ -928,6 +928,29 @@ func TestVerificationMutationRoutesRejectEveryInvalidBodyBeforeSideEffects(t *te
 	}
 }
 
+func TestWorkspaceRuntimeRouteClearsRuntimeOnNull(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	if _, err := apiHandler.verification.workspaces.SaveRuntime(workspace.ID, &models.WorkspaceRuntimeConfig{
+		Type:     models.RuntimeTypeCustom,
+		Commands: models.RuntimeCommandSet{Up: "true", Down: "true", Verify: models.RuntimeVerifyCommands{Smoke: "true"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	response := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/api/workspaces/"+workspace.ID+"/runtime", strings.NewReader("null")))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	updated, ok, err := apiHandler.verification.workspaces.Get(workspace.ID)
+	if err != nil || !ok {
+		t.Fatalf("workspace lookup: ok=%v err=%v", ok, err)
+	}
+	if updated.Runtime != nil {
+		t.Fatalf("runtime was not cleared: %#v", updated.Runtime)
+	}
+}
+
 func TestVerificationCreateReturnsQueueFullWithoutPartialJob(t *testing.T) {
 	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
 	if _, err := apiHandler.verification.workspaces.SaveRuntime(workspace.ID, &models.WorkspaceRuntimeConfig{Type: models.RuntimeTypeCustom, Commands: models.RuntimeCommandSet{Up: "true", Down: "true", Verify: models.RuntimeVerifyCommands{Smoke: "sleep 0.5"}}}); err != nil {

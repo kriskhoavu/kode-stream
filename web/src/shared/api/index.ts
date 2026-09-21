@@ -378,7 +378,7 @@ export const api = {
     if ('runtime' in payload) return payload.runtime;
     return payload;
   }),
-  saveWorkspaceRuntime: (workspaceId: string, input: WorkspaceRuntimeConfig) => request<WorkspaceRuntimeConfig>(`/api/workspaces/${encodeURIComponent(workspaceId)}/runtime`, { method: 'PUT', body: JSON.stringify(input) }),
+  saveWorkspaceRuntime: (workspaceId: string, input: WorkspaceRuntimeConfig | null) => request<WorkspaceRuntimeConfig | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/runtime`, { method: 'PUT', body: JSON.stringify(input) }),
   createVerificationJob: (workspaceId: string, input: CreateVerificationJobInput = {}, signal?: AbortSignal) =>
     request<VerificationJob>(`/api/workspaces/${encodeURIComponent(workspaceId)}/verification-jobs`, { method: 'POST', body: JSON.stringify(input), signal }, false),
   ingestVerificationCheckpoint: (workspaceId: string, input: { eventType: string; profile?: VerifyProfile; provider?: string; sessionId?: string; terminalMode?: string }) =>

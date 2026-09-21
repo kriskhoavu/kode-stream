@@ -9,6 +9,30 @@ afterEach(() => {
 });
 
 describe('existing workspace import state', () => {
+	it('removes a source without resubmitting unrelated runtime settings', async () => {
+		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
+		const workspace = {
+			id: 'discovery', name: 'discovery', path: '/discovery', baselineBranch: 'master', sources: ['wiki', 'plans'], createdAt: '',
+			runtime: {
+				type: 'custom' as const,
+				commands: { up: 'start', down: 'stop', verify: { smoke: 'verify' } },
+				automation: { enabled: true, repositoryPath: '/automation', runner: 'cypress' as const, commandTemplate: 'npx cypress run --spec "{specs}"' }
+			}
+		};
+		const update = vi.spyOn(api, 'updateWorkspace').mockResolvedValue({ ...workspace, sources: ['plans'] });
+		const saveRuntime = vi.spyOn(api, 'saveWorkspaceRuntime');
+		render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+
+		fireEvent.click(screen.getByRole('button', { name: 'Edit sources' }));
+		fireEvent.change(screen.getByPlaceholderText('Add source'), { target: { value: 'plans' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Save sources' }));
+
+		await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+		expect(update.mock.calls[0][1]).toEqual(expect.objectContaining({ sources: ['plans'] }));
+		expect(update.mock.calls[0][1]).not.toHaveProperty('runtime');
+		expect(saveRuntime).not.toHaveBeenCalled();
+	});
+
 	it('renders Cloud Agent registration controls in Cloud mode', async () => {
 		vi.spyOn(api, 'systemConfigPaths').mockResolvedValue({ dataDir: '/data', defaultDataDir: '/default', cloneRootDir: '/data/clones', registryFile: '/data/workspaces.yaml' });
 		vi.spyOn(api, 'createAgentConnectToken').mockResolvedValue({ token: 'token', expiresAt: '2026-07-15T00:00:00Z', deepLink: 'kodestream://connect?token=token' });

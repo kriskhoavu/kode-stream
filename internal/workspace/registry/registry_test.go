@@ -88,6 +88,57 @@ func TestKnowledgeSettingsRoundTripAndSurviveUnrelatedUpdate(t *testing.T) {
 	}
 }
 
+func TestUnrelatedUpdatePreservesLegacyRuntimeWithoutRevalidatingIt(t *testing.T) {
+	root := newRegistryGitRepo(t)
+	for _, source := range []string{"plans", "wiki"} {
+		if err := os.MkdirAll(filepath.Join(root, source), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	registryPath := filepath.Join(t.TempDir(), "workspaces.yaml")
+	repository := New(registryPath, gitadapter.New())
+	created, err := repository.Create(models.WorkspaceInput{
+		Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans", "wiki"},
+		Runtime: &models.WorkspaceRuntimeConfig{
+			Type:       models.RuntimeTypeCustom,
+			Commands:   models.RuntimeCommandSet{Up: "start", Down: "stop", Verify: models.RuntimeVerifyCommands{Smoke: "verify"}},
+			Automation: &models.RuntimeAutomationConfig{Enabled: false},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Older releases accepted quoted placeholders. Keep such stored settings
+	// intact during an unrelated source edit; the runtime endpoint validates
+	// them when an administrator explicitly edits runtime settings.
+	repository.mu.Lock()
+	legacyRuntime := *repository.records[0].Runtime
+	legacyAutomation := *legacyRuntime.Automation
+	legacyAutomation.Enabled = true
+	legacyAutomation.RepositoryPath = root
+	legacyAutomation.CommandTemplate = `npx cypress run --spec "{specs}"`
+	legacyRuntime.Automation = &legacyAutomation
+	repository.records[0].Runtime = &legacyRuntime
+	repository.mu.Unlock()
+
+	updated, err := repository.Update(created.ID, models.WorkspaceInput{Name: created.Name, Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Sources) != 1 || updated.Sources[0] != "plans" {
+		t.Fatalf("sources = %#v", updated.Sources)
+	}
+	reloaded := New(registryPath, gitadapter.New())
+	if err := reloaded.load(); err != nil {
+		t.Fatal(err)
+	}
+	storedRuntime := reloaded.records[0].Runtime
+	if storedRuntime == nil || storedRuntime.Automation == nil || storedRuntime.Automation.CommandTemplate != legacyAutomation.CommandTemplate {
+		t.Fatalf("stored runtime was not preserved: %#v", storedRuntime)
+	}
+}
+
 func TestValidateJiraConnectionNormalizesCloudAndServer(t *testing.T) {
 	cloud, err := ValidateJiraConnection(&models.JiraConnection{DeploymentType: " CLOUD ", BaseURL: "https://jira.example.com/", ProjectKey: "di", AccountEmail: " user@example.com ", TokenEnvVar: "JIRA_TOKEN"})
 	if err != nil {

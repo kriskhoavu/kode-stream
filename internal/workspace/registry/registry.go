@@ -196,12 +196,13 @@ func (r *Registry) Update(id string, input models.WorkspaceInput) (models.Worksp
 	if input.Knowledge == nil {
 		input.Knowledge = existing.Knowledge
 	}
-	if input.Runtime == nil {
-		input.Runtime = existing.Runtime
-	}
+	preserveRuntime := input.Runtime == nil
 	workspace, err := r.validate(input)
 	if err != nil {
 		return models.WorkspaceConfig{}, err
+	}
+	if preserveRuntime {
+		workspace.Runtime = existing.Runtime
 	}
 
 	r.mu.Lock()
