@@ -121,7 +121,6 @@
 .canvas-verification-result.result-passed.freshness-fresh { color: var(--green); }
 .canvas-verification-result.freshness-stale, .canvas-verification-result.freshness-inconclusive { color: var(--muted); }
 .canvas-node-select-target:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 65%, white); outline-offset: -3px; }
-.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 .canvas-graph-controls-panel { position: absolute; z-index: 7; bottom: 12px; left: 12px; display: flex; flex-direction: row; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow-soft); }
 .canvas-graph-control-button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-right: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
 .canvas-graph-control-button:last-child { border-right: 0; }

@@ -65,7 +65,7 @@ describe('LocalServerUnavailable', () => {
 });
 
 describe('App route transitions', () => {
-  it('navigates from quick search, focuses the page, and omits the redundant Workstream announcement', async () => {
+  it('navigates from quick search, focuses the page, and omits redundant route announcements', async () => {
     vi.stubGlobal('fetch', vi.fn((path: string) => {
       const payload = path.includes('/api/state')
         ? { mode: 'local' }
@@ -80,7 +80,7 @@ describe('App route transitions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     fireEvent.click(await screen.findByRole('button', { name: /Settings/ }));
     await waitFor(() => expect(document.title).toBe('Settings · Kode Stream'));
-    expect(screen.getByText('Navigated to settings')).toBeInTheDocument();
+    expect(screen.queryByText('Navigated to settings')).not.toBeInTheDocument();
     expect(document.getElementById('app-main')).toHaveFocus();
 
     window.history.back();
@@ -92,7 +92,7 @@ describe('App route transitions', () => {
     window.history.forward();
     await waitFor(() => expect(window.location.pathname).toBe('/settings'));
     await waitFor(() => expect(document.title).toBe('Settings · Kode Stream'));
-    expect(screen.getByText('Navigated to settings')).toBeInTheDocument();
+    expect(screen.queryByText('Navigated to settings')).not.toBeInTheDocument();
     expect(document.getElementById('app-main')).toHaveFocus();
   });
 });
