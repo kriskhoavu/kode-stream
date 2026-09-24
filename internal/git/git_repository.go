@@ -683,6 +683,15 @@ func pathsOverlap(a, b string) bool {
 	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
 }
 
+// newMutationLock returns a held-token channel standing in for a mutex. The
+// token is put in before the channel is published, so a second caller that
+// finds the entry can never wait on a lock the first caller has not seeded.
+func newMutationLock() chan struct{} {
+	lock := make(chan struct{}, 1)
+	lock <- struct{}{}
+	return lock
+}
+
 func (g *GitAdapter) WithWorkspaceMutation(workspacePath string, action func() error) error {
 	return g.WithWorkspaceMutationContext(context.Background(), workspacePath, action)
 }
@@ -695,11 +704,14 @@ func (g *GitAdapter) WithWorkspaceMutationContext(ctx context.Context, workspace
 	if resolved, err := filepath.EvalSymlinks(key); err == nil {
 		key = resolved
 	}
-	value, loaded := g.mutations.LoadOrStore(key, make(chan struct{}, 1))
-	lock := value.(chan struct{})
-	if !loaded {
-		lock <- struct{}{}
+	// Load first: LoadOrStore evaluates its argument whether or not it stores,
+	// so building the channel inline allocated one per mutation and threw it
+	// away again on every call after the first for a workspace.
+	value, ok := g.mutations.Load(key)
+	if !ok {
+		value, _ = g.mutations.LoadOrStore(key, newMutationLock())
 	}
+	lock := value.(chan struct{})
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
