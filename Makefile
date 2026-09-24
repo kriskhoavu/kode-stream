@@ -81,17 +81,23 @@ test:
 	$(NPM) test
 	$(GO) test ./...
 
+# Separate from test so a quick loop stays quick, and in verify because this is
+# a server: every request is its own goroutine, and a race here is a wrong
+# answer served rather than a crash that names itself.
+race:
+	$(GO) test -race ./...
+
 # Starts the native server once per storage option and health-checks each.
 smoke-storage:
 	./run.sh smoke-storage
 
-verify: typecheck test build
+verify: typecheck test race build
 
 help: docker-help
 	@printf '\n'
 	@$(MAKE) --no-print-directory dev-help
 	@printf '\nVerification\n\n'
-	@printf '  make verify           typecheck, test, build\n'
+	@printf '  make verify           typecheck, test, race, build\n'
 	@printf '  make build            frontend bundle\n'
 	@printf '  make binary           go build ./cmd/kode-stream\n'
 	@printf '  make test             vitest and go test\n'
