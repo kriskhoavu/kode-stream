@@ -85,6 +85,9 @@
 
 .plan-drawer-body.agents-open {
 	grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+	/* One row as tall as the drawer, so the agent pane fills it and its
+	 * terminal, file list and diff scroll inside rather than the drawer. */
+	grid-template-rows: minmax(0, 1fr);
 }
 
 .drawer-work-item .side-panel-tabs {
@@ -117,7 +120,9 @@
 
 .agents-tab-launch {
 	display: grid;
+	justify-items: center;
 	gap: 6px;
+	text-align: center;
 }
 
 .agents-tab-message {
@@ -383,6 +388,8 @@
 }
 
 .agent-transcript {
+	flex: 1;
+	min-height: 0;
 	list-style: none;
 	margin: 0;
 	padding: 0 12px 14px;
@@ -417,4 +424,38 @@
 	overflow-wrap: anywhere;
 	font-size: 13px;
 	line-height: 1.5;
+}
+
+/* The Changes view fills the agent pane: header lines on top, then the file
+ * list and the diff side by side, each scrolling on its own. */
+.agent-pane-body > .session-changes-panel {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.agent-pane-body > .session-changes-panel .session-changes-body {
+	flex: 1;
+	min-height: 0;
+	align-items: stretch;
+}
+
+.agent-pane-body > .session-changes-panel .session-changes-file-list {
+	max-height: none;
+	min-height: 0;
+	overflow: auto;
+}
+
+.agent-pane-body > .session-changes-panel .session-changes-diff {
+	position: static;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.agent-pane-body > .session-changes-panel .session-changes-diff pre {
+	flex: 1;
+	max-height: none;
+	min-height: 0;
 }
