@@ -406,3 +406,18 @@ describe('CanvasBoard sessions entry point', () => {
 		expect(onOpenSessions).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('CanvasBoard ephemeral sessions', () => {
+	it('labels a live unplaced session and offers Pin instead of Remove', () => {
+		const base = baseProjection();
+		const ephemeral: CanvasNode = { ...base.nodes[2], revision: 0, collapsed: false, ephemeral: true };
+		const onPinSession = vi.fn();
+		const onRemove = vi.fn();
+		renderBoard({ ...base, nodes: [base.nodes[0], base.nodes[1], ephemeral] }, { selectedId: ephemeral.id, onPinSession, onRemove });
+		expect(screen.getByText('Live session')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Remove from Canvas/ })).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: /Pin to Canvas/ }));
+		expect(onPinSession).toHaveBeenCalledWith('session-1');
+		expect(onRemove).not.toHaveBeenCalled();
+	});
+});

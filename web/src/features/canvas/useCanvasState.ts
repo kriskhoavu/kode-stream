@@ -319,7 +319,7 @@ export function useCanvasState(workspaceId?: string) {
 		const current = projectionRef.current;
 		if (!current) return;
 		const existing = current.nodes.find((node) => node.entityRef.sessionId === sessionId);
-		if (existing && !existing.collapsed) return;
+		if (existing && !existing.collapsed && !existing.ephemeral) return;
 		const entityRef = current.unplaced.find((candidate) => candidate.kind === 'session' && candidate.sessionId === sessionId);
 		if (!existing && !entityRef) return;
 		setError('');

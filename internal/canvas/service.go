@@ -65,6 +65,9 @@ type ProjectedNode struct {
 	Workspace *WorkspaceNode `json:"workspace,omitempty"`
 	Plan      *PlanNode      `json:"plan,omitempty"`
 	Session   *SessionNode   `json:"session,omitempty"`
+	// Ephemeral marks a live session drawn beside its plan without a placement.
+	// It leaves the Canvas when the session stops unless it is placed.
+	Ephemeral bool `json:"ephemeral,omitempty"`
 }
 
 type Connection struct {
@@ -583,6 +586,9 @@ func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceCo
 		}
 		nodes = append(nodes, node)
 	}
+	if !readForbidden {
+		nodes = append(nodes, ephemeralSessionNodes(nodes, sessions, placed)...)
+	}
 	unplaced := []EntityRef{}
 	if !placed[workspaceNodeID(layout.WorkspaceID)] {
 		unplaced = append(unplaced, EntityRef{Kind: EntityWorkspace, WorkspaceID: layout.WorkspaceID})
@@ -593,7 +599,7 @@ func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceCo
 		}
 	}
 	for _, session := range sessions {
-		if !placed[sessionNodeID(session.ID)] {
+		if !placed[sessionNodeID(session.ID)] && !placed[ephemeralMarker(session.ID)] {
 			unplaced = append(unplaced, sessionRef(session))
 		}
 	}
@@ -626,6 +632,53 @@ func canvasPlanServiceFromPath(itemPath string) string {
 	}
 	return parts[1]
 }
+
+// Ephemeral session nodes sit in a row to the right of their plan, sized like
+// an expanded session node so the terminal shows; the constants mirror the
+// Canvas board's focus layout.
+const (
+	ephemeralGutter        = 40
+	ephemeralPlanWidth     = 245
+	ephemeralSessionWidth  = 660
+	ephemeralSessionHeight = 500
+)
+
+// ephemeralSessionNodes projects every live session that has no placement but
+// whose plan is on the Canvas, so a session started from a card shows up next
+// to its plan without anyone placing it. It marks each in placed so the session
+// is not offered as unplaced as well.
+func ephemeralSessionNodes(nodes []ProjectedNode, sessions []ai.SessionRecordView, placed map[string]bool) []ProjectedNode {
+	plans := map[string]ProjectedNode{}
+	for _, node := range nodes {
+		if node.Kind == EntityPlan && node.State == NodeResolved && node.Plan != nil {
+			plans[node.Plan.ItemID] = node
+		}
+	}
+	perPlan := map[string]int{}
+	result := []ProjectedNode{}
+	for _, session := range sessions {
+		if !session.Live || session.PlanRef == nil || placed[sessionNodeID(session.ID)] {
+			continue
+		}
+		plan, ok := plans[session.PlanRef.ItemID]
+		if !ok {
+			continue
+		}
+		slot := perPlan[plan.ID]
+		perPlan[plan.ID]++
+		placed[ephemeralMarker(session.ID)] = true
+		result = append(result, ProjectedNode{
+			ID: sessionNodeID(session.ID), Kind: EntitySession, State: NodeResolved, EntityRef: sessionRef(session),
+			Position:  Position{X: plan.Position.X + ephemeralPlanWidth + ephemeralGutter + float64(slot)*(ephemeralSessionWidth+ephemeralGutter), Y: plan.Position.Y},
+			Size:      &Size{Width: ephemeralSessionWidth, Height: ephemeralSessionHeight},
+			Session:   &SessionNode{Record: session},
+			Ephemeral: true,
+		})
+	}
+	return result
+}
+
+func ephemeralMarker(sessionID string) string { return "ephemeral:" + sessionID }
 
 func derivedConnections(nodes []ProjectedNode) []Connection {
 	placed := map[string]ProjectedNode{}

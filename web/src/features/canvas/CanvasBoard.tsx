@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { Background, Handle, NodeResizer, Position, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
 import type { Edge, Node as XYNode, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
-import { Bot, Box, ChevronDown, Expand, Eye, EyeOff, GitBranch, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Play, Plus, RotateCcw, Search, Square, TerminalSquare, Trash2, WandSparkles, Workflow, X } from 'lucide-react';
+import { Bot, Box, ChevronDown, Expand, Eye, EyeOff, GitBranch, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Pin, Play, Plus, RotateCcw, Search, Square, TerminalSquare, Trash2, WandSparkles, Workflow, X } from 'lucide-react';
 import { api } from '../../shared/api';
 import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasSection, CanvasSize, CanvasViewport, EmbeddedAISessionResult, EmbeddedAISessionState, GitStatus, SafeSessionRecord } from '../../lib/types';
 import { EmbeddedTerminal } from '../ai-session/EmbeddedTerminal';
@@ -54,7 +54,7 @@ type CanvasFlowNode = XYNode<CanvasNodeData>;
 
 const nodeTypes = { workspace: memo(WorkspaceCanvasNode), plan: memo(PlanCanvasNode), session: memo(SessionCanvasNode), section: memo(CanvasSectionNode) };
 
-export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onOpenSessions, onMoveNode, onResizeNode = () => {}, onSetCollapsed, onArrange, serviceGridColumns = 1, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onOpenAISession, aiSessionDisabled = true }: {
+export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onOpenSessions, onMoveNode, onResizeNode = () => {}, onSetCollapsed, onArrange, serviceGridColumns = 1, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onPinSession, onOpenAISession, aiSessionDisabled = true }: {
 	projection: CanvasProjection;
 	sections?: CanvasSection[];
 	conflicts: string[];
@@ -75,6 +75,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	onCreateSection?: (nodeIds: string[]) => void;
 	onMoveSection?: (id: string, position: CanvasPosition, delta: CanvasPosition) => void;
 	onRemoveSection?: (id: string) => void;
+	onPinSession?: (sessionId: string) => void;
 	onOpenAISession?: () => void;
 	aiSessionDisabled?: boolean;
 }) {
@@ -259,7 +260,8 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 				<button className="primary" type="button" disabled={aiSessionDisabled} onClick={onOpenAISession}><Bot size={15} /> AI session</button>
 				{(onCreateSection || selected) && <div className={`canvas-board-actions${selected ? ' with-selection' : ''}`} role="group" aria-label="Canvas actions">
 					{onCreateSection && <button className="secondary" type="button" disabled={sectionSelection.length < 2} title={sectionSelection.length < 2 ? 'Cmd/Ctrl-click or drag-select at least two nodes to create a section.' : 'Create a named section around the selected nodes.'} onClick={() => { onCreateSection(sectionSelection); setSectionSelection([]); }}>Create section{sectionSelection.length ? ` (${sectionSelection.length})` : ''}</button>}
-					{selected && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
+					{selected?.ephemeral && selected.entityRef.sessionId && <button className="secondary" type="button" onClick={() => onPinSession?.(selected.entityRef.sessionId!)} disabled={!layoutAvailable || !onPinSession} title={!layoutAvailable ? layoutCapability?.message : 'Keep this session on the Canvas after it stops'}><Pin size={15} /> Pin to Canvas</button>}
+					{selected && !selected.ephemeral && <button className="secondary danger" type="button" onClick={() => onRemove(selected)} disabled={!layoutAvailable} title={!layoutAvailable ? layoutCapability?.message : undefined}><Trash2 size={15} /> Remove from Canvas</button>}
 				</div>}
 			</div>
 			<div className="canvas-facet-row">
@@ -426,7 +428,7 @@ function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	// virtual collapsed state through onSetCollapsed. Hide the disclosure and make close
 	// a no-op instead.
 	const disclosure = record && !data.focusOn ? <button className="icon-button canvas-node-action nodrag nopan" type="button" aria-label={expanded ? 'Collapse session terminal' : 'Expand session terminal'} title={expanded ? 'Collapse terminal' : 'Expand terminal'} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); data.onSetCollapsed(data.node.id, expanded); }}>{expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button> : undefined;
-	return <NodeFrame data={data} eyebrow="Session" icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded && !data.focusOn} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => { if (!data.focusOn) data.onSetCollapsed(data.node.id, true); }} onReload={data.onReload} /> : undefined}>
+	return <NodeFrame data={data} eyebrow={data.node.ephemeral ? 'Live session' : 'Session'} icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded && !data.focusOn} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => { if (!data.focusOn) data.onSetCollapsed(data.node.id, true); }} onReload={data.onReload} /> : undefined}>
 		<strong>{record?.provider || 'Unavailable session'}</strong>
 		<span className={`canvas-session-state state-${record?.state || 'stale'}`}><Play size={11} /> {record?.state || stateLabel(data.node)}</span>
 		<span>{record?.requestedBranch || data.node.entityRef.branchKey}</span>

@@ -357,3 +357,51 @@ func TestCanvasServiceKeepsPlanNodesResolvedAcrossCommitDrift(t *testing.T) {
 		}
 	}
 }
+
+func TestLiveUnplacedSessionIsDrawnBesideItsPlanUntilItStops(t *testing.T) {
+	repository, reg, items, git, workspaceConfig, initialItems, session := canvasServiceFixture(t)
+	reader := &canvasSessionReader{records: []ai.SessionRecordView{session}}
+	service := NewService(repository, reg, items, git, reader, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
+	if _, err := service.ResolveDefault("", workspaceConfig.ID, "main"); err != nil {
+		t.Fatal(err)
+	}
+	live := session
+	live.ID, live.State, live.Live, live.EndedAt = "session-live", ai.StateRunning, true, time.Time{}
+	reader.records = append(reader.records, live)
+
+	projection, err := service.ResolveDefault("", workspaceConfig.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := findProjectedNode(t, projection, planNodeID(initialItems[0].ID))
+	node := findProjectedNode(t, projection, sessionNodeID(live.ID))
+	if !node.Ephemeral || node.Collapsed || node.Position.Y != plan.Position.Y || node.Position.X <= plan.Position.X {
+		t.Fatalf("ephemeral node = %#v beside plan at %#v", node, plan.Position)
+	}
+	if placed := findProjectedNode(t, projection, sessionNodeID(session.ID)); placed.Ephemeral {
+		t.Fatal("placed session marked ephemeral")
+	}
+	for _, ref := range projection.Unplaced {
+		if ref.SessionID == live.ID {
+			t.Fatal("ephemeral session also offered as unplaced")
+		}
+	}
+	connected := false
+	for _, connection := range projection.Connections {
+		connected = connected || (connection.Source == plan.ID && connection.Target == node.ID)
+	}
+	if !connected {
+		t.Fatalf("connections = %#v", projection.Connections)
+	}
+
+	reader.records[1].State, reader.records[1].Live = ai.StateExited, false
+	projection, err = service.ResolveDefault("", workspaceConfig.ID, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range projection.Nodes {
+		if node.ID == sessionNodeID(live.ID) {
+			t.Fatal("stopped ephemeral session stayed on the Canvas")
+		}
+	}
+}
