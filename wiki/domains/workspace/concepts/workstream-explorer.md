@@ -23,7 +23,7 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-workstream-explorer-one-surface -->
 <!-- keywords: workstream, board, status column, item workspace -->
 
-[live] PM-011, PM-012, and PM-028 Workstream is the primary collection view, and a structured item opens into Item Workspace instead of a separate top-level Explorer product. Evidence: `web/src/app/router.ts:1`, `web/src/pages/WorkstreamPage.tsx:613`, `web/src/pages/ItemWorkspacePage.tsx:1158`.
+[live] PM-011, PM-012, and PM-028 Workstream is the primary collection view, and a structured item opens into Item Workspace instead of a separate top-level Explorer product. Evidence: `web/src/app/router.ts:1`, `web/src/pages/WorkstreamPage.tsx:620`, `web/src/pages/ItemWorkspacePage.tsx:1159`.
 
 Cards are grouped by workflow status and eligible cards can be dragged between columns. The same move remains available
 through explicit status controls, so drag and drop is an interaction shortcut rather than a separate state model.
@@ -32,7 +32,7 @@ through explicit status controls, so drag and drop is an interaction shortcut ra
 <!-- chunkId: workspace-workstream-explorer-context -->
 <!-- keywords: embedded explorer, item workspace, sources, all files -->
 
-[live] PM-007, PM-008, PM-009, and PM-028 repository exploration is implemented by `WorkstreamExplorer` embedded in Item Workspace, with configured-source and all-files modes. Evidence: `web/src/pages/ItemWorkspacePage.tsx:1158`, `web/src/pages/WorkstreamExplorer.tsx:44`, `web/src/features/workstream-explorer/useWorkstreamExplorer.ts:136`.
+[live] PM-007, PM-008, PM-009, and PM-028 repository exploration is implemented by `WorkstreamExplorer` embedded in Item Workspace, with configured-source and all-files modes. Evidence: `web/src/pages/ItemWorkspacePage.tsx:1159`, `web/src/pages/WorkstreamExplorer.tsx:44`, `web/src/features/workstream-explorer/useWorkstreamExplorer.ts:136`.
 
 The tree supplies repository context beside item metadata and content. It supports lazy directory loading, Git state,
 path search, scoped content search, preview, and guarded editing without changing the application-wide route context.
@@ -51,7 +51,7 @@ to the calling surface.
 <!-- chunkId: workspace-workstream-explorer-preview -->
 <!-- keywords: markdown, json, image, html sandbox, source fallback -->
 
-[live] PM-006 one content viewer is reused by Workstream, Item Workspace, Explorer, Knowledge, Branch Review, and verification evidence. Evidence: `web/src/features/content-viewer/ContentViewer.tsx:15`, `web/src/pages/WorkstreamPage.tsx:1916`, `web/src/features/knowledge/KnowledgeReader.tsx:24`.
+[live] PM-006 one content viewer is reused by Workstream, Item Workspace, Explorer, Knowledge, Branch Review, and verification evidence. Evidence: `web/src/features/content-viewer/ContentViewer.tsx:15`, `web/src/pages/WorkstreamPage.tsx:1949`, `web/src/features/knowledge/KnowledgeReader.tsx:24`.
 
 It selects a safe presentation for Markdown, structured text, images, HTML, and plain source. Large or unsupported content
 falls back to source-oriented presentation rather than executing repository content in the application context.

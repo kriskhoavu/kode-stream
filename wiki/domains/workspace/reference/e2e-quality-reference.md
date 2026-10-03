@@ -33,7 +33,7 @@ The read model returns a result destination even before the first run. Missing r
 
 [live] `E2EQualityPanel` groups plan runbooks before wiki journeys, filters cards, displays result metadata, opens evidence through the guarded workspace file API, and launches the selected runbook through `AISessionLaunchDialog`. Evidence: `web/src/features/e2e-testing/E2EQualityPanel.tsx:29`, `web/src/features/e2e-testing/E2EQualityPanel.tsx:36`, `web/src/features/e2e-testing/E2EQualityPanel.tsx:47`, `web/src/features/e2e-testing/E2EQualityPanel.tsx:103`.
 
-[live] E2E launch fixes the prompt's runbook and result path, requires a discovered `e2e-testing` capability, and sends the resolved capability identifier. Evidence: `web/src/features/ai-session/AISessionLaunchDialog.tsx:51`, `web/src/features/ai-session/AISessionLaunchDialog.tsx:63`, `web/src/features/ai-session/AISessionLaunchDialog.tsx:169`.
+[live] E2E launch fixes the prompt's runbook and result path, requires a discovered `e2e-testing` capability, and sends the resolved capability identifier. Evidence: `web/src/features/ai-session/AISessionLaunchDialog.tsx:52`, `web/src/features/ai-session/AISessionLaunchDialog.tsx:64`, `web/src/features/ai-session/AISessionLaunchDialog.tsx:170`.
 
 Knowledge renders the Quality side panel only while reading a page under the E2E bucket. Evidence: `web/src/pages/KnowledgePage.tsx:33`, `web/src/features/e2e-testing/KnowledgeE2ESidePanel.tsx:7`.
 

@@ -18,6 +18,7 @@ lastVerified: never
 - [[workspace-branch-review-workflows]] describes review and import.
 - [[workspace-terminal-canvas]], [[workspace-terminal-canvas-workflows]], and [[workspace-terminal-canvas-reference]] cover the spatial workbench.
 - [[workspace-session-focus]] and [[workspace-session-focus-reference]] cover active-session focus, global and Workbench session lists, and checkout-derived changes.
+- [[workspace-card-agent-sessions]] and [[workspace-card-agent-sessions-reference]] cover a card's agent chips, its Agents tab and terminal, and resuming Claude Code conversations.
 - [[workspace-automation-verification]] and [[workspace-automation-verification-reference]] cover browser automation selection and execution.
 - [[workspace-e2e-quality]] and [[workspace-e2e-quality-reference]] cover agent-run browser journeys, results, and evidence.
 - [[workspace-appearance]] and [[workspace-appearance-reference]] cover the shared route backdrop and accessibility boundary.

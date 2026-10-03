@@ -17,7 +17,7 @@ lastVerified: 2026-09-12
 <!-- chunkId: platform-extension-reference-distribution-origin -->
 <!-- keywords: unpacked extension, manifest v3, api origin, local host -->
 
-[live] The Chromium surface is built as an unpacked Manifest V3 extension and stores a configurable API origin that defaults to `http://127.0.0.1:4317`. Evidence: `web/src/shared/api/index.ts:116`, `vite.config.ts:17`.
+[live] The Chromium surface is built as an unpacked Manifest V3 extension and stores a configurable API origin that defaults to `http://127.0.0.1:4317`. Evidence: `web/src/shared/api/index.ts:118`, `vite.config.ts:17`.
 
 The extension reuses the application frontend while producing a separate output directory and manifest. It talks to the Local application over HTTP.
 

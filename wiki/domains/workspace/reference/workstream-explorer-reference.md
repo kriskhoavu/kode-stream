@@ -22,7 +22,7 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-workstream-explorer-reference-surfaces -->
 <!-- keywords: route, workstream, item workspace, explorer -->
 
-[live] PM-028 the router exposes Workstream and Item Workspace, while `WorkstreamExplorer` is a component used inside Item Workspace rather than a route. Evidence: `web/src/app/router.ts:1`, `web/src/pages/ItemWorkspacePage.tsx:1158`.
+[live] PM-028 the router exposes Workstream and Item Workspace, while `WorkstreamExplorer` is a component used inside Item Workspace rather than a route. Evidence: `web/src/app/router.ts:1`, `web/src/pages/ItemWorkspacePage.tsx:1159`.
 
 | Concern                                                  | Owning surface               |
 |----------------------------------------------------------|------------------------------|
@@ -45,7 +45,7 @@ valid application route and filter state; recent items are owner-scoped navigati
 <!-- chunkId: workspace-workstream-explorer-reference-card-move -->
 <!-- keywords: drag card, workflow status, optimistic update, rollback -->
 
-[live] PM-012 Workstream calculates a status transition through the shared drag-and-drop model and persists it through the same item status operation used by menus. Evidence: `web/src/features/workstream/dragAndDrop.ts:13`, `web/src/pages/WorkstreamPage.tsx:372`, `web/src/pages/WorkstreamPage.tsx:1483`.
+[live] PM-012 Workstream calculates a status transition through the shared drag-and-drop model and persists it through the same item status operation used by menus. Evidence: `web/src/features/workstream/dragAndDrop.ts:13`, `web/src/pages/WorkstreamPage.tsx:379`, `web/src/pages/WorkstreamPage.tsx:1503`.
 
 Only supported destination statuses accept a drop. The UI may show the move immediately, but server failure restores
 authoritative state and exposes the error rather than leaving a visual-only status.

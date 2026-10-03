@@ -16,7 +16,7 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-jira-workstream-context -->
 <!-- keywords: issue key, item creation, workspace, local plan -->
 
-[live] PM-019 and PM-025 Workstream can look up an issue through workspace Jira settings and seed a new local structured item from the returned summary, description, status, type, assignee, and labels. Evidence: `internal/jira/jira_service.go:110`, `web/src/pages/WorkstreamPage.tsx:455`, `web/src/pages/WorkstreamPage.tsx:483`.
+[live] PM-019 and PM-025 Workstream can look up an issue through workspace Jira settings and seed a new local structured item from the returned summary, description, status, type, assignee, and labels. Evidence: `internal/jira/jira_service.go:110`, `web/src/pages/WorkstreamPage.tsx:462`, `web/src/pages/WorkstreamPage.tsx:490`.
 
 The resulting item belongs to the repository and follows its source-structure rules. Jira remains the origin reference,
 not the persistence layer for Kode Stream planning state.
@@ -34,7 +34,7 @@ are lazy rather than part of the initial issue fetch.
 <!-- chunkId: workspace-jira-workstream-ai-context -->
 <!-- keywords: Jira description, AI prompt, launch composer, explicit inclusion -->
 
-[live] PM-025 the AI launch flow can append the available Jira description when the user explicitly chooses that context. Evidence: `web/src/features/ai-session/AISessionLaunchControl.tsx:79`, `web/src/features/ai-session/AISessionLaunchDialog.test.tsx:107`.
+[live] PM-025 the AI launch flow can append the available Jira description when the user explicitly chooses that context. Evidence: `web/src/features/ai-session/AISessionLaunchControl.tsx:81`, `web/src/features/ai-session/AISessionLaunchDialog.test.tsx:107`.
 
 ## Not supported
 <!-- chunkId: workspace-jira-workstream-not-supported -->

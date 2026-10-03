@@ -26,7 +26,7 @@ capability roots in the workspace and application configuration without recursiv
 <!-- chunkId: workspace-ai-launch-reference-guards -->
 <!-- keywords: workspace ID, expected branch, observed commit, idempotency -->
 
-[live] PM-018 and PM-020 embedded launches carry expected workspace and branch context, observed commit, and an idempotency key. Evidence: `internal/ai/ai_embedded_service.go:19`, `internal/ai/ai_embedded_service.go:21`, `internal/ai/ai_embedded_service.go:22`.
+[live] PM-018 and PM-020 embedded launches carry expected workspace and branch context, observed commit, and an idempotency key. Evidence: `internal/ai/ai_embedded_service.go:40`, `internal/ai/ai_embedded_service.go:42`, `internal/ai/ai_embedded_service.go:43`.
 
 The service revalidates operational context before process start. A mismatch is a blocked launch with recovery context,
 not permission to switch branches automatically. Session records are published around process state transitions so a
@@ -45,7 +45,7 @@ Canvas view does not redefine process lifetime; the session record remains the s
 <!-- chunkId: workspace-ai-launch-reference-presentation -->
 <!-- keywords: floating, side panel, maximized, minimized, responsive -->
 
-[live] PM-027 the dock stores floating geometry, resizes the right panel, and promotes an undersized side panel to maximized presentation. Evidence: `web/src/features/ai-session/EmbeddedTerminalDock.tsx:29`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:149`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:168`.
+[live] PM-027 the dock stores floating geometry, resizes the right panel, and promotes an undersized side panel to maximized presentation. Evidence: `web/src/features/ai-session/EmbeddedTerminalDock.tsx:30`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:154`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:173`.
 
 ## Not supported
 <!-- chunkId: workspace-ai-launch-reference-not-supported -->

@@ -17,7 +17,7 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-ai-session-launch-compose -->
 <!-- keywords: provider, prompt, preset, skill, agent -->
 
-[live] PM-018 and PM-027 the launch dialog resolves a provider, context mode, preset or edited prompt, and optional provider-discovered skills and agents before starting a process. Evidence: `web/src/features/ai-session/AISessionLaunchDialog.tsx:36`, `web/src/features/ai-session/AISessionLaunchDialog.tsx:168`, `internal/ai/ai_launch_service.go:348`.
+[live] PM-018 and PM-027 the launch dialog resolves a provider, context mode, preset or edited prompt, and optional provider-discovered skills and agents before starting a process. Evidence: `web/src/features/ai-session/AISessionLaunchDialog.tsx:37`, `web/src/features/ai-session/AISessionLaunchDialog.tsx:169`, `internal/ai/ai_launch_service.go:348`.
 
 Capability selection is validated against the chosen provider's catalog. The prompt carries the chosen workspace or item
 context rather than giving the process an unbounded application snapshot.
@@ -26,7 +26,7 @@ context rather than giving the process an unbounded application snapshot.
 <!-- chunkId: workspace-ai-session-launch-surface -->
 <!-- keywords: embedded terminal, external terminal, PTY, process -->
 
-[live] PM-018, PM-020, and PM-027 a session can launch through a configured external terminal or through the application-managed PTY. Evidence: `internal/ai/ai_launch_service.go:309`, `internal/ai/ai_terminal_repository.go:155`, `web/src/features/ai-session/AISessionLaunchControl.tsx:29`.
+[live] PM-018, PM-020, and PM-027 a session can launch through a configured external terminal or through the application-managed PTY. Evidence: `internal/ai/ai_launch_service.go:309`, `internal/ai/ai_terminal_repository.go:155`, `web/src/features/ai-session/AISessionLaunchControl.tsx:35`.
 
 External launch delegates the visible process to the selected terminal adapter. Embedded launch keeps terminal I/O in
 Kode Stream and records enough safe metadata for Canvas, the workspace Workbench tab, and the global Sessions page.
@@ -35,7 +35,7 @@ Kode Stream and records enough safe metadata for Canvas, the workspace Workbench
 <!-- chunkId: workspace-ai-session-launch-layout -->
 <!-- keywords: floating terminal, side panel, maximize, minimize -->
 
-[live] PM-027 an embedded session can be floating, docked to the right, maximized, or minimized without restarting the underlying process. Evidence: `web/src/features/ai-session/EmbeddedTerminalDock.tsx:8`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:81`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:131`.
+[live] PM-027 an embedded session can be floating, docked to the right, maximized, or minimized without restarting the underlying process. Evidence: `web/src/features/ai-session/EmbeddedTerminalDock.tsx:9`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:86`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:136`.
 
 Canvas may present a live session as a spatial node. The workspace-node Workbench tab and global Sessions page present
 the same terminal and changes in scoped lists. These are views over session state, not different launch contracts. See

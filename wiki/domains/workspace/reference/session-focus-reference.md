@@ -41,7 +41,7 @@ An unavailable or unsupported diff returns conflict with its reason. Empty paths
 <!-- chunkId: workspace-session-focus-reference-client-refresh -->
 <!-- keywords: global route, checkout filter, plan grouping, projection refresh -->
 
-[live] The top-level Sessions route remains in primary navigation and renders records grouped by workspace and plan. Evidence: `web/src/App.tsx:127`, `web/src/App.tsx:298`, `web/src/features/sessions/SessionsPage.tsx:44`.
+[live] The top-level Sessions route remains in primary navigation and renders records grouped by workspace and plan. Evidence: `web/src/App.tsx:127`, `web/src/App.tsx:299`, `web/src/features/sessions/SessionsPage.tsx:44`.
 
 [live] The workspace-node Sessions tab loads records for the current workspace and checkout and groups them by plan. Stopping a session reloads the list and Canvas projection; **Open on board** selects the existing Canvas node. Evidence: `web/src/features/canvas/CanvasWorkbench.tsx:193`, `web/src/features/canvas/CanvasWorkbench.tsx:300`, `web/src/features/canvas/CanvasWorkbench.tsx:319`, `web/src/pages/CanvasPage.tsx:75`.
 

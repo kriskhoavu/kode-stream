@@ -24,12 +24,12 @@ F1 SessionTerminal + provider display + dock attach ─────────�
 
 | Phase | Name                                         | Track    | Status  |
 |-------|----------------------------------------------|----------|---------|
-| B1    | Claude session naming                        | Backend  | Pending |
-| B2    | Transcript discovery, tail, and resume       | Backend  | Pending |
-| B3    | Ephemeral Canvas nodes for live sessions     | Backend  | Pending |
-| F1    | Shared terminal, provider display, dock      | Frontend | Pending |
-| F2    | Card cluster, Agents tab, agent pane         | Frontend | Pending |
-| I1    | Wiki and journey                             | Docs     | Pending |
+| B1    | Claude session naming                        | Backend  | Done    |
+| B2    | Transcript discovery, tail, and resume       | Backend  | Done    |
+| B3    | Ephemeral Canvas nodes for live sessions     | Backend  | Done    |
+| F1    | Shared terminal, provider display, dock      | Frontend | Done    |
+| F2    | Card cluster, Agents tab, agent pane         | Frontend | Done    |
+| I1    | Wiki and journey                             | Docs     | Done    |
 
 ### B1 Claude session naming
 
@@ -54,7 +54,7 @@ node to the right of its plan. It disappears when the session stops; **Pin** pla
 ### F1 Shared terminal, provider display, dock
 
 `CanvasSessionTerminal` moves to `features/ai-session/SessionTerminal.tsx`. One provider display module replaces the
-copied label maps and adds `AgentChip`. The dock accepts `attachEmbeddedSession`.
+copied label maps and adds `AgentChip`. The dock accepts `attachEmbeddedSession` and brings the attached session to the front, as it does a started one.
 
 ### F2 Card cluster, Agents tab, agent pane
 
@@ -64,4 +64,5 @@ the Agents tab and the agent pane; closing the drawer on a live session hands it
 
 ### I1 Wiki and journey
 
-Enrich the session launch and session focus concepts and the Workstream journey.
+`workspace-card-agent-sessions` and its reference page record the delivered behaviour. The browser journey in
+`automation/` has not been executed.
