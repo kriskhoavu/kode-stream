@@ -3,6 +3,7 @@ import { Square } from 'lucide-react';
 import { api } from '../../shared/api';
 import type { EmbeddedAISessionResult, EmbeddedAISessionState, SafeSessionRecord } from '../../lib/types';
 import { EmbeddedTerminal } from './EmbeddedTerminal';
+import { notifyEmbeddedSessionEnded } from './terminalSessions';
 
 /**
  * Reattaches to a session's live terminal. Shared by the Canvas session
@@ -61,6 +62,7 @@ export function SessionTerminal({ record, visible, onClose = () => {}, onReload,
 		if (!window.confirm('Cancel this terminal process? Its durable session metadata will remain available.')) return;
 		setError('');
 		try {
+			notifyEmbeddedSessionEnded(record.id);
 			const session = await api.cancelEmbeddedAISession(record.id);
 			if (!mounted.current || currentRecord.current.id !== record.id) return;
 			setResult((current) => current ? { ...current, session } : current);

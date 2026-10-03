@@ -6,6 +6,7 @@ import type { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { api } from '../../shared/api';
 import type { EmbeddedAISessionResult, EmbeddedAISessionState } from '../../lib/types';
+import { notifyEmbeddedSessionEnded } from './terminalSessions';
 
 type ServerFrame = { type: 'output' | 'state' | 'warning' | 'exit'; data?: string; encoding?: string; state?: EmbeddedAISessionState; exitCode?: number; message?: string };
 
@@ -54,7 +55,7 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onSt
 				socket.onmessage = (event) => {
 				const frame = JSON.parse(String(event.data)) as ServerFrame;
 				if (frame.type === 'output' && frame.data) activeTerminal.write(frame.encoding === 'base64' ? Uint8Array.from(atob(frame.data), (character) => character.charCodeAt(0)) : frame.data);
-				if (frame.type === 'state' && frame.state) { stateRef.current = frame.state; setState(frame.state); setExitCode(frame.exitCode); onStateChangeRef.current?.(frame.state, frame.exitCode); }
+				if (frame.type === 'state' && frame.state) { stateRef.current = frame.state; setState(frame.state); setExitCode(frame.exitCode); onStateChangeRef.current?.(frame.state, frame.exitCode); if (frame.state !== 'starting' && frame.state !== 'running') notifyEmbeddedSessionEnded(sessionId); }
 				if (frame.type === 'warning') setMessage(frame.message ?? 'Terminal warning');
 			};
 			socket.onclose = () => { if (disposed) return; if (Date.now() < deadline && (stateRef.current === 'starting' || stateRef.current === 'running')) { setConnection('reconnecting'); retry = window.setTimeout(() => connect(activeTerminal), 500); } else { setConnection('closed'); setMessage('The terminal connection could not be restored.'); } };
@@ -81,7 +82,7 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onSt
 		return () => cancelAnimationFrame(frame);
 	}, [mode, visible]);
 
-	const close = () => { if (cancelOnClose && active && !window.confirm('Cancel the running AI session and close the terminal?')) return; if (cancelOnClose && active) void api.cancelEmbeddedAISession(sessionId); onClose(); };
+	const close = () => { if (cancelOnClose && active && !window.confirm('Cancel the running AI session and close the terminal?')) return; if (cancelOnClose && active) { notifyEmbeddedSessionEnded(sessionId); void api.cancelEmbeddedAISession(sessionId).finally(() => notifyEmbeddedSessionEnded(sessionId)); } onClose(); };
 	const startMove = (event: ReactPointerEvent<HTMLElement>) => {
 		const target = event.target as HTMLElement;
 		if (target.closest('button')) return;

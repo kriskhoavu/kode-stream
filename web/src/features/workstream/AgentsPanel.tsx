@@ -51,10 +51,10 @@ export function AgentCluster({ agents, title, onOpen }: { agents?: ItemAgents; t
 	}
 	return <span className="agent-cluster" role="group" aria-label={`Agents on ${title}`}>
 		{shown.map((record) => <button key={record.id} type="button" className="agent-cluster-chip" aria-label={`Open the running ${providerLabel(record.provider)} session`} title={`${providerLabel(record.provider)} · ${sessionGlyph(record).label} · started ${formatAge(record.startedAt)}`} onPointerDown={stop} onClick={(event) => { stop(event); onOpen({ kind: 'session', id: record.id }); }}>
-			<AgentChip provider={record.provider} live />
+			<AgentChip live />
 		</button>)}
 		{external.map((transcript) => <button key={transcript.sessionId} type="button" className="agent-cluster-chip" aria-label="Open the Claude Code conversation active in your terminal" title={`Claude Code · active in your terminal · ${formatAge(transcript.lastActiveAt)}`} onPointerDown={stop} onClick={(event) => { stop(event); onOpen({ kind: 'transcript', id: transcript.sessionId }); }}>
-			<AgentChip provider="claude" hollow />
+			<AgentChip hollow />
 		</button>)}
 		{hidden > 0 && <button type="button" className="agent-cluster-more" aria-label={`Show all ${live.length + active.length} agents`} onPointerDown={stop} onClick={(event) => { stop(event); onOpen(shown[0] ? { kind: 'session', id: shown[0].id } : { kind: 'launch' }); }}>+{hidden}</button>}
 	</span>;
@@ -74,14 +74,14 @@ export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError 
 			{message && <p className="agents-tab-message" role="status">{message}</p>}
 		</div>
 		<AgentGroup title="Live" empty="No session is running for this card.">
-			{live.map((record) => <AgentRow key={record.id} selected={selected === `session:${record.id}`} chip={<AgentChip provider={record.provider} live />} title={providerLabel(record.provider)} meta={[sessionGlyph(record).label, formatAge(record.startedAt), record.requestedBranch]} onClick={() => onFocus({ kind: 'session', id: record.id })} />)}
+			{live.map((record) => <AgentRow key={record.id} selected={selected === `session:${record.id}`} chip={<AgentChip live />} title={providerLabel(record.provider)} meta={[sessionGlyph(record).label, formatAge(record.startedAt), record.requestedBranch]} onClick={() => onFocus({ kind: 'session', id: record.id })} />)}
 		</AgentGroup>
 		{transcripts.length > 0 && <AgentGroup title="In your terminal">
-			{transcripts.map((transcript) => <AgentRow key={transcript.sessionId} selected={selected === `transcript:${transcript.sessionId}`} chip={<AgentChip provider="claude" hollow />} title="Claude Code" meta={[transcriptActive(transcript) ? 'Active' : 'Idle', `last ${formatAge(transcript.lastActiveAt)}`, `${transcript.messages} messages`, transcript.branch ?? '']} onClick={() => onFocus({ kind: 'transcript', id: transcript.sessionId })} />)}
+			{transcripts.map((transcript) => <AgentRow key={transcript.sessionId} selected={selected === `transcript:${transcript.sessionId}`} chip={<AgentChip hollow />} title="Claude Code" meta={[transcriptActive(transcript) ? 'Active' : 'Idle', `last ${formatAge(transcript.lastActiveAt)}`, `${transcript.messages} messages`, transcript.branch ?? '']} onClick={() => onFocus({ kind: 'transcript', id: transcript.sessionId })} />)}
 		</AgentGroup>}
 		{ended.length > 0 && <section className="agents-group">
 			<button type="button" className="agents-group-toggle" aria-expanded={earlierOpen} onClick={() => setEarlierOpen((open) => !open)}><ChevronRight size={13} /> Earlier <span>{ended.length}</span></button>
-			{earlierOpen && <ul>{ended.map((record) => <AgentRow key={record.id} selected={selected === `session:${record.id}`} chip={<AgentChip provider={record.provider} />} title={providerLabel(record.provider)} meta={[sessionGlyph(record).label, formatAge(record.startedAt), record.requestedBranch]} onClick={() => onFocus({ kind: 'session', id: record.id })} />)}</ul>}
+			{earlierOpen && <ul>{ended.map((record) => <AgentRow key={record.id} selected={selected === `session:${record.id}`} chip={<AgentChip />} title={providerLabel(record.provider)} meta={[sessionGlyph(record).label, formatAge(record.startedAt), record.requestedBranch]} onClick={() => onFocus({ kind: 'session', id: record.id })} />)}</ul>}
 		</section>}
 	</section>;
 }
@@ -164,7 +164,7 @@ function SessionPane({ record, itemId, back, onBack, onReload, onFocus }: { reco
 	return <section className="agent-pane" aria-label={`${providerLabel(record.provider)} session`}>
 		<header className="agent-pane-header">
 			{back}
-			<span className="agent-pane-title"><AgentChip provider={record.provider} live={live} /><strong>{providerLabel(record.provider)}</strong><span>{sessionGlyph(record).label} · {record.requestedBranch}</span></span>
+			<span className="agent-pane-title"><AgentChip live={live} /><strong>{providerLabel(record.provider)}</strong><span>{sessionGlyph(record).label} · {record.requestedBranch}</span></span>
 			<div className="agent-pane-views" role="tablist" aria-label="Session view">
 				<button type="button" role="tab" aria-selected={view === 'terminal'} className={view === 'terminal' ? 'active' : ''} onClick={() => setView('terminal')}><TerminalSquare size={14} /> Terminal</button>
 				<button type="button" role="tab" aria-selected={view === 'changes'} className={view === 'changes' ? 'active' : ''} onClick={() => setView('changes')}><GitCompare size={14} /> Changes</button>
@@ -209,7 +209,7 @@ function TranscriptPane({ conversation, transcript, itemId, workspaceId, back, o
 	return <section className="agent-pane" aria-label="Claude Code conversation">
 		<header className="agent-pane-header">
 			{back}
-			<span className="agent-pane-title"><AgentChip provider="claude" hollow /><strong>Claude Code</strong><span>{transcript ? `In your terminal · last ${formatAge(transcript.lastActiveAt)}` : 'In your terminal'}</span></span>
+			<span className="agent-pane-title"><AgentChip hollow /><strong>Claude Code</strong><span>{transcript ? `In your terminal · last ${formatAge(transcript.lastActiveAt)}` : 'In your terminal'}</span></span>
 			<button type="button" className="primary" disabled={resuming} onClick={() => void resume()}>{resuming ? 'Resuming…' : 'Continue here'}</button>
 		</header>
 		{mayBeOpen && <p className="agent-pane-warning" role="note">This conversation may still be open in your terminal; continuing here forks it.</p>}

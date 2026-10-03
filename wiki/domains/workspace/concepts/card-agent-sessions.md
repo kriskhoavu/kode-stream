@@ -15,7 +15,7 @@ lastVerified: 2026-10-03
 <!-- chunkId: workspace-card-agent-sessions-card -->
 <!-- keywords: agent chip, live ring, launcher, plus count, hollow chip -->
 
-[live] A card shows one provider chip per live session launched from it, at most three, then `+N`. A Claude Code conversation from the user's terminal that is active in the last ten minutes gets a hollow chip. A card with neither offers a launcher, shown on hover or focus. Evidence: `web/src/features/workstream/AgentsPanel.tsx:41`, `web/src/features/workstream/useItemSessions.ts:9`.
+[live] A card shows one green robot chip per live session launched from it, at most three, then `+N`; the provider is named in each chip's tooltip. A Claude Code conversation from the user's terminal that is active in the last ten minutes gets a dashed terminal chip. A card with neither offers a launcher, shown on hover or focus. Evidence: `web/src/features/workstream/AgentsPanel.tsx:41`, `web/src/features/workstream/useItemSessions.ts:9`.
 
 Every chip is its own button, so clicking one opens that agent and never previews or drags the card. Documentation cards carry no cluster. Evidence: `web/src/pages/WorkstreamPage.tsx:1535`.
 
@@ -31,7 +31,7 @@ A session pane shows the live terminal, where the conversation continues by typi
 <!-- chunkId: workspace-card-agent-sessions-dock-hand-off -->
 <!-- keywords: dock hand-off, last viewer, fresh grant, cancel grace -->
 
-[live] An embedded process is cancelled shortly after its last viewer leaves. Closing the drawer on a live session therefore hands it to the terminal dock with a fresh grant, so the process keeps a viewer. Evidence: `web/src/pages/WorkstreamPage.tsx:1804`, `web/src/features/workstream/AgentsPanel.tsx:107`, `web/src/features/ai-session/terminalSessions.ts:16`.
+[live] A session closed or cancelled anywhere in the app leaves the card at once, before the next poll confirms it. An embedded process is cancelled shortly after its last viewer leaves. Closing the drawer on a live session therefore hands it to the terminal dock with a fresh grant, so the process keeps a viewer. Evidence: `web/src/pages/WorkstreamPage.tsx:1804`, `web/src/features/workstream/AgentsPanel.tsx:107`, `web/src/features/ai-session/terminalSessions.ts:25`.
 
 ## Claude Code Conversations
 <!-- chunkId: workspace-card-agent-sessions-claude -->

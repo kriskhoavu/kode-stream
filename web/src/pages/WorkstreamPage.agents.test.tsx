@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WorkstreamPage } from './WorkstreamPage';
 import type { ClaudeTranscript, ItemSummary, SafeSessionRecord, WorkstreamBranchLoadResult } from '../lib/types';
-import { embeddedSessionAttachEvent } from '../features/ai-session/terminalSessions';
+import { embeddedSessionAttachEvent, notifyEmbeddedSessionEnded } from '../features/ai-session/terminalSessions';
 
 vi.mock('../features/ai-session/SessionTerminal', () => ({
 	SessionTerminal: ({ record, visible }: { record: SafeSessionRecord; visible: boolean }) => <section data-testid={`terminal-${record.id}`} hidden={!visible}><textarea aria-label="Agent terminal input" /></section>
@@ -62,6 +62,17 @@ describe('WorkstreamPage card agents', () => {
 		expect(within(drawer).queryByText('Document')).not.toBeInTheDocument();
 		fireEvent.click(within(drawer).getByRole('button', { name: 'Back to document' }));
 		expect(within(drawer).getByText('Document')).toBeInTheDocument();
+	});
+
+	it('drops a session from the card as soon as it is reported ended, even while the server still lists it live', async () => {
+		stubBoard([record('live-1', 'claude', true)]);
+		renderBoard();
+		await screen.findByRole('button', { name: 'Open the running Claude session' });
+		act(() => { notifyEmbeddedSessionEnded('live-1'); });
+		expect(screen.queryByRole('button', { name: 'Open the running Claude session' })).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Start an agent session for Card agents' })).toBeInTheDocument();
+		await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+		expect(screen.queryByRole('button', { name: 'Open the running Claude session' })).not.toBeInTheDocument();
 	});
 
 	it('opens the launcher on a card with no live session', async () => {

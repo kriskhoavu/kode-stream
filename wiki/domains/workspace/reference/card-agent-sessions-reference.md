@@ -37,7 +37,7 @@ Both routes answer 404 in Cloud mode. Evidence: `internal/server/api/ai_controll
 <!-- chunkId: workspace-card-agent-sessions-reference-polling -->
 <!-- keywords: ten seconds, visibility, session started event, local only -->
 
-[live] The board loads the branch's session records and the workspace's conversations every 10 seconds while the page is visible, and again when any session starts or the page becomes visible. After a refusal it stops asking for conversations until the workspace or branch changes. Evidence: `web/src/features/workstream/useItemSessions.ts:7`, `web/src/features/workstream/useItemSessions.ts:30`.
+[live] The board loads the branch's session records and the workspace's conversations every 10 seconds while the page is visible, and again when any session starts or the page becomes visible. After a refusal it stops asking for conversations until the workspace or branch changes. Evidence: `web/src/features/workstream/useItemSessions.ts:7`, `web/src/features/workstream/useItemSessions.ts:31`.
 
 ## Ephemeral Canvas Nodes
 <!-- chunkId: workspace-card-agent-sessions-reference-ephemeral -->

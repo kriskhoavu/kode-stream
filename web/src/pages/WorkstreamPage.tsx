@@ -2006,7 +2006,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
           </div>
         </header>
         {error && <p className="error drawer-error">{error}</p>}
-        <div className="plan-drawer-body">
+        <div className={agentFocus || sideTab === 'agents' ? 'plan-drawer-body agents-open' : 'plan-drawer-body'}>
           {agentFocus ? (
           <section className="drawer-main drawer-agent-main">
             <AgentPane focus={agentFocus} itemId={itemId} workspaceId={workspaceId ?? plan?.workspaceId} agents={agents} onBack={() => onAgentFocus(undefined)} onFocus={onAgentFocus} onReload={onAgentsChanged} />

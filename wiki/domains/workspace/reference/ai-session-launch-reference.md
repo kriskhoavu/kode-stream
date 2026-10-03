@@ -36,7 +36,7 @@ failed record write cannot silently produce an untracked running process.
 <!-- chunkId: workspace-ai-launch-reference-pty -->
 <!-- keywords: PTY, resize, channel, cancel, process state -->
 
-[live] PM-020 the embedded adapter starts a bounded PTY, supports terminal resize, streams through a session channel, and tracks exit state. Evidence: `internal/ai/ai_terminal_repository.go:155`, `internal/ai/ai_terminal_repository.go:297`, `web/src/features/ai-session/EmbeddedTerminal.tsx:12`.
+[live] PM-020 the embedded adapter starts a bounded PTY, supports terminal resize, streams through a session channel, and tracks exit state. Evidence: `internal/ai/ai_terminal_repository.go:155`, `internal/ai/ai_terminal_repository.go:297`, `web/src/features/ai-session/EmbeddedTerminal.tsx:13`.
 
 Closing a normal embedded window cancels its process unless the owning surface explicitly retains it. Hiding a compact
 Canvas view does not redefine process lifetime; the session record remains the shared source for other views.

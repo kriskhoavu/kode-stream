@@ -77,7 +77,16 @@
 	.agent-cluster-launcher { opacity: 1; }
 }
 
-/* Drawer: four side tabs instead of three. */
+/* Drawer: a wider Work Item column for four side tabs, wider again while
+ * the Agents tab lists sessions beside a terminal. */
+.plan-drawer-body {
+	grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+}
+
+.plan-drawer-body.agents-open {
+	grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+}
+
 .drawer-work-item .side-panel-tabs {
 	grid-template-columns: repeat(4, minmax(0, 1fr));
 }
