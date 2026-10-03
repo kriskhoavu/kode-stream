@@ -341,13 +341,16 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 					return
 				}
 			case "resize":
+				// A size outside the PTY's limits is refused but the channel stays
+				// open: a viewer briefly laid out at a sliver must not lose the
+				// session, which the manager cancels once nobody is watching.
 				if message.Columns == 0 || message.Rows == 0 || message.Columns > maxTerminalDimension || message.Rows > maxTerminalDimension {
 					_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal size"})
-					return
+					continue
 				}
 				if err := manager.Resize(id, message.Columns, message.Rows); err != nil {
 					_ = writeChannel(channelOutput{Type: "error", Message: "terminal resize rejected"})
-					return
+					continue
 				}
 			case "cancel":
 				if _, err := manager.Cancel(id); err != nil {

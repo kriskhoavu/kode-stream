@@ -15,7 +15,7 @@ vi.mock('@xterm/xterm', () => ({ Terminal: class {
 	onResize() { return { dispose() {} }; }
 } }));
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit = fit; } }));
-vi.mock('../../shared/api', () => ({ api: { cancelEmbeddedAISession: vi.fn() } }));
+vi.mock('../../shared/api', () => ({ api: { cancelEmbeddedAISession: vi.fn(), embeddedAISessionGrant: vi.fn() } }));
 
 class TestSocket {
 	static OPEN = 1;
@@ -33,6 +33,23 @@ const terminalProps = { visible: true, mode: 'floating' as const, title: 'Codex 
 
 describe('EmbeddedTerminal', () => {
 	afterEach(() => { TestSocket.instances = []; vi.clearAllMocks(); });
+
+	it('reconnects a long-watched session with a fresh grant after a drop', async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		vi.stubGlobal('WebSocket', TestSocket);
+		vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+		vi.mocked(api.embeddedAISessionGrant).mockResolvedValue({ sessionId: 'session-1', token: 'fresh', expiresAt: '' });
+		render(<EmbeddedTerminal initial={initial} {...terminalProps} onClose={vi.fn()} />);
+		await waitFor(() => expect(TestSocket.instances).toHaveLength(1));
+		act(() => { TestSocket.instances[0].onopen?.(); });
+		await act(async () => { vi.advanceTimersByTime(60_000); });
+		act(() => { TestSocket.instances[0].onclose?.(); });
+		await act(async () => { vi.advanceTimersByTime(600); });
+		await waitFor(() => expect(TestSocket.instances).toHaveLength(2));
+		expect(TestSocket.instances[1].url).toContain('token=fresh');
+		expect(screen.queryByText('The terminal connection could not be restored.')).not.toBeInTheDocument();
+		vi.useRealTimers();
+	});
 
 	it('connects, handles output and presents exit state', async () => {
 		vi.stubGlobal('WebSocket', TestSocket);

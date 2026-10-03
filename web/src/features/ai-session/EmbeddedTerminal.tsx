@@ -44,28 +44,45 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onSt
 		if (!hostRef.current) return;
 		setConnection('connecting');
 		setMessage('');
-		let disposed = false; let retry: number | undefined; let terminal: Terminal | undefined; let observer: ResizeObserver | undefined; let dataDisposable: { dispose(): void } | undefined; let resizeDisposable: { dispose(): void } | undefined; const deadline = Date.now() + 15_000;
+		let disposed = false; let retry: number | undefined; let terminal: Terminal | undefined; let observer: ResizeObserver | undefined; let dataDisposable: { dispose(): void } | undefined; let resizeDisposable: { dispose(): void } | undefined;
+		// The reconnect window starts at each disconnect, not at mount: a session
+		// watched for minutes must survive a drop as well as one just opened.
+		let deadline = 0; let token = grantToken;
 		const send = (value: unknown) => { if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(value)); };
+		// The server accepts 20-500 columns and 5-200 rows; a host caught mid-layout
+		// at a sliver must not send a size it refuses.
+		const sendResize = (columns: number, rows: number) => send({ type: 'resize', columns: Math.min(500, Math.max(20, columns)), rows: Math.min(200, Math.max(5, rows)) });
 		const connect = (activeTerminal: Terminal) => {
 			if (disposed) return;
 			const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
-			const socket = new WebSocket(`${scheme}//${location.host}/api/ai/sessions/${encodeURIComponent(sessionId)}/channel?token=${encodeURIComponent(grantToken)}`);
+			const socket = new WebSocket(`${scheme}//${location.host}/api/ai/sessions/${encodeURIComponent(sessionId)}/channel?token=${encodeURIComponent(token)}`);
 			socketRef.current = socket;
-			socket.onopen = () => { setConnection('connected'); send({ type: 'resize', columns: activeTerminal.cols, rows: activeTerminal.rows }); };
+			socket.onopen = () => { deadline = 0; setConnection('connected'); sendResize(activeTerminal.cols, activeTerminal.rows); };
 				socket.onmessage = (event) => {
 				const frame = JSON.parse(String(event.data)) as ServerFrame;
 				if (frame.type === 'output' && frame.data) activeTerminal.write(frame.encoding === 'base64' ? Uint8Array.from(atob(frame.data), (character) => character.charCodeAt(0)) : frame.data);
 				if (frame.type === 'state' && frame.state) { stateRef.current = frame.state; setState(frame.state); setExitCode(frame.exitCode); onStateChangeRef.current?.(frame.state, frame.exitCode); if (frame.state !== 'starting' && frame.state !== 'running') notifyEmbeddedSessionEnded(sessionId); }
 				if (frame.type === 'warning') setMessage(frame.message ?? 'Terminal warning');
 			};
-			socket.onclose = () => { if (disposed) return; if (Date.now() < deadline && (stateRef.current === 'starting' || stateRef.current === 'running')) { setConnection('reconnecting'); retry = window.setTimeout(() => connect(activeTerminal), 500); } else { setConnection('closed'); setMessage('The terminal connection could not be restored.'); } };
+			socket.onclose = () => {
+				if (disposed) return;
+				if (deadline === 0) deadline = Date.now() + 15_000;
+				if (Date.now() < deadline && (stateRef.current === 'starting' || stateRef.current === 'running')) {
+					setConnection('reconnecting');
+					// A grant lasts a minute and a newer one replaces it, so each
+					// attempt asks for a fresh one rather than replaying the first.
+					retry = window.setTimeout(() => {
+						void api.embeddedAISessionGrant(sessionId).then((grant) => { token = grant.token; }).catch(() => undefined).finally(() => connect(activeTerminal));
+					}, 500);
+				} else { setConnection('closed'); setMessage('The terminal connection could not be restored.'); }
+			};
 		};
 		void Promise.all([import('@xterm/xterm'), import('@xterm/addon-fit')]).then(([terminalModule, fitModule]) => {
 			if (disposed || !hostRef.current) return;
 			terminal = new terminalModule.Terminal({ convertEol: true, cursorBlink: true, fontSize: 12, lineHeight: 1.15, scrollback: 5000, theme: { background: '#090d18' } });
 			const fit = new fitModule.FitAddon(); fitRef.current = fit; terminal.loadAddon(fit); terminal.open(hostRef.current); fit.fit(); terminal.focus(); terminalRef.current = terminal;
 			dataDisposable = terminal.onData((data) => send({ type: 'input', data: btoa(unescape(encodeURIComponent(data))) }));
-			resizeDisposable = terminal.onResize(({ cols, rows }) => send({ type: 'resize', columns: cols, rows }));
+			resizeDisposable = terminal.onResize(({ cols, rows }) => sendResize(cols, rows));
 			observer = new ResizeObserver(() => fit.fit()); observer.observe(hostRef.current); connect(terminal);
 		}).catch(() => setMessage('The terminal emulator could not be loaded.'));
 		return () => { disposed = true; if (retry) window.clearTimeout(retry); observer?.disconnect(); dataDisposable?.dispose(); resizeDisposable?.dispose(); socketRef.current?.close(); terminal?.dispose(); terminalRef.current = null; fitRef.current = null; };
