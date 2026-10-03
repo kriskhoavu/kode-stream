@@ -19,6 +19,8 @@
   --blue: #4f46e5;
   --button-accent: #c65f2a;
   --accent-contrast: #ffffff;
+  /* Accent for text and thin marks on the page background: readable orange. */
+  --accent-text: #b4501d;
   --green: #079669;
   --selection-accent: var(--button-accent);
   --orange: #c2410c;
@@ -310,6 +312,7 @@
   --blue: #f9b98c;
   --button-accent: #b95f2e;
   --accent-contrast: #ffffff;
+  --accent-text: #f2894a;
   --green: #40c977;
   --selection-accent: #f9b98c;
   --orange: #f9b98c;
@@ -3991,13 +3994,9 @@ body.is-resizing-drawer {
 }
 
 .drawer-tabs button.active {
-  color: var(--text);
+  color: var(--accent-text);
   font-weight: 650;
   background: transparent;
-}
-
-.drawer-tabs button.active svg {
-  color: var(--button-accent);
 }
 
 .drawer-tabs button.active::after {
@@ -4008,7 +4007,7 @@ body.is-resizing-drawer {
   bottom: 0;
   height: 2px;
   border-radius: 2px;
-  background: var(--button-accent);
+  background: var(--accent-text);
 }
 
 .drawer-markdown,

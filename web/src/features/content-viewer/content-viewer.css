@@ -56,6 +56,7 @@
 
 .viewer-mode-toolbar button.active,
 .viewer-mode-toolbar button[aria-selected='true'] {
+  color: var(--accent-text);
   font-weight: 700;
 }
 
