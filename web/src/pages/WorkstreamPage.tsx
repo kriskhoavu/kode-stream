@@ -1,6 +1,6 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
-import { BookmarkPlus, Bot, ChevronDown, Code2, FileText, Filter, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Bot, ChevronDown, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { useModalDialog } from '../components/overlay';
 import { readStringPreference, writePreference } from '../shared/preferences/store';
@@ -1564,6 +1564,17 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
   const [diff, setDiff] = useState('');
   const [tab, setTab] = useState<DrawerTab>('preview');
   const [sideTab, setSideTab] = useState<DrawerSideTab>(() => agentFocus ? 'agents' : 'info');
+  // Collapsed, the Work Item panel shrinks to a rail of tab icons and the main
+  // pane takes its width; the choice is remembered across drawers.
+  const [workItemCollapsed, setWorkItemCollapsed] = useState(() => readStoredToggle('workstream.drawer.workItemCollapsed'));
+  const collapseWorkItem = (collapsed: boolean) => {
+    setWorkItemCollapsed(collapsed);
+    writePreference('workstream.drawer.workItemCollapsed', collapsed ? '1' : '0');
+  };
+  const openSideTab = (tab: DrawerSideTab) => {
+    setSideTab(tab);
+    if (workItemCollapsed) collapseWorkItem(false);
+  };
   // Live sessions opened in this drawer keep their terminal mounted until the
   // drawer lets go of them: the server cancels a session shortly after its
   // last viewer leaves, so going back to the document must not drop it.
@@ -2020,7 +2031,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
           </div>
         </header>
         {error && <p className="error drawer-error">{error}</p>}
-        <div className={agentFocus || sideTab === 'agents' ? 'plan-drawer-body agents-open' : 'plan-drawer-body'}>
+        <div className={['plan-drawer-body', agentFocus || sideTab === 'agents' ? 'agents-open' : '', workItemCollapsed ? 'work-item-collapsed' : ''].filter(Boolean).join(' ')}>
           {(agentFocus || heldLiveSessionIds.length > 0) && (
           <section className="drawer-main drawer-agent-main" hidden={!agentFocus}>
             <AgentPane focus={agentFocus} heldSessionIds={heldLiveSessionIds} itemId={itemId} workspaceId={workspaceId ?? plan?.workspaceId} agents={agents} onBack={() => onAgentFocus(undefined)} onFocus={onAgentFocus} onRelease={(id) => setHeldSessionIds((held) => held.filter((candidate) => candidate !== id))} onReload={onAgentsChanged} />
@@ -2063,8 +2074,19 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
             </section>
           </section>
           )}
+          {workItemCollapsed ? (
+          <aside className="drawer-work-item-rail" aria-label="Work item">
+            <button type="button" className="icon-button" aria-label="Expand work item panel" title="Expand work item panel" onClick={() => collapseWorkItem(false)}><PanelRightOpen size={16} /></button>
+            <span className="drawer-work-item-rail-divider" aria-hidden="true" />
+            {([['info', Info, 'Info'], ['git', GitBranch, 'Git'], ['jira', Ticket, 'Jira'], ['agents', Bot, 'Agents']] as const).map(([tab, Icon, label]) => (
+              <button key={tab} type="button" className={sideTab === tab ? 'icon-button active' : 'icon-button'} aria-label={`Open ${label}`} title={label} onClick={() => openSideTab(tab)}>
+                <Icon size={16} />{tab === 'agents' && (agents?.live.length ?? 0) > 0 && <span className="side-tab-count" aria-hidden="true">{agents?.live.length}</span>}
+              </button>
+            ))}
+          </aside>
+          ) : (
           <aside className="drawer-meta drawer-work-item">
-            <h3><Info size={15} /> Work Item</h3>
+            <h3><Info size={15} /> Work Item<button type="button" className="icon-button drawer-work-item-collapse" aria-label="Collapse work item panel" title="Collapse work item panel" onClick={() => collapseWorkItem(true)}><PanelRightClose size={15} /></button></h3>
             <div className="side-panel-tabs" role="tablist" aria-label="Work item side panel">
               <button type="button" className={sideTab === 'info' ? 'active' : ''} onClick={() => setSideTab('info')}>
                 <Info size={14} /> Info
@@ -2163,6 +2185,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
               {sideTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={onAgentFocus} onError={setError} onLaunched={(result) => { void Promise.resolve(onAgentsChanged()).then(() => onAgentFocus({ kind: 'session', id: result.session.id })); }} />}
             </div>
           </aside>
+          )}
         </div>
       </aside>
     </>

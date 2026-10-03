@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WorkstreamPage } from './WorkstreamPage';
+import { readStringPreference } from '../shared/preferences/store';
 import type { ClaudeTranscript, ItemSummary, SafeSessionRecord, WorkstreamBranchLoadResult } from '../lib/types';
 import { embeddedSessionAttachEvent, notifyEmbeddedSessionEnded } from '../features/ai-session/terminalSessions';
 
@@ -90,6 +91,22 @@ describe('WorkstreamPage card agents', () => {
 		await waitFor(() => expect(attached).toHaveBeenCalledTimes(1));
 		window.removeEventListener(embeddedSessionAttachEvent, attached);
 		await act(async () => undefined);
+	});
+
+	it('collapses the Work Item panel to a rail, remembers it, and reopens on the tab picked from the rail', async () => {
+		stubBoard([record('live-1', 'claude', true)]);
+		renderBoard();
+		fireEvent.click(await screen.findByRole('button', { name: 'Open the running Claude session' }));
+		const drawer = await screen.findByLabelText('Item preview');
+		fireEvent.click(within(drawer).getByRole('button', { name: 'Collapse work item panel' }));
+		expect(within(drawer).queryByRole('tablist', { name: 'Work item side panel' })).not.toBeInTheDocument();
+		expect(drawer.querySelector('.plan-drawer-body')).toHaveClass('work-item-collapsed');
+		expect(within(drawer).getByTestId('terminal-live-1')).toBeVisible();
+		expect(readStringPreference('workstream.drawer.workItemCollapsed')).toBe('1');
+		fireEvent.click(within(drawer).getByRole('button', { name: 'Open Git' }));
+		expect(within(drawer).getByRole('tablist', { name: 'Work item side panel' })).toBeInTheDocument();
+		expect(within(drawer).getByRole('button', { name: /^Git/ })).toHaveClass('active');
+		expect(readStringPreference('workstream.drawer.workItemCollapsed')).toBe('0');
 	});
 
 	it('opens the launcher on a card with no live session', async () => {

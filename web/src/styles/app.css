@@ -3997,6 +3997,59 @@ body.is-resizing-drawer {
   margin-bottom: 2px;
 }
 
+/* A collapsed Work Item panel leaves a rail of tab icons and gives the main
+ * pane its width. */
+.plan-drawer .plan-drawer-body.work-item-collapsed {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.drawer-work-item h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drawer-work-item-collapse {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+}
+
+.drawer-work-item-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 88%, var(--panel-soft));
+  min-height: 0;
+}
+
+.drawer-work-item-rail .icon-button {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.drawer-work-item-rail .icon-button.active {
+  color: var(--button-accent);
+  background: color-mix(in srgb, var(--button-accent) 10%, transparent);
+}
+
+.drawer-work-item-rail .side-tab-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+
+.drawer-work-item-rail-divider {
+  width: 20px;
+  height: 1px;
+  background: var(--line);
+}
+
 .drawer-work-item-content {
   min-height: 0;
   overflow: auto;
