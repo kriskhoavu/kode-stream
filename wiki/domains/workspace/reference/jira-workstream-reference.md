@@ -34,7 +34,7 @@ normalizes content type and filename before streaming. Browser clients do not re
 <!-- chunkId: workspace-jira-workstream-reference-creation -->
 <!-- keywords: Jira issue, plan draft, source structure, duplicate -->
 
-[live] PM-025 Workstream resolves Jira before constructing the local draft and then creates the item through the same source-aware item creation path as manual intake. Evidence: `web/src/pages/WorkstreamPage.tsx:490`, `web/src/pages/WorkstreamPage.tsx:507`, `internal/item/writer/writer_test.go:201`.
+[live] PM-025 Workstream resolves Jira before constructing the local draft and then creates the item through the same source-aware item creation path as manual intake. Evidence: `web/src/pages/WorkstreamPage.tsx:491`, `web/src/pages/WorkstreamPage.tsx:508`, `internal/item/writer/writer_test.go:201`.
 
 Jira fields seed local values but do not bypass identifier, path, source, or collision validation.
 

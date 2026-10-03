@@ -109,29 +109,36 @@ export async function handOffToDock(record: SafeSessionRecord): Promise<void> {
 	attachEmbeddedSession({ session, grant, record });
 }
 
-/** The drawer's main pane while an agent is in focus. */
-export function AgentPane({ focus, itemId, workspaceId, agents, onBack, onFocus, onReload }: { focus: AgentFocus; itemId: string; workspaceId?: string; agents?: ItemAgents; onBack: () => void; onFocus: (focus: AgentFocus) => void; onReload: () => Promise<unknown> | void }) {
+/**
+ * The drawer's main pane while an agent is in focus. Every held session keeps
+ * its pane, hidden when another view is shown: an embedded process is
+ * cancelled shortly after its last viewer leaves, so leaving a live session's
+ * pane must not unmount its terminal.
+ */
+export function AgentPane({ focus, heldSessionIds, itemId, workspaceId, agents, onBack, onFocus, onRelease, onReload }: { focus?: AgentFocus; heldSessionIds: string[]; itemId: string; workspaceId?: string; agents?: ItemAgents; onBack: () => void; onFocus: (focus: AgentFocus) => void; onRelease: (sessionId: string) => void; onReload: () => Promise<unknown> | void }) {
 	const back = <button type="button" className="secondary agent-pane-back" onClick={onBack}><ArrowLeft size={14} /> Back to document</button>;
-	if (focus.kind === 'launch') {
-		return <section className="agent-pane agent-pane-empty" aria-label="Agent">
+	const focusedSession = focus?.kind === 'session' ? focus.id : undefined;
+	const sessionIds = focusedSession && !heldSessionIds.includes(focusedSession) ? [...heldSessionIds, focusedSession] : heldSessionIds;
+	const transcript = focus?.kind === 'transcript' ? agents?.transcripts.find((candidate) => candidate.sessionId === focus.id) : undefined;
+	return <>
+		{focus?.kind === 'launch' && <section className="agent-pane agent-pane-empty" aria-label="Agent">
 			<header className="agent-pane-header">{back}</header>
 			<div className="agent-pane-placeholder"><Bot size={28} /><p>Start a session from the Agents tab. Its terminal opens here, and you can keep prompting it.</p></div>
-		</section>;
-	}
-	if (focus.kind === 'transcript') {
-		const transcript = agents?.transcripts.find((candidate) => candidate.sessionId === focus.id);
-		return <TranscriptPane conversation={focus.id} transcript={transcript} itemId={itemId} workspaceId={workspaceId} back={back} onResumed={(result) => { void onReload(); onFocus({ kind: 'session', id: result.session.id }); }} />;
-	}
-	const record = agents?.live.find((candidate) => candidate.id === focus.id) ?? agents?.ended.find((candidate) => candidate.id === focus.id);
-	return <SessionPane key={focus.id} record={record} itemId={itemId} back={back} onBack={onBack} onReload={onReload} onFocus={onFocus} />;
+		</section>}
+		{focus?.kind === 'transcript' && <TranscriptPane conversation={focus.id} transcript={transcript} itemId={itemId} workspaceId={workspaceId} back={back} onResumed={(result) => { void onReload(); onFocus({ kind: 'session', id: result.session.id }); }} />}
+		{sessionIds.map((id) => {
+			const record = agents?.live.find((candidate) => candidate.id === id) ?? agents?.ended.find((candidate) => candidate.id === id);
+			return <SessionPane key={id} hidden={id !== focusedSession} record={record} itemId={itemId} back={back} onBack={onBack} onRelease={() => onRelease(id)} onReload={onReload} onFocus={onFocus} />;
+		})}
+	</>;
 }
 
-function SessionPane({ record, itemId, back, onBack, onReload, onFocus }: { record?: SafeSessionRecord; itemId: string; back: React.ReactNode; onBack: () => void; onReload: () => Promise<unknown> | void; onFocus: (focus: AgentFocus) => void }) {
+function SessionPane({ hidden, record, itemId, back, onBack, onRelease, onReload, onFocus }: { hidden: boolean; record?: SafeSessionRecord; itemId: string; back: React.ReactNode; onBack: () => void; onRelease: () => void; onReload: () => Promise<unknown> | void; onFocus: (focus: AgentFocus) => void }) {
 	const [view, setView] = useState<'terminal' | 'changes'>('terminal');
 	const [error, setError] = useState('');
 	const [resuming, setResuming] = useState(false);
 	if (!record) {
-		return <section className="agent-pane" aria-label="Agent">
+		return <section className="agent-pane" aria-label="Agent" hidden={hidden}>
 			<header className="agent-pane-header">{back}</header>
 			<p className="agent-pane-placeholder" role="status">Loading session…</p>
 		</section>;
@@ -142,6 +149,7 @@ function SessionPane({ record, itemId, back, onBack, onReload, onFocus }: { reco
 		setError('');
 		try {
 			await handOffToDock(record);
+			onRelease();
 			onBack();
 		} catch (caught) {
 			setError(caught instanceof Error ? caught.message : 'The session could not be moved to the dock.');
@@ -161,7 +169,7 @@ function SessionPane({ record, itemId, back, onBack, onReload, onFocus }: { reco
 			setResuming(false);
 		}
 	};
-	return <section className="agent-pane" aria-label={`${providerLabel(record.provider)} session`}>
+	return <section className="agent-pane" aria-label={`${providerLabel(record.provider)} session`} hidden={hidden}>
 		<header className="agent-pane-header">
 			{back}
 			<span className="agent-pane-title"><AgentChip live={live} /><strong>{providerLabel(record.provider)}</strong><span>{sessionGlyph(record).label} · {record.requestedBranch}</span></span>
@@ -174,8 +182,8 @@ function SessionPane({ record, itemId, back, onBack, onReload, onFocus }: { reco
 		</header>
 		{error && <p className="error" role="alert">{error}</p>}
 		<div className="agent-pane-body">
-			<SessionTerminal record={record} visible={view === 'terminal'} onReload={onReload} classPrefix="agent-pane-terminal" ariaLabel={`${providerLabel(record.provider)} terminal`} />
-			{view === 'changes' && <SessionChangesPanel session={record} />}
+			<SessionTerminal record={record} visible={!hidden && view === 'terminal'} onReload={onReload} classPrefix="agent-pane-terminal" ariaLabel={`${providerLabel(record.provider)} terminal`} />
+			{!hidden && view === 'changes' && <SessionChangesPanel session={record} />}
 		</div>
 	</section>;
 }

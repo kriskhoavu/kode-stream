@@ -75,6 +75,23 @@ describe('WorkstreamPage card agents', () => {
 		expect(screen.queryByRole('button', { name: 'Open the running Claude session' })).not.toBeInTheDocument();
 	});
 
+	it('keeps a live session connected after Back to document, and hands it to the dock when the drawer closes', async () => {
+		stubBoard([record('live-1', 'claude', true)]);
+		const attached = vi.fn();
+		window.addEventListener(embeddedSessionAttachEvent, attached);
+		renderBoard();
+		fireEvent.click(await screen.findByRole('button', { name: 'Open the running Claude session' }));
+		const drawer = await screen.findByLabelText('Item preview');
+		fireEvent.click(within(drawer).getByRole('button', { name: 'Back to document' }));
+		expect(within(drawer).getByText('Document')).toBeInTheDocument();
+		expect(within(drawer).getByTestId('terminal-live-1')).not.toBeVisible();
+		expect(attached).not.toHaveBeenCalled();
+		fireEvent.click(within(drawer).getAllByRole('button', { name: 'Close preview' })[0]);
+		await waitFor(() => expect(attached).toHaveBeenCalledTimes(1));
+		window.removeEventListener(embeddedSessionAttachEvent, attached);
+		await act(async () => undefined);
+	});
+
 	it('opens the launcher on a card with no live session', async () => {
 		stubBoard([]);
 		renderBoard();

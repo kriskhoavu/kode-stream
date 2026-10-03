@@ -214,6 +214,10 @@
 }
 
 /* Main pane: the agent replaces the document. */
+.drawer-agent-main[hidden] {
+	display: none;
+}
+
 .drawer-agent-main {
 	display: flex;
 	flex-direction: column;
@@ -230,6 +234,10 @@
 	border-radius: 10px;
 	background: var(--panel);
 	overflow: hidden;
+}
+
+.agent-pane[hidden] {
+	display: none;
 }
 
 .agent-pane-header {

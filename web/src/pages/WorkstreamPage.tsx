@@ -20,6 +20,7 @@ import type {
   ItemStatus,
   ItemSummary,
   JiraIssue,
+  SafeSessionRecord,
   JiraIssueState,
   SavedFilter,
   SourceSettingsResult,
@@ -1563,6 +1564,13 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
   const [diff, setDiff] = useState('');
   const [tab, setTab] = useState<DrawerTab>('preview');
   const [sideTab, setSideTab] = useState<DrawerSideTab>(() => agentFocus ? 'agents' : 'info');
+  // Live sessions opened in this drawer keep their terminal mounted until the
+  // drawer lets go of them: the server cancels a session shortly after its
+  // last viewer leaves, so going back to the document must not drop it.
+  const [heldSessionIds, setHeldSessionIds] = useState<string[]>([]);
+  const liveSessions = agents?.live ?? [];
+  const heldLiveSessionIds = heldSessionIds.filter((id) => liveSessions.some((record) => record.id === id));
+  const heldLiveRecordsRef = useRef<SafeSessionRecord[]>([]);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitActivity, setGitActivity] = useState<GitActivityEntry[]>([]);
   const [gitActivityLoading, setGitActivityLoading] = useState(false);
@@ -1620,6 +1628,23 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
   useEffect(() => {
     if (agentFocus) setSideTab('agents');
   }, [agentFocusKey(agentFocus)]);
+
+  useEffect(() => {
+    if (agentFocus?.kind !== 'session' || !liveSessions.some((record) => record.id === agentFocus.id)) return;
+    setHeldSessionIds((held) => held.includes(agentFocus.id) ? held : [...held, agentFocus.id]);
+  }, [agentFocusKey(agentFocus), agents?.key]);
+
+  useEffect(() => {
+    heldLiveRecordsRef.current = liveSessions.filter((record) => heldSessionIds.includes(record.id));
+  });
+
+  // Leaving this card, or closing the drawer, hands every held live session to
+  // the terminal dock, which keeps it connected.
+  useEffect(() => () => {
+    for (const record of heldLiveRecordsRef.current) void handOffToDock(record).catch(() => undefined);
+    heldLiveRecordsRef.current = [];
+    setHeldSessionIds([]);
+  }, [itemId]);
 
   useEffect(() => {
     const updateTopOffset = () => setTopOffset(Math.max(0, 68 - window.scrollY));
@@ -1798,24 +1823,13 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
     await loadDrawerFile(fileId);
   };
 
-  // A live session open in the main pane goes to the terminal dock on close,
-  // so closing the drawer never leaves the process without a viewer.
-  const focusedLiveSession = agentFocus?.kind === 'session' ? agents?.live.find((record) => record.id === agentFocus.id) : undefined;
-  const closeWithHandOff = () => {
-    if (!focusedLiveSession) {
+  const closeDrawer = () => {
+    if (!dirtyFile) {
       onClose();
       return;
     }
-    void handOffToDock(focusedLiveSession).catch(() => undefined).finally(onClose);
-  };
-
-  const closeDrawer = () => {
-    if (!dirtyFile) {
-      closeWithHandOff();
-      return;
-    }
     void saveDrawerFileNow().then((saved) => {
-      if (saved) closeWithHandOff();
+      if (saved) onClose();
     });
   };
 
@@ -2007,11 +2021,12 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
         </header>
         {error && <p className="error drawer-error">{error}</p>}
         <div className={agentFocus || sideTab === 'agents' ? 'plan-drawer-body agents-open' : 'plan-drawer-body'}>
-          {agentFocus ? (
-          <section className="drawer-main drawer-agent-main">
-            <AgentPane focus={agentFocus} itemId={itemId} workspaceId={workspaceId ?? plan?.workspaceId} agents={agents} onBack={() => onAgentFocus(undefined)} onFocus={onAgentFocus} onReload={onAgentsChanged} />
+          {(agentFocus || heldLiveSessionIds.length > 0) && (
+          <section className="drawer-main drawer-agent-main" hidden={!agentFocus}>
+            <AgentPane focus={agentFocus} heldSessionIds={heldLiveSessionIds} itemId={itemId} workspaceId={workspaceId ?? plan?.workspaceId} agents={agents} onBack={() => onAgentFocus(undefined)} onFocus={onAgentFocus} onRelease={(id) => setHeldSessionIds((held) => held.filter((candidate) => candidate !== id))} onReload={onAgentsChanged} />
           </section>
-          ) : (
+          )}
+          {agentFocus ? null : (
           <section className="drawer-main">
             {plan?.description && (
               <section className="drawer-section">

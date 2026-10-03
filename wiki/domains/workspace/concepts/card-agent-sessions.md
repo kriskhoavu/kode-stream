@@ -17,21 +17,23 @@ lastVerified: 2026-10-03
 
 [live] A card shows one green robot chip per live session launched from it, at most three, then `+N`; the provider is named in each chip's tooltip. A Claude Code conversation from the user's terminal that is active in the last ten minutes gets a dashed terminal chip. A card with neither offers a launcher, shown on hover or focus. Evidence: `web/src/features/workstream/AgentsPanel.tsx:41`, `web/src/features/workstream/useItemSessions.ts:9`.
 
-Every chip is its own button, so clicking one opens that agent and never previews or drags the card. Documentation cards carry no cluster. Evidence: `web/src/pages/WorkstreamPage.tsx:1535`.
+Every chip is its own button, so clicking one opens that agent and never previews or drags the card. Documentation cards carry no cluster. Evidence: `web/src/pages/WorkstreamPage.tsx:1536`.
 
 ## Agents Tab And Agent Pane
 <!-- chunkId: workspace-card-agent-sessions-drawer -->
 <!-- keywords: agents tab, main pane, back to document, continue prompting, pop out -->
 
-[live] The card drawer's Agents side tab holds a session launcher, the card's live sessions, the Claude conversations that mention it, and its ended sessions under **Earlier**. Picking one replaces the document in the drawer's main pane with that agent. Evidence: `web/src/features/workstream/AgentsPanel.tsx:64`, `web/src/features/workstream/AgentsPanel.tsx:113`.
+[live] The card drawer's Agents side tab holds a session launcher, the card's live sessions, the Claude conversations that mention it, and its ended sessions under **Earlier**. Picking one replaces the document in the drawer's main pane with that agent. Evidence: `web/src/features/workstream/AgentsPanel.tsx:64`, `web/src/features/workstream/AgentsPanel.tsx:118`.
 
-A session pane shows the live terminal, where the conversation continues by typing, beside a Changes view, **Pop out to dock**, and **Back to document**. An Escape typed into the terminal goes to the agent and does not close the drawer. Evidence: `web/src/pages/WorkstreamPage.tsx:1613`.
+A session pane shows the live terminal, where the conversation continues by typing, beside a Changes view, **Pop out to dock**, and **Back to document**. An Escape typed into the terminal goes to the agent and does not close the drawer. Evidence: `web/src/pages/WorkstreamPage.tsx:1621`.
 
 ## Keeping A Session Alive
 <!-- chunkId: workspace-card-agent-sessions-dock-hand-off -->
 <!-- keywords: dock hand-off, last viewer, fresh grant, cancel grace -->
 
-[live] A session closed or cancelled anywhere in the app leaves the card at once, before the next poll confirms it. An embedded process is cancelled shortly after its last viewer leaves. Closing the drawer on a live session therefore hands it to the terminal dock with a fresh grant, so the process keeps a viewer. Evidence: `web/src/pages/WorkstreamPage.tsx:1804`, `web/src/features/workstream/AgentsPanel.tsx:107`, `web/src/features/ai-session/terminalSessions.ts:25`.
+[live] A session closed or cancelled anywhere in the app leaves the card at once, before the next poll confirms it. An embedded process is cancelled shortly after its last viewer leaves, so every live session opened in the drawer keeps its terminal mounted, hidden, while the drawer shows the document, a transcript, or another session. Closing the drawer, opening another card, or leaving the page hands each of them to the terminal dock with a fresh grant. Evidence: `web/src/features/workstream/AgentsPanel.tsx:118`, `web/src/pages/WorkstreamPage.tsx:1641`, `web/src/features/workstream/AgentsPanel.tsx:107`.
+
+[live] A terminal whose connection drops reconnects for fifteen seconds from the drop, asking for a fresh grant each time, and the channel answers a terminal size outside the PTY's limits with an error instead of closing. Evidence: `web/src/features/ai-session/EmbeddedTerminal.tsx:67`, `internal/server/api/ai_controller.go:343`.
 
 ## Claude Code Conversations
 <!-- chunkId: workspace-card-agent-sessions-claude -->
@@ -39,7 +41,7 @@ A session pane shows the live terminal, where the conversation continues by typi
 
 [live] Conversations the user holds with Claude Code in the workspace root are read from Claude Code's project directory and tied to the items whose path or identifier they mention. They show read-only as their last turns, with **Continue here**, which resumes the conversation in an embedded terminal on the card. Evidence: `internal/ai/claude_transcripts.go:137`, `internal/ai/ai_embedded_service.go:224`.
 
-An embedded Claude session is named after its conversation, so kode-stream's own conversations are never listed as the user's, and an ended one can be continued from **Earlier**. A conversation written in the last two minutes may still be open in the user's terminal; continuing it here forks it, and the pane says so. Evidence: `internal/ai/ai_embedded_service.go:19`, `web/src/features/workstream/AgentsPanel.tsx:215`.
+An embedded Claude session is named after its conversation, so kode-stream's own conversations are never listed as the user's, and an ended one can be continued from **Earlier**. A conversation written in the last two minutes may still be open in the user's terminal; continuing it here forks it, and the pane says so. Evidence: `internal/ai/ai_embedded_service.go:19`, `web/src/features/workstream/AgentsPanel.tsx:223`.
 
 ## Across The Workbench
 <!-- chunkId: workspace-card-agent-sessions-workbench -->
