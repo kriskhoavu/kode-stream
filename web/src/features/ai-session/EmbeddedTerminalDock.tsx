@@ -3,7 +3,8 @@ import { Bot, Maximize2 } from 'lucide-react';
 import type { EmbeddedAISessionResult, WorkspaceConfig } from '../../lib/types';
 import { api } from '../../shared/api';
 import { EmbeddedTerminal } from './EmbeddedTerminal';
-import { embeddedSessionStartedEvent } from './terminalSessions';
+import { embeddedSessionAttachEvent, embeddedSessionStartedEvent } from './terminalSessions';
+import { providerLabel } from './providerDisplay';
 
 type DockMode = 'floating' | 'side_panel' | 'maximized' | 'minimized';
 type FloatingLayout = { x: number; y: number; width: number; height: number };
@@ -43,7 +44,11 @@ export function EmbeddedTerminalDock({ workspaces }: { workspaces: WorkspaceConf
 			setMode((current) => current === 'minimized' ? lastExpandedMode : current);
 		};
 		window.addEventListener(embeddedSessionStartedEvent, add);
-		return () => window.removeEventListener(embeddedSessionStartedEvent, add);
+		window.addEventListener(embeddedSessionAttachEvent, add);
+		return () => {
+			window.removeEventListener(embeddedSessionStartedEvent, add);
+			window.removeEventListener(embeddedSessionAttachEvent, add);
+		};
 	}, [lastExpandedMode]);
 
 	useEffect(() => {
@@ -225,8 +230,4 @@ function workspaceContext(result: EmbeddedAISessionResult, workspaceNames: Map<s
 
 function workspaceName(result: EmbeddedAISessionResult, workspaceNames: Map<string, string>) {
 	return workspaceNames.get(result.session.workspaceId) ?? result.session.workspaceId;
-}
-
-function providerLabel(provider: string) {
-	return ({ codex: 'Codex', claude: 'Claude', copilot: 'Copilot', opencode: 'OpenCode' } as Record<string, string>)[provider] ?? provider;
 }

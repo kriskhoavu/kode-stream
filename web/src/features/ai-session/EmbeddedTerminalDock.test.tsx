@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { EmbeddedTerminalDock } from './EmbeddedTerminalDock';
-import { openEmbeddedSession } from './terminalSessions';
+import { attachEmbeddedSession, openEmbeddedSession } from './terminalSessions';
 
 Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
 Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
@@ -19,6 +19,14 @@ function pointerEvent(type: string, clientX: number) {
 }
 
 describe('EmbeddedTerminalDock', () => {
+	it('holds an attached running session once, beside started ones', () => {
+		render(<EmbeddedTerminalDock workspaces={[]} />);
+		act(() => { openEmbeddedSession(session('one', 'ws-1', 'PM-020')); attachEmbeddedSession(session('two', 'ws-1', 'PM-043')); attachEmbeddedSession(session('two', 'ws-1', 'PM-043')); });
+		expect(screen.getAllByRole('button', { name: /Codex · PM-043/ })).toHaveLength(1);
+		expect(screen.getByRole('button', { name: /Codex · PM-020/ })).toBeInTheDocument();
+		expect(screen.getAllByRole('region', { name: 'Codex terminal' }).find((region) => !region.hidden)).toHaveTextContent('PM-043');
+	});
+
 	it('keeps and switches sessions from multiple workspaces', () => {
 		render(<EmbeddedTerminalDock workspaces={[{ id: 'ws-1', name: 'Discovery', path: '/one', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-03T00:00:00Z' }, { id: 'ws-2', name: 'Platform', path: '/two', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-03T00:00:00Z' }]} />);
 		act(() => { openEmbeddedSession(session('one', 'ws-1', 'PM-020')); openEmbeddedSession(session('two', 'ws-2', 'PM-021')); });

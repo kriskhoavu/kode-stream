@@ -3,7 +3,8 @@ import type { ComponentType, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../shared/api';
 import type { CanvasNode, CanvasProjection, EmbeddedAISessionResult } from '../../lib/types';
-import { CanvasBoard, CanvasSessionTerminal } from './CanvasBoard';
+import { CanvasBoard } from './CanvasBoard';
+import { SessionTerminal } from '../ai-session/SessionTerminal';
 
 const fitView = vi.fn();
 const setViewport = vi.fn();
@@ -44,10 +45,10 @@ describe('CanvasBoard', () => {
 		vi.mocked(api.embeddedAISessionGrant).mockImplementation((id) => Promise.resolve({ sessionId: id, token: `grant-${id}`, expiresAt: '' }));
 		const firstRecord = baseProjection().nodes[2].session!.record;
 		const secondRecord = { ...firstRecord, id: 'session-2' };
-		const view = render(<CanvasSessionTerminal record={firstRecord} visible onReload={vi.fn()} />);
+		const view = render(<SessionTerminal record={firstRecord} visible onReload={vi.fn()} />);
 		await waitFor(() => expect(api.embeddedAISession).toHaveBeenCalledWith('session-1'));
 
-		view.rerender(<CanvasSessionTerminal record={secondRecord} visible onReload={vi.fn()} />);
+		view.rerender(<SessionTerminal record={secondRecord} visible onReload={vi.fn()} />);
 		expect(await screen.findByTestId('canvas-terminal-session-2')).toBeInTheDocument();
 		await act(async () => { resolveFirst({ id: 'session-1', itemId: 'item-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', state: 'running', startedAt: '' }); });
 

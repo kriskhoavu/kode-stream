@@ -2,10 +2,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { Background, Handle, NodeResizer, Position, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
 import type { Edge, Node as XYNode, NodeProps, OnMoveEnd, OnNodeDrag } from '@xyflow/react';
-import { Bot, Box, ChevronDown, Expand, Eye, EyeOff, GitBranch, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Pin, Play, Plus, RotateCcw, Search, Square, TerminalSquare, Trash2, WandSparkles, Workflow, X } from 'lucide-react';
-import { api } from '../../shared/api';
-import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasSection, CanvasSize, CanvasViewport, EmbeddedAISessionResult, EmbeddedAISessionState, GitStatus, SafeSessionRecord } from '../../lib/types';
-import { EmbeddedTerminal } from '../ai-session/EmbeddedTerminal';
+import { Bot, Box, ChevronDown, Expand, Eye, EyeOff, GitBranch, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Pin, Play, Plus, RotateCcw, Search, TerminalSquare, Trash2, WandSparkles, Workflow, X } from 'lucide-react';
+import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasSection, CanvasSize, CanvasViewport, GitStatus } from '../../lib/types';
+import { SessionTerminal } from '../ai-session/SessionTerminal';
 import { readPreference, writePreference } from '../../shared/preferences/store';
 import { WorkbenchViewSwitcher } from './WorkbenchViewSwitcher';
 import '@xyflow/react/dist/style.css';
@@ -428,7 +427,7 @@ function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	// virtual collapsed state through onSetCollapsed. Hide the disclosure and make close
 	// a no-op instead.
 	const disclosure = record && !data.focusOn ? <button className="icon-button canvas-node-action nodrag nopan" type="button" aria-label={expanded ? 'Collapse session terminal' : 'Expand session terminal'} title={expanded ? 'Collapse terminal' : 'Expand terminal'} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); data.onSetCollapsed(data.node.id, expanded); }}>{expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button> : undefined;
-	return <NodeFrame data={data} eyebrow={data.node.ephemeral ? 'Live session' : 'Session'} icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded && !data.focusOn} addon={record ? <CanvasSessionTerminal record={record} visible={expanded} onClose={() => { if (!data.focusOn) data.onSetCollapsed(data.node.id, true); }} onReload={data.onReload} /> : undefined}>
+	return <NodeFrame data={data} eyebrow={data.node.ephemeral ? 'Live session' : 'Session'} icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded && !data.focusOn} addon={record ? <SessionTerminal record={record} visible={expanded} onClose={() => { if (!data.focusOn) data.onSetCollapsed(data.node.id, true); }} onReload={data.onReload} /> : undefined}>
 		<strong>{record?.provider || 'Unavailable session'}</strong>
 		<span className={`canvas-session-state state-${record?.state || 'stale'}`}><Play size={11} /> {record?.state || stateLabel(data.node)}</span>
 		<span>{record?.requestedBranch || data.node.entityRef.branchKey}</span>
@@ -458,85 +457,6 @@ function NodeFrame({ data, eyebrow, icon, children, addon, action, expanded = fa
 		{addon}
 		<Handle className="canvas-derived-handle" type="source" position={Position.Right} isConnectable={false} />
 	</div>;
-}
-
-/**
- * Reattaches to a session's live terminal. Shared by the Canvas session
- * node (a draggable graph node, hence the `nodrag nopan nowheel` classes and
- * the click/pointerdown guards below) and the Session Browser's detail pane
- * (via `SessionBrowserTerminal`, a thin wrapper that supplies its own
- * `classPrefix`); `visible` follows the same shape in both so only the
- * selected/expanded session ever attaches.
- */
-export function CanvasSessionTerminal({ record, visible, onClose = () => {}, onReload, classPrefix = 'canvas-session-terminal', ariaLabel }: { record: SafeSessionRecord; visible: boolean; onClose?: () => void; onReload: () => Promise<unknown> | void; classPrefix?: string; ariaLabel?: string }) {
-	const [result, setResult] = useState<EmbeddedAISessionResult>();
-	const [attaching, setAttaching] = useState(false);
-	const [error, setError] = useState('');
-	const [retry, setRetry] = useState(0);
-	const attempted = useRef(-1);
-	const currentRecord = useRef(record);
-	const mounted = useRef(true);
-	currentRecord.current = record;
-	const active = record.state === 'starting' || record.state === 'running';
-
-	useEffect(() => {
-		mounted.current = true;
-		return () => { mounted.current = false; };
-	}, []);
-
-	// A different record (e.g. the Session Browser's selection changing to
-	// another session) re-attaches from scratch instead of carrying over the
-	// previous session's terminal state.
-	useEffect(() => {
-		setResult(undefined);
-		setError('');
-		attempted.current = -1;
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [record.id]);
-
-	useEffect(() => {
-		if (!visible || !record.live || result || attempted.current === retry) return;
-		attempted.current = retry;
-		let current = true;
-		let settled = false;
-		setAttaching(true);
-		setError('');
-		void Promise.all([api.embeddedAISession(record.id), api.embeddedAISessionGrant(record.id)]).then(([session, grant]) => {
-			if (current) setResult({ session, grant, record: currentRecord.current });
-		}).catch(() => { if (current) setError('The live process could not be reattached.'); }).finally(() => {
-			settled = true;
-			if (current) setAttaching(false);
-		});
-		return () => {
-			current = false;
-			if (!settled && attempted.current === retry) attempted.current = -1;
-		};
-	}, [record.id, record.live, result, retry, visible]);
-
-	const cancel = async () => {
-		if (!window.confirm('Cancel this terminal process? Its durable session metadata will remain available.')) return;
-		setError('');
-		try {
-			const session = await api.cancelEmbeddedAISession(record.id);
-			if (!mounted.current || currentRecord.current.id !== record.id) return;
-			setResult((current) => current ? { ...current, session } : current);
-			await Promise.resolve(onReload());
-		} catch (caught) {
-			if (mounted.current && currentRecord.current.id === record.id) setError(caught instanceof Error ? caught.message : 'Could not cancel the terminal process.');
-		}
-	};
-	const stateChanged = (state: EmbeddedAISessionState, exitCode?: number) => {
-		setResult((current) => current ? { ...current, session: { ...current.session, state, exitCode } } : current);
-		if (state !== 'starting' && state !== 'running') void onReload();
-	};
-
-	return <section className={`${classPrefix} nodrag nopan nowheel`} hidden={!visible} aria-label={ariaLabel ?? `${record.provider} Canvas terminal`} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
-		{result && <EmbeddedTerminal initial={result} visible={visible} mode="side_panel" title={`${record.provider} terminal`} subtitle={record.requestedBranch} cancelOnClose={false} compact onStartMove={() => {}} onToggleDockMode={() => {}} onToggleMinimize={() => {}} onToggleMaximize={() => {}} onClose={onClose} onStateChange={stateChanged} />}
-		{attaching && <p role="status">Connecting to terminal…</p>}
-		{!record.live && <div className={`${classPrefix}-lifecycle`}><strong>Terminal session {record.state}</strong><span>Branch {record.requestedBranch}</span>{record.exitCode !== undefined && <span>Exit code {record.exitCode}</span>}{record.state === 'interrupted' && <p>The application restarted without this process. Reconnect is unavailable; launch a new session.</p>}</div>}
-		{error && <div className={`${classPrefix}-error`} role="alert"><span>{error}</span>{record.live && <button type="button" onClick={() => { setError(''); setRetry((value) => value + 1); }}>Retry connection</button>}</div>}
-		{active && <div className={`${classPrefix}-actions`}><button className="danger-confirm" type="button" onClick={() => void cancel()}><Square size={13} /> Cancel process</button></div>}
-	</section>;
 }
 
 function CanvasSearch({ query, onQueryChange }: { query: string; onQueryChange: (value: string) => void }) {

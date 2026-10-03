@@ -1,6 +1,7 @@
 import type { GlobalSessionRow, SafeSessionRecord } from '../../lib/types';
 import { Trash2 } from 'lucide-react';
 import { formatAge, isSessionLive } from './sessionDisplay';
+import { providerLabel } from '../ai-session/providerDisplay';
 
 export type SessionGlyph = { kind: 'spinner' | 'dot'; tone: 'live' | 'success' | 'danger' | 'neutral'; label: string };
 
@@ -12,12 +13,6 @@ export function sessionGlyph(record: SafeSessionRecord): SessionGlyph {
 	if (record.state === 'interrupted') return { kind: 'dot', tone: 'danger', label: 'Interrupted' };
 	if (record.state === 'failed') return { kind: 'dot', tone: 'danger', label: 'Failed' };
 	return { kind: 'dot', tone: 'danger', label: 'Exited' };
-}
-
-const providerLabels: Record<string, string> = { codex: 'Codex', claude: 'Claude', copilot: 'Copilot', opencode: 'OpenCode' };
-
-export function providerLabel(provider: string): string {
-	return providerLabels[provider] ?? provider;
 }
 
 /** Title shown on a card and in the detail header: plan title, else intent, else provider. */

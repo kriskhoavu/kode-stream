@@ -6,6 +6,7 @@ import { AISessionLaunchDialog } from './AISessionLaunchDialog';
 import { appendJiraDescriptionPrompt } from './jiraPrompt';
 import { readAISessionPreference, saveAISessionPreference } from './preferences';
 import { openEmbeddedSession } from './terminalSessions';
+import { toolLabel as label } from './providerDisplay';
 
 export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, buttonLabel = 'Open AI session', allowEmbedded = true }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void; buttonLabel?: string; allowEmbedded?: boolean }) {
   const [preference, setPreference] = useState<AISessionLaunchInput | null>(readAISessionPreference);
@@ -67,10 +68,6 @@ function preferenceLabel(preference: AISessionLaunchInput) {
 	const prompt = preference.presetId ? ` · ${preference.presetId}` : preference.promptDraft || preference.customPrompt ? ' · free prompt' : '';
 	const jira = preference.includeJiraDescription ? ' · Jira description' : '';
 	return `${label(preference.provider)} · ${surface} · ${context}${prompt}${jira}`;
-}
-
-function label(id: string) {
-  return ({ claude: 'Claude', codex: 'Codex', copilot: 'Copilot', opencode: 'OpenCode', terminal: 'Terminal', iterm2: 'iTerm2', wezterm: 'WezTerm' } as Record<string, string>)[id] ?? id;
 }
 
 async function withCurrentJiraDescription(itemId: string, preference: AISessionLaunchInput): Promise<AISessionLaunchInput> {

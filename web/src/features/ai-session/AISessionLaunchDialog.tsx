@@ -17,6 +17,7 @@ import type {
 } from '../../lib/types';
 import { appendJiraDescriptionPrompt, removeJiraDescriptionPrompt } from './jiraPrompt';
 import { useModalDialog } from '../../components/overlay';
+import { toolLabel as label } from './providerDisplay';
 
 type EmbeddedLaunchGuards = Pick<EmbeddedAISessionLaunchInput, 'expectedWorkspaceId' | 'expectedBranch' | 'observedCommit' | 'idempotencyKey'>;
 
@@ -289,8 +290,4 @@ function CapabilityScopeGroup({ title, capabilityTitle, items, selected, onToggl
 
 function toolOptions(templates: Record<string, { enabled: boolean }> | undefined, capabilities: AICapability[], kind: 'provider' | 'terminal') {
 	return Object.keys(templates ?? {}).filter((id) => templates?.[id].enabled && capabilities.some((item) => item.kind === kind && item.id === id && item.detected)).map((id) => ({ id }));
-}
-
-function label(id: string) {
-	return ({ claude: 'Claude', codex: 'Codex', copilot: 'Copilot', opencode: 'OpenCode', terminal: 'Terminal', iterm2: 'iTerm2', wezterm: 'WezTerm' } as Record<string, string>)[id] ?? id;
 }

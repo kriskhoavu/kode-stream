@@ -48,6 +48,7 @@ import type { ExplorerLocation } from '../features/workstream-explorer/types';
 import { E2EQualityPanel } from '../features/e2e-testing/E2EQualityPanel';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
+import { providerLabel } from '../features/ai-session/providerDisplay';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'jira' | 'quality';
@@ -1762,8 +1763,4 @@ function verificationTriggerTone(job: VerificationJob): 'manual' | 'rerun' | 'au
     return 'auto';
   }
   return 'manual';
-}
-
-function providerLabel(id: string): string {
-  return ({ claude: 'Claude', codex: 'Codex', copilot: 'Copilot', opencode: 'OpenCode' } as Record<string, string>)[id] ?? id;
 }

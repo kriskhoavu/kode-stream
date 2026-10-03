@@ -1,0 +1,44 @@
+.agent-chip {
+	--agent-tone: var(--muted);
+	display: inline-grid;
+	place-items: center;
+	flex: none;
+	border-radius: 999px;
+	border: 1.5px solid var(--panel);
+	background: var(--agent-tone);
+	color: #fff;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	line-height: 1;
+	position: relative;
+}
+
+.agent-chip.provider-claude { --agent-tone: var(--button-accent); }
+.agent-chip.provider-codex { --agent-tone: var(--text); }
+.agent-chip.provider-copilot { --agent-tone: var(--purple); }
+.agent-chip.provider-opencode { --agent-tone: var(--blue); }
+
+.agent-chip.hollow {
+	background: var(--panel);
+	color: var(--agent-tone);
+	border: 1.5px dashed color-mix(in srgb, var(--agent-tone) 70%, transparent);
+}
+
+.agent-chip.live::after {
+	content: '';
+	position: absolute;
+	inset: -4px;
+	border-radius: inherit;
+	border: 2px solid var(--green);
+	animation: agent-chip-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes agent-chip-pulse {
+	0%, 100% { opacity: 0.9; transform: scale(1); }
+	50% { opacity: 0.3; transform: scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.agent-chip.live::after { animation: none; }
+}
