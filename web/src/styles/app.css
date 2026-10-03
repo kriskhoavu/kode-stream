@@ -8637,21 +8637,27 @@ body.is-resizing-panel {
 
 .session-changes-body {
   display: grid;
-  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+  grid-template-columns: minmax(220px, 34%) minmax(0, 1fr);
   gap: 14px;
   min-height: 0;
+  align-items: start;
 }
 
 .session-changes-file-list {
   margin: 0;
-  padding: 0;
+  padding: 0 4px 0 0;
   list-style: none;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   align-content: start;
+  max-height: 560px;
+  overflow: auto;
 }
 
 .session-changes-file-list h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 4px;
   font-size: 11px;
   text-transform: uppercase;
@@ -8659,24 +8665,34 @@ body.is-resizing-panel {
   color: var(--muted);
 }
 
+.session-changes-file-list h3 span {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 .session-changes-file-list ul {
   margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 2px;
+  gap: 1px;
 }
 
 .session-changes-file-list button {
   width: 100%;
-  padding: 4px 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 6px;
   border: none;
   border-radius: 6px;
   background: none;
   color: var(--text);
   font-size: 12px;
   text-align: left;
-  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
@@ -8685,17 +8701,86 @@ body.is-resizing-panel {
   background: var(--panel-soft);
 }
 
+.session-changes-file-list button.active {
+  box-shadow: inset 2px 0 0 var(--blue);
+}
+
+.session-changes-status {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--panel-soft);
+}
+
+.session-changes-status.status-A { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+.session-changes-status.status-M { color: var(--blue); background: color-mix(in srgb, var(--blue) 14%, transparent); }
+.session-changes-status.status-D { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.session-changes-status.status-R,
+.session-changes-status.status-C { color: var(--purple); background: color-mix(in srgb, var(--purple) 14%, transparent); }
+
+.session-changes-path {
+  display: grid;
+  min-width: 0;
+}
+
+.session-changes-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-changes-folder {
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-changes-diff {
+  min-width: 0;
+  position: sticky;
+  top: 0;
+}
+
+.session-changes-diff-empty {
+  padding: 24px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  text-align: center;
+}
+
 .session-changes-diff pre {
   margin: 0;
-  max-height: 420px;
+  max-height: 560px;
   overflow: auto;
-  padding: 10px;
+  padding: 10px 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-soft);
   font-size: 11px;
+  line-height: 1.5;
   white-space: pre;
 }
+
+.session-changes-diff pre > span {
+  display: block;
+  padding: 0 10px;
+  min-width: max-content;
+}
+
+.session-changes-diff pre > span.added { background: color-mix(in srgb, var(--green) 14%, transparent); }
+.session-changes-diff pre > span.removed { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.session-changes-diff pre > span.hunk { color: var(--blue); }
+.session-changes-diff pre > span.meta { color: var(--muted); }
 
 .session-changes-unavailable p {
   margin: 0;

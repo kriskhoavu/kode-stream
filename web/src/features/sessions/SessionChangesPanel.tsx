@@ -25,6 +25,20 @@ function availabilityMessage(changes: SessionChanges): string {
 	}
 }
 
+/** A path shown as its file name first and its folder after, so a long path never breaks mid-word. */
+function splitPath(path: string): { name: string; folder: string } {
+	const index = path.lastIndexOf('/');
+	return index < 0 ? { name: path, folder: '' } : { name: path.slice(index + 1), folder: path.slice(0, index) };
+}
+
+function diffLineClass(line: string): string {
+	if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff ') || line.startsWith('index ')) return 'meta';
+	if (line.startsWith('@@')) return 'hunk';
+	if (line.startsWith('+')) return 'added';
+	if (line.startsWith('-')) return 'removed';
+	return '';
+}
+
 function groupFiles(files: SessionFile[]) {
 	return STATUS_ORDER.map((status) => ({ status, label: STATUS_LABEL[status], files: files.filter((file) => file.status === status) })).filter((group) => group.files.length > 0);
 }
@@ -96,15 +110,21 @@ export function SessionChangesPanel({ session }: { session: SafeSessionRecord })
 		{changes.truncated && <p className="session-changes-truncated">Only the first files are shown; more files changed than are listed here.</p>}
 		<div className="session-changes-body">
 			<ul className="session-changes-file-list" aria-label="Changed files">
-				{groups.map((group) => <li key={group.status}><h3>{group.label}</h3><ul>{group.files.map((file) => <li key={file.path}><button type="button" aria-pressed={selectedPath === file.path} className={selectedPath === file.path ? 'active' : ''} onClick={() => openFile(file.path)}>{file.path}</button></li>)}</ul></li>)}
+				{groups.map((group) => <li key={group.status}><h3>{group.label} <span>{group.files.length}</span></h3><ul>{group.files.map((file) => {
+					const { name, folder } = splitPath(file.path);
+					return <li key={file.path}><button type="button" aria-label={file.path} title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path} aria-pressed={selectedPath === file.path} className={selectedPath === file.path ? 'active' : ''} onClick={() => openFile(file.path)}>
+						<span className={`session-changes-status status-${file.status === '?' ? 'untracked' : file.status}`} aria-hidden="true">{file.status === '?' ? 'U' : file.status}</span>
+						<span className="session-changes-path"><span className="session-changes-name">{name}</span>{folder && <span className="session-changes-folder">{folder}</span>}</span>
+					</button></li>;
+				})}</ul></li>)}
 			</ul>
 			<div className="session-changes-diff">
-				{!selectedPath && <p className="session-changes-note">Select a file to view its diff.</p>}
+				{!selectedPath && <p className="session-changes-note session-changes-diff-empty">Select a file to view its diff.</p>}
 				{selectedPath && diffLoading && <p role="status">Loading diff…</p>}
 				{selectedPath && diffError && <p className="error" role="alert">{diffError}</p>}
 				{selectedPath && diff && <>
 					{diff.truncated && <p className="session-changes-truncated">This diff is truncated.</p>}
-					<pre>{diff.diff}</pre>
+					<pre className="session-changes-diff-text">{diff.diff.split('\n').map((line, index) => <span key={index} className={diffLineClass(line)}>{line}{'\n'}</span>)}</pre>
 				</>}
 			</div>
 		</div>
