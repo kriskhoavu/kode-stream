@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { FileNode } from '../../lib/types';
-import { DrawerFileTree } from './DrawerFileTree';
+import type { FileNode } from '../lib/types';
+import { FileTree } from './FileTree';
 
 const nodes: FileNode[] = [
 	{ id: 'f-plan', name: 'plan.yaml', path: 'plan.yaml', type: 'file' },
@@ -16,10 +16,10 @@ const nodes: FileNode[] = [
 	{ id: 'f-readme', name: 'README.md', path: 'README.md', type: 'file' }
 ];
 
-describe('DrawerFileTree', () => {
+describe('FileTree', () => {
 	it('lists folders before files, expands top-level folders and the open file’s folders, and opens a file by id', () => {
 		const onOpen = vi.fn();
-		render(<DrawerFileTree nodes={nodes} activeId="f-png" onOpen={onOpen} />);
+		render(<FileTree nodes={nodes} activeId="f-png" onOpen={onOpen} />);
 		const tree = screen.getByRole('tree', { name: 'Item files' });
 		const top = within(tree).getAllByRole('treeitem').filter((item) => item.parentElement === tree).map((item) => item.getAttribute('aria-label'));
 		expect(top).toEqual(['design', 'scenario', 'plan.yaml', 'README.md']);
@@ -30,7 +30,7 @@ describe('DrawerFileTree', () => {
 	});
 
 	it('collapses and expands a folder', () => {
-		render(<DrawerFileTree nodes={nodes} onOpen={vi.fn()} />);
+		render(<FileTree nodes={nodes} onOpen={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: 'scenario' }));
 		expect(screen.queryByRole('button', { name: 'scenario-01.md' })).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'scenario' }));

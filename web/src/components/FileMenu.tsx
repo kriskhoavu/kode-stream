@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useMenuPopover } from './overlay';
+import type { FileNode } from '../lib/types';
+import { FileTree } from './FileTree';
 
 export type FileMenuOption = {
   id: string;
   label: string;
 };
 
-export function FileMenu({ value, options, onChange }: { value: string; options: FileMenuOption[]; onChange: (id: string) => void | Promise<void> }) {
+/** With `tree`, the dropdown shows the files as a folder tree instead of a flat list of paths. */
+export function FileMenu({ value, options, onChange, tree }: { value: string; options: FileMenuOption[]; onChange: (id: string) => void | Promise<void>; tree?: FileNode[] }) {
   const [open, setOpen] = useState(false);
   const menuRef = useMenuPopover(open, () => setOpen(false));
   const selected = options.find((option) => option.id === value);
@@ -24,7 +27,12 @@ export function FileMenu({ value, options, onChange }: { value: string; options:
         <span>{selected?.label ?? 'No files available'}</span>
         <ChevronDown className={open ? 'file-menu-chevron open' : 'file-menu-chevron'} size={15} aria-hidden="true" />
       </button>
-      {open && (
+      {open && tree && (
+        <div className="file-menu-popover file-menu-tree">
+          <FileTree nodes={tree} activeId={value} onOpen={selectFile} />
+        </div>
+      )}
+      {open && !tree && (
         <div className="file-menu-popover" role="menu" aria-label="Documents">
           {options.map((option) => (
             <button type="button" role="menuitemradio" aria-checked={option.id === value} className={option.id === value ? 'active' : undefined} key={option.id} onClick={() => selectFile(option.id)}>
