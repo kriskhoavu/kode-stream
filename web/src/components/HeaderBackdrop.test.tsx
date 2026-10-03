@@ -55,3 +55,17 @@ describe('HeaderBackdrop', () => {
     }
   });
 });
+
+describe('HeaderBackdrop band end', () => {
+  it('ends the band at the bottom of the page title row', () => {
+    document.body.innerHTML = '<div class="app-shell"><main id="app-main"><div class="page-title">Title</div><div class="board">Board</div></main></div>';
+    const shell = document.querySelector<HTMLElement>('.app-shell')!;
+    const title = document.querySelector<HTMLElement>('.page-title')!;
+    shell.getBoundingClientRect = () => ({ top: 0, bottom: 1000, left: 0, right: 1000, width: 1000, height: 1000, x: 0, y: 0, toJSON() {} });
+    title.getBoundingClientRect = () => ({ top: 68, bottom: 145, left: 0, right: 1000, width: 1000, height: 77, x: 0, y: 68, toJSON() {} });
+    const view = render(<HeaderBackdrop variant="lattice" />, { container: shell.appendChild(document.createElement('div')) });
+    expect(shell.style.getPropertyValue('--band-height')).toBe('145px');
+    view.unmount();
+    expect(shell.style.getPropertyValue('--band-height')).toBe('');
+  });
+});

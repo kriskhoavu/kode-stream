@@ -1,10 +1,12 @@
+import { useLayoutEffect } from 'react';
 import { LatticeBackdrop } from './LatticeBackdrop';
 import { NeonBackdrop } from './NeonBackdrop';
 import './header-backdrop.css';
 
 /**
  * The header backdrop is the decorative layer filling the band that runs from
- * the topbar down through each page's toolbar and filter rows.
+ * the topbar down to the bottom of each page's title row, so the board, its
+ * toolbar and its filters sit on a still background.
  *
  * This module owns what is true of every variant — the variant union and the
  * routes that carry a band — so adding a treatment touches one module rather
@@ -24,6 +26,52 @@ export function toBackdropVariant(value: unknown): BackdropVariant {
   return (backdropVariants as readonly string[]).includes(value as string)
     ? (value as BackdropVariant)
     : defaultBackdropVariant;
+}
+
+/** The row the band ends under: each band route's page title row. */
+export const bandEndSelector = '#app-main .page-title, #app-main .knowledge-heading-row';
+
+/**
+ * Holds the band to the page's title row. The band is absolutely placed in the
+ * shell, so its height is the title row's bottom measured from the shell's top,
+ * taken as if the page were not scrolled. Without a title row the stylesheet's
+ * default height stands.
+ */
+function useBandEnd() {
+  useLayoutEffect(() => {
+    const shell = document.querySelector<HTMLElement>('.app-shell');
+    if (!shell) return;
+    let timer = 0;
+    const measure = () => {
+      const end = document.querySelector(bandEndSelector);
+      if (!end) {
+        shell.style.removeProperty('--band-height');
+        return;
+      }
+      const scroller = end.closest<HTMLElement>('#app-main');
+      const height = end.getBoundingClientRect().bottom - shell.getBoundingClientRect().top + (scroller?.scrollTop ?? 0);
+      shell.style.setProperty('--band-height', `${Math.max(0, Math.round(height))}px`);
+    };
+    // A timer rather than an animation frame: a hidden tab paints no frames,
+    // and the band must already fit when it is shown.
+    const schedule = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(measure, 0);
+    };
+    measure();
+    const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(schedule);
+    resize?.observe(shell);
+    const mutations = new MutationObserver(schedule);
+    mutations.observe(document.getElementById('app-main') ?? shell, { childList: true, subtree: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      window.clearTimeout(timer);
+      resize?.disconnect();
+      mutations.disconnect();
+      window.removeEventListener('resize', schedule);
+      shell.style.removeProperty('--band-height');
+    };
+  }, []);
 }
 
 /** Routes whose header-to-filter band carries a backdrop. */
@@ -55,6 +103,7 @@ export function bandClasses(routeName: string, variant: BackdropVariant): string
  * band would leave the topbar with no chrome and nothing behind it.
  */
 export function HeaderBackdrop({ variant }: { variant: BackdropVariant }) {
+  useBandEnd();
   if (variant === 'none') return null;
 
   return (
