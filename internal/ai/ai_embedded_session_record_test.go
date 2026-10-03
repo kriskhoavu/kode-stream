@@ -226,3 +226,36 @@ func TestEmbeddedReservationFailureStartsNoProcessForItemOrWorkspace(t *testing.
 		}
 	}
 }
+
+func TestClaudeEmbeddedLaunchIsNamedAfterItsConversation(t *testing.T) {
+	service, item, workspace, _, _, _ := launchTestService(t, true)
+	argsPath := filepath.Join(t.TempDir(), "args")
+	executable := filepath.Join(t.TempDir(), "claude")
+	if err := os.WriteFile(executable, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > "+argsPath+"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Save(Settings{DefaultProvider: "claude", DefaultTerminal: "wezterm", Providers: map[string]LaunchTemplate{"claude": {Enabled: true, Executable: executable, Args: []string{"{prompt}"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	manager := NewTerminalManager(Config{})
+	t.Cleanup(func() { _ = manager.Close() })
+	service.ConfigureEmbedded(manager).ConfigureSessionRecords(NewFileSessionRecordRepository(filepath.Join(t.TempDir(), "records.yaml")), gitadapter.New())
+
+	result, err := service.StartEmbedded(item.ID, EmbeddedInput{Provider: "claude", ContextMode: "card_context", PromptDraft: "go", ExpectedWorkspaceID: workspace.ID, ExpectedBranch: item.Branch})
+	if err != nil {
+		t.Fatal(err)
+	}
+	conversation := strings.TrimPrefix(result.Record.ID, "embedded-")
+	if len(conversation) != 36 || result.Session.ID != result.Record.ID {
+		t.Fatalf("record id %q is not named after a conversation", result.Record.ID)
+	}
+	var args []byte
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if args, err = os.ReadFile(argsPath); err == nil && len(args) > 0 {
+			break
+		}
+	}
+	if lines := strings.Split(string(args), "\n"); len(lines) < 2 || lines[0] != "--session-id" || lines[1] != conversation {
+		t.Fatalf("claude args = %q, want --session-id %s first", args, conversation)
+	}
+}

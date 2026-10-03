@@ -2,10 +2,29 @@ package ai
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"kode-stream/internal/filesystem/pathguard"
 )
+
+// embeddedSessionID names a new embedded session and returns the arguments it
+// launches with. A Claude Code session is named after its conversation: the
+// record ID carries the conversation's UUID, passed to Claude as --session-id,
+// so the conversation can be told apart from the user's own and resumed later.
+func embeddedSessionID(providerID string, provider LaunchTemplate, args []string) (string, []string) {
+	if !isClaudeProvider(providerID, provider) {
+		return "embedded-" + randomID(), args
+	}
+	conversation := uuid.NewString()
+	return "embedded-" + conversation, append([]string{"--session-id", conversation}, args...)
+}
+
+func isClaudeProvider(providerID string, provider LaunchTemplate) bool {
+	return providerID == "claude" || strings.TrimSuffix(filepath.Base(provider.Executable), ".exe") == "claude"
+}
 
 type EmbeddedInput struct {
 	Provider            string   `json:"provider"`
@@ -75,12 +94,13 @@ func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput
 		contextLabel = "workspace root"
 	}
 	values := map[string]string{"workspace": workspace.Path, "contextFile": contextLabel, "itemPath": contextLabel, "identifier": contextLabel, "contextMode": "workspace_only", "intent": "workspace_only", "prompt": prompt}
+	recordID, args := embeddedSessionID(providerID, provider, launchProviderArgs("workspace_only", provider.Args, values))
 	now := s.sessionNow()
-	record, err := s.persistStartingSession(SessionRecord{ID: "embedded-" + randomID(), WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", RequestedBranch: branch, ObservedCommit: commit, IdempotencyKey: input.IdempotencyKey, State: StateStarting, StartedAt: now, LastKnownAt: now})
+	record, err := s.persistStartingSession(SessionRecord{ID: recordID, WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", RequestedBranch: branch, ObservedCommit: commit, IdempotencyKey: input.IdempotencyKey, State: StateStarting, StartedAt: now, LastKnownAt: now})
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
-	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", Executable: capability.Executable, Args: launchProviderArgs("workspace_only", provider.Args, values), Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 	if err != nil {
 		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
 			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))
@@ -170,9 +190,9 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 		return EmbeddedResult{}, promptErr
 	}
 	values := map[string]string{"workspace": workspace.Path, "contextFile": item.ItemPath, "itemPath": item.ItemPath, "identifier": item.Identifier, "contextMode": mode, "intent": mode, "prompt": prompt}
-	args := launchProviderArgs(mode, provider.Args, values)
+	recordID, args := embeddedSessionID(providerID, provider, launchProviderArgs(mode, provider.Args, values))
 	now := s.sessionNow()
-	record, err := s.persistStartingSession(SessionRecord{ID: "embedded-" + randomID(), WorkspaceID: workspace.ID, PlanRef: &SessionPlanRef{ItemID: itemID, ItemPath: item.ItemPath, Identifier: item.Identifier, BranchKey: branch, ObservedCommit: commit}, Provider: providerID, Intent: mode, RequestedBranch: branch, ObservedCommit: commit, IdempotencyKey: input.IdempotencyKey, State: StateStarting, StartedAt: now, LastKnownAt: now})
+	record, err := s.persistStartingSession(SessionRecord{ID: recordID, WorkspaceID: workspace.ID, PlanRef: &SessionPlanRef{ItemID: itemID, ItemPath: item.ItemPath, Identifier: item.Identifier, BranchKey: branch, ObservedCommit: commit}, Provider: providerID, Intent: mode, RequestedBranch: branch, ObservedCommit: commit, IdempotencyKey: input.IdempotencyKey, State: StateStarting, StartedAt: now, LastKnownAt: now})
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
