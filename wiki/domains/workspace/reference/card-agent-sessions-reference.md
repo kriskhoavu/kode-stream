@@ -15,7 +15,7 @@ lastVerified: 2026-10-03
 
 [live] `GET /api/workspaces/{id}/claude-transcripts?branch=` reads `$CLAUDE_CONFIG_DIR` or `~/.claude`, then `projects/<workspace path with every non-alphanumeric character as ->`. It keeps UUID-named transcripts changed in the last 14 days, at most 50, whose recorded working directory is the workspace path. Evidence: `internal/ai/claude_transcripts.go:29`, `internal/ai/claude_transcripts.go:137`.
 
-Each result carries the conversation ID, branch, first and last activity, the count of user and assistant text turns, and the IDs of the branch's items whose path or identifier it mentions as a whole token. Conversations named by a session record are left out. Scans are cached per file until its size or modification time changes. Evidence: `internal/ai/claude_transcripts.go:265`, `internal/ai/claude_transcripts.go:419`.
+Each result carries the conversation ID, branch, first and last activity, the count of user and assistant text turns, and the IDs of the branch's items it mentions as a whole token: the item's path, or its identifier when that contains a digit. Only what the user or Claude wrote counts — prompts, replies, and the inputs of Claude's tool calls; tool output and injected context such as git status do not. Conversations named by a session record are left out. Scans are cached per file until its size or modification time changes. Evidence: `internal/ai/claude_transcripts.go:265`, `internal/ai/claude_transcripts.go:393`, `internal/ai/claude_transcripts.go:464`.
 
 ## Transcript Tail
 <!-- chunkId: workspace-card-agent-sessions-reference-tail -->

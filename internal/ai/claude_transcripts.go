@@ -286,7 +286,7 @@ func (c *claudeTranscriptCache) scan(path string, info os.FileInfo, needles []st
 	for _, needle := range needles {
 		pending[needle] = true
 	}
-	err := readTranscriptLines(path, func(line claudeTranscriptLine, raw []byte) {
+	err := readTranscriptLines(path, func(line claudeTranscriptLine, _ []byte) {
 		if scan.cwd == "" && line.Cwd != "" {
 			scan.cwd = line.Cwd
 		}
@@ -302,8 +302,9 @@ func (c *claudeTranscriptCache) scan(path string, info os.FileInfo, needles []st
 		if _, ok := transcriptTurn(line); ok {
 			scan.summary.Messages++
 		}
+		authored := authoredText(line)
 		for needle := range pending {
-			if mentions(raw, needle) {
+			if len(authored) > 0 && mentions(authored, needle) {
 				scan.mentions = append(scan.mentions, needle)
 				delete(pending, needle)
 			}
@@ -384,13 +385,57 @@ func transcriptText(content json.RawMessage) string {
 	return strings.Join(parts, "\n\n")
 }
 
+// authoredText is what the user or Claude wrote in a line: the user's prompts,
+// Claude's replies, and the inputs of the tools Claude called, such as a file
+// it read or edited. Tool output, injected context, and metadata are left out:
+// a search result or git status that happens to list a plan's files says
+// nothing about whether the conversation worked on it.
+func authoredText(line claudeTranscriptLine) []byte {
+	if (line.Type != "user" && line.Type != "assistant") || line.IsMeta || line.Message == nil {
+		return nil
+	}
+	var plain string
+	if json.Unmarshal(line.Message.Content, &plain) == nil {
+		if line.Type == "user" {
+			return []byte(plain)
+		}
+		return nil
+	}
+	var blocks []struct {
+		Type  string          `json:"type"`
+		Text  string          `json:"text"`
+		Input json.RawMessage `json:"input"`
+	}
+	if json.Unmarshal(line.Message.Content, &blocks) != nil {
+		return nil
+	}
+	var text bytes.Buffer
+	for _, block := range blocks {
+		switch {
+		case block.Type == "text":
+			text.WriteString(block.Text)
+		case block.Type == "tool_use" && line.Type == "assistant":
+			text.Write(block.Input)
+		default:
+			continue
+		}
+		text.WriteByte('\n')
+	}
+	return text.Bytes()
+}
+
 // transcriptNeedles are the strings that tie a conversation to an item: its
-// repository path and its identifier.
+// repository path, and its identifier when that is ticket-like. A plain-word
+// identifier such as a wiki section's "platform" would match any conversation.
 func transcriptNeedles(items []models.ItemSummary) []string {
 	seen := map[string]bool{}
 	needles := []string{}
 	for _, item := range items {
-		for _, needle := range []string{strings.Trim(item.ItemPath, "/"), strings.TrimSpace(item.Identifier)} {
+		identifier := strings.TrimSpace(item.Identifier)
+		if !strings.ContainsAny(identifier, "0123456789") {
+			identifier = ""
+		}
+		for _, needle := range []string{strings.Trim(item.ItemPath, "/"), identifier} {
 			if len(needle) >= 3 && !seen[needle] {
 				seen[needle] = true
 				needles = append(needles, needle)

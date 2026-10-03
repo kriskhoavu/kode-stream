@@ -184,3 +184,31 @@ func TestResumeClaudeConversationInEmbeddedTerminal(t *testing.T) {
 		t.Fatalf("resumed conversation still listed as the user's: %#v err=%v", transcripts, err)
 	}
 }
+
+func TestClaudeTranscriptsMatchOnlyWhatTheUserOrClaudeWrote(t *testing.T) {
+	service, item, workspace, projectDir := transcriptTestService(t)
+	toolOutput := `{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"plans/platform/PM-018/plan.yaml\nPM-018 notes"}]},"toolUseResult":{"stdout":"PM-018"}}`
+	injected := `{"type":"user","isMeta":true,"message":{"role":"user","content":"git status: plans/platform/PM-018/README.md"}}`
+	writeTranscript(t, projectDir, conversationA+".jsonl", workspace.Path, toolOutput, injected)
+	writeTranscript(t, projectDir, conversationB+".jsonl", workspace.Path, `{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"`+workspace.Path+`/plans/platform/PM-018/implementation-plan.md"}}]}}`)
+	writeTranscript(t, projectDir, conversationC+".jsonl", workspace.Path, `{"type":"user","message":{"role":"user","content":"What does PM-018 still need?"}}`)
+
+	transcripts, err := service.ClaudeTranscripts(workspace.ID, item.Branch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	matched := map[string]bool{}
+	for _, transcript := range transcripts {
+		matched[transcript.SessionID] = len(transcript.ItemIDs) == 1 && transcript.ItemIDs[0] == item.ID
+	}
+	if matched[conversationA] || !matched[conversationB] || !matched[conversationC] {
+		t.Fatalf("matched = %v; want only the tool call (B) and the prompt (C), not tool output or injected context (A)", matched)
+	}
+}
+
+func TestTranscriptNeedlesIgnorePlainWordIdentifiers(t *testing.T) {
+	needles := transcriptNeedles([]models.ItemSummary{{ItemPath: "wiki/platform", Identifier: "platform"}, {ItemPath: "plans/api/DI-365", Identifier: "DI-365"}})
+	if strings.Join(needles, ",") != "DI-365,plans/api/DI-365,wiki/platform" {
+		t.Fatalf("needles = %v", needles)
+	}
+}

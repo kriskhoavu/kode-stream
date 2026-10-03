@@ -39,7 +39,7 @@ A session pane shows the live terminal, where the conversation continues by typi
 <!-- chunkId: workspace-card-agent-sessions-claude -->
 <!-- keywords: transcript, continue here, resume, session id, fork -->
 
-[live] Conversations the user holds with Claude Code in the workspace root are read from Claude Code's project directory and tied to the items whose path or identifier they mention. They show read-only as their last turns, with **Continue here**, which resumes the conversation in an embedded terminal on the card. Evidence: `internal/ai/claude_transcripts.go:137`, `internal/ai/ai_embedded_service.go:224`.
+[live] Conversations the user holds with Claude Code in the workspace root are read from Claude Code's project directory and tied to the items that the user's prompts, Claude's replies, or Claude's file reads and edits name; a plan that only appears in a tool's output does not count. They show read-only as their last turns, with **Continue here**, which resumes the conversation in an embedded terminal on the card. Evidence: `internal/ai/claude_transcripts.go:137`, `internal/ai/ai_embedded_service.go:224`.
 
 An embedded Claude session is named after its conversation, so kode-stream's own conversations are never listed as the user's, and an ended one can be continued from **Earlier**. A conversation written in the last two minutes may still be open in the user's terminal; continuing it here forks it, and the pane says so. Evidence: `internal/ai/ai_embedded_service.go:19`, `web/src/features/workstream/AgentsPanel.tsx:223`.
 
