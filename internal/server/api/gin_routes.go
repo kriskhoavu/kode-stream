@@ -198,6 +198,8 @@ func routeManifest(a *API) []routeSpec {
 		{http.MethodPost, "/items/:id/ai-sessions/embedded", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.startEmbeddedAISession)},
 		{http.MethodPost, "/workspaces/:id/ai-sessions", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.launchWorkspaceAISession)},
 		{http.MethodPost, "/workspaces/:id/ai-sessions/embedded", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.startEmbeddedWorkspaceAISession)},
+		{http.MethodGet, "/workspaces/:id/claude-transcripts", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.claudeTranscripts)},
+		{http.MethodGet, "/workspaces/:id/claude-transcripts/:sessionId/tail", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.claudeTranscriptTail)},
 		{http.MethodGet, "/ai/sessions/:sessionId", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.embeddedAISession)},
 		{http.MethodPost, "/ai/sessions/:sessionId/grant", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.embeddedAISessionGrant)},
 		{http.MethodDelete, "/ai/sessions/:sessionId", "ai", protectedRoute, ginHTTPHandler(a.aiSessions.cancelEmbeddedAISession)},

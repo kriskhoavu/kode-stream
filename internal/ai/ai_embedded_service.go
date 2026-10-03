@@ -1,12 +1,14 @@
 package ai
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
 
+	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/pathguard"
 )
 
@@ -39,8 +41,11 @@ type EmbeddedInput struct {
 	ExpectedBranch      string   `json:"expectedBranch,omitempty"`
 	ObservedCommit      string   `json:"observedCommit,omitempty"`
 	IdempotencyKey      string   `json:"idempotencyKey,omitempty"`
-	Columns             uint16   `json:"columns"`
-	Rows                uint16   `json:"rows"`
+	// ResumeClaudeSessionID resumes one of the workspace's Claude conversations
+	// instead of starting a new one; the prompt inputs are then ignored.
+	ResumeClaudeSessionID string `json:"resumeClaudeSessionId,omitempty"`
+	Columns               uint16 `json:"columns"`
+	Rows                  uint16 `json:"rows"`
 }
 
 func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput) (EmbeddedResult, error) {
@@ -160,6 +165,10 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	if err != nil {
 		return EmbeddedResult{}, err
 	}
+	resume := strings.TrimSpace(input.ResumeClaudeSessionID)
+	if resume != "" {
+		return s.resumeClaudeEmbedded(itemID, item, workspace, branch, commit, resume, input)
+	}
 	mode := strings.TrimSpace(input.ContextMode)
 	if mode != "workspace_only" && mode != "card_context" {
 		return EmbeddedResult{}, launchError("invalid_context_mode", "contextMode must be workspace_only or card_context")
@@ -197,6 +206,55 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
 	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+	if err != nil {
+		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
+			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))
+		}
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	if saved, ok, getErr := s.recordsGet(record.ID); getErr == nil && ok {
+		record = saved
+	}
+	return EmbeddedResult{Session: session, Grant: grant, Record: &record}, nil
+}
+
+// resumeClaudeEmbedded continues one of the workspace's Claude conversations
+// in an embedded terminal for the item. The record is named after the
+// conversation with a suffix, since one conversation may be resumed many times.
+func (s *Service) resumeClaudeEmbedded(itemID string, item models.ItemDetail, workspace models.WorkspaceConfig, branch, commit, conversation string, input EmbeddedInput) (EmbeddedResult, error) {
+	if _, err := s.claudeTranscriptPath(workspace.ID, conversation); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return EmbeddedResult{}, launchError("claude_session_not_found", "the Claude conversation is not held in this workspace")
+		}
+		var launchErr *LaunchError
+		if errors.As(err, &launchErr) {
+			return EmbeddedResult{}, err
+		}
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	settings, err := s.Settings()
+	if err != nil {
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	providerID := strings.TrimSpace(input.Provider)
+	if providerID == "" {
+		providerID = "claude"
+	}
+	provider, ok := settings.Providers[providerID]
+	if !ok || !provider.Enabled || !isClaudeProvider(providerID, provider) {
+		return EmbeddedResult{}, launchError("ai_provider_missing", "the Claude provider is unavailable")
+	}
+	capability := s.detect(provider.Executable)
+	if !capability.Detected {
+		return EmbeddedResult{}, launchError("ai_provider_missing", "the Claude executable was not found")
+	}
+	const intent = "resume"
+	now := s.sessionNow()
+	record, err := s.persistStartingSession(SessionRecord{ID: "embedded-" + conversation + "-" + randomID(), WorkspaceID: workspace.ID, PlanRef: &SessionPlanRef{ItemID: itemID, ItemPath: item.ItemPath, Identifier: item.Identifier, BranchKey: branch, ObservedCommit: commit}, Provider: providerID, Intent: intent, RequestedBranch: branch, ObservedCommit: commit, IdempotencyKey: input.IdempotencyKey, State: StateStarting, StartedAt: now, LastKnownAt: now})
+	if err != nil {
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: intent, Executable: capability.Executable, Args: []string{"--resume", conversation}, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 	if err != nil {
 		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
 			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))

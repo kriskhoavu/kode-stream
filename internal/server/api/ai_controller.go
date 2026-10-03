@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -85,7 +86,7 @@ func writeEmbeddedLaunchError(w http.ResponseWriter, err error) {
 	}
 	status := http.StatusBadRequest
 	switch launchErr.Code {
-	case "item_not_found", "workspace_not_found":
+	case "item_not_found", "workspace_not_found", "claude_session_not_found":
 		status = http.StatusNotFound
 	case "terminal_workspace_mismatch", "terminal_branch_mismatch", "terminal_revision_mismatch":
 		status = http.StatusConflict
@@ -118,6 +119,51 @@ func (a *aiController) aiSessionRecords(w http.ResponseWriter, r *http.Request) 
 	}
 	records, err := a.aiSessions.SessionRecords(workspaceID, r.URL.Query().Get("branch"))
 	respond(w, records, err)
+}
+
+// claudeTranscripts lists the workspace's Claude Code conversations by item.
+// Transcripts live in the user's home, so only Local mode has any.
+func (a *aiController) claudeTranscripts(w http.ResponseWriter, r *http.Request) {
+	if !a.claudeTranscriptsAvailable(w, r) {
+		return
+	}
+	transcripts, err := a.aiSessions.ClaudeTranscripts(r.PathValue("id"), r.URL.Query().Get("branch"))
+	respondClaudeTranscripts(w, transcripts, err)
+}
+
+func (a *aiController) claudeTranscriptTail(w http.ResponseWriter, r *http.Request) {
+	if !a.claudeTranscriptsAvailable(w, r) {
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	turns, err := a.aiSessions.ClaudeTranscriptTail(r.PathValue("id"), r.PathValue("sessionId"), limit)
+	respondClaudeTranscripts(w, turns, err)
+}
+
+func (a *aiController) claudeTranscriptsAvailable(w http.ResponseWriter, r *http.Request) bool {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI sessions are unavailable")
+		return false
+	}
+	if a.runtimeConfig.Mode == models.RuntimeModeCloud {
+		writeError(w, http.StatusNotFound, "Claude transcripts are read in Local mode only")
+		return false
+	}
+	return a.authorizeWorkspace(w, r, r.PathValue("id"))
+}
+
+func respondClaudeTranscripts(w http.ResponseWriter, data any, err error) {
+	var launchErr *appaisession.LaunchError
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, data)
+	case errors.Is(err, appaisession.ErrNotFound), errors.Is(err, appaisession.ErrClaudeTranscriptsUnavailable):
+		writeError(w, http.StatusNotFound, "Claude transcript not found")
+	case errors.As(err, &launchErr):
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": launchErr.Error(), "code": launchErr.Code})
+	default:
+		writeError(w, http.StatusInternalServerError, err.Error())
+	}
 }
 
 func (a *aiController) embeddedAISession(w http.ResponseWriter, r *http.Request) {
@@ -556,7 +602,7 @@ func validLaunchInput(input appaisession.LaunchInput) bool {
 }
 
 func validEmbeddedInput(input appaisession.EmbeddedInput) bool {
-	return input.Columns >= 20 && input.Columns <= maxTerminalDimension && input.Rows >= 5 && input.Rows <= 200 && validAIStrings(input.Provider, input.ContextMode, input.PresetID, input.PromptDraft, input.CustomPrompt, input.ContextPath, input.ExpectedWorkspaceID, input.ExpectedBranch, input.ObservedCommit, input.IdempotencyKey) && validCapabilitySelection(input.SelectedSkills, input.SelectedAgents)
+	return input.Columns >= 20 && input.Columns <= maxTerminalDimension && input.Rows >= 5 && input.Rows <= 200 && validAIStrings(input.Provider, input.ContextMode, input.PresetID, input.PromptDraft, input.CustomPrompt, input.ContextPath, input.ExpectedWorkspaceID, input.ExpectedBranch, input.ObservedCommit, input.IdempotencyKey) && len(input.ResumeClaudeSessionID) <= 64 && validCapabilitySelection(input.SelectedSkills, input.SelectedAgents)
 }
 
 func validAIStrings(values ...string) bool {
