@@ -8,6 +8,14 @@ describe('router', () => {
     expect(routeFromLocation()).toEqual({ name: 'item', itemId: 'PM-003 Architecture' });
   });
 
+  it('opens a card session from the Workstream agent parameter only with an item', () => {
+    window.history.pushState(null, '', '/workstream?itemId=p1&agent=embedded-1');
+    expect(routeFromLocation()).toEqual({ name: 'workstream', focusedItemId: 'p1', focusedSessionId: 'embedded-1' });
+    window.history.pushState(null, '', '/workstream?agent=embedded-1');
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
+    expect(pathForRoute({ name: 'workstream', focusedItemId: 'p1', focusedSessionId: 'embedded-1' })).toBe('/workstream?itemId=p1&agent=embedded-1');
+  });
+
   it('builds paths for routes', () => {
     expect(pathForRoute({ name: 'workstream' })).toBe('/workstream');
     expect(pathForRoute({ name: 'workstream', focusedItemId: 'item 1' })).toBe('/workstream?itemId=item+1');

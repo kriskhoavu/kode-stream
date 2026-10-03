@@ -5,7 +5,7 @@ export interface CanvasLocation { workspaceId?: string; selectedNodeId?: string;
 export interface ReviewLocation { workspaceId?: string; branch?: string; }
 
 export type Route =
-  | { name: 'workstream'; focusedItemId?: string }
+  | { name: 'workstream'; focusedItemId?: string; focusedSessionId?: string }
   | { name: 'workspaces' }
   | { name: 'settings' }
   | { name: 'knowledge'; location?: KnowledgeLocation }
@@ -53,7 +53,7 @@ export function routeFromPath(path: string, search = ''): Route {
     return { name: 'review', location: reviewLocationFromSearch(search) };
   }
   if (path === '/workstream' || path === '/') {
-    return { name: 'workstream', focusedItemId: workstreamFocusedItemFromSearch(search) };
+    return { name: 'workstream', ...workstreamFocusFromSearch(search) };
   }
   return { name: 'not-found', path };
 }
@@ -69,7 +69,7 @@ export function pathForRoute(route: Route): string {
       ? '/workspaces'
       : route.name === 'settings'
         ? '/settings'
-        : workstreamPath(route.focusedItemId);
+        : workstreamPath(route.focusedItemId, route.focusedSessionId);
 }
 
 export function canvasLocationFromSearch(search: string): CanvasLocation | undefined {
@@ -121,11 +121,17 @@ export function knowledgePath(location?: KnowledgeLocation): string {
 	return query.size ? `/knowledge?${query.toString()}` : '/knowledge';
 }
 
-function workstreamFocusedItemFromSearch(search: string): string | undefined {
-  return new URLSearchParams(search).get('itemId')?.trim() || undefined;
+/** `agent` names a session to open in the focused card's drawer; it means nothing without `itemId`. */
+function workstreamFocusFromSearch(search: string): { focusedItemId?: string; focusedSessionId?: string } {
+  const query = new URLSearchParams(search);
+  const focusedItemId = query.get('itemId')?.trim() || undefined;
+  const focusedSessionId = focusedItemId ? query.get('agent')?.trim() || undefined : undefined;
+  return focusedSessionId ? { focusedItemId, focusedSessionId } : { focusedItemId };
 }
 
-function workstreamPath(focusedItemId?: string): string {
+function workstreamPath(focusedItemId?: string, focusedSessionId?: string): string {
   if (!focusedItemId) return '/workstream';
-  return `/workstream?${new URLSearchParams({ itemId: focusedItemId }).toString()}`;
+  const query = new URLSearchParams({ itemId: focusedItemId });
+  if (focusedSessionId) query.set('agent', focusedSessionId);
+  return `/workstream?${query.toString()}`;
 }

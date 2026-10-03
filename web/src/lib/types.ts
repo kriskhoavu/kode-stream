@@ -544,6 +544,8 @@ export interface EmbeddedAISessionLaunchInput extends Pick<AISessionLaunchInput,
 	expectedBranch?: string;
 	observedCommit?: string;
 	idempotencyKey?: string;
+	/** Resumes one of the workspace's Claude conversations instead of starting a new one. */
+	resumeClaudeSessionId?: string;
 	columns?: number;
 	rows?: number;
 }
@@ -569,6 +571,9 @@ export interface SessionFile { path: string; status: SessionFileStatus; oldPath?
 export type SessionChangesAvailability = 'available' | 'unavailable' | 'unsupported';
 export type SessionChangesReason = 'launch_commit_unknown' | 'launch_commit_missing' | 'workspace_missing' | 'content_provider_unsupported';
 export interface SessionChanges { sessionId: string; launchCommit: string; headCommit: string; headMoved: number; files: SessionFile[]; additions: number; deletions: number; truncated: boolean; availability: SessionChangesAvailability; reason?: SessionChangesReason; }
+/** A Claude Code conversation held in the workspace root, outside kode-stream; metadata only. */
+export interface ClaudeTranscript { sessionId: string; branch?: string; startedAt: string; lastActiveAt: string; messages: number; itemIds: string[]; }
+export interface ClaudeTurn { role: 'user' | 'assistant'; text: string; at?: string; }
 export type SessionScope = 'active' | 'all';
 export interface GlobalSessionRow { record: SafeSessionRecord; workspaceName: string; checkoutBranch: string; planTitle?: string; changesCount?: number; }
 export interface GlobalSessionsResponse { rows: GlobalSessionRow[]; truncated: boolean; }

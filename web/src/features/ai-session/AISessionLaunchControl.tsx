@@ -8,7 +8,12 @@ import { readAISessionPreference, saveAISessionPreference } from './preferences'
 import { openEmbeddedSession } from './terminalSessions';
 import { toolLabel as label } from './providerDisplay';
 
-export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, buttonLabel = 'Open AI session', allowEmbedded = true }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void; buttonLabel?: string; allowEmbedded?: boolean }) {
+/**
+ * `onEmbeddedLaunched` takes an embedded session that would otherwise open in
+ * the terminal dock, for a caller that shows the terminal itself.
+ */
+export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, onEmbeddedLaunched, buttonLabel = 'Open AI session', allowEmbedded = true }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void; onEmbeddedLaunched?: (result: EmbeddedAISessionResult) => void; buttonLabel?: string; allowEmbedded?: boolean }) {
+  const showEmbedded = onEmbeddedLaunched ?? openEmbeddedSession;
   const [preference, setPreference] = useState<AISessionLaunchInput | null>(readAISessionPreference);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
@@ -28,7 +33,7 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, 
 		}
 		if (preference.surface === 'embedded') {
 			const result = await api.startEmbeddedAISession(itemId, { provider: launchPreference.provider, contextMode: launchPreference.contextMode, presetId: launchPreference.presetId, promptDraft: launchPreference.promptDraft, customPrompt: launchPreference.customPrompt, selectedSkills: undefined, selectedAgents: undefined, columns: 80, rows: 24 });
-			openEmbeddedSession(result); onLaunched(`${label(preference.provider)} opened in the embedded terminal.`);
+			showEmbedded(result); onLaunched(`${label(preference.provider)} opened in the embedded terminal.`);
 		} else {
 			const result = await api.launchAISession(itemId, { provider: launchPreference.provider, terminal: launchPreference.terminal, contextMode: launchPreference.contextMode, presetId: launchPreference.presetId, promptDraft: launchPreference.promptDraft, customPrompt: launchPreference.customPrompt, selectedSkills: undefined, selectedAgents: undefined });
 			onLaunched(launchMessage(result));
@@ -45,7 +50,7 @@ export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, 
 		const next = { provider: input.provider, terminal: input.terminal, contextMode: input.contextMode, surface: input.surface ?? 'external', presetId: input.presetId, promptDraft: input.promptDraft, customPrompt: input.customPrompt, includeJiraDescription: input.includeJiraDescription };
     saveAISessionPreference(next);
     setPreference(next);
-		if ('session' in result) { if (allowEmbedded) openEmbeddedSession(result); onLaunched(`${label(input.provider)} opened in the embedded terminal.`); }
+		if ('session' in result) { if (allowEmbedded) showEmbedded(result); onLaunched(`${label(input.provider)} opened in the embedded terminal.`); }
 		else onLaunched(launchMessage(result));
   };
 

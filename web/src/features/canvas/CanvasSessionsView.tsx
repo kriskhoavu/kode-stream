@@ -4,13 +4,14 @@ import type { CanvasProjection, GlobalSessionRow, SafeSessionRecord } from '../.
 import { SessionBrowser } from '../sessions/SessionBrowser';
 import { WorkbenchViewSwitcher } from './WorkbenchViewSwitcher';
 
-export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch, projection, onViewChange, onOpenOnBoard, onReload }: {
+export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch, projection, onViewChange, onOpenOnBoard, onOpenOnCard, onReload }: {
 	workspaceId: string;
 	workspaceName?: string;
 	checkoutBranch?: string;
 	projection: CanvasProjection;
 	onViewChange: (view: 'canvas' | 'sessions') => void;
 	onOpenOnBoard: (sessionId: string) => void;
+	onOpenOnCard?: (itemId: string, sessionId: string) => void;
 	onReload: () => Promise<unknown> | void;
 }) {
 	const [records, setRecords] = useState<SafeSessionRecord[]>();
@@ -51,6 +52,6 @@ export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch,
 		</div>
 		{error && <div className="canvas-state error" role="alert">{error}<button type="button" onClick={() => setReloadToken((token) => token + 1)}>Retry</button></div>}
 		{!error && !records && <div className="canvas-state" role="status">Loading sessions…</div>}
-		{!error && records && <SessionBrowser rows={rows} grouping="plan" persistKey={`workbench:${workspaceId}`} onStop={stop} onRemove={remove} onReload={onReload} onOpenOnBoard={(row) => onOpenOnBoard(row.record.id)} emptyMessage="No sessions for this workspace and branch." />}
+		{!error && records && <SessionBrowser rows={rows} grouping="plan" persistKey={`workbench:${workspaceId}`} onStop={stop} onRemove={remove} onReload={onReload} onOpenOnBoard={(row) => onOpenOnBoard(row.record.id)} onOpenOnCard={onOpenOnCard ? (row) => { if (row.record.planRef) onOpenOnCard(row.record.planRef.itemId, row.record.id); } : undefined} emptyMessage="No sessions for this workspace and branch." />}
 	</div>;
 }

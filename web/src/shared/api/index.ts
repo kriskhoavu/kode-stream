@@ -13,6 +13,8 @@ import type {
 	SafeSessionRecord,
 	SessionChanges,
 	SessionScope,
+	ClaudeTranscript,
+	ClaudeTurn,
 	GlobalSessionsResponse,
   E2ERunbookList,
   AppState,
@@ -253,6 +255,11 @@ export const api = {
 		return (await request<SafeSessionRecord[] | null>(`/api/ai/session-records?${query.toString()}`, { signal }, false)) ?? [];
 	},
   cancelEmbeddedAISession: (sessionId: string) => request<EmbeddedAISession>(`/api/ai/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
+	claudeTranscripts: async (workspaceId: string, branch?: string, signal?: AbortSignal) => {
+		const query = branch ? `?${new URLSearchParams({ branch }).toString()}` : '';
+		return (await request<ClaudeTranscript[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/claude-transcripts${query}`, { signal }, false)) ?? [];
+	},
+	claudeTranscriptTail: (workspaceId: string, sessionId: string, limit = 20, signal?: AbortSignal) => request<ClaudeTurn[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/claude-transcripts/${encodeURIComponent(sessionId)}/tail?limit=${limit}`, { signal }, false),
 	listSessions: (scope: SessionScope) => request<GlobalSessionsResponse>(`/api/sessions?scope=${encodeURIComponent(scope)}`),
 	deleteSession: (sessionId: string) => request<void>(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
 	sessionChanges: (sessionId: string, signal?: AbortSignal) => request<SessionChanges>(`/api/sessions/${encodeURIComponent(sessionId)}/changes`, { signal }, !signal),

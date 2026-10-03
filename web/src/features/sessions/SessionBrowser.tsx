@@ -45,7 +45,7 @@ function buildGroups(rows: GlobalSessionRow[], grouping: SessionBrowserGrouping)
  * the Workbench Sessions view (grouped by plan). The grouping option remains
  * reusable for callers that aggregate more than one workspace.
  */
-export function SessionBrowser({ rows, grouping, persistKey, onStop, onRemove, onReload, onOpenOnBoard, emptyMessage = 'No sessions yet. Start one from a plan on the Workbench.' }: {
+export function SessionBrowser({ rows, grouping, persistKey, onStop, onRemove, onReload, onOpenOnBoard, onOpenOnCard, emptyMessage = 'No sessions yet. Start one from a plan on the Workbench.' }: {
 	rows: GlobalSessionRow[];
 	grouping: SessionBrowserGrouping;
 	persistKey: string;
@@ -53,6 +53,8 @@ export function SessionBrowser({ rows, grouping, persistKey, onStop, onRemove, o
 	onRemove?: (row: GlobalSessionRow) => Promise<unknown>;
 	onReload: () => Promise<unknown> | void;
 	onOpenOnBoard?: (row: GlobalSessionRow) => void;
+	/** Opens the session in its plan's Workstream card drawer; offered only for a session launched from a plan. */
+	onOpenOnCard?: (row: GlobalSessionRow) => void;
 	emptyMessage?: string;
 }) {
 	const [query, setQuery] = useState('');
@@ -122,13 +124,13 @@ export function SessionBrowser({ rows, grouping, persistKey, onStop, onRemove, o
 			</section>)}
 		</div>
 		<div className="session-browser-detail">
-			{selectedRow ? <SessionDetail row={selectedRow} onStop={onStop} onReload={onReload} onOpenOnBoard={onOpenOnBoard} /> : <p className="session-browser-detail-empty">Select a session to see its terminal.</p>}
+			{selectedRow ? <SessionDetail row={selectedRow} onStop={onStop} onReload={onReload} onOpenOnBoard={onOpenOnBoard} onOpenOnCard={onOpenOnCard} /> : <p className="session-browser-detail-empty">Select a session to see its terminal.</p>}
 		</div>
 		{removeTarget && <SessionConfirmDialog title="Remove session?" message={`Remove ${sessionTitle(removeTarget)} from session history? This removes its saved terminal metadata; workspace files and Git changes are untouched.`} confirmLabel="Remove session" busyLabel="Removing…" busy={removing} error={removeError} onCancel={() => { setRemoveTarget(undefined); setRemoveError(''); }} onConfirm={() => void remove()} />}
 	</div>;
 }
 
-function SessionDetail({ row, onStop, onReload, onOpenOnBoard }: { row: GlobalSessionRow; onStop: (row: GlobalSessionRow) => Promise<unknown>; onReload: () => Promise<unknown> | void; onOpenOnBoard?: (row: GlobalSessionRow) => void }) {
+function SessionDetail({ row, onStop, onReload, onOpenOnBoard, onOpenOnCard }: { row: GlobalSessionRow; onStop: (row: GlobalSessionRow) => Promise<unknown>; onReload: () => Promise<unknown> | void; onOpenOnBoard?: (row: GlobalSessionRow) => void; onOpenOnCard?: (row: GlobalSessionRow) => void }) {
 	const [tab, setTab] = useState<'terminal' | 'changes'>('terminal');
 	const [confirming, setConfirming] = useState(false);
 	const [stopping, setStopping] = useState(false);
@@ -174,6 +176,7 @@ function SessionDetail({ row, onStop, onReload, onOpenOnBoard }: { row: GlobalSe
 			</div>
 			<div className="session-browser-detail-actions">
 				{onOpenOnBoard && <button type="button" className="secondary" onClick={() => onOpenOnBoard(row)}>Open on board</button>}
+				{onOpenOnCard && row.record.planRef && <button type="button" className="secondary" onClick={() => onOpenOnCard(row)}>Open on card</button>}
 				{live && <button type="button" className="danger-confirm" onClick={() => setConfirming(true)}>{`Stop ${title} session`}</button>}
 			</div>
 		</header>

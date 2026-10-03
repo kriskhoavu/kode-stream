@@ -1,6 +1,6 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
-import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Bot, ChevronDown, Code2, FileText, Filter, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { useModalDialog } from '../components/overlay';
 import { readStringPreference, writePreference } from '../shared/preferences/store';
@@ -38,9 +38,11 @@ import { MarkdownPreview } from '../features/content-viewer/renderers/MarkdownPr
 import { lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
+import { AgentCluster, AgentPane, AgentsTab, agentFocusKey, handOffToDock, type AgentFocus } from '../features/workstream/AgentsPanel';
+import { useItemSessions, type ItemAgents } from '../features/workstream/useItemSessions';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
-type DrawerSideTab = 'info' | 'git' | 'jira';
+type DrawerSideTab = 'info' | 'git' | 'jira' | 'agents';
 type DrawerFileOption = { id: string; path: string; label: string };
 const DRAG_CLICK_SUPPRESSION_MS = 350;
 const UNSORTED_SELECTION_ID = UNSORTED_SOURCE_SELECTION_ID;
@@ -77,11 +79,13 @@ const emptyNewWorkItemDraft = (): NewWorkItemDraft => ({
 
 export { filterPlans };
 
-export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces, onOpenReview }: {
+export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, focusedSessionId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces, onOpenReview }: {
   workspace?: WorkspaceConfig;
   refreshKey: number;
   visibleStatuses?: ItemStatus[];
   focusedItemId?: string;
+  /** A session to open in the focused card's drawer. */
+  focusedSessionId?: string;
   onOpenPlan: (itemId: string) => void;
   onWorkspacesChanged: () => void | Promise<void>;
   onOpenWorkspaces?: () => void;
@@ -95,6 +99,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [scanState, setScanState] = useState('');
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
   const [drawerPlanId, setDrawerPlanId] = useState('');
+  const [drawerAgent, setDrawerAgent] = useState<AgentFocus>();
   const [newPlanOpen, setNewPlanOpen] = useState(false);
   const [newPlanDraft, setNewPlanDraft] = useState<NewWorkItemDraft>(() => emptyNewWorkItemDraft());
   const [newPlanError, setNewPlanError] = useState('');
@@ -116,6 +121,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [workspaceBranchList, setWorkspaceBranchList] = useState<string[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
   const [branchContext, setBranchContext] = useState<WorkstreamBranchLoadResult | null>(null);
+  const { byItem: itemAgents, reload: reloadItemAgents } = useItemSessions(workspace?.id, selectedBranch);
   const [sourceItemsOpen, setSourceItemsOpen] = useState(false);
   const [sourceItemsLoading, setSourceItemsLoading] = useState(false);
   const [sourceItemsSaving, setSourceItemsSaving] = useState(false);
@@ -209,14 +215,15 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   useEffect(() => {
     if (!focusedItemId || loading) return;
-    const focusKey = `${workspace?.id ?? ''}:${focusedItemId}:${selectedBranch}`;
+    const focusKey = `${workspace?.id ?? ''}:${focusedItemId}:${focusedSessionId ?? ''}:${selectedBranch}`;
     if (appliedFocusRef.current === focusKey) return;
     const item = items.find((candidate) => candidate.id === focusedItemId);
     if (!item) return;
     appliedFocusRef.current = focusKey;
     setQuery(item.identifier || item.title);
     setDrawerPlanId(item.id);
-  }, [focusedItemId, items, loading, selectedBranch, workspace?.id]);
+    setDrawerAgent(focusedSessionId ? { kind: 'session', id: focusedSessionId } : undefined);
+  }, [focusedItemId, focusedSessionId, items, loading, selectedBranch, workspace?.id]);
 
   // Bring the freshly created card into view and let its highlight fade on its own.
   useEffect(() => {
@@ -761,6 +768,12 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                     }
                     suppressPreviewRef.current = null;
                     setDrawerPlanId(plan.id);
+                    setDrawerAgent(undefined);
+                  }}
+                  agents={itemAgents.get(plan.id)}
+                  onOpenAgent={(focus) => {
+                    setDrawerPlanId(plan.id);
+                    setDrawerAgent(focus);
                   }}
                   onOpen={() => onOpenPlan(plan.id)}
                   onMove={(status) => moveItem(plan.id, status)}
@@ -782,7 +795,12 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         <PlanPreviewDrawer
           itemId={drawerPlanId}
           refreshKey={refreshKey}
-          onClose={() => setDrawerPlanId('')}
+          workspaceId={workspace?.id}
+          agents={itemAgents.get(drawerPlanId)}
+          agentFocus={drawerAgent}
+          onAgentFocus={setDrawerAgent}
+          onAgentsChanged={reloadItemAgents}
+          onClose={() => { setDrawerPlanId(''); setDrawerAgent(undefined); }}
           onOpenFull={() => onOpenPlan(drawerPlanId)}
           onChanged={async () => {
             await onWorkspacesChanged();
@@ -1459,17 +1477,19 @@ function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetSt
   );
 }
 
-const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, onDragStart, onDragEnd, onPreview, onOpen, onMove }: {
+const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
   item: ItemSummary;
   workspace?: WorkspaceConfig;
   pending: boolean;
   active: boolean;
   created: boolean;
+  agents?: ItemAgents;
   onDragStart: (event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
   onPreview: () => void;
   onOpen: () => void;
   onMove: (status: ItemStatus) => void;
+  onOpenAgent: (focus: AgentFocus) => void;
 }) {
   const source = sourceLabel(plan, workspace);
   const docs = isDocumentationMetadataSource(plan.metadataSource);
@@ -1512,6 +1532,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
         <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
         <span className="card-badges">
           {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
+          {!docs && <AgentCluster agents={agents} title={plan.title} onOpen={onOpenAgent} />}
         </span>
       </div>
       {showItem && <span className="plan-card-identifier">{plan.identifier}</span>}
@@ -1529,7 +1550,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   );
 });
 
-function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged }: { itemId: string; refreshKey: number; onClose: () => void; onOpenFull: () => void; onChanged: () => void | Promise<void> }) {
+function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus, onAgentFocus, onAgentsChanged, onClose, onOpenFull, onChanged }: { itemId: string; refreshKey: number; workspaceId?: string; agents?: ItemAgents; agentFocus?: AgentFocus; onAgentFocus: (focus: AgentFocus | undefined) => void; onAgentsChanged: () => Promise<unknown> | void; onClose: () => void; onOpenFull: () => void; onChanged: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [file, setFile] = useState<FileContent | null>(null);
@@ -1541,7 +1562,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [diff, setDiff] = useState('');
   const [tab, setTab] = useState<DrawerTab>('preview');
-  const [sideTab, setSideTab] = useState<DrawerSideTab>('info');
+  const [sideTab, setSideTab] = useState<DrawerSideTab>(() => agentFocus ? 'agents' : 'info');
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitActivity, setGitActivity] = useState<GitActivityEntry[]>([]);
   const [gitActivityLoading, setGitActivityLoading] = useState(false);
@@ -1587,17 +1608,18 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (!dirtyFile) {
-        onClose();
-        return;
-      }
-      void saveDrawerFileNow().then((saved) => {
-        if (saved) onClose();
-      });
+      // Escape typed into an agent's terminal belongs to the agent (it
+      // interrupts Claude, for one); it must not close the drawer.
+      if (event.target instanceof Element && event.target.closest('.agent-pane-body')) return;
+      closeDrawer();
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [dirtyFile, editorContent, file, onClose, savedContent]);
+  }, [agentFocus, agents, dirtyFile, editorContent, file, onClose, savedContent]);
+
+  useEffect(() => {
+    if (agentFocus) setSideTab('agents');
+  }, [agentFocusKey(agentFocus)]);
 
   useEffect(() => {
     const updateTopOffset = () => setTopOffset(Math.max(0, 68 - window.scrollY));
@@ -1776,13 +1798,24 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     await loadDrawerFile(fileId);
   };
 
-  const closeDrawer = () => {
-    if (!dirtyFile) {
+  // A live session open in the main pane goes to the terminal dock on close,
+  // so closing the drawer never leaves the process without a viewer.
+  const focusedLiveSession = agentFocus?.kind === 'session' ? agents?.live.find((record) => record.id === agentFocus.id) : undefined;
+  const closeWithHandOff = () => {
+    if (!focusedLiveSession) {
       onClose();
       return;
     }
+    void handOffToDock(focusedLiveSession).catch(() => undefined).finally(onClose);
+  };
+
+  const closeDrawer = () => {
+    if (!dirtyFile) {
+      closeWithHandOff();
+      return;
+    }
     void saveDrawerFileNow().then((saved) => {
-      if (saved) onClose();
+      if (saved) closeWithHandOff();
     });
   };
 
@@ -1974,6 +2007,11 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
         </header>
         {error && <p className="error drawer-error">{error}</p>}
         <div className="plan-drawer-body">
+          {agentFocus ? (
+          <section className="drawer-main drawer-agent-main">
+            <AgentPane focus={agentFocus} itemId={itemId} workspaceId={workspaceId ?? plan?.workspaceId} agents={agents} onBack={() => onAgentFocus(undefined)} onFocus={onAgentFocus} onReload={onAgentsChanged} />
+          </section>
+          ) : (
           <section className="drawer-main">
             {plan?.description && (
               <section className="drawer-section">
@@ -2009,6 +2047,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
               <div className="drawer-file-note">{file?.path ?? 'No file selected'}</div>
             </section>
           </section>
+          )}
           <aside className="drawer-meta drawer-work-item">
             <h3><Info size={15} /> Work Item</h3>
             <div className="side-panel-tabs" role="tablist" aria-label="Work item side panel">
@@ -2020,6 +2059,9 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
               </button>
               <button type="button" className={sideTab === 'jira' ? 'active' : ''} onClick={() => setSideTab('jira')}>
                 <Ticket size={14} /> Jira
+              </button>
+              <button type="button" className={sideTab === 'agents' ? 'active' : ''} onClick={() => setSideTab('agents')}>
+                <Bot size={14} /> Agents{(agents?.live.length ?? 0) > 0 && <span className="side-tab-count" aria-label={`${agents?.live.length} live`}>{agents?.live.length}</span>}
               </button>
             </div>
             <div className="drawer-work-item-content">
@@ -2103,6 +2145,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                 )
               )}
               {sideTab === 'jira' && <JiraItemPanel itemId={itemId} />}
+              {sideTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={onAgentFocus} onError={setError} onLaunched={(result) => { void Promise.resolve(onAgentsChanged()).then(() => onAgentFocus({ kind: 'session', id: result.session.id })); }} />}
             </div>
           </aside>
         </div>

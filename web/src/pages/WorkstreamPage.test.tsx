@@ -332,7 +332,7 @@ describe('WorkstreamPage', () => {
 
     const drawer = await screen.findByLabelText('Item preview');
     const tablist = within(drawer).getByRole('tablist', { name: 'Work item side panel' });
-    expect(within(tablist).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Info', 'Git', 'Jira']);
+    expect(within(tablist).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Info', 'Git', 'Jira', 'Agents']);
 
     fireEvent.click(within(tablist).getByRole('button', { name: 'Jira' }));
 

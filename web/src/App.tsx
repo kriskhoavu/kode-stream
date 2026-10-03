@@ -281,6 +281,7 @@ export function App() {
             refreshKey={contentRefreshKey}
             visibleStatuses={appSettings.visibleWorkstreamStatuses}
             focusedItemId={route.focusedItemId}
+            focusedSessionId={route.focusedSessionId}
             onOpenPlan={(itemId) => navigate({ name: 'item', itemId })}
             onWorkspacesChanged={async () => { await refreshAppData(); }}
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
@@ -291,7 +292,7 @@ export function App() {
         {route.name === 'workspaces' && <Suspense fallback={<section className="empty-state">Loading workspaces...</section>}><WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={async () => { await refreshAppData(); }} /></Suspense>}
         {route.name === 'settings' && <Suspense fallback={<section className="empty-state">Loading settings...</section>}><SettingsPage settings={appSettings} onChange={setAppSettings} /></Suspense>}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} activeWorkspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
-		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Workbench...</section>}><CanvasPage workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
+		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Workbench...</section>}><CanvasPage workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenOnCard={(itemId, sessionId) => navigate({ name: 'workstream', focusedItemId: itemId, focusedSessionId: sessionId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
         {route.name === 'review' && <Suspense fallback={<section className="empty-state">Loading Branch Review...</section>}><BranchReviewPage
           workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo}
           location={route.location}
