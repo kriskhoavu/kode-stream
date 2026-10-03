@@ -1,6 +1,6 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
-import { BookmarkPlus, Bot, ChevronDown, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Bot, ChevronDown, List, ListTree, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { useModalDialog } from '../components/overlay';
 import { readStringPreference, writePreference } from '../shared/preferences/store';
@@ -41,6 +41,7 @@ import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSetting
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { AgentCluster, AgentPane, AgentsTab, agentFocusKey, handOffToDock, type AgentFocus } from '../features/workstream/AgentsPanel';
 import { useItemSessions, type ItemAgents } from '../features/workstream/useItemSessions';
+import { DrawerFileTree } from '../features/workstream/DrawerFileTree';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
 type DrawerSideTab = 'info' | 'git' | 'jira' | 'agents';
@@ -1571,6 +1572,12 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
     setWorkItemCollapsed(collapsed);
     writePreference('workstream.drawer.workItemCollapsed', collapsed ? '1' : '0');
   };
+  // The item's files show as a dropdown or as a tree beside the document.
+  const [fileView, setFileView] = useState<'menu' | 'tree'>(() => readStringPreference('workstream.drawer.fileView') === 'tree' ? 'tree' : 'menu');
+  const chooseFileView = (view: 'menu' | 'tree') => {
+    setFileView(view);
+    writePreference('workstream.drawer.fileView', view);
+  };
   const openSideTab = (tab: DrawerSideTab) => {
     setSideTab(tab);
     if (workItemCollapsed) collapseWorkItem(false);
@@ -2046,10 +2053,19 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
               </section>
             )}
             <section className="drawer-section">
-              <label className="drawer-file-picker">
-                <span>Document</span>
-                <FileMenu value={file?.id ?? ''} options={fileOptions} onChange={selectDrawerFile} />
-              </label>
+              <div className="drawer-file-picker">
+                <div className="drawer-file-picker-heading">
+                  <span id="drawer-document-label">Document</span>
+                  <div className="drawer-file-view" role="group" aria-label="File view">
+                    <button type="button" className={fileView === 'menu' ? 'active' : ''} aria-pressed={fileView === 'menu'} title="Pick from a list" onClick={() => chooseFileView('menu')}><List size={14} /> List</button>
+                    <button type="button" className={fileView === 'tree' ? 'active' : ''} aria-pressed={fileView === 'tree'} title="Browse as a tree" onClick={() => chooseFileView('tree')}><ListTree size={14} /> Tree</button>
+                  </div>
+                </div>
+                {fileView === 'menu' && <div role="group" aria-labelledby="drawer-document-label"><FileMenu value={file?.id ?? ''} options={fileOptions} onChange={selectDrawerFile} /></div>}
+              </div>
+              <div className={fileView === 'tree' ? 'drawer-document with-tree' : 'drawer-document'}>
+              {fileView === 'tree' && <DrawerFileTree nodes={files} activeId={file?.id} onOpen={(id) => void selectDrawerFile(id)} />}
+              <div className="drawer-document-view">
               <div className="drawer-tabs">
                 <div>
                   <button className={tab === 'preview' ? 'active' : ''} type="button" onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
@@ -2071,6 +2087,8 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
               )}
               {tab === 'diff' && <pre className="drawer-raw">{diff || 'Loading diff...'}</pre>}
               <div className="drawer-file-note">{file?.path ?? 'No file selected'}</div>
+              </div>
+              </div>
             </section>
           </section>
           )}

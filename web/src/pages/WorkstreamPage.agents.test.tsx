@@ -109,6 +109,20 @@ describe('WorkstreamPage card agents', () => {
 		expect(readStringPreference('workstream.drawer.workItemCollapsed')).toBe('0');
 	});
 
+	it('switches the drawer’s documents between the list and a remembered tree', async () => {
+		stubBoard([]);
+		renderBoard();
+		fireEvent.click((await screen.findByText('Quiet card')).closest('[data-item-id]')!);
+		const drawer = await screen.findByLabelText('Item preview');
+		fireEvent.click(within(drawer).getByRole('button', { name: 'Tree' }));
+		expect(within(drawer).getByRole('button', { name: 'Tree' })).toHaveAttribute('aria-pressed', 'true');
+		expect(within(drawer).getByText('No files.')).toBeInTheDocument();
+		expect(readStringPreference('workstream.drawer.fileView')).toBe('tree');
+		fireEvent.click(within(drawer).getByRole('button', { name: 'List' }));
+		expect(within(drawer).queryByText('No files.')).not.toBeInTheDocument();
+		expect(readStringPreference('workstream.drawer.fileView')).toBe('menu');
+	});
+
 	it('opens the launcher on a card with no live session', async () => {
 		stubBoard([]);
 		renderBoard();
