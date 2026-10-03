@@ -21,6 +21,9 @@
   --accent-contrast: #ffffff;
   /* Accent for text and thin marks on the page background: readable orange. */
   --accent-text: #b4501d;
+  /* A selected tab: its label colour and the mark under or around it. */
+  --tab-selected-text: var(--accent-text);
+  --tab-selected-mark: var(--text);
   --green: #079669;
   --selection-accent: var(--button-accent);
   --orange: #c2410c;
@@ -313,6 +316,8 @@
   --button-accent: #b95f2e;
   --accent-contrast: #ffffff;
   --accent-text: #f2894a;
+  --tab-selected-text: var(--text);
+  --tab-selected-mark: var(--accent-text);
   --green: #40c977;
   --selection-accent: #f9b98c;
   --orange: #f9b98c;
@@ -3994,7 +3999,7 @@ body.is-resizing-drawer {
 }
 
 .drawer-tabs button.active {
-  color: var(--accent-text);
+  color: var(--tab-selected-text);
   font-weight: 650;
   background: transparent;
 }
@@ -4007,7 +4012,7 @@ body.is-resizing-drawer {
   bottom: 0;
   height: 2px;
   border-radius: 2px;
-  background: var(--accent-text);
+  background: var(--tab-selected-mark);
 }
 
 .drawer-markdown,

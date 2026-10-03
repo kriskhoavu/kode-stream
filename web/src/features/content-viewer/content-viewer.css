@@ -56,8 +56,9 @@
 
 .viewer-mode-toolbar button.active,
 .viewer-mode-toolbar button[aria-selected='true'] {
-  color: var(--accent-text);
+  color: var(--tab-selected-text);
   font-weight: 700;
+  box-shadow: 0 0 0 1px var(--tab-selected-mark), 0 1px 2px color-mix(in srgb, var(--text) 12%, transparent);
 }
 
 .viewer-toolbar-spacer {
