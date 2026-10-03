@@ -3964,55 +3964,18 @@ body.is-resizing-drawer {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  border-bottom: 1px solid var(--line);
 }
 
-.drawer-tabs > div {
-  min-width: 0;
-  align-self: stretch;
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-  overflow-x: auto;
-  overflow-y: hidden;
+.drawer-tabs .segmented-control {
+  width: auto;
+  grid-template-columns: repeat(3, auto);
 }
 
-/* Underlined tabs: the selected one reads in full-strength text with an
- * accent bar sitting on the row's bottom border. */
-.drawer-tabs button {
-  position: relative;
-  min-height: 40px;
-  border: 0;
-  border-radius: 6px 6px 0 0;
-  background: transparent;
-  color: var(--muted);
-  padding: 0 10px;
+.drawer-tabs .segmented-control button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-weight: 500;
-}
-
-.drawer-tabs button:hover {
-  color: var(--text);
-  background: color-mix(in srgb, var(--panel-soft) 70%, transparent);
-}
-
-.drawer-tabs button.active {
-  color: var(--tab-selected-text);
-  font-weight: 650;
-  background: transparent;
-}
-
-.drawer-tabs button.active::after {
-  content: '';
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 0;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--tab-selected-mark);
+  min-height: 30px;
 }
 
 .drawer-markdown,
@@ -4052,7 +4015,8 @@ body.is-resizing-drawer {
 .drawer-raw-editor {
   width: 100%;
   min-height: 440px;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
   outline: 0;
   color: var(--text);
 }

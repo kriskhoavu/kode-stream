@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
 import { BookmarkPlus, Bot, ChevronDown, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
@@ -1595,6 +1595,9 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
   const [width, setWidth] = useState(1120);
   const [topOffset, setTopOffset] = useState(() => Math.max(0, 68 - window.scrollY));
   const autoSaveTimerRef = useRef<number | null>(null);
+  // The Raw editor grows with the document so the whole file shows, as the
+  // preview does, and the drawer scrolls instead of a small box.
+  const rawEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const autoSaveSettledTimerRef = useRef<number | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
   const drawerGenerationRef = useRef(0);
@@ -1635,6 +1638,13 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [agentFocus, agents, dirtyFile, editorContent, file, onClose, savedContent]);
+
+  useLayoutEffect(() => {
+    const editor = rawEditorRef.current;
+    if (tab !== 'raw' || !editor) return;
+    editor.style.height = 'auto';
+    editor.style.height = `${editor.scrollHeight + 2}px`;
+  }, [tab, editorContent, width]);
 
   useEffect(() => {
     if (agentFocus) setSideTab('agents');
@@ -2051,10 +2061,10 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
                 <FileMenu value={file?.id ?? ''} options={fileOptions} tree={files} onChange={selectDrawerFile} />
               </label>
               <div className="drawer-tabs">
-                <div>
-                  <button className={tab === 'preview' ? 'active' : ''} type="button" onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
-                  <button className={tab === 'raw' ? 'active' : ''} type="button" onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
-                  <button className={tab === 'diff' ? 'active' : ''} type="button" onClick={() => setTab('diff')}><RefreshCw size={15} /> Diff</button>
+                <div className="segmented-control segmented-control-compact" role="tablist" aria-label="Document view">
+                  <button className={tab === 'preview' ? 'active' : ''} type="button" role="tab" aria-selected={tab === 'preview'} onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
+                  <button className={tab === 'raw' ? 'active' : ''} type="button" role="tab" aria-selected={tab === 'raw'} onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
+                  <button className={tab === 'diff' ? 'active' : ''} type="button" role="tab" aria-selected={tab === 'diff'} onClick={() => setTab('diff')}><RefreshCw size={15} /> Diff</button>
                 </div>
                 <span className={`autosave-state ${autoSaveState}`}>{autoSaveLabel(autoSaveState)}</span>
               </div>
@@ -2062,6 +2072,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
               {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} compact /> : <div className="drawer-empty">No readable file selected.</div>)}
               {tab === 'raw' && (
                 <textarea
+                  ref={rawEditorRef}
                   className="drawer-raw drawer-raw-editor"
                   value={file ? editorContent : 'No readable file selected.'}
                   onChange={(event) => setEditorContent(event.target.value)}
