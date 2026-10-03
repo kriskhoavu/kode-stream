@@ -233,7 +233,7 @@ describe('WorkstreamExplorer', () => {
     );
 
     expect(await screen.findByRole('button', { name: 'docs' })).toBeInTheDocument();
-    fireEvent.doubleClick(screen.getByRole('button', { name: 'docs' }));
+    // The tree root opens expanded on its own, whatever the remembered expansion says.
     await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false, false, expect.anything()));
     expect(await screen.findByText('guide.md')).toBeInTheDocument();
 

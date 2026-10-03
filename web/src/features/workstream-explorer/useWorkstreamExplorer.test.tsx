@@ -79,3 +79,14 @@ it('classifies a selected path from its own workspace directory', async () => {
   });
   expect(result.current.selection).toMatchObject({ workspaceId: 'second', path: 'docs/shared', kind: 'directory' });
 });
+
+it('expands a collapsed root and the folders leading to it without selecting it', async () => {
+  apiMock.workspaceTree.mockResolvedValue({ hiddenCount: 0, entries: [] });
+  const { result } = renderHook(() => useWorkstreamExplorer([], { mode: 'all' }));
+  act(() => { result.current.collapseAll(); });
+
+  await act(async () => { await result.current.expandPath('ws', 'plans/api/DI-365', 'directory'); });
+
+  for (const path of ['', 'plans', 'plans/api', 'plans/api/DI-365']) expect(result.current.expandedNodeIds.has(`ws:${path}`)).toBe(true);
+  expect(result.current.selection).toBeFalsy();
+});

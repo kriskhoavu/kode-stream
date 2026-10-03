@@ -212,17 +212,24 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
 
   useEffect(() => () => abortDirectoryRequests(), [abortDirectoryRequests]);
 
-  const expandToPath = useCallback(async (workspaceId: string, path: string, type: 'file' | 'directory' = 'file') => {
+  // Opens every folder leading to path, and path itself when it is a folder,
+  // without changing the selection.
+  const expandPath = useCallback(async (workspaceId: string, path: string, type: 'file' | 'directory' = 'file') => {
     const ancestors = ancestorDirectoryPaths(path, type);
     setExpandedNodeIds((current) => {
-      const next = new Set(current);
-      ancestors.forEach((ancestor) => next.add(explorerNodeId(workspaceId, ancestor)));
+      const ids = ancestors.map((ancestor) => explorerNodeId(workspaceId, ancestor));
+      if (ids.every((id) => current.has(id))) return current;
+      const next = new Set([...current, ...ids]);
       writePreference(expandedStorageKey, [...next]);
       return next;
     });
     await Promise.all(ancestors.map((ancestor) => loadDirectory(workspaceId, ancestor)));
+  }, [loadDirectory]);
+
+  const expandToPath = useCallback(async (workspaceId: string, path: string, type: 'file' | 'directory' = 'file') => {
+    await expandPath(workspaceId, path, type);
     select(workspaceId, path);
-  }, [loadDirectory, select]);
+  }, [expandPath, select]);
 
   const collapseAll = useCallback(() => {
     setExpandedNodeIds(new Set());
@@ -268,7 +275,7 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
 
 	const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter, mode }), [cache, decorations, expandedNodeIds, filter, mode, showIgnored, workspaceKey]);
 
-	return { rows, cache, decorations, gitStateByPath, expandedNodeIds, showIgnored, mode, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, setMode, toggleExpanded, loadDirectory, refresh, refreshWorkspaceBranch, collapseAll, collapsePath, select, invalidateDirectories, expandToPath };
+	return { rows, cache, decorations, gitStateByPath, expandedNodeIds, showIgnored, mode, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, setMode, toggleExpanded, loadDirectory, refresh, refreshWorkspaceBranch, collapseAll, collapsePath, select, invalidateDirectories, expandPath, expandToPath };
 }
 
 function readMode(): ExplorerTreeMode {

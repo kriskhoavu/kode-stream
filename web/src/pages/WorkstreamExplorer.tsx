@@ -81,6 +81,14 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   const rightPanelCollapsedLabel = rightPanel?.collapsedLabel ?? 'Expand inspector';
   const normalizedTreeRootPath = normalizeExplorerPath(treeRootPath ?? '');
   const visibleRows = useMemo(() => restrictRowsToRoot(explorer.rows, location?.workspaceId, normalizedTreeRootPath), [explorer.rows, location?.workspaceId, normalizedTreeRootPath]);
+  // A tree restricted to a root (the item's Plan view) always opens on that
+  // root expanded: the expanded set is shared and remembered, so a root
+  // collapsed once elsewhere would otherwise greet every visit closed.
+  const { expandPath } = explorer;
+  useEffect(() => {
+    if (!location?.workspaceId || !normalizedTreeRootPath) return;
+    void expandPath(location.workspaceId, normalizedTreeRootPath, 'directory');
+  }, [expandPath, location?.workspaceId, normalizedTreeRootPath]);
   const selectedRow = visibleRows.find((row) => explorerNodeId(row.workspaceId, row.node.path) === explorer.selection?.nodeId);
   const activeTab = useMemo(() => openTabs.find((tab) => tabKey(tab.workspaceId, tab.path) === activeTabKey) ?? null, [activeTabKey, openTabs]);
 	const pathSearch = useWorkspacePathSearch({ workspaceId: location?.workspaceId, includeIgnored: explorer.showIgnored });
