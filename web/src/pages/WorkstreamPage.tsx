@@ -332,7 +332,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   }, [visibleStatuses]);
   const boardStyle = useMemo(() => ({
     gridTemplateColumns: displayedStatuses
-      .flatMap((status) => status === 'unsorted' ? ['minmax(260px, 1fr)', '44px'] : ['minmax(260px, 1fr)'])
+      .flatMap((status) => status === 'unsorted' ? ['minmax(200px, 1fr)', '44px'] : ['minmax(200px, 1fr)'])
       .join(' ')
   }) as CSSProperties, [displayedStatuses]);
   const grouped = useMemo(() => {

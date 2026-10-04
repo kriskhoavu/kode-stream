@@ -3308,6 +3308,10 @@ select:disabled {
   display: grid;
   gap: 12px;
   min-height: 620px;
+  /* A board wider than the window scrolls on its own, so a sideways swipe
+   * never slides the search, filters and checkout row under the left nav. */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .workstream-separator {
