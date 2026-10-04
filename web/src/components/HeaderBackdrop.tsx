@@ -36,9 +36,9 @@ export const bandEndSelector = '#app-main .page-title, #app-main .knowledge-head
 
 /**
  * Holds the band to the page's title row. The band is absolutely placed in the
- * shell, so its height is the title row's bottom measured from the shell's top,
- * taken as if the page were not scrolled. Without a title row the stylesheet's
- * default height stands.
+ * shell and does not scroll, so its height follows the title row's bottom as
+ * the page scrolls, never shorter than the topbar it sits behind. Without a
+ * title row the stylesheet's default height stands.
  */
 function useBandEnd(endSelector: string) {
   useLayoutEffect(() => {
@@ -51,9 +51,11 @@ function useBandEnd(endSelector: string) {
         shell.style.removeProperty('--band-height');
         return;
       }
-      const scroller = end.closest<HTMLElement>('main');
-      const height = end.getBoundingClientRect().bottom - shell.getBoundingClientRect().top + (scroller?.scrollTop ?? 0);
-      shell.style.setProperty('--band-height', `${Math.max(0, Math.round(height))}px`);
+      const top = shell.getBoundingClientRect().top;
+      const topbar = shell.querySelector('.topbar');
+      const floor = topbar ? topbar.getBoundingClientRect().bottom - top : 0;
+      const height = Math.max(floor, end.getBoundingClientRect().bottom - top);
+      shell.style.setProperty('--band-height', `${Math.round(height)}px`);
     };
     // A timer rather than an animation frame: a hidden tab paints no frames,
     // and the band must already fit when it is shown.
@@ -67,7 +69,10 @@ function useBandEnd(endSelector: string) {
     const mutations = new MutationObserver(schedule);
     mutations.observe(shell, { childList: true, subtree: true });
     window.addEventListener('resize', schedule);
+    // Capture, because scroll does not bubble: whichever element scrolls the page.
+    document.addEventListener('scroll', measure, { capture: true, passive: true });
     return () => {
+      document.removeEventListener('scroll', measure, { capture: true });
       window.clearTimeout(timer);
       resize?.disconnect();
       mutations.disconnect();
