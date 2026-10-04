@@ -28,7 +28,10 @@ export function toBackdropVariant(value: unknown): BackdropVariant {
     : defaultBackdropVariant;
 }
 
-/** The row the band ends under: each band route's page title row. */
+/**
+ * The row the band ends under in kode-stream: each band route's page title row.
+ * An application with other page markup passes its own to HeaderBackdrop.
+ */
 export const bandEndSelector = '#app-main .page-title, #app-main .knowledge-heading-row';
 
 /**
@@ -37,18 +40,18 @@ export const bandEndSelector = '#app-main .page-title, #app-main .knowledge-head
  * taken as if the page were not scrolled. Without a title row the stylesheet's
  * default height stands.
  */
-function useBandEnd() {
+function useBandEnd(endSelector: string) {
   useLayoutEffect(() => {
     const shell = document.querySelector<HTMLElement>('.app-shell');
     if (!shell) return;
     let timer = 0;
     const measure = () => {
-      const end = document.querySelector(bandEndSelector);
+      const end = document.querySelector(endSelector);
       if (!end) {
         shell.style.removeProperty('--band-height');
         return;
       }
-      const scroller = end.closest<HTMLElement>('#app-main');
+      const scroller = end.closest<HTMLElement>('main');
       const height = end.getBoundingClientRect().bottom - shell.getBoundingClientRect().top + (scroller?.scrollTop ?? 0);
       shell.style.setProperty('--band-height', `${Math.max(0, Math.round(height))}px`);
     };
@@ -62,7 +65,7 @@ function useBandEnd() {
     const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(schedule);
     resize?.observe(shell);
     const mutations = new MutationObserver(schedule);
-    mutations.observe(document.getElementById('app-main') ?? shell, { childList: true, subtree: true });
+    mutations.observe(shell, { childList: true, subtree: true });
     window.addEventListener('resize', schedule);
     return () => {
       window.clearTimeout(timer);
@@ -71,7 +74,7 @@ function useBandEnd() {
       window.removeEventListener('resize', schedule);
       shell.style.removeProperty('--band-height');
     };
-  }, []);
+  }, [endSelector]);
 }
 
 /** Routes whose header-to-filter band carries a backdrop. */
@@ -102,8 +105,8 @@ export function bandClasses(routeName: string, variant: BackdropVariant): string
  * too — the class also strips the topbar's fill, blur and border, so an empty
  * band would leave the topbar with no chrome and nothing behind it.
  */
-export function HeaderBackdrop({ variant }: { variant: BackdropVariant }) {
-  useBandEnd();
+export function HeaderBackdrop({ variant, endSelector = bandEndSelector }: { variant: BackdropVariant; endSelector?: string }) {
+  useBandEnd(endSelector);
   if (variant === 'none') return null;
 
   return (

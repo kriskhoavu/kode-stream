@@ -69,3 +69,14 @@ describe('HeaderBackdrop band end', () => {
     expect(shell.style.getPropertyValue('--band-height')).toBe('');
   });
 });
+
+describe('HeaderBackdrop end selector', () => {
+  it('ends the band under the row an application names', () => {
+    document.body.innerHTML = '<div class="app-shell"><main><div class="page-heading">Captures</div></main></div>';
+    const shell = document.querySelector<HTMLElement>('.app-shell')!;
+    shell.getBoundingClientRect = () => ({ top: 0, bottom: 900, left: 0, right: 900, width: 900, height: 900, x: 0, y: 0, toJSON() {} });
+    document.querySelector<HTMLElement>('.page-heading')!.getBoundingClientRect = () => ({ top: 70, bottom: 132, left: 0, right: 900, width: 900, height: 62, x: 0, y: 70, toJSON() {} });
+    render(<HeaderBackdrop variant="neon" endSelector="main .page-heading" />, { container: shell.appendChild(document.createElement('div')) });
+    expect(shell.style.getPropertyValue('--band-height')).toBe('132px');
+  });
+});
