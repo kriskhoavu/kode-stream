@@ -8,7 +8,6 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import type { CanvasNode, CanvasSection, WorkspaceConfig } from '../lib/types';
-import { Workflow } from 'lucide-react';
 import '../features/canvas/canvas.css';
 import { readPreference, readStringPreference, writePreference } from '../shared/preferences/store';
 
@@ -157,7 +156,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	return (
 		<section className="canvas-page" aria-label="Workspace Canvas">
 			<header className="page-title workstream-title canvas-page-header">
-				<div className="workstream-heading"><div><h1><Workflow size={22} /> Workbench</h1></div></div>
+				<h1 className="sr-only">Workbench</h1>
 				{workspace && <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={branches?.current ?? canvas.projection?.layout.branchKey ?? workspace.baselineBranch} branches={branches?.branches ?? []} gitStatus={workspaceNode?.workspace?.git} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" disabled={canvas.loading} onSwitched={async () => { setSelectedId(undefined); await canvas.reload(); }} />}
 			</header>
 			{canvas.loading && <div className="canvas-state" role="status">Loading Canvas…</div>}

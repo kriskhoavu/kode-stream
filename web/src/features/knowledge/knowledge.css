@@ -15,23 +15,9 @@
 .knowledge-heading-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   min-width: 0;
-}
-
-.knowledge-title h1,
-.knowledge-title p {
-  margin: 0;
-}
-
-.knowledge-title h1 {
-  font-size: 26px;
-}
-
-.knowledge-title p {
-  margin-top: 6px;
-  color: var(--muted);
 }
 
 .knowledge-toolbar {

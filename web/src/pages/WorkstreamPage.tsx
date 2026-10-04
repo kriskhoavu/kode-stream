@@ -1,6 +1,6 @@
 import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
-import { BookmarkPlus, Bot, ChevronDown, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, KanbanSquare as WorkstreamIcon, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Bot, ChevronDown, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { useModalDialog } from '../components/overlay';
 import { readStringPreference, writePreference } from '../shared/preferences/store';
@@ -669,9 +669,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   return (
     <section className="workstream-page">
       <div className="page-title workstream-title">
-        <div className="workstream-heading">
-          <div><h1><WorkstreamIcon size={22} /> Workstream</h1></div>
-        </div>
+        <h1 className="sr-only">Workstream</h1>
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
             <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} gitStatus={workspaceGitStatus} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await loadCheckout(true); await onWorkspacesChanged(); }} />

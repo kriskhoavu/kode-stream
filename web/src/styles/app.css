@@ -652,8 +652,7 @@ button:disabled {
   margin-bottom: 4px;
 }
 
-.settings-title h1,
-.workstream-heading h1 {
+.settings-title h1 {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2171,41 +2170,10 @@ select {
   border-bottom: 1px solid var(--line);
 }
 
-.workstream-heading {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-width: 0;
-}
-
-.workstream-heading > div {
-  display: grid;
-  gap: 6px;
-}
-
-.workstream-heading h1,
-.workstream-heading span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.workstream-heading h1 {
-  margin-bottom: 0;
-  font-size: 25px;
-  letter-spacing: 0;
-}
-
-.workstream-heading h1 svg {
-  color: var(--blue);
-}
-
-:root:not([data-theme="dark"]) .workstream-heading h1 svg {
-  color: var(--button-accent);
-}
-
-.workstream-heading > div > span svg {
-  color: var(--muted);
+/* The page name is announced, not shown, so the row holds only the checkout
+ * and context controls, kept at the right. */
+.workstream-title {
+  justify-content: flex-end;
 }
 
 .workspace-context {
