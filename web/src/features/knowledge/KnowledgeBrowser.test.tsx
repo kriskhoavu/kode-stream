@@ -20,22 +20,28 @@ describe('KnowledgeBrowser', () => {
 
 	it('supports keyboard movement and activation', () => {
 		const onSelect = vi.fn();
-		const rootPages = pages.map((page) => ({ ...page, domain: '' }));
+		const rootPages = pages.map((page) => ({ ...page, domain: '', path: page.path.split('/').pop()! }));
 		render(<KnowledgeBrowser pages={rootPages} warnings={[]} onSelect={onSelect} />);
-		const first = screen.getByRole('button', { name: /Offer Overview/ });
-		const second = screen.getByRole('button', { name: /Article Import/ });
+		const first = screen.getByRole('button', { name: /Article Import/ });
+		const second = screen.getByRole('button', { name: /Offer Overview/ });
 		first.focus(); fireEvent.keyDown(first, { key: 'ArrowDown' }); expect(second).toHaveFocus();
-		fireEvent.keyDown(second, { key: 'Enter' }); expect(onSelect).toHaveBeenCalledWith('article-import');
+		fireEvent.keyDown(second, { key: 'Enter' }); expect(onSelect).toHaveBeenCalledWith('offer-overview');
 	});
 
-	it('always places the root domain before other top-level domains', () => {
-		const unorderedPages: KnowledgePage[] = [
+	it('holds every folder and root-level page under the wiki root, folders first', () => {
+		const rootedPages: KnowledgePage[] = [
 			...pages,
 			{ ...pages[0], slug: 'root-page', title: 'Root Page', path: 'root-page.md', domain: '' }
 		];
-		render(<KnowledgeBrowser pages={unorderedPages} warnings={[]} onSelect={vi.fn()} />);
+		render(<KnowledgeBrowser pages={rootedPages} rootName="wiki" warnings={[]} onSelect={vi.fn()} />);
 
-		expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('root');
+		const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
+		expect(headings).toEqual(['wiki', 'master-data', 'offer']);
+		const root = screen.getByRole('heading', { name: 'wiki' }).closest('.knowledge-domain');
+		expect(root).toContainElement(screen.getByRole('heading', { name: 'offer' }));
+		const rootPage = screen.getByRole('button', { name: /Root Page/ });
+		expect(root).toContainElement(rootPage);
+		expect(screen.getByRole('heading', { name: 'offer' }).compareDocumentPosition(rootPage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 	});
 
 	it('promotes a domain index page into an interactive parent', () => {
@@ -46,16 +52,15 @@ describe('KnowledgeBrowser', () => {
 		];
 		render(<KnowledgeBrowser pages={domainPages} warnings={[]} onSelect={onSelect} />);
 
-		fireEvent.click(screen.getByRole('button', { name: 'Open A12 index' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Open a12 index' }));
 		expect(onSelect).toHaveBeenCalledWith('a12-index');
-		expect(screen.queryByRole('button', { name: /A12 Documentation/ })).not.toBeInTheDocument();
-		const childPage = screen.getByRole('button', { name: /A12 Architecture Analysis/ });
-		expect(childPage).toBeInTheDocument();
-		const landingControl = screen.getByRole('button', { name: 'Open A12 index' });
+		// The index is still a file in its folder, as it is on disk.
+		expect(screen.getByRole('button', { name: /A12 Documentation/ })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
+		const landingControl = screen.getByRole('button', { name: 'Open a12 index' });
 		expect(landingControl.firstElementChild).toHaveClass('lucide-folder');
-		expect(landingControl.lastElementChild).toHaveTextContent('A12');
-		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-folder')).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Open A12 index' }).querySelector('.lucide-chevron-right')).not.toBeInTheDocument();
+		expect(landingControl.lastElementChild).toHaveTextContent('a12');
+		expect(landingControl.querySelector('.lucide-chevron-right')).not.toBeInTheDocument();
 	});
 
 	it('renders slash-separated domains as a nested hierarchy with simple page type text', () => {
@@ -91,18 +96,18 @@ describe('KnowledgeBrowser', () => {
 		];
 		render(<KnowledgeBrowser pages={domainPages} warnings={[]} onSelect={onSelect} />);
 
-		const expand = screen.getByRole('button', { name: 'Expand A12' });
+		const expand = screen.getByRole('button', { name: 'Expand a12' });
 		expect(expand).toHaveAttribute('aria-expanded', 'false');
 		expect(screen.queryByRole('button', { name: /A12 Architecture Analysis/ })).not.toBeInTheDocument();
 		fireEvent.click(expand);
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: 'Collapse A12' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Collapse a12' }));
 		expect(onSelect).not.toHaveBeenCalled();
 		fireEvent.change(screen.getByRole('textbox', { name: 'Filter Knowledge pages' }), { target: { value: 'architecture' } });
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
 		fireEvent.change(screen.getByRole('textbox', { name: 'Filter Knowledge pages' }), { target: { value: '' } });
 
-		fireEvent.click(screen.getByRole('button', { name: 'Expand A12' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Expand a12' }));
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
 	});
 
@@ -114,9 +119,9 @@ describe('KnowledgeBrowser', () => {
 		render(<KnowledgeBrowser pages={domainPages} selectedSlug="a12-index" warnings={[]} onSelect={vi.fn()} />);
 
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: 'Open A12 index' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Open a12 index' }));
 		expect(screen.queryByRole('button', { name: /A12 Architecture Analysis/ })).not.toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Expand A12' })).toHaveAttribute('aria-expanded', 'false');
+		expect(screen.getByRole('button', { name: 'Expand a12' })).toHaveAttribute('aria-expanded', 'false');
 	});
 
 	it('provides a left-border resize handle for the Knowledge Quality side panel', () => {
@@ -124,7 +129,7 @@ describe('KnowledgeBrowser', () => {
 		expect(screen.getByRole('button', { name: 'Resize Knowledge Quality panel' })).toHaveClass('panel-resize-handle-right');
 	});
 
-	it('opens only the root domain by default', () => {
+	it('opens only the wiki root by default', () => {
 		const domainPages: KnowledgePage[] = [
 			{ ...pages[0], slug: 'root-page', title: 'Root Page', path: 'root.md', domain: '' },
 			{ ...pages[1], slug: 'article-page', title: 'Article Page', path: 'article/page.md', domain: 'article' }
@@ -133,9 +138,9 @@ describe('KnowledgeBrowser', () => {
 
 		expect(screen.getByRole('button', { name: /Root Page/ })).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Article Page/ })).not.toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Collapse root' })).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByRole('button', { name: 'Collapse wiki' })).toHaveAttribute('aria-expanded', 'true');
 		expect(screen.getByRole('button', { name: 'Expand article' })).toHaveAttribute('aria-expanded', 'false');
-		expect(screen.getByRole('heading', { name: 'root' }).querySelector('.lucide-folder')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'wiki' }).querySelector('.lucide-folder')).toBeInTheDocument();
 		expect(screen.getByRole('heading', { name: 'article' }).querySelector('.lucide-folder')).toBeInTheDocument();
 	});
 
@@ -161,7 +166,7 @@ describe('KnowledgeBrowser', () => {
 	});
 });
 
-describe('taxonomy grouping', () => {
+describe('folder tree', () => {
 	const taxonomyPages: KnowledgePage[] = [
 		{ slug: 'wiki-index', title: 'Documentation Index', path: 'index.md', domain: 'root', bucket: '', area: '', tier: '', pageType: 'REFERENCE', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
 		{ slug: 'offer-index', title: 'Offer Documentation', path: 'domains/offer/README.md', domain: 'domains/offer', bucket: 'domains', area: 'offer', tier: '', pageType: 'CONCEPT', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] },
@@ -186,20 +191,32 @@ describe('taxonomy grouping', () => {
 		expect(screen.getByRole('button', { name: /Offer Permissions/i })).toBeInTheDocument();
 	});
 
-	it('labels tier partitions inside their area', () => {
+	it('shows tier folders inside their area folder', () => {
 		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
 		fireEvent.click(screen.getByRole('button', { name: 'Open domains/offer index' }));
 
-		const tiers = screen.getAllByTestId('knowledge-tier-label').map((element) => element.textContent);
-		expect(tiers).toEqual(expect.arrayContaining(['concepts', 'reference']));
+		const offer = screen.getByRole('heading', { name: /offer/ }).closest('.knowledge-domain');
+		expect(offer).toContainElement(screen.getByRole('heading', { name: 'concepts' }));
+		expect(offer).toContainElement(screen.getByRole('heading', { name: 'reference' }));
 	});
 
-	it('shows a nested area as one row', () => {
+	it('nests an area folder inside its parent folder, as on disk', () => {
 		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
+		fireEvent.click(screen.getByRole('button', { name: /^master-data$/i }));
 
-		expect(screen.getByRole('button', { name: /master-data \/ article/i })).toBeInTheDocument();
+		const masterData = screen.getByRole('heading', { name: 'master-data' }).closest('.knowledge-domain');
+		expect(masterData).toContainElement(screen.getByRole('heading', { name: 'article' }));
+	});
+
+	it('opens the root index from the wiki root folder', () => {
+		const onSelect = vi.fn();
+		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={onSelect} />);
+
+		fireEvent.click(screen.getByRole('button', { name: 'Open wiki index' }));
+		expect(onSelect).toHaveBeenCalledWith('wiki-index');
+		expect(screen.getByRole('button', { name: /Documentation Index/ })).toBeInTheDocument();
 	});
 
 	it('toggles a section from its header even with no landing page', () => {
@@ -234,15 +251,13 @@ describe('tier colour and page type suppression', () => {
 	};
 	const rowFor = (title: string) => screen.getByRole('button', { name: new RegExp(title, 'i') });
 
-	// The tier is the grouping a reader scans, so it carries the colour.
-	it('marks each tier label distinctly', () => {
+	// The tier is the grouping a reader scans, so its folder carries the colour.
+	it('marks each tier folder distinctly', () => {
 		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
 		openOffer();
 
-		const labels = screen.getAllByTestId('knowledge-tier-label');
-		const byText = new Map(labels.map((label) => [label.textContent?.trim(), label]));
-		expect(byText.get('concepts')).toHaveClass('tier-concepts');
-		expect(byText.get('reference')).toHaveClass('tier-reference');
+		expect(screen.getByRole('button', { name: /^concepts$/i })).toHaveClass('tier-concepts');
+		expect(screen.getByRole('button', { name: /^reference$/i })).toHaveClass('tier-reference');
 	});
 
 	// A tier label already states what the pages under it are, so repeating the

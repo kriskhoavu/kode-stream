@@ -2,31 +2,28 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { BookOpen, ChevronRight, FileText, Folder, GripVertical, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
-import { areaKey, bucketKey, groupingOf, rootGroupKey } from './taxonomy';
 
-export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children, sidePanel }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode; sidePanel?: ReactNode }) {
+export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, children, sidePanel, rootName = 'wiki' }: { pages: KnowledgePage[]; selectedSlug?: string; warnings: KnowledgeWarning[]; onSelect: (slug: string) => void; children?: ReactNode; sidePanel?: ReactNode; rootName?: string }) {
 	const [query, setQuery] = useState('');
 	const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
 	const [sidePanelWidth, setSidePanelWidth] = useState(300);
-	const [expandedDomains, setExpandedDomains] = useState<Set<string>>(() => new Set(['root']));
+	const [expandedDomains, setExpandedDomains] = useState<Set<string>>(() => new Set([rootFolderPath]));
 	const navigationRef = useRef<HTMLElement | null>(null);
 	const resizeCleanupRef = useRef<(() => void) | null>(null);
 	const filtered = useMemo(() => {
 		const needle = query.trim().toLowerCase();
 		return needle ? pages.filter((page) => [page.title, page.slug, page.summary ?? '', ...page.roles, ...page.topics].some((value) => value.toLowerCase().includes(needle))) : pages;
 	}, [pages, query]);
-	const domains = useMemo(() => buildDomainTree(filtered, pages), [filtered, pages]);
+	const tree = useMemo(() => buildFolderTree(filtered, pages, rootName), [filtered, pages, rootName]);
 	useEffect(() => {
 		if (!selectedSlug) return;
 		const selectedPage = pages.find((page) => page.slug === selectedSlug);
 		if (!selectedPage) return;
 		setQuery('');
-		const grouping = groupingOf(selectedPage);
-		const section = areaKey(grouping) ?? bucketKey(grouping);
-		const keys = [bucketKey(grouping), areaKey(grouping), grouping.tier ? tierKey(section, grouping.tier) : ''].filter(Boolean) as string[];
+		const keys = ancestorFolders(selectedPage.path);
 		setExpandedDomains((current) => {
 			const next = new Set(current);
-			for (const key of keys) next.add(key.toLowerCase());
+			for (const key of keys) next.add(key);
 			return next;
 		});
 	}, [pages, selectedSlug]);
@@ -65,28 +62,25 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		window.addEventListener('pointerup', finish, { once: true });
 		resizeCleanupRef.current = cleanup;
 	};
-	// The index reads as a file tree, like the Workstream explorer: a chevron
-	// column, a folder or file icon, and one row per entry, indented by depth.
-	// Folders (areas, then tiers) come before the loose pages beside them.
-	const renderDomain = (node: DomainNode, level = 0): ReactNode => {
-		const tiers = node.tiers
-			.map((group) => ({ ...group, pages: node.landingPage ? group.pages.filter((page) => page !== node.landingPage) : group.pages }))
-			.filter((group) => group.pages.length > 0);
-		const collapsible = tiers.length > 0 || node.children.length > 0;
-		const expanded = query.trim() !== '' || expandedDomains.has(node.path.toLowerCase());
-		const toggleDomain = () => setExpandedDomains((current) => {
+	// The index is the wiki's folder tree, drawn like the Workstream explorer:
+	// the wiki root, its folders, then the pages in each, indented by depth. A
+	// folder holding an index.md or README.md opens it from its name.
+	const renderFolder = (node: FolderNode, level = 0): ReactNode => {
+		const label = node.path || node.name;
+		const collapsible = node.folders.length > 0 || node.pages.length > 0;
+		const expanded = query.trim() !== '' || expandedDomains.has(node.path);
+		const toggleFolder = () => setExpandedDomains((current) => {
 			const next = new Set(current);
-			const key = node.path.toLowerCase();
-			if (next.has(key)) next.delete(key); else next.add(key);
+			if (next.has(node.path)) next.delete(node.path); else next.add(node.path);
 			return next;
 		});
 		const openOrToggleLanding = () => {
 			if (query.trim() === '' && node.landingPage?.slug === selectedSlug) {
-				toggleDomain();
+				toggleFolder();
 				return;
 			}
 			onSelect(node.landingPage!.slug);
-			if (!expanded) setExpandedDomains((current) => new Set(current).add(node.path.toLowerCase()));
+			if (!expanded) setExpandedDomains((current) => new Set(current).add(node.path));
 		};
 		const handleLandingKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
 			if (event.key === 'Enter') {
@@ -96,47 +90,29 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			}
 			moveFocus(event, node.landingPage!.slug);
 		};
-		const depth = node.path.includes('/') ? 'area' : 'bucket';
-		const renderPage = (page: KnowledgePage, tier: string, pageLevel: number) => {
+		const renderPage = (page: KnowledgePage) => {
 			const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length;
-			return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row knowledge-tree-row active' : 'knowledge-page-row knowledge-tree-row'} style={treeDepth(pageLevel)} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}>
+			const showType = !page.tier;
+			return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row knowledge-tree-row active' : 'knowledge-page-row knowledge-tree-row'} style={treeDepth(level + 1)} key={page.slug} title={page.path} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}>
 				<span className="knowledge-tree-spacer" aria-hidden="true" />
 				<FileText className="knowledge-tree-icon" size={16} />
 				<strong className="knowledge-page-title">{page.title}</strong>
-				{(!tier || pageWarnings > 0) && <small>{tier ? null : <span className="knowledge-page-type">{displayPageType(page.pageType)}</span>}{pageWarnings ? <span className="knowledge-page-warning">{pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small>}
+				{(showType || pageWarnings > 0) && <small>{showType ? <span className="knowledge-page-type">{displayPageType(page.pageType)}</span> : null}{pageWarnings ? <span className="knowledge-page-warning">{pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small>}
 			</button>;
 		};
-		const loosePages = tiers.find((group) => !group.tier)?.pages ?? [];
-		const landingActive = node.landingPage !== undefined && node.landingPage.slug === selectedSlug;
-		return <section className={`knowledge-domain knowledge-domain-${depth}`} key={node.path}>
-			<div className={landingActive ? 'knowledge-domain-header knowledge-tree-row active' : 'knowledge-domain-header knowledge-tree-row'} style={treeDepth(level)}>
+		const folderClass = ['knowledge-domain-link', tierClass(node.name), node.path === rootFolderPath ? 'knowledge-root-link' : ''].filter(Boolean).join(' ');
+		return <section className={node.path === rootFolderPath ? 'knowledge-domain knowledge-domain-root' : 'knowledge-domain'} key={node.path}>
+			<div className="knowledge-domain-header knowledge-tree-row" style={treeDepth(level)}>
 				{collapsible
-					? <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>
+					? <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${label}`} aria-expanded={expanded} onClick={toggleFolder}><ChevronRight size={14} /></button>
 					: <span className="knowledge-tree-spacer" aria-hidden="true" />}
 				<h3>{node.landingPage
-					? <button data-knowledge-entry data-knowledge-slug={node.landingPage.slug} type="button" className={landingActive ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={openOrToggleLanding} onKeyDown={handleLandingKeyDown} aria-label={`Open ${node.path} index`}><Folder className="knowledge-tree-icon" size={16} /><span>{node.name}</span></button>
-					: <button data-knowledge-entry type="button" className="knowledge-domain-link knowledge-domain-link-toggle" aria-expanded={collapsible ? expanded : undefined} onClick={toggleDomain} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); toggleDomain(); } }}><Folder className="knowledge-tree-icon" size={16} /><span>{node.name}</span></button>}
+					? <button data-knowledge-entry type="button" className={folderClass} onClick={openOrToggleLanding} onKeyDown={handleLandingKeyDown} aria-label={`Open ${label} index`}><Folder className="knowledge-tree-icon" size={16} /><span>{node.name}</span></button>
+					: <button data-knowledge-entry type="button" className={folderClass} aria-expanded={collapsible ? expanded : undefined} onClick={toggleFolder} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); toggleFolder(); } }}><Folder className="knowledge-tree-icon" size={16} /><span>{node.name}</span></button>}
 				</h3>
 			</div>
-			{expanded && node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map((child) => renderDomain(child, level + 1))}</div>}
-			{expanded && tiers.filter((group) => group.tier).map((group) => {
-				const key = tierKey(node.path, group.tier);
-				const tierExpanded = query.trim() !== '' || expandedDomains.has(key);
-				const toggleTier = () => setExpandedDomains((current) => {
-					const next = new Set(current);
-					if (next.has(key)) next.delete(key); else next.add(key);
-					return next;
-				});
-				return <div className="knowledge-tier" key={group.tier}>
-					<button data-knowledge-entry type="button" className={tierExpanded ? `${tierLabelClass(group.tier)} knowledge-tree-row expanded` : `${tierLabelClass(group.tier)} knowledge-tree-row`} style={treeDepth(level + 1)} data-testid="knowledge-tier-label" aria-expanded={tierExpanded} onClick={toggleTier} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleTier(); } }}>
-						<span className="knowledge-tree-chevron" aria-hidden="true"><ChevronRight size={14} className="knowledge-tier-chevron" /></span>
-						<Folder className="knowledge-tree-icon" size={16} />
-						<span>{group.tier}</span>
-					</button>
-					{tierExpanded && group.pages.map((page) => renderPage(page, group.tier, level + 2))}
-				</div>;
-			})}
-			{expanded && loosePages.length > 0 && <div className="knowledge-tier">{loosePages.map((page) => renderPage(page, '', level + 1))}</div>}
+			{expanded && node.folders.map((child) => renderFolder(child, level + 1))}
+			{expanded && node.pages.map(renderPage)}
 		</section>;
 	};
 
@@ -146,7 +122,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			<label className="knowledge-search"><Search size={15} /><span className="knowledge-visually-hidden">Filter Knowledge pages</span><input aria-label="Filter Knowledge pages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter pages" /></label>
 			{pages.length === 0 && <div className="knowledge-empty"><h2>No valid pages indexed</h2><p>Add Markdown pages with <code>slug</code> and <code>title</code> front matter, then rescan.</p></div>}
 			{pages.length > 0 && filtered.length === 0 && <p className="knowledge-empty">No pages match this filter.</p>}
-			<nav ref={navigationRef} aria-label="Knowledge pages">{domains.map((node) => renderDomain(node))}</nav>
+			<nav ref={navigationRef} aria-label="Knowledge pages">{pages.length > 0 && renderFolder(tree)}</nav>
 			<KnowledgeWarnings warnings={warnings} compact indexDiagnostics />
 		</div>
 		<section className="knowledge-content-pane" aria-label="Knowledge page content">{children ?? <div className="knowledge-welcome"><BookOpen size={28} /><h2>Select a page</h2><p>Choose an entry from the index to read its full content.</p></div>}</section>
@@ -154,89 +130,61 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 	</div>;
 }
 
-interface TierGroup {
-	tier: string;
-	pages: KnowledgePage[];
-}
+const rootFolderPath = '';
 
-interface DomainNode {
+interface FolderNode {
 	name: string;
 	path: string;
-	tiers: TierGroup[];
+	folders: FolderNode[];
+	pages: KnowledgePage[];
 	landingPage?: KnowledgePage;
-	children: DomainNode[];
+}
+
+function folderOf(path: string): string {
+	const slash = path.lastIndexOf('/');
+	return slash < 0 ? rootFolderPath : path.slice(0, slash);
+}
+
+function ancestorFolders(path: string): string[] {
+	const folders = [rootFolderPath];
+	const parts = path.split('/').slice(0, -1);
+	for (let index = 1; index <= parts.length; index += 1) folders.push(parts.slice(0, index).join('/'));
+	return folders;
 }
 
 function findLandingPage(pages: KnowledgePage[]): KnowledgePage | undefined {
 	return pages.find((page) => /(?:^|\/)index\.md$/i.test(page.path)) ?? pages.find((page) => /(?:^|\/)readme\.md$/i.test(page.path));
 }
 
-// Pages are grouped bucket then area, and an area's pages are partitioned by
-// tier. A tier is never a node: it has no landing page anywhere in a corpus, so
-// as a node it could only be opened through its disclosure control.
-function buildDomainTree(visiblePages: KnowledgePage[], allPages: KnowledgePage[]): DomainNode[] {
-	const buckets = new Map<string, DomainNode>();
-	const areas = new Map<string, DomainNode>();
-	const order: string[] = [];
-	const nodeFor = (key: string, name: string, into?: DomainNode[]): DomainNode => {
-		const existing = areas.get(key) ?? buckets.get(key);
+// Folders come from each page's path relative to the wiki root, so the tree is
+// the wiki as it sits on disk. Only folders holding a visible page appear, which
+// is what lets the filter prune the tree.
+function buildFolderTree(visiblePages: KnowledgePage[], allPages: KnowledgePage[], rootName: string): FolderNode {
+	const root: FolderNode = { name: rootName, path: rootFolderPath, folders: [], pages: [] };
+	const folders = new Map<string, FolderNode>([[rootFolderPath, root]]);
+	const folderFor = (path: string): FolderNode => {
+		const existing = folders.get(path);
 		if (existing) return existing;
-		const node: DomainNode = { name, path: key, tiers: [], children: [] };
-		(into ?? []).push(node);
+		const node: FolderNode = { name: path.slice(path.lastIndexOf('/') + 1), path, folders: [], pages: [] };
+		folders.set(path, node);
+		folderFor(folderOf(path)).folders.push(node);
 		return node;
 	};
-	for (const page of visiblePages) {
-		const grouping = groupingOf(page);
-		const bucket = bucketKey(grouping);
-		let bucketNode = buckets.get(bucket);
-		if (!bucketNode) {
-			bucketNode = { name: grouping.bucket || rootGroupKey, path: bucket, tiers: [], children: [] };
-			buckets.set(bucket, bucketNode);
-			order.push(bucket);
-		}
-		const area = areaKey(grouping);
-		let target = bucketNode;
-		if (area) {
-			let areaNode = areas.get(area);
-			if (!areaNode) {
-				areaNode = nodeFor(area, grouping.area.split('/').filter(Boolean).join(' / '), bucketNode.children);
-				areas.set(area, areaNode);
-			}
-			target = areaNode;
-		}
-		const tier = grouping.tier;
-		const group = target.tiers.find((candidate) => candidate.tier === tier);
-		if (group) group.pages.push(page);
-		else target.tiers.push({ tier, pages: [page] });
+	for (const page of visiblePages) folderFor(folderOf(page.path)).pages.push(page);
+	for (const node of folders.values()) {
+		node.landingPage = findLandingPage(allPages.filter((page) => folderOf(page.path) === node.path));
+		node.folders.sort((left, right) => left.name.localeCompare(right.name));
+		node.pages.sort((left, right) => left.title.localeCompare(right.title));
 	}
-	for (const node of [...buckets.values(), ...areas.values()]) {
-		node.landingPage = findLandingPage(allPages.filter((page) => nodeKeyOf(page) === node.path));
-		node.tiers.sort((left, right) => left.tier.localeCompare(right.tier));
-		node.children.sort((left, right) => left.name.localeCompare(right.name));
-	}
-	const roots = order.map((key) => buckets.get(key)!).sort((left, right) => left.name.localeCompare(right.name));
-	const rootIndex = roots.findIndex((node) => node.path === rootGroupKey);
-	if (rootIndex > 0) roots.unshift(...roots.splice(rootIndex, 1));
-	return roots;
+	return root;
 }
 
-function nodeKeyOf(page: KnowledgePage): string {
-	const grouping = groupingOf(page);
-	return areaKey(grouping) ?? bucketKey(grouping);
-}
-
-// The tier is the grouping a reader scans, so it carries the colour. Any tier
-// beyond the two the corpus uses falls back to the muted default rather than
-// being assigned a colour nobody chose.
+// A tier folder carries the colour the graph gives its tier. Any tier beyond
+// the two the corpus uses stays muted rather than taking a colour nobody chose.
 const markedTiers: Record<string, string> = { concepts: 'tier-concepts', reference: 'tier-reference' };
 
-function tierKey(sectionPath: string, tier: string): string {
-	return `${sectionPath}#${tier}`.toLowerCase();
-}
-
-function tierLabelClass(tier: string): string {
-	const marker = markedTiers[tier.toLowerCase()];
-	return marker ? `knowledge-tier-label ${marker}` : 'knowledge-tier-label';
+function tierClass(folderName: string): string {
+	return markedTiers[folderName.toLowerCase()] ?? '';
 }
 
 function treeDepth(level: number): CSSProperties {

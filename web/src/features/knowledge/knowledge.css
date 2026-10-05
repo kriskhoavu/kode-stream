@@ -259,16 +259,9 @@ body.is-resizing-panel .knowledge-browser {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--blue) 60%, transparent);
 }
 
-.knowledge-tree-spacer,
-.knowledge-tree-chevron {
+.knowledge-tree-spacer {
   flex: 0 0 26px;
   width: 26px;
-}
-
-.knowledge-tree-chevron {
-  display: grid;
-  place-items: center;
-  color: var(--muted);
 }
 
 .knowledge-tree-icon {
@@ -301,13 +294,11 @@ body.is-resizing-panel .knowledge-browser {
   color: var(--text);
 }
 
-.knowledge-domain-toggle svg,
-.knowledge-tier-chevron {
+.knowledge-domain-toggle svg {
   transition: transform 140ms ease;
 }
 
-.knowledge-domain-toggle.expanded svg,
-.knowledge-tier-label.expanded .knowledge-tier-chevron {
+.knowledge-domain-toggle.expanded svg {
   transform: rotate(90deg);
 }
 
@@ -330,8 +321,7 @@ body.is-resizing-panel .knowledge-browser {
   outline: none;
 }
 
-.knowledge-domain-link > span,
-.knowledge-tier-label > span:last-child {
+.knowledge-domain-link > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1211,15 +1201,10 @@ body.is-resizing-panel .knowledge-browser {
   }
 }
 
-/* A tier is a folder of an area's pages. Its folder icon carries the tier's
-   colour, matching the graph's tier badge, so the row itself reads like any
-   other folder. */
-.knowledge-tier-label {
-  gap: 7px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 650;
-  cursor: pointer;
+/* The wiki root reads like the explorer's workspace row. */
+.knowledge-root-link {
+  color: var(--text);
+  font-weight: 700;
 }
 
 /* Tier on a graph node, beside the page type. */
@@ -1238,11 +1223,11 @@ body.is-resizing-panel .knowledge-browser {
    inside a tier, is not repeated at all: the reference tier is REFERENCE for
    27 of 27 pages, so the badge restated the folder above it. */
 
-.knowledge-tier-label.tier-concepts .knowledge-tree-icon {
+.knowledge-domain-link.tier-concepts .knowledge-tree-icon {
   color: color-mix(in srgb, var(--green) 80%, var(--text));
 }
 
-.knowledge-tier-label.tier-reference .knowledge-tree-icon {
+.knowledge-domain-link.tier-reference .knowledge-tree-icon {
   color: color-mix(in srgb, var(--purple) 88%, var(--text));
 }
 
