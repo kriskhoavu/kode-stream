@@ -166,7 +166,7 @@ describe('Knowledge graph', () => {
 		const panel = screen.getByLabelText('Knowledge graph review panel');
 		expect(screen.queryByRole('button', { name: 'Close node tooltip' })).not.toBeInTheDocument();
 		await waitFor(() => expect(panel).toHaveTextContent('Main roadmap preview content'), { timeout: 5_000 });
-		expect(panel).toHaveTextContent('Outgoing links');
+		expect(panel).not.toHaveTextContent('Outgoing links');
 		expect(panel).not.toHaveTextContent('Relationships');
 		fireEvent.click(within(panel).getByRole('button', { name: 'Open details page' }));
 		expect(onOpenDetails).toHaveBeenCalledWith('a');

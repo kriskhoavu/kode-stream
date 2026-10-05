@@ -13,14 +13,13 @@ const detail: KnowledgePageDetail = {
 };
 
 describe('KnowledgeReader', () => {
-	it('renders shared Markdown, metadata, and relationships', async () => {
-		const onNavigate = vi.fn();
-		render(<KnowledgeReader detail={detail} onNavigate={onNavigate} />);
+	it('renders the page body and its warnings, without the front matter', async () => {
+		render(<KnowledgeReader detail={detail} onNavigate={vi.fn()} />);
 		expect(await screen.findByRole('heading', { name: 'Overview', level: 1 }, { timeout: 3000 })).toBeInTheDocument();
-		expect(screen.getByText('plans/api/PM-1/README.md')).toBeInTheDocument();
 		expect(screen.getByText('Missing target')).toBeInTheDocument();
-		fireEvent.click(screen.getAllByRole('button', { name: 'Target page' })[0]);
-		expect(onNavigate).toHaveBeenCalledWith('target');
+		expect(screen.queryByText('plans/api/PM-1/README.md')).not.toBeInTheDocument();
+		expect(screen.queryByRole('heading', { name: 'Roles' })).not.toBeInTheDocument();
+		expect(screen.queryByText('slug: overview')).not.toBeInTheDocument();
 	});
 
 	it('intercepts rendered Wiki links and keeps external links safe', async () => {
