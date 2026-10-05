@@ -42,7 +42,6 @@ import type { TreeFileState } from '../features/file-tree/FileStateIcon';
 import { ContentSearchInput, ContentSearchResults } from '../features/content-search/ContentSearch';
 import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
-import { AISessionLaunchControl } from '../features/ai-session/AISessionLaunchControl';
 import { JiraItemPanel } from '../features/jira/JiraItemPanel';
 import { WorkstreamExplorer } from './WorkstreamExplorer';
 import { AgentPane, AgentsTab, useHeldAgentSessions, type AgentFocus } from '../features/workstream/AgentsPanel';
@@ -94,7 +93,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [leftWidth, setLeftWidth] = useState(300);
   const [rightWidth, setRightWidth] = useState(300);
   const [detailViewMode, setDetailViewMode] = useState<DetailViewMode>('plan');
-  const [aiLaunchMessage, setAILaunchMessage] = useState('');
   const [createPathKind, setCreatePathKind] = useState<'file' | 'directory' | null>(null);
   const [createPathName, setCreatePathName] = useState('');
   const [creatingPath, setCreatingPath] = useState(false);
@@ -1178,7 +1176,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       )}
       {rightPanelTab === 'jira' && <JiraItemPanel itemId={itemId} />}
       {rightPanelTab === 'quality' && qualityPanel}
-      {rightPanelTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={setAgentFocus} onError={setError} onLaunched={(result) => { void Promise.resolve(reloadAgents()).then(() => setAgentFocus({ kind: 'session', id: result.session.id })); }} />}
+      {rightPanelTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={setAgentFocus} onError={setError} allowEmbedded={allowEmbeddedAISessions} onLaunched={(result) => { void Promise.resolve(reloadAgents()).then(() => setAgentFocus({ kind: 'session', id: result.session.id })); }} />}
       {error && (
         <div className="operation-error">
           <p className="error">{error}</p>
@@ -1221,7 +1219,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           </div>
         </div>
         <div className="workspace-header-actions">
-          <AISessionLaunchControl itemId={itemId} buttonLabel="AI session" disabled={!plan} allowEmbedded={allowEmbeddedAISessions} onLaunched={setAILaunchMessage} onError={(caught) => showOperationError(caught, 'AI session launch failed')} />
           <button
             className={`icon-button workspace-git-status-button${gitStatus?.dirty ? ' is-dirty' : ''}`}
             type="button"
@@ -1234,7 +1231,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           </button>
         </div>
       </header>
-      {aiLaunchMessage && <div className="operation-notice" role="status">{aiLaunchMessage}</div>}
       {plan && workspaceConfig ? (
         <WorkstreamExplorer
           embedded

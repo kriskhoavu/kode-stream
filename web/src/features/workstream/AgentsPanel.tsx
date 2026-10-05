@@ -61,7 +61,7 @@ export function AgentCluster({ agents, title, onOpen }: { agents?: ItemAgents; t
 }
 
 /** The drawer's Agents side tab: a launcher, then the card's live sessions, its Claude conversations, and its ended sessions. */
-export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError }: { itemId: string; agents?: ItemAgents; focus?: AgentFocus; onFocus: (focus: AgentFocus) => void; onLaunched: (result: EmbeddedAISessionResult) => void; onError: (message: string) => void }) {
+export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError, allowEmbedded = true }: { itemId: string; agents?: ItemAgents; focus?: AgentFocus; onFocus: (focus: AgentFocus) => void; onLaunched: (result: EmbeddedAISessionResult) => void; onError: (message: string) => void; allowEmbedded?: boolean }) {
 	const [earlierOpen, setEarlierOpen] = useState(false);
 	const [message, setMessage] = useState('');
 	const selected = agentFocusKey(focus);
@@ -70,7 +70,7 @@ export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError 
 	const ended = agents?.ended ?? [];
 	return <section className="agents-tab" aria-label="Agents">
 		<div className="agents-tab-launch">
-			<AISessionLaunchControl itemId={itemId} buttonLabel="New session" onLaunched={setMessage} onError={(caught) => onError(caught instanceof Error ? caught.message : 'The session could not be started.')} onEmbeddedLaunched={onLaunched} />
+			<AISessionLaunchControl itemId={itemId} buttonLabel="New session" onLaunched={setMessage} onError={(caught) => onError(caught instanceof Error ? caught.message : 'The session could not be started.')} onEmbeddedLaunched={onLaunched} allowEmbedded={allowEmbedded} />
 			{message && <p className="agents-tab-message" role="status">{message}</p>}
 		</div>
 		<AgentGroup title="Live" empty="No session is running for this card.">
