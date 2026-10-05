@@ -6,13 +6,13 @@ import { adaptKnowledgeGraph } from './graphModel';
 const reactFlowSpy = vi.fn();
 
 vi.mock('@xyflow/react', () => ({
-		ReactFlow: ({ nodes, edges, nodeTypes, onNodeClick, onNodeDragStop, nodesDraggable, children }: { nodes: Array<{ id: string; type?: string; position: { x: number; y: number }; data: { label: string } }>; edges: Array<{ id: string }>; nodeTypes?: Record<string, React.ComponentType<{ data: { label: string } }>>; onNodeClick: (event: unknown, node: { id: string }) => void; onNodeDragStop?: (event: unknown, node: { id: string; position: { x: number; y: number } }) => void; nodesDraggable?: boolean; children: React.ReactNode }) => {
+		ReactFlow: ({ nodes, edges, nodeTypes, onNodeClick, onNodeDoubleClick, onNodeDragStop, nodesDraggable, children }: { nodes: Array<{ id: string; type?: string; position: { x: number; y: number }; data: { label: string } }>; edges: Array<{ id: string }>; nodeTypes?: Record<string, React.ComponentType<{ data: { label: string } }>>; onNodeClick: (event: unknown, node: { id: string }) => void; onNodeDoubleClick?: (event: unknown, node: { id: string }) => void; onNodeDragStop?: (event: unknown, node: { id: string; position: { x: number; y: number } }) => void; nodesDraggable?: boolean; children: React.ReactNode }) => {
 			reactFlowSpy({ nodes, edges, nodesDraggable });
 		return <div data-testid="flow" data-draggable={nodesDraggable ? 'true' : 'false'}>
 			{nodes.map((node) => {
 				const NodeComponent = node.type ? nodeTypes?.[node.type] : undefined;
 				return <div key={node.id}>
-					<button onClick={() => onNodeClick({}, node)}>{node.data.label}</button>
+					<button onClick={() => onNodeClick({}, node)} onDoubleClick={() => onNodeDoubleClick?.({}, node)}>{node.data.label}</button>
 					<button type="button" onClick={() => onNodeDragStop?.({}, { ...node, position: { x: 444, y: 222 } })}>Drag {node.data.label}</button>
 					{NodeComponent ? <NodeComponent data={node.data} /> : null}
 				</div>;
@@ -133,21 +133,26 @@ describe('Knowledge graph', () => {
 		// Only the page's own link: focus mode draws no group nodes or group links.
 		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(1);
 		expect(reactFlowSpy.mock.calls.at(-1)?.[0].nodes.map((node: { id: string }) => node.id).sort()).toEqual(['a', 'b']);
-		fireEvent.click(screen.getByRole('button', { name: 'Hide selected links' }));
+		// A second click on the focused page hides its links and leaves focus.
+		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
 		expect(screen.getByRole('button', { name: 'Focus relationships' })).toHaveAttribute('aria-pressed', 'false');
 		expect(within(screen.getByTestId('flow')).getByRole('button', { name: 'Gamma' })).toBeInTheDocument();
 		expect(reactFlowSpy.mock.calls.at(-1)?.[0].nodes.find((node: { id: string }) => node.id === 'a')?.className).not.toContain('selected');
 	});
 
-	it('shows gray domain grouping links in the overview and adds selected links on request', async () => {
+	it('shows gray domain grouping links in the overview and adds a page’s links when it is clicked', async () => {
 		const { KnowledgeGraph } = await import('./KnowledgeGraph');
 		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" onSelect={vi.fn()} onOpenDetails={vi.fn()} />);
 		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(2);
-		fireEvent.click(screen.getByRole('button', { name: 'Show selected links' }));
+		expect(screen.queryByRole('button', { name: /selected links/ })).not.toBeInTheDocument();
+		expect(screen.queryByRole('combobox', { name: 'Filter graph page type' })).not.toBeInTheDocument();
+		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
 		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(3);
+		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
+		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(2);
 	});
 
-	it('shows a review panel, enables dragging, and opens details from the tooltip action', async () => {
+	it('shows links on a click, hides them on a second, and opens the review panel on a double click', async () => {
 		const { KnowledgeGraph } = await import('./KnowledgeGraph');
 		const onSelect = vi.fn();
 		const onOpenDetails = vi.fn();
@@ -161,12 +166,17 @@ describe('Knowledge graph', () => {
 		expect(screen.queryByLabelText('Knowledge graph review panel')).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Review in panel' })).not.toBeInTheDocument();
 
-		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
+		const alpha = within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' });
+		fireEvent.click(alpha);
 		expect(screen.queryByLabelText('Knowledge graph review panel')).not.toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Close node tooltip' })).toBeInTheDocument();
-		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
+		expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(3);
+		fireEvent.click(alpha);
+		expect(screen.queryByLabelText('Knowledge graph review panel')).not.toBeInTheDocument();
+		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(2);
+		fireEvent.doubleClick(alpha);
 		const panel = screen.getByLabelText('Knowledge graph review panel');
-		expect(screen.queryByRole('button', { name: 'Close node tooltip' })).not.toBeInTheDocument();
+		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(3);
 		await waitFor(() => expect(panel).toHaveTextContent('Main roadmap preview content'), { timeout: 5_000 });
 		expect(panel).not.toHaveTextContent('Outgoing links');
 		expect(panel).not.toHaveTextContent('Relationships');
@@ -205,13 +215,12 @@ describe('Knowledge graph', () => {
 		const onSelect = vi.fn();
 		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" selectedDetail={detail} onSelect={onSelect} onOpenDetails={vi.fn()} />);
 
-		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
-		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
+		fireEvent.doubleClick(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
 		expect(screen.getByLabelText('Knowledge graph review panel')).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Close review panel' }));
 		expect(screen.queryByLabelText('Knowledge graph review panel')).not.toBeInTheDocument();
 
-		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
+		fireEvent.doubleClick(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
 		expect(onSelect).toHaveBeenCalledWith('a');
 		expect(screen.getByLabelText('Knowledge graph review panel')).toBeInTheDocument();
 	});
@@ -220,8 +229,7 @@ describe('Knowledge graph', () => {
 		const { KnowledgeGraph } = await import('./KnowledgeGraph');
 		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" selectedDetail={detail} onSelect={vi.fn()} onOpenDetails={vi.fn()} />);
 
-		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
-		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
+		fireEvent.doubleClick(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
 		expect(screen.getByLabelText('Knowledge graph review panel')).toBeInTheDocument();
 		fireEvent.keyDown(window, { key: 'Escape' });
 		expect(screen.queryByLabelText('Knowledge graph review panel')).not.toBeInTheDocument();
