@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { filterPlans, WorkstreamPage } from './WorkstreamPage';
+import { documentRepeats, filterPlans, WorkstreamPage } from './WorkstreamPage';
 import type { WorkstreamBranchLoadResult, ItemSummary, SourceMode } from '../lib/types';
 
 const workspace = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', sources: ['items'], createdAt: new Date().toISOString() };
@@ -585,5 +585,16 @@ describe('Jira description formatting', () => {
     expect(within(preview).getByRole('heading', { name: 'Acceptance Criteria' })).toBeInTheDocument();
     expect(within(preview).getAllByRole('listitem')).toHaveLength(2);
     expect(preview.querySelector('code')?.textContent).toBe('ArticleIndex');
+  });
+});
+
+describe('documentRepeats', () => {
+  const description = 'The customer wants the offer PDF in the Chef\'s Culinar brand design. In **Configure PDF** the user picks `PDF_TEMPLATE_PRICE`.';
+  it('finds the description in a README that holds it with its markup', () => {
+    expect(documentRepeats('# DI-365\n\nThe customer wants the offer PDF in the Chef\'s Culinar brand design. In **Configure PDF** the user\npicks `PDF_TEMPLATE_PRICE`.\n\n## Glossary', description)).toBe(true);
+  });
+  it('keeps the description for a document that does not hold it', () => {
+    expect(documentRepeats('# Scenario 1\n\nOpen an offer and configure the PDF.', description)).toBe(false);
+    expect(documentRepeats('', description)).toBe(false);
   });
 });

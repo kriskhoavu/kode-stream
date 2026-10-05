@@ -2047,7 +2047,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
           )}
           {agentFocus ? null : (
           <section className="drawer-main">
-            {plan?.description && (
+            {plan?.description && !documentRepeats(editorContent, plan.description) && (
               <section className="drawer-section">
                 <h3>Description</h3>
                 <p>{plan.description}</p>
@@ -2199,6 +2199,26 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
       </aside>
     </>
   );
+}
+
+/** Markdown reduced to its words, so the same paragraph matches with or without its markup. */
+function plainWords(markdown: string): string {
+  return markdown
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[`*_#>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Whether the open document already holds the item's description. The
+ * description is the first paragraph of the item's README, so showing both
+ * repeats it whenever the README is open.
+ */
+export function documentRepeats(document: string, description: string): boolean {
+  const words = plainWords(description);
+  return words.length > 0 && plainWords(document).includes(words);
 }
 
 function firstFile(nodes: FileNode[]): FileNode | null {
