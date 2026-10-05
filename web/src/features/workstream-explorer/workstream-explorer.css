@@ -476,6 +476,22 @@
   justify-content: space-between;
 }
 
+.workspace-file-editor.agent-active > :not(.explorer-agent-area) {
+  display: none !important;
+}
+
+.explorer-agent-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+
+.explorer-agent-area[hidden] {
+  display: none;
+}
+
 .workspace-file-editor > .content-viewer,
 .workspace-file-editor > .raw-editor,
 .workspace-file-editor > .diff-panel,

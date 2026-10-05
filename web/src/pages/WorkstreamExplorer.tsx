@@ -41,7 +41,7 @@ type ExplorerRightPanelProps = {
   expandedLabel?: string;
 };
 
-export function WorkstreamExplorer({ workspaces, location, onLocationChange, embedded = false, treeRootPath, showModeSelector = true, embeddedHeaderContent, leftPanelContent, mainContent, rightPanel }: {
+export function WorkstreamExplorer({ workspaces, location, onLocationChange, embedded = false, treeRootPath, showModeSelector = true, embeddedHeaderContent, leftPanelContent, mainContent, agentArea, rightPanel }: {
   workspaces: WorkspaceConfig[];
   location?: ExplorerLocation;
   onLocationChange: (location?: ExplorerLocation) => void;
@@ -51,6 +51,12 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   embeddedHeaderContent?: ReactNode;
   leftPanelContent?: ReactNode;
   mainContent?: ReactNode;
+  /**
+   * Agent sessions shown in the main pane. Kept mounted while inactive, so a
+   * held terminal stays connected; while active it hides the file editor,
+   * which stays mounted too and keeps its open tabs.
+   */
+  agentArea?: { content: ReactNode; active: boolean };
   rightPanel?: ExplorerRightPanelProps;
 }) {
   const explorer = useWorkstreamExplorer(workspaces, location, onLocationChange);
@@ -437,7 +443,8 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
           </div>}
           {!leftCollapsed && <button className="explorer-resize-handle left" aria-label="Resize workspace tree" onPointerDown={(event) => startResize('left', event)} />}
         </aside>
-        <main className="workspace-file-editor">
+        <main className={agentArea?.active ? 'workspace-file-editor agent-active' : 'workspace-file-editor'}>
+          {agentArea && <div className="explorer-agent-area" hidden={!agentArea.active}>{agentArea.content}</div>}
           {mainContent ?? <>
           <div className="explorer-breadcrumbs">
             <span>{workspace?.name ?? 'Select a workspace'}</span>

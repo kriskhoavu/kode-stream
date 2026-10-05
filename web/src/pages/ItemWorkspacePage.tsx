@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MutableRefObject, RefObject } from 'react';
 import {
   ArrowLeft,
+  Bot,
   ChevronDown,
   Code2,
   File as FileIcon,
@@ -44,6 +45,8 @@ import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../li
 import { AISessionLaunchControl } from '../features/ai-session/AISessionLaunchControl';
 import { JiraItemPanel } from '../features/jira/JiraItemPanel';
 import { WorkstreamExplorer } from './WorkstreamExplorer';
+import { AgentPane, AgentsTab, useHeldAgentSessions, type AgentFocus } from '../features/workstream/AgentsPanel';
+import { useItemSessions } from '../features/workstream/useItemSessions';
 import type { ExplorerLocation } from '../features/workstream-explorer/types';
 import { E2EQualityPanel } from '../features/e2e-testing/E2EQualityPanel';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
@@ -51,7 +54,7 @@ import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspa
 import { providerLabel } from '../features/ai-session/providerDisplay';
 
 type Tab = 'preview' | 'raw' | 'diff';
-type RightPanelTab = 'info' | 'jira' | 'quality';
+type RightPanelTab = 'info' | 'jira' | 'quality' | 'agents';
 type DiffMode = 'review' | 'raw';
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
 type DetailViewMode = 'plan' | 'workspace' | 'git';
@@ -78,6 +81,12 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [tab, setTab] = useState<Tab>('preview');
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('info');
+  // The item's agent sessions: listed in the Agents tab, shown in the main pane
+  // while one is in focus, and held connected until the page leaves the item.
+  const [agentFocus, setAgentFocus] = useState<AgentFocus>();
+  const { byItem: itemAgents, reload: reloadAgents } = useItemSessions(plan?.workspaceId, plan?.branch ?? '');
+  const agents = itemAgents.get(itemId);
+  const { heldLiveSessionIds, release: releaseHeldSession } = useHeldAgentSessions(agents, agentFocus, itemId);
   const [error, setError] = useState('');
   const [recoveryHint, setRecoveryHint] = useState('');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -1123,6 +1132,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
         <button type="button" className={rightPanelTab === 'quality' ? 'active' : ''} onClick={() => setRightPanelTab('quality')}>
           <GitCompare size={14} /> Quality
         </button>
+        <button type="button" className={rightPanelTab === 'agents' ? 'active' : ''} onClick={() => setRightPanelTab('agents')}>
+          <Bot size={14} /> Agents{(agents?.live.length ?? 0) > 0 && <span className="side-tab-count" aria-label={`${agents?.live.length} live`}>{agents?.live.length}</span>}
+        </button>
       </div>
       {rightPanelTab === 'info' && (
         <>
@@ -1166,6 +1178,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       )}
       {rightPanelTab === 'jira' && <JiraItemPanel itemId={itemId} />}
       {rightPanelTab === 'quality' && qualityPanel}
+      {rightPanelTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={setAgentFocus} onError={setError} onLaunched={(result) => { void Promise.resolve(reloadAgents()).then(() => setAgentFocus({ kind: 'session', id: result.session.id })); }} />}
       {error && (
         <div className="operation-error">
           <p className="error">{error}</p>
@@ -1228,6 +1241,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           showModeSelector={false}
           treeRootPath={detailViewMode === 'plan' ? itemRootPath : undefined}
           leftPanelContent={detailViewMode === 'git' ? gitPanel : undefined}
+          agentArea={agentFocus || heldLiveSessionIds.length > 0 ? {
+            active: Boolean(agentFocus),
+            content: <section className="drawer-main drawer-agent-main"><AgentPane focus={agentFocus} heldSessionIds={heldLiveSessionIds} itemId={itemId} workspaceId={plan?.workspaceId} agents={agents} onBack={() => setAgentFocus(undefined)} onFocus={setAgentFocus} onRelease={releaseHeldSession} onReload={reloadAgents} /></section>
+          } : undefined}
           rightPanel={{
             title: <><Info size={16} /> Work Item</>,
             content: workItemPanelContent,

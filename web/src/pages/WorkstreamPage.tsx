@@ -20,7 +20,6 @@ import type {
   ItemStatus,
   ItemSummary,
   JiraIssue,
-  SafeSessionRecord,
   JiraIssueState,
   SavedFilter,
   SourceSettingsResult,
@@ -39,7 +38,7 @@ import { MarkdownPreview } from '../features/content-viewer/renderers/MarkdownPr
 import { lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
-import { AgentCluster, AgentPane, AgentsTab, agentFocusKey, handOffToDock, type AgentFocus } from '../features/workstream/AgentsPanel';
+import { AgentCluster, AgentPane, AgentsTab, agentFocusKey, useHeldAgentSessions, type AgentFocus } from '../features/workstream/AgentsPanel';
 import { useItemSessions, type ItemAgents } from '../features/workstream/useItemSessions';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
@@ -1573,13 +1572,9 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
     setSideTab(tab);
     if (workItemCollapsed) collapseWorkItem(false);
   };
-  // Live sessions opened in this drawer keep their terminal mounted until the
-  // drawer lets go of them: the server cancels a session shortly after its
-  // last viewer leaves, so going back to the document must not drop it.
-  const [heldSessionIds, setHeldSessionIds] = useState<string[]>([]);
-  const liveSessions = agents?.live ?? [];
-  const heldLiveSessionIds = heldSessionIds.filter((id) => liveSessions.some((record) => record.id === id));
-  const heldLiveRecordsRef = useRef<SafeSessionRecord[]>([]);
+  // Live sessions opened in this drawer stay connected until it closes or
+  // moves to another card, then go to the terminal dock.
+  const { heldLiveSessionIds, release: releaseHeldSession } = useHeldAgentSessions(agents, agentFocus, itemId);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitActivity, setGitActivity] = useState<GitActivityEntry[]>([]);
   const [gitActivityLoading, setGitActivityLoading] = useState(false);
@@ -1647,23 +1642,6 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
   useEffect(() => {
     if (agentFocus) setSideTab('agents');
   }, [agentFocusKey(agentFocus)]);
-
-  useEffect(() => {
-    if (agentFocus?.kind !== 'session' || !liveSessions.some((record) => record.id === agentFocus.id)) return;
-    setHeldSessionIds((held) => held.includes(agentFocus.id) ? held : [...held, agentFocus.id]);
-  }, [agentFocusKey(agentFocus), agents?.key]);
-
-  useEffect(() => {
-    heldLiveRecordsRef.current = liveSessions.filter((record) => heldSessionIds.includes(record.id));
-  });
-
-  // Leaving this card, or closing the drawer, hands every held live session to
-  // the terminal dock, which keeps it connected.
-  useEffect(() => () => {
-    for (const record of heldLiveRecordsRef.current) void handOffToDock(record).catch(() => undefined);
-    heldLiveRecordsRef.current = [];
-    setHeldSessionIds([]);
-  }, [itemId]);
 
   useEffect(() => {
     const updateTopOffset = () => setTopOffset(Math.max(0, 68 - window.scrollY));
@@ -2042,7 +2020,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
         <div className={['plan-drawer-body', agentFocus || sideTab === 'agents' ? 'agents-open' : '', workItemCollapsed ? 'work-item-collapsed' : ''].filter(Boolean).join(' ')}>
           {(agentFocus || heldLiveSessionIds.length > 0) && (
           <section className="drawer-main drawer-agent-main" hidden={!agentFocus}>
-            <AgentPane focus={agentFocus} heldSessionIds={heldLiveSessionIds} itemId={itemId} workspaceId={workspaceId ?? plan?.workspaceId} agents={agents} onBack={() => onAgentFocus(undefined)} onFocus={onAgentFocus} onRelease={(id) => setHeldSessionIds((held) => held.filter((candidate) => candidate !== id))} onReload={onAgentsChanged} />
+            <AgentPane focus={agentFocus} heldSessionIds={heldLiveSessionIds} itemId={itemId} workspaceId={workspaceId ?? plan?.workspaceId} agents={agents} onBack={() => onAgentFocus(undefined)} onFocus={onAgentFocus} onRelease={releaseHeldSession} onReload={onAgentsChanged} />
           </section>
           )}
           {agentFocus ? null : (

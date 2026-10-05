@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent, PointerEvent } from 'react';
 import { ArrowLeft, Bot, ChevronRight, GitCompare, PanelBottomOpen, Plus, TerminalSquare } from 'lucide-react';
 import { ApiError, api } from '../../shared/api';
@@ -107,6 +107,36 @@ function AgentRow({ selected, chip, title, meta, onClick }: { selected: boolean;
 export async function handOffToDock(record: SafeSessionRecord): Promise<void> {
 	const [session, grant] = await Promise.all([api.embeddedAISession(record.id), api.embeddedAISessionGrant(record.id)]);
 	attachEmbeddedSession({ session, grant, record });
+}
+
+/**
+ * Keeps the live sessions an agent pane opened connected while the pane shows
+ * something else. The server cancels a session shortly after its last viewer
+ * leaves, so a live session focused once is held, its terminal mounted and
+ * hidden, until resetKey changes or the owner unmounts; every held session is
+ * then handed to the terminal dock.
+ */
+export function useHeldAgentSessions(agents: ItemAgents | undefined, focus: AgentFocus | undefined, resetKey: string) {
+	const [held, setHeld] = useState<string[]>([]);
+	const live = agents?.live ?? [];
+	const heldLiveSessionIds = held.filter((id) => live.some((record) => record.id === id));
+	const heldRecordsRef = useRef<SafeSessionRecord[]>([]);
+	const focusKey = agentFocusKey(focus);
+	useEffect(() => {
+		if (focus?.kind !== 'session' || !live.some((record) => record.id === focus.id)) return;
+		setHeld((current) => current.includes(focus.id) ? current : [...current, focus.id]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [focusKey, agents?.key]);
+	useEffect(() => {
+		heldRecordsRef.current = live.filter((record) => held.includes(record.id));
+	});
+	useEffect(() => () => {
+		for (const record of heldRecordsRef.current) void handOffToDock(record).catch(() => undefined);
+		heldRecordsRef.current = [];
+		setHeld([]);
+	}, [resetKey]);
+	const release = (sessionId: string) => setHeld((current) => current.filter((id) => id !== sessionId));
+	return { heldLiveSessionIds, release };
 }
 
 /**

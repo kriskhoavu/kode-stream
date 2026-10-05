@@ -90,8 +90,8 @@
 	grid-template-rows: minmax(0, 1fr);
 }
 
-.drawer-work-item .side-panel-tabs {
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+.drawer-work-item .side-panel-tabs button {
+	padding: 0 6px;
 }
 
 .drawer-work-item .side-panel-tabs button {

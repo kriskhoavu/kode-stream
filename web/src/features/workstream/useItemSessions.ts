@@ -45,8 +45,8 @@ export function useItemSessions(workspaceId: string | undefined, branch: string)
 		}
 		const generation = ++generationRef.current;
 		const [records, transcripts] = await Promise.all([
-			api.aiSessionRecords(workspaceId, branch || undefined).catch(() => undefined),
-			transcriptsAvailableRef.current ? api.claudeTranscripts(workspaceId, branch || undefined).catch(() => { transcriptsAvailableRef.current = false; return [] as ClaudeTranscript[]; }) : Promise.resolve([] as ClaudeTranscript[])
+			Promise.resolve().then(() => api.aiSessionRecords(workspaceId, branch || undefined)).catch(() => undefined),
+			transcriptsAvailableRef.current ? Promise.resolve().then(() => api.claudeTranscripts(workspaceId, branch || undefined)).catch(() => { transcriptsAvailableRef.current = false; return [] as ClaudeTranscript[]; }) : Promise.resolve([] as ClaudeTranscript[])
 		]);
 		if (generation !== generationRef.current || !Array.isArray(records)) return;
 		const now = Date.now();
