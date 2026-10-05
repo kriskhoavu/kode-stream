@@ -215,6 +215,26 @@ describe('WorkstreamExplorer', () => {
     await waitFor(() => expect(apiMock.createWorkspaceFile).toHaveBeenCalledWith('ws', { parentPath: '', name: 'notes.md', content: '' }));
   });
 
+  it('opens the last file directly in the tree root when nothing is open', async () => {
+    apiMock.workspaceTree.mockImplementation((_workspaceId: string, path: string) => Promise.resolve({
+      workspaceId: 'ws', path, hiddenCount: 0, entries: path === ''
+        ? [{ id: 'docs', name: 'docs', path: 'docs', type: 'directory', hasChildren: true, ignored: false, hidden: false, editable: false }]
+        : path === 'docs'
+          ? [
+            { id: 'design', name: 'design', path: 'docs/design', type: 'directory', hasChildren: true, ignored: false, hidden: false, editable: false },
+            { id: 'guide', name: 'guide.md', path: 'docs/guide.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' },
+            { id: 'readme', name: 'README.md', path: 'docs/README.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }
+          ]
+          : []
+    }));
+    apiMock.workspaceFile.mockResolvedValue({ id: 'readme', path: 'docs/README.md', content: '# Docs', language: 'markdown', hash: 'hash', kind: 'markdown', sizeBytes: 6, editable: true, truncated: false });
+    apiMock.workspaceFileDiff.mockResolvedValue({ diff: '' });
+    const onLocationChange = vi.fn();
+    render(<WorkstreamExplorer embedded showModeSelector={false} treeRootPath="docs" workspaces={[workspace]} location={{ workspaceId: 'ws', path: 'docs', mode: 'all' }} onLocationChange={onLocationChange} />);
+
+    await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'ws', path: 'docs/README.md' })));
+  });
+
   it('collapses and expands the embedded files panel without changing tree expansion', async () => {
     apiMock.workspaceTree.mockImplementation((_workspaceId: string, path: string) => Promise.resolve({
       workspaceId: 'ws', path, hiddenCount: 0, entries: path === ''

@@ -209,6 +209,26 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     explorer.select(row.workspaceId, row.node.path);
   };
 
+  // A tree restricted to a root (the item's Plan view) opens on the last file
+  // directly in that root, as the tree sorts it: a plan's README.md. Once per
+  // root, and only while nothing else is open, so it never replaces a file
+  // the user opened or one the URL names.
+  const openedRootRef = useRef('');
+  useEffect(() => {
+    const workspaceId = location?.workspaceId;
+    if (!workspaceId || !normalizedTreeRootPath) return;
+    const rootKey = explorerNodeId(workspaceId, normalizedTreeRootPath);
+    if (openedRootRef.current === rootKey) return;
+    if (openTabs.length > 0 || (selectedRow && selectedRow.node.type === 'file')) {
+      openedRootRef.current = rootKey;
+      return;
+    }
+    const lastRootFile = [...visibleRows].reverse().find((row) => row.parentId === rootKey && row.node.type === 'file');
+    if (!lastRootFile) return;
+    openedRootRef.current = rootKey;
+    void selectRow(lastRootFile);
+  }, [location?.workspaceId, normalizedTreeRootPath, openTabs.length, selectedRow, visibleRows]);
+
   const openSearchResult = async (result: WorkspacePathSearchResult) => {
     if (editor.dirty && !(await editor.saveNow())) return;
     await explorer.expandToPath(result.workspaceId, result.path, result.type);
