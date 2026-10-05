@@ -7117,11 +7117,13 @@ body.is-resizing-panel {
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel) 84%, var(--panel-soft));
   padding: 3px;
-  /* However many tabs, in equal columns; a Work Item panel too narrow for
-   * four labelled tabs lays them out two by two (see below). */
+  /* However many tabs: each column fits its own label and the spare width is
+   * shared out, so a long label keeps the same room as a short one. A Work
+   * Item panel too narrow for four labelled tabs lays them out two by two
+   * (see below). */
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: auto;
   flex: none;
   gap: 0;
   margin-bottom: 14px;
