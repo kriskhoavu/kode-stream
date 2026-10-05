@@ -1310,7 +1310,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           <div className="tabs">
             <div className="editor-toolbar-actions">
               <div className="editor-view-switch" role="tablist" aria-label="File view mode">
-                <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><FileText size={15} /> Rendered</button>
+                <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
                 <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Source</button>
                 <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
               </div>
@@ -1319,7 +1319,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           </div>
 		  {matchContext && <div className="content-match-context">Line {matchContext.lineNumber}, columns {matchContext.columnStart}–{matchContext.columnEnd}</div>}
           {(dirtyMetadata || dirtyFile || autoSaveState !== 'idle') && <div className="edit-state-banner">{dirtyMetadata ? 'Unsaved metadata changes' : autoSaveLabel(autoSaveState)}</div>}
-		  {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} selection={matchContext} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
+		  {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} selection={matchContext} modeSwitch={false} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
           {tab === 'raw' && (
             <textarea
               className="raw-editor"

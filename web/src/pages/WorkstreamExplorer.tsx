@@ -468,7 +468,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
           <div className="tabs explorer-editor-tabs">
             <div className="editor-toolbar-actions">
               <div className="editor-view-switch" role="tablist" aria-label="File view mode">
-                <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><Eye size={15} /> Rendered</button>
+                <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><Eye size={15} /> Preview</button>
                 <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Source</button>
                 <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
               </div>
@@ -481,7 +481,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
             if (!location?.workspaceId) return;
             void api.scan(location.workspaceId).then(() => { setRefreshWarning(''); explorer.refresh(); }).catch((caught) => showError(caught, 'Workspace refresh failed'));
           }}>Retry workspace refresh</button></div>}
-		  {tab === 'preview' && (editor.file ? <ContentViewer file={editor.file} content={editor.content} selection={matchContext} /> : <ExplorerEmpty row={selectedRow} />)}
+		  {tab === 'preview' && (editor.file ? <ContentViewer file={editor.file} content={editor.content} selection={matchContext} modeSwitch={false} /> : <ExplorerEmpty row={selectedRow} />)}
           {tab === 'raw' && <textarea className="raw-editor" value={editor.file ? editor.content : 'Select a file.'} disabled={!editor.file?.editable} onChange={(event) => editor.setContent(event.target.value)} spellCheck={false} />}
           {tab === 'diff' && <ExplorerDiff diff={diff} onRevert={() => setRevertOpen(true)} disabled={!editor.file || reverting} />}
           </>}

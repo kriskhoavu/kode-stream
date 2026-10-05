@@ -35,6 +35,13 @@ describe('ContentViewer', () => {
     expect(screen.queryByRole('tablist', { name: 'Viewer mode' })).not.toBeInTheDocument();
   });
 
+  it('opens on the source while a search match points at the file, even without a mode switch', async () => {
+    const view = render(<ContentViewer file={file({ content: '# Viewer\nneedle' })} content={'# Viewer\nneedle'} modeSwitch={false} selection={{ workspaceId: 'ws', path: 'README.md', lineNumber: 2, columnStart: 1, columnEnd: 7 }} />);
+    await waitFor(() => expect(document.querySelector('.source-line-content')).toBeInTheDocument(), { timeout: 3000 });
+    view.rerender(<ContentViewer file={file({ content: '# Viewer\nneedle' })} content={'# Viewer\nneedle'} modeSwitch={false} selection={null} />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Viewer' })).toBeInTheDocument(), { timeout: 3000 });
+  });
+
   it('uses structured mode for JSON and preserves source fallback', async () => {
     render(<ContentViewer file={file({ id: 'data_json', path: 'data.json', kind: 'json', language: 'json', editable: false })} content='{"enabled":true}' />);
 
