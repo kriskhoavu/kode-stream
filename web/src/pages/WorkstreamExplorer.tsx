@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
 import {
-  ChevronDown, ChevronRight, Clipboard, Code2, Eye, File, Folder, FolderGit2, GitCompare,
+  CaseSensitive, ChevronDown, ChevronRight, Clipboard, Code2, Eye, File, Folder, FolderGit2, GitCompare,
   FilePlus2, FolderPlus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, X
 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -425,7 +425,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
 			  if (event.key === 'Enter' && searchResults.length) { event.preventDefault(); openUnifiedSearchResult(searchResults[searchIndex] ?? searchResults[0]); }
 			  if (event.key === 'Escape') setExplorerSearchQuery('');
 			}} placeholder="Search files and text" /></label>
-			<button type="button" aria-label="Match case" aria-pressed={contentSearch.caseSensitive} className={contentSearch.caseSensitive ? 'active' : ''} onClick={() => { contentSearch.setCaseSensitive(!contentSearch.caseSensitive); setSearchIndex(0); }}>Aa</button>
+			<button type="button" aria-label="Match case" title="Match case" aria-pressed={contentSearch.caseSensitive} className={contentSearch.caseSensitive ? 'icon-button active' : 'icon-button'} onClick={() => { contentSearch.setCaseSensitive(!contentSearch.caseSensitive); setSearchIndex(0); }}><CaseSensitive size={17} /></button>
 		  </div>}
 		  {!leftCollapsed && !leftPanelContent && pathSearch.query.trim() && <ExplorerUnifiedSearchResults query={pathSearch.query} results={searchResults} loading={pathSearch.loading || contentSearch.loading} error={pathSearch.error || contentSearch.error} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={openUnifiedSearchResult} />}
 		  {!leftCollapsed && !leftPanelContent && <div className="explorer-tree" ref={treeRef} role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>

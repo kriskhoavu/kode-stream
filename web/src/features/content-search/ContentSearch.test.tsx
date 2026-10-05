@@ -8,7 +8,7 @@ describe('ContentSearchResults', () => {
 	it('uses one plain input without ambiguous adjacent controls', () => {
 		render(<ContentSearchInput query="needle" onQueryChange={vi.fn()} label="Search inside this item" />);
 		expect(screen.getByRole('textbox', { name: 'Search inside this item' })).toHaveValue('needle');
-		expect(screen.queryByText('Aa')).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Match case' })).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /clear/i })).not.toBeInTheDocument();
 	});
 	it('highlights matches and supports keyboard opening and clearing', () => {

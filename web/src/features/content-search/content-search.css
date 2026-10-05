@@ -7,6 +7,11 @@
   background: var(--panel);
 }
 
+.content-search-input .icon-button.active {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
+}
+
 .content-search-input > label:first-child {
   min-width: 0;
   flex: 1;

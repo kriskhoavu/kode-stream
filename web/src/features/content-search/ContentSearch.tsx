@@ -1,5 +1,5 @@
 import type { KeyboardEvent, RefObject } from 'react';
-import { Search } from 'lucide-react';
+import { CaseSensitive, Search } from 'lucide-react';
 import type { WorkspaceContentSearchResult, WorkspacePathSearchResult } from '../../lib/types';
 
 const maxVisibleResults = 20;
@@ -14,7 +14,7 @@ export function ContentSearchInput({ query, onQueryChange, caseSensitive = false
 }) {
 	return <div className="content-search-input" role="search">
 		<label><Search size={15} /><input aria-label={label} value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={label} /></label>
-		{onCaseSensitiveChange && <button type="button" aria-label="Match case" aria-pressed={caseSensitive} className={caseSensitive ? 'active' : ''} onClick={() => onCaseSensitiveChange(!caseSensitive)}>Aa</button>}
+		{onCaseSensitiveChange && <button type="button" aria-label="Match case" title="Match case" aria-pressed={caseSensitive} className={caseSensitive ? 'icon-button active' : 'icon-button'} onClick={() => onCaseSensitiveChange(!caseSensitive)}><CaseSensitive size={17} /></button>}
 	</div>;
 }
 
