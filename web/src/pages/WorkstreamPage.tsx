@@ -2061,7 +2061,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
                 <span className={`autosave-state ${autoSaveState}`}>{autoSaveLabel(autoSaveState)}</span>
               </div>
               {dirtyFile && <div className="edit-state-banner">{autoSaveLabel(autoSaveState)}</div>}
-              {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} compact /> : <div className="drawer-empty">No readable file selected.</div>)}
+              {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} compact modeSwitch={false} /> : <div className="drawer-empty">No readable file selected.</div>)}
               {tab === 'raw' && (
                 <textarea
                   ref={rawEditorRef}

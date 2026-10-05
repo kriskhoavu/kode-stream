@@ -12,7 +12,7 @@ const HtmlPreview = lazy(() => import('./renderers/HtmlPreview').then((module) =
 const StructuredDataView = lazy(() => import('./renderers/StructuredDataView').then((module) => ({ default: module.StructuredDataView })));
 const SourceCodeView = lazy(() => import('./renderers/SourceCodeView').then((module) => ({ default: module.SourceCodeView })));
 
-export const ContentViewer = memo(function ContentViewer({ file, content, compact = false, selection }: ContentViewerProps) {
+export const ContentViewer = memo(function ContentViewer({ file, content, compact = false, selection, modeSwitch = true }: ContentViewerProps) {
   const adapter = viewerAdapter(file.kind);
   const [mode, setMode] = useState<ViewerMode>(adapter.defaultMode);
   const large = file.kind !== 'image' && file.sizeBytes > richPreviewThresholdBytes;
@@ -25,7 +25,7 @@ export const ContentViewer = memo(function ContentViewer({ file, content, compac
 
   return (
     <section className={`content-viewer ${compact ? 'compact' : ''}`} data-file-kind={file.kind}>
-      <ViewerToolbar modes={adapter.modes} mode={mode} onChange={setMode} />
+      {modeSwitch && <ViewerToolbar modes={adapter.modes} mode={mode} onChange={setMode} />}
       <ViewerErrorBoundary resetKey={`${file.id}:${file.path}:${mode}:${content.length}`}>
         <Suspense fallback={<div className="viewer-loading">Loading preview...</div>}>
           {file.kind === 'unsupported' ? (

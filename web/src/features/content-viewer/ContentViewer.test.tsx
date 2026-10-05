@@ -28,6 +28,13 @@ describe('ContentViewer', () => {
     await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Viewer'), { timeout: 3000 });
   });
 
+  it('renders Markdown without a mode switch where the source is shown elsewhere', async () => {
+    render(<ContentViewer file={file()} content="# Viewer" modeSwitch={false} />);
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Viewer' })).toBeInTheDocument(), { timeout: 3000 });
+    expect(screen.queryByRole('tablist', { name: 'Viewer mode' })).not.toBeInTheDocument();
+  });
+
   it('uses structured mode for JSON and preserves source fallback', async () => {
     render(<ContentViewer file={file({ id: 'data_json', path: 'data.json', kind: 'json', language: 'json', editable: false })} content='{"enabled":true}' />);
 

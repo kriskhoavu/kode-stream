@@ -9,6 +9,8 @@ export interface ContentViewerProps {
   content: string;
 	compact?: boolean;
 	selection?: ContentSearchSelection | null;
+	/** Off where the source is shown elsewhere, as in the card drawer's Raw tab: the file keeps its default view. */
+	modeSwitch?: boolean;
 }
 
 export interface ViewerAdapter {
