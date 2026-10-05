@@ -103,3 +103,50 @@ describe('graph grouping by taxonomy', () => {
 		expect(labels).toEqual(expect.arrayContaining(['Offer', 'Master Data', 'Article', 'Domains']));
 	});
 });
+
+describe('focus layout', () => {
+	const focusGraph = (): KnowledgeGraph => {
+		const graph = graphOf([
+			{ id: 'page', title: 'Export Format', domain: 'domains/offer/reference', bucket: 'domains', area: 'offer', tier: 'reference' },
+			{ id: 'in-a', title: 'Close an Order', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts' },
+			{ id: 'in-b', title: 'Base Setup', domain: 'e2e-testing', bucket: 'e2e-testing', area: '', tier: '' },
+			{ id: 'out-a', title: 'Returns', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts' },
+			{ id: 'both', title: 'Billing Contract', domain: 'domains/pricing/reference', bucket: 'domains', area: 'pricing', tier: 'reference' }
+		]);
+		graph.edges = [
+			{ source: 'in-a', target: 'page' }, { source: 'in-b', target: 'page' },
+			{ source: 'page', target: 'out-a' }, { source: 'page', target: 'both' }, { source: 'both', target: 'page' }
+		] as KnowledgeGraph['edges'];
+		return graph;
+	};
+	const positionOf = (model: ReturnType<typeof adaptKnowledgeGraph>, id: string) => model.nodes.find((node) => node.id === id)!.position;
+
+	it('places linking pages above the page and linked pages below, without group nodes', () => {
+		const model = adaptKnowledgeGraph(focusGraph(), 'page', 'page');
+
+		expect(model.nodes.map((node) => node.id).sort()).toEqual(['both', 'in-a', 'in-b', 'out-a', 'page']);
+		expect(positionOf(model, 'page')).toEqual({ x: 0, y: 0 });
+		expect(positionOf(model, 'in-a').y).toBeLessThan(0);
+		expect(positionOf(model, 'in-b').y).toBeLessThan(0);
+		expect(positionOf(model, 'out-a').y).toBeGreaterThan(0);
+		// Linked both ways: below, so its outgoing link to the page is the loop, not the crossing.
+		expect(positionOf(model, 'both').y).toBeGreaterThan(0);
+	});
+
+	it('keeps each side within a few hundred pixels of the page and names each node’s group', () => {
+		const model = adaptKnowledgeGraph(focusGraph(), 'page', 'page');
+
+		for (const node of model.nodes) expect(Math.abs(node.position.x)).toBeLessThanOrEqual(600);
+		const groups = Object.fromEntries(model.nodes.map((node) => [node.id, (node.data as { groupLabel?: string }).groupLabel]));
+		expect(groups).toMatchObject({ 'in-a': 'Offer', 'in-b': 'E2e Testing', both: 'Pricing' });
+	});
+
+	it('wraps a crowded side into rows of five', () => {
+		const graph = graphOf([{ id: 'page', title: 'Hub', domain: 'root' }, ...Array.from({ length: 12 }, (_, index) => ({ id: `out-${index}`, title: `Out ${index}`, domain: 'root' }))]);
+		graph.edges = Array.from({ length: 12 }, (_, index) => ({ source: 'page', target: `out-${index}` })) as KnowledgeGraph['edges'];
+		const model = adaptKnowledgeGraph(graph, 'page', 'page');
+
+		const rows = new Set(model.nodes.filter((node) => node.id !== 'page').map((node) => node.position.y));
+		expect(rows.size).toBe(3);
+	});
+});

@@ -677,6 +677,15 @@ body.is-resizing-panel .knowledge-browser {
   text-transform: uppercase;
 }
 
+.knowledge-flow-node-card > .knowledge-flow-node-group {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .knowledge-node-tooltip {
   position: absolute;
   z-index: 20;

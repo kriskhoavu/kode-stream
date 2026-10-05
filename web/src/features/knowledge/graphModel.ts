@@ -12,15 +12,18 @@ interface Hierarchy {
 	layers: Map<string, number>;
 }
 
-export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string): { nodes: Node[]; edges: Edge[]; neighbors: Set<string> } {
+// With `focusSlug` the graph is that page's neighbourhood, laid out around it
+// rather than across the whole wiki's sections; see focusPositions.
+export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string, focusSlug?: string): { nodes: Node[]; edges: Edge[]; neighbors: Set<string> } {
 	const neighbors = new Set<string>();
 	for (const edge of graph.edges) {
 		if (edge.source === selectedSlug) neighbors.add(edge.target);
 		if (edge.target === selectedSlug) neighbors.add(edge.source);
 	}
-	const displayGraph = withDomainParents(graph);
+	const focused = focusSlug !== undefined && graph.nodes.some((node) => node.id === focusSlug);
+	const displayGraph = focused ? graph : withDomainParents(graph);
 	const hierarchy = deriveHierarchy(displayGraph);
-	const positions = domainSectionPositions(displayGraph.nodes);
+	const positions = focused ? focusPositions(graph, focusSlug) : domainSectionPositions(displayGraph.nodes);
 	const nodes = displayGraph.nodes.map((node) => {
 		const selected = node.id === selectedSlug;
 		const neighbor = neighbors.has(node.id);
@@ -29,7 +32,7 @@ export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string
 			id: node.id,
 			type: 'knowledge',
 			position: positions.get(node.id) ?? { x: 0, y: 0 },
-			data: { label: node.title, node, hierarchyRole: role, isDomain: isDomainNode(node.id) },
+			data: { label: node.title, node, hierarchyRole: role, isDomain: isDomainNode(node.id), groupLabel: focused ? groupLabelOf(node) : undefined },
 			ariaLabel: `${node.title}, ${role} node, ${node.domain}, ${node.inbound} incoming and ${node.outbound} outgoing links`,
 			className: [selected ? 'selected' : '', neighbor ? 'neighbor' : '', `knowledge-${role}`].filter(Boolean).join(' ')
 		} satisfies Node;
@@ -204,6 +207,48 @@ function domainSectionPositions(nodes: KnowledgeGraphNode[]): Map<string, { x: n
 		nextSectionX += columnCount * sectionWidth + 180;
 	}
 	return positions;
+}
+
+// A focused page sits in the middle. The pages linking to it stand in rows
+// above and the pages it links to in rows below, matching the nodes' handles
+// (in at the top, out at the bottom), so no link has to cross the page. A page
+// linked both ways goes below. Each side is ordered by group, then title, so
+// pages from one area stand together; the group itself is named on the node
+// instead of being drawn, since a group node would pull its whole section in.
+function focusPositions(graph: KnowledgeGraph, focusSlug: string): Map<string, { x: number; y: number }> {
+	const outbound = new Set(graph.edges.filter((edge) => edge.source === focusSlug && edge.target !== focusSlug).map((edge) => edge.target));
+	const inbound = new Set(graph.edges.filter((edge) => edge.target === focusSlug && edge.source !== focusSlug && !outbound.has(edge.source)).map((edge) => edge.source));
+	const byGroup = (left: KnowledgeGraphNode, right: KnowledgeGraphNode) => groupLabelOf(left).localeCompare(groupLabelOf(right)) || left.title.localeCompare(right.title) || left.id.localeCompare(right.id);
+	const above = graph.nodes.filter((node) => inbound.has(node.id)).sort(byGroup);
+	const below = graph.nodes.filter((node) => outbound.has(node.id)).sort(byGroup);
+	const nodeSpacingX = 300;
+	const rowSpacing = 150;
+	const gap = 110;
+	const perRow = 5;
+	const positions = new Map<string, { x: number; y: number }>([[focusSlug, { x: 0, y: 0 }]]);
+	const place = (nodes: KnowledgeGraphNode[], direction: 1 | -1) => {
+		const rows = Math.ceil(nodes.length / perRow);
+		for (let index = 0; index < nodes.length; index++) {
+			const row = Math.floor(index / perRow);
+			const inRow = Math.min(perRow, nodes.length - row * perRow);
+			// Rows above fill from the farthest row inward, so the nearest row
+			// to the page is the last, and possibly short, one.
+			const distance = direction === 1 ? row : rows - 1 - row;
+			positions.set(nodes[index].id, {
+				x: ((index % perRow) - (inRow - 1) / 2) * nodeSpacingX,
+				y: direction * (gap + rowSpacing + distance * rowSpacing)
+			});
+		}
+	};
+	place(above, -1);
+	place(below, 1);
+	return positions;
+}
+
+// The group a page belongs to, as the overview names its group node.
+function groupLabelOf(node: KnowledgeGraphNode): string {
+	const grouping = groupingOf(node);
+	return grouping.area ? formatArea(grouping.area) : formatDomain(grouping.bucket || rootGroupKey);
 }
 
 function edgeKey(edge: { source: string; target: string }): string { return `${edge.source}->${edge.target}`; }

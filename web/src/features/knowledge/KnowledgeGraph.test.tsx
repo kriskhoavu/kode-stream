@@ -130,7 +130,9 @@ describe('Knowledge graph', () => {
 		expect(within(screen.getByTestId('flow')).getByRole('button', { name: 'Beta' })).toBeInTheDocument();
 		expect(within(screen.getByTestId('flow')).queryByRole('button', { name: 'Gamma' })).not.toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Show all components' })).toHaveAttribute('aria-pressed', 'true');
-		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(3);
+		// Only the page's own link: focus mode draws no group nodes or group links.
+		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(1);
+		expect(reactFlowSpy.mock.calls.at(-1)?.[0].nodes.map((node: { id: string }) => node.id).sort()).toEqual(['a', 'b']);
 		fireEvent.click(screen.getByRole('button', { name: 'Hide selected links' }));
 		expect(screen.getByRole('button', { name: 'Focus relationships' })).toHaveAttribute('aria-pressed', 'false');
 		expect(within(screen.getByTestId('flow')).getByRole('button', { name: 'Gamma' })).toBeInTheDocument();

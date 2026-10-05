@@ -14,6 +14,7 @@ interface KnowledgeNodeData {
 	node: GraphNodeData;
 	hierarchyRole: KnowledgeHierarchyRole;
 	isDomain: boolean;
+	groupLabel?: string;
 	isTooltipOpen: boolean;
 	onSelect: (slug: string) => void;
 	onOpenDetails: (slug: string) => void;
@@ -50,6 +51,7 @@ function KnowledgeNode({ data }: NodeProps) {
 		<div className="knowledge-flow-node-card" role={nodeData.isDomain ? undefined : 'button'} tabIndex={nodeData.isDomain ? -1 : 0} onClick={(event) => { event.stopPropagation(); if (!nodeData.isDomain) nodeData.onSelect(node.id); }} onKeyDown={onKeyDown}>
 			<div className="knowledge-flow-node-heading"><strong>{node.title}</strong><span className="knowledge-flow-node-role">{roleLabel}</span></div>
 			<span>{node.pageType || 'PAGE'}{node.tier ? <span className={graphTierClass(node.tier)}>{node.tier}</span> : null}</span>
+			{nodeData.groupLabel && <span className="knowledge-flow-node-group">{nodeData.groupLabel}</span>}
 		</div>
 		{!nodeData.isDomain && nodeData.isTooltipOpen && <div className="knowledge-node-tooltip" role="tooltip">
 			<button type="button" className="knowledge-node-tooltip-close nodrag nopan" aria-label="Close node tooltip" onClick={closeTooltip}><X size={13} /></button>
@@ -151,7 +153,16 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 	const [isSelectionDismissed, setIsSelectionDismissed] = useState(false);
 	const [isFullscreen, setIsFullscreen] = useState(false);
 	const [layoutRevision, setLayoutRevision] = useState(0);
-	const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>({});
+	const [overviewPositions, setOverviewPositions] = useState<Record<string, { x: number; y: number }>>({});
+	// Positions dragged in focus mode belong to that focus only: an overview
+	// position would drop a neighbour back into its far-off section.
+	const [focusPositions, setFocusPositions] = useState<{ slug?: string; positions: Record<string, { x: number; y: number }> }>({ positions: {} });
+	const focusSlug = focusRelationships && selectedSlug ? selectedSlug : undefined;
+	const nodePositions = focusSlug ? (focusPositions.slug === focusSlug ? focusPositions.positions : {}) : overviewPositions;
+	const setNodePositions = (update: Record<string, { x: number; y: number }> | ((current: Record<string, { x: number; y: number }>) => Record<string, { x: number; y: number }>)) => {
+		if (focusSlug) setFocusPositions((current) => ({ slug: focusSlug, positions: typeof update === 'function' ? update(current.slug === focusSlug ? current.positions : {}) : update }));
+		else setOverviewPositions(update);
+	};
 	const graphViewRef = useRef<HTMLDivElement>(null);
 	const hasCustomLayout = Object.keys(nodePositions).length > 0;
 	useEffect(() => {
@@ -186,7 +197,8 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 		setLayoutRevision((revision) => revision + 1);
 	};
 	const autoArrangeLayout = () => {
-		setNodePositions(autoArrangeNodes(model.nodes, model.edges));
+		// The focus layout is already arranged around the page; restore it.
+		setNodePositions(focusSlug ? {} : autoArrangeNodes(model.nodes, model.edges));
 		setLayoutRevision((revision) => revision + 1);
 	};
 	const filtered = useMemo(() => {
@@ -204,7 +216,7 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 		return { ...graph, nodes, edges: graph.edges.filter((edge) => allowed.has(edge.source) && allowed.has(edge.target)) };
 	}, [bucket, focusRelationships, graph, pageType, query, selectedSlug, tier]);
 	const model = useMemo(() => {
-		const adapted = adaptKnowledgeGraph(filtered, isSelectionDismissed ? undefined : selectedSlug);
+		const adapted = adaptKnowledgeGraph(filtered, isSelectionDismissed ? undefined : selectedSlug, focusSlug);
 		return {
 			...adapted,
 			nodes: adapted.nodes.map((node) => ({
@@ -219,7 +231,7 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 				}
 			}))
 		};
-	}, [filtered, isSelectionDismissed, nodePositions, onOpenDetails, selectedSlug, tooltipSlug]);
+	}, [filtered, focusSlug, isSelectionDismissed, nodePositions, onOpenDetails, selectedSlug, tooltipSlug]);
 	const handleNodeDragStop: OnNodeDrag<Node> = (_, node) => {
 		setNodePositions((current) => {
 			const currentPosition = current[node.id];
