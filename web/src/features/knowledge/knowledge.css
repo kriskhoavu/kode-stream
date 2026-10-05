@@ -686,6 +686,17 @@ body.is-resizing-panel .knowledge-browser {
   text-transform: none;
 }
 
+/* A focused page's neighbour from another bucket: its group reads as a chip,
+   so "E2e Testing › Offer" is not mistaken for the page's own Offer area. */
+.knowledge-flow-node-card > .knowledge-flow-node-group.other-bucket {
+  justify-self: start;
+  max-width: 100%;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
+  color: color-mix(in srgb, var(--blue) 85%, var(--text));
+}
+
 
 
 

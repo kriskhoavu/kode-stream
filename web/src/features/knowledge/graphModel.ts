@@ -24,6 +24,8 @@ export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string
 	const displayGraph = focused ? graph : withDomainParents(graph);
 	const hierarchy = deriveHierarchy(displayGraph);
 	const positions = focused ? focusPositions(graph, focusSlug) : domainSectionPositions(displayGraph.nodes);
+	const focusNode = focused ? graph.nodes.find((node) => node.id === focusSlug) : undefined;
+	const focusBucket = focusNode ? bucketKey(groupingOf(focusNode)) : undefined;
 	const nodes = displayGraph.nodes.map((node) => {
 		const selected = node.id === selectedSlug;
 		const neighbor = neighbors.has(node.id);
@@ -32,7 +34,13 @@ export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string
 			id: node.id,
 			type: 'knowledge',
 			position: positions.get(node.id) ?? { x: 0, y: 0 },
-			data: { label: node.title, node, hierarchyRole: role, isDomain: isDomainNode(node.id), groupLabel: focused ? groupLabelOf(node) : undefined },
+			data: {
+				label: node.title, node, hierarchyRole: role, isDomain: isDomainNode(node.id),
+				groupLabel: focused ? groupLabelOf(node) : undefined,
+				// In focus, a neighbour from another bucket is marked, since an area
+				// name (Offer) can recur in several buckets (domains, e2e-testing).
+				otherBucket: focusBucket !== undefined && bucketKey(groupingOf(node)) !== focusBucket
+			},
 			ariaLabel: `${node.title}, ${role} node, ${node.domain}, ${node.inbound} incoming and ${node.outbound} outgoing links`,
 			className: [selected ? 'selected' : '', neighbor ? 'neighbor' : '', `knowledge-${role}`].filter(Boolean).join(' ')
 		} satisfies Node;
@@ -245,10 +253,12 @@ function focusPositions(graph: KnowledgeGraph, focusSlug: string): Map<string, {
 	return positions;
 }
 
-// The group a page belongs to, as the overview names its group node.
+// The bucket and area a page belongs to, as the overview names its group
+// nodes. Both are named because an area name recurs across buckets.
 function groupLabelOf(node: KnowledgeGraphNode): string {
 	const grouping = groupingOf(node);
-	return grouping.area ? formatArea(grouping.area) : formatDomain(grouping.bucket || rootGroupKey);
+	const bucket = formatDomain(grouping.bucket || rootGroupKey);
+	return grouping.area ? `${bucket} › ${formatArea(grouping.area)}` : bucket;
 }
 
 function edgeKey(edge: { source: string; target: string }): string { return `${edge.source}->${edge.target}`; }

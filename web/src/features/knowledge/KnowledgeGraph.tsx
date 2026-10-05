@@ -15,6 +15,7 @@ interface KnowledgeNodeData {
 	hierarchyRole: KnowledgeHierarchyRole;
 	isDomain: boolean;
 	groupLabel?: string;
+	otherBucket?: boolean;
 	onSelect: (slug: string) => void;
 	onOpenPanel: (slug: string) => void;
 }
@@ -40,7 +41,7 @@ function KnowledgeNode({ data }: NodeProps) {
 		<div className="knowledge-flow-node-card" role={nodeData.isDomain ? undefined : 'button'} tabIndex={nodeData.isDomain ? -1 : 0} onClick={(event) => { event.stopPropagation(); if (!nodeData.isDomain) nodeData.onSelect(node.id); }} onDoubleClick={(event) => { event.stopPropagation(); if (!nodeData.isDomain) nodeData.onOpenPanel(node.id); }} onKeyDown={onKeyDown}>
 			<div className="knowledge-flow-node-heading"><strong>{node.title}</strong><span className="knowledge-flow-node-role">{roleLabel}</span></div>
 			<span>{node.pageType || 'PAGE'}{node.tier ? <span className={graphTierClass(node.tier)}>{node.tier}</span> : null}</span>
-			{nodeData.groupLabel && <span className="knowledge-flow-node-group">{nodeData.groupLabel}</span>}
+			{nodeData.groupLabel && <span className={nodeData.otherBucket ? 'knowledge-flow-node-group other-bucket' : 'knowledge-flow-node-group'} title={nodeData.otherBucket ? 'In another bucket than the focused page' : undefined}>{nodeData.groupLabel}</span>}
 		</div>
 		<Handle type="source" position={Position.Bottom} />
 	</div>;

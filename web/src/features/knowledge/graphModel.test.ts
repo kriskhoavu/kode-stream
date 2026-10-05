@@ -138,7 +138,9 @@ describe('focus layout', () => {
 
 		for (const node of model.nodes) expect(Math.abs(node.position.x)).toBeLessThanOrEqual(600);
 		const groups = Object.fromEntries(model.nodes.map((node) => [node.id, (node.data as { groupLabel?: string }).groupLabel]));
-		expect(groups).toMatchObject({ 'in-a': 'Offer', 'in-b': 'E2e Testing', both: 'Pricing' });
+		expect(groups).toMatchObject({ 'in-a': 'Domains › Offer', 'in-b': 'E2e Testing', both: 'Domains › Pricing' });
+		const otherBucket = Object.fromEntries(model.nodes.map((node) => [node.id, (node.data as { otherBucket?: boolean }).otherBucket]));
+		expect(otherBucket).toMatchObject({ page: false, 'in-a': false, 'in-b': true, both: false });
 	});
 
 	it('wraps a crowded side into rows of five', () => {
