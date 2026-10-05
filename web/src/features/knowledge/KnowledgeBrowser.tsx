@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookMarked, BookOpen, ChevronRight, GripVertical, Library, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
+import { BookOpen, ChevronRight, FileText, Folder, GripVertical, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
 import { areaKey, bucketKey, groupingOf, rootGroupKey } from './taxonomy';
@@ -65,7 +65,10 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		window.addEventListener('pointerup', finish, { once: true });
 		resizeCleanupRef.current = cleanup;
 	};
-	const renderDomain = (node: DomainNode): ReactNode => {
+	// The index reads as a file tree, like the Workstream explorer: a chevron
+	// column, a folder or file icon, and one row per entry, indented by depth.
+	// Folders (areas, then tiers) come before the loose pages beside them.
+	const renderDomain = (node: DomainNode, level = 0): ReactNode => {
 		const tiers = node.tiers
 			.map((group) => ({ ...group, pages: node.landingPage ? group.pages.filter((page) => page !== node.landingPage) : group.pages }))
 			.filter((group) => group.pages.length > 0);
@@ -94,23 +97,29 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			moveFocus(event, node.landingPage!.slug);
 		};
 		const depth = node.path.includes('/') ? 'area' : 'bucket';
-		const Marker = depth === 'bucket' ? Library : BookMarked;
-		const renderPage = (page: KnowledgePage, tier: string) => {
+		const renderPage = (page: KnowledgePage, tier: string, pageLevel: number) => {
 			const pageWarnings = warnings.filter((warning) => warning.slug === page.slug || warning.path === page.path).length;
-			return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row active' : 'knowledge-page-row'} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}>
-				<span><strong className="knowledge-page-title">{page.title}</strong><small>{tier ? null : <span className="knowledge-page-type">{displayPageType(page.pageType)}</span>}{pageWarnings ? <span className="knowledge-page-warning">· {pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small></span>
+			return <button data-knowledge-entry data-knowledge-slug={page.slug} className={page.slug === selectedSlug ? 'knowledge-page-row knowledge-tree-row active' : 'knowledge-page-row knowledge-tree-row'} style={treeDepth(pageLevel)} key={page.slug} onClick={() => onSelect(page.slug)} onKeyDown={(event) => moveFocus(event, page.slug)}>
+				<span className="knowledge-tree-spacer" aria-hidden="true" />
+				<FileText className="knowledge-tree-icon" size={16} />
+				<strong className="knowledge-page-title">{page.title}</strong>
+				{(!tier || pageWarnings > 0) && <small>{tier ? null : <span className="knowledge-page-type">{displayPageType(page.pageType)}</span>}{pageWarnings ? <span className="knowledge-page-warning">{pageWarnings} warning{pageWarnings === 1 ? '' : 's'}</span> : null}</small>}
 			</button>;
 		};
+		const loosePages = tiers.find((group) => !group.tier)?.pages ?? [];
+		const landingActive = node.landingPage !== undefined && node.landingPage.slug === selectedSlug;
 		return <section className={`knowledge-domain knowledge-domain-${depth}`} key={node.path}>
-			<div className="knowledge-domain-header">
+			<div className={landingActive ? 'knowledge-domain-header knowledge-tree-row active' : 'knowledge-domain-header knowledge-tree-row'} style={treeDepth(level)}>
+				{collapsible
+					? <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>
+					: <span className="knowledge-tree-spacer" aria-hidden="true" />}
 				<h3>{node.landingPage
-					? <button data-knowledge-entry data-knowledge-slug={node.landingPage.slug} type="button" className={node.landingPage.slug === selectedSlug ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={openOrToggleLanding} onKeyDown={handleLandingKeyDown} aria-label={`Open ${node.path} index`}><Marker size={13} /><span>{node.name}</span></button>
-					: <button data-knowledge-entry type="button" className="knowledge-domain-link knowledge-domain-link-toggle" aria-expanded={collapsible ? expanded : undefined} onClick={toggleDomain} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); toggleDomain(); } }}><Marker size={13} /><span>{node.name}</span></button>}
+					? <button data-knowledge-entry data-knowledge-slug={node.landingPage.slug} type="button" className={landingActive ? 'knowledge-domain-link active' : 'knowledge-domain-link'} onClick={openOrToggleLanding} onKeyDown={handleLandingKeyDown} aria-label={`Open ${node.path} index`}><Folder className="knowledge-tree-icon" size={16} /><span>{node.name}</span></button>
+					: <button data-knowledge-entry type="button" className="knowledge-domain-link knowledge-domain-link-toggle" aria-expanded={collapsible ? expanded : undefined} onClick={toggleDomain} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); toggleDomain(); } }}><Folder className="knowledge-tree-icon" size={16} /><span>{node.name}</span></button>}
 				</h3>
-				{collapsible && <button type="button" className={expanded ? 'knowledge-domain-toggle expanded' : 'knowledge-domain-toggle'} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path}`} aria-expanded={expanded} onClick={toggleDomain}><ChevronRight size={14} /></button>}
 			</div>
-			{expanded && tiers.map((group) => {
-				if (!group.tier) return <div className="knowledge-tier" key="_">{group.pages.map((page) => renderPage(page, ''))}</div>;
+			{expanded && node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map((child) => renderDomain(child, level + 1))}</div>}
+			{expanded && tiers.filter((group) => group.tier).map((group) => {
 				const key = tierKey(node.path, group.tier);
 				const tierExpanded = query.trim() !== '' || expandedDomains.has(key);
 				const toggleTier = () => setExpandedDomains((current) => {
@@ -119,14 +128,15 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 					return next;
 				});
 				return <div className="knowledge-tier" key={group.tier}>
-					<button data-knowledge-entry type="button" className={tierExpanded ? `${tierLabelClass(group.tier)} expanded` : tierLabelClass(group.tier)} data-testid="knowledge-tier-label" aria-expanded={tierExpanded} onClick={toggleTier} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleTier(); } }}>
-						<ChevronRight size={11} className="knowledge-tier-chevron" />
+					<button data-knowledge-entry type="button" className={tierExpanded ? `${tierLabelClass(group.tier)} knowledge-tree-row expanded` : `${tierLabelClass(group.tier)} knowledge-tree-row`} style={treeDepth(level + 1)} data-testid="knowledge-tier-label" aria-expanded={tierExpanded} onClick={toggleTier} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleTier(); } }}>
+						<span className="knowledge-tree-chevron" aria-hidden="true"><ChevronRight size={14} className="knowledge-tier-chevron" /></span>
+						<Folder className="knowledge-tree-icon" size={16} />
 						<span>{group.tier}</span>
 					</button>
-					{tierExpanded && group.pages.map((page) => renderPage(page, group.tier))}
+					{tierExpanded && group.pages.map((page) => renderPage(page, group.tier, level + 2))}
 				</div>;
 			})}
-			{expanded && node.children.length > 0 && <div className="knowledge-domain-children">{node.children.map(renderDomain)}</div>}
+			{expanded && loosePages.length > 0 && <div className="knowledge-tier">{loosePages.map((page) => renderPage(page, '', level + 1))}</div>}
 		</section>;
 	};
 
@@ -136,7 +146,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 			<label className="knowledge-search"><Search size={15} /><span className="knowledge-visually-hidden">Filter Knowledge pages</span><input aria-label="Filter Knowledge pages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter pages" /></label>
 			{pages.length === 0 && <div className="knowledge-empty"><h2>No valid pages indexed</h2><p>Add Markdown pages with <code>slug</code> and <code>title</code> front matter, then rescan.</p></div>}
 			{pages.length > 0 && filtered.length === 0 && <p className="knowledge-empty">No pages match this filter.</p>}
-			<nav ref={navigationRef} aria-label="Knowledge pages">{domains.map(renderDomain)}</nav>
+			<nav ref={navigationRef} aria-label="Knowledge pages">{domains.map((node) => renderDomain(node))}</nav>
 			<KnowledgeWarnings warnings={warnings} compact indexDiagnostics />
 		</div>
 		<section className="knowledge-content-pane" aria-label="Knowledge page content">{children ?? <div className="knowledge-welcome"><BookOpen size={28} /><h2>Select a page</h2><p>Choose an entry from the index to read its full content.</p></div>}</section>
@@ -227,6 +237,10 @@ function tierKey(sectionPath: string, tier: string): string {
 function tierLabelClass(tier: string): string {
 	const marker = markedTiers[tier.toLowerCase()];
 	return marker ? `knowledge-tier-label ${marker}` : 'knowledge-tier-label';
+}
+
+function treeDepth(level: number): CSSProperties {
+	return { '--knowledge-depth': level } as CSSProperties;
 }
 
 function displayPageType(pageType?: string): string {
