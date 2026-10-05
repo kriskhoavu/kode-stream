@@ -19,7 +19,7 @@ export const routeDescriptors: Record<Route['name'], { title: string; mainId: st
   workspaces: { title: 'Workspaces · Kode Stream', mainId: 'app-main' },
   settings: { title: 'Settings · Kode Stream', mainId: 'app-main' },
   knowledge: { title: 'Knowledge · Kode Stream', mainId: 'app-main' },
-  canvas: { title: 'Workbench · Kode Stream', mainId: 'app-main' },
+  canvas: { title: 'Agent Space · Kode Stream', mainId: 'app-main' },
   review: { title: 'Branch Review · Kode Stream', mainId: 'app-main' },
   item: { title: 'Item · Kode Stream', mainId: 'app-main' },
   'not-found': { title: 'Page not found · Kode Stream', mainId: 'app-main' }

@@ -68,7 +68,7 @@ export function SettingsPage({ settings, onChange }: { settings: AppSettings; on
           <div>
             <span className="settings-group-label">Appearance</span>
             <h2>Header backdrop</h2>
-            <p>The decoration behind the topbar and filter rows on Workstream, Workbench and Knowledge.</p>
+            <p>The decoration behind the topbar and filter rows on Workstream, Agent Space and Knowledge.</p>
           </div>
         </header>
         <div className="settings-toggle-list" role="radiogroup" aria-label="Header backdrop">

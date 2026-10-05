@@ -122,7 +122,7 @@ export function App() {
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>
           <NavButton active={route.name === 'workstream'} onClick={() => navigate({ name: 'workstream' })} icon={<WorkstreamIcon size={18} />} label="Workstream" />
-					{!extensionSurface && <NavButton active={route.name === 'canvas'} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })} icon={<Workflow size={18} />} label="Workbench" />}
+					{!extensionSurface && <NavButton active={route.name === 'canvas'} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })} icon={<Workflow size={18} />} label="Agent Space" />}
           <NavButton active={route.name === 'knowledge'} onClick={() => navigate({ name: 'knowledge' })} icon={<BookOpen size={18} />} label="Knowledge" />
         </div>
         <div className="workspace-list">
@@ -292,7 +292,7 @@ export function App() {
         {route.name === 'workspaces' && <Suspense fallback={<section className="empty-state">Loading workspaces...</section>}><WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={async () => { await refreshAppData(); }} /></Suspense>}
         {route.name === 'settings' && <Suspense fallback={<section className="empty-state">Loading settings...</section>}><SettingsPage settings={appSettings} onChange={setAppSettings} /></Suspense>}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} activeWorkspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
-		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Workbench...</section>}><CanvasPage workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenOnCard={(itemId, sessionId) => navigate({ name: 'workstream', focusedItemId: itemId, focusedSessionId: sessionId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
+		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Agent Space...</section>}><CanvasPage workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenOnCard={(itemId, sessionId) => navigate({ name: 'workstream', focusedItemId: itemId, focusedSessionId: sessionId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
         {route.name === 'review' && <Suspense fallback={<section className="empty-state">Loading Branch Review...</section>}><BranchReviewPage
           workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo}
           location={route.location}
@@ -307,7 +307,7 @@ export function App() {
       <nav className="bottom-nav">
         <button className={route.name === 'workstream' ? 'active' : ''} onClick={() => navigate({ name: 'workstream' })}><WorkstreamIcon size={18} />Workstream</button>
         <button className={route.name === 'knowledge' ? 'active' : ''} onClick={() => navigate({ name: 'knowledge' })}><BookOpen size={18} />Knowledge</button>
-		{!extensionSurface && <button className={route.name === 'canvas' ? 'active' : ''} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })}><Workflow size={18} />Workbench</button>}
+		{!extensionSurface && <button className={route.name === 'canvas' ? 'active' : ''} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })}><Workflow size={18} />Agent Space</button>}
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}><Settings size={18} />Settings</button>
       </nav>

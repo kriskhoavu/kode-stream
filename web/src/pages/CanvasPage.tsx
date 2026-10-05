@@ -151,12 +151,12 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	const onRemoveSection = useCallback((id: string) => setSections((current) => current.filter((section) => section.id !== id)), []);
 	const onOpenAISession = useCallback(() => setAISessionDialogOpen(true), []);
 	const onOpenSessions = useCallback(() => changeView('sessions'), [changeView]);
-	if (!workspaceId) return <section className="empty-state"><h1>Workbench</h1><p>Select a workspace to arrange plans and terminal sessions.</p></section>;
+	if (!workspaceId) return <section className="empty-state"><h1>Agent Space</h1><p>Select a workspace to arrange plans and terminal sessions.</p></section>;
 
 	return (
 		<section className="canvas-page" aria-label="Workspace Canvas">
 			<header className="page-title workstream-title canvas-page-header">
-				<h1 className="sr-only">Workbench</h1>
+				<h1 className="sr-only">Agent Space</h1>
 				{workspace && <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={branches?.current ?? canvas.projection?.layout.branchKey ?? workspace.baselineBranch} branches={branches?.branches ?? []} gitStatus={workspaceNode?.workspace?.git} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" disabled={canvas.loading} onSwitched={async () => { setSelectedId(undefined); await canvas.reload(); }} />}
 			</header>
 			{canvas.loading && <div className="canvas-state" role="status">Loading Canvas…</div>}
