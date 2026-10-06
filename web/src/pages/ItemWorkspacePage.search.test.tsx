@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ItemWorkspacePage } from './ItemWorkspacePage';
 
@@ -30,5 +30,19 @@ describe('ItemWorkspacePage embedded explorer', () => {
 	it('renders the merged explorer surface for item details', async () => {
 		render(<ItemWorkspacePage itemId="item-1" refreshKey={0} workspaces={[{ id: 'ws', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }]} onBack={vi.fn()} onOpenItem={vi.fn()} />);
 		expect(await screen.findByTestId('embedded-explorer')).toBeInTheDocument();
+	});
+
+	// The app bumps refreshKey whenever the window regains focus; that used to
+	// close every open tab, drop any unsaved edit and reopen the default file.
+	it('refreshes in place on an app refresh, without reopening the default file', async () => {
+		apiMock.files.mockResolvedValue([{ id: 'README_md', name: 'README.md', path: 'README.md', type: 'file' }]);
+		const workspaces = [{ id: 'ws', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }];
+		const view = render(<ItemWorkspacePage itemId="item-1" refreshKey={0} workspaces={workspaces} onBack={vi.fn()} onOpenItem={vi.fn()} />);
+		await waitFor(() => expect(apiMock.file).toHaveBeenCalledTimes(1));
+		view.rerender(<ItemWorkspacePage itemId="item-1" refreshKey={1} workspaces={workspaces} onBack={vi.fn()} onOpenItem={vi.fn()} />);
+		await waitFor(() => expect(apiMock.files).toHaveBeenCalledTimes(2));
+		expect(apiMock.item).toHaveBeenCalledTimes(2);
+		expect(apiMock.file).toHaveBeenCalledTimes(1);
+		expect(screen.getByTestId('embedded-explorer')).toBeInTheDocument();
 	});
 });

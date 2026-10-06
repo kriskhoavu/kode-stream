@@ -271,7 +271,27 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       }
     })();
     return () => controller.abort();
-  }, [itemId, refreshKey]);
+  }, [itemId]);
+
+  // A refreshKey bump is the app refreshing (on window focus, among others),
+  // not a new item: refresh the item, its file tree and diff in place, and
+  // leave the open tabs and any unsaved edit alone.
+  const refreshKeyLoadedRef = useRef(refreshKey);
+  useEffect(() => {
+    if (refreshKeyLoadedRef.current === refreshKey) return;
+    refreshKeyLoadedRef.current = refreshKey;
+    const controller = new AbortController();
+    api.item(itemId, controller.signal).then((nextPlan) => {
+      if (!controller.signal.aborted) setPlan((current) => JSON.stringify(current) === JSON.stringify(nextPlan) ? current : nextPlan);
+    }).catch(() => undefined);
+    api.files(itemId, undefined, controller.signal).then((tree) => {
+      if (!controller.signal.aborted) setFiles((current) => JSON.stringify(current) === JSON.stringify(tree) ? current : tree);
+    }).catch(() => undefined);
+    api.diff(itemId, controller.signal).then((nextDiff) => {
+      if (!controller.signal.aborted) setDiff(nextDiff.diff);
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [refreshKey]);
 
   useEffect(() => {
     if (!plan) return;
