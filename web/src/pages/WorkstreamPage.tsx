@@ -95,6 +95,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [query, setQuery] = useState('');
   const [items, setPlans] = useState<ItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedWorkspaceRef = useRef<string | undefined>(undefined);
   const [error, setError] = useState('');
   const [scanState, setScanState] = useState('');
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
@@ -210,7 +211,11 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       setLoading(false);
       return;
     }
-    void loadCheckout(false);
+    // A refreshKey bump is the app refreshing (on window focus, among others),
+    // not a new board: reload the same workspace silently so the cards stay.
+    const sameWorkspace = loadedWorkspaceRef.current === workspace.id;
+    loadedWorkspaceRef.current = workspace.id;
+    void loadCheckout(false, { silent: sameWorkspace });
   }, [workspace?.id, refreshKey]);
 
   useEffect(() => {
@@ -1703,7 +1708,28 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
       autoSaveRefreshAbortRef.current?.abort();
       clearDrawerAutoSaveTimers();
     };
-  }, [itemId, refreshKey]);
+  }, [itemId]);
+
+  // A refreshKey bump is the app refreshing (on window focus, among others),
+  // not a new item: refresh the item, its files, diff and git status in place,
+  // and leave the open file and any unsaved edit alone.
+  const refreshKeyLoadedRef = useRef(refreshKey);
+  useEffect(() => {
+    if (refreshKeyLoadedRef.current === refreshKey) return;
+    refreshKeyLoadedRef.current = refreshKey;
+    const controller = new AbortController();
+    const generation = drawerGenerationRef.current;
+    const isCurrent = () => !controller.signal.aborted && drawerGenerationRef.current === generation;
+    api.item(itemId, controller.signal).then((payload) => {
+      if (!isCurrent()) return;
+      // An unchanged item keeps its identity, so the Info tab's draft survives.
+      setPlan((current) => sameJSON(current, payload) ? current : payload);
+      void loadGitStatus(payload.workspaceId, generation);
+    }).catch(() => undefined);
+    api.files(itemId, undefined, controller.signal).then((tree) => { if (isCurrent()) setFiles((current) => sameJSON(current, tree) ? current : tree); }).catch(() => undefined);
+    api.diff(itemId, controller.signal).then((payload) => { if (isCurrent()) setDiff(payload.diff || 'No local changes.'); }).catch(() => undefined);
+    return () => controller.abort();
+  }, [refreshKey]);
 
   useEffect(() => {
     if (!plan) return;
@@ -2249,4 +2275,8 @@ function unique(values: string[]): string[] {
 
 function readStoredToggle(key: string): boolean {
   return readStringPreference(key) === '1';
+}
+
+function sameJSON(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

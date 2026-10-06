@@ -109,6 +109,24 @@ describe('WorkstreamPage card agents', () => {
 		expect(readStringPreference('workstream.drawer.workItemCollapsed')).toBe('0');
 	});
 
+	// The app bumps refreshKey whenever the window regains focus. Treating that
+	// as a new board swapped every card for a skeleton and back: a flicker.
+	it('keeps the cards and an open drawer on screen when the app refreshes', async () => {
+		const fetchMock = stubBoard([record('live-1', 'claude', true)]);
+		const view = renderBoard();
+		fireEvent.click(await screen.findByRole('button', { name: 'Open the running Claude session' }));
+		await screen.findByLabelText('Item preview');
+		const boardLoads = () => fetchMock.mock.calls.filter(([url]) => String(url) === '/api/workspaces/r1/workstream/checkout').length;
+		const before = boardLoads();
+		view.rerender(<WorkstreamPage workspace={workspace} refreshKey={1} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+		expect(document.querySelector('.plan-card.skeleton')).toBeNull();
+		expect(screen.getByRole('button', { name: 'Start an agent session for Quiet card' })).toBeInTheDocument();
+		expect(screen.getByLabelText('Item preview')).toBeInTheDocument();
+		await waitFor(() => expect(boardLoads()).toBe(before + 1));
+		expect(document.querySelector('.plan-card.skeleton')).toBeNull();
+		expect(within(screen.getByLabelText('Item preview')).getByTestId('terminal-live-1')).toBeVisible();
+	});
+
 	it('opens the launcher on a card with no live session', async () => {
 		stubBoard([]);
 		renderBoard();
