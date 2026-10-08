@@ -6,10 +6,10 @@ follows each platform's url line. Every platform present in the formula must
 have a checksum in SHA256SUMS, and the file must actually change, otherwise
 this exits non-zero.
 
-That strictness is deliberate. An earlier version matched a `version "x.y.z"`
-line that no longer exists in the formula, so it silently updated the
-checksums while leaving the URLs on the previous release. The formula stayed
-syntactically valid and every `brew install` failed its checksum check.
+That strictness is deliberate. The formula carries no `version "x.y.z"` line,
+so an updater that rewrote the checksums but left any URL on the previous
+release would produce a syntactically valid formula whose every
+`brew install` fails its checksum check.
 
 Usage: update_formula.py <formula-path> <version> <sha256sums-path>
 """

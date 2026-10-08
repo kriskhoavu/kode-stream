@@ -27,6 +27,6 @@ leaves the durable record and placement available.
 
 ## Capability Boundary
 
-PM-037 delivers Local checkout plus Local process execution. Cloud Agent execution is a future execution-provider
+Canvas supports Local checkout plus Local process execution. Cloud Agent execution is a future execution-provider
 adapter. Agentless Remote Snapshot support is a separate content-provider capability and is not a restricted Canvas
 mode or a delivered terminal surface.

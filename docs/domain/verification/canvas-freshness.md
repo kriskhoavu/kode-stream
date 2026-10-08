@@ -21,6 +21,6 @@ Branch changes, commits, staged changes, unstaged changes, relevant untracked fi
 changes can make a result stale. Canvas refreshes on explicit Git/Canvas refresh, after verification polling, when the
 window regains focus, and when the document becomes visible. Position refresh never moves a saved node.
 
-Verification jobs remain in memory for PM-037. Application restart does not restore verification history; durable
+Verification jobs are held in memory. Application restart does not restore verification history; durable
 verification lineage is future work. The Workbench shows abbreviated verified and current revisions and labels a stale
 pass as **Passed (historical)**.

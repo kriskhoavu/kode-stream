@@ -15,7 +15,7 @@ persisted:
   tree — staged, unstaged, and untracked files. Agents often leave uncommitted work, and the user needs to see it
   before deciding anything, so the view is not commits-only.
 - **Shared-checkout caveat.** The comparison is against the checkout, not against one session's private clone.
-  Because PM-042 does not introduce worktree isolation, changes since launch include work by any session — or any
+  Because sessions are not isolated in worktrees, changes since launch include work by any session — or any
   person — in that same checkout, not only the one session being viewed.
 - **What they are not.** Session changes carry no transcript, prompt, or output. There is no new store: the durable
   session record still holds only workspace/plan references, provider, intent, branch, launch commit, lifecycle

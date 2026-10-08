@@ -50,7 +50,7 @@ set `localStorage.kodeStreamApiOrigin` to the desired origin, and reload the ext
 | No downloads access  | The showcase does not create downloads from the extension.                                      |
 | No native messaging  | The user starts `kode-stream serve` explicitly for v1.                                          |
 | No embedded terminal | Embedded AI terminal uses same-origin WebSocket assumptions and needs a separate security pass. |
-| No store publishing  | PM-034 targets manual local import only.                                                        |
+| No store publishing  | The extension is distributed for manual local import only.                                      |
 
 ## Troubleshooting
 
@@ -58,6 +58,6 @@ set `localStorage.kodeStreamApiOrigin` to the desired origin, and reload the ext
 |--------------------------|--------------------------------------------------------------------------------------------------|
 | Extension shows offline  | Confirm `kode-stream serve -port 4317` is running and `/api/health` responds in a browser tab.   |
 | Wrong local port         | Set `localStorage.kodeStreamApiOrigin` in the extension page and reload.                         |
-| API requests blocked     | Confirm the server is a PM-034 build with local-mode Chrome extension CORS support.              |
+| API requests blocked     | Confirm the server runs in Local mode; only Local mode allows `chrome-extension://` origins.     |
 | Blank page after rebuild | Reload the extension from `chrome://extensions` after running `npm run build:extension`.         |
 | Terminal controls absent | This is expected in extension mode for v1. Use the normal localhost UI for embedded AI terminal. |

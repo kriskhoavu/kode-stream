@@ -26,7 +26,7 @@ export function transcriptActive(transcript: ClaudeTranscript, now = Date.now())
  * grouped by item, and keeps them current: it polls while the page is visible
  * and reloads when a session starts anywhere in the app. A session reported as
  * ended leaves the live list at once, before the reload confirms it. Transcripts exist only
- * in Local mode; a refusal is remembered and transcripts are no longer asked for.
+ * in Local mode; a refusal is remembered and transcripts are not asked for again.
  */
 export function useItemSessions(workspaceId: string | undefined, branch: string) {
 	const [byItem, setByItem] = useState<Map<string, ItemAgents>>(() => new Map());

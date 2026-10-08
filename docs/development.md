@@ -17,7 +17,7 @@ npm ci --no-audit --no-fund
 
 ## Verify
 
-Run these before every commit. They are the same checks CI runs in `.github/workflows/release.yml`.
+Run these before every commit. CI in `.github/workflows/release.yml` runs the same checks except the race pass.
 
 ```bash
 make verify
@@ -26,15 +26,16 @@ make verify
 which is:
 
 ```bash
-npm run typecheck && npm test && npm run build && go test ./...
+npm run typecheck && npm test && go test ./... && go test -race ./... && npm run build
 ```
 
-| Command           | Covers                                                     |
-|-------------------|------------------------------------------------------------|
-| `npm run typecheck` | `tsc --noEmit` over the React frontend                   |
-| `npm test`          | Vitest suites under `web/`                               |
-| `npm run build`     | Typecheck plus the Vite production bundle                |
-| `go test ./...`     | Every backend package                                    |
+| Command               | Covers                                        |
+|-----------------------|-----------------------------------------------|
+| `npm run typecheck`   | `tsc --noEmit` over the React frontend        |
+| `npm test`            | Vitest suites under `web/`                    |
+| `npm run build`       | Typecheck plus the Vite production bundle     |
+| `go test ./...`       | Every backend package                         |
+| `go test -race ./...` | Every backend package under the race detector |
 
 ## Suites that need backing services
 
@@ -55,7 +56,7 @@ server, [Cloud mode](../deploy/docker/local/cloud-mode/README.md) for the other 
 what each stack contains and what it needs bootstrapped.
 
 `make dev-up` starts the same server from source instead, backgrounded, for the edit loop. It is `./run.sh start`
-underneath, and `./run.sh` still works; the Makefile exists so that starting this repository looks the same as
+underneath, and `./run.sh` can be run directly; the Makefile exists so that starting this repository looks the same as
 starting `agent-plane` or `context-cellar`.
 
 ## Where things go

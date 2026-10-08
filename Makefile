@@ -5,8 +5,8 @@
 #   docker  the default. `make up` starts a stack from deploy/docker/local.
 #   native  `make dev-up` builds the frontend and the Go binary and serves them
 #           from this checkout, backgrounded, with no image rebuild in the
-#           loop. This is what ./run.sh has always done; the Makefile is now
-#           the way in, and run.sh is the implementation.
+#           loop. The Makefile is the way in, and run.sh is the
+#           implementation.
 #
 # The stack table below is the only part of the docker lane specific to this
 # repository; the verbs live in the vendored docker-local.mk.
@@ -28,8 +28,8 @@ FILE_local := compose.yaml
 URL_local := http://127.0.0.1:$(or $(KODE_STREAM_LOCAL_PORT),4317)
 # The app root, not /api/health: that endpoint reports database status only, so
 # under the default `datadir` storage option it answers 503 while the server is
-# serving normally. (The image's own HEALTHCHECK has the same problem, so a
-# datadir container never reports healthy. Pre-existing and product-side.)
+# serving normally. (The image's own HEALTHCHECK probes that endpoint, so a
+# datadir container never reports healthy. That is a product-side limitation.)
 PROBE_local := $(URL_local)/
 # Not a plain `compose up`. The script validates KODE_STREAM_STORAGE_OPTION and
 # the workspace mount before starting, so a typo fails with a sentence instead

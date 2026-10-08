@@ -35,9 +35,9 @@ are planned follow-up work; do not treat the procedures below as an available se
 - Select a branch and confirm the returned workspace includes its resolved commit SHA.
 - Browse a tree and file; both responses must report that same SHA.
 - Confirm file, Git, terminal, AI, runtime, and verification commands return an unsupported read-only response.
-- Register an Agent-Backed workspace and run the PM-032 smoke unchanged.
+- Register an Agent-Backed workspace and run the [Connected-Agent Smoke](../../../deploy/docker/local/cloud-mode/README.md#connected-agent-smoke) unchanged.
 
 ## Security Boundary
 
 Remote Snapshot responses must not include a local path, dirty state, agent ID, command envelope, or credential material.
-Provider writes are outside this release scope.
+Remote Snapshot never writes to a provider.

@@ -19,8 +19,8 @@
   min-height: 560px;
   display: flex;
   overflow: hidden;
-  /* Lets the header's divider and the icon band breathe above the card, which
-   * previously started immediately under the title. */
+  /* Lets the header's divider and the icon band breathe above the card, so the
+   * card does not start immediately under the title. */
   margin-top: 14px;
   border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
   border-radius: 16px;

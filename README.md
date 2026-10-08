@@ -92,7 +92,7 @@ and verification freshness. A passed result becomes historical and stale when th
 changes.
 
 Removing a node or resetting layout changes presentation only. Cancelling a live process is a separate confirmed action.
-PM-037 supports this workflow for Local checkouts and local execution; groups, notes, custom links, multiple canvases,
+Canvas supports this workflow for Local checkouts and local execution; groups, notes, custom links, multiple canvases,
 Cloud Agent execution, and Remote Snapshot Canvas UX remain future capabilities.
 
 See [Terminal Canvas concepts](wiki/domains/workspace/concepts/terminal-canvas.md) and the
@@ -130,8 +130,7 @@ make dev-up
 ```
 
 That builds the frontend and the Go binary and serves them in the background;
-`make dev-down`, `make dev-ps`, and `make dev-logs` manage it. By hand it is
-still just:
+`make dev-down`, `make dev-ps`, and `make dev-logs` manage it. By hand it is:
 
 ```bash
 npm install
@@ -173,7 +172,7 @@ brew upgrade kode-stream
 make verify
 ```
 
-That is `npm run typecheck`, `npm test`, `go test ./...`, and `npm run build`. Run the
+That is `npm run typecheck`, `npm test`, `go test ./...`, `go test -race ./...`, and `npm run build`. Run the
 pieces directly when you want only one:
 
 ```bash

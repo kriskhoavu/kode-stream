@@ -50,8 +50,7 @@ brew install kriskhoavu/localtest/kode-stream
 brew untap kriskhoavu/localtest
 ```
 
-## Retiring an old formula
+## Retiring a formula
 
-`plan-manager.rb` was removed when the project was renamed. Deleting a formula breaks
-`brew upgrade` for anyone who installed it; `deprecate!` with a migration note is gentler if the
-old name has users.
+The tap carries only `kode-stream.rb`. Deleting a formula breaks `brew upgrade` for anyone who
+installed it; `deprecate!` with a migration note is gentler if the old name has users.

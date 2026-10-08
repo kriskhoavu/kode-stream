@@ -2,8 +2,7 @@
 
 Canonical procedure for publishing a Kode Stream release and updating the Homebrew tap.
 
-Last exercised end to end on **v2.0.0**. The troubleshooting section records failures that
-actually occurred, not hypothetical ones.
+The troubleshooting section covers the failures this procedure is known to hit, not hypothetical ones.
 
 ## Scope
 
@@ -19,8 +18,8 @@ actually occurred, not hypothetical ones.
 
 ## Preflight
 
-CI builds on Linux; local development is macOS. Everything below has broken a release before,
-so check it rather than assuming.
+CI builds on Linux; local development is macOS. Each check below guards a known release failure,
+so run it rather than assuming.
 
 ```bash
 go test ./...                 # must pass; see "macOS-only passes" in Troubleshooting
@@ -130,36 +129,36 @@ the workflow finish, or cancel it, before the script uploads.
 fails before any build step. Commit it; do not switch the workflow to `npm install`.
 
 **`npm error Exit handler never called!`** — npm's generic crash, almost never an npm bug here.
-Read the debug log it points at; the real error is inside. On v2.0.0 it was hundreds of
-`ENOTFOUND` on an internal mirror host, from a lockfile resolved against it rather than the
-public registry. Surface it
-with:
+Read the debug log it points at; the real error is inside. A typical cause is a lockfile resolved
+against an internal mirror rather than the public registry, which shows as many `ENOTFOUND` errors
+on the mirror host. Surface it with:
 
 ```yaml
 run: |
   npm ci --no-audit --no-fund || { tail -n 150 /home/runner/.npm/_logs/*-debug-0.log; exit 1; }
 ```
 
-Worse, on Node 20 the crash did **not** fail the step: the build continued against a
-half-installed tree and failed later with `Cannot find module 'react'`. CI is pinned to Node 22.
+On Node 20 the crash does **not** fail the step: the build continues against a half-installed
+tree and fails later with `Cannot find module 'react'`. That is why CI is pinned to Node 22.
 
 **Tests that only pass on macOS** — timing-sensitive tests can pass locally and fail on the
-faster Linux runner. Two were fixed for v2.0.0:
+faster Linux runner. Two patterns to look for:
 
-- an adapter-level test asserted a lock the adapter never takes (the *service* layer holds it);
-  it passed on macOS only because `git switch` there outran the 50 ms window.
-- `Manager.Close()` signalled processes without waiting for the goroutines it spawned, so session
-  records were still being written while `t.TempDir()` cleanup ran.
+- a test that asserts a guarantee at a layer that does not provide it, such as a lock held by the
+  *service* layer asserted against the adapter; it passes on macOS only when `git switch` outruns
+  the test's timing window.
+- shutdown that signals processes without waiting for the goroutines it spawned, so they keep
+  writing session records while `t.TempDir()` cleanup runs. `Manager.Close()` waits for them.
 
 Reproduce with `go test ./... -count=3 -race` before blaming the runner, and prefer asserting at
 the layer that owns the guarantee.
 
-**Silent checksum mismatch in the tap** — the old updater matched a `version "x.y.z"` line. When
-that line was removed for `brew audit --strict`, it silently updated the checksums and left the
-URLs on the previous release: a valid-looking formula where every install fails its checksum
-check. `update_formula.py` now fails loudly instead. Always run step 4.
+**Silent checksum mismatch in the tap** — an updater that rewrites the checksums but leaves any
+URL on the previous release produces a valid-looking formula where every install fails its
+checksum check. The formula carries no `version` line to match on, so `update_formula.py` checks
+every URL and fails loudly on any mismatch. Always run step 4.
 
-**`No available formula ... Did you mean kriskhoavu/tap/plan-manager?`** — a stale tap clone.
+**`No available formula ... Did you mean ...?`** — a stale tap clone.
 `brew untap kriskhoavu/tap` then reinstall, or
 `git -C "$(brew --repository)/Library/Taps/kriskhoavu/homebrew-tap" fetch origin && git reset --hard origin/main`.
 

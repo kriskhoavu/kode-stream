@@ -37,8 +37,8 @@ Required OAuth2Proxy behavior:
 - Set user identity headers. Kode Stream accepts `X-Auth-Request-User` and `X-Auth-Request-Email`, or OAuth2Proxy's
   forwarded user headers such as `X-Forwarded-User` and `X-Forwarded-Email`.
 - Optionally set `X-Auth-Request-Preferred-Username` or `X-Forwarded-Preferred-Username`.
-- Optionally pass the access token or authorization header for future validation. PM-032 does not introspect or validate
-  opaque/JWT tokens inside Kode Stream.
+- Optionally pass the access token or authorization header. Kode Stream does not introspect or validate opaque/JWT
+  tokens; it trusts the identity headers from OAuth2Proxy.
 - Preserve `Host` and `X-Forwarded-Proto`.
 - Support WebSocket upgrade for `/api/agents/channel`.
 - Allow unauthenticated `GET /api/health` for deployment health checks and `GET /api/agents/channel` for agent

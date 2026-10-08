@@ -24,7 +24,7 @@ describe('app settings', () => {
   });
 
   /*
-   * Every install that predates PM-041 reaches this code with the field
+   * Every install whose stored settings lack this field reaches this code with it
    * missing, so the fallback is the part worth pinning: silently yielding
    * undefined would blank the band with no error anyone would notice.
    */

@@ -205,13 +205,12 @@ describe('ItemWorkspacePage', () => {
 
   it('keeps a right-panel tab selected when it is clicked as the panel first appears', async () => {
     /*
-     * Regression: the page used to resolve the item's workspace in an effect,
-     * so `plan` landed one render before `workspaceConfig` and the layout gate
-     * flipped from the pre-explorer fallback to the explorer. That swap
-     * replaced every node in the Info/Jira/Quality bar, and a click arriving in
-     * the window hit a detached button and was dropped. Clicking the tab the
+     * If `plan` landed one render before `workspaceConfig`, the layout gate
+     * would flip from the pre-explorer fallback to the explorer, replacing
+     * every node in the Info/Jira/Quality bar, and a click arriving in that
+     * window would hit a detached button and be dropped. Clicking the tab the
      * instant it appears — without first waiting for the explorer — pins that
-     * the panel now mounts once and keeps the selection.
+     * the panel mounts once and keeps the selection.
      */
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);

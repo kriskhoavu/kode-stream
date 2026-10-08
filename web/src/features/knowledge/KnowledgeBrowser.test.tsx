@@ -176,9 +176,8 @@ describe('folder tree', () => {
 		{ slug: 'rollback', title: 'Deployment Rollback', path: 'platform/concepts/rollback.md', domain: 'platform/concepts', bucket: 'platform', area: '', tier: 'concepts', pageType: 'CONCEPT', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }
 	];
 
-	// The reported defect was a tier that no control could open, because it had no
-	// README to hang a button on. A tier is now a section that opens from its own
-	// label, so the defect cannot recur.
+	// A tier is a section that opens from its own label, so a tier with no README
+	// to hang a button on is still reachable.
 	it('opens a tier from its own label with no landing page involved', () => {
 		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
 

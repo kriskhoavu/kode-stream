@@ -125,8 +125,8 @@ func journeysBucketFor(taxonomy Taxonomy) string {
 }
 
 // DefaultJourneysBucket is the bucket assumed to hold reusable E2E journeys
-// when no settings file declares one. It keeps every Wiki Root that predates
-// PM-040 working without new configuration.
+// when no settings file declares one, so a Wiki Root with no settings file
+// works without configuration.
 const DefaultJourneysBucket = "e2e-testing"
 
 // journeysBucket resolves the bucket holding reusable E2E journeys.
@@ -140,10 +140,10 @@ func (w KnowledgeWiki) journeysBucket() string {
 // pageIsJourney reports whether a page belongs to the Wiki Root's journeys
 // bucket.
 //
-// A page carrying no bucket comes from an index written before PM-040, so the
+// A page carrying no bucket comes from an index without taxonomy fields, so the
 // path is used instead until the next rescan. Both branches require a full
-// segment match, which is stricter than the prefix test this replaced: a
-// sibling bucket such as e2e-testing-archive no longer matches by accident.
+// segment match rather than a prefix, so a sibling bucket such as
+// e2e-testing-archive does not match by accident.
 func pageIsJourney(wiki KnowledgeWiki, page KnowledgePage) bool {
 	bucket := wiki.journeysBucket()
 	if page.Bucket != "" {
