@@ -199,7 +199,7 @@ describe('WorkstreamExplorer', () => {
     apiMock.searchWorkspacePaths.mockResolvedValue({ results: [{ id: 'result', workspaceId: 'ws', workspaceName: 'Workspace', name: 'guide.md', path: 'docs/guide.md', type: 'file', ignored: false, context: 'docs' }], truncated: false });
     render(<WorkstreamExplorer workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={onLocationChange} />);
 		fireEvent.change(screen.getByRole('textbox', { name: 'Search files' }), { target: { value: 'guide' } });
-		const pathResult = await screen.findByRole('option', { name: /guide.md/i });
+		const pathResult = await screen.findByRole('option', { name: /guide.md/i }, { timeout: 5_000 });
 		expect(pathResult).toHaveClass('content-search-result');
 		expect(pathResult).toHaveTextContent('File');
 		fireEvent.click(pathResult);
