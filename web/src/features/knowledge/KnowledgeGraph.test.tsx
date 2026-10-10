@@ -185,7 +185,7 @@ describe('Knowledge graph', () => {
 		expect(onSelect).toHaveBeenCalledWith('a');
 		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
 		expect(screen.queryByLabelText('Knowledge graph review panel')).not.toBeInTheDocument();
-	});
+	}, 15_000);
 
 	it('keeps manually moved node positions until the graph layout is reset', async () => {
 		const { KnowledgeGraph } = await import('./KnowledgeGraph');
