@@ -207,8 +207,8 @@ func TestClaudeTranscriptsMatchOnlyWhatTheUserOrClaudeWrote(t *testing.T) {
 }
 
 func TestTranscriptNeedlesIgnorePlainWordIdentifiers(t *testing.T) {
-	needles := transcriptNeedles([]models.ItemSummary{{ItemPath: "wiki/platform", Identifier: "platform"}, {ItemPath: "plans/api/DI-365", Identifier: "DI-365"}})
-	if strings.Join(needles, ",") != "DI-365,plans/api/DI-365,wiki/platform" {
+	needles := transcriptNeedles([]models.ItemSummary{{ItemPath: "wiki/platform", Identifier: "platform"}, {ItemPath: "plans/api/PM-365", Identifier: "PM-365"}})
+	if strings.Join(needles, ",") != "PM-365,plans/api/PM-365,wiki/platform" {
 		t.Fatalf("needles = %v", needles)
 	}
 }

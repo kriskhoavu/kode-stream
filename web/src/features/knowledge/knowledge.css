@@ -687,7 +687,7 @@ body.is-resizing-panel .knowledge-browser {
 }
 
 /* A focused page's neighbour from another bucket: its group reads as a chip,
-   so "E2e Testing › Offer" is not mistaken for the page's own Offer area. */
+   so "E2e Testing › Orders" is not mistaken for the page's own Orders area. */
 .knowledge-flow-node-card > .knowledge-flow-node-group.other-bucket {
   justify-self: start;
   max-width: 100%;

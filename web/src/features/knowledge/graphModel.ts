@@ -38,7 +38,7 @@ export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string
 				label: node.title, node, hierarchyRole: role, isDomain: isDomainNode(node.id),
 				groupLabel: focused ? groupLabelOf(node) : undefined,
 				// In focus, a neighbour from another bucket is marked, since an area
-				// name (Offer) can recur in several buckets (domains, e2e-testing).
+				// name (Orders) can recur in several buckets (domains, e2e-testing).
 				otherBucket: focusBucket !== undefined && bucketKey(groupingOf(node)) !== focusBucket
 			},
 			ariaLabel: `${node.title}, ${role} node, ${node.domain}, ${node.inbound} incoming and ${node.outbound} outgoing links`,

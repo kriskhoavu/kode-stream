@@ -9,8 +9,8 @@ vi.mock('../features/ai-session/SessionTerminal', () => ({
 	SessionTerminal: ({ record, visible }: { record: SafeSessionRecord; visible: boolean }) => <section data-testid={`terminal-${record.id}`} hidden={!visible}><textarea aria-label="Agent terminal input" /></section>
 }));
 
-const workspace = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-10-01T00:00:00Z' };
-const item: ItemSummary = { id: 'p1', workspaceId: 'r1', workspaceName: 'Discovery', branch: 'main', scope: 'platform', identifier: 'PM-043', title: 'Card agents', status: 'in_progress', tags: [], metadataSource: 'plan.yaml', itemPath: 'plans/platform/PM-043' };
+const workspace = { id: 'r1', name: 'Sample', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-10-01T00:00:00Z' };
+const item: ItemSummary = { id: 'p1', workspaceId: 'r1', workspaceName: 'Sample', branch: 'main', scope: 'platform', identifier: 'PM-043', title: 'Card agents', status: 'in_progress', tags: [], metadataSource: 'plan.yaml', itemPath: 'plans/platform/PM-043' };
 const quiet: ItemSummary = { ...item, id: 'p2', identifier: 'PM-044', title: 'Quiet card', itemPath: 'plans/platform/PM-044' };
 
 function record(id: string, provider: string, live: boolean, itemId = 'p1'): SafeSessionRecord {

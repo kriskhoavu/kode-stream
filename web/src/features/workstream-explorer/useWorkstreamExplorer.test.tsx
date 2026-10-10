@@ -85,8 +85,8 @@ it('expands a collapsed root and the folders leading to it without selecting it'
   const { result } = renderHook(() => useWorkstreamExplorer([], { mode: 'all' }));
   act(() => { result.current.collapseAll(); });
 
-  await act(async () => { await result.current.expandPath('ws', 'plans/api/DI-365', 'directory'); });
+  await act(async () => { await result.current.expandPath('ws', 'plans/api/PM-365', 'directory'); });
 
-  for (const path of ['', 'plans', 'plans/api', 'plans/api/DI-365']) expect(result.current.expandedNodeIds.has(`ws:${path}`)).toBe(true);
+  for (const path of ['', 'plans', 'plans/api', 'plans/api/PM-365']) expect(result.current.expandedNodeIds.has(`ws:${path}`)).toBe(true);
   expect(result.current.selection).toBeFalsy();
 });

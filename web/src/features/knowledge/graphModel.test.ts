@@ -107,11 +107,11 @@ describe('graph grouping by taxonomy', () => {
 describe('focus layout', () => {
 	const focusGraph = (): KnowledgeGraph => {
 		const graph = graphOf([
-			{ id: 'page', title: 'Export Format', domain: 'domains/offer/reference', bucket: 'domains', area: 'offer', tier: 'reference' },
-			{ id: 'in-a', title: 'Close an Order', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts' },
+			{ id: 'page', title: 'Export Format', domain: 'domains/orders/reference', bucket: 'domains', area: 'orders', tier: 'reference' },
+			{ id: 'in-a', title: 'Close an Order', domain: 'domains/orders/concepts', bucket: 'domains', area: 'orders', tier: 'concepts' },
 			{ id: 'in-b', title: 'Base Setup', domain: 'e2e-testing', bucket: 'e2e-testing', area: '', tier: '' },
-			{ id: 'out-a', title: 'Returns', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts' },
-			{ id: 'both', title: 'Billing Contract', domain: 'domains/pricing/reference', bucket: 'domains', area: 'pricing', tier: 'reference' }
+			{ id: 'out-a', title: 'Returns', domain: 'domains/orders/concepts', bucket: 'domains', area: 'orders', tier: 'concepts' },
+			{ id: 'both', title: 'Billing Contract', domain: 'domains/billing/reference', bucket: 'domains', area: 'billing', tier: 'reference' }
 		]);
 		graph.edges = [
 			{ source: 'in-a', target: 'page' }, { source: 'in-b', target: 'page' },
@@ -138,7 +138,7 @@ describe('focus layout', () => {
 
 		for (const node of model.nodes) expect(Math.abs(node.position.x)).toBeLessThanOrEqual(600);
 		const groups = Object.fromEntries(model.nodes.map((node) => [node.id, (node.data as { groupLabel?: string }).groupLabel]));
-		expect(groups).toMatchObject({ 'in-a': 'Domains › Offer', 'in-b': 'E2e Testing', both: 'Domains › Pricing' });
+		expect(groups).toMatchObject({ 'in-a': 'Domains › Orders', 'in-b': 'E2e Testing', both: 'Domains › Billing' });
 		const otherBucket = Object.fromEntries(model.nodes.map((node) => [node.id, (node.data as { otherBucket?: boolean }).otherBucket]));
 		expect(otherBucket).toMatchObject({ page: false, 'in-a': false, 'in-b': true, both: false });
 	});
