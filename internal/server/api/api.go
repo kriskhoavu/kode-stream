@@ -13,6 +13,7 @@ import (
 	"kode-stream/internal/cloudstate"
 	fileaccess "kode-stream/internal/filesystem/content"
 	appgit "kode-stream/internal/git"
+	"kode-stream/internal/harness"
 	appitem "kode-stream/internal/item"
 	"kode-stream/internal/item/index"
 	"kode-stream/internal/item/writer"
@@ -50,6 +51,7 @@ type API struct {
 	canvas        *canvasController
 	storage       *storageController
 	cloud         *cloudController
+	harness       *harnessController
 	runtimeConfig system.RuntimeConfig
 }
 
@@ -95,6 +97,8 @@ type Dependencies struct {
 	StorageSync         storageSyncService
 	CloudPersistence    cloudstate.Repository
 	WorkspaceCloner     appworkspace.ClonePort
+	// Harness is the engineering harness; nil answers 503 on its routes.
+	Harness *harness.Service
 }
 
 type databaseHealthChecker interface {
@@ -170,6 +174,7 @@ func New(deps Dependencies) *API {
 		runtimeConfig: runtimeConfig,
 		storage:       &storageController{status: deps.StorageStatus, sync: deps.StorageSync},
 		cloud:         cloud,
+		harness:       &harnessController{harness: deps.Harness},
 	}
 }
 
@@ -232,5 +237,8 @@ func (a *API) initializeControllers() {
 	}
 	if a.storage == nil {
 		a.storage = &storageController{}
+	}
+	if a.harness == nil {
+		a.harness = &harnessController{}
 	}
 }

@@ -37,8 +37,10 @@ packages.
 ## Storage
 
 Migration v12 `harness_core` creates, for SQLite and Postgres both: `harness_tasks`, `harness_runs`,
-`harness_stages`, `harness_rounds`, `harness_agent_runs`, `harness_approvals`, `harness_events`,
-`harness_outbox`, `harness_settings`.
+`harness_stages`, `harness_agent_runs`, `harness_approvals`, `harness_events`, `harness_outbox`,
+`harness_settings`. A row keeps as columns what the queue filters, claims and sums on (state, revision, lease,
+role, model, cost, turns, timestamps as fixed-width UTC text) and the rest of the entity as JSON. A stage's rounds
+are part of its row.
 
 Every mutable row carries `state` and `revision`. A transition is one statement:
 
@@ -289,7 +291,7 @@ Event types: `task.discovered`, `task.updated`, `task.ranked`, `task.pinned`, `r
 | POST   | `/harness/runs/:id/cancel`              | `{ reason?, expectedRevision }`                               | `HarnessRun`                   |
 | GET    | `/harness/runs/:id/changes`             |                                                               | `{ baseCommit, branch, files: [{path, status, additions, deletions}], diffStat }` |
 | GET    | `/harness/agent-runs/:id`               |                                                               | `HarnessAgentRun`              |
-| GET    | `/harness/approvals?state=requested`    |                                                               | `{ approvals: HarnessApproval[] }` |
+| GET    | `/harness/approvals?state=&runId=&taskId=` (default `requested`; `all` lists every state) |                                                               | `{ approvals: HarnessApproval[] }` |
 | POST   | `/harness/approvals/:id/decide`         | `{ decision: 'approve'|'reject', reason?, idempotencyKey, expectedRevision }` | `HarnessApproval` |
 | POST   | `/harness/roles/:role/pause`            |                                                               | `HarnessRoleHealth`            |
 | POST   | `/harness/roles/:role/resume`           |                                                               | `HarnessRoleHealth`            |

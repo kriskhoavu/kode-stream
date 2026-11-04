@@ -118,10 +118,10 @@ func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 	if !health.OK {
 		t.Fatalf("health = %#v", health)
 	}
-	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 11 {
-		t.Fatalf("health = %#v, want sqlite version 11", health)
+	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 12 {
+		t.Fatalf("health = %#v, want sqlite version 12", health)
 	}
-	for _, table := range []string{"workspaces", "branch_scans", "indexed_items", "import_status", "canvas_layouts", "canvas_placements", "ai_session_records"} {
+	for _, table := range []string{"workspaces", "branch_scans", "indexed_items", "import_status", "canvas_layouts", "canvas_placements", "ai_session_records", "harness_tasks", "harness_events", "harness_settings"} {
 		var name string
 		err := state.SQLStore.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&name)
 		if err != nil {
@@ -170,7 +170,7 @@ func TestSQLiteOwnershipMigrationsUpgradeExistingSchemaWithoutReset(t *testing.T
 			t.Fatal(err)
 		}
 	}
-	if version, err := ensureMigrations(context.Background(), db, StorageDriverSQLite, "auto", migrations); err != nil || version != 11 {
+	if version, err := ensureMigrations(context.Background(), db, StorageDriverSQLite, "auto", migrations); err != nil || version != 12 {
 		t.Fatalf("upgrade version=%d err=%v", version, err)
 	}
 	var owner string

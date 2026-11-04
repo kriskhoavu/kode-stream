@@ -40,7 +40,7 @@ P0 Plan ─> B1 Core ─> B2 Scout + sorter ─> B3 Claude Code + plan stage ─
 | Phase | Name                                         | Track    | Depends on | Status  |
 |-------|----------------------------------------------|----------|------------|---------|
 | P0    | Plan folder                                  | Docs     | —          | Done    |
-| B1    | Core                                         | Backend  | P0         | Pending |
+| B1    | Core                                         | Backend  | P0         | Done    |
 | B2    | Scout, sorter, queue operations              | Backend  | B1         | Pending |
 | B3    | Claude Code engine, plan stage, plan gate    | Backend  | B2         | Pending |
 | B4    | Implement stage                              | Backend  | B3         | Pending |

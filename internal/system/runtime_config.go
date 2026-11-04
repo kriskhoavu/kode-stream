@@ -149,6 +149,7 @@ func defaultCapabilities(mode models.RuntimeMode) map[models.Capability]bool {
 		models.CapabilityAI:                    true,
 		models.CapabilityRuntime:               true,
 		models.CapabilityVerification:          true,
+		models.CapabilityHarness:               true,
 	}
 	if mode == models.RuntimeModeCloud {
 		capabilities[models.CapabilitySystem] = false
@@ -156,6 +157,7 @@ func defaultCapabilities(mode models.RuntimeMode) map[models.Capability]bool {
 		capabilities[models.CapabilityAI] = false
 		capabilities[models.CapabilityRuntime] = false
 		capabilities[models.CapabilityVerification] = false
+		capabilities[models.CapabilityHarness] = false
 		capabilities[models.CapabilityGit] = false
 		capabilities[models.CapabilityWrite] = false
 	}

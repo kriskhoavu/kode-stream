@@ -18,6 +18,7 @@ import (
 	"kode-stream/internal/cloudstate"
 	"kode-stream/internal/common/models"
 	appgit "kode-stream/internal/git"
+	harnessdomain "kode-stream/internal/harness/domain"
 	itemindex "kode-stream/internal/item/index"
 	"kode-stream/internal/knowledge"
 	"kode-stream/internal/navigation"
@@ -71,6 +72,8 @@ type AppOwnedState struct {
 	StatusService  *StorageStatusService
 	SyncService    *StorageSyncService
 	Cloud          cloudstate.Repository
+	// Harness is nil under datadir storage, which does not support it.
+	Harness harnessdomain.Repository
 }
 
 type RepositoryBundle struct {
@@ -254,6 +257,7 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		state.SessionRecords = &SQLiteSessionRecordRepository{db: sqlStore.db, driver: sqlStore.driver}
 		state.Repositories = RepositoryBundle{Workspaces: state.Workspaces, Items: state.Items, Audit: state.Audit, Navigation: state.Navigation, AISettings: state.AISettings, Canvas: state.Canvas, SessionRecords: state.SessionRecords, Knowledge: state.Knowledge}
 		state.Provider = &SQLiteProvider{store: state.SQLiteStore, repositories: state.Repositories}
+		state.Harness = newSQLHarnessRepository(sqlStore)
 		if err := ImportLegacyFiles(paths, git, state); err != nil {
 			_ = sqlStore.Close()
 			return nil, err
@@ -276,6 +280,7 @@ func OpenAppOwnedState(paths system.Paths, runtime system.RuntimeConfig, git *ap
 		state.Cloud = &SQLCloudRepository{db: sqlStore.db, driver: sqlStore.driver, now: time.Now}
 		state.Repositories = RepositoryBundle{Workspaces: state.Workspaces, Items: state.Items, Audit: state.Audit, Navigation: state.Navigation, AISettings: state.AISettings, Canvas: state.Canvas, SessionRecords: state.SessionRecords, Knowledge: state.Knowledge}
 		state.Provider = &PostgresProvider{store: state.PostgresStore, repositories: state.Repositories}
+		state.Harness = newSQLHarnessRepository(sqlStore)
 	}
 	state.StatusService = NewStorageStatusService(config, paths, runtime, state.SQLStore)
 	state.SyncService = NewStorageSyncService(config, paths, runtime, git)
@@ -598,6 +603,10 @@ DELETE FROM scan_warnings WHERE workspace_id NOT IN (SELECT id FROM workspaces);
 		Version: 11,
 		Name:    "canvas_terminal_dimensions",
 		SQL:     `ALTER TABLE canvas_placements ADD COLUMN width REAL; ALTER TABLE canvas_placements ADD COLUMN height REAL;`,
+	}, {
+		Version: 12,
+		Name:    "harness_core",
+		SQL:     harnessCoreDDL("INTEGER PRIMARY KEY AUTOINCREMENT", "REAL", "INTEGER"),
 	}}
 }
 
@@ -612,7 +621,8 @@ func postgresMigrations() []Migration {
 		{Version: 8, Name: "legacy_import_coordination", SQL: `CREATE TABLE IF NOT EXISTS import_locks (source_name TEXT PRIMARY KEY, acquired_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP);`},
 		{Version: 9, Name: "cloud_agent_enrollment_tokens", SQL: `CREATE TABLE IF NOT EXISTS cloud_agent_enrollment_tokens (id TEXT PRIMARY KEY, expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ NOT NULL);`},
 		{Version: 10, Name: "cloud_workspace_publication_revisions", SQL: `ALTER TABLE cloud_workspaces ADD COLUMN IF NOT EXISTS publication_revision BIGINT NOT NULL DEFAULT 0;`},
-		{Version: 11, Name: "canvas_terminal_dimensions", SQL: `ALTER TABLE canvas_placements ADD COLUMN IF NOT EXISTS width DOUBLE PRECISION; ALTER TABLE canvas_placements ADD COLUMN IF NOT EXISTS height DOUBLE PRECISION;`}}
+		{Version: 11, Name: "canvas_terminal_dimensions", SQL: `ALTER TABLE canvas_placements ADD COLUMN IF NOT EXISTS width DOUBLE PRECISION; ALTER TABLE canvas_placements ADD COLUMN IF NOT EXISTS height DOUBLE PRECISION;`},
+		{Version: 12, Name: "harness_core", SQL: harnessCoreDDL("BIGSERIAL PRIMARY KEY", "DOUBLE PRECISION", "BIGINT")}}
 
 }
 
@@ -685,3 +695,27 @@ DELETE FROM branch_scans WHERE workspace_id NOT IN (SELECT id FROM workspaces);
 INSERT INTO migration_repairs (migration_version, repair_name, affected_rows) SELECT 7, 'scan_warnings', COUNT(*) FROM scan_warnings WHERE workspace_id NOT IN (SELECT id FROM workspaces);
 INSERT INTO orphaned_scan_warnings_v7 SELECT * FROM scan_warnings WHERE workspace_id NOT IN (SELECT id FROM workspaces);
 DELETE FROM scan_warnings WHERE workspace_id NOT IN (SELECT id FROM workspaces);`
+
+// harnessCoreDDL is the harness schema for both drivers. Timestamps are
+// fixed-width UTC text so they sort and compare the same way in each.
+func harnessCoreDDL(serial, real, bigint string) string {
+	return `CREATE TABLE IF NOT EXISTS harness_tasks (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, source_kind TEXT NOT NULL, source_key TEXT NOT NULL, state TEXT NOT NULL, score ` + real + ` NOT NULL DEFAULT 0, pinned INTEGER NOT NULL DEFAULT 0, run_id TEXT NOT NULL DEFAULT '', revision ` + bigint + ` NOT NULL, data_json TEXT NOT NULL, discovered_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS harness_tasks_source ON harness_tasks (source_kind, source_key);
+CREATE INDEX IF NOT EXISTS harness_tasks_workspace_state ON harness_tasks (workspace_id, state);
+CREATE TABLE IF NOT EXISTS harness_runs (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, workspace_id TEXT NOT NULL, state TEXT NOT NULL, revision ` + bigint + ` NOT NULL, data_json TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT);
+CREATE INDEX IF NOT EXISTS harness_runs_task ON harness_runs (task_id);
+CREATE INDEX IF NOT EXISTS harness_runs_state ON harness_runs (state);
+CREATE TABLE IF NOT EXISTS harness_stages (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, kind TEXT NOT NULL, ordinal INTEGER NOT NULL, state TEXT NOT NULL, revision ` + bigint + ` NOT NULL, lease_owner TEXT NOT NULL DEFAULT '', lease_until TEXT, retry_at TEXT, data_json TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS harness_stages_run ON harness_stages (run_id, ordinal);
+CREATE INDEX IF NOT EXISTS harness_stages_kind_state ON harness_stages (kind, state, created_at);
+CREATE TABLE IF NOT EXISTS harness_agent_runs (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, stage_id TEXT NOT NULL, role TEXT NOT NULL, engine TEXT NOT NULL, model TEXT NOT NULL, state TEXT NOT NULL, revision ` + bigint + ` NOT NULL, lease_owner TEXT NOT NULL DEFAULT '', lease_until TEXT, cost_usd ` + real + ` NOT NULL DEFAULT 0, turns INTEGER NOT NULL DEFAULT 0, queued_at TEXT NOT NULL, finished_at TEXT, data_json TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS harness_agent_runs_role_state ON harness_agent_runs (role, state, queued_at);
+CREATE INDEX IF NOT EXISTS harness_agent_runs_run ON harness_agent_runs (run_id, stage_id);
+CREATE TABLE IF NOT EXISTS harness_approvals (id TEXT PRIMARY KEY, run_id TEXT NOT NULL DEFAULT '', task_id TEXT NOT NULL, stage_id TEXT NOT NULL DEFAULT '', gate TEXT NOT NULL, state TEXT NOT NULL, revision ` + bigint + ` NOT NULL, idempotency_key TEXT NOT NULL DEFAULT '', requested_at TEXT NOT NULL, data_json TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS harness_approvals_idempotency ON harness_approvals (idempotency_key) WHERE idempotency_key <> '';
+CREATE INDEX IF NOT EXISTS harness_approvals_state ON harness_approvals (state, requested_at);
+CREATE TABLE IF NOT EXISTS harness_events (seq ` + serial + `, kind TEXT NOT NULL, at TEXT NOT NULL, data_json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS harness_outbox (id TEXT PRIMARY KEY, event_seq ` + bigint + ` NOT NULL, target TEXT NOT NULL, state TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_at TEXT NOT NULL, data_json TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS harness_outbox_due ON harness_outbox (state, next_at);
+CREATE TABLE IF NOT EXISTS harness_settings (id TEXT PRIMARY KEY, settings_json TEXT NOT NULL, revision ` + bigint + ` NOT NULL, updated_at TEXT NOT NULL);`
+}

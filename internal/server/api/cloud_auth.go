@@ -242,6 +242,7 @@ func roleCapabilities(role models.CloudRole) map[models.Capability]bool {
 		models.CapabilityAI:                    role == models.CloudRoleAdmin || role == models.CloudRoleEditor,
 		models.CapabilityRuntime:               role == models.CloudRoleAdmin || role == models.CloudRoleEditor,
 		models.CapabilityVerification:          role == models.CloudRoleAdmin || role == models.CloudRoleEditor,
+		models.CapabilityHarness:               role == models.CloudRoleAdmin || role == models.CloudRoleEditor,
 	}
 	return capabilities
 }

@@ -20,6 +20,7 @@ import (
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/content"
 	appgit "kode-stream/internal/git"
+	"kode-stream/internal/harness"
 	"kode-stream/internal/item/writer"
 	appjira "kode-stream/internal/jira"
 	"kode-stream/internal/knowledge"
@@ -42,6 +43,7 @@ type Server struct {
 	app         http.Handler
 	sessions    *ai.Manager
 	storage     *storage.SQLStore
+	harness     *harness.Service
 }
 
 func NewServer(port int) (*Server, error) {
@@ -78,6 +80,11 @@ func NewServer(port int) (*Server, error) {
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore).ConfigureCheckout(git)
 	verificationService := verification.NewService(reg, appruntime.NewService())
+	harnessService := harness.New(harness.Dependencies{
+		Repository: state.Harness,
+		Workspaces: reg,
+		Config:     harness.ResolveConfig(os.Getenv, paths.Dir, runtimeConfig.Mode == models.RuntimeModeLocal),
+	})
 	canvasService := canvas.NewService(state.Canvas, reg, idx, git, aiSessionService, verificationService, runtimeConfig.Mode, canvasDatastore(state.Config), runtimeConfig.Capabilities)
 	apiHandler := api.New(api.Dependencies{
 		WorkspaceRepository: reg,
@@ -102,12 +109,13 @@ func NewServer(port int) (*Server, error) {
 		StorageSync:         state.SyncService,
 		CloudPersistence:    state.Cloud,
 		WorkspaceCloner:     git,
+		Harness:             harnessService,
 	})
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())
 	mux.Handle("/", spaHandler())
-	return &Server{port: port, bindAddress: runtimeConfig.BindAddress, app: api.Log(mux), sessions: sessionManager, storage: state.SQLStore}, nil
+	return &Server{port: port, bindAddress: runtimeConfig.BindAddress, app: api.Log(mux), sessions: sessionManager, storage: state.SQLStore, harness: harnessService}, nil
 }
 
 func canvasDatastore(config storage.Config) models.AppStateDatastore {
@@ -122,6 +130,9 @@ func canvasDatastore(config storage.Config) models.AppStateDatastore {
 }
 
 func (s *Server) Close() error {
+	if s.harness != nil {
+		s.harness.Stop(10 * time.Second)
+	}
 	var sessionErr error
 	if s.sessions != nil {
 		sessionErr = s.sessions.Close()

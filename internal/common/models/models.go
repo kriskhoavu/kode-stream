@@ -279,6 +279,7 @@ const (
 	CapabilityAI                    Capability = "ai"
 	CapabilityRuntime               Capability = "runtime"
 	CapabilityVerification          Capability = "verification"
+	CapabilityHarness               Capability = "harness"
 )
 
 type DeploymentTopology string

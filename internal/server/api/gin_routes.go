@@ -62,6 +62,10 @@ func policyForRoute(route routeSpec) (routePolicy, bool) {
 		if isMutatingMethod(route.method) {
 			policy.capability = models.CapabilityVerification
 		}
+	case "harness":
+		if isMutatingMethod(route.method) {
+			policy.capability = models.CapabilityHarness
+		}
 	case "git":
 		policy.capability = models.CapabilityGit
 	case "cloud-agent":
@@ -208,6 +212,18 @@ func routeManifest(a *API) []routeSpec {
 		{http.MethodGet, "/sessions/:id/changes", "ai", protectedRoute, ginHTTPHandler(a.sessions.sessionChanges)},
 		{http.MethodGet, "/sessions/:id/diff", "ai", protectedRoute, ginHTTPHandler(a.sessions.sessionDiff)},
 		{http.MethodDelete, "/sessions/:id", "ai", protectedRoute, ginHTTPHandler(a.sessions.deleteSession)},
+
+		{http.MethodGet, "/harness/status", "harness", protectedRoute, a.harness.route(a.harness.status)},
+		{http.MethodGet, "/harness/settings", "harness", protectedRoute, a.harness.route(a.harness.settings)},
+		{http.MethodPut, "/harness/settings", "harness", protectedRoute, a.harness.route(a.harness.saveSettings)},
+		{http.MethodGet, "/harness/tasks", "harness", protectedRoute, a.harness.route(a.harness.tasks)},
+		{http.MethodGet, "/harness/tasks/:id", "harness", protectedRoute, a.harness.route(a.harness.task)},
+		{http.MethodGet, "/harness/queue", "harness", protectedRoute, a.harness.route(a.harness.queue)},
+		{http.MethodGet, "/harness/runs", "harness", protectedRoute, a.harness.route(a.harness.runs)},
+		{http.MethodGet, "/harness/runs/:id", "harness", protectedRoute, a.harness.route(a.harness.run)},
+		{http.MethodGet, "/harness/agent-runs/:id", "harness", protectedRoute, a.harness.route(a.harness.agentRun)},
+		{http.MethodGet, "/harness/approvals", "harness", protectedRoute, a.harness.route(a.harness.approvals)},
+		{http.MethodGet, "/harness/events", "harness", protectedRoute, a.harness.route(a.harness.events)},
 	}
 }
 

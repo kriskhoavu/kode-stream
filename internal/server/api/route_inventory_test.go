@@ -21,8 +21,8 @@ func TestRouteManifestMatchesRegisteredAPIInventory(t *testing.T) {
 	}
 
 	manifest := routeManifest(apiHandler)
-	if got := len(manifest); got != 126 {
-		t.Fatalf("API route baseline = %d, want 126", got)
+	if got := len(manifest); got != 137 {
+		t.Fatalf("API route baseline = %d, want 137", got)
 	}
 	expected := make(map[string]routeSpec, len(manifest))
 	owners := map[string]bool{}
@@ -74,7 +74,7 @@ func TestRouteManifestMatchesRegisteredAPIInventory(t *testing.T) {
 		}
 	}
 
-	for _, owner := range []string{"health", "cloud-auth", "cloud-agent", "cloud-workspace", "cloud-command", "cloud-snapshot", "audit", "navigation", "system", "storage", "canvas", "state", "search", "ai", "workspace", "workspace-files", "workspace-search", "workspace-health", "item", "item-search", "jira", "knowledge", "verification", "git", "workspace-stream"} {
+	for _, owner := range []string{"health", "cloud-auth", "cloud-agent", "cloud-workspace", "cloud-command", "cloud-snapshot", "audit", "navigation", "system", "storage", "canvas", "state", "search", "ai", "workspace", "workspace-files", "workspace-search", "workspace-health", "item", "item-search", "jira", "knowledge", "verification", "git", "workspace-stream", "harness"} {
 		if !owners[owner] {
 			t.Errorf("route family %q owns no manifest route", owner)
 		}
