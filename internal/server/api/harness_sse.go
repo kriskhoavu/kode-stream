@@ -56,7 +56,7 @@ func (a *harnessController) events(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, event := range stored {
-		if !writeHarnessEvent(w, event) {
+		if !a.writeHarnessEvent(ctx, w, event) {
 			return
 		}
 		after = event.Seq
@@ -90,7 +90,7 @@ func (a *harnessController) events(w http.ResponseWriter, r *http.Request) {
 			if event.Seq != 0 && event.Seq <= after {
 				continue
 			}
-			if !writeHarnessEvent(w, event) {
+			if !a.writeHarnessEvent(ctx, w, event) {
 				return
 			}
 			if event.Seq != 0 {
@@ -118,8 +118,14 @@ func harnessAfter(r *http.Request) int64 {
 	return value
 }
 
-func writeHarnessEvent(w http.ResponseWriter, event domain.Event) bool {
-	data, err := json.Marshal(event)
+// writeHarnessEvent sends one event with the entity it is about; an event
+// the dashboard does not show is skipped.
+func (a *harnessController) writeHarnessEvent(ctx context.Context, w http.ResponseWriter, event domain.Event) bool {
+	view, ok := a.harness.DashboardEvent(ctx, event)
+	if !ok {
+		return true
+	}
+	data, err := json.Marshal(view)
 	if err != nil {
 		return true
 	}

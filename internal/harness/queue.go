@@ -373,3 +373,26 @@ func boundedText(value string, limit int) string {
 }
 
 var _ queue.Ranker = queue.RuleRanker{}
+
+// MoveBefore sets a task's hand-set priority so that it ranks just above
+// another task, the way dragging a card above another does. The override is
+// bounded, so a pinned neighbour may stay above.
+func (s *Service) MoveBefore(ctx context.Context, id, beforeID string, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
+	if !s.Supported() {
+		return domain.Task{}, domain.ErrUnsupported
+	}
+	if beforeID == id {
+		return domain.Task{}, domain.Invalid("a task cannot move before itself")
+	}
+	above, err := s.repository.GetTask(ctx, beforeID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	task, err := s.repository.GetTask(ctx, id)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	override := task.PriorityOverride + (above.Score + 0.5 - task.Score)
+	override = max(-maxPriorityOverride, min(maxPriorityOverride, override))
+	return s.SetPriority(ctx, id, override, expectedRevision, actor)
+}

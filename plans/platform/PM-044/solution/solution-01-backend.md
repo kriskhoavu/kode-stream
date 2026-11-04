@@ -371,25 +371,25 @@ See [solution-03-bot-contract.md](solution-03-bot-contract.md).
 | `KODE_STREAM_HARNESS_WORKTREE_ROOT`      | Overrides `<dataDir>/harness/worktrees`            |
 | `KODE_STREAM_HARNESS_DASHBOARD_URL`      | Base for the `links.dashboard` field of a webhook  |
 
-## Open: Dashboard Shapes That Differ From This Contract
+## Dashboard Shapes
 
-The dashboard (F1–F6, merged into `master`) reads some shapes that differ from the contract above. The backend
-serves the contract. Until one side changes, these views read empty or wrong data, and two calls are refused:
+The dashboard routes answer the shapes the dashboard's types declare (`Harness*` in `web/src/lib/types.ts`). The
+views live in `internal/harness/dashboard.go`; each carries the domain fields above and adds what the screens read.
+The bot routes keep the domain shapes of the Types section.
 
-| Call                          | The contract answers                                                                                | The dashboard expects                                                                     |
-|-------------------------------|-----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
-| `GET /runs/:id`               | `HarnessRun` with `stages[]`, each with `agentRuns[]`                                               | `{ run, task, stages, agentRuns, approvals }`                                             |
-| `GET /agent-runs/:id`         | `HarnessAgentRun`                                                                                   | `{ agentRun, session? }`                                                                  |
-| `GET /status`                 | `counts.waitingApprovals`; roles `busy`, `lastActivityAt`; engines `unsupported`                    | `waitingCount`; roles `working`, `queued`, `lastRunAt`, `found`; engines `limits`         |
-| `GET /cost`                   | `rows[]`                                                                                            | `groups[]`, `agentRuns`                                                                   |
-| `GET/PUT /settings`           | `slots.qa_fixer`, `workspaces[]` with typed sources, `modelPolicy.roles` with `highDifficultyModel` | `slots.qa`, a flat `sources[]` with `query`, `modelPolicy` keyed by role with `hardModel` |
-| `POST /roles/:role/pause`     | role keys `scout, sorter, planner, reviewer, coder, qa_fixer`                                       | `qa` for the tester                                                                       |
-| `POST /tasks/:id/priority`    | `{ priorityOverride, expectedRevision }`, unknown fields refused (400)                              | also sends `before` (drag to reorder)                                                     |
-| `POST /scout/poll`            | `{ sources[] }`                                                                                     | `{ started }`                                                                             |
-| `GET /events`                 | `{ seq, type, at, …ids, payload }`                                                                  | the whole entity per event: `task`, `run`, `stage`, `agentRun`, `approval`, `role`        |
-| `GET /runs/:id/changes`       | `{ branch, baseCommit, files[], diffStat, available }`                                              | the Sessions page's `SessionChanges`                                                      |
-| approval `context.difficulty` | `low`, `medium`, `high`                                                                             | `easy`, `hard`                                                                            |
-
-Resolving it is one decision for the two tracks: either the dashboard's client maps the contract, or the transport
-answers the dashboard's shapes beside it. Nothing in `internal/harness` depends on the choice.
-
+| Call                       | Answer                                                                                                                                                                                                                                                  |
+|----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET /status`              | `waitingCount`; roles with `working`, `queued`, `lastRunAt`, `found`, `engine`, `model`; engines with `limits`                                                                                                                                          |
+| `GET /tasks`, `/queue`     | tasks with `createdAt`, `milestone`, `epic`, and `finishedOutside` for a stale task                                                                                                                                                                     |
+| `GET /runs`                | runs with `currentStage` and `activeAgentRun`                                                                                                                                                                                                           |
+| `GET /runs/:id`            | `{ run, task, stages, agentRuns, approvals }`                                                                                                                                                                                                           |
+| `GET /agent-runs/:id`      | `{ agentRun }`; an agent run is never a terminal session                                                                                                                                                                                                |
+| agent runs everywhere      | add `verdict`, `blocking`, `advisory`, `summary`, `findings` from the report                                                                                                                                                                            |
+| approvals everywhere       | `context` is `{ difficulty: "easy" or "hard", subtasks, rounds, blocking, advisory, costUsd, durationMs, verdict }`                                                                                                                                     |
+| `GET /cost`                | `{ groupBy, from, to, totalUsd, agentRuns, groups[] }`                                                                                                                                                                                                  |
+| `GET/PUT /settings`        | `{ revision, enabled, autoStart, requirePrApproval, slots, paused, sources[], modelPolicy }`; `qa` names the tester; a source is `{ workspaceId, kind, enabled, query, labels, tokenEnvVar }`. A save keeps every stored value the screen does not show |
+| `POST /roles/:role/…`      | `qa` is the tester's pool                                                                                                                                                                                                                               |
+| `POST /tasks/:id/priority` | `{ priorityOverride }` or `{ before: taskId }`, which ranks the task just above that one within the bounded override                                                                                                                                    |
+| `POST /scout/poll`         | `{ started: true, sources[] }`                                                                                                                                                                                                                          |
+| `GET /runs/:id/changes`    | the Sessions page's changes shape, `sessionId` being the run id                                                                                                                                                                                         |
+| `GET /events`              | `{ seq, type, at }` plus the entity: `task`, `run`, `stage`, `agentRun`, `approval`, `role`, or `message`; events the dashboard does not show are skipped                                                                                               |

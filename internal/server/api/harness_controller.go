@@ -91,7 +91,7 @@ func queryStates[S ~string](r *http.Request, name string) []S {
 }
 
 func (a *harnessController) status(w http.ResponseWriter, r *http.Request) {
-	status, err := a.harness.Status(r.Context())
+	status, err := a.harness.DashboardStatus(r.Context())
 	if err != nil {
 		writeHarnessError(w, err)
 		return
@@ -100,7 +100,7 @@ func (a *harnessController) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *harnessController) settings(w http.ResponseWriter, r *http.Request) {
-	settings, err := a.harness.Settings(r.Context())
+	settings, err := a.harness.DashboardSettings(r.Context())
 	if err != nil {
 		writeHarnessError(w, err)
 		return
@@ -108,21 +108,12 @@ func (a *harnessController) settings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, settings)
 }
 
-type harnessSettingsRequest struct {
-	domain.Settings
-	ExpectedRevision *int64 `json:"expectedRevision"`
-}
-
 func (a *harnessController) saveSettings(w http.ResponseWriter, r *http.Request) {
-	var request harnessSettingsRequest
+	var request harness.DashboardSettings
 	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, false) {
 		return
 	}
-	expected := request.Settings.Revision
-	if request.ExpectedRevision != nil {
-		expected = *request.ExpectedRevision
-	}
-	saved, err := a.harness.SaveSettings(r.Context(), request.Settings, expected, harnessActor(r))
+	saved, err := a.harness.SaveDashboardSettings(r.Context(), request, harnessActor(r))
 	if err != nil {
 		writeHarnessError(w, err)
 		return
@@ -136,7 +127,7 @@ func (a *harnessController) tasks(w http.ResponseWriter, r *http.Request) {
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
+	writeJSON(w, http.StatusOK, map[string]any{"tasks": harness.DashboardTasks(tasks)})
 }
 
 func (a *harnessController) task(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +136,7 @@ func (a *harnessController) task(w http.ResponseWriter, r *http.Request) {
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, task)
+	writeJSON(w, http.StatusOK, harness.DashboardTaskWithBody(task))
 }
 
 func (a *harnessController) queue(w http.ResponseWriter, r *http.Request) {
@@ -154,11 +145,11 @@ func (a *harnessController) queue(w http.ResponseWriter, r *http.Request) {
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
+	writeJSON(w, http.StatusOK, map[string]any{"tasks": harness.DashboardTasks(tasks)})
 }
 
 func (a *harnessController) runs(w http.ResponseWriter, r *http.Request) {
-	runs, err := a.harness.Runs(r.Context(), domain.RunFilter{TaskID: r.URL.Query().Get("taskId"), WorkspaceID: r.URL.Query().Get("workspaceId"), States: queryStates[domain.RunState](r, "state"), Limit: queryLimit(r, 100, 500)})
+	runs, err := a.harness.DashboardRuns(r.Context(), domain.RunFilter{TaskID: r.URL.Query().Get("taskId"), WorkspaceID: r.URL.Query().Get("workspaceId"), States: queryStates[domain.RunState](r, "state"), Limit: queryLimit(r, 100, 500)})
 	if err != nil {
 		writeHarnessError(w, err)
 		return
@@ -167,7 +158,7 @@ func (a *harnessController) runs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *harnessController) run(w http.ResponseWriter, r *http.Request) {
-	run, err := a.harness.Run(r.Context(), r.PathValue("id"))
+	run, err := a.harness.DashboardRunDetail(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeHarnessError(w, err)
 		return
@@ -176,7 +167,7 @@ func (a *harnessController) run(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *harnessController) agentRun(w http.ResponseWriter, r *http.Request) {
-	agentRun, err := a.harness.AgentRun(r.Context(), r.PathValue("id"))
+	agentRun, err := a.harness.DashboardAgentRun(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeHarnessError(w, err)
 		return
@@ -192,7 +183,7 @@ func (a *harnessController) approvals(w http.ResponseWriter, r *http.Request) {
 	if len(states) == 1 && states[0] == "all" {
 		states = nil
 	}
-	approvals, err := a.harness.Approvals(r.Context(), domain.ApprovalFilter{RunID: r.URL.Query().Get("runId"), TaskID: r.URL.Query().Get("taskId"), States: states, Limit: queryLimit(r, 100, 500)})
+	approvals, err := a.harness.DashboardApprovals(r.Context(), domain.ApprovalFilter{RunID: r.URL.Query().Get("runId"), TaskID: r.URL.Query().Get("taskId"), States: states, Limit: queryLimit(r, 100, 500)})
 	if err != nil {
 		writeHarnessError(w, err)
 		return
@@ -215,12 +206,13 @@ func (a *harnessController) pinTask(w http.ResponseWriter, r *http.Request) {
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, task)
+	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
 }
 
 type harnessPriorityRequest struct {
-	PriorityOverride float64 `json:"priorityOverride"`
-	ExpectedRevision int64   `json:"expectedRevision"`
+	PriorityOverride *float64 `json:"priorityOverride"`
+	Before           string   `json:"before"`
+	ExpectedRevision int64    `json:"expectedRevision"`
 }
 
 func (a *harnessController) setPriority(w http.ResponseWriter, r *http.Request) {
@@ -228,12 +220,22 @@ func (a *harnessController) setPriority(w http.ResponseWriter, r *http.Request) 
 	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
 		return
 	}
-	task, err := a.harness.SetPriority(r.Context(), r.PathValue("id"), request.PriorityOverride, request.ExpectedRevision, harnessActor(r))
+	var task domain.Task
+	var err error
+	switch {
+	case request.Before != "":
+		task, err = a.harness.MoveBefore(r.Context(), r.PathValue("id"), request.Before, request.ExpectedRevision, harnessActor(r))
+	case request.PriorityOverride != nil:
+		task, err = a.harness.SetPriority(r.Context(), r.PathValue("id"), *request.PriorityOverride, request.ExpectedRevision, harnessActor(r))
+	default:
+		writeHarnessInvalid(w, "priorityOverride or before is required")
+		return
+	}
 	if err != nil {
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, task)
+	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
 }
 
 type harnessDismissRequest struct {
@@ -251,7 +253,7 @@ func (a *harnessController) dismissTask(w http.ResponseWriter, r *http.Request) 
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, task)
+	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
 }
 
 type harnessStartRequest struct {
@@ -269,7 +271,7 @@ func (a *harnessController) startTask(w http.ResponseWriter, r *http.Request) {
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, task)
+	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
 }
 
 type harnessPollRequest struct {
@@ -286,7 +288,7 @@ func (a *harnessController) pollScouts(w http.ResponseWriter, r *http.Request) {
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"sources": sources})
+	writeJSON(w, http.StatusOK, map[string]any{"started": true, "sources": sources})
 }
 
 type harnessDecideRequest struct {
@@ -315,7 +317,15 @@ func (a *harnessController) decide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	approval, err := a.harness.Decide(r.Context(), r.PathValue("id"), harness.DecideInput{Decision: harness.Decision(request.Decision), Reason: request.Reason, IdempotencyKey: request.IdempotencyKey, ExpectedRevision: request.ExpectedRevision, RequestID: r.Header.Get(requestIDHeader), Actor: harnessActor(r), Channel: domain.ChannelDashboard})
-	writeHarnessDecision(w, approval, err)
+	var already harness.AlreadyDecidedError
+	switch {
+	case errors.As(err, &already):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "already_decided", "approval": a.harness.DashboardDecision(r.Context(), already.Approval)})
+	case err != nil:
+		writeHarnessError(w, err)
+	default:
+		writeJSON(w, http.StatusOK, a.harness.DashboardDecision(r.Context(), approval))
+	}
 }
 
 func (a *harnessController) pauseRole(w http.ResponseWriter, r *http.Request) {
@@ -327,12 +337,12 @@ func (a *harnessController) resumeRole(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *harnessController) setRolePaused(w http.ResponseWriter, r *http.Request, paused bool) {
-	health, err := a.harness.SetRolePaused(r.Context(), domain.RoleKey(r.PathValue("role")), paused, harnessActor(r))
+	health, err := a.harness.SetRolePaused(r.Context(), harness.RoleKeyFromDashboard(r.PathValue("role")), paused, harnessActor(r))
 	if err != nil {
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, health)
+	writeJSON(w, http.StatusOK, harness.DashboardRoleHealth(health))
 }
 
 func (a *harnessController) cost(w http.ResponseWriter, r *http.Request) {
@@ -360,11 +370,11 @@ func (a *harnessController) cost(w http.ResponseWriter, r *http.Request) {
 		writeHarnessError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, summary)
+	writeJSON(w, http.StatusOK, harness.DashboardCostOf(summary))
 }
 
 func (a *harnessController) runChanges(w http.ResponseWriter, r *http.Request) {
-	changes, err := a.harness.Changes(r.Context(), r.PathValue("id"))
+	changes, err := a.harness.DashboardChanges(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeHarnessError(w, err)
 		return
@@ -386,6 +396,13 @@ func (a *harnessController) cancelRun(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeHarnessError(w, err)
 		return
+	}
+	runs, err := a.harness.DashboardRuns(r.Context(), domain.RunFilter{TaskID: run.TaskID, Limit: 50})
+	for _, view := range runs {
+		if err == nil && view.ID == run.ID {
+			writeJSON(w, http.StatusOK, view)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, run)
 }

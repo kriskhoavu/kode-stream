@@ -37,18 +37,18 @@ P0 Plan ─> B1 Core ─> B2 Scout + sorter ─> B3 Claude Code + plan stage ─
 
 ## Phases
 
-| Phase | Name                                      | Track    | Depends on  | Status                                 |
-|-------|-------------------------------------------|----------|-------------|----------------------------------------|
-| P0    | Plan folder                               | Docs     | —           | Done                                   |
-| B1    | Core                                      | Backend  | P0          | Done                                   |
-| B2    | Scout, sorter, queue operations           | Backend  | B1          | Done                                   |
-| B3    | Claude Code engine, plan stage, plan gate | Backend  | B2          | Done                                   |
-| B4    | Implement stage                           | Backend  | B3          | Done                                   |
-| B5    | QA and draft PR                           | Backend  | B4          | Done                                   |
-| B6    | Bot surface and webhooks                  | Backend  | B3          | Done                                   |
-| B7    | More engines, policy editing, LLM ranker  | Backend  | B5          | Done                                   |
-| F1–F6 | Dashboard                                 | Frontend | B1 contract | Merged; shapes differ, see solution 01 |
-| I1    | Documentation                             | Docs     | all         | Done                                   |
+| Phase | Name                                      | Track    | Depends on  | Status |
+|-------|-------------------------------------------|----------|-------------|--------|
+| P0    | Plan folder                               | Docs     | —           | Done   |
+| B1    | Core                                      | Backend  | P0          | Done   |
+| B2    | Scout, sorter, queue operations           | Backend  | B1          | Done   |
+| B3    | Claude Code engine, plan stage, plan gate | Backend  | B2          | Done   |
+| B4    | Implement stage                           | Backend  | B3          | Done   |
+| B5    | QA and draft PR                           | Backend  | B4          | Done   |
+| B6    | Bot surface and webhooks                  | Backend  | B3          | Done   |
+| B7    | More engines, policy editing, LLM ranker  | Backend  | B5          | Done   |
+| F1–F6 | Dashboard                                 | Frontend | B1 contract | Done   |
+| I1    | Documentation                             | Docs     | all         | Done   |
 
 ### P0 Plan folder
 

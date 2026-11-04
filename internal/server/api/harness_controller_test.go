@@ -79,22 +79,34 @@ func TestHarnessSettingsAndReadRoutes(t *testing.T) {
 	handler := New(Dependencies{Harness: service}).Routes()
 
 	get := serveHarness(handler, http.MethodGet, "/api/harness/settings", "")
-	var settings domain.Settings
-	if get.Code != http.StatusOK || json.Unmarshal(get.Body.Bytes(), &settings) != nil || settings.Revision != 0 || settings.Enabled {
+	var settings harness.DashboardSettings
+	if get.Code != http.StatusOK || json.Unmarshal(get.Body.Bytes(), &settings) != nil || settings.Revision != 0 || settings.Enabled || settings.Slots["qa"] != 1 || settings.ModelPolicy[domain.RoleCoder].HardModel != "opus" {
 		t.Fatalf("get = %d body = %s", get.Code, get.Body.String())
 	}
 	settings.Enabled = true
-	settings.Workspaces = []domain.WorkspaceSettings{{WorkspaceID: "ws", Jira: &domain.JiraSourceSettings{Enabled: true, JQL: "project = PM"}}}
+	settings.Paused = map[string]bool{"qa": true}
+	settings.Sources = []harness.DashboardSource{{WorkspaceID: "ws", Kind: "jira", Enabled: true, Query: "project = PM"}}
+	policy := settings.ModelPolicy[domain.RoleCoder]
+	policy.HardModel = "opus-next"
+	settings.ModelPolicy[domain.RoleCoder] = policy
 	body, _ := json.Marshal(settings)
 	put := serveHarness(handler, http.MethodPut, "/api/harness/settings", string(body))
-	if put.Code != http.StatusOK || !strings.Contains(put.Body.String(), `"revision":1`) {
+	if put.Code != http.StatusOK || !strings.Contains(put.Body.String(), `"revision":1`) || !strings.Contains(put.Body.String(), `"query":"project = PM"`) || !strings.Contains(put.Body.String(), `"paused":{"qa":true}`) || !strings.Contains(put.Body.String(), `"hardModel":"opus-next"`) {
 		t.Fatalf("put = %d body = %s", put.Code, put.Body.String())
+	}
+	stored, _ := service.Settings(context.Background())
+	if stored.Workspaces[0].Jira == nil || stored.Workspaces[0].Jira.JQL != "project = PM" || !stored.Paused[domain.RoleKeyQAFixer] || stored.ModelPolicy.Roles[domain.RoleCoder].AllowedTools == nil {
+		t.Fatalf("stored = %#v", stored)
 	}
 	stale := serveHarness(handler, http.MethodPut, "/api/harness/settings", string(body))
 	if stale.Code != http.StatusConflict || !strings.Contains(stale.Body.String(), `"code":"conflict"`) {
 		t.Fatalf("stale = %d body = %s", stale.Code, stale.Body.String())
 	}
 	invalid := serveHarness(handler, http.MethodPut, "/api/harness/settings", `{"expectedRevision":1,"slots":{"coder":99}}`)
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid = %d body = %s", invalid.Code, invalid.Body.String())
+	}
+	invalid = serveHarness(handler, http.MethodPut, "/api/harness/settings", `{"expectedRevision":1,"sources":[{"workspaceId":"ws","kind":"gitlab","query":"x"}]}`)
 	if invalid.Code != http.StatusBadRequest || !strings.Contains(invalid.Body.String(), `"code":"invalid_request"`) {
 		t.Fatalf("invalid = %d body = %s", invalid.Code, invalid.Body.String())
 	}
@@ -105,7 +117,7 @@ func TestHarnessSettingsAndReadRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 	queue := serveHarness(handler, http.MethodGet, "/api/harness/queue", "")
-	if queue.Code != http.StatusOK || !strings.Contains(queue.Body.String(), `"key":"PM-1"`) || strings.Contains(queue.Body.String(), "secret-ish") {
+	if queue.Code != http.StatusOK || !strings.Contains(queue.Body.String(), `"key":"PM-1"`) || !strings.Contains(queue.Body.String(), `"createdAt":`) || strings.Contains(queue.Body.String(), "secret-ish") {
 		t.Fatalf("queue = %d body = %s", queue.Code, queue.Body.String())
 	}
 	detail := serveHarness(handler, http.MethodGet, "/api/harness/tasks/tsk-1", "")
@@ -155,6 +167,10 @@ func TestHarnessRoutesNeedTheHarnessCapabilityToChange(t *testing.T) {
 func TestHarnessEventStreamCatchesUpThenStreamsLive(t *testing.T) {
 	service, repository := newHarnessTestService(t, true)
 	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := repository.InsertTask(ctx, domain.Task{ID: "tsk-1", WorkspaceID: "ws", Source: domain.Source{Kind: domain.SourceJira, Key: "PM-1"}, Title: "One", State: domain.TaskRanked, DiscoveredAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
 	first, err := repository.AppendEvent(ctx, domain.Event{Kind: domain.EventTaskDiscovered, At: time.Now(), TaskID: "tsk-1"})
 	if err != nil {
 		t.Fatal(err)
@@ -209,15 +225,17 @@ func TestHarnessEventStreamCatchesUpThenStreamsLive(t *testing.T) {
 		}
 	}
 	caughtUp := readUntil(": connected")
-	if strings.Contains(caughtUp, `"seq":`+itoa(first.Seq)+`,`) || !strings.Contains(caughtUp, `"type":"task.ranked"`) || !strings.Contains(caughtUp, "id: 2") {
+	if strings.Contains(caughtUp, `"seq":`+itoa(first.Seq)+`,`) || !strings.Contains(caughtUp, `"type":"task.ranked"`) || !strings.Contains(caughtUp, `"task":{"id":"tsk-1"`) || !strings.Contains(caughtUp, "id: 2") {
 		t.Fatalf("catch-up = %q", caughtUp)
 	}
-	settings := domain.DefaultSettings()
-	if _, err := service.SaveSettings(ctx, settings, 0, domain.Actor{ActorID: "local"}); err != nil {
+	if _, err := service.SaveSettings(ctx, domain.DefaultSettings(), 0, domain.Actor{ActorID: "local"}); err != nil {
 		t.Fatal(err)
 	}
-	live := readUntil("settings.updated")
-	if !strings.Contains(live, "id: 3") {
+	if _, err := service.SetRolePaused(ctx, domain.RoleKeyQAFixer, true, domain.Actor{ActorID: "local"}); err != nil {
+		t.Fatal(err)
+	}
+	live := readUntil("role.paused")
+	if !strings.Contains(live, "id: 4") || !strings.Contains(live, `"role":{"role":"qa","paused":true`) || strings.Contains(live, "settings.updated") {
 		t.Fatalf("live = %q", live)
 	}
 }
@@ -251,16 +269,26 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 	if priority.Code != http.StatusOK || !strings.Contains(priority.Body.String(), `"priorityOverride":5`) {
 		t.Fatalf("priority = %d %s", priority.Code, priority.Body.String())
 	}
-	start := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/start", `{"expectedRevision":2,"idempotencyKey":"k1"}`)
+	if err := repository.InsertTask(ctx, domain.Task{ID: "tsk-2", WorkspaceID: "ws", Source: domain.Source{Kind: domain.SourceJira, Key: "PM-2"}, Title: "Two", State: domain.TaskRanked, Score: 60, DiscoveredAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	moved := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/priority", `{"before":"tsk-2","expectedRevision":2}`)
+	if moved.Code != http.StatusOK || !strings.Contains(moved.Body.String(), `"priorityOverride":-500`) {
+		t.Fatalf("moved = %d %s", moved.Code, moved.Body.String())
+	}
+	if empty := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/priority", `{"expectedRevision":3}`); empty.Code != http.StatusBadRequest {
+		t.Fatalf("empty priority = %d %s", empty.Code, empty.Body.String())
+	}
+	start := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/start", `{"expectedRevision":3,"idempotencyKey":"k1"}`)
 	if start.Code != http.StatusOK || !strings.Contains(start.Body.String(), `"startRequested":true`) {
 		t.Fatalf("start = %d %s", start.Code, start.Body.String())
 	}
-	dismiss := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/dismiss", `{"reason":"no","expectedRevision":3}`)
+	dismiss := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/dismiss", `{"reason":"no","expectedRevision":4}`)
 	if dismiss.Code != http.StatusOK || !strings.Contains(dismiss.Body.String(), `"state":"dismissed"`) {
 		t.Fatalf("dismiss = %d %s", dismiss.Code, dismiss.Body.String())
 	}
 	poll := serveHarness(handler, http.MethodPost, "/api/harness/scout/poll", "")
-	if poll.Code != http.StatusOK || !strings.Contains(poll.Body.String(), `"sources":[]`) {
+	if poll.Code != http.StatusOK || !strings.Contains(poll.Body.String(), `"started":true`) {
 		t.Fatalf("poll = %d %s", poll.Code, poll.Body.String())
 	}
 	missing := serveHarness(handler, http.MethodPost, "/api/harness/tasks/missing/start", `{"expectedRevision":0}`)
@@ -319,22 +347,26 @@ func TestHarnessDecideCancelCostAndRoleRoutes(t *testing.T) {
 		t.Fatalf("again = %d %s", again.Code, again.Body.String())
 	}
 	run := serveHarness(handler, http.MethodGet, "/api/harness/runs/run-9", "")
-	if run.Code != http.StatusOK || !strings.Contains(run.Body.String(), `"currentStageKind":"implement"`) {
+	var detail harness.DashboardRunDetail
+	if run.Code != http.StatusOK || json.Unmarshal(run.Body.Bytes(), &detail) != nil || detail.Run.CurrentStageKind != domain.StageImplement || detail.Run.CurrentStage == nil || detail.Run.ActiveAgentRun == nil || detail.Task.ID != "tsk-9" || len(detail.Approvals) != 1 || len(detail.AgentRuns) != 1 {
 		t.Fatalf("run = %d %s", run.Code, run.Body.String())
 	}
 
-	pause := serveHarness(handler, http.MethodPost, "/api/harness/roles/coder/pause", "")
+	pause := serveHarness(handler, http.MethodPost, "/api/harness/roles/qa/pause", "")
 	if pause.Code != http.StatusOK || !strings.Contains(pause.Body.String(), `"paused":true`) {
 		t.Fatalf("pause = %d %s", pause.Code, pause.Body.String())
 	}
-	if resume := serveHarness(handler, http.MethodPost, "/api/harness/roles/coder/resume", ""); resume.Code != http.StatusOK || !strings.Contains(resume.Body.String(), `"paused":false`) {
+	if !strings.Contains(pause.Body.String(), `"role":"qa"`) {
+		t.Fatalf("pause role = %s", pause.Body.String())
+	}
+	if resume := serveHarness(handler, http.MethodPost, "/api/harness/roles/qa/resume", ""); resume.Code != http.StatusOK || !strings.Contains(resume.Body.String(), `"paused":false`) {
 		t.Fatalf("resume = %d %s", resume.Code, resume.Body.String())
 	}
 	if unknown := serveHarness(handler, http.MethodPost, "/api/harness/roles/janitor/pause", ""); unknown.Code != http.StatusNotFound {
 		t.Fatalf("unknown role = %d %s", unknown.Code, unknown.Body.String())
 	}
 	cost := serveHarness(handler, http.MethodGet, "/api/harness/cost?groupBy=role&from=2026-01-01", "")
-	if cost.Code != http.StatusOK || !strings.Contains(cost.Body.String(), `"groupBy":"role"`) {
+	if cost.Code != http.StatusOK || !strings.Contains(cost.Body.String(), `"groupBy":"role"`) || !strings.Contains(cost.Body.String(), `"groups":[{"key":"coder"`) || !strings.Contains(cost.Body.String(), `"agentRuns":1`) {
 		t.Fatalf("cost = %d %s", cost.Code, cost.Body.String())
 	}
 	if bad := serveHarness(handler, http.MethodGet, "/api/harness/cost?groupBy=week", ""); bad.Code != http.StatusBadRequest {
@@ -344,7 +376,7 @@ func TestHarnessDecideCancelCostAndRoleRoutes(t *testing.T) {
 		t.Fatalf("bad date = %d %s", badDate.Code, badDate.Body.String())
 	}
 	changes := serveHarness(handler, http.MethodGet, "/api/harness/runs/run-9/changes", "")
-	if changes.Code != http.StatusOK || !strings.Contains(changes.Body.String(), `"available":false`) {
+	if changes.Code != http.StatusOK || !strings.Contains(changes.Body.String(), `"availability":"unavailable"`) {
 		t.Fatalf("changes = %d %s", changes.Code, changes.Body.String())
 	}
 	cancel := serveHarness(handler, http.MethodPost, "/api/harness/runs/run-9/cancel", `{"reason":"enough"}`)
