@@ -148,3 +148,5 @@ func TestResolveConfigReadsTheEnvironment(t *testing.T) {
 		t.Fatalf("config = %#v", config)
 	}
 }
+
+func errorsAs(err error, target any) bool { return errors.As(err, target) }

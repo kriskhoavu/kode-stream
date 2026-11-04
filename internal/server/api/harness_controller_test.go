@@ -226,3 +226,52 @@ func itoa(value int64) string {
 	data, _ := json.Marshal(value)
 	return string(data)
 }
+
+func TestHarnessQueueOperationRoutes(t *testing.T) {
+	service, repository := newHarnessTestService(t, true)
+	handler := New(Dependencies{Harness: service}).Routes()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := repository.InsertTask(ctx, domain.Task{ID: "tsk-1", WorkspaceID: "ws", Source: domain.Source{Kind: domain.SourceJira, Key: "PM-1"}, Title: "One", State: domain.TaskRanked, DiscoveredAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	pin := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/pin", `{"pinned":true,"expectedRevision":0}`)
+	if pin.Code != http.StatusOK || !strings.Contains(pin.Body.String(), `"pinned":true`) {
+		t.Fatalf("pin = %d %s", pin.Code, pin.Body.String())
+	}
+	stale := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/pin", `{"pinned":false,"expectedRevision":0}`)
+	if stale.Code != http.StatusConflict {
+		t.Fatalf("stale pin = %d %s", stale.Code, stale.Body.String())
+	}
+	unknown := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/pin", `{"pinned":false,"expectedRevision":1,"extra":1}`)
+	if unknown.Code != http.StatusBadRequest {
+		t.Fatalf("unknown field = %d %s", unknown.Code, unknown.Body.String())
+	}
+	priority := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/priority", `{"priorityOverride":5,"expectedRevision":1}`)
+	if priority.Code != http.StatusOK || !strings.Contains(priority.Body.String(), `"priorityOverride":5`) {
+		t.Fatalf("priority = %d %s", priority.Code, priority.Body.String())
+	}
+	start := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/start", `{"expectedRevision":2,"idempotencyKey":"k1"}`)
+	if start.Code != http.StatusOK || !strings.Contains(start.Body.String(), `"startRequested":true`) {
+		t.Fatalf("start = %d %s", start.Code, start.Body.String())
+	}
+	dismiss := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/dismiss", `{"reason":"no","expectedRevision":3}`)
+	if dismiss.Code != http.StatusOK || !strings.Contains(dismiss.Body.String(), `"state":"dismissed"`) {
+		t.Fatalf("dismiss = %d %s", dismiss.Code, dismiss.Body.String())
+	}
+	poll := serveHarness(handler, http.MethodPost, "/api/harness/scout/poll", "")
+	if poll.Code != http.StatusOK || !strings.Contains(poll.Body.String(), `"sources":[]`) {
+		t.Fatalf("poll = %d %s", poll.Code, poll.Body.String())
+	}
+	missing := serveHarness(handler, http.MethodPost, "/api/harness/tasks/missing/start", `{"expectedRevision":0}`)
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing = %d %s", missing.Code, missing.Body.String())
+	}
+
+	cloud, _ := newHarnessTestService(t, false)
+	cloudHandler := New(Dependencies{Harness: cloud}).Routes()
+	refused := serveHarness(cloudHandler, http.MethodPost, "/api/harness/scout/poll", "")
+	if refused.Code != http.StatusServiceUnavailable || !strings.Contains(refused.Body.String(), "Local mode") {
+		t.Fatalf("cloud poll = %d %s", refused.Code, refused.Body.String())
+	}
+}

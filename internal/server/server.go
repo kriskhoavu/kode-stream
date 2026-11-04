@@ -1,10 +1,12 @@
 package server
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -21,6 +23,10 @@ import (
 	"kode-stream/internal/filesystem/content"
 	appgit "kode-stream/internal/git"
 	"kode-stream/internal/harness"
+	harnessbitbucket "kode-stream/internal/harness/adapters/scout/bitbucket"
+	harnessgithub "kode-stream/internal/harness/adapters/scout/github"
+	harnessjira "kode-stream/internal/harness/adapters/scout/jira"
+	"kode-stream/internal/harness/ports"
 	"kode-stream/internal/item/writer"
 	appjira "kode-stream/internal/jira"
 	"kode-stream/internal/knowledge"
@@ -83,6 +89,7 @@ func NewServer(port int) (*Server, error) {
 	harnessService := harness.New(harness.Dependencies{
 		Repository: state.Harness,
 		Workspaces: reg,
+		Scouts:     []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New()},
 		Config:     harness.ResolveConfig(os.Getenv, paths.Dir, runtimeConfig.Mode == models.RuntimeModeLocal),
 	})
 	canvasService := canvas.NewService(state.Canvas, reg, idx, git, aiSessionService, verificationService, runtimeConfig.Mode, canvasDatastore(state.Config), runtimeConfig.Capabilities)
@@ -111,6 +118,10 @@ func NewServer(port int) (*Server, error) {
 		WorkspaceCloner:     git,
 		Harness:             harnessService,
 	})
+
+	if err := harnessService.Start(context.Background()); err != nil {
+		log.Printf("harness did not start: %v", err)
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())

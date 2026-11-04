@@ -17,6 +17,9 @@ import (
 	"time"
 
 	"kode-stream/internal/harness/application/feed"
+	"kode-stream/internal/harness/application/queue"
+	"kode-stream/internal/harness/application/scheduler"
+	"kode-stream/internal/harness/application/scout"
 	"kode-stream/internal/harness/domain"
 	"kode-stream/internal/harness/ports"
 )
@@ -60,8 +63,11 @@ type Dependencies struct {
 	// Repository is nil when the storage option cannot hold harness state.
 	Repository domain.Repository
 	Workspaces ports.Workspaces
-	Now        func() time.Time
-	Config     Config
+	Scouts     []ports.Scout
+	// Ranker re-orders the rules' ranking; nil keeps the rules' order.
+	Ranker queue.Ranker
+	Now    func() time.Time
+	Config Config
 }
 
 type Service struct {
@@ -70,10 +76,18 @@ type Service struct {
 	now        func() time.Time
 	config     Config
 	feed       *feed.Broadcaster
+	poller     *scout.Poller
+	rules      queue.RuleRanker
+	ranker     queue.Ranker
 
-	mu       sync.Mutex
-	running  bool
-	progress map[string]string
+	pollWake chan struct{}
+	sortWake chan struct{}
+	workWake chan struct{}
+
+	mu           sync.Mutex
+	running      bool
+	orchestrator *scheduler.Orchestrator
+	progress     map[string]string
 }
 
 func New(deps Dependencies) *Service {
@@ -81,7 +95,20 @@ func New(deps Dependencies) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), progress: map[string]string{}}
+	service := &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), ranker: deps.Ranker, progress: map[string]string{},
+		pollWake: make(chan struct{}, 1), sortWake: make(chan struct{}, 1), workWake: make(chan struct{}, 1)}
+	if deps.Repository != nil && deps.Workspaces != nil {
+		service.poller = scout.NewPoller(deps.Repository, deps.Workspaces, deps.Scouts, service.now, service.emit)
+	}
+	return service
+}
+
+// wake nudges a loop without blocking; a wake already pending is enough.
+func wake(channel chan struct{}) {
+	select {
+	case channel <- struct{}{}:
+	default:
+	}
 }
 
 // Supported reports whether the storage option holds harness state.
@@ -453,9 +480,30 @@ func startOfDay(now time.Time) time.Time {
 // decorateRole and sourceHealth read the orchestrator's in-memory health;
 // engineStatus reads the engines' detection. Each is filled by a later part
 // of the service and returns empty data until then.
-func (s *Service) decorateRole(health RoleHealth) RoleHealth { return health }
+func (s *Service) decorateRole(health RoleHealth) RoleHealth {
+	s.mu.Lock()
+	orchestrator := s.orchestrator
+	s.mu.Unlock()
+	if orchestrator == nil {
+		return health
+	}
+	if loop, ok := orchestrator.Health(string(health.Role)); ok {
+		health.LastActivityAt = loop.LastRunAt
+		health.LastError = loop.LastError
+	}
+	return health
+}
 
-func (s *Service) sourceHealth() []SourceHealth { return []SourceHealth{} }
+func (s *Service) sourceHealth() []SourceHealth {
+	out := []SourceHealth{}
+	if s.poller == nil {
+		return out
+	}
+	for _, health := range s.poller.Health() {
+		out = append(out, SourceHealth{WorkspaceID: health.WorkspaceID, Kind: string(health.Kind), LastPolledAt: health.LastPolledAt, Found: health.Found, Added: health.Added, LastError: health.LastError})
+	}
+	return out
+}
 
 func (s *Service) engineStatus(context.Context) []EngineStatus { return []EngineStatus{} }
 
@@ -506,13 +554,3 @@ func IsInvalid(err error) bool {
 	return errors.As(err, &invalid) || errors.As(err, &illegal)
 }
 
-// Stop ends the orchestrator's loops and every agent run it started, waiting
-// at most timeout. It is safe to call when the orchestrator never started.
-func (s *Service) Stop(timeout time.Duration) {
-	if s == nil {
-		return
-	}
-	s.mu.Lock()
-	s.running = false
-	s.mu.Unlock()
-}

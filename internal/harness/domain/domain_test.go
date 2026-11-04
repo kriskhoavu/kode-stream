@@ -69,15 +69,21 @@ func TestSettingsNormalizeFillsDefaultsAndCapsKnobs(t *testing.T) {
 	}
 
 	cases := map[string]func(*Settings){
-		"slots.coder":     func(s *Settings) { s.Slots.Coder = 99 },
-		"leaseSeconds":    func(s *Settings) { s.Intervals.LeaseSeconds = 5 },
-		"maxTurns":        func(s *Settings) { s.ModelPolicy.Roles[RolePlanner] = RolePolicy{MaxTurns: 500} },
-		"may not allow":   func(s *Settings) { s.ModelPolicy.Roles[RoleCoder] = RolePolicy{AllowedTools: []string{"Bash(git push:*)"}} },
-		"read-only":       func(s *Settings) { s.ModelPolicy.Roles[RoleCodeReviewer] = RolePolicy{PermissionMode: "acceptEdits"} },
-		"perAgentRunUsd":  func(s *Settings) { s.ModelPolicy.PerAgentRunUSD = 100 },
-		"jira.jql":        func(s *Settings) { s.Workspaces = []WorkspaceSettings{{WorkspaceID: "ws", Jira: &JiraSourceSettings{Enabled: true}}} },
-		"listed twice":    func(s *Settings) { s.Workspaces = []WorkspaceSettings{{WorkspaceID: "ws"}, {WorkspaceID: "ws"}} },
-		"owner/name":      func(s *Settings) { s.Workspaces = []WorkspaceSettings{{WorkspaceID: "ws", GitHub: &GitHubSourceSettings{Enabled: true, Repo: "nope"}}} },
+		"slots.coder":  func(s *Settings) { s.Slots.Coder = 99 },
+		"leaseSeconds": func(s *Settings) { s.Intervals.LeaseSeconds = 5 },
+		"maxTurns":     func(s *Settings) { s.ModelPolicy.Roles[RolePlanner] = RolePolicy{MaxTurns: 500} },
+		"may not allow": func(s *Settings) {
+			s.ModelPolicy.Roles[RoleCoder] = RolePolicy{AllowedTools: []string{"Bash(git push:*)"}}
+		},
+		"read-only":      func(s *Settings) { s.ModelPolicy.Roles[RoleCodeReviewer] = RolePolicy{PermissionMode: "acceptEdits"} },
+		"perAgentRunUsd": func(s *Settings) { s.ModelPolicy.PerAgentRunUSD = 100 },
+		"jira.jql": func(s *Settings) {
+			s.Workspaces = []WorkspaceSettings{{WorkspaceID: "ws", Jira: &JiraSourceSettings{Enabled: true}}}
+		},
+		"listed twice": func(s *Settings) { s.Workspaces = []WorkspaceSettings{{WorkspaceID: "ws"}, {WorkspaceID: "ws"}} },
+		"owner/name": func(s *Settings) {
+			s.Workspaces = []WorkspaceSettings{{WorkspaceID: "ws", GitHub: &GitHubSourceSettings{Enabled: true, Repo: "nope"}}}
+		},
 		"unknown role":    func(s *Settings) { s.Paused = map[RoleKey]bool{"janitor": true} },
 		"ranker.llm.topN": func(s *Settings) { s.Ranker.LLM.TopN = 1 },
 	}

@@ -198,3 +198,92 @@ func (a *harnessController) approvals(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"approvals": approvals})
 }
+
+type harnessPinRequest struct {
+	Pinned           bool  `json:"pinned"`
+	ExpectedRevision int64 `json:"expectedRevision"`
+}
+
+func (a *harnessController) pinTask(w http.ResponseWriter, r *http.Request) {
+	var request harnessPinRequest
+	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	task, err := a.harness.PinTask(r.Context(), r.PathValue("id"), request.Pinned, request.ExpectedRevision, harnessActor(r))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, task)
+}
+
+type harnessPriorityRequest struct {
+	PriorityOverride float64 `json:"priorityOverride"`
+	ExpectedRevision int64   `json:"expectedRevision"`
+}
+
+func (a *harnessController) setPriority(w http.ResponseWriter, r *http.Request) {
+	var request harnessPriorityRequest
+	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	task, err := a.harness.SetPriority(r.Context(), r.PathValue("id"), request.PriorityOverride, request.ExpectedRevision, harnessActor(r))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, task)
+}
+
+type harnessDismissRequest struct {
+	Reason           string `json:"reason"`
+	ExpectedRevision int64  `json:"expectedRevision"`
+}
+
+func (a *harnessController) dismissTask(w http.ResponseWriter, r *http.Request) {
+	var request harnessDismissRequest
+	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	task, err := a.harness.DismissTask(r.Context(), r.PathValue("id"), request.Reason, request.ExpectedRevision, harnessActor(r))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, task)
+}
+
+type harnessStartRequest struct {
+	ExpectedRevision int64  `json:"expectedRevision"`
+	IdempotencyKey   string `json:"idempotencyKey"`
+}
+
+func (a *harnessController) startTask(w http.ResponseWriter, r *http.Request) {
+	var request harnessStartRequest
+	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	task, err := a.harness.StartTask(r.Context(), r.PathValue("id"), request.ExpectedRevision, request.IdempotencyKey, harnessActor(r), domain.ChannelDashboard)
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, task)
+}
+
+type harnessPollRequest struct {
+	WorkspaceID string `json:"workspaceId"`
+}
+
+func (a *harnessController) pollScouts(w http.ResponseWriter, r *http.Request) {
+	var request harnessPollRequest
+	if r.ContentLength != 0 && !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	sources, err := a.harness.PollNow(r.Context(), request.WorkspaceID)
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"sources": sources})
+}
