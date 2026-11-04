@@ -18,7 +18,7 @@ describe('harness reducer', () => {
 		const state = loaded();
 		expect(state.loaded).toBe(true);
 		expect(state.lastSeq).toBe(10);
-		expect(queueTasks(state).map((item) => item.source.key)).toEqual(['D', 'C', 'B', 'A']);
+		expect(queueTasks(state.tasks).map((item) => item.source.key)).toEqual(['D', 'C', 'B', 'A']);
 		expect(waitsFor(state.tasks['task-B'], state.tasks)).toEqual(['A']);
 		expect(workingRuns(state).map((item) => item.id)).toEqual(['run-2']);
 	});

@@ -261,8 +261,8 @@ export function doneToday(state: HarnessState, now: number): DoneTodayEntry[] {
 }
 
 /** The queue as the Sorter ranked it: waiting on you first, then pinned, then by score. */
-export function queueTasks(state: HarnessState, options: { includeFinished?: boolean } = {}): HarnessTask[] {
-	return Object.values(state.tasks)
+export function queueTasks(tasks: Record<string, HarnessTask>, options: { includeFinished?: boolean } = {}): HarnessTask[] {
+	return Object.values(tasks)
 		.filter((task) => options.includeFinished || !(task.state === 'dismissed' || task.state === 'stale'))
 		.sort(compareTasks);
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HarnessLocation, HarnessView } from '../app/router';
+import type { HarnessTask } from '../lib/types';
 import type { HarnessClient } from '../features/harness/harnessClient';
 import { loadHarnessClient, wantsHarnessFixture } from '../features/harness/loadHarnessClient';
 import { apiHarnessClient } from '../features/harness/harnessClient';
@@ -7,7 +8,7 @@ import { useHarness } from '../features/harness/useHarness';
 import { queueTasks, waitingApprovals } from '../features/harness/harnessState';
 import { InboxView } from '../features/harness/InboxView';
 import { ApprovalsView } from '../features/harness/ApprovalsView';
-import { QueueList } from '../features/harness/QueueList';
+import { WaveBoard } from '../features/harness/WaveBoard';
 import { RunView } from '../features/harness/RunView';
 import { plural } from '../features/harness/vocabulary';
 import '../features/harness/harness.css';
@@ -90,7 +91,17 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 	onLocationChange: (location: HarnessLocation) => void;
 }) {
 	const { state } = harness;
-	const tasks = useMemo(() => queueTasks(state), [state]);
+	// Only the tasks decide the board, so progress events elsewhere do not re-plan the waves.
+	const tasks = useMemo(() => queueTasks(state.tasks), [state.tasks]);
+	const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+	const track = async (task: HarnessTask, change: () => Promise<void>) => {
+		setPendingIds((current) => new Set(current).add(task.id));
+		try {
+			await change();
+		} finally {
+			setPendingIds((current) => { const next = new Set(current); next.delete(task.id); return next; });
+		}
+	};
 	if (!state.loaded && !state.error) return <section className="hx-card hx-state" aria-busy="true">Loading the harness…</section>;
 	if (!state.loaded && state.error) {
 		return (
@@ -116,7 +127,18 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 			{state.error && <p className="hx-banner" role="alert">{state.error}</p>}
 			{location.view === 'inbox' && <InboxView state={state} newestApprovalId={newestApprovalId} onApprove={harness.approve} onReject={harness.reject} onOpenRun={onOpenRun} />}
 			{location.view === 'approvals' && <ApprovalsView state={state} onApprove={harness.approve} onReject={harness.reject} onOpenRun={onOpenRun} />}
-			{location.view === 'queue' && <QueueList tasks={tasks} allTasks={state.tasks} onPin={harness.pin} onOpen={(task) => task.runId && onOpenRun(task.runId)} />}
+			{location.view === 'queue' && (
+				<WaveBoard
+					tasks={tasks}
+					allTasks={state.tasks}
+					runs={state.runs}
+					pendingIds={pendingIds}
+					onOpenTask={(task) => { if (task.runId) onOpenRun(task.runId); }}
+					onPin={(task, pinned) => void track(task, () => harness.pin(task, pinned))}
+					onMove={(task, before) => void track(task, () => harness.setPriority(task, { before: before?.id }))}
+					onRefresh={() => void harness.refresh()}
+				/>
+			)}
 			{location.view === 'run' && <RunView state={state} runId={location.runId} onSelectRun={onOpenRun} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} />}
 			{location.view === 'settings' && <section className="hx-card hx-state"><p>Harness settings are not available yet.</p></section>}
 		</>

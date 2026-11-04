@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HarnessPage } from './HarnessPage';
 import { approval, run, stage, status, task } from '../features/harness/testData';
 
@@ -30,6 +30,10 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
+beforeEach(() => {
+	vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} unobserve() {} });
+});
+
 describe('HarnessPage', () => {
 	it('opens on the Inbox, reports the waiting count and approves from the gate card', async () => {
 		const fetchMock = stubHarness();
@@ -51,10 +55,10 @@ describe('HarnessPage', () => {
 		stubHarness();
 		const onLocationChange = vi.fn();
 		render(<HarnessPage location={{ view: 'queue' }} onLocationChange={onLocationChange} />);
-		const list = await screen.findByRole('list', { name: 'Queue in order' });
-		expect(list).toHaveTextContent('PM-02');
-		expect(list).toHaveTextContent('Waiting on you');
-		expect(list).toHaveTextContent('Up next');
+		const wave = await screen.findByRole('region', { name: /^Wave 0,/ });
+		expect(wave).toHaveTextContent('PM-02');
+		expect(wave).toHaveTextContent('Waiting on you');
+		expect(wave).toHaveTextContent('Up next');
 		fireEvent.click(screen.getByRole('button', { name: 'Approvals' }));
 		expect(onLocationChange).toHaveBeenCalledWith({ view: 'approvals' });
 	});
