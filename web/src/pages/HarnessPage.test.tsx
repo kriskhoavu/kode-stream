@@ -75,4 +75,21 @@ describe('HarnessPage', () => {
 		expect(await screen.findByRole('alert')).toHaveTextContent('Harness unavailable Start Kode Stream in Local mode.');
 		expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 	});
+
+	it('opens the drawer from a queue card and the pipeline tab from the URL', async () => {
+		stubHarness({ '/api/harness/runs/run-1': { run: run('run-1', 'task-PM-02'), task: task('PM-02', { title: 'Add login form', runId: 'run-1', state: 'running' }), stages: [], agentRuns: [], approvals: [] } });
+		const onLocationChange = vi.fn();
+		const { unmount } = render(<HarnessPage location={{ view: 'queue' }} onLocationChange={onLocationChange} />);
+		fireEvent.click(await screen.findByRole('button', { name: /^PM-04, Write conventions/ }));
+		expect(screen.getByRole('complementary', { name: 'Write conventions' })).toBeInTheDocument();
+		fireEvent.click(screen.getAllByRole('button', { name: 'Close details' })[1]);
+		expect(screen.queryByRole('complementary', { name: 'Write conventions' })).not.toBeInTheDocument();
+		unmount();
+
+		render(<HarnessPage location={{ view: 'run', runId: 'run-1', tab: 'links' }} onLocationChange={onLocationChange} />);
+		expect(await screen.findByRole('complementary', { name: 'Add login form' })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('tab', { name: 'Stages' }));
+		expect(onLocationChange).toHaveBeenLastCalledWith({ view: 'run', runId: 'run-1', tab: 'stages' });
+	});
 });
+

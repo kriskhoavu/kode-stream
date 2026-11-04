@@ -306,7 +306,7 @@ export function App() {
           onImported={(itemId) => { void refreshAppData(); navigate({ name: 'item', itemId }); }}
           onCheckoutSwitched={async () => { await refreshAppData(); navigate({ name: 'workstream' }); }}
         /></Suspense>}
-        {route.name === 'harness' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Harness...</section>}><HarnessPage location={route.location} onLocationChange={(location) => navigate({ name: 'harness', location })} onWaitingCountChange={reportHarnessWaiting} /></Suspense>}
+        {route.name === 'harness' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Harness...</section>}><HarnessPage location={route.location} onLocationChange={(location) => navigate({ name: 'harness', location })} onWaitingCountChange={reportHarnessWaiting} onOpenAgentSpace={(workspaceId, view) => navigate({ name: 'canvas', location: { workspaceId, view } })} /></Suspense>}
         {route.name === 'not-found' && <section className="empty-state" role="alert"><h1>Page not found</h1><p>This link is not a Kode Stream route.</p><button type="button" className="primary" onClick={() => navigate({ name: 'workstream' })}>Go to Workstream</button></section>}
       </main>
 

@@ -1403,3 +1403,145 @@ a.hx-source:hover {
 	color: var(--hx-path);
 	font-weight: 700;
 }
+
+/* ── Run drawer ─────────────────────────────────────────────────────────── */
+
+.hx-drawer {
+	--drawer-width: 560px;
+}
+
+.hx .plan-drawer-body.hx-drawer-body {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.hx-drawer .plan-drawer-header h2:focus {
+	outline: none;
+}
+
+.hx-drawer-status {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	font-size: 13px;
+}
+
+.hx-drawer .drawer-kicker {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.hx-drawer .hx-gate {
+	grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.hx-drawer .hx-gate-actions {
+	grid-column: 1 / -1;
+	flex-direction: row;
+	flex-wrap: wrap;
+}
+
+.hx-drawer-queue {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 12px;
+	font-size: 13px;
+}
+
+.hx-drawer-queue p {
+	margin: 0;
+}
+
+.hx-drawer-queue-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.hx-tabs {
+	display: flex;
+	gap: 4px;
+	border-bottom: 1px solid var(--line);
+}
+
+.hx-tabs button {
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: transparent;
+	color: var(--muted);
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.hx-tabs button.on {
+	color: var(--tab-selected-text);
+	border-bottom-color: var(--tab-selected-mark);
+}
+
+.hx-tab-panel {
+	min-height: 0;
+}
+
+.hx-findings-rounds {
+	display: grid;
+	gap: 18px;
+}
+
+.hx-findings-rounds h3 {
+	margin-bottom: 8px;
+}
+
+.hx-changes ul,
+.hx-links {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.hx-changes li {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.hx-changes code,
+.hx-links code {
+	overflow-wrap: anywhere;
+}
+
+.hx-links a {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--accent-text);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.hx-live {
+	display: grid;
+	gap: 8px;
+}
+
+.hx-live p {
+	margin: 0;
+}
+
+.hx-live-line {
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 12px;
+}

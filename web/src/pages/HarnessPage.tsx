@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { HarnessLocation, HarnessView } from '../app/router';
+import type { HarnessLocation, HarnessRunTab, HarnessView } from '../app/router';
 import type { HarnessTask } from '../lib/types';
 import type { HarnessClient } from '../features/harness/harnessClient';
 import { loadHarnessClient, wantsHarnessFixture } from '../features/harness/loadHarnessClient';
 import { apiHarnessClient } from '../features/harness/harnessClient';
 import { useHarness } from '../features/harness/useHarness';
-import { queueTasks, waitingApprovals } from '../features/harness/harnessState';
+import { compareTasks, queueTasks, waitingApprovals } from '../features/harness/harnessState';
 import { InboxView } from '../features/harness/InboxView';
 import { ApprovalsView } from '../features/harness/ApprovalsView';
 import { WaveBoard } from '../features/harness/WaveBoard';
+import { RunDrawer } from '../features/harness/RunDrawer';
+import { planWaves } from '../features/harness/waves';
 import { RunView } from '../features/harness/RunView';
 import { plural } from '../features/harness/vocabulary';
 import '../features/harness/harness.css';
@@ -20,24 +22,26 @@ const sections: { view: HarnessView; label: string }[] = [
 	{ view: 'settings', label: 'Settings' }
 ];
 
-export function HarnessPage({ location, onLocationChange, onWaitingCountChange }: {
+export function HarnessPage({ location, onLocationChange, onWaitingCountChange, onOpenAgentSpace }: {
 	location: HarnessLocation;
 	onLocationChange: (location: HarnessLocation) => void;
 	onWaitingCountChange?: (count: number) => void;
+	onOpenAgentSpace?: (workspaceId: string, view?: 'sessions') => void;
 }) {
 	const [client, setClient] = useState<HarnessClient | undefined>(() => wantsHarnessFixture() ? undefined : apiHarnessClient);
 	useEffect(() => {
 		if (!client) void loadHarnessClient().then(setClient);
 	}, [client]);
 	if (!client) return <section className="hx empty-state">Loading the harness…</section>;
-	return <HarnessScreens client={client} location={location} onLocationChange={onLocationChange} onWaitingCountChange={onWaitingCountChange} />;
+	return <HarnessScreens client={client} location={location} onLocationChange={onLocationChange} onWaitingCountChange={onWaitingCountChange} onOpenAgentSpace={onOpenAgentSpace} />;
 }
 
-function HarnessScreens({ client, location, onLocationChange, onWaitingCountChange }: {
+function HarnessScreens({ client, location, onLocationChange, onWaitingCountChange, onOpenAgentSpace }: {
 	client: HarnessClient;
 	location: HarnessLocation;
 	onLocationChange: (location: HarnessLocation) => void;
 	onWaitingCountChange?: (count: number) => void;
+	onOpenAgentSpace?: (workspaceId: string, view?: 'sessions') => void;
 }) {
 	const harness = useHarness(client);
 	const { state } = harness;
@@ -78,17 +82,18 @@ function HarnessScreens({ client, location, onLocationChange, onWaitingCountChan
 			</div>
 			{location.view === 'inbox' && state.announcement?.assertive && <span className="sr-only" role="alert" aria-live="assertive" key={state.announcement.id}>{state.announcement.text}</span>}
 
-			<HarnessBody harness={harness} location={location} newestApprovalId={newestApprovalId} onOpenRun={openRun} onLocationChange={onLocationChange} />
+			<HarnessBody harness={harness} location={location} newestApprovalId={newestApprovalId} onOpenRun={openRun} onLocationChange={onLocationChange} onOpenAgentSpace={onOpenAgentSpace} />
 		</section>
 	);
 }
 
-function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocationChange }: {
+function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocationChange, onOpenAgentSpace }: {
 	harness: ReturnType<typeof useHarness>;
 	location: HarnessLocation;
 	newestApprovalId?: string;
 	onOpenRun: (runId: string) => void;
 	onLocationChange: (location: HarnessLocation) => void;
+	onOpenAgentSpace?: (workspaceId: string, view?: 'sessions') => void;
 }) {
 	const { state } = harness;
 	// Only the tasks decide the board, so progress events elsewhere do not re-plan the waves.
@@ -102,6 +107,34 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 			setPendingIds((current) => { const next = new Set(current); next.delete(task.id); return next; });
 		}
 	};
+	// The queue's drawer lives in the page; the pipeline's drawer lives in the URL (`?tab=`).
+	const [queueDrawer, setQueueDrawer] = useState<{ taskId: string; tab: HarnessRunTab } | undefined>();
+	const plan = useMemo(() => planWaves(tasks), [tasks]);
+	const waveOf = (taskId: string) => {
+		const wave = plan.waveOf.get(taskId);
+		return wave === undefined ? [] : plan.waves[wave].map((id) => state.tasks[id]).filter(Boolean).sort(compareTasks);
+	};
+	const pin = (task: HarnessTask, pinned: boolean) => void track(task, () => harness.pin(task, pinned));
+	const move = (task: HarnessTask, before?: HarnessTask) => void track(task, () => harness.setPriority(task, { before: before?.id }));
+	const drawer = (taskId: string, tab: HarnessRunTab, onTabChange: (tab: HarnessRunTab) => void, onClose: () => void) => (
+		<RunDrawer
+			state={state}
+			client={harness.client}
+			taskId={taskId}
+			tab={tab}
+			wave={waveOf(taskId)}
+			onTabChange={onTabChange}
+			onClose={onClose}
+			onOpenPipeline={location.view === 'run' ? undefined : (runId) => onLocationChange({ view: 'run', runId })}
+			onOpenAgentSpace={onOpenAgentSpace}
+			loadRun={harness.loadRun}
+			onApprove={harness.approve}
+			onReject={harness.reject}
+			onPin={pin}
+			onMove={move}
+		/>
+	);
+	const runTask = location.view === 'run' && location.runId ? state.runs[location.runId]?.taskId : undefined;
 	if (!state.loaded && !state.error) return <section className="hx-card hx-state" aria-busy="true">Loading the harness…</section>;
 	if (!state.loaded && state.error) {
 		return (
@@ -133,13 +166,26 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 					allTasks={state.tasks}
 					runs={state.runs}
 					pendingIds={pendingIds}
-					onOpenTask={(task) => { if (task.runId) onOpenRun(task.runId); }}
-					onPin={(task, pinned) => void track(task, () => harness.pin(task, pinned))}
-					onMove={(task, before) => void track(task, () => harness.setPriority(task, { before: before?.id }))}
+					onOpenTask={(task) => setQueueDrawer({ taskId: task.id, tab: task.runId ? 'stages' : 'links' })}
+					onPin={pin}
+					onMove={move}
 					onRefresh={() => void harness.refresh()}
 				/>
 			)}
-			{location.view === 'run' && <RunView state={state} runId={location.runId} onSelectRun={onOpenRun} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} />}
+			{location.view === 'queue' && queueDrawer && drawer(queueDrawer.taskId, queueDrawer.tab, (tab) => setQueueDrawer({ ...queueDrawer, tab }), () => setQueueDrawer(undefined))}
+			{location.view === 'run' && (
+				<RunView
+					state={state}
+					runId={location.runId}
+					onSelectRun={onOpenRun}
+					onRefresh={() => void harness.refresh()}
+					loadRun={harness.loadRun}
+					onApprove={harness.approve}
+					onReject={harness.reject}
+					onOpenTab={(tab) => location.runId && onLocationChange({ view: 'run', runId: location.runId, tab })}
+				/>
+			)}
+			{location.view === 'run' && location.runId && location.tab && runTask && drawer(runTask, location.tab, (tab) => onLocationChange({ view: 'run', runId: location.runId, tab }), () => onLocationChange({ view: 'run', runId: location.runId }))}
 			{location.view === 'settings' && <section className="hx-card hx-state"><p>Harness settings are not available yet.</p></section>}
 		</>
 	);

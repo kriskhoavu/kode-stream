@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { HarnessApproval } from '../../lib/types';
+import type { HarnessRunTab } from '../../app/router';
 import type { HarnessState } from './harnessState';
 import { GateCard } from './GateCard';
 import { HxStatusBadge } from './HxStatusBadge';
@@ -14,7 +15,7 @@ import { useNow } from './useNow';
 import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, plural, sourceLabels, stageKindLabels } from './vocabulary';
 
 /** The pipeline for one run: where it stands, what waits on a person, and what each step took. */
-export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onApprove, onReject, links }: {
+export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onApprove, onReject, onOpenTab }: {
 	state: HarnessState;
 	runId?: string;
 	onSelectRun: (runId: string) => void;
@@ -22,8 +23,8 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 	loadRun: (runId: string) => Promise<void>;
 	onApprove: (approval: HarnessApproval, reason?: string) => void;
 	onReject: (approval: HarnessApproval, reason: string) => void;
-	/** Extra links under the findings, such as the drawer's tabs. */
-	links?: React.ReactNode;
+	/** Opens the run's drawer on a tab: changed files, the live agent, every finding. */
+	onOpenTab?: (tab: HarnessRunTab) => void;
 }) {
 	const now = useNow(30_000);
 	const summary = runId ? state.runs[runId] : undefined;
@@ -88,7 +89,9 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 			<div className="hx-run-split">
 				<RunLedger detail={detail} />
 				<FindingsPanel agentRuns={detail.agentRuns}>
-					{links}
+					{onOpenTab && <button type="button" className="hx-link" onClick={() => onOpenTab('findings')}>Every finding</button>}
+					{onOpenTab && <button type="button" className="hx-link" onClick={() => onOpenTab('changes')}>Changes so far</button>}
+					{onOpenTab && working && <button type="button" className="hx-link" onClick={() => onOpenTab('live')}>Watch the {agentRoleLabels[working.role]} live</button>}
 					{task.source.url && <a className="hx-link" href={task.source.url} target="_blank" rel="noreferrer">{sourceLabels[task.source.kind]} {task.source.key}</a>}
 					{run.prUrl && <a className="hx-link" href={run.prUrl} target="_blank" rel="noreferrer">Draft pull request</a>}
 				</FindingsPanel>
