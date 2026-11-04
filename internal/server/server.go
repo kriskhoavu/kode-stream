@@ -24,9 +24,12 @@ import (
 	appgit "kode-stream/internal/git"
 	"kode-stream/internal/harness"
 	harnessclaude "kode-stream/internal/harness/adapters/engine/claudecode"
+	harnesscodex "kode-stream/internal/harness/adapters/engine/codex"
+	harnessopencode "kode-stream/internal/harness/adapters/engine/opencode"
 	harnesswebhook "kode-stream/internal/harness/adapters/notifier/webhook"
 	harnessprbitbucket "kode-stream/internal/harness/adapters/pr/bitbucket"
 	harnessprgithub "kode-stream/internal/harness/adapters/pr/github"
+	harnessranker "kode-stream/internal/harness/adapters/ranker/openai"
 	harnessbitbucket "kode-stream/internal/harness/adapters/scout/bitbucket"
 	harnessgithub "kode-stream/internal/harness/adapters/scout/github"
 	harnessjira "kode-stream/internal/harness/adapters/scout/jira"
@@ -101,7 +104,8 @@ func NewServer(port int) (*Server, error) {
 		Repository:   state.Harness,
 		Workspaces:   reg,
 		Scouts:       []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New()},
-		Engines:      []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath)},
+		Engines:      []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath), harnesscodex.New(), harnessopencode.New()},
+		Reranker:     harnessranker.New(),
 		Worktrees:    harnessworktree.New(harnessConfig.WorktreeRoot, git),
 		PullRequests: []ports.PullRequests{harnessprgithub.New(), harnessprbitbucket.New()},
 		Audit:        auditStore,

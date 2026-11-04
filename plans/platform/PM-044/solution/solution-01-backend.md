@@ -127,6 +127,24 @@ allow-list. It parses stdout line by line (4 MB per line): `system/init` gives t
 turn and its tool names, `result` gives `total_cost_usd`, `duration_ms`, `num_turns`, `usage`, `is_error` and
 `subtype`. stderr keeps a 64 KB ring for the failure reason. The wall-clock limit is the lease.
 
+### Codex and OpenCode
+
+All three adapters share one process runner (own process group, SIGTERM then SIGKILL, 4 MB lines, 64 KB stderr
+ring, the lease as the wall-clock limit). Codex runs `codex exec --json --skip-git-repo-check --cd <worktree>
+--sandbox <read-only|workspace-write> --model <m> -` with the brief on stdin; it reports tokens but no cost, and has
+no turn limit, spending limit, tool allow-list or caller-chosen session id. OpenCode runs `opencode run --format json
+--file .harness/brief.md --model <provider/model> [--session <id>] [--auto] <one-line message>`: its message is an
+argument, so the brief is a file attached to the message and removed when the run ends; it reports cost and tokens per
+step but has no turn limit, spending limit or tool allow-list. `Detect` lists each missing knob, and Settings shows
+it. Saving settings refuses an engine the server does not run and an OpenCode model without its provider.
+
+### Model re-ranker
+
+When `ranker.llm.enabled`, the sorter sends the rules' top `topN` unpinned tasks (id, key, title, priority, labels,
+score, how many tasks each waits for) inside task-data delimiters to `<endpoint>/chat/completions` and asks for
+`{"order": [ids]}`. Only a permutation of exactly those ids is applied; the reordered tasks take the same scores in the
+new order, with the reason "reordered by the model". Anything else keeps the rules' order and is logged.
+
 ## Structured Report `harness.report/v1`
 
 Read from `.harness/report.json` in the worktree, else from a fenced ` ```json harness-report ` block in the final

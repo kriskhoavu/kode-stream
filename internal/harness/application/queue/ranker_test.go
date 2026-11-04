@@ -28,3 +28,24 @@ func TestRuleRankerScoresPriorityLabelsAgeOverrideAndPin(t *testing.T) {
 		t.Fatalf("ranked = %#v err=%v", ranked, err)
 	}
 }
+
+func TestApplyOrderReordersOnlyUnpinnedTopTasks(t *testing.T) {
+	ranked := []Scored{
+		{Task: domain.Task{ID: "pin", Pinned: true}, Score: 1000},
+		{Task: domain.Task{ID: "a"}, Score: 40},
+		{Task: domain.Task{ID: "b"}, Score: 30},
+		{Task: domain.Task{ID: "c"}, Score: 20},
+	}
+	out, ok := ApplyOrder(ranked, 3, []string{"b", "a"})
+	if !ok || out[0].Task.ID != "pin" || out[1].Task.ID != "b" || out[1].Score != 40 || out[2].Task.ID != "a" || out[2].Score != 30 || out[3].Task.ID != "c" {
+		t.Fatalf("out = %#v", out)
+	}
+	if out[1].Reasons[len(out[1].Reasons)-1] != "reordered by the model" {
+		t.Fatalf("reasons = %v", out[1].Reasons)
+	}
+	for _, bad := range [][]string{{"a"}, {"a", "a"}, {"a", "c"}, {"pin", "a"}} {
+		if _, ok := ApplyOrder(ranked, 3, bad); ok {
+			t.Fatalf("order %v was accepted", bad)
+		}
+	}
+}

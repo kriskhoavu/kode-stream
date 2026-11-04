@@ -112,3 +112,48 @@ func SortScored(scored []Scored) {
 		return scored[i].Task.ID < scored[j].Task.ID
 	})
 }
+
+// Reranker may reorder the rules' top N; it never adds, drops or moves a
+// task in or out of the top N, and never moves a pinned task.
+type Reranker interface {
+	Rerank(ctx context.Context, ranked []Scored, settings domain.Settings) ([]Scored, error)
+}
+
+// ApplyOrder reorders the unpinned tasks among ranked's first topN by order
+// (task ids, best first) and hands them the same scores in the new order, so
+// the stored ranking follows. An order that is not a permutation of those
+// ids is refused and ranked comes back unchanged.
+func ApplyOrder(ranked []Scored, topN int, order []string) ([]Scored, bool) {
+	if topN > len(ranked) {
+		topN = len(ranked)
+	}
+	var slots []int
+	byID := map[string]Scored{}
+	for i := 0; i < topN; i++ {
+		if ranked[i].Task.Pinned {
+			continue
+		}
+		slots = append(slots, i)
+		byID[ranked[i].Task.ID] = ranked[i]
+	}
+	if len(order) != len(slots) {
+		return ranked, false
+	}
+	seen := map[string]bool{}
+	for _, id := range order {
+		if _, ok := byID[id]; !ok || seen[id] {
+			return ranked, false
+		}
+		seen[id] = true
+	}
+	out := append([]Scored{}, ranked...)
+	for position, slot := range slots {
+		entry := byID[order[position]]
+		if entry.Task.ID != ranked[slot].Task.ID {
+			entry.Reasons = append(append([]string{}, entry.Reasons...), "reordered by the model")
+		}
+		entry.Score = ranked[slot].Score
+		out[slot] = entry
+	}
+	return out, true
+}

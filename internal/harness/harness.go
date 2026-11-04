@@ -74,10 +74,10 @@ type Dependencies struct {
 	// RuntimeVerifyCommand returns a workspace runtime's smoke verification
 	// command, or "" when it has none.
 	RuntimeVerifyCommand func(*models.WorkspaceRuntimeConfig) string
-	// Ranker re-orders the rules' ranking; nil keeps the rules' order.
-	Ranker queue.Ranker
-	Now    func() time.Time
-	Config Config
+	// Reranker may reorder the rules' top N when the settings enable it.
+	Reranker queue.Reranker
+	Now      func() time.Time
+	Config   Config
 }
 
 type Service struct {
@@ -88,7 +88,7 @@ type Service struct {
 	feed       *feed.Broadcaster
 	poller     *scout.Poller
 	rules      queue.RuleRanker
-	ranker     queue.Ranker
+	reranker   queue.Reranker
 
 	engines    map[string]ports.Engine
 	engineList []ports.Engine
@@ -120,7 +120,7 @@ func New(deps Dependencies) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	service := &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), ranker: deps.Ranker, progress: map[string]string{},
+	service := &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), reranker: deps.Reranker, progress: map[string]string{},
 		pollWake: make(chan struct{}, 1), sortWake: make(chan struct{}, 1), workWakes: map[string]chan struct{}{},
 		engines: map[string]ports.Engine{}, engineList: deps.Engines, worktrees: deps.Worktrees, pulls: deps.PullRequests, notifier: deps.Notifier, audit: deps.Audit, runtimeCmd: deps.RuntimeVerifyCommand, handles: map[string]agentProcess{}, busy: map[domain.RoleKey]int{}}
 	for _, name := range workLoopNames {
@@ -227,6 +227,9 @@ func (s *Service) SaveSettings(ctx context.Context, settings domain.Settings, ex
 	if err != nil {
 		return domain.Settings{}, err
 	}
+	if err := s.checkEngines(normalized.ModelPolicy); err != nil {
+		return domain.Settings{}, err
+	}
 	if s.workspaces != nil {
 		for _, workspace := range normalized.Workspaces {
 			if _, found, err := s.workspaces.Get(workspace.WorkspaceID); err != nil {
@@ -242,6 +245,26 @@ func (s *Service) SaveSettings(ctx context.Context, settings domain.Settings, ex
 	}
 	s.emit(ctx, domain.Event{Kind: domain.EventSettingsUpdated, Actor: actorOrNil(actor), Payload: payload(map[string]any{"revision": saved.Revision, "enabled": saved.Enabled})})
 	return saved, nil
+}
+
+// checkEngines refuses a policy that names an engine this server does not
+// run, or an OpenCode model without its provider.
+func (s *Service) checkEngines(policy domain.ModelPolicy) error {
+	if len(s.engines) == 0 {
+		return nil
+	}
+	for _, role := range domain.Roles {
+		rolePolicy := policy.Roles[role]
+		if _, ok := s.engines[rolePolicy.Engine]; !ok {
+			return domain.Invalid("modelPolicy.roles.%s.engine %q is not available; choose one of the engines in status", role, rolePolicy.Engine)
+		}
+		for _, model := range []string{rolePolicy.Model, rolePolicy.HighDifficultyModel} {
+			if rolePolicy.Engine == "opencode" && model != "" && !strings.Contains(model, "/") {
+				return domain.Invalid("modelPolicy.roles.%s: OpenCode models are named provider/model, not %q", role, model)
+			}
+		}
+	}
+	return nil
 }
 
 func actorOrNil(actor domain.Actor) *domain.Actor {

@@ -3,6 +3,7 @@ package harness
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 
 	"kode-stream/internal/harness/application/queue"
@@ -63,8 +64,11 @@ func (s *Service) Sort(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if s.ranker != nil {
-			if reordered, err := s.ranker.Rank(ctx, group, settings, now); err == nil && len(reordered) == len(scored) {
+		if s.reranker != nil && settings.Ranker.LLM.Enabled {
+			reordered, err := s.reranker.Rerank(ctx, scored, settings)
+			if err != nil {
+				log.Printf("harness: the re-ranker kept the rules' order: %v", err)
+			} else if len(reordered) == len(scored) {
 				scored = reordered
 			}
 		}
