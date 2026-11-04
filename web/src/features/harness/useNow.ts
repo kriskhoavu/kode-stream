@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 /**
  * One shared clock per interval, so twenty live timers on a page cost one
@@ -19,6 +19,7 @@ function subscribe(intervalMs: number, listener: () => void) {
 	const entry = clock(intervalMs);
 	entry.listeners.add(listener);
 	if (entry.timer === undefined) {
+		// The clock was idle: catch up once, so a page opened later never shows an old time.
 		entry.now = Date.now();
 		entry.timer = window.setInterval(() => {
 			entry.now = Date.now();
@@ -35,8 +36,10 @@ function subscribe(intervalMs: number, listener: () => void) {
 }
 
 export function useNow(intervalMs = 1000): number {
+	// A stable subscribe, so React does not resubscribe (and restart the clock) on every render.
+	const listen = useCallback((listener: () => void) => subscribe(intervalMs, listener), [intervalMs]);
 	return useSyncExternalStore(
-		(listener) => subscribe(intervalMs, listener),
+		listen,
 		() => clock(intervalMs).now,
 		() => clock(intervalMs).now
 	);

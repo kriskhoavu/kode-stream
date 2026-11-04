@@ -8,6 +8,7 @@ import { queueTasks, waitingApprovals } from '../features/harness/harnessState';
 import { InboxView } from '../features/harness/InboxView';
 import { ApprovalsView } from '../features/harness/ApprovalsView';
 import { QueueList } from '../features/harness/QueueList';
+import { RunView } from '../features/harness/RunView';
 import { plural } from '../features/harness/vocabulary';
 import '../features/harness/harness.css';
 
@@ -116,7 +117,7 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 			{location.view === 'inbox' && <InboxView state={state} newestApprovalId={newestApprovalId} onApprove={harness.approve} onReject={harness.reject} onOpenRun={onOpenRun} />}
 			{location.view === 'approvals' && <ApprovalsView state={state} onApprove={harness.approve} onReject={harness.reject} onOpenRun={onOpenRun} />}
 			{location.view === 'queue' && <QueueList tasks={tasks} allTasks={state.tasks} onPin={harness.pin} onOpen={(task) => task.runId && onOpenRun(task.runId)} />}
-			{location.view === 'run' && <section className="hx-card hx-state"><p>Loading progress for this run…</p></section>}
+			{location.view === 'run' && <RunView state={state} runId={location.runId} onSelectRun={onOpenRun} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} />}
 			{location.view === 'settings' && <section className="hx-card hx-state"><p>Harness settings are not available yet.</p></section>}
 		</>
 	);
