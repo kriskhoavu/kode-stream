@@ -21,10 +21,11 @@ func (s *Service) atomic(ctx context.Context, fn func(tx domain.Repository, reco
 				event.At = s.now()
 			}
 			saved, err := tx.AppendEvent(ctx, event)
-			if err == nil {
-				stored = append(stored, saved)
+			if err != nil {
+				return err
 			}
-			return err
+			stored = append(stored, saved)
+			return s.enqueueFor(ctx, tx, saved)
 		})
 	})
 	if err == nil {

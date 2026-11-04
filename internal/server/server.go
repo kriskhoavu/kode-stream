@@ -24,6 +24,7 @@ import (
 	appgit "kode-stream/internal/git"
 	"kode-stream/internal/harness"
 	harnessclaude "kode-stream/internal/harness/adapters/engine/claudecode"
+	harnesswebhook "kode-stream/internal/harness/adapters/notifier/webhook"
 	harnessprbitbucket "kode-stream/internal/harness/adapters/pr/bitbucket"
 	harnessprgithub "kode-stream/internal/harness/adapters/pr/github"
 	harnessbitbucket "kode-stream/internal/harness/adapters/scout/bitbucket"
@@ -92,6 +93,10 @@ func NewServer(port int) (*Server, error) {
 	runtimeService := appruntime.NewService()
 	verificationService := verification.NewService(reg, runtimeService)
 	harnessConfig := harness.ResolveConfig(os.Getenv, paths.Dir, runtimeConfig.Mode == models.RuntimeModeLocal)
+	var harnessNotifier ports.Notifier
+	if harnessConfig.WebhookURL != "" {
+		harnessNotifier = harnesswebhook.New(harnessConfig.WebhookURL, harnessConfig.WebhookSecret)
+	}
 	harnessService := harness.New(harness.Dependencies{
 		Repository:   state.Harness,
 		Workspaces:   reg,
@@ -100,6 +105,7 @@ func NewServer(port int) (*Server, error) {
 		Worktrees:    harnessworktree.New(harnessConfig.WorktreeRoot, git),
 		PullRequests: []ports.PullRequests{harnessprgithub.New(), harnessprbitbucket.New()},
 		Audit:        auditStore,
+		Notifier:     harnessNotifier,
 		RuntimeVerifyCommand: func(config *models.WorkspaceRuntimeConfig) string {
 			return runtimeService.VerifyCommand(config, appruntime.VerifyProfileSmoke)
 		},

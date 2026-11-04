@@ -39,8 +39,9 @@ Decision body:
 }
 ```
 
-`expectedRevision` is optional for the bot: when absent the current revision is used. The decision is recorded with
-`channel: "webex"`. Replaying the same `idempotencyKey` answers 200 with the recorded approval. A decision on an
+`expectedRevision` is optional for the bot: when absent the current revision is used. `actor.personId` is
+required. The decision is recorded with `channel: "webex"` and `decidedBy: { actorId: "webex:<personId>",
+displayName, email }`, which is how the dashboard shows "Approved via Webex by Anna". Replaying the same `idempotencyKey` answers 200 with the recorded approval. A decision on an
 approval already decided under another key answers 409 `already_decided`. A stale `expectedRevision` answers 409
 `conflict`. `/runs/:id/decision` answers 404 when the run has no waiting approval.
 

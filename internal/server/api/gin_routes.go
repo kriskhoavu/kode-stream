@@ -91,6 +91,13 @@ func routeManifest(a *API) []routeSpec {
 		{http.MethodPost, "/auth/logout", "cloud-auth", publicRoute, a.cloud.route(a.cloud.cloudLogout)},
 		{http.MethodGet, "/agents/channel", "cloud-agent", publicRoute, a.cloud.route(a.cloud.cloudAgentChannel)},
 		{http.MethodPost, "/workspaces/from-agent", "cloud-workspace", publicRoute, a.cloud.route(a.cloud.registerCloudWorkspaceFromAgent)},
+		// The bot routes authenticate themselves with the bot's bearer token.
+		{http.MethodGet, "/harness/bot/status", "harness-bot", publicRoute, a.harnessBot.route(a.harnessBot.status)},
+		{http.MethodGet, "/harness/bot/queue", "harness-bot", publicRoute, a.harnessBot.route(a.harnessBot.queue)},
+		{http.MethodGet, "/harness/bot/approvals", "harness-bot", publicRoute, a.harnessBot.route(a.harnessBot.approvals)},
+		{http.MethodGet, "/harness/bot/runs/:id", "harness-bot", publicRoute, a.harnessBot.route(a.harnessBot.run)},
+		{http.MethodPost, "/harness/bot/runs/:id/decision", "harness-bot", publicRoute, a.harnessBot.route(a.harnessBot.decideRun)},
+		{http.MethodPost, "/harness/bot/approvals/:id/decide", "harness-bot", publicRoute, a.harnessBot.route(a.harnessBot.decideApproval)},
 
 		{http.MethodGet, "/audit-events", "audit", protectedRoute, ginHTTPHandler(a.audit.auditEvents)},
 		{http.MethodGet, "/saved-filters", "navigation", protectedRoute, ginHTTPHandler(a.navigation.Filters)},

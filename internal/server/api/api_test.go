@@ -1112,6 +1112,7 @@ func TestZeroValueAPIRoutesReturnUnavailableForExtractedControllers(t *testing.T
 		{name: "Git", owner: "git", method: http.MethodGet, path: "/api/workspaces/ws/git/status", status: http.StatusServiceUnavailable},
 		{name: "State", owner: "state", method: http.MethodGet, path: "/api/state", status: http.StatusServiceUnavailable},
 		{name: "Search", owner: "search", method: http.MethodGet, path: "/api/search?q=x", status: http.StatusOK},
+		{name: "Harness bot", owner: "harness-bot", method: http.MethodGet, path: "/api/harness/bot/status", status: http.StatusServiceUnavailable},
 		{name: "Harness", owner: "harness", method: http.MethodGet, path: "/api/harness/status", status: http.StatusServiceUnavailable},
 		{name: "Workspace stream", owner: "workspace-stream", method: http.MethodPost, path: "/api/workspaces/stream-create", body: `{}`, status: http.StatusServiceUnavailable},
 	}

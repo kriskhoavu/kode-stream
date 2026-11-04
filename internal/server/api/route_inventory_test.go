@@ -21,18 +21,24 @@ func TestRouteManifestMatchesRegisteredAPIInventory(t *testing.T) {
 	}
 
 	manifest := routeManifest(apiHandler)
-	if got := len(manifest); got != 148 {
-		t.Fatalf("API route baseline = %d, want 148", got)
+	if got := len(manifest); got != 154 {
+		t.Fatalf("API route baseline = %d, want 154", got)
 	}
 	expected := make(map[string]routeSpec, len(manifest))
 	owners := map[string]bool{}
 	public := map[string]bool{
-		http.MethodGet + " /api/health":                 true,
-		http.MethodGet + " /api/auth/login":             true,
-		http.MethodGet + " /api/auth/callback":          true,
-		http.MethodPost + " /api/auth/logout":           true,
-		http.MethodGet + " /api/agents/channel":         true,
-		http.MethodPost + " /api/workspaces/from-agent": true,
+		http.MethodGet + " /api/health":                            true,
+		http.MethodGet + " /api/auth/login":                        true,
+		http.MethodGet + " /api/auth/callback":                     true,
+		http.MethodPost + " /api/auth/logout":                      true,
+		http.MethodGet + " /api/agents/channel":                    true,
+		http.MethodPost + " /api/workspaces/from-agent":            true,
+		http.MethodGet + " /api/harness/bot/status":                true,
+		http.MethodGet + " /api/harness/bot/queue":                 true,
+		http.MethodGet + " /api/harness/bot/approvals":             true,
+		http.MethodGet + " /api/harness/bot/runs/:id":              true,
+		http.MethodPost + " /api/harness/bot/runs/:id/decision":    true,
+		http.MethodPost + " /api/harness/bot/approvals/:id/decide": true,
 	}
 	for _, route := range manifest {
 		key := route.method + " /api" + route.path
@@ -74,7 +80,7 @@ func TestRouteManifestMatchesRegisteredAPIInventory(t *testing.T) {
 		}
 	}
 
-	for _, owner := range []string{"health", "cloud-auth", "cloud-agent", "cloud-workspace", "cloud-command", "cloud-snapshot", "audit", "navigation", "system", "storage", "canvas", "state", "search", "ai", "workspace", "workspace-files", "workspace-search", "workspace-health", "item", "item-search", "jira", "knowledge", "verification", "git", "workspace-stream", "harness"} {
+	for _, owner := range []string{"health", "cloud-auth", "cloud-agent", "cloud-workspace", "cloud-command", "cloud-snapshot", "audit", "navigation", "system", "storage", "canvas", "state", "search", "ai", "workspace", "workspace-files", "workspace-search", "workspace-health", "item", "item-search", "jira", "knowledge", "verification", "git", "workspace-stream", "harness", "harness-bot"} {
 		if !owners[owner] {
 			t.Errorf("route family %q owns no manifest route", owner)
 		}

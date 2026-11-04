@@ -52,6 +52,7 @@ type API struct {
 	storage       *storageController
 	cloud         *cloudController
 	harness       *harnessController
+	harnessBot    *harnessBotController
 	runtimeConfig system.RuntimeConfig
 }
 
@@ -175,6 +176,7 @@ func New(deps Dependencies) *API {
 		storage:       &storageController{status: deps.StorageStatus, sync: deps.StorageSync},
 		cloud:         cloud,
 		harness:       &harnessController{harness: deps.Harness},
+		harnessBot:    &harnessBotController{harness: deps.Harness},
 	}
 }
 
@@ -240,5 +242,8 @@ func (a *API) initializeControllers() {
 	}
 	if a.harness == nil {
 		a.harness = &harnessController{}
+	}
+	if a.harnessBot == nil {
+		a.harnessBot = &harnessBotController{}
 	}
 }

@@ -86,6 +86,7 @@ func (s *Service) loops() []scheduler.Loop {
 		{Name: string(domain.RoleKeySorter), Interval: s.interval(func(i domain.Intervals) int { return i.SorterSeconds }), Wake: s.sortWake, Run: s.sortCycle},
 		{Name: "recovery", Interval: s.interval(func(i domain.Intervals) int { return i.WorkerSeconds }), Run: s.recoveryCycle},
 	}
+	loops = append(loops, s.notifierLoop())
 	return append(loops, s.workLoops()...)
 }
 
