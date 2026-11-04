@@ -311,6 +311,13 @@ type AgentRun struct {
 	FailureReason   string        `json:"failureReason,omitempty"`
 	Report          *Report       `json:"report,omitempty"`
 	DiffStat        string        `json:"diffStat,omitempty"`
+	// OutOfScope lists paths the harness reverted after the agent changed
+	// them outside its scope.
+	OutOfScope []string `json:"outOfScope,omitempty"`
+	// HarnessGate is the harness's own run of the verification commands.
+	HarnessGate *GateRun `json:"harnessGate,omitempty"`
+	// Commit is the harness's commit after this agent run, if any.
+	Commit string `json:"commit,omitempty"`
 	Progress        string        `json:"progress,omitempty"`
 	LeaseOwner      string        `json:"-"`
 	LeaseUntil      *time.Time    `json:"-"`
@@ -357,6 +364,20 @@ type Finding struct {
 type Gate struct {
 	Command string `json:"command"`
 	Passed  bool   `json:"passed"`
+}
+
+// MaxLogTailBytes bounds the verification output the harness keeps.
+const MaxLogTailBytes = 8 << 10
+
+// GateRun is one run of the verification commands by the harness itself.
+type GateRun struct {
+	Command    string `json:"command"`
+	Passed     bool   `json:"passed"`
+	ExitCode   int    `json:"exitCode"`
+	DurationMs int64  `json:"durationMs"`
+	// LogTail is the last 8 KB of the failing command's output. It is
+	// untrusted and goes to a brief only inside task-data delimiters.
+	LogTail string `json:"logTail,omitempty"`
 }
 
 type Report struct {

@@ -299,13 +299,20 @@ func (st *step) review(agentRun domain.AgentRun) {
 	report := agentRun.Report
 	blocking, advisory := brief.Blocking(report.Findings)
 	round := st.round(st.stage.Round)
-	round.ReviewerAgentRunID, round.Verdict, round.Blocking, round.Advisory = agentRun.ID, report.Verdict, blocking, advisory
-	st.stage.Blocking, st.stage.Advisory = blocking, advisory
-	st.run.Totals.Blocking, st.run.Totals.Advisory = blocking, advisory
 	for _, finding := range report.Findings {
 		finding.Round = st.stage.Round
 		st.stage.Findings = append(st.stage.Findings, finding)
 	}
+	var thisRound []domain.Finding
+	for _, finding := range st.stage.Findings {
+		if finding.Round == st.stage.Round {
+			thisRound = append(thisRound, finding)
+		}
+	}
+	roundBlocking, roundAdvisory := brief.Blocking(thisRound)
+	round.ReviewerAgentRunID, round.Verdict, round.Blocking, round.Advisory = agentRun.ID, report.Verdict, roundBlocking, roundAdvisory
+	st.stage.Blocking, st.stage.Advisory = roundBlocking, roundAdvisory
+	st.run.Totals.Blocking, st.run.Totals.Advisory = roundBlocking, roundAdvisory
 	st.event(domain.EventStageRound, st.stage.ID, map[string]any{"kind": st.stage.Kind, "round": st.stage.Round, "verdict": report.Verdict, "blocking": blocking, "advisory": advisory})
 	if report.Verdict == domain.VerdictApprove {
 		st.reviewApproved(agentRun)

@@ -43,7 +43,7 @@ P0 Plan ─> B1 Core ─> B2 Scout + sorter ─> B3 Claude Code + plan stage ─
 | B1    | Core                                         | Backend  | P0         | Done    |
 | B2    | Scout, sorter, queue operations              | Backend  | B1         | Done    |
 | B3    | Claude Code engine, plan stage, plan gate    | Backend  | B2         | Done    |
-| B4    | Implement stage                              | Backend  | B3         | Pending |
+| B4    | Implement stage                              | Backend  | B3         | Done    |
 | B5    | QA and draft PR                              | Backend  | B4         | Pending |
 | B6    | Bot surface and webhooks                     | Backend  | B3         | Pending |
 | B7    | More engines, policy editing, LLM ranker     | Backend  | B5         | Pending |

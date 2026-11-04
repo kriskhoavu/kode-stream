@@ -83,6 +83,9 @@ type WorkspaceSettings struct {
 	WorkspaceID          string                   `json:"workspaceId"`
 	MaxConcurrentRuns    int                      `json:"maxConcurrentRuns"`
 	VerificationCommands []string                 `json:"verificationCommands"`
+	// Scope lists the path prefixes a builder may change; empty allows any
+	// path that is not protected.
+	Scope []string `json:"scope"`
 	Jira                 *JiraSourceSettings      `json:"jira,omitempty"`
 	GitHub               *GitHubSourceSettings    `json:"github,omitempty"`
 	Bitbucket            *BitbucketSourceSettings `json:"bitbucket,omitempty"`
@@ -258,6 +261,20 @@ func (s Settings) Normalize() (Settings, error) {
 		}
 		if len(workspace.VerificationCommands) > maxVerificationCmds {
 			return s, Invalid("workspace %s lists more than %d verification commands", workspace.WorkspaceID, maxVerificationCmds)
+		}
+		for _, command := range workspace.VerificationCommands {
+			if strings.TrimSpace(command) == "" || strings.ContainsAny(command, "\n\r") {
+				return s, Invalid("workspace %s has an empty or multi-line verification command", workspace.WorkspaceID)
+			}
+		}
+		if workspace.Scope == nil {
+			workspace.Scope = []string{}
+		}
+		for _, prefix := range workspace.Scope {
+			clean := strings.TrimSpace(prefix)
+			if clean == "" || strings.HasPrefix(clean, "/") || strings.Contains(clean, "..") {
+				return s, Invalid("workspace %s scope entry %q must be a relative path inside the repository", workspace.WorkspaceID, prefix)
+			}
 		}
 		if workspace.Jira != nil {
 			if workspace.Jira.Max == 0 {

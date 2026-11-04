@@ -3,6 +3,7 @@ package harness
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -101,8 +102,25 @@ func (s *Service) Decide(ctx context.Context, approvalID string, input DecideInp
 		}
 		return domain.Approval{}, err
 	}
+	if decided.Gate == domain.GatePlan && decided.State == domain.ApprovalApproved {
+		s.commitApprovedPlan(ctx, decided.RunID)
+	}
 	s.wakeWork()
 	return decided, nil
+}
+
+// commitApprovedPlan commits the approved plan on the run branch, so each
+// builder's changes are measured against it.
+func (s *Service) commitApprovedPlan(ctx context.Context, runID string) {
+	run, err := s.repository.GetRun(ctx, runID)
+	if err != nil {
+		return
+	}
+	if commit, err := s.commitRun(ctx, run, "Plan "); err != nil {
+		log.Printf("harness: commit the plan of run %s: %v", runID, err)
+	} else if commit != "" {
+		s.emit(ctx, domain.Event{Kind: domain.EventStageRound, TaskID: run.TaskID, RunID: run.ID, Payload: payload(map[string]any{"kind": domain.StagePlan, "commit": commit})})
+	}
 }
 
 func (s *Service) applyDecision(ctx context.Context, tx domain.Repository, record func(domain.Event) error, settings domain.Settings, approval domain.Approval, input DecideInput) error {

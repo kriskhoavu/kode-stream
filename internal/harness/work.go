@@ -347,11 +347,19 @@ func (s *Service) execute(agentRun domain.AgentRun, settings domain.Settings, po
 		return
 	}
 	report, reportErr := brief.ReadReport(run.WorktreePath, result.FinalText, agentRun.Role)
-	diffStat := ""
-	if !result.IsError && reportErr == nil && producer(agentRun.Role) && s.worktrees != nil {
+	succeeded := !result.IsError && reportErr == nil
+	diffStat, commit := "", ""
+	var outOfScope []string
+	var gate *domain.GateRun
+	var checkErr error
+	if succeeded && producer(agentRun.Role) {
+		outOfScope, gate, checkErr = s.afterProducer(ctx, run, agentRun, settings, lease)
 		if _, stat, err := s.worktrees.Diff(ctx, run.WorktreePath, run.BaseCommit); err == nil {
 			diffStat = boundedText(stat, domain.MaxDiffStatBytes)
 		}
+	}
+	if succeeded && agentRun.Role == domain.RoleCodeReviewer && report.Verdict == domain.VerdictApprove {
+		commit, checkErr = s.commitRun(ctx, run, "")
 	}
 	s.finishAgentRun(ctx, agentRun.ID, func(current *domain.AgentRun) {
 		current.EngineSessionID, current.TranscriptRef = result.SessionID, result.TranscriptRef
@@ -359,7 +367,11 @@ func (s *Service) execute(agentRun domain.AgentRun, settings domain.Settings, po
 		current.Usage.CostUSD = result.CostUSD
 		exitCode := result.ExitCode
 		current.ExitCode, current.StopReason, current.DiffStat = &exitCode, result.StopReason, diffStat
+		current.OutOfScope, current.HarnessGate, current.Commit = outOfScope, gate, commit
 		switch {
+		case checkErr != nil:
+			current.State = domain.AgentFailed
+			current.FailureReason = "the harness could not check the work: " + boundedText(checkErr.Error(), 400)
 		case result.IsError:
 			current.State = domain.AgentFailed
 			current.FailureReason = failureText(result)

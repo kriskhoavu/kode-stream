@@ -135,6 +135,15 @@ text. Fields: `status`, `summary` (≤600), `difficulty` (`low|medium|high`), `s
 `filesChanged[]`, `gate{command, passed}`, `planDrift`, `open[]`. At most 64 KB. A missing or invalid report fails the
 agent run with `report_missing` and is retried once with a reminder.
 
+## Scope And Commits
+
+A producer's changes are compared with the last harness commit. A path outside its scope is reverted and
+reported as an advisory finding: the planner's scope is `plans/`; a builder's and tester's is the workspace's
+`scope` setting plus the plan folder (empty means any path). `.git/`, `.harness/`, `.claude/` and
+`.github/workflows/` are never in scope. Reviewers run read-only (`permissionMode: plan`, no edit tools) and are
+not checked. The harness commits on the run branch three times at most: the approved plan
+(`<KEY>: Plan <title>`), the approved build (`<KEY>: <title>`) and the tester's fixes after QA passes.
+
 ## Worktrees
 
 `<dataDir>/harness/worktrees/<workspaceId>/<runId>/`, outside every workspace, on branch `harness/<key>-<short>` from
@@ -211,7 +220,10 @@ interface HarnessAgentRunSummary { id: string; role: Role; engine: string; model
 interface HarnessAgentRun extends HarnessAgentRunSummary { runId: string; stageId: string;
   worktreePath: string; engineSessionId?: string; transcriptRef?: string; usage: HarnessUsage;
   exitCode?: number; stopReason?: string; failureReason?: string; report?: HarnessReport;
-  diffStat?: string; heartbeatAt?: string }
+  diffStat?: string; heartbeatAt?: string;
+  outOfScope?: string[]           /* paths the harness reverted */
+  harnessGate?: { command: string; passed: boolean; exitCode: number; durationMs: number; logTail?: string };
+  commit?: string                 /* the harness's commit after an approving review */ }
 
 interface HarnessFinding { severity: 'blocking'|'advisory'; title: string; path?: string; line?: number;
   detail?: string; round?: number }
@@ -247,7 +259,7 @@ interface HarnessRolePolicy { engine: string; model: string; highDifficultyModel
   permissionMode: string; allowedTools: string[] }
 
 interface HarnessWorkspaceSettings { workspaceId: string; maxConcurrentRuns: number;
-  verificationCommands: string[];
+  verificationCommands: string[]; scope: string[] /* path prefixes a builder may change; [] = any */;
   jira?: { enabled: boolean; jql: string; max: number };
   github?: { enabled: boolean; repo: string; labels: string[]; tokenEnvVar: string };
   bitbucket?: { enabled: boolean; workspace: string; repo: string; tokenEnvVar: string; cloud: boolean } }
