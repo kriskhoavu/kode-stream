@@ -64,6 +64,8 @@ type Dependencies struct {
 	Repository domain.Repository
 	Workspaces ports.Workspaces
 	Scouts     []ports.Scout
+	Engines    []ports.Engine
+	Worktrees  ports.Worktrees
 	// Ranker re-orders the rules' ranking; nil keeps the rules' order.
 	Ranker queue.Ranker
 	Now    func() time.Time
@@ -80,14 +82,25 @@ type Service struct {
 	rules      queue.RuleRanker
 	ranker     queue.Ranker
 
-	pollWake chan struct{}
-	sortWake chan struct{}
-	workWake chan struct{}
+	engines    map[string]ports.Engine
+	engineList []ports.Engine
+	worktrees  ports.Worktrees
 
-	mu           sync.Mutex
-	running      bool
-	orchestrator *scheduler.Orchestrator
-	progress     map[string]string
+	pollWake  chan struct{}
+	sortWake  chan struct{}
+	workWakes map[string]chan struct{}
+
+	mu             sync.Mutex
+	running        bool
+	orchestrator   *scheduler.Orchestrator
+	progress       map[string]string
+	handles        map[string]agentProcess
+	busy           map[domain.RoleKey]int
+	workCtx        context.Context
+	workCancel     context.CancelFunc
+	detections     []EngineStatus
+	detectedAt     time.Time
+	dispatchCursor int
 }
 
 func New(deps Dependencies) *Service {
@@ -96,7 +109,14 @@ func New(deps Dependencies) *Service {
 		now = time.Now
 	}
 	service := &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), ranker: deps.Ranker, progress: map[string]string{},
-		pollWake: make(chan struct{}, 1), sortWake: make(chan struct{}, 1), workWake: make(chan struct{}, 1)}
+		pollWake: make(chan struct{}, 1), sortWake: make(chan struct{}, 1), workWakes: map[string]chan struct{}{},
+		engines: map[string]ports.Engine{}, engineList: deps.Engines, worktrees: deps.Worktrees, handles: map[string]agentProcess{}, busy: map[domain.RoleKey]int{}}
+	for _, name := range workLoopNames {
+		service.workWakes[name] = make(chan struct{}, 1)
+	}
+	for _, engine := range deps.Engines {
+		service.engines[engine.ID()] = engine
+	}
 	if deps.Repository != nil && deps.Workspaces != nil {
 		service.poller = scout.NewPoller(deps.Repository, deps.Workspaces, deps.Scouts, service.now, service.emit)
 	}
@@ -108,6 +128,13 @@ func wake(channel chan struct{}) {
 	select {
 	case channel <- struct{}{}:
 	default:
+	}
+}
+
+// wakeWork nudges the dispatcher, every role loop and the stage loop.
+func (s *Service) wakeWork() {
+	for _, channel := range s.workWakes {
+		wake(channel)
 	}
 }
 
@@ -505,7 +532,31 @@ func (s *Service) sourceHealth() []SourceHealth {
 	return out
 }
 
-func (s *Service) engineStatus(context.Context) []EngineStatus { return []EngineStatus{} }
+// engineStatus detects each engine at most once a minute: detection runs the
+// CLI's --version.
+func (s *Service) engineStatus(ctx context.Context) []EngineStatus {
+	s.mu.Lock()
+	if s.detections != nil && s.now().Sub(s.detectedAt) < time.Minute {
+		cached := append([]EngineStatus{}, s.detections...)
+		s.mu.Unlock()
+		return cached
+	}
+	s.mu.Unlock()
+	out := []EngineStatus{}
+	for _, engine := range s.engineList {
+		detection := engine.Detect(ctx)
+		unsupported := detection.Unsupported
+		if unsupported == nil {
+			unsupported = []string{}
+		}
+		out = append(out, EngineStatus{ID: engine.ID(), Available: detection.Available, Version: detection.Version, Path: detection.Path, Unsupported: unsupported})
+	}
+	s.mu.Lock()
+	s.detections = out
+	s.detectedAt = s.now()
+	s.mu.Unlock()
+	return out
+}
 
 // --- events ---
 
@@ -553,4 +604,3 @@ func IsInvalid(err error) bool {
 	var illegal domain.IllegalTransitionError
 	return errors.As(err, &invalid) || errors.As(err, &illegal)
 }
-

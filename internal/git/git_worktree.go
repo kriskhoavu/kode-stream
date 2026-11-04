@@ -1,0 +1,276 @@
+package git
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// Worktree operations used by the engineering harness. Each runs git in the
+// directory it names; none touches the workspace's own checkout except to
+// register, prune and remove worktrees.
+
+const worktreeTimeout = 2 * time.Minute
+
+// DiffFile is one changed path between a base commit and a worktree.
+type DiffFile struct {
+	Path      string `json:"path"`
+	Status    string `json:"status"`
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
+}
+
+func (g *GitAdapter) runLong(ctx context.Context, dir string, timeout time.Duration, args ...string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	stdout := &limitedBuffer{limit: 8 << 20}
+	stderr := &limitedBuffer{limit: 1 << 20}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	if err := cmd.Run(); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return "", fmt.Errorf("git %s: %w", args[0], ctxErr)
+		}
+		if errors.Is(err, ErrOutputLimit) {
+			return "", ErrOutputLimit
+		}
+		message := strings.TrimSpace(stderr.String())
+		if message == "" {
+			message = err.Error()
+		}
+		return "", errors.New(message)
+	}
+	return stdout.String(), nil
+}
+
+// RevParseContext resolves ref to a commit id.
+func (g *GitAdapter) RevParseContext(ctx context.Context, repoPath, ref string) (string, error) {
+	out, err := g.runLong(ctx, repoPath, worktreeTimeout, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve %s: %w", ref, err)
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// FetchRemoteContext fetches one remote with a timeout long enough for a
+// network round trip.
+func (g *GitAdapter) FetchRemoteContext(ctx context.Context, repoPath, remote string) error {
+	_, err := g.runLong(ctx, repoPath, worktreeTimeout, "fetch", "--prune", remote)
+	return err
+}
+
+// HasRemoteContext reports whether the repository names remote.
+func (g *GitAdapter) HasRemoteContext(ctx context.Context, repoPath, remote string) bool {
+	out, err := g.runLong(ctx, repoPath, worktreeTimeout, "remote")
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) == remote {
+			return true
+		}
+	}
+	return false
+}
+
+// WorktreeAddContext creates branch at startPoint and checks it out in a new
+// worktree at worktreePath.
+func (g *GitAdapter) WorktreeAddContext(ctx context.Context, repoPath, worktreePath, branch, startPoint string) error {
+	if err := os.MkdirAll(filepath.Dir(worktreePath), 0o755); err != nil {
+		return err
+	}
+	_, err := g.runLong(ctx, repoPath, worktreeTimeout, "worktree", "add", "-b", branch, worktreePath, startPoint)
+	return err
+}
+
+// WorktreeRemoveContext removes a worktree; force also discards its changes.
+func (g *GitAdapter) WorktreeRemoveContext(ctx context.Context, repoPath, worktreePath string, force bool) error {
+	args := []string{"worktree", "remove"}
+	if force {
+		args = append(args, "--force")
+	}
+	_, err := g.runLong(ctx, repoPath, worktreeTimeout, append(args, worktreePath)...)
+	return err
+}
+
+// WorktreePruneContext forgets worktrees whose directories are gone.
+func (g *GitAdapter) WorktreePruneContext(ctx context.Context, repoPath string) error {
+	_, err := g.runLong(ctx, repoPath, worktreeTimeout, "worktree", "prune")
+	return err
+}
+
+// DeleteBranchContext deletes a local branch.
+func (g *GitAdapter) DeleteBranchContext(ctx context.Context, repoPath, branch string) error {
+	_, err := g.runLong(ctx, repoPath, worktreeTimeout, "branch", "-D", branch)
+	return err
+}
+
+// ExcludeContext adds pattern to the repository's shared info/exclude, so
+// every worktree ignores it.
+func (g *GitAdapter) ExcludeContext(ctx context.Context, repoPath, pattern string) error {
+	out, err := g.runLong(ctx, repoPath, worktreeTimeout, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return err
+	}
+	excludePath := filepath.Join(strings.TrimSpace(out), "info", "exclude")
+	existing, err := os.ReadFile(excludePath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	for _, line := range strings.Split(string(existing), "\n") {
+		if strings.TrimSpace(line) == pattern {
+			return nil
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(excludePath), 0o755); err != nil {
+		return err
+	}
+	prefix := ""
+	if len(existing) > 0 && !bytes.HasSuffix(existing, []byte("\n")) {
+		prefix = "\n"
+	}
+	file, err := os.OpenFile(excludePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.WriteString(prefix + pattern + "\n")
+	return err
+}
+
+// intendToAdd records untracked files as intent-to-add, so a diff against
+// the base lists files an agent created.
+func (g *GitAdapter) intendToAdd(ctx context.Context, worktreePath string) error {
+	_, err := g.runLong(ctx, worktreePath, worktreeTimeout, "add", "--intent-to-add", "--all")
+	return err
+}
+
+// DiffStatContext summarises every change in the worktree against base,
+// committed or not, new files included.
+func (g *GitAdapter) DiffStatContext(ctx context.Context, worktreePath, base string) (string, error) {
+	if err := g.intendToAdd(ctx, worktreePath); err != nil {
+		return "", err
+	}
+	return g.runLong(ctx, worktreePath, worktreeTimeout, "diff", "--stat", base)
+}
+
+// ChangedPathsContext lists every path the worktree changed against base.
+func (g *GitAdapter) ChangedPathsContext(ctx context.Context, worktreePath, base string) ([]string, error) {
+	files, err := g.DiffFilesContext(ctx, worktreePath, base)
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, file.Path)
+	}
+	return paths, nil
+}
+
+// DiffFilesContext lists every changed path with its status and line counts.
+func (g *GitAdapter) DiffFilesContext(ctx context.Context, worktreePath, base string) ([]DiffFile, error) {
+	if err := g.intendToAdd(ctx, worktreePath); err != nil {
+		return nil, err
+	}
+	statusOut, err := g.runLong(ctx, worktreePath, worktreeTimeout, "diff", "--name-status", "-z", "--no-renames", base)
+	if err != nil {
+		return nil, err
+	}
+	numstatOut, err := g.runLong(ctx, worktreePath, worktreeTimeout, "diff", "--numstat", "-z", "--no-renames", base)
+	if err != nil {
+		return nil, err
+	}
+	counts := map[string][2]int{}
+	for _, record := range strings.Split(numstatOut, "\x00") {
+		fields := strings.SplitN(record, "\t", 3)
+		if len(fields) != 3 {
+			continue
+		}
+		additions, _ := strconv.Atoi(fields[0])
+		deletions, _ := strconv.Atoi(fields[1])
+		counts[fields[2]] = [2]int{additions, deletions}
+	}
+	parts := strings.Split(strings.TrimSuffix(statusOut, "\x00"), "\x00")
+	files := []DiffFile{}
+	for i := 0; i+1 < len(parts); i += 2 {
+		status, path := parts[i], parts[i+1]
+		if path == "" {
+			continue
+		}
+		count := counts[path]
+		files = append(files, DiffFile{Path: path, Status: diffStatus(status), Additions: count[0], Deletions: count[1]})
+	}
+	return files, nil
+}
+
+func diffStatus(code string) string {
+	switch {
+	case strings.HasPrefix(code, "A"):
+		return "added"
+	case strings.HasPrefix(code, "D"):
+		return "deleted"
+	default:
+		return "modified"
+	}
+}
+
+// RestorePathsContext returns paths to their content at base: a path base
+// holds is checked out from it, a path base lacks is deleted.
+func (g *GitAdapter) RestorePathsContext(ctx context.Context, worktreePath, base string, paths []string) error {
+	for _, path := range paths {
+		clean := filepath.Clean(path)
+		if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
+			return fmt.Errorf("path %q escapes the worktree", path)
+		}
+		if _, err := g.runLong(ctx, worktreePath, worktreeTimeout, "cat-file", "-e", base+":"+filepath.ToSlash(clean)); err == nil {
+			if _, err := g.runLong(ctx, worktreePath, worktreeTimeout, "checkout", base, "--", clean); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, err := g.runLong(ctx, worktreePath, worktreeTimeout, "rm", "-q", "--cached", "--ignore-unmatch", "--", clean); err != nil {
+			return err
+		}
+		if err := os.RemoveAll(filepath.Join(worktreePath, clean)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CommitAllContext stages every change in the worktree and commits it with
+// message. It returns the new commit, or "" when there was nothing to commit.
+func (g *GitAdapter) CommitAllContext(ctx context.Context, worktreePath, message string) (string, error) {
+	if _, err := g.runLong(ctx, worktreePath, worktreeTimeout, "add", "--all"); err != nil {
+		return "", err
+	}
+	status, err := g.runLong(ctx, worktreePath, worktreeTimeout, "status", "--porcelain")
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(status) == "" {
+		return "", nil
+	}
+	if _, err := g.runLong(ctx, worktreePath, worktreeTimeout, "commit", "--no-verify", "-m", message); err != nil {
+		return "", err
+	}
+	return g.RevParseContext(ctx, worktreePath, "HEAD")
+}
+
+// PushBranchContext pushes branch to remote and sets its upstream.
+func (g *GitAdapter) PushBranchContext(ctx context.Context, worktreePath, remote, branch string) error {
+	_, err := g.runLong(ctx, worktreePath, worktreeTimeout, "push", "--set-upstream", remote, branch+":"+branch)
+	return err
+}

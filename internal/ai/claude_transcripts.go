@@ -109,6 +109,17 @@ func claudeProjectDirName(path string) string {
 	return name.String()
 }
 
+// ClaudeTranscriptPath is where Claude Code writes the transcript of the
+// session sessionID started in workingDir. Callers store this path, never
+// the transcript.
+func ClaudeTranscriptPath(workingDir, sessionID string) (string, error) {
+	configDir, err := claudeConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, "projects", claudeProjectDirName(workingDir), sessionID+".jsonl"), nil
+}
+
 func (s *Service) claudeProject(workspaceID string) (models.WorkspaceConfig, string, error) {
 	if s.runtimeMode != models.RuntimeModeLocal {
 		return models.WorkspaceConfig{}, "", ErrClaudeTranscriptsUnavailable

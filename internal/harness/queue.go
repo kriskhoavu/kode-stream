@@ -98,7 +98,7 @@ func (s *Service) Sort(ctx context.Context) error {
 			s.emit(ctx, domain.Event{Kind: domain.EventTaskRanked, TaskID: saved.ID, Payload: payload(map[string]any{"score": saved.Score, "scoreReasons": saved.ScoreReasons, "state": saved.State})})
 		}
 	}
-	wake(s.workWake)
+	s.wakeWork()
 	return nil
 }
 
@@ -267,7 +267,7 @@ func (s *Service) StartTask(ctx context.Context, id string, expectedRevision int
 		return domain.Task{}, err
 	}
 	saved.Body = ""
-	wake(s.workWake)
+	s.wakeWork()
 	return saved, nil
 }
 
@@ -335,7 +335,7 @@ func (s *Service) SetRolePaused(ctx context.Context, key domain.RoleKey, paused 
 	}
 	s.emit(ctx, domain.Event{Kind: kind, Actor: actorOrNil(actor), Payload: payload(map[string]any{"role": key})})
 	if !paused {
-		wake(s.workWake)
+		s.wakeWork()
 		if key == domain.RoleKeyScout {
 			wake(s.pollWake)
 		}

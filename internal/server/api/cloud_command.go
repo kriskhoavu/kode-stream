@@ -95,5 +95,6 @@ func cloudHostedExecutionRoute(method, path string) bool {
 		strings.Contains(path, "/verification-") ||
 		strings.Contains(path, "/runtime") ||
 		strings.HasSuffix(path, "/scan") ||
+		strings.Contains(path, "/harness/") ||
 		strings.Contains(path, "/system/")
 }

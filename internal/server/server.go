@@ -23,9 +23,11 @@ import (
 	"kode-stream/internal/filesystem/content"
 	appgit "kode-stream/internal/git"
 	"kode-stream/internal/harness"
+	harnessclaude "kode-stream/internal/harness/adapters/engine/claudecode"
 	harnessbitbucket "kode-stream/internal/harness/adapters/scout/bitbucket"
 	harnessgithub "kode-stream/internal/harness/adapters/scout/github"
 	harnessjira "kode-stream/internal/harness/adapters/scout/jira"
+	harnessworktree "kode-stream/internal/harness/adapters/worktree/gitworktree"
 	"kode-stream/internal/harness/ports"
 	"kode-stream/internal/item/writer"
 	appjira "kode-stream/internal/jira"
@@ -86,11 +88,14 @@ func NewServer(port int) (*Server, error) {
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore).ConfigureCheckout(git)
 	verificationService := verification.NewService(reg, appruntime.NewService())
+	harnessConfig := harness.ResolveConfig(os.Getenv, paths.Dir, runtimeConfig.Mode == models.RuntimeModeLocal)
 	harnessService := harness.New(harness.Dependencies{
 		Repository: state.Harness,
 		Workspaces: reg,
 		Scouts:     []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New()},
-		Config:     harness.ResolveConfig(os.Getenv, paths.Dir, runtimeConfig.Mode == models.RuntimeModeLocal),
+		Engines:    []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath)},
+		Worktrees:  harnessworktree.New(harnessConfig.WorktreeRoot, git),
+		Config:     harnessConfig,
 	})
 	canvasService := canvas.NewService(state.Canvas, reg, idx, git, aiSessionService, verificationService, runtimeConfig.Mode, canvasDatastore(state.Config), runtimeConfig.Capabilities)
 	apiHandler := api.New(api.Dependencies{

@@ -141,7 +141,7 @@ func (s *Service) requeueInterrupted(ctx context.Context, agentRun domain.AgentR
 		agentRun.QueuedAt = s.now()
 		agentRun.StartedAt = nil
 		if _, err := s.repository.SaveAgentRun(ctx, agentRun, expect); err == nil {
-			wake(s.workWake)
+			s.wakeWork()
 		}
 		return
 	}

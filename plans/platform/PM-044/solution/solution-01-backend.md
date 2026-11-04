@@ -30,6 +30,11 @@ internal/server/api/harness_bot_controller.go   bearer-token routes (owner harne
 internal/server/api/harness_sse.go              GET /api/harness/events
 ```
 
+The stage logic (dispatcher, role loops, how a finished agent run moves its stage, approvals, cancel) lives in
+files of the `harness` package itself (`work.go`, `pipeline.go`, `stages.go`, `approvals.go`) rather than in an
+`application/pipeline` package: every step needs the repository, the event feed and the settings in one
+transaction, and a second package would only pass them through. The pure parts stay in `application/`.
+
 Dependency direction: adapters → ports and domain; application → ports and domain; `internal/server/api` →
 `harness.go`; `internal/storage` → `internal/harness/domain`. The harness never imports Gin, the server or the Cloud
 packages.

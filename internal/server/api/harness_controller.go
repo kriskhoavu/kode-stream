@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -286,4 +287,105 @@ func (a *harnessController) pollScouts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"sources": sources})
+}
+
+type harnessDecideRequest struct {
+	Decision         string `json:"decision"`
+	Reason           string `json:"reason"`
+	IdempotencyKey   string `json:"idempotencyKey"`
+	ExpectedRevision *int64 `json:"expectedRevision"`
+}
+
+func writeHarnessDecision(w http.ResponseWriter, approval domain.Approval, err error) {
+	var already harness.AlreadyDecidedError
+	if errors.As(err, &already) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "already_decided", "approval": already.Approval})
+		return
+	}
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, approval)
+}
+
+func (a *harnessController) decide(w http.ResponseWriter, r *http.Request) {
+	var request harnessDecideRequest
+	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	approval, err := a.harness.Decide(r.Context(), r.PathValue("id"), harness.DecideInput{Decision: harness.Decision(request.Decision), Reason: request.Reason, IdempotencyKey: request.IdempotencyKey, ExpectedRevision: request.ExpectedRevision, RequestID: r.Header.Get(requestIDHeader), Actor: harnessActor(r), Channel: domain.ChannelDashboard})
+	writeHarnessDecision(w, approval, err)
+}
+
+func (a *harnessController) pauseRole(w http.ResponseWriter, r *http.Request) {
+	a.setRolePaused(w, r, true)
+}
+
+func (a *harnessController) resumeRole(w http.ResponseWriter, r *http.Request) {
+	a.setRolePaused(w, r, false)
+}
+
+func (a *harnessController) setRolePaused(w http.ResponseWriter, r *http.Request, paused bool) {
+	health, err := a.harness.SetRolePaused(r.Context(), domain.RoleKey(r.PathValue("role")), paused, harnessActor(r))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, health)
+}
+
+func (a *harnessController) cost(w http.ResponseWriter, r *http.Request) {
+	parse := func(name string) (time.Time, bool) {
+		raw := strings.TrimSpace(r.URL.Query().Get(name))
+		if raw == "" {
+			return time.Time{}, true
+		}
+		if value, err := time.Parse(time.RFC3339, raw); err == nil {
+			return value.UTC(), true
+		}
+		if value, err := time.Parse("2006-01-02", raw); err == nil {
+			return value.UTC(), true
+		}
+		return time.Time{}, false
+	}
+	from, okFrom := parse("from")
+	to, okTo := parse("to")
+	if !okFrom || !okTo {
+		writeHarnessInvalid(w, "from and to must be RFC 3339 timestamps or dates")
+		return
+	}
+	summary, err := a.harness.CostSummary(r.Context(), domain.CostGroup(r.URL.Query().Get("groupBy")), from, to)
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, summary)
+}
+
+func (a *harnessController) runChanges(w http.ResponseWriter, r *http.Request) {
+	changes, err := a.harness.Changes(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, changes)
+}
+
+type harnessCancelRequest struct {
+	Reason           string `json:"reason"`
+	ExpectedRevision *int64 `json:"expectedRevision"`
+}
+
+func (a *harnessController) cancelRun(w http.ResponseWriter, r *http.Request) {
+	var request harnessCancelRequest
+	if r.ContentLength != 0 && !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	run, err := a.harness.CancelRun(r.Context(), r.PathValue("id"), request.Reason, request.ExpectedRevision, harnessActor(r))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
 }

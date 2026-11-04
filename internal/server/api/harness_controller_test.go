@@ -275,3 +275,89 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 		t.Fatalf("cloud poll = %d %s", refused.Code, refused.Body.String())
 	}
 }
+
+func seedWaitingPlanApproval(t *testing.T, repository domain.Repository) domain.Approval {
+	t.Helper()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	task := domain.Task{ID: "tsk-9", WorkspaceID: "ws", Source: domain.Source{Kind: domain.SourceJira, Key: "PM-9"}, Title: "Nine", State: domain.TaskRunning, RunID: "run-9", NeedsYou: true, DiscoveredAt: now, UpdatedAt: now}
+	stage := domain.NewStage("run-9", domain.StagePlanApproval, 1)
+	stage.State = domain.StageAwaitingApproval
+	run := domain.Run{ID: "run-9", TaskID: task.ID, WorkspaceID: "ws", SourceKey: "PM-9", State: domain.RunRunning, CurrentStageID: stage.ID, CurrentStageKind: stage.Kind, StartedAt: now}
+	approval := domain.Approval{ID: "apr-9", RunID: run.ID, TaskID: task.ID, StageID: stage.ID, SourceKey: "PM-9", Gate: domain.GatePlan, State: domain.ApprovalRequested, RequestedAt: now}
+	for _, err := range []error{repository.InsertTask(ctx, task), repository.InsertRun(ctx, run), repository.InsertStage(ctx, stage), repository.InsertApproval(ctx, approval)} {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return approval
+}
+
+func TestHarnessDecideCancelCostAndRoleRoutes(t *testing.T) {
+	service, repository := newHarnessTestService(t, true)
+	handler := New(Dependencies{Harness: service}).Routes()
+	seedWaitingPlanApproval(t, repository)
+
+	missingKey := serveHarness(handler, http.MethodPost, "/api/harness/approvals/apr-9/decide", `{"decision":"approve"}`)
+	if missingKey.Code != http.StatusBadRequest {
+		t.Fatalf("missing key = %d %s", missingKey.Code, missingKey.Body.String())
+	}
+	stale := serveHarness(handler, http.MethodPost, "/api/harness/approvals/apr-9/decide", `{"decision":"approve","idempotencyKey":"a","expectedRevision":7}`)
+	if stale.Code != http.StatusConflict || !strings.Contains(stale.Body.String(), `"code":"conflict"`) {
+		t.Fatalf("stale = %d %s", stale.Code, stale.Body.String())
+	}
+	approve := serveHarness(handler, http.MethodPost, "/api/harness/approvals/apr-9/decide", `{"decision":"approve","idempotencyKey":"a","expectedRevision":0}`)
+	if approve.Code != http.StatusOK || !strings.Contains(approve.Body.String(), `"state":"approved"`) || !strings.Contains(approve.Body.String(), `"channel":"dashboard"`) {
+		t.Fatalf("approve = %d %s", approve.Code, approve.Body.String())
+	}
+	replay := serveHarness(handler, http.MethodPost, "/api/harness/approvals/apr-9/decide", `{"decision":"approve","idempotencyKey":"a","expectedRevision":0}`)
+	if replay.Code != http.StatusOK || replay.Body.String() != approve.Body.String() {
+		t.Fatalf("replay = %d %s", replay.Code, replay.Body.String())
+	}
+	again := serveHarness(handler, http.MethodPost, "/api/harness/approvals/apr-9/decide", `{"decision":"reject","reason":"no","idempotencyKey":"b"}`)
+	if again.Code != http.StatusConflict || !strings.Contains(again.Body.String(), `"code":"already_decided"`) || !strings.Contains(again.Body.String(), `"approval":{`) {
+		t.Fatalf("again = %d %s", again.Code, again.Body.String())
+	}
+	run := serveHarness(handler, http.MethodGet, "/api/harness/runs/run-9", "")
+	if run.Code != http.StatusOK || !strings.Contains(run.Body.String(), `"currentStageKind":"implement"`) {
+		t.Fatalf("run = %d %s", run.Code, run.Body.String())
+	}
+
+	pause := serveHarness(handler, http.MethodPost, "/api/harness/roles/coder/pause", "")
+	if pause.Code != http.StatusOK || !strings.Contains(pause.Body.String(), `"paused":true`) {
+		t.Fatalf("pause = %d %s", pause.Code, pause.Body.String())
+	}
+	if resume := serveHarness(handler, http.MethodPost, "/api/harness/roles/coder/resume", ""); resume.Code != http.StatusOK || !strings.Contains(resume.Body.String(), `"paused":false`) {
+		t.Fatalf("resume = %d %s", resume.Code, resume.Body.String())
+	}
+	if unknown := serveHarness(handler, http.MethodPost, "/api/harness/roles/janitor/pause", ""); unknown.Code != http.StatusNotFound {
+		t.Fatalf("unknown role = %d %s", unknown.Code, unknown.Body.String())
+	}
+	cost := serveHarness(handler, http.MethodGet, "/api/harness/cost?groupBy=role&from=2026-01-01", "")
+	if cost.Code != http.StatusOK || !strings.Contains(cost.Body.String(), `"groupBy":"role"`) {
+		t.Fatalf("cost = %d %s", cost.Code, cost.Body.String())
+	}
+	if bad := serveHarness(handler, http.MethodGet, "/api/harness/cost?groupBy=week", ""); bad.Code != http.StatusBadRequest {
+		t.Fatalf("bad cost = %d %s", bad.Code, bad.Body.String())
+	}
+	if badDate := serveHarness(handler, http.MethodGet, "/api/harness/cost?from=yesterday", ""); badDate.Code != http.StatusBadRequest {
+		t.Fatalf("bad date = %d %s", badDate.Code, badDate.Body.String())
+	}
+	changes := serveHarness(handler, http.MethodGet, "/api/harness/runs/run-9/changes", "")
+	if changes.Code != http.StatusOK || !strings.Contains(changes.Body.String(), `"available":false`) {
+		t.Fatalf("changes = %d %s", changes.Code, changes.Body.String())
+	}
+	cancel := serveHarness(handler, http.MethodPost, "/api/harness/runs/run-9/cancel", `{"reason":"enough"}`)
+	if cancel.Code != http.StatusOK || !strings.Contains(cancel.Body.String(), `"state":"cancelled"`) {
+		t.Fatalf("cancel = %d %s", cancel.Code, cancel.Body.String())
+	}
+	if twice := serveHarness(handler, http.MethodPost, "/api/harness/runs/run-9/cancel", ""); twice.Code != http.StatusConflict {
+		t.Fatalf("cancel twice = %d %s", twice.Code, twice.Body.String())
+	}
+}
+
+func TestHarnessMutationsAreHostedExecutionInCloudMode(t *testing.T) {
+	if !cloudHostedExecutionRoute(http.MethodPost, "/api/harness/approvals/:id/decide") || cloudHostedExecutionRoute(http.MethodGet, "/api/harness/status") {
+		t.Fatal("harness mutations must be refused as hosted execution in Cloud mode")
+	}
+}
