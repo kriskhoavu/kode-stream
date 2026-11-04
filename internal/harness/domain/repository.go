@@ -100,8 +100,8 @@ type Repository interface {
 	GetStage(ctx context.Context, id string) (Stage, error)
 	ListStages(ctx context.Context, runID string) ([]Stage, error)
 	SaveStage(ctx context.Context, stage Stage, expect Expect) (Stage, error)
-	// ClaimStage moves the oldest pending stage of one of kinds to running
-	// under a lease.
+	// ClaimStage moves the oldest pending stage of one of kinds whose retry
+	// time has come to running under a lease.
 	ClaimStage(ctx context.Context, kinds []StageKind, claim Claim) (Stage, bool, error)
 
 	InsertAgentRun(ctx context.Context, agentRun AgentRun) error

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"kode-stream/internal/common/models"
 	"kode-stream/internal/harness/application/feed"
 	"kode-stream/internal/harness/application/queue"
 	"kode-stream/internal/harness/application/scheduler"
@@ -61,11 +62,16 @@ func ResolveConfig(getenv func(string) string, dataDir string, localMode bool) C
 
 type Dependencies struct {
 	// Repository is nil when the storage option cannot hold harness state.
-	Repository domain.Repository
-	Workspaces ports.Workspaces
-	Scouts     []ports.Scout
-	Engines    []ports.Engine
-	Worktrees  ports.Worktrees
+	Repository   domain.Repository
+	Workspaces   ports.Workspaces
+	Scouts       []ports.Scout
+	Engines      []ports.Engine
+	Worktrees    ports.Worktrees
+	PullRequests []ports.PullRequests
+	Audit        ports.Audit
+	// RuntimeVerifyCommand returns a workspace runtime's smoke verification
+	// command, or "" when it has none.
+	RuntimeVerifyCommand func(*models.WorkspaceRuntimeConfig) string
 	// Ranker re-orders the rules' ranking; nil keeps the rules' order.
 	Ranker queue.Ranker
 	Now    func() time.Time
@@ -85,6 +91,9 @@ type Service struct {
 	engines    map[string]ports.Engine
 	engineList []ports.Engine
 	worktrees  ports.Worktrees
+	pulls      []ports.PullRequests
+	audit      ports.Audit
+	runtimeCmd func(*models.WorkspaceRuntimeConfig) string
 
 	pollWake  chan struct{}
 	sortWake  chan struct{}
@@ -110,7 +119,7 @@ func New(deps Dependencies) *Service {
 	}
 	service := &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), ranker: deps.Ranker, progress: map[string]string{},
 		pollWake: make(chan struct{}, 1), sortWake: make(chan struct{}, 1), workWakes: map[string]chan struct{}{},
-		engines: map[string]ports.Engine{}, engineList: deps.Engines, worktrees: deps.Worktrees, handles: map[string]agentProcess{}, busy: map[domain.RoleKey]int{}}
+		engines: map[string]ports.Engine{}, engineList: deps.Engines, worktrees: deps.Worktrees, pulls: deps.PullRequests, audit: deps.Audit, runtimeCmd: deps.RuntimeVerifyCommand, handles: map[string]agentProcess{}, busy: map[domain.RoleKey]int{}}
 	for _, name := range workLoopNames {
 		service.workWakes[name] = make(chan struct{}, 1)
 	}

@@ -190,7 +190,9 @@ type Stage struct {
 	FinishedAt    *time.Time `json:"finishedAt,omitempty"`
 	Rounds        []Round    `json:"rounds"`
 	Findings      []Finding  `json:"findings,omitempty"`
-	Revision      int64      `json:"revision"`
+	// LastGate is the harness's latest verification run in a QA stage.
+	LastGate *GateRun `json:"lastGate,omitempty"`
+	Revision int64    `json:"revision"`
 }
 
 type Role string
@@ -317,15 +319,15 @@ type AgentRun struct {
 	// HarnessGate is the harness's own run of the verification commands.
 	HarnessGate *GateRun `json:"harnessGate,omitempty"`
 	// Commit is the harness's commit after this agent run, if any.
-	Commit string `json:"commit,omitempty"`
-	Progress        string        `json:"progress,omitempty"`
-	LeaseOwner      string        `json:"-"`
-	LeaseUntil      *time.Time    `json:"-"`
-	HeartbeatAt     *time.Time    `json:"heartbeatAt,omitempty"`
-	QueuedAt        time.Time     `json:"queuedAt"`
-	StartedAt       *time.Time    `json:"startedAt,omitempty"`
-	FinishedAt      *time.Time    `json:"finishedAt,omitempty"`
-	Revision        int64         `json:"revision"`
+	Commit      string     `json:"commit,omitempty"`
+	Progress    string     `json:"progress,omitempty"`
+	LeaseOwner  string     `json:"-"`
+	LeaseUntil  *time.Time `json:"-"`
+	HeartbeatAt *time.Time `json:"heartbeatAt,omitempty"`
+	QueuedAt    time.Time  `json:"queuedAt"`
+	StartedAt   *time.Time `json:"startedAt,omitempty"`
+	FinishedAt  *time.Time `json:"finishedAt,omitempty"`
+	Revision    int64      `json:"revision"`
 }
 
 // AgentRunSummary is the list form shown on a stage.

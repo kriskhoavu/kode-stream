@@ -35,8 +35,10 @@ func newFakeEngine(s script) *fakeEngine {
 	return &fakeEngine{script: s, calls: map[domain.Role]int{}, briefs: map[domain.Role][]string{}, models: map[domain.Role][]string{}}
 }
 
-func (f *fakeEngine) ID() string                             { return "claudecode" }
-func (f *fakeEngine) Detect(context.Context) ports.Detection { return ports.Detection{Available: true, Version: "fake"} }
+func (f *fakeEngine) ID() string { return "claudecode" }
+func (f *fakeEngine) Detect(context.Context) ports.Detection {
+	return ports.Detection{Available: true, Version: "fake"}
+}
 
 func (f *fakeEngine) Start(_ context.Context, invocation ports.Invocation) (ports.Handle, error) {
 	f.mu.Lock()
@@ -146,9 +148,9 @@ func (p *pipelineFixture) settle(t *testing.T) {
 			}
 		}
 		for _, loop := range p.service.stageLoops(nil) {
-			if err := loop.Run(ctx); err != nil {
-				t.Fatalf("stage loop %s: %v", loop.Name, err)
-			}
+			// A stage loop reports a failed attempt as an error and retries;
+			// the stage's state is what the tests check.
+			_ = loop.Run(ctx)
 		}
 		p.service.mu.Lock()
 		busy := 0
@@ -171,7 +173,8 @@ func (p *pipelineFixture) pendingStage(t *testing.T) bool {
 	runs, _ := p.repository.ListRuns(context.Background(), domain.RunFilter{States: []domain.RunState{domain.RunRunning}})
 	for _, run := range runs {
 		stage, err := p.repository.GetStage(context.Background(), run.CurrentStageID)
-		if err == nil && stage.State == domain.StagePending && (stage.Kind == domain.StageQA || stage.Kind == domain.StageDraftPR) && len(p.service.stageLoops(nil)) > 0 {
+		waiting := stage.RetryAt != nil && stage.RetryAt.After(time.Now())
+		if err == nil && stage.State == domain.StagePending && !waiting && (stage.Kind == domain.StageQA || stage.Kind == domain.StageDraftPR) {
 			return true
 		}
 	}

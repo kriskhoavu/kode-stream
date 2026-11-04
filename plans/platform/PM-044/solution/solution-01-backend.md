@@ -144,6 +144,16 @@ reported as an advisory finding: the planner's scope is `plans/`; a builder's an
 not checked. The harness commits on the run branch three times at most: the approved plan
 (`<KEY>: Plan <title>`), the approved build (`<KEY>: <title>`) and the tester's fixes after QA passes.
 
+## QA And Draft Pull Request
+
+QA runs the workspace's verification commands, then its runtime's smoke verification when it has a runtime,
+twice in a row; both runs must pass. A failure queues the tester with the last 8 KB of the log, for at most two fix
+rounds, and blocks the run after that. The draft PR stage pushes the run branch and opens a draft pull request
+through the first provider that serves the workspace: GitHub (REST with the token, else `gh pr create --draft`) or
+Bitbucket (a Cloud draft, or a Server pull request titled `[DRAFT] …`). A failed attempt retries a minute later, at
+most three times. The pushes, commits and pull requests are audit events. A passed run's worktree and local branch
+are removed at once; a cancelled or failed run's worktree is removed after `retentionDays`, and its branch is kept.
+
 ## Worktrees
 
 `<dataDir>/harness/worktrees/<workspaceId>/<runId>/`, outside every workspace, on branch `harness/<key>-<short>` from
@@ -208,7 +218,9 @@ interface HarnessStage { id: string; runId: string; kind: StageKind; ordinal: nu
   round: number; maxRounds: number; attempt: number; maxAttempts: number; engine?: string; model?: string;
   turns: number; durationMs: number; costUsd: number; blocking: number; advisory: number;
   failureReason?: string; startedAt?: string; finishedAt?: string; rounds: HarnessRound[];
-  agentRuns: HarnessAgentRunSummary[] }
+  agentRuns: HarnessAgentRunSummary[]; findings?: HarnessFinding[];
+  retryAt?: string                /* a draft PR stage waiting to retry */;
+  lastGate?: { command: string; passed: boolean; exitCode: number; durationMs: number; logTail?: string } }
 
 interface HarnessUsage { inputTokens: number; outputTokens: number; cacheReadTokens: number;
   cacheWriteTokens: number; costUsd: number }

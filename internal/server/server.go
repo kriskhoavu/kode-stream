@@ -24,6 +24,8 @@ import (
 	appgit "kode-stream/internal/git"
 	"kode-stream/internal/harness"
 	harnessclaude "kode-stream/internal/harness/adapters/engine/claudecode"
+	harnessprbitbucket "kode-stream/internal/harness/adapters/pr/bitbucket"
+	harnessprgithub "kode-stream/internal/harness/adapters/pr/github"
 	harnessbitbucket "kode-stream/internal/harness/adapters/scout/bitbucket"
 	harnessgithub "kode-stream/internal/harness/adapters/scout/github"
 	harnessjira "kode-stream/internal/harness/adapters/scout/jira"
@@ -87,15 +89,21 @@ func NewServer(port int) (*Server, error) {
 	aiSessionService := ai.New(state.AISettings).ConfigureLaunch(reg, idx, auditStore, os.TempDir()).ConfigureEmbedded(sessionManager).ConfigureSessionRecords(state.SessionRecords, git).SetRuntimeMode(runtimeConfig.Mode)
 	jiraService := appjira.NewService(reg, idx, appjira.New())
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore).ConfigureCheckout(git)
-	verificationService := verification.NewService(reg, appruntime.NewService())
+	runtimeService := appruntime.NewService()
+	verificationService := verification.NewService(reg, runtimeService)
 	harnessConfig := harness.ResolveConfig(os.Getenv, paths.Dir, runtimeConfig.Mode == models.RuntimeModeLocal)
 	harnessService := harness.New(harness.Dependencies{
-		Repository: state.Harness,
-		Workspaces: reg,
-		Scouts:     []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New()},
-		Engines:    []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath)},
-		Worktrees:  harnessworktree.New(harnessConfig.WorktreeRoot, git),
-		Config:     harnessConfig,
+		Repository:   state.Harness,
+		Workspaces:   reg,
+		Scouts:       []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New()},
+		Engines:      []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath)},
+		Worktrees:    harnessworktree.New(harnessConfig.WorktreeRoot, git),
+		PullRequests: []ports.PullRequests{harnessprgithub.New(), harnessprbitbucket.New()},
+		Audit:        auditStore,
+		RuntimeVerifyCommand: func(config *models.WorkspaceRuntimeConfig) string {
+			return runtimeService.VerifyCommand(config, appruntime.VerifyProfileSmoke)
+		},
+		Config: harnessConfig,
 	})
 	canvasService := canvas.NewService(state.Canvas, reg, idx, git, aiSessionService, verificationService, runtimeConfig.Mode, canvasDatastore(state.Config), runtimeConfig.Capabilities)
 	apiHandler := api.New(api.Dependencies{

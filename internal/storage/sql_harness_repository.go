@@ -395,8 +395,8 @@ func (r *SQLHarnessRepository) ClaimStage(ctx context.Context, kinds []domain.St
 	found := false
 	err := r.Atomic(ctx, func(repository domain.Repository) error {
 		tx := repository.(*SQLHarnessRepository)
-		args := append(stringArgs(kinds), string(domain.StagePending))
-		stage, err := scanStage(tx.queryRow(ctx, `SELECT `+stageColumns+` FROM harness_stages WHERE kind IN `+inClause(len(kinds))+` AND state = ? ORDER BY created_at ASC, id ASC LIMIT 1`+tx.lockSuffix(), args...))
+		args := append(stringArgs(kinds), string(domain.StagePending), harnessTime(claim.Now))
+		stage, err := scanStage(tx.queryRow(ctx, `SELECT `+stageColumns+` FROM harness_stages WHERE kind IN `+inClause(len(kinds))+` AND state = ? AND (retry_at IS NULL OR retry_at <= ?) ORDER BY created_at ASC, id ASC LIMIT 1`+tx.lockSuffix(), args...))
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil
 		}
@@ -405,6 +405,7 @@ func (r *SQLHarnessRepository) ClaimStage(ctx context.Context, kinds []domain.St
 		}
 		expect := domain.Expect{State: string(stage.State), Revision: stage.Revision}
 		stage.State = domain.StageRunning
+		stage.RetryAt = nil
 		stage.LeaseOwner = claim.Owner
 		leaseUntil := claim.LeaseUntil
 		stage.LeaseUntil = &leaseUntil

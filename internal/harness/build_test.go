@@ -81,8 +81,8 @@ func TestImplementStageRevertsOutOfScopeChangesGatesReviewsAndCommits(t *testing
 	if build.State != domain.StagePassed || len(build.Rounds) != 1 || build.Rounds[0].Verdict != domain.VerdictApprove || build.Advisory == 0 {
 		t.Fatalf("build = %#v", build.Stage)
 	}
-	if last := view.Stages[len(view.Stages)-1]; last.Kind != domain.StageQA || last.State != domain.StagePending || view.CurrentStageKind != domain.StageQA {
-		t.Fatalf("after build = %#v", last.Stage)
+	if next := view.Stages[2]; next.Kind != domain.StageImplement || view.Stages[3].Kind != domain.StageQA {
+		t.Fatalf("after build = %#v", view.Stages)
 	}
 	coders, _ := fixture.repository.ListAgentRuns(ctx, domain.AgentRunFilter{StageID: build.ID})
 	var coder, reviewer domain.AgentRun

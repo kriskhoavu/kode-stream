@@ -80,15 +80,15 @@ type BitbucketSourceSettings struct {
 }
 
 type WorkspaceSettings struct {
-	WorkspaceID          string                   `json:"workspaceId"`
-	MaxConcurrentRuns    int                      `json:"maxConcurrentRuns"`
-	VerificationCommands []string                 `json:"verificationCommands"`
+	WorkspaceID          string   `json:"workspaceId"`
+	MaxConcurrentRuns    int      `json:"maxConcurrentRuns"`
+	VerificationCommands []string `json:"verificationCommands"`
 	// Scope lists the path prefixes a builder may change; empty allows any
 	// path that is not protected.
-	Scope []string `json:"scope"`
-	Jira                 *JiraSourceSettings      `json:"jira,omitempty"`
-	GitHub               *GitHubSourceSettings    `json:"github,omitempty"`
-	Bitbucket            *BitbucketSourceSettings `json:"bitbucket,omitempty"`
+	Scope     []string                 `json:"scope"`
+	Jira      *JiraSourceSettings      `json:"jira,omitempty"`
+	GitHub    *GitHubSourceSettings    `json:"github,omitempty"`
+	Bitbucket *BitbucketSourceSettings `json:"bitbucket,omitempty"`
 }
 
 type LLMRankerSettings struct {

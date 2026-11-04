@@ -243,3 +243,26 @@ func exerciseHarnessRepository(t *testing.T, repository domain.Repository) {
 		t.Fatalf("loaded = %#v err=%v", loaded, err)
 	}
 }
+
+func TestClaimStageWaitsForTheRetryTime(t *testing.T) {
+	ctx := context.Background()
+	repository, closeStore, err := OpenSQLiteHarness(filepath.Join(t.TempDir(), "harness.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeStore()
+	now := time.Date(2026, 11, 4, 9, 0, 0, 0, time.UTC)
+	stage := domain.NewStage("run-1", domain.StageDraftPR, 5)
+	later := now.Add(time.Minute)
+	stage.RetryAt = &later
+	if err := repository.InsertStage(ctx, stage); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := repository.ClaimStage(ctx, []domain.StageKind{domain.StageDraftPR}, domain.Claim{Owner: "o", LeaseUntil: now.Add(time.Hour), Now: now}); ok {
+		t.Fatal("a stage was claimed before its retry time")
+	}
+	claimed, ok, err := repository.ClaimStage(ctx, []domain.StageKind{domain.StageDraftPR}, domain.Claim{Owner: "o", LeaseUntil: now.Add(time.Hour), Now: later})
+	if err != nil || !ok || claimed.RetryAt != nil {
+		t.Fatalf("claimed = %#v ok=%v err=%v", claimed, ok, err)
+	}
+}
