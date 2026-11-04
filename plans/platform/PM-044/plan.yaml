@@ -1,0 +1,6 @@
+plan:
+  status: in-progress
+  wiki_enriched: false
+  e2e-runbook: false
+automation-test:
+  - path: "automation/README.md"
