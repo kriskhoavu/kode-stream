@@ -155,4 +155,17 @@ describe('useAppState runtime context', () => {
     expect(main).toHaveFocus();
     main.remove();
   });
+
+	it('keeps the harness open when a workspace is chosen', async () => {
+		window.history.replaceState(null, '', '/harness/queue');
+		vi.stubGlobal('fetch', vi.fn((path: string) => Promise.resolve({ ok: true, json: async () => path === '/api/state' ? { mode: 'local' } : [
+			{ id: 'first', name: 'First', path: '/first', baselineBranch: 'main', createdAt: '' }
+		] })));
+		const { result } = renderHook(() => useAppState());
+		await waitFor(() => expect(result.current.dataStatus).toBe('ready'));
+		act(() => result.current.selectWorkspace(result.current.workspaces[0]));
+		expect(result.current.route).toEqual({ name: 'harness', location: { view: 'queue' } });
+		expect(window.location.pathname).toBe('/harness/queue');
+	});
 });
+

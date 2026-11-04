@@ -91,7 +91,18 @@ import type {
   RunArtifact,
   VerificationTestSelection,
   SourceSettingsResult,
-  WriteResult
+  WriteResult,
+  HarnessAgentRun,
+  HarnessApproval,
+  HarnessCostSummary,
+  HarnessDecision,
+  HarnessRoleHealth,
+  HarnessRoleId,
+  HarnessRun,
+  HarnessRunDetail,
+  HarnessSettings,
+  HarnessStatus,
+  HarnessTask
 } from '../../lib/types';
 
 export class ApiError extends Error {
@@ -528,8 +539,55 @@ export const api = {
   switchBranch: (workspaceId: string, input: BranchSwitchInput) =>
     request<GitOperationResult>(`/api/workspaces/${workspaceId}/git/switch`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
   stashes: (workspaceId: string, signal?: AbortSignal) => request<GitStashEntry[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/stashes`, { signal }, !signal),
-  applyStash: (workspaceId: string, ref: string) => request<GitOperationResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/stashes/${encodeURIComponent(ref)}/apply`, { method: 'POST' }).then(normalizeGitResult)
+  applyStash: (workspaceId: string, ref: string) => request<GitOperationResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/stashes/${encodeURIComponent(ref)}/apply`, { method: 'POST' }).then(normalizeGitResult),
+  harnessStatus: (signal?: AbortSignal) => request<HarnessStatus>('/api/harness/status', { signal }, !signal),
+  harnessTasks: async (signal?: AbortSignal) => (await request<{ tasks?: HarnessTask[] | null }>('/api/harness/tasks', { signal }, !signal)).tasks?.map(normalizeHarnessTask) ?? [],
+  harnessQueue: async (signal?: AbortSignal) => (await request<{ tasks?: HarnessTask[] | null }>('/api/harness/queue', { signal }, !signal)).tasks?.map(normalizeHarnessTask) ?? [],
+  harnessRuns: async (signal?: AbortSignal) => (await request<{ runs?: HarnessRun[] | null }>('/api/harness/runs', { signal }, !signal)).runs ?? [],
+  harnessRun: async (runId: string, signal?: AbortSignal) => normalizeHarnessRunDetail(await request<HarnessRunDetail>(`/api/harness/runs/${encodeURIComponent(runId)}`, { signal }, !signal)),
+  harnessRunChanges: (runId: string, signal?: AbortSignal) => request<SessionChanges>(`/api/harness/runs/${encodeURIComponent(runId)}/changes`, { signal }, !signal),
+  harnessAgentRun: (agentRunId: string, signal?: AbortSignal) => request<{ agentRun: HarnessAgentRun; session?: SafeSessionRecord }>(`/api/harness/agent-runs/${encodeURIComponent(agentRunId)}`, { signal }, !signal),
+  cancelHarnessRun: (runId: string, expectedRevision: number) => request<HarnessRun>(`/api/harness/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST', body: JSON.stringify({ expectedRevision }) }, false),
+  harnessApprovals: async (signal?: AbortSignal) => (await request<{ approvals?: HarnessApproval[] | null }>('/api/harness/approvals', { signal }, !signal)).approvals ?? [],
+  /** Resolves to the decided approval, or `undefined` when someone else already decided it (409 `already_decided`). */
+  approveHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason?: string) => decideHarnessGate(approval, 'approve', idempotencyKey, reason),
+  rejectHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason: string) => decideHarnessGate(approval, 'reject', idempotencyKey, reason),
+  pinHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, pinned: boolean) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/pin`, { method: 'POST', body: JSON.stringify({ pinned, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
+  /** `before` names the task this one should now sit above in its wave; omitted means last. */
+  setHarnessPriority: (task: Pick<HarnessTask, 'id' | 'revision'>, input: { priorityOverride?: number; before?: string }) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/priority`, { method: 'POST', body: JSON.stringify({ ...input, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
+  startHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, idempotencyKey: string) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/start`, { method: 'POST', body: JSON.stringify({ idempotencyKey, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
+  dismissHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, reason?: string) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/dismiss`, { method: 'POST', body: JSON.stringify({ reason, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
+  pollHarnessScouts: () => request<{ started: boolean }>('/api/harness/scout/poll', { method: 'POST' }, false),
+  pauseHarnessRole: (role: HarnessRoleId) => request<HarnessRoleHealth>(`/api/harness/roles/${encodeURIComponent(role)}/pause`, { method: 'POST' }, false),
+  resumeHarnessRole: (role: HarnessRoleId) => request<HarnessRoleHealth>(`/api/harness/roles/${encodeURIComponent(role)}/resume`, { method: 'POST' }, false),
+  harnessCostSummary: (groupBy: HarnessCostSummary['groupBy'], range: { from?: string; to?: string } = {}, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ groupBy });
+    if (range.from) query.set('from', range.from);
+    if (range.to) query.set('to', range.to);
+    return request<HarnessCostSummary>(`/api/harness/cost?${query.toString()}`, { signal }, !signal).then((summary) => ({ ...summary, groups: summary.groups ?? [] }));
+  },
+  harnessSettings: (signal?: AbortSignal) => request<HarnessSettings>('/api/harness/settings', { signal }, !signal),
+  saveHarnessSettings: (settings: HarnessSettings) => request<HarnessSettings>('/api/harness/settings', { method: 'PUT', body: JSON.stringify({ ...settings, expectedRevision: settings.revision }) }, false),
+  harnessEventsURL: (lastEventId?: number) => apiURL(lastEventId ? `/api/harness/events?after=${lastEventId}` : '/api/harness/events')
 };
+
+async function decideHarnessGate(approval: Pick<HarnessApproval, 'id' | 'revision'>, decision: HarnessDecision, idempotencyKey: string, reason?: string): Promise<HarnessApproval | undefined> {
+  try {
+    return await request<HarnessApproval>(`/api/harness/approvals/${encodeURIComponent(approval.id)}/decide`, { method: 'POST', body: JSON.stringify({ decision, reason: reason?.trim() || undefined, idempotencyKey, expectedRevision: approval.revision }) }, false);
+  } catch (error) {
+    // Someone decided it first (another tab, Webex). The later approval.decided event says who.
+    if (error instanceof ApiError && error.status === 409 && error.code === 'already_decided') return undefined;
+    throw error;
+  }
+}
+
+function normalizeHarnessTask(task: HarnessTask): HarnessTask {
+  return { ...task, scoreReasons: task.scoreReasons ?? [], dependsOn: task.dependsOn ?? [], source: { ...task.source, labels: task.source?.labels ?? [] } };
+}
+
+function normalizeHarnessRunDetail(detail: HarnessRunDetail): HarnessRunDetail {
+  return { ...detail, task: normalizeHarnessTask(detail.task), stages: detail.stages ?? [], agentRuns: detail.agentRuns ?? [], approvals: detail.approvals ?? [] };
+}
 
 function knowledgeURL(workspaceId: string, root: string, resource: 'pages' | 'graph' | 'rescan'): string {
 	return `/api/knowledge/wikis/${encodeURIComponent(workspaceId)}/${encodeURIComponent(root)}/${resource}`;

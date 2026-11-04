@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent, PointerEvent } from 'react';
 import { ArrowLeft, Bot, ChevronRight, GitCompare, PanelBottomOpen, Plus, TerminalSquare } from 'lucide-react';
 import { ApiError, api } from '../../shared/api';
+import { newIdempotencyKey } from '../../shared/api/idempotency';
 import type { ClaudeTranscript, ClaudeTurn, EmbeddedAISessionResult, SafeSessionRecord } from '../../lib/types';
 import { AISessionLaunchControl } from '../ai-session/AISessionLaunchControl';
 import { AgentChip, providerLabel } from '../ai-session/providerDisplay';
@@ -30,7 +31,6 @@ export function claudeConversationOf(record: SafeSessionRecord): string | undefi
 
 const stop = (event: MouseEvent | PointerEvent) => event.stopPropagation();
 
-function newIdempotencyKey() { return globalThis.crypto?.randomUUID?.() ?? `card-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 
 /**
  * The card's agent chips: one per live session, then `+N`; a hollow chip for

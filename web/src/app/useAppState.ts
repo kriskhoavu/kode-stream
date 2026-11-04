@@ -149,6 +149,8 @@ export function useAppState() {
       navigate({ name: 'review', location: { workspaceId: repo.id } });
       return;
     }
+    // The harness spans every workspace, so choosing one must not leave it.
+    if (route.name === 'harness') return;
     navigate({ name: 'workstream' });
   };
 

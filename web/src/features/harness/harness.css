@@ -1,0 +1,684 @@
+/*
+ * PM-044 engineering harness. Every rule is hx- prefixed and every token
+ * --hx-*: the shell tokens and classes in styles/app.css are vendored by the
+ * frontend repository, so the harness reads them and never redefines them.
+ */
+
+:root {
+	--hx-done: #047857;
+	--hx-running: #1d4ed8;
+	--hx-waiting: #a16207;
+	--hx-stopped: var(--danger);
+	--hx-idle: #64748b;
+	--hx-manual: var(--purple);
+	--hx-path: var(--accent-text);
+	--hx-mix: 12%;
+	--hx-ring: 0 0 0 3px color-mix(in srgb, var(--hx-waiting) 35%, transparent);
+	--hx-ease: cubic-bezier(.2, .8, .2, 1);
+	--hx-card-shadow: 0 8px 18px rgba(17, 24, 39, .06);
+}
+
+:root[data-theme="dark"] {
+	--hx-done: #4ade80;
+	--hx-running: #60a5fa;
+	--hx-waiting: #facc15;
+	--hx-idle: #94a3b8;
+	--hx-mix: 18%;
+	--hx-card-shadow: 0 10px 28px rgba(0, 0, 0, .38);
+}
+
+.hx {
+	font-size: 14px;
+	line-height: 1.45;
+	color: var(--text);
+}
+
+.hx-page {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+	min-width: 0;
+}
+
+.hx-title {
+	justify-content: flex-start;
+	flex-wrap: wrap;
+	gap: 18px;
+	margin-bottom: 0;
+}
+
+.hx-title h1 {
+	margin: 0;
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.hx-title h1:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 4px;
+	border-radius: 4px;
+}
+
+.hx-title h1:focus:not(:focus-visible) {
+	outline: none;
+}
+
+.hx-title-status {
+	margin-left: auto;
+	font-size: 13px;
+}
+
+.hx-seg {
+	display: inline-flex;
+	gap: 2px;
+	padding: 3px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+}
+
+.hx-seg button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--muted);
+	padding: 6px 14px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.hx-seg button:hover {
+	color: var(--text);
+}
+
+.hx-seg button.on {
+	background: var(--panel-soft);
+	color: var(--text);
+}
+
+.hx-seg-small button {
+	padding: 4px 10px;
+	font-size: 12px;
+}
+
+.hx-seg-count {
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	border-radius: 9px;
+	background: var(--hx-waiting);
+	color: #111;
+	font-size: 11px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.hx-demo-chip {
+	border-style: dashed;
+}
+
+.hx-muted {
+	color: var(--muted);
+}
+
+.hx-num {
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-card {
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--panel);
+	box-shadow: var(--shadow-soft);
+}
+
+.hx-state {
+	padding: 22px;
+	display: grid;
+	gap: 12px;
+	justify-items: start;
+	max-width: 720px;
+}
+
+.hx-state p {
+	margin: 0;
+}
+
+.hx-banner {
+	margin: 0;
+	padding: 10px 14px;
+	border: 1px solid color-mix(in srgb, var(--hx-stopped) 40%, var(--line));
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--hx-stopped) var(--hx-mix), var(--panel));
+	color: var(--text);
+}
+
+.hx-link {
+	border: 0;
+	background: transparent;
+	color: var(--accent-text);
+	font-weight: 600;
+	font-size: 13px;
+	padding: 6px 8px;
+	border-radius: 6px;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.hx-link:hover {
+	background: var(--panel-soft);
+}
+
+/* ── Inbox ──────────────────────────────────────────────────────────────── */
+
+.hx-inbox {
+	display: flex;
+	flex-direction: column;
+	gap: 28px;
+	max-width: 1040px;
+}
+
+.hx-section {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.hx-section-title {
+	margin: 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.hx-section-title small {
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.hx-empty {
+	padding: 22px;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	color: var(--muted);
+}
+
+.hx-empty-line {
+	margin: 0;
+	font-size: 13px;
+}
+
+.hx-row {
+	display: grid;
+	grid-template-columns: 120px minmax(0, 1fr) 190px 160px auto;
+	gap: 14px;
+	align-items: center;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	box-shadow: var(--hx-card-shadow);
+}
+
+.hx-row-key {
+	display: grid;
+	gap: 2px;
+	justify-items: start;
+}
+
+.hx-row-key b {
+	font-size: 13px;
+}
+
+.hx-row-title {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.hx-row-title > span:first-child,
+.hx-title-button {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hx-row-title small,
+.hx-row-title a {
+	font-size: 13px;
+}
+
+.hx-inbox-pair {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 18px;
+}
+
+.hx-panel {
+	padding: 18px 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.hx-panel p {
+	margin: 0;
+}
+
+.hx-spend-total {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.hx-spend-total b {
+	font-size: 26px;
+}
+
+.hx-spend-roles {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	font-size: 13px;
+}
+
+.hx-decisions {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.hx-team {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.hx-tile {
+	display: grid;
+	gap: 4px;
+	align-content: start;
+	justify-items: start;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+}
+
+.hx-tile b {
+	font-size: 13px;
+}
+
+.hx-tile span {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.hx-tile.paused {
+	border-color: color-mix(in srgb, var(--hx-waiting) 50%, var(--line));
+}
+
+/* ── Status badges, chips, sources ─────────────────────────────────────── */
+
+.hx-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 24px;
+	padding: 0 9px;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .02em;
+	white-space: nowrap;
+	justify-self: start;
+	color: var(--hx-tone);
+	background: color-mix(in srgb, var(--hx-tone) var(--hx-mix), var(--panel));
+}
+
+.hx-badge svg {
+	width: 13px;
+	height: 13px;
+	flex: none;
+}
+
+.hx-badge time {
+	color: inherit;
+}
+
+.hx-badge-sm {
+	height: 20px;
+	padding: 0 7px;
+	font-size: 11px;
+}
+
+.hx-badge-sm svg {
+	width: 11px;
+	height: 11px;
+}
+
+.hx-tone-idle { --hx-tone: var(--hx-idle); }
+.hx-tone-running { --hx-tone: var(--hx-running); }
+.hx-tone-waiting { --hx-tone: var(--hx-waiting); }
+.hx-tone-done { --hx-tone: var(--hx-done); }
+.hx-tone-stopped { --hx-tone: var(--hx-stopped); }
+.hx-tone-manual { --hx-tone: var(--hx-manual); }
+
+/* "Up next" is ready but not started: outlined rather than filled. */
+.hx-status-up_next {
+	background: transparent;
+	border-color: color-mix(in srgb, var(--hx-done) 45%, var(--line));
+}
+
+/* "Done by hand" is the one status also told apart by its dashed edge. */
+.hx-status-manual {
+	border-style: dashed;
+	border-color: var(--hx-manual);
+}
+
+.hx-status-not_started svg {
+	stroke-dasharray: 3 3;
+}
+
+.hx-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 22px;
+	padding: 0 8px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--panel-soft);
+	color: var(--text);
+	font-size: 12px;
+	font-weight: 600;
+	white-space: nowrap;
+	justify-self: start;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.hx-chip svg {
+	flex: none;
+}
+
+.hx-source {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .02em;
+	text-transform: uppercase;
+	text-decoration: none;
+}
+
+a.hx-source:hover {
+	color: var(--accent-text);
+}
+
+/* ── Gate cards ─────────────────────────────────────────────────────────── */
+
+.hx-gate {
+	position: relative;
+	padding: 20px 22px;
+	display: grid;
+	grid-template-columns: 44px minmax(0, 1fr) auto;
+	gap: 16px;
+	align-items: start;
+}
+
+.hx-gate-attention {
+	box-shadow: var(--hx-ring), var(--shadow-soft);
+}
+
+.hx-gate-decided {
+	opacity: .92;
+	align-items: center;
+}
+
+.hx-gate-icon {
+	width: 44px;
+	height: 44px;
+	border-radius: 12px;
+	display: grid;
+	place-items: center;
+	color: var(--hx-waiting);
+	background: color-mix(in srgb, var(--hx-waiting) var(--hx-mix), var(--panel));
+}
+
+.hx-gate-icon.ok {
+	color: var(--hx-done);
+	background: color-mix(in srgb, var(--hx-done) var(--hx-mix), var(--panel));
+}
+
+.hx-gate-icon svg {
+	width: 22px;
+	height: 22px;
+}
+
+.hx-gate-body h3 {
+	margin: 0 0 4px;
+	font-size: 16px;
+	font-weight: 700;
+}
+
+.hx-gate-body p {
+	margin: 0;
+	color: var(--muted);
+}
+
+.hx-gate-facts {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin-top: 10px;
+	font-size: 13px;
+}
+
+.hx-gate .hx-gate-status {
+	margin-top: 10px;
+	color: var(--text);
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.hx-gate .hx-gate-status.error {
+	color: var(--hx-stopped);
+}
+
+.hx-gate-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 160px;
+}
+
+.hx-dialog form {
+	display: grid;
+	gap: 12px;
+}
+
+.hx-field {
+	display: grid;
+	gap: 6px;
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.hx-field textarea,
+.hx-field input,
+.hx-field select {
+	width: 100%;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+	color: var(--text);
+	padding: 10px;
+	font: inherit;
+	font-weight: 400;
+}
+
+.hx-field textarea {
+	min-height: 96px;
+	resize: vertical;
+}
+
+.hx-field-error {
+	margin: 0;
+	color: var(--hx-stopped);
+	font-size: 13px;
+}
+
+/* ── Queue list ─────────────────────────────────────────────────────────── */
+
+.hx-queue-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 8px;
+	max-width: 1040px;
+}
+
+.hx-queue-row {
+	grid-template-columns: 32px 120px minmax(0, 1fr) 160px auto;
+}
+
+.hx-queue-rank {
+	color: var(--muted);
+	font-weight: 700;
+	text-align: right;
+}
+
+.hx-title-button {
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	padding: 0;
+	text-align: left;
+	max-width: 100%;
+}
+
+.hx-title-button:hover {
+	color: var(--accent-text);
+}
+
+.hx-icon-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--muted);
+	padding: 5px 10px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-icon-toggle.on {
+	color: var(--accent-text);
+	border-color: color-mix(in srgb, var(--accent-text) 45%, var(--line));
+}
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+
+.hx-table-card {
+	padding: 6px 4px 4px;
+	overflow-x: auto;
+}
+
+.hx-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.hx-table th {
+	text-align: left;
+	font-size: 11px;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	color: var(--muted);
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--line);
+}
+
+.hx-table td {
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--line);
+	vertical-align: middle;
+}
+
+.hx-table tr:last-child td {
+	border-bottom: 0;
+}
+
+/* ── Narrow screens ─────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+	.hx-row,
+	.hx-queue-row {
+		grid-template-columns: 1fr;
+		gap: 8px;
+	}
+	.hx-gate {
+		grid-template-columns: 44px minmax(0, 1fr);
+	}
+	.hx-gate-actions {
+		grid-column: 1 / -1;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+	.hx-inbox-pair {
+		grid-template-columns: 1fr;
+	}
+	.hx-team {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.hx-title-status {
+		margin-left: 0;
+		width: 100%;
+	}
+}
+
+/* The count on the Harness nav button; loaded with the shell, so it lives beside the tokens it reads. */
+.hx-nav-count {
+	margin-left: auto;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 6px;
+	border-radius: 10px;
+	background: var(--hx-waiting);
+	color: #111;
+	font-size: 11px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-variant-numeric: tabular-nums;
+}
+
+.left-nav-collapsed .hx-nav-count {
+	position: absolute;
+	margin: 0;
+	transform: translate(10px, -10px);
+}
