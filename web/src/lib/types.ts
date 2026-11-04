@@ -1015,3 +1015,250 @@ export interface GitOperationResult {
 	stashRef?: string;
 	stashMessage?: string;
 }
+
+// ── PM-044 engineering harness ───────────────────────────────────────────────
+// Mirrors the backend contract in plans/platform/PM-044 (API section). Every
+// timestamp is an RFC 3339 string; every cost is US dollars as a number.
+
+export type HarnessSourceKind = 'jira' | 'github' | 'bitbucket';
+export type HarnessTaskState = 'discovered' | 'ranked' | 'running' | 'blocked' | 'done' | 'dismissed' | 'stale' | 'cancelled';
+export type HarnessRunState = 'running' | 'blocked' | 'passed' | 'failed' | 'cancelled';
+export type HarnessStageKind = 'plan' | 'plan_approval' | 'implement' | 'qa' | 'pr_approval' | 'draft_pr';
+export type HarnessStageState = 'pending' | 'running' | 'awaiting_approval' | 'passed' | 'failed' | 'retry_wait' | 'cancelled' | 'skipped';
+export type HarnessAgentRole = 'planner' | 'plan_reviewer' | 'coder' | 'code_reviewer' | 'qa_fixer';
+export type HarnessAgentRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted';
+export type HarnessApprovalGate = 'start' | 'plan' | 'resume' | 'draft_pr';
+export type HarnessApprovalState = 'requested' | 'approved' | 'rejected' | 'expired' | 'superseded';
+export type HarnessChannel = 'dashboard' | 'webex' | 'api';
+/** The orchestrator's loops a person can pause; `reviewer` covers plan and code review. */
+export type HarnessRoleId = 'scout' | 'sorter' | 'planner' | 'coder' | 'reviewer' | 'qa';
+export type HarnessEngineId = 'claudecode' | 'codex' | 'opencode';
+export type HarnessDecision = 'approve' | 'reject';
+
+export interface HarnessActor { actorId: string; displayName: string; email?: string }
+
+export interface HarnessTaskSource {
+  kind: HarnessSourceKind;
+  key: string;
+  url?: string;
+  status?: string;
+  labels: string[];
+  priority?: string;
+  assignee?: string;
+  updatedAt?: string;
+}
+
+export interface HarnessTask {
+  id: string;
+  workspaceId: string;
+  source: HarnessTaskSource;
+  title: string;
+  state: HarnessTaskState;
+  score: number;
+  scoreReasons: string[];
+  priorityOverride: number;
+  pinned: boolean;
+  needsYou: boolean;
+  note?: string;
+  runId?: string;
+  attempts: number;
+  revision: number;
+  /** Ids of the tasks this one waits for; drives the wave board. */
+  dependsOn: string[];
+  milestone?: string;
+  epic?: string;
+  risk?: 'low' | 'medium' | 'high';
+  estimatedMinutes?: number;
+  /** Set when the source closed the task outside the harness ("Done by hand"). */
+  finishedOutside?: { by?: string; at?: string };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface HarnessTotals { turns: number; durationMs: number; costUsd: number; blocking: number; advisory: number }
+
+export interface HarnessStage {
+  id: string;
+  runId: string;
+  kind: HarnessStageKind;
+  ordinal: number;
+  state: HarnessStageState;
+  round: number;
+  maxRounds: number;
+  attempt: number;
+  maxAttempts: number;
+  engine?: HarnessEngineId;
+  model?: string;
+  turns: number;
+  durationMs: number;
+  costUsd: number;
+  blocking: number;
+  advisory: number;
+  startedAt?: string;
+  finishedAt?: string;
+  failureReason?: string;
+}
+
+export interface HarnessFinding {
+  severity: 'blocking' | 'advisory';
+  title: string;
+  path?: string;
+  line?: number;
+  detail?: string;
+  /** True once a later round no longer reports it. */
+  resolved?: boolean;
+}
+
+export interface HarnessAgentRun {
+  id: string;
+  runId: string;
+  stageId: string;
+  role: HarnessAgentRole;
+  round: number;
+  engine: HarnessEngineId;
+  model: string;
+  state: HarnessAgentRunState;
+  startedAt?: string;
+  finishedAt?: string;
+  turns: number;
+  durationMs: number;
+  costUsd: number;
+  verdict?: 'approve' | 'changes_requested';
+  blocking: number;
+  advisory: number;
+  summary?: string;
+  /** The last ≤200 characters the engine reported, for live progress. */
+  progress?: string;
+  findings?: HarnessFinding[];
+  stopReason?: string;
+}
+
+export interface HarnessRun {
+  id: string;
+  taskId: string;
+  workspaceId: string;
+  branch: string;
+  state: HarnessRunState;
+  currentStageId?: string;
+  totals: HarnessTotals;
+  prUrl?: string;
+  startedAt: string;
+  finishedAt?: string;
+  revision: number;
+  /** Embedded by the list endpoint so the Inbox needs no second request. */
+  currentStage?: HarnessStage;
+  activeAgentRun?: HarnessAgentRun;
+}
+
+export interface HarnessApproval {
+  id: string;
+  runId?: string;
+  taskId: string;
+  gate: HarnessApprovalGate;
+  state: HarnessApprovalState;
+  requestedAt: string;
+  expiresAt?: string;
+  decidedAt?: string;
+  decidedBy?: HarnessActor;
+  channel?: HarnessChannel;
+  reason?: string;
+  revision: number;
+  /** Plain summary of what is being approved, written by the harness (≤600). */
+  summary?: string;
+  /** What the next step usually takes, shown in the consequence sentence. */
+  estimate?: { minMinutes?: number; maxMinutes?: number; costUsd?: number };
+  context?: { difficulty?: 'easy' | 'hard'; subtasks?: number; rounds?: number; blocking?: number; advisory?: number; costUsd?: number; durationMs?: number; verdict?: 'approve' | 'changes_requested' };
+}
+
+export interface HarnessRunDetail {
+  run: HarnessRun;
+  task: HarnessTask;
+  stages: HarnessStage[];
+  agentRuns: HarnessAgentRun[];
+  approvals: HarnessApproval[];
+}
+
+export interface HarnessRoleHealth {
+  role: HarnessRoleId;
+  paused: boolean;
+  pausedBy?: string;
+  pausedAt?: string;
+  working: number;
+  slots: number;
+  queued: number;
+  lastRunAt?: string;
+  /** Finder only: tasks found by the last look. */
+  found?: number;
+  model?: string;
+  engine?: HarnessEngineId;
+}
+
+export interface HarnessEngineStatus {
+  id: HarnessEngineId;
+  available: boolean;
+  version?: string;
+  /** Plain notes on what this engine cannot do (from Detect). */
+  limits?: string[];
+}
+
+export interface HarnessStatus {
+  enabled: boolean;
+  storageSupported: boolean;
+  mode: 'local' | 'cloud';
+  running: boolean;
+  waitingCount: number;
+  lastEventSeq: number;
+  roles: HarnessRoleHealth[];
+  engines: HarnessEngineStatus[];
+}
+
+export interface HarnessCostGroup { key: string; costUsd: number; agentRuns: number; turns: number; durationMs: number }
+export interface HarnessCostSummary {
+  groupBy: 'day' | 'run' | 'role' | 'model';
+  from: string;
+  to: string;
+  totalUsd: number;
+  agentRuns: number;
+  groups: HarnessCostGroup[];
+}
+
+export interface HarnessRolePolicy {
+  engine: HarnessEngineId;
+  model: string;
+  /** Builder only: the model used when the plan rates the work hard. */
+  hardModel?: string;
+  maxTurns: number;
+}
+
+export interface HarnessSourceSettings {
+  workspaceId: string;
+  kind: HarnessSourceKind;
+  enabled: boolean;
+  /** Jira search query, GitHub `owner/repo`, or Bitbucket `workspace/repo`. */
+  query: string;
+  labels?: string[];
+  tokenEnvVar?: string;
+  lastCheckedAt?: string;
+  lastFound?: number;
+  lastError?: string;
+}
+
+export interface HarnessSettings {
+  revision: number;
+  enabled: boolean;
+  autoStart: boolean;
+  requirePrApproval: boolean;
+  slots: Record<HarnessRoleId, number>;
+  paused: Partial<Record<HarnessRoleId, boolean>>;
+  sources: HarnessSourceSettings[];
+  modelPolicy: Record<HarnessAgentRole, HarnessRolePolicy>;
+}
+
+export type HarnessEvent =
+  | { seq: number; at: string; type: 'task.discovered' | 'task.updated' | 'task.ranked' | 'task.pinned'; task: HarnessTask }
+  | { seq: number; at: string; type: 'run.started' | 'run.blocked' | 'run.finished'; run: HarnessRun }
+  | { seq: number; at: string; type: 'stage.started' | 'stage.round' | 'stage.finished'; stage: HarnessStage }
+  | { seq: number; at: string; type: 'agent.started' | 'agent.progress' | 'agent.finished'; agentRun: HarnessAgentRun }
+  | { seq: number; at: string; type: 'approval.requested' | 'approval.decided'; approval: HarnessApproval }
+  | { seq: number; at: string; type: 'role.paused' | 'role.resumed'; role: HarnessRoleHealth }
+  | { seq: number; at: string; type: 'notification.failed'; message: string };

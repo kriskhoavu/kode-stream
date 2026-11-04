@@ -24,7 +24,7 @@ describe('HeaderBackdrop', () => {
   });
 
   it('decorates the workstream, workbench and knowledge routes only', () => {
-    expect([...backdropRoutes]).toEqual(['workstream', 'canvas', 'knowledge']);
+    expect([...backdropRoutes]).toEqual(['workstream', 'canvas', 'knowledge', 'harness']);
   });
 
   /*

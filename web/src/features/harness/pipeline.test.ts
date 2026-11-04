@@ -1,0 +1,45 @@
+import { describe, expect, it } from 'vitest';
+import { createFixtureClient } from './fixture';
+import { pipelineModel } from './pipeline';
+import { ledgerGroups } from './RunLedger';
+
+async function detail(runId: string) {
+	return createFixtureClient({ tickMs: 0, arrivalMs: 0 }).run(runId);
+}
+
+describe('pipeline model', () => {
+	it('reads the building run as the mockup does', async () => {
+		const model = pipelineModel(await detail('run-pm-02'));
+		expect(model.groups.map((group) => group.label)).toEqual(['Start', 'Plan · round 2 of 3', 'You', 'Build · round 1 of 3', 'Test', 'Hand-off']);
+		const cards = Object.fromEntries(model.groups.flatMap((group) => group.cards).map((card) => [card.id, card]));
+		expect(cards.start).toMatchObject({ status: 'done', meta: ['Khoa · here', '31 min ago'] });
+		expect(cards.plan).toMatchObject({ status: 'done', meta: ['2 rounds', '8 min', '$3.03'] });
+		expect(cards.plan_check).toMatchObject({ status: 'done', meta: ['approved', '3 min', '$1.44'] });
+		expect(cards.approval.meta[0]).toBe('Anna · via Webex');
+		expect(cards.build).toMatchObject({ status: 'working', current: true });
+		expect(cards.code_check).toMatchObject({ status: 'not_started', meta: ['after Build'] });
+		expect(cards.fix).toMatchObject({ status: 'not_started', meta: ['only if a test fails'] });
+		expect(cards.draft_pr.meta).toEqual(['you approve first']);
+		expect(model.groups[model.activeGroup].id).toBe('build');
+	});
+
+	it('makes the waiting approval the current step', async () => {
+		const model = pipelineModel(await detail('run-ux-11'));
+		expect(model.current).toMatchObject({ id: 'approval', status: 'waiting' });
+		expect(model.activeGroup).toBe(-1);
+	});
+
+	it('shows a stuck plan as needing a fix with three rounds behind it', async () => {
+		const model = pipelineModel(await detail('run-srv-04'));
+		const plan = model.groups.find((group) => group.id === 'plan');
+		expect(plan?.label).toBe('Plan · round 3 of 3');
+		expect(plan?.cards[1]).toMatchObject({ status: 'needs_fix', meta: ['1 must fix', '9 min', '$1.80'] });
+	});
+
+	it('groups the ledger by stage and names each round', async () => {
+		const groups = ledgerGroups(await detail('run-pm-02'));
+		expect(groups.map((group) => group.title)).toEqual(['Plan', 'Build']);
+		expect(groups[0].note).toBe('Anna approved via Webex');
+		expect(groups[0].rows.map((row) => row.step)).toEqual(['Round 1 · plan', 'Round 1 · plan check', 'Round 2 · plan again', 'Round 2 · plan check']);
+	});
+});

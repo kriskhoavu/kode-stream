@@ -3,6 +3,10 @@ export interface KnowledgeLocation { workspaceId?: string; root?: string; slug?:
 export type WorkbenchView = 'canvas' | 'sessions';
 export interface CanvasLocation { workspaceId?: string; selectedNodeId?: string; view?: WorkbenchView; }
 export interface ReviewLocation { workspaceId?: string; branch?: string; }
+export type HarnessView = 'inbox' | 'queue' | 'run' | 'approvals' | 'settings';
+export type HarnessRunTab = 'stages' | 'findings' | 'changes' | 'live' | 'links';
+export const harnessRunTabs: readonly HarnessRunTab[] = ['stages', 'findings', 'changes', 'live', 'links'];
+export interface HarnessLocation { view: HarnessView; runId?: string; tab?: HarnessRunTab; }
 
 export type Route =
   | { name: 'workstream'; focusedItemId?: string; focusedSessionId?: string }
@@ -12,6 +16,7 @@ export type Route =
   | { name: 'canvas'; location?: CanvasLocation }
   | { name: 'review'; location?: ReviewLocation }
   | { name: 'item'; itemId: string }
+  | { name: 'harness'; location: HarnessLocation }
   | { name: 'not-found'; path: string };
 
 export const routeDescriptors: Record<Route['name'], { title: string; mainId: string }> = {
@@ -22,6 +27,7 @@ export const routeDescriptors: Record<Route['name'], { title: string; mainId: st
   canvas: { title: 'Agent Space · Kode Stream', mainId: 'app-main' },
   review: { title: 'Branch Review · Kode Stream', mainId: 'app-main' },
   item: { title: 'Item · Kode Stream', mainId: 'app-main' },
+  harness: { title: 'Harness · Kode Stream', mainId: 'app-main' },
   'not-found': { title: 'Page not found · Kode Stream', mainId: 'app-main' }
 };
 
@@ -33,6 +39,10 @@ export function routeFromPath(path: string, search = ''): Route {
   if (path.startsWith('/items/')) {
     const itemId = decodeURIComponent(path.split('/')[2] ?? '');
     return itemId ? { name: 'item', itemId } : { name: 'not-found', path };
+  }
+  if (path === '/harness' || path.startsWith('/harness/')) {
+    const location = harnessLocationFromPath(path, search);
+    return location ? { name: 'harness', location } : { name: 'not-found', path };
   }
   if (path === '/workspaces') {
     return { name: 'workspaces' };
@@ -62,6 +72,7 @@ export function pathForRoute(route: Route): string {
 	if (route.name === 'knowledge') return knowledgePath(route.location);
 	if (route.name === 'canvas') return canvasPath(route.location);
   if (route.name === 'review') return reviewPath(route.location);
+  if (route.name === 'harness') return harnessPath(route.location);
   return route.name === 'not-found' ? route.path
     : route.name === 'item'
     ? `/items/${encodeURIComponent(route.itemId)}`
@@ -70,6 +81,27 @@ export function pathForRoute(route: Route): string {
       : route.name === 'settings'
         ? '/settings'
         : workstreamPath(route.focusedItemId, route.focusedSessionId);
+}
+
+export function harnessLocationFromPath(path: string, search = ''): HarnessLocation | undefined {
+  const segments = path.replace(/\/+$/, '').split('/').slice(2);
+  if (segments.length === 0) return { view: 'inbox' };
+  if (segments.length === 1 && (segments[0] === 'queue' || segments[0] === 'approvals' || segments[0] === 'settings')) return { view: segments[0] };
+  if (segments.length === 2 && segments[0] === 'runs' && segments[1]) {
+    const runId = decodeURIComponent(segments[1]);
+    const rawTab = new URLSearchParams(search).get('tab');
+    const tab = harnessRunTabs.find((candidate) => candidate === rawTab);
+    return tab ? { view: 'run', runId, tab } : { view: 'run', runId };
+  }
+  return undefined;
+}
+
+export function harnessPath(location: HarnessLocation): string {
+  if (location.view === 'run' && location.runId) {
+    const base = `/harness/runs/${encodeURIComponent(location.runId)}`;
+    return location.tab ? `${base}?tab=${location.tab}` : base;
+  }
+  return location.view === 'inbox' || location.view === 'run' ? '/harness' : `/harness/${location.view}`;
 }
 
 export function canvasLocationFromSearch(search: string): CanvasLocation | undefined {

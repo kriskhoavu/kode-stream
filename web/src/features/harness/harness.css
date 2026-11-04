@@ -1,0 +1,1923 @@
+/*
+ * PM-044 engineering harness. Every rule is hx- prefixed and every token
+ * --hx-*: the shell tokens and classes in styles/app.css are vendored by the
+ * frontend repository, so the harness reads them and never redefines them.
+ */
+
+:root {
+	--hx-done: #047857;
+	--hx-running: #1d4ed8;
+	--hx-waiting: #a16207;
+	--hx-stopped: var(--danger);
+	--hx-idle: #64748b;
+	--hx-manual: var(--purple);
+	--hx-path: var(--accent-text);
+	--hx-mix: 12%;
+	--hx-ring: 0 0 0 3px color-mix(in srgb, var(--hx-waiting) 35%, transparent);
+	--hx-ease: cubic-bezier(.2, .8, .2, 1);
+	--hx-card-shadow: 0 8px 18px rgba(17, 24, 39, .06);
+}
+
+:root[data-theme="dark"] {
+	--hx-done: #4ade80;
+	--hx-running: #60a5fa;
+	--hx-waiting: #facc15;
+	--hx-idle: #94a3b8;
+	--hx-mix: 18%;
+	--hx-card-shadow: 0 10px 28px rgba(0, 0, 0, .38);
+}
+
+.hx {
+	font-size: 14px;
+	line-height: 1.45;
+	color: var(--text);
+}
+
+.hx-page {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+	min-width: 0;
+}
+
+.hx-title {
+	justify-content: flex-start;
+	flex-wrap: wrap;
+	gap: 18px;
+	margin-bottom: 0;
+}
+
+.hx-title h1 {
+	margin: 0;
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.hx-title h1:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 4px;
+	border-radius: 4px;
+}
+
+.hx-title h1:focus:not(:focus-visible) {
+	outline: none;
+}
+
+.hx-title-status {
+	margin-left: auto;
+	font-size: 13px;
+}
+
+.hx-seg {
+	display: inline-flex;
+	gap: 2px;
+	padding: 3px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+}
+
+.hx-seg button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--muted);
+	padding: 6px 14px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.hx-seg button:hover {
+	color: var(--text);
+}
+
+.hx-seg button.on {
+	background: var(--panel-soft);
+	color: var(--text);
+}
+
+.hx-seg-small button {
+	padding: 4px 10px;
+	font-size: 12px;
+}
+
+.hx-seg .hx-seg-count {
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	border-radius: 9px;
+	background: var(--hx-waiting);
+	color: #111;
+	font-size: 11px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.hx-demo-chip {
+	border-style: dashed;
+}
+
+/* The shell mutes every span in a title row; the chip keeps its own colour. */
+.hx-title .hx-chip {
+	color: var(--text);
+}
+
+.hx-muted {
+	color: var(--muted);
+}
+
+.hx-num {
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-card {
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--panel);
+	box-shadow: var(--shadow-soft);
+}
+
+.hx-state {
+	padding: 22px;
+	display: grid;
+	gap: 12px;
+	justify-items: start;
+	max-width: 720px;
+}
+
+.hx-state p {
+	margin: 0;
+}
+
+.hx-banner {
+	margin: 0;
+	padding: 10px 14px;
+	border: 1px solid color-mix(in srgb, var(--hx-stopped) 40%, var(--line));
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--hx-stopped) var(--hx-mix), var(--panel));
+	color: var(--text);
+}
+
+.hx-link {
+	border: 0;
+	background: transparent;
+	color: var(--accent-text);
+	font-weight: 600;
+	font-size: 13px;
+	padding: 6px 8px;
+	border-radius: 6px;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.hx-link:hover {
+	background: var(--panel-soft);
+}
+
+/* ── Inbox ──────────────────────────────────────────────────────────────── */
+
+.hx-inbox {
+	display: flex;
+	flex-direction: column;
+	gap: 28px;
+	max-width: 1040px;
+}
+
+.hx-section {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.hx-section-title {
+	margin: 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.hx-section-title small {
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.hx-empty {
+	padding: 22px;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	color: var(--muted);
+}
+
+.hx-empty-line {
+	margin: 0;
+	font-size: 13px;
+}
+
+.hx-row {
+	display: grid;
+	grid-template-columns: 120px minmax(0, 1fr) 190px 160px auto;
+	gap: 14px;
+	align-items: center;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	box-shadow: var(--hx-card-shadow);
+}
+
+.hx-row-key {
+	display: grid;
+	gap: 2px;
+	justify-items: start;
+}
+
+.hx-row-key b {
+	font-size: 13px;
+}
+
+.hx-row-title {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.hx-row-title > span:first-child,
+.hx-title-button {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hx-row-title small,
+.hx-row-title a {
+	font-size: 13px;
+}
+
+.hx-inbox-pair {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 18px;
+}
+
+.hx-panel {
+	padding: 18px 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.hx-panel p {
+	margin: 0;
+}
+
+.hx-spend-total {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.hx-spend-total b {
+	font-size: 26px;
+}
+
+.hx-spend-roles {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	font-size: 13px;
+}
+
+.hx-decisions {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.hx-team {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.hx-tile {
+	display: grid;
+	gap: 4px;
+	align-content: start;
+	justify-items: start;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+}
+
+.hx-tile b {
+	font-size: 13px;
+}
+
+.hx-tile span {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.hx-tile.paused {
+	border-color: color-mix(in srgb, var(--hx-waiting) 50%, var(--line));
+}
+
+/* ── Status badges, chips, sources ─────────────────────────────────────── */
+
+.hx-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 24px;
+	padding: 0 9px;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .02em;
+	white-space: nowrap;
+	justify-self: start;
+	color: var(--hx-tone);
+	background: color-mix(in srgb, var(--hx-tone) var(--hx-mix), var(--panel));
+}
+
+.hx-badge svg {
+	width: 13px;
+	height: 13px;
+	flex: none;
+}
+
+.hx-badge time {
+	color: inherit;
+}
+
+.hx-badge-sm {
+	height: 20px;
+	padding: 0 7px;
+	font-size: 11px;
+}
+
+.hx-badge-sm svg {
+	width: 11px;
+	height: 11px;
+}
+
+.hx-tone-idle { --hx-tone: var(--hx-idle); }
+.hx-tone-running { --hx-tone: var(--hx-running); }
+.hx-tone-waiting { --hx-tone: var(--hx-waiting); }
+.hx-tone-done { --hx-tone: var(--hx-done); }
+.hx-tone-stopped { --hx-tone: var(--hx-stopped); }
+.hx-tone-manual { --hx-tone: var(--hx-manual); }
+
+/* "Up next" is ready but not started: outlined rather than filled. */
+.hx-status-up_next {
+	background: transparent;
+	border-color: color-mix(in srgb, var(--hx-done) 45%, var(--line));
+}
+
+/* "Done by hand" is the one status also told apart by its dashed edge. */
+.hx-status-manual {
+	border-style: dashed;
+	border-color: var(--hx-manual);
+}
+
+.hx-status-not_started svg {
+	stroke-dasharray: 3 3;
+}
+
+.hx-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 22px;
+	padding: 0 8px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--panel-soft);
+	color: var(--text);
+	font-size: 12px;
+	font-weight: 600;
+	white-space: nowrap;
+	justify-self: start;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.hx-chip svg {
+	flex: none;
+}
+
+.hx-source {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .02em;
+	text-transform: uppercase;
+	text-decoration: none;
+}
+
+a.hx-source:hover {
+	color: var(--accent-text);
+}
+
+/* ── Gate cards ─────────────────────────────────────────────────────────── */
+
+.hx-gate {
+	position: relative;
+	padding: 20px 22px;
+	display: grid;
+	grid-template-columns: 44px minmax(0, 1fr) auto;
+	gap: 16px;
+	align-items: start;
+}
+
+.hx-gate-attention {
+	box-shadow: var(--hx-ring), var(--shadow-soft);
+}
+
+.hx-gate-decided {
+	opacity: .92;
+	align-items: center;
+}
+
+.hx-gate-icon {
+	width: 44px;
+	height: 44px;
+	border-radius: 12px;
+	display: grid;
+	place-items: center;
+	color: var(--hx-waiting);
+	background: color-mix(in srgb, var(--hx-waiting) var(--hx-mix), var(--panel));
+}
+
+.hx-gate-icon.ok {
+	color: var(--hx-done);
+	background: color-mix(in srgb, var(--hx-done) var(--hx-mix), var(--panel));
+}
+
+.hx-gate-icon svg {
+	width: 22px;
+	height: 22px;
+}
+
+.hx-gate-body h3 {
+	margin: 0 0 4px;
+	font-size: 16px;
+	font-weight: 700;
+}
+
+.hx-gate-body p {
+	margin: 0;
+	color: var(--muted);
+}
+
+.hx-gate-facts {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin-top: 10px;
+	font-size: 13px;
+}
+
+.hx-gate .hx-gate-status {
+	margin-top: 10px;
+	color: var(--text);
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.hx-gate .hx-gate-status.error {
+	color: var(--hx-stopped);
+}
+
+.hx-gate-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 160px;
+}
+
+.hx-dialog form {
+	display: grid;
+	gap: 12px;
+}
+
+.hx-field {
+	display: grid;
+	gap: 6px;
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.hx-field textarea,
+.hx-field input,
+.hx-field select {
+	width: 100%;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+	color: var(--text);
+	padding: 10px;
+	font: inherit;
+	font-weight: 400;
+}
+
+.hx-field textarea {
+	min-height: 96px;
+	resize: vertical;
+}
+
+.hx-field-error {
+	margin: 0;
+	color: var(--hx-stopped);
+	font-size: 13px;
+}
+
+/* ── Queue list ─────────────────────────────────────────────────────────── */
+
+.hx-queue-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 8px;
+	max-width: 1040px;
+}
+
+.hx-queue-row {
+	grid-template-columns: 32px 120px minmax(0, 1fr) 160px auto;
+}
+
+.hx-queue-rank {
+	color: var(--muted);
+	font-weight: 700;
+	text-align: right;
+}
+
+.hx-title-button {
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	padding: 0;
+	text-align: left;
+	max-width: 100%;
+}
+
+.hx-title-button:hover {
+	color: var(--accent-text);
+}
+
+.hx-icon-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--muted);
+	padding: 5px 10px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-icon-toggle.on {
+	color: var(--accent-text);
+	border-color: color-mix(in srgb, var(--accent-text) 45%, var(--line));
+}
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+
+.hx-table-card {
+	padding: 6px 4px 4px;
+	overflow-x: auto;
+}
+
+.hx-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.hx-table th {
+	text-align: left;
+	font-size: 11px;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	color: var(--muted);
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--line);
+}
+
+.hx-table tbody th {
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 13px;
+	color: var(--text);
+	font-weight: 400;
+}
+
+.hx-table td {
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--line);
+	vertical-align: middle;
+}
+
+.hx-table tr:last-child td {
+	border-bottom: 0;
+}
+
+/* ── Narrow screens ─────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+	.hx-row,
+	.hx-queue-row {
+		grid-template-columns: 1fr;
+		gap: 8px;
+	}
+	.hx-gate {
+		grid-template-columns: 44px minmax(0, 1fr);
+	}
+	.hx-gate-actions {
+		grid-column: 1 / -1;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+	.hx-inbox-pair {
+		grid-template-columns: 1fr;
+	}
+	.hx-team {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.hx-title-status {
+		margin-left: 0;
+		width: 100%;
+	}
+}
+
+/* The count on the Harness nav button; loaded with the shell, so it lives beside the tokens it reads. */
+.hx-nav-count {
+	margin-left: auto;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 6px;
+	border-radius: 10px;
+	background: var(--hx-waiting);
+	color: #111;
+	font-size: 11px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-variant-numeric: tabular-nums;
+}
+
+.left-nav-collapsed .hx-nav-count {
+	position: absolute;
+	margin: 0;
+	transform: translate(10px, -10px);
+}
+
+/* ── Pipeline ───────────────────────────────────────────────────────────── */
+
+.hx-run {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+	max-width: 1180px;
+}
+
+.hx-run-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 14px;
+}
+
+.hx-run-head-spacer {
+	flex: 1;
+}
+
+.hx-eyebrow {
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+}
+
+.hx-run-picker select {
+	min-width: 320px;
+	max-width: 100%;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--text);
+	padding: 8px 12px;
+	font-weight: 600;
+}
+
+.hx-small-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 7px 12px;
+	font-size: 13px;
+}
+
+.hx-stepper-card {
+	padding: 18px 20px 14px;
+}
+
+.hx-stepper-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.hx-stepper {
+	display: flex;
+	align-items: center;
+	margin: 0;
+	padding: 6px 4px 10px;
+	list-style: none;
+	overflow-x: auto;
+}
+
+.hx-step-group {
+	position: relative;
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 26px 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--panel-soft) 55%, transparent);
+}
+
+.hx-step-group-label {
+	position: absolute;
+	top: 8px;
+	left: 12px;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.hx-stage-slot {
+	position: relative;
+}
+
+.hx-stage {
+	position: relative;
+	width: 182px;
+	min-height: 88px;
+	display: grid;
+	gap: 4px;
+	align-content: start;
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+	box-shadow: var(--hx-card-shadow);
+	color: var(--text);
+	text-align: left;
+	font: inherit;
+}
+
+.hx-stage:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 2px;
+}
+
+.hx-stage-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--hx-tone);
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .02em;
+}
+
+.hx-stage-status svg {
+	width: 14px;
+	height: 14px;
+}
+
+.hx-stage-name {
+	font-size: 14px;
+	font-weight: 700;
+}
+
+.hx-stage-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	color: var(--muted);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-stage-done {
+	border-color: color-mix(in srgb, var(--hx-done) 45%, var(--line));
+}
+
+.hx-stage-working {
+	border-color: var(--hx-running);
+}
+
+.hx-stage-waiting {
+	border-color: var(--hx-waiting);
+	box-shadow: var(--hx-ring), var(--hx-card-shadow);
+}
+
+.hx-stage-stopped,
+.hx-stage-failed {
+	border-color: var(--hx-stopped);
+}
+
+.hx-stage-not_started,
+.hx-stage-skipped {
+	border-style: dashed;
+}
+
+.hx-stage-manual {
+	border-style: dashed;
+	border-color: var(--hx-manual);
+}
+
+.hx-conn {
+	position: relative;
+	flex: none;
+	width: 34px;
+	height: 2px;
+	background: var(--line);
+}
+
+.hx-conn.done {
+	background: var(--hx-done);
+}
+
+.hx-conn.flow {
+	background: repeating-linear-gradient(90deg, var(--hx-running) 0 6px, transparent 6px 16px);
+}
+
+.hx-explain {
+	position: absolute;
+	z-index: 5;
+	top: 100%;
+	left: 0;
+	width: 300px;
+	margin-top: 8px;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+	box-shadow: var(--shadow-soft);
+	font-size: 13px;
+	color: var(--text);
+}
+
+.hx-explain b {
+	display: block;
+	margin-bottom: 4px;
+}
+
+.hx-legend {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 18px;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.hx-legend span {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.hx-legend-hint {
+	margin-left: auto;
+}
+
+.hx-swatch {
+	width: 10px;
+	height: 10px;
+	border-radius: 3px;
+	display: inline-block;
+	background: var(--hx-tone);
+}
+
+.hx-swatch.outline {
+	background: transparent;
+	border: 1px dashed var(--hx-tone);
+}
+
+/* The vertical stepper lives in the drawer: one column, connectors become a rail. */
+.hx-stepper.vertical {
+	flex-direction: column;
+	align-items: stretch;
+	overflow: visible;
+}
+
+.hx-stepper.vertical .hx-conn {
+	width: 2px;
+	height: 14px;
+	margin-left: 22px;
+}
+
+.hx-stepper.vertical .hx-stage {
+	width: 100%;
+}
+
+.hx-run-split {
+	display: grid;
+	grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+	gap: 18px;
+	align-items: start;
+}
+
+.hx-ledger th.num,
+.hx-ledger td.num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+.hx-ledger tr.grp th,
+.hx-ledger tr.grp td {
+	background: var(--panel-soft);
+	font-weight: 700;
+	text-align: left;
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 13px;
+	color: var(--text);
+}
+
+.hx-ledger tr.grp td.num {
+	text-align: right;
+	color: var(--text);
+}
+
+.hx-ledger tr.total th,
+.hx-ledger tr.total td {
+	font-weight: 700;
+	color: var(--text);
+	text-align: left;
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 13px;
+	border-bottom: 0;
+}
+
+.hx-ledger tr.total td.num {
+	text-align: right;
+	color: var(--text);
+}
+
+.hx-findings {
+	display: grid;
+	gap: 14px;
+}
+
+.hx-findings-head {
+	margin: 0 0 6px;
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+}
+
+.hx-findings-head.must {
+	color: var(--hx-stopped);
+}
+
+.hx-findings ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.hx-findings li {
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+}
+
+.hx-findings code {
+	font-size: 12px;
+	background: var(--panel-soft);
+	padding: 1px 6px;
+	border-radius: 4px;
+	overflow-wrap: anywhere;
+}
+
+.hx-finding-fixed {
+	flex: none;
+	color: var(--hx-done);
+}
+
+.hx-panel-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding-top: 6px;
+	border-top: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+	.hx-run-split {
+		grid-template-columns: 1fr;
+	}
+	.hx-run-picker select {
+		min-width: 0;
+		width: 100%;
+	}
+	.hx-legend-hint {
+		margin-left: 0;
+	}
+}
+
+/* ── Wave board ─────────────────────────────────────────────────────────── */
+
+.hx-board {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	min-width: 0;
+}
+
+.hx-board-filters,
+.hx-board-statuses,
+.hx-hidden-columns {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 10px;
+}
+
+.hx-board-statuses {
+	gap: 4px;
+}
+
+.hx-board-spacer {
+	flex: 1;
+}
+
+.hx-board-count {
+	margin-left: auto;
+	font-size: 13px;
+}
+
+.hx-find {
+	min-width: 220px;
+}
+
+.hx-seg-label {
+	padding: 4px 8px;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.hx-stat {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	padding: 4px 8px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-stat.on {
+	background: var(--panel-soft);
+	color: var(--text);
+}
+
+.hx-path-swatch {
+	display: inline-block;
+	width: 14px;
+	height: 3px;
+	border-radius: 2px;
+	background: var(--hx-path);
+}
+
+.hx-board-hint {
+	margin: 0;
+	padding: 8px 12px;
+	border: 1px solid color-mix(in srgb, var(--hx-waiting) 45%, var(--line));
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--hx-waiting) var(--hx-mix), var(--panel));
+	font-size: 13px;
+}
+
+.hx-board-scroll {
+	overflow-x: auto;
+	padding: 4px 2px 12px;
+}
+
+.hx-board-inner {
+	position: relative;
+	display: flex;
+	align-items: flex-start;
+	/* Wide enough that a curve between neighbouring waves is visible between the cards. */
+	gap: 40px;
+	width: max-content;
+	min-width: 100%;
+}
+
+.hx-edges {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: visible;
+	z-index: 0;
+}
+
+.hx-edges path {
+	fill: none;
+	stroke: color-mix(in srgb, var(--muted) 40%, transparent);
+	stroke-width: 1.5;
+}
+
+.hx-edges path.crit {
+	stroke: var(--hx-path);
+	stroke-width: 2.5;
+}
+
+.hx-edges.dim path {
+	opacity: .15;
+}
+
+.hx-edges.dim path.on {
+	opacity: 1;
+	stroke-width: 2.5;
+}
+
+.hx-edges path.live {
+	stroke: var(--hx-running);
+	stroke-dasharray: 6 10;
+}
+
+.hx-wave {
+	position: relative;
+	z-index: 1;
+	width: 228px;
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	border-radius: 10px;
+}
+
+.hx-wave.collapsed {
+	width: 140px;
+}
+
+.hx-wave.drop-enabled {
+	outline: 2px dashed color-mix(in srgb, var(--accent-text) 50%, transparent);
+	outline-offset: 4px;
+}
+
+.hx-wave-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 4px;
+	min-height: 34px;
+}
+
+.hx-wave-head h2 {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.hx-wave-head small {
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-wave-actions {
+	display: inline-flex;
+}
+
+.hx-wave-actions .hx-link {
+	padding: 4px 5px;
+	font-size: 12px;
+}
+
+.hx-wave-collapsed {
+	margin: 0;
+	padding: 10px;
+	border: 1px dashed var(--line);
+	border-radius: 8px;
+	font-size: 12px;
+}
+
+.hx-task {
+	position: relative;
+	height: 74px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	box-shadow: var(--hx-card-shadow);
+}
+
+.hx-task.draggable,
+.hx-task[draggable="true"] {
+	cursor: grab;
+}
+
+.hx-task-open {
+	width: 100%;
+	height: 100%;
+	display: grid;
+	gap: 3px;
+	align-content: start;
+	padding: 8px 26px 8px 10px;
+	border: 0;
+	border-radius: inherit;
+	background: transparent;
+	color: var(--text);
+	text-align: left;
+	font: inherit;
+}
+
+.hx-task-open:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 2px;
+}
+
+.hx-task-r1 {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.hx-task-r1 b {
+	color: var(--text);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.hx-task-r1 .hx-source span {
+	display: none;
+}
+
+.hx-task-r1 .hx-badge {
+	margin-left: auto;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.hx-task-title {
+	font-size: 12px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.hx-task-r3 {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.hx-task-worker {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.hx-critical-word {
+	color: var(--hx-path);
+}
+
+.hx-risk {
+	color: var(--hx-stopped);
+}
+
+.hx-task.critical {
+	border-left: 3px solid var(--hx-path);
+}
+
+.hx-task-not_started {
+	opacity: .72;
+}
+
+.hx-task-not_started:hover,
+.hx-task-not_started:focus-within,
+.hx-task.related {
+	opacity: 1;
+}
+
+.hx-task-working {
+	border-color: var(--hx-running);
+}
+
+.hx-task-waiting {
+	border-color: var(--hx-waiting);
+}
+
+.hx-task-stopped,
+.hx-task-failed {
+	border-color: var(--hx-stopped);
+}
+
+.hx-task.related {
+	border-color: color-mix(in srgb, var(--accent-text) 55%, var(--line));
+}
+
+.hx-task.move-pending {
+	opacity: .55;
+}
+
+.hx-task-pin {
+	position: absolute;
+	top: 30px;
+	right: 4px;
+	width: 22px;
+	height: 22px;
+	display: grid;
+	place-items: center;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	opacity: 0;
+}
+
+.hx-task:hover .hx-task-pin,
+.hx-task:focus-within .hx-task-pin,
+.hx-task-pin.on,
+.hx-task-pin:focus-visible {
+	opacity: 1;
+}
+
+.hx-task-pin.on {
+	color: var(--accent-text);
+}
+
+.hx-epic {
+	display: grid;
+	gap: 3px;
+	align-content: start;
+	padding: 8px 10px;
+}
+
+.hx-board-legend .hx-path-note {
+	color: var(--hx-path);
+	font-weight: 700;
+}
+
+/* ── Run drawer ─────────────────────────────────────────────────────────── */
+
+.hx-drawer {
+	--drawer-width: 560px;
+}
+
+.hx .plan-drawer-body.hx-drawer-body {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.hx-drawer .plan-drawer-header h2:focus {
+	outline: none;
+}
+
+.hx-drawer-status {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	font-size: 13px;
+}
+
+.hx-drawer .drawer-kicker {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.hx-drawer .hx-gate {
+	grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.hx-drawer .hx-gate-actions {
+	grid-column: 1 / -1;
+	flex-direction: row;
+	flex-wrap: wrap;
+}
+
+.hx-drawer-queue {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 12px;
+	font-size: 13px;
+}
+
+.hx-drawer-queue p {
+	margin: 0;
+}
+
+.hx-drawer-queue-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.hx-tabs {
+	display: flex;
+	gap: 4px;
+	border-bottom: 1px solid var(--line);
+}
+
+.hx-tabs button {
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: transparent;
+	color: var(--muted);
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.hx-tabs button.on {
+	color: var(--tab-selected-text);
+	border-bottom-color: var(--tab-selected-mark);
+}
+
+.hx-tab-panel {
+	min-height: 0;
+}
+
+.hx-findings-rounds {
+	display: grid;
+	gap: 18px;
+}
+
+.hx-findings-rounds h3 {
+	margin-bottom: 8px;
+}
+
+.hx-changes ul,
+.hx-links {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.hx-changes li {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.hx-changes code,
+.hx-links code {
+	overflow-wrap: anywhere;
+}
+
+.hx-links a {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--accent-text);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.hx-live {
+	display: grid;
+	gap: 8px;
+}
+
+.hx-live p {
+	margin: 0;
+}
+
+.hx-live-line {
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 12px;
+}
+
+/* ── Settings ───────────────────────────────────────────────────────────── */
+
+.hx-settings {
+	max-width: 1040px;
+}
+
+.hx-settings .settings-toggle-row strong {
+	font-size: 14px;
+}
+
+.hx-settings-policy .hx-table-card {
+	box-shadow: none;
+	border: 0;
+	padding: 4px 8px 8px;
+}
+
+.hx-settings .hx-table th[scope="row"] {
+	font-weight: 400;
+	white-space: nowrap;
+}
+
+.hx-select,
+.hx-model-input input,
+.hx-number {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--text);
+	padding: 6px 8px;
+	font: inherit;
+	font-size: 13px;
+}
+
+.hx-number {
+	width: 76px;
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-model-input {
+	display: grid;
+	gap: 2px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-model-input input {
+	width: 180px;
+	font-weight: 400;
+}
+
+.hx-model-pair {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 10px 14px;
+}
+
+.hx-explainer {
+	flex-basis: 100%;
+	font-size: 13px;
+}
+
+.hx-explainer summary,
+.hx-advanced summary {
+	cursor: pointer;
+	color: var(--accent-text);
+	font-weight: 600;
+}
+
+.hx-explainer p {
+	margin: 6px 0 0;
+	max-width: 520px;
+	color: var(--muted);
+}
+
+.hx-engine-notes {
+	margin: 0;
+	padding: 4px 20px 16px 36px;
+	color: var(--muted);
+	font-size: 13px;
+}
+
+.hx-sources {
+	display: grid;
+}
+
+.hx-source-row {
+	display: grid;
+	gap: 8px;
+	padding: 14px 20px;
+	border-bottom: 1px solid var(--line);
+}
+
+.hx-source-row:last-child {
+	border-bottom: 0;
+}
+
+.hx-source-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+	font-size: 13px;
+}
+
+.hx-source-head > span:first-child {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.hx-inline-switch {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+}
+
+.hx-advanced {
+	font-size: 13px;
+}
+
+.hx-advanced-fields {
+	display: grid;
+	gap: 10px;
+	margin-top: 10px;
+	max-width: 640px;
+}
+
+.hx-role-row {
+	gap: 20px;
+}
+
+.hx-role-switch {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.hx-role-switch small {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.hx-slots {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-settings-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+}
+
+/* ── Connection and cost ────────────────────────────────────────────────── */
+
+.hx-connection {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--muted);
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+.hx-connection-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--hx-idle);
+}
+
+.hx-connection.live .hx-connection-dot {
+	background: var(--hx-done);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-done) 25%, transparent);
+}
+
+.hx-connection.reconnecting .hx-connection-dot {
+	background: var(--hx-waiting);
+	animation: hx-blink 1.2s ease-in-out infinite;
+}
+
+.hx-connection.polling .hx-connection-dot {
+	background: var(--hx-waiting);
+}
+
+.hx-connection.offline .hx-connection-dot {
+	background: var(--hx-stopped);
+}
+
+.hx-cost {
+	position: relative;
+	display: inline-flex;
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-cost-ghost {
+	position: absolute;
+	left: 100%;
+	bottom: 60%;
+	margin-left: 6px;
+	color: var(--hx-done);
+	font-size: 12px;
+	font-weight: 700;
+	white-space: nowrap;
+	pointer-events: none;
+	animation: hx-rise .9s var(--hx-ease) forwards;
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+/* At most two things move on a screen; tables, findings, counts and words never do. */
+
+.hx-stage-working::after,
+.hx-task-working::after {
+	content: "";
+	position: absolute;
+	inset: -4px;
+	border: 2px solid var(--hx-running);
+	border-radius: 13px;
+	pointer-events: none;
+	animation: hx-pulse 1.8s ease-in-out infinite;
+}
+
+.hx-task-working::after {
+	inset: -3px;
+	border-radius: 10px;
+}
+
+.hx-stage.just-done {
+	animation: hx-glow .4s ease-out;
+}
+
+.hx-check-draw path,
+.hx-check-draw polyline {
+	stroke-dasharray: 24;
+	stroke-dashoffset: 24;
+	animation: hx-check .28s var(--hx-ease) .05s forwards;
+}
+
+.hx-gate-attention {
+	animation: hx-gate-in .22s var(--hx-ease) both, hx-gate-ring 1.2s .3s ease-out both;
+}
+
+.hx-conn.flow {
+	background-size: 32px 2px;
+	animation: hx-flow 1.4s linear infinite;
+}
+
+.hx-edges path.live {
+	animation: hx-edge-flow 1.4s linear infinite;
+}
+
+.hx-stage,
+.hx-task {
+	transition: transform .15s ease, border-color .15s ease;
+}
+
+.hx-stage:hover,
+.hx-task:hover {
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--accent-text) 55%, var(--line));
+}
+
+@keyframes hx-pulse {
+	0%, 100% { opacity: .9; transform: scale(1); }
+	50% { opacity: .25; transform: scale(1.04); }
+}
+
+@keyframes hx-glow {
+	from { box-shadow: 0 0 0 4px color-mix(in srgb, var(--hx-done) 35%, transparent), var(--hx-card-shadow); }
+	to { box-shadow: 0 0 0 4px transparent, var(--hx-card-shadow); }
+}
+
+@keyframes hx-check {
+	to { stroke-dashoffset: 0; }
+}
+
+@keyframes hx-gate-in {
+	from { opacity: 0; transform: translateY(-8px); }
+	to { opacity: 1; transform: none; }
+}
+
+@keyframes hx-gate-ring {
+	from { box-shadow: var(--hx-ring), var(--shadow-soft); }
+	to { box-shadow: 0 0 0 3px transparent, var(--shadow-soft); }
+}
+
+@keyframes hx-flow {
+	to { background-position: 32px 0; }
+}
+
+@keyframes hx-edge-flow {
+	to { stroke-dashoffset: -32; }
+}
+
+@keyframes hx-blink {
+	0%, 100% { opacity: 1; }
+	50% { opacity: .2; }
+}
+
+@keyframes hx-rise {
+	from { opacity: 1; transform: translateY(0); }
+	to { opacity: 0; transform: translateY(-14px); }
+}
+
+@keyframes hx-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* The working ring stays, still. */
+	.hx-stage-working::after,
+	.hx-task-working::after {
+		animation: none;
+		opacity: .9;
+	}
+	.hx-stage.just-done,
+	.hx-cost-ghost {
+		animation: none;
+	}
+	.hx-cost-ghost {
+		display: none;
+	}
+	.hx-check-draw path,
+	.hx-check-draw polyline {
+		animation: none;
+		stroke-dashoffset: 0;
+	}
+	/* A new approval only fades in; no slide and no ring. */
+	.hx-gate-attention {
+		animation: hx-fade-in .22s linear both;
+	}
+	.hx-conn.flow {
+		animation: none;
+		background: var(--hx-running);
+	}
+	.hx-edges path.live {
+		animation: none;
+		stroke-dasharray: none;
+	}
+	/* The words "Reconnecting…" carry the state without the blink. */
+	.hx-connection.reconnecting .hx-connection-dot {
+		animation: none;
+	}
+	.hx-stage,
+	.hx-task {
+		transition: none;
+	}
+	.hx-stage:hover,
+	.hx-task:hover {
+		transform: none;
+	}
+}
