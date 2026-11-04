@@ -13,32 +13,32 @@ lease that expires is recovered on the next tick.
 
 ## Glossary
 
-| Term          | Meaning                                                                                       | Maps To (code)                         |
-|---------------|-----------------------------------------------------------------------------------------------|----------------------------------------|
-| Task          | One issue found by a scout, ranked in the queue, worked by at most one run at a time.         | `domain.Task`                          |
-| Run           | One attempt to take a task from plan to draft pull request, on branch `harness/<key>-<short>`. | `domain.Run`                           |
-| Stage         | One step of a run: plan, plan approval, implement, QA, PR approval, draft PR.                  | `domain.Stage`                         |
-| Round         | One producer and reviewer pass inside a stage.                                                 | `domain.Round`                         |
-| Agent run     | One headless CLI process for one role, with its usage, cost and structured report.             | `domain.AgentRun`                      |
-| Approval      | A gate a person decides: start, plan, resume, draft PR.                                        | `domain.Approval`                      |
-| Event         | An append-only record with a sequence number, streamed to the dashboard and the bot.           | `domain.Event`                         |
-| Engine        | The spawn-and-parse adapter for one coding CLI.                                                | `ports.Engine`                         |
-| Scout         | A reader of one issue source: Jira, GitHub, Bitbucket.                                         | `ports.Scout`                          |
-| Brief         | The six-part instruction the orchestrator composes for one agent run. Never stored.            | `brief.Compose`                        |
-| Report        | The agent's structured result, `harness.report/v1`, read from `.harness/report.json`.          | `brief.Report`                         |
+| Term      | Meaning                                                                                        | Maps To (code)    |
+|-----------|------------------------------------------------------------------------------------------------|-------------------|
+| Task      | One issue found by a scout, ranked in the queue, worked by at most one run at a time.          | `domain.Task`     |
+| Run       | One attempt to take a task from plan to draft pull request, on branch `harness/<key>-<short>`. | `domain.Run`      |
+| Stage     | One step of a run: plan, plan approval, implement, QA, PR approval, draft PR.                  | `domain.Stage`    |
+| Round     | One producer and reviewer pass inside a stage.                                                 | `domain.Round`    |
+| Agent run | One headless CLI process for one role, with its usage, cost and structured report.             | `domain.AgentRun` |
+| Approval  | A gate a person decides: start, plan, resume, draft PR.                                        | `domain.Approval` |
+| Event     | An append-only record with a sequence number, streamed to the dashboard and the bot.           | `domain.Event`    |
+| Engine    | The spawn-and-parse adapter for one coding CLI.                                                | `ports.Engine`    |
+| Scout     | A reader of one issue source: Jira, GitHub, Bitbucket.                                         | `ports.Scout`     |
+| Brief     | The six-part instruction the orchestrator composes for one agent run. Never stored.            | `brief.Compose`   |
+| Report    | The agent's structured result, `harness.report/v1`, read from `.harness/report.json`.          | `brief.Report`    |
 
 ## Components
 
-| Layer       | Component                                       | Purpose                                                            |
-|-------------|-------------------------------------------------|--------------------------------------------------------------------|
-| Façade      | `internal/harness/harness.go`                   | Configuration, construction, start and stop, the service methods.  |
-| Domain      | `internal/harness/domain`                       | Entities, state machines, policy, settings, repository interface.  |
-| Application | `internal/harness/application/*`                | Ranker, scheduler loops, pipeline stages, brief, feed, outbox.     |
-| Ports       | `internal/harness/ports`                        | Engine, scout, worktree, pull request, notifier.                   |
-| Adapters    | `internal/harness/adapters/*`                   | Claude Code, Codex, OpenCode, scouts, git worktree, PRs, webhook.  |
-| Storage     | `internal/storage/sql_harness_repository.go`    | SQLite and Postgres implementation of `domain.Repository`.         |
-| Transport   | `internal/server/api/harness_*.go`              | Dashboard routes, bot routes, the event stream.                    |
-| Frontend    | `web/src/features/harness`, `HarnessPage`       | Inbox, Pipeline, Queue as waves, run drawer, settings.             |
+| Layer       | Component                                    | Purpose                                                           |
+|-------------|----------------------------------------------|-------------------------------------------------------------------|
+| Façade      | `internal/harness/harness.go`                | Configuration, construction, start and stop, the service methods. |
+| Domain      | `internal/harness/domain`                    | Entities, state machines, policy, settings, repository interface. |
+| Application | `internal/harness/application/*`             | Ranker, scheduler loops, pipeline stages, brief, feed, outbox.    |
+| Ports       | `internal/harness/ports`                     | Engine, scout, worktree, pull request, notifier.                  |
+| Adapters    | `internal/harness/adapters/*`                | Claude Code, Codex, OpenCode, scouts, git worktree, PRs, webhook. |
+| Storage     | `internal/storage/sql_harness_repository.go` | SQLite and Postgres implementation of `domain.Repository`.        |
+| Transport   | `internal/server/api/harness_*.go`           | Dashboard routes, bot routes, the event stream.                   |
+| Frontend    | `web/src/features/harness`, `HarnessPage`    | Inbox, Pipeline, Queue as waves, run drawer, settings.            |
 
 ## Boundaries
 

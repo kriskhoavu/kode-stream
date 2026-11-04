@@ -7,24 +7,24 @@ webhook. The bot change itself is a separate plan in the chat-bot checkout.
 
 Every bot route takes `Authorization: Bearer <KODE_STREAM_HARNESS_BOT_TOKEN>`, compared in constant time.
 
-| Condition                          | Answer                                       |
-|------------------------------------|----------------------------------------------|
-| Token not configured on the server | 503 `{ code: "unavailable" }`                |
-| Header missing or token wrong      | 401 `{ code: "unauthorized" }`               |
-| Harness storage unsupported        | 503 `{ code: "unavailable" }`                |
+| Condition                          | Answer                         |
+|------------------------------------|--------------------------------|
+| Token not configured on the server | 503 `{ code: "unavailable" }`  |
+| Header missing or token wrong      | 401 `{ code: "unauthorized" }` |
+| Harness storage unsupported        | 503 `{ code: "unavailable" }`  |
 
 The routes are public in the router (no Cloud session), like `/agents/channel`, and authenticate themselves.
 
 ## Routes (base `/api/harness/bot`)
 
-| Method | Path                         | Answer                                                    |
-|--------|------------------------------|-----------------------------------------------------------|
-| GET    | `/status`                    | `HarnessStatus`                                           |
-| GET    | `/queue?limit=n`             | `{ tasks: HarnessTask[] }`, at most 50                    |
-| GET    | `/approvals`                 | `{ approvals: HarnessApproval[] }` waiting                |
-| GET    | `/runs/:id`                  | `HarnessRun` with stages                                  |
-| POST   | `/runs/:id/decision`         | `HarnessApproval`: decides the run's one waiting approval |
-| POST   | `/approvals/:id/decide`      | `HarnessApproval`                                         |
+| Method | Path                    | Answer                                                    |
+|--------|-------------------------|-----------------------------------------------------------|
+| GET    | `/status`               | `HarnessStatus`                                           |
+| GET    | `/queue?limit=n`        | `{ tasks: HarnessTask[] }`, at most 50                    |
+| GET    | `/approvals`            | `{ approvals: HarnessApproval[] }` waiting                |
+| GET    | `/runs/:id`             | `HarnessRun` with stages                                  |
+| POST   | `/runs/:id/decision`    | `HarnessApproval`: decides the run's one waiting approval |
+| POST   | `/approvals/:id/decide` | `HarnessApproval`                                         |
 
 Decision body:
 
@@ -47,13 +47,13 @@ approval already decided under another key answers 409 `already_decided`. A stal
 
 ## Commands
 
-| Command                              | Calls                                     |
-|--------------------------------------|-------------------------------------------|
-| `/harness status`                    | `GET /status`                             |
-| `/harness queue [n]`                 | `GET /queue?limit=n`                      |
-| `/harness run <id>`                  | `GET /runs/:id`                           |
-| `/harness approve <runId> [reason]`  | draft → confirm card → `POST /runs/:id/decision` |
-| `/harness reject <runId> <reason>`   | draft → confirm card → `POST /runs/:id/decision` |
+| Command                             | Calls                                            |
+|-------------------------------------|--------------------------------------------------|
+| `/harness status`                   | `GET /status`                                    |
+| `/harness queue [n]`                | `GET /queue?limit=n`                             |
+| `/harness run <id>`                 | `GET /runs/:id`                                  |
+| `/harness approve <runId> [reason]` | draft → confirm card → `POST /runs/:id/decision` |
+| `/harness reject <runId> <reason>`  | draft → confirm card → `POST /runs/:id/decision` |
 
 The bot's two-step draft → confirm card carries `requestId` and `idempotencyKey`, as its deploy-tag card does.
 

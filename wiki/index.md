@@ -66,6 +66,9 @@ that matters is the `lastVerified` column below, which is each page's own.
 | [Cloud Runtime Reference](platform/cloud-runtime-reference.md)                           | `platform-cloud-runtime-reference` | REFERENCE | page | 2026-09-12   | Reference for Cloud authentication, Agent-backed metadata, Remote Snapshot reads, and delivery boundaries.                                    |
 | [Documentation Overlap Audit](platform/documentation-audit.md)                           | `platform-documentation-audit`     | REFERENCE | page | 2026-09-12   | Audit of the repository documentation surface and its intended boundary with the evidence-aware wiki.                                         |
 | [Browser Extension Reference](platform/extension-reference.md)                           | `platform-extension-reference`     | REFERENCE | page | 2026-09-12   | Reference for the unpacked Chromium extension surface and its Local API boundary.                                                             |
+| [Harness Bot Contract](platform/harness-bot-contract.md)                                 | `platform-harness-bot-contract`    | REFERENCE | page | 2026-11-04   | The API chat-bot calls to read and decide harness work, and the signed webhook the harness sends it.                                     |
+| [Engineering Harness Reference](platform/harness-reference.md)                           | `platform-harness-reference`       | REFERENCE | page | 2026-11-04   | Reference for the harness's storage, queue, state machines, stages, engine adapters, scope rules, and dashboard API.                          |
+| [Engineering Harness](platform/harness.md)                                               | `platform-harness`                 | CONCEPT   | page | 2026-11-04   | The harness finds issues, ranks them, and runs coding CLIs in worktrees from plan to draft pull request, with a person approving each gate.   |
 | [Storage Reference](platform/storage-reference.md)                                       | `platform-storage-reference`       | REFERENCE | page | 2026-09-12   | Reference for app-owned storage selection, repository composition, and local manual synchronization.                                          |
 
 ## e2e-testing
@@ -95,7 +98,7 @@ that matters is the `lastVerified` column below, which is each page's own.
 
 ## Coverage
 
-39 pages in 7 groups. 27 carry a verification date; 12 carry `never`.
+44 pages in 7 groups. 32 carry a verification date; 12 carry `never`.
 
 Regenerate with:
 

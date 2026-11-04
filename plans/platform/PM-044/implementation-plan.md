@@ -24,31 +24,31 @@ P0 Plan ─> B1 Core ─> B2 Scout + sorter ─> B3 Claude Code + plan stage ─
 
 ## Delegation
 
-| Wave | Backend (this session)                 | Frontend (separate session)            |
-|------|----------------------------------------|----------------------------------------|
-| 0    | P0 Plan folder                         | —                                      |
-| 1    | B1 Core                                | F1 Inbox + queue list                  |
-| 2    | B2 Scout + sorter + queue operations   | F2 Stepper + ledger                    |
-| 3    | B3 Claude Code engine + plan stage     | F3 Wave board + dependency curves      |
-| 4    | B4 Implement stage                     | F4 Run drawer + live session           |
-| 5    | B5 QA + draft PR                       | F5 Settings + model policy             |
-| 6    | B6 Bot surface + webhooks              | F6 Polish + motion                     |
-| 7    | B7 More engines + LLM ranker, I1 Docs  | —                                      |
+| Wave | Backend (this session)                | Frontend (separate session)       |
+|------|---------------------------------------|-----------------------------------|
+| 0    | P0 Plan folder                        | —                                 |
+| 1    | B1 Core                               | F1 Inbox + queue list             |
+| 2    | B2 Scout + sorter + queue operations  | F2 Stepper + ledger               |
+| 3    | B3 Claude Code engine + plan stage    | F3 Wave board + dependency curves |
+| 4    | B4 Implement stage                    | F4 Run drawer + live session      |
+| 5    | B5 QA + draft PR                      | F5 Settings + model policy        |
+| 6    | B6 Bot surface + webhooks             | F6 Polish + motion                |
+| 7    | B7 More engines + LLM ranker, I1 Docs | —                                 |
 
 ## Phases
 
-| Phase | Name                                         | Track    | Depends on | Status  |
-|-------|----------------------------------------------|----------|------------|---------|
-| P0    | Plan folder                                  | Docs     | —          | Done    |
-| B1    | Core                                         | Backend  | P0         | Done    |
-| B2    | Scout, sorter, queue operations              | Backend  | B1         | Done    |
-| B3    | Claude Code engine, plan stage, plan gate    | Backend  | B2         | Done    |
-| B4    | Implement stage                              | Backend  | B3         | Done    |
-| B5    | QA and draft PR                              | Backend  | B4         | Done    |
-| B6    | Bot surface and webhooks                     | Backend  | B3         | Done    |
-| B7    | More engines, policy editing, LLM ranker     | Backend  | B5         | Done    |
-| F1–F6 | Dashboard                                    | Frontend | B1 contract| Separate session |
-| I1    | Documentation                                | Docs     | all        | Pending |
+| Phase | Name                                      | Track    | Depends on  | Status                                 |
+|-------|-------------------------------------------|----------|-------------|----------------------------------------|
+| P0    | Plan folder                               | Docs     | —           | Done                                   |
+| B1    | Core                                      | Backend  | P0          | Done                                   |
+| B2    | Scout, sorter, queue operations           | Backend  | B1          | Done                                   |
+| B3    | Claude Code engine, plan stage, plan gate | Backend  | B2          | Done                                   |
+| B4    | Implement stage                           | Backend  | B3          | Done                                   |
+| B5    | QA and draft PR                           | Backend  | B4          | Done                                   |
+| B6    | Bot surface and webhooks                  | Backend  | B3          | Done                                   |
+| B7    | More engines, policy editing, LLM ranker  | Backend  | B5          | Done                                   |
+| F1–F6 | Dashboard                                 | Frontend | B1 contract | Merged; shapes differ, see solution 01 |
+| I1    | Documentation                             | Docs     | all         | Done                                   |
 
 ### P0 Plan folder
 

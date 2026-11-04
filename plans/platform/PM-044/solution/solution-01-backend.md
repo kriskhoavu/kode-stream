@@ -92,13 +92,13 @@ orchestrator starts only in Local mode with SQL storage.
 
 ## Model Policy
 
-| Role          | Engine     | Model                          | maxTurns | permissionMode | Tools                                                    |
-|---------------|------------|--------------------------------|----------|----------------|----------------------------------------------------------|
-| planner       | claudecode | opus                           | 60       | acceptEdits    | Read Grep Glob Write Edit, `Bash(git diff:*)`, `Bash(git log:*)` |
-| plan_reviewer | claudecode | opus                           | 25       | plan           | Read Grep Glob, `Bash(git diff:*)`                       |
-| coder         | claudecode | sonnet; `difficulty: high` → opus | 120   | acceptEdits    | planner's, tests, typecheck, `Bash(git status:*)`        |
-| code_reviewer | claudecode | opus                           | 40       | plan           | Read Grep Glob, `Bash(git diff:*)`, tests                |
-| qa_fixer      | claudecode | sonnet                         | 60       | acceptEdits    | Read Grep Glob Write Edit, tests                         |
+| Role          | Engine     | Model                             | maxTurns | permissionMode | Tools                                                            |
+|---------------|------------|-----------------------------------|----------|----------------|------------------------------------------------------------------|
+| planner       | claudecode | opus                              | 60       | acceptEdits    | Read Grep Glob Write Edit, `Bash(git diff:*)`, `Bash(git log:*)` |
+| plan_reviewer | claudecode | opus                              | 25       | plan           | Read Grep Glob, `Bash(git diff:*)`                               |
+| coder         | claudecode | sonnet; `difficulty: high` → opus | 120      | acceptEdits    | planner's, tests, typecheck, `Bash(git status:*)`                |
+| code_reviewer | claudecode | opus                              | 40       | plan           | Read Grep Glob, `Bash(git diff:*)`, tests                        |
+| qa_fixer      | claudecode | sonnet                            | 60       | acceptEdits    | Read Grep Glob Write Edit, tests                                 |
 
 Always disallowed: `Bash(git commit:*)`, `Bash(git push:*)`, `Bash(git checkout:*)`, `Bash(git reset:*)`,
 `Bash(rm -rf:*)`. Every knob is capped by `max` (`maxTurns` 200, `perAgentRunUsd` 25). The model names are the CLI
@@ -320,30 +320,30 @@ Event types: `task.discovered`, `task.updated`, `task.ranked`, `task.pinned`, `r
 
 ### Dashboard routes (owner `harness`)
 
-| Method | Path                                    | Body                                                          | Answer                         |
-|--------|-----------------------------------------|---------------------------------------------------------------|--------------------------------|
-| GET    | `/harness/status`                       |                                                               | `HarnessStatus`                |
-| GET    | `/harness/settings`                     |                                                               | `HarnessSettings`              |
-| PUT    | `/harness/settings`                     | `HarnessSettings` with `expectedRevision`                     | `HarnessSettings`              |
-| GET    | `/harness/tasks?state=&workspaceId=`    |                                                               | `{ tasks: HarnessTask[] }`     |
-| GET    | `/harness/tasks/:id`                    |                                                               | `HarnessTask` (with `body`)    |
-| GET    | `/harness/queue?workspaceId=`           |                                                               | `{ tasks: HarnessTask[] }` in queue order |
-| POST   | `/harness/tasks/:id/pin`                | `{ pinned: boolean, expectedRevision }`                       | `HarnessTask`                  |
-| POST   | `/harness/tasks/:id/priority`           | `{ priorityOverride: number, expectedRevision }`              | `HarnessTask`                  |
-| POST   | `/harness/tasks/:id/dismiss`            | `{ reason?, expectedRevision }`                               | `HarnessTask`                  |
-| POST   | `/harness/tasks/:id/start`              | `{ expectedRevision, idempotencyKey? }`                       | `HarnessTask`                  |
-| POST   | `/harness/scout/poll`                   | `{ workspaceId? }`                                            | `{ sources: HarnessSourceHealth[] }` |
-| GET    | `/harness/runs?state=&taskId=`          |                                                               | `{ runs: HarnessRun[] }`       |
-| GET    | `/harness/runs/:id`                     |                                                               | `HarnessRun` with `stages`     |
-| POST   | `/harness/runs/:id/cancel`              | `{ reason?, expectedRevision }`                               | `HarnessRun`                   |
-| GET    | `/harness/runs/:id/changes`             |                                                               | `{ baseCommit, branch, files: [{path, status, additions, deletions}], diffStat }` |
-| GET    | `/harness/agent-runs/:id`               |                                                               | `HarnessAgentRun`              |
-| GET    | `/harness/approvals?state=&runId=&taskId=` (default `requested`; `all` lists every state) |                                                               | `{ approvals: HarnessApproval[] }` |
-| POST   | `/harness/approvals/:id/decide`         | `{ decision: 'approve'|'reject', reason?, idempotencyKey, expectedRevision }` | `HarnessApproval` |
-| POST   | `/harness/roles/:role/pause`            |                                                               | `HarnessRoleHealth`            |
-| POST   | `/harness/roles/:role/resume`           |                                                               | `HarnessRoleHealth`            |
-| GET    | `/harness/cost?groupBy=day|run|role|model&from=&to=` |                                                  | `HarnessCostSummary`           |
-| GET    | `/harness/events?after=<seq>`           | `text/event-stream`                                           | see below                      |
+| Method | Path                                                                                      | Body                                                                          | Answer                                                                            |
+|--------|-------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| GET    | `/harness/status`                                                                         |                                                                               | `HarnessStatus`                                                                   |
+| GET    | `/harness/settings`                                                                       |                                                                               | `HarnessSettings`                                                                 |
+| PUT    | `/harness/settings`                                                                       | `HarnessSettings` with `expectedRevision`                                     | `HarnessSettings`                                                                 |
+| GET    | `/harness/tasks?state=&workspaceId=`                                                      |                                                                               | `{ tasks: HarnessTask[] }`                                                        |
+| GET    | `/harness/tasks/:id`                                                                      |                                                                               | `HarnessTask` (with `body`)                                                       |
+| GET    | `/harness/queue?workspaceId=`                                                             |                                                                               | `{ tasks: HarnessTask[] }` in queue order                                         |
+| POST   | `/harness/tasks/:id/pin`                                                                  | `{ pinned: boolean, expectedRevision }`                                       | `HarnessTask`                                                                     |
+| POST   | `/harness/tasks/:id/priority`                                                             | `{ priorityOverride: number, expectedRevision }`                              | `HarnessTask`                                                                     |
+| POST   | `/harness/tasks/:id/dismiss`                                                              | `{ reason?, expectedRevision }`                                               | `HarnessTask`                                                                     |
+| POST   | `/harness/tasks/:id/start`                                                                | `{ expectedRevision, idempotencyKey? }`                                       | `HarnessTask`                                                                     |
+| POST   | `/harness/scout/poll`                                                                     | `{ workspaceId? }`                                                            | `{ sources: HarnessSourceHealth[] }`                                              |
+| GET    | `/harness/runs?state=&taskId=`                                                            |                                                                               | `{ runs: HarnessRun[] }`                                                          |
+| GET    | `/harness/runs/:id`                                                                       |                                                                               | `HarnessRun` with `stages`                                                        |
+| POST   | `/harness/runs/:id/cancel`                                                                | `{ reason?, expectedRevision }`                                               | `HarnessRun`                                                                      |
+| GET    | `/harness/runs/:id/changes`                                                               |                                                                               | `{ baseCommit, branch, files: [{path, status, additions, deletions}], diffStat }` |
+| GET    | `/harness/agent-runs/:id`                                                                 |                                                                               | `HarnessAgentRun`                                                                 |
+| GET    | `/harness/approvals?state=&runId=&taskId=` (default `requested`; `all` lists every state) |                                                                               | `{ approvals: HarnessApproval[] }`                                                |
+| POST   | `/harness/approvals/:id/decide`                                                           | `{ decision: 'approve'|'reject', reason?, idempotencyKey, expectedRevision }` | `HarnessApproval`                                                                 |
+| POST   | `/harness/roles/:role/pause`                                                              |                                                                               | `HarnessRoleHealth`                                                               |
+| POST   | `/harness/roles/:role/resume`                                                             |                                                                               | `HarnessRoleHealth`                                                               |
+| GET    | `/harness/cost?groupBy=day|run|role|model&from=&to=`                                      |                                                                               | `HarnessCostSummary`                                                              |
+| GET    | `/harness/events?after=<seq>`                                                             | `text/event-stream`                                                           | see below                                                                         |
 
 Decide rules: a reject needs a reason. The same `idempotencyKey` again answers 200 with the recorded approval. An
 approval decided under another key answers 409 `already_decided` with the approval in `approval`. A stale
@@ -363,10 +363,33 @@ See [solution-03-bot-contract.md](solution-03-bot-contract.md).
 
 ## Configuration
 
-| Variable                                   | Meaning                                                   |
-|--------------------------------------------|-----------------------------------------------------------|
-| `KODE_STREAM_HARNESS_BOT_TOKEN`            | Bearer token for the bot routes; unset answers 503        |
-| `KODE_STREAM_HARNESS_BOT_WEBHOOK_URL`      | Outbound webhook target; unset disables delivery          |
-| `KODE_STREAM_HARNESS_BOT_WEBHOOK_SECRET`   | HMAC secret for `X-Harness-Signature`                     |
-| `KODE_STREAM_HARNESS_WORKTREE_ROOT`        | Overrides `<dataDir>/harness/worktrees`                   |
-| `KODE_STREAM_HARNESS_DASHBOARD_URL`        | Base for the `links.dashboard` field of a webhook         |
+| Variable                                 | Meaning                                            |
+|------------------------------------------|----------------------------------------------------|
+| `KODE_STREAM_HARNESS_BOT_TOKEN`          | Bearer token for the bot routes; unset answers 503 |
+| `KODE_STREAM_HARNESS_BOT_WEBHOOK_URL`    | Outbound webhook target; unset disables delivery   |
+| `KODE_STREAM_HARNESS_BOT_WEBHOOK_SECRET` | HMAC secret for `X-Harness-Signature`              |
+| `KODE_STREAM_HARNESS_WORKTREE_ROOT`      | Overrides `<dataDir>/harness/worktrees`            |
+| `KODE_STREAM_HARNESS_DASHBOARD_URL`      | Base for the `links.dashboard` field of a webhook  |
+
+## Open: Dashboard Shapes That Differ From This Contract
+
+The dashboard (F1–F6, merged into `master`) reads some shapes that differ from the contract above. The backend
+serves the contract. Until one side changes, these views read empty or wrong data, and two calls are refused:
+
+| Call                          | The contract answers                                                                                | The dashboard expects                                                                     |
+|-------------------------------|-----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| `GET /runs/:id`               | `HarnessRun` with `stages[]`, each with `agentRuns[]`                                               | `{ run, task, stages, agentRuns, approvals }`                                             |
+| `GET /agent-runs/:id`         | `HarnessAgentRun`                                                                                   | `{ agentRun, session? }`                                                                  |
+| `GET /status`                 | `counts.waitingApprovals`; roles `busy`, `lastActivityAt`; engines `unsupported`                    | `waitingCount`; roles `working`, `queued`, `lastRunAt`, `found`; engines `limits`         |
+| `GET /cost`                   | `rows[]`                                                                                            | `groups[]`, `agentRuns`                                                                   |
+| `GET/PUT /settings`           | `slots.qa_fixer`, `workspaces[]` with typed sources, `modelPolicy.roles` with `highDifficultyModel` | `slots.qa`, a flat `sources[]` with `query`, `modelPolicy` keyed by role with `hardModel` |
+| `POST /roles/:role/pause`     | role keys `scout, sorter, planner, reviewer, coder, qa_fixer`                                       | `qa` for the tester                                                                       |
+| `POST /tasks/:id/priority`    | `{ priorityOverride, expectedRevision }`, unknown fields refused (400)                              | also sends `before` (drag to reorder)                                                     |
+| `POST /scout/poll`            | `{ sources[] }`                                                                                     | `{ started }`                                                                             |
+| `GET /events`                 | `{ seq, type, at, …ids, payload }`                                                                  | the whole entity per event: `task`, `run`, `stage`, `agentRun`, `approval`, `role`        |
+| `GET /runs/:id/changes`       | `{ branch, baseCommit, files[], diffStat, available }`                                              | the Sessions page's `SessionChanges`                                                      |
+| approval `context.difficulty` | `low`, `medium`, `high`                                                                             | `easy`, `hard`                                                                            |
+
+Resolving it is one decision for the two tracks: either the dashboard's client maps the contract, or the transport
+answers the dashboard's shapes beside it. Nothing in `internal/harness` depends on the choice.
+

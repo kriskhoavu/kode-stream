@@ -8,6 +8,11 @@ making implementation changes.
 
 - This repository owns the workspace UI, plan indexing, the Workstream board, Canvas, terminal sessions, Jira
   context, the verification harness, and wiki/graph indexing.
+- It also owns the engineering harness in `internal/harness/`: scouts fill a ranked queue, and an orchestrator runs
+  coding CLIs (Claude Code, Codex, OpenCode) headless in `harness/*` worktrees from plan to draft pull request, with a
+  person approving each gate. Agents never commit; the harness has no model runtime and does not use `agent-plane`.
+  Only `internal/server`, `internal/server/api` and `internal/storage` import it. See
+  [the harness page](wiki/platform/harness.md).
 - Local mode is a single-user server over local repositories. Cloud mode is a hosted control plane with
   Agent-Backed and Agentless Remote Snapshot workspaces. Both modes share one binary and one storage abstraction.
 - Knowledge publication, retrieval, and the release registry belong to `context-cellar`. Tenancy, provider routing,
