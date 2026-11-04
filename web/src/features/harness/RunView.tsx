@@ -10,6 +10,7 @@ import { RunLedger } from './RunLedger';
 import { RunPicker } from './RunPicker';
 import { FindingsPanel } from './FindingsPanel';
 import { WorkerChip } from './WorkerChip';
+import { CostCounter } from './CostCounter';
 import { pipelineModel, runStatus } from './pipeline';
 import { useNow } from './useNow';
 import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, plural, sourceLabels, stageKindLabels } from './vocabulary';
@@ -67,7 +68,7 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 				<HxStatusBadge status={status} label={where && (status === 'working' || status === 'waiting') ? `${hxStatuses[status].label} · ${where}` : undefined} />
 				{working && <WorkerChip engine={working.engine} model={working.model} role={agentRoleLabels[working.role]} />}
 				<span className="hx-run-head-spacer" />
-				<span className="hx-muted hx-num">So far: {plural(agentRunCount, 'agent run')} · {formatMinutes(run.totals.durationMs)} · {formatCost(run.totals.costUsd)}</span>
+				<span className="hx-muted hx-num">So far: {plural(agentRunCount, 'agent run')} · {formatMinutes(run.totals.durationMs)} · <CostCounter value={run.totals.costUsd} /></span>
 				<button type="button" className="secondary hx-small-button" onClick={() => { onRefresh(); void loadRun(run.id); }}><RefreshCw size={14} aria-hidden="true" />Refresh</button>
 			</div>
 

@@ -41,7 +41,7 @@ describe('InboxView', () => {
 		expect(within(done).getByText('Draft pull request airship#3103')).toBeInTheDocument();
 		expect(within(done).getByText('Done by hand')).toBeInTheDocument();
 
-		expect(screen.getByText('$17.62')).toBeInTheDocument();
+		expect(screen.getByText('$17.62', { selector: '.sr-only' })).toBeInTheDocument();
 		expect(screen.getByText('Checker $2.97')).toBeInTheDocument();
 		expect(screen.getByText(/looked 12 min ago · 3 new/)).toBeInTheDocument();
 	});

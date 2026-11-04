@@ -6,8 +6,6 @@ import type { HarnessClient } from './harnessClient';
 import { harnessReducer, initialHarnessState, startOfDay } from './harnessState';
 import type { HarnessAction, HarnessState } from './harnessState';
 
-export const harnessPollMs = 10_000;
-
 export interface HarnessController {
 	state: HarnessState;
 	client: HarnessClient;
@@ -25,7 +23,7 @@ export interface HarnessController {
 /**
  * Owned once by HarnessPage; every view reads from it through props. A
  * snapshot is fetched on mount and on every `refresh`; `useHarnessEvents`
- * keeps it current between snapshots.
+ * keeps it current between snapshots, and polls when the feed is down.
  */
 export function useHarness(client: HarnessClient): HarnessController {
 	const [state, dispatch] = useReducer(harnessReducer, initialHarnessState);
@@ -55,14 +53,6 @@ export function useHarness(client: HarnessClient): HarnessController {
 	useEffect(() => {
 		void refresh();
 		return () => controller.current?.abort();
-	}, [refresh]);
-
-	useEffect(() => {
-		dispatch({ type: 'connection', connection: 'polling' });
-		const timer = window.setInterval(() => {
-			if (document.visibilityState !== 'hidden') void refresh();
-		}, harnessPollMs);
-		return () => window.clearInterval(timer);
 	}, [refresh]);
 
 	const loadRun = useCallback(async (runId: string) => {

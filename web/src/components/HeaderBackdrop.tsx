@@ -83,7 +83,7 @@ function useBandEnd(endSelector: string) {
 }
 
 /** Routes whose header-to-filter band carries a backdrop. */
-export const backdropRoutes = ['workstream', 'canvas', 'knowledge'] as const;
+export const backdropRoutes = ['workstream', 'canvas', 'knowledge', 'harness'] as const;
 
 /**
  * The shell classes this route and variant call for, empty when nothing paints.

@@ -1,4 +1,5 @@
 import { api } from '../../shared/api';
+import { openEventSourceFeed } from './useHarnessEvents';
 import type {
 	HarnessAgentRun,
 	HarnessApproval,
@@ -67,5 +68,8 @@ export const apiHarnessClient: HarnessClient = {
 	pauseRole: (role) => api.pauseHarnessRole(role),
 	resumeRole: (role) => api.resumeHarnessRole(role),
 	settings: (signal) => api.harnessSettings(signal),
-	saveSettings: (settings) => api.saveHarnessSettings(settings)
+	saveSettings: (settings) => api.saveHarnessSettings(settings),
+	subscribe: (afterSeq, handlers) => typeof EventSource === 'undefined'
+		? (handlers.onError(), () => undefined)
+		: openEventSourceFeed(api.harnessEventsURL(afterSeq || undefined), handlers)
 };

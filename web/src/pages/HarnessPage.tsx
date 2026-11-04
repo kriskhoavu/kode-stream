@@ -5,6 +5,8 @@ import type { HarnessClient } from '../features/harness/harnessClient';
 import { loadHarnessClient, wantsHarnessFixture } from '../features/harness/loadHarnessClient';
 import { apiHarnessClient } from '../features/harness/harnessClient';
 import { useHarness } from '../features/harness/useHarness';
+import { useHarnessEvents } from '../features/harness/useHarnessEvents';
+import { ConnectionIndicator } from '../features/harness/ConnectionIndicator';
 import { compareTasks, queueTasks, waitingApprovals } from '../features/harness/harnessState';
 import { InboxView } from '../features/harness/InboxView';
 import { ApprovalsView } from '../features/harness/ApprovalsView';
@@ -45,6 +47,7 @@ function HarnessScreens({ client, location, onLocationChange, onWaitingCountChan
 	onOpenAgentSpace?: (workspaceId: string, view?: 'sessions') => void;
 }) {
 	const harness = useHarness(client);
+	useHarnessEvents(harness);
 	const { state } = harness;
 	const waiting = waitingApprovals(state);
 	const headingRef = useRef<HTMLHeadingElement | null>(null);
@@ -80,6 +83,7 @@ function HarnessScreens({ client, location, onLocationChange, onWaitingCountChan
 				</nav>
 				{client.fixture && <span className="hx-chip hx-demo-chip" title="Showing demo data from the development fixture">Demo data</span>}
 				<span className="hx-title-status hx-muted" role="status" aria-live="polite">{politeText}</span>
+				<ConnectionIndicator connection={state.connection} />
 			</div>
 			{location.view === 'inbox' && state.announcement?.assertive && <span className="sr-only" role="alert" aria-live="assertive" key={state.announcement.id}>{state.announcement.text}</span>}
 

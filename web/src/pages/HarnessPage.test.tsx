@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HarnessPage } from './HarnessPage';
 import { approval, run, stage, status, task } from '../features/harness/testData';
@@ -90,6 +90,29 @@ describe('HarnessPage', () => {
 		expect(await screen.findByRole('complementary', { name: 'Add login form' })).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('tab', { name: 'Stages' }));
 		expect(onLocationChange).toHaveBeenLastCalledWith({ view: 'run', runId: 'run-1', tab: 'stages' });
+	});
+
+	it('announces a new approval assertively on the Inbox and puts focus on its Approve button', async () => {
+		const sources: { onopen?: () => void; onmessage?: (message: { data: string }) => void }[] = [];
+		vi.stubGlobal('EventSource', class {
+			onopen?: () => void;
+			onmessage?: (message: { data: string }) => void;
+			onerror?: () => void;
+			constructor() { sources.push(this); }
+			addEventListener() {}
+			close() {}
+		});
+		stubHarness();
+		render(<HarnessPage location={{ view: 'inbox' }} onLocationChange={vi.fn()} />);
+		await screen.findByRole('heading', { name: /approve the plan for PM-02/ });
+		act(() => sources[0].onopen?.());
+		expect(await screen.findByText('Live')).toBeInTheDocument();
+		act(() => sources[0].onmessage?.({ data: JSON.stringify({ seq: 4, at: '', type: 'approval.requested', approval: approval('ap-2', 'task-PM-04', { gate: 'start', requestedAt: new Date().toISOString() }) }) }));
+		expect(screen.getByRole('alert')).toHaveTextContent('PM-04 is waiting on you');
+		const card = screen.getByRole('article', { name: /start work on PM-04/ });
+		expect(card).toHaveClass('hx-gate-attention');
+		await waitFor(() => expect(within(card).getByRole('button', { name: 'Start' })).toHaveFocus());
+		expect(screen.getByRole('status')).toHaveTextContent('2 items waiting on you');
 	});
 });
 

@@ -63,7 +63,7 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 	if (decided) {
 		return (
 			<article className="hx-card hx-gate hx-gate-decided" aria-label={`${task?.source.key ?? 'Task'} decided`}>
-				<div className="hx-gate-icon ok" aria-hidden="true"><Check strokeWidth={2.5} className="hx-check-draw" /></div>
+				<div className="hx-gate-icon ok" aria-hidden="true"><Check strokeWidth={2.5} className={sent ? 'hx-check-draw' : undefined} /></div>
 				<div className="hx-gate-body">
 					<h3>{task ? `${task.source.key} · ${task.title}` : 'Decision recorded'}</h3>
 					<p>{line}{approval.decidedAt ? ` · ${formatAgo(approval.decidedAt, now)}` : ''}{approval.reason ? `. “${approval.reason}”` : ''}</p>

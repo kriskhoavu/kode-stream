@@ -93,20 +93,28 @@ function StageCard({ card, refCallback, tabIndex, open, onToggle, onKeyDown }: {
 	const meta = hxStatuses[card.status];
 	const Icon = meta.icon;
 	const explainId = `hx-explain-${card.id}`;
+	// Draw the check and glow only when a step finishes while someone watches, not on every page load.
+	const [justDone, setJustDone] = useState(false);
+	const previous = useRef(card.status);
+	useEffect(() => {
+		if (card.status === 'done' && previous.current !== 'done') setJustDone(true);
+		previous.current = card.status;
+	}, [card.status]);
 	return (
 		<div className="hx-stage-slot">
 			<button
 				ref={refCallback}
 				type="button"
-				className={`hx-stage hx-tone-${meta.tone} hx-stage-${card.status}`}
+				className={`hx-stage hx-tone-${meta.tone} hx-stage-${card.status}${justDone ? ' just-done' : ''}`}
 				tabIndex={tabIndex}
 				aria-current={card.current ? 'step' : undefined}
 				aria-expanded={open}
 				aria-controls={open ? explainId : undefined}
 				onClick={onToggle}
 				onKeyDown={onKeyDown}
+				onAnimationEnd={(event) => { if (event.animationName === 'hx-glow') setJustDone(false); }}
 			>
-				<span className="hx-stage-status"><Icon aria-hidden="true" strokeWidth={2.5} key={card.status} className={card.status === 'done' ? 'hx-check-draw' : undefined} />{meta.label}</span>
+				<span className="hx-stage-status"><Icon aria-hidden="true" strokeWidth={2.5} key={card.status} className={justDone ? 'hx-check-draw' : undefined} />{meta.label}</span>
 				<span className="hx-stage-name">{card.label}</span>
 				<span className="hx-stage-meta">
 					{card.since && <LiveTimer since={card.since} label="for" />}

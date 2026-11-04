@@ -120,7 +120,7 @@ export function createFixtureStore(now = Date.now()): Store {
 		tasks.set(id, {
 			id,
 			workspaceId: prefix === 'CLI' ? 'airship-client' : 'airship',
-			source: { kind: sourceOf(key), key, url: sourceURL(key), status: 'To Do', labels: ['harness'], priority: index < 8 ? 'High' : 'Medium', updatedAt: at((index + 2) * 37 * min) },
+			source: { kind: sourceOf(key), key, url: sourceURL(key), status: 'To Do', labels: ['harness'], priority: index < 8 ? 'High' : 'Medium', assignee: ['Anna', 'Khoa', 'Mai'][index % 3], updatedAt: at((index + 2) * 37 * min) },
 			title,
 			state: 'ranked',
 			score: 100 - index,

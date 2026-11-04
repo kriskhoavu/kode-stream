@@ -3,12 +3,13 @@ import type { HarnessApproval, HarnessCostSummary, HarnessRoleHealth, HarnessRun
 import type { HarnessState } from './harnessState';
 import { decidedToday, decisionLine, doneToday, waitingApprovals, workingRuns } from './harnessState';
 import { GateCard } from './GateCard';
+import { CostCounter } from './CostCounter';
 import { HxStatusBadge } from './HxStatusBadge';
 import { LiveTimer } from './LiveTimer';
 import { SourceBadge } from './SourceBadge';
 import { WorkerChip } from './WorkerChip';
 import { useNow } from './useNow';
-import { agentRoleLabels, formatAgo, formatCost, formatMinutes, formatTime, gateTitles, modelLabel, plural, roleLabels, roleOrder, stageKindDoing } from './vocabulary';
+import { agentRoleLabels, formatAgo, formatCost, formatMinutes, formatTime, modelLabel, plural, roleLabels, roleOrder, stageKindDoing } from './vocabulary';
 
 export function InboxView({ state, newestApprovalId, onApprove, onReject, onOpenRun }: {
 	state: HarnessState;
@@ -151,7 +152,7 @@ function SpendToday({ cost }: { cost?: HarnessCostSummary }) {
 			<h2 className="hx-section-title" id="hx-spend">Spend today</h2>
 			{cost ? (
 				<>
-					<p className="hx-spend-total"><b className="hx-num">{formatCost(cost.totalUsd)}</b><span className="hx-muted">across {plural(cost.agentRuns, 'agent run')}</span></p>
+					<p className="hx-spend-total"><b><CostCounter value={cost.totalUsd} /></b><span className="hx-muted">across {plural(cost.agentRuns, 'agent run')}</span></p>
 					<p className="hx-spend-roles hx-muted hx-num">{[...byRole].map(([label, usd]) => <span key={label}>{label} {formatCost(usd)}</span>)}</p>
 				</>
 			) : <p className="hx-muted">No spend recorded yet today.</p>}
@@ -159,9 +160,16 @@ function SpendToday({ cost }: { cost?: HarnessCostSummary }) {
 	);
 }
 
+const approvedWords: Record<HarnessApproval['gate'], string> = {
+	start: 'approved the start of',
+	plan: 'approved the plan for',
+	resume: 'answered and retried',
+	draft_pr: 'approved the draft pull request for'
+};
+
 function DecisionLine({ approval, task }: { approval: HarnessApproval; task?: HarnessTask }) {
 	const who = approval.decidedBy?.displayName ?? 'Someone';
-	const what = approval.state === 'approved' ? `approved: ${gateTitles[approval.gate]}` : approval.state === 'rejected' ? `asked for changes on` : decisionLine(approval).toLowerCase();
+	const what = approval.state === 'approved' ? approvedWords[approval.gate] : approval.state === 'rejected' ? 'asked for changes on' : decisionLine(approval).toLowerCase();
 	return (
 		<li>
 			<b>{who}</b> {what} <b>{task?.source.key ?? 'a task'}</b>

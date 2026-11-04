@@ -104,7 +104,7 @@
 	font-size: 12px;
 }
 
-.hx-seg-count {
+.hx-seg .hx-seg-count {
 	min-width: 18px;
 	height: 18px;
 	padding: 0 5px;
@@ -120,6 +120,11 @@
 
 .hx-demo-chip {
 	border-style: dashed;
+}
+
+/* The shell mutes every span in a title row; the chip keeps its own colour. */
+.hx-title .hx-chip {
+	color: var(--text);
 }
 
 .hx-muted {
@@ -620,6 +625,14 @@ a.hx-source:hover {
 	color: var(--muted);
 	padding: 10px 12px;
 	border-bottom: 1px solid var(--line);
+}
+
+.hx-table tbody th {
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 13px;
+	color: var(--text);
+	font-weight: 400;
 }
 
 .hx-table td {
@@ -1141,7 +1154,8 @@ a.hx-source:hover {
 	position: relative;
 	display: flex;
 	align-items: flex-start;
-	gap: 14px;
+	/* Wide enough that a curve between neighbouring waves is visible between the cards. */
+	gap: 40px;
 	width: max-content;
 	min-width: 100%;
 }
@@ -1182,7 +1196,7 @@ a.hx-source:hover {
 .hx-wave {
 	position: relative;
 	z-index: 1;
-	width: 196px;
+	width: 228px;
 	flex: none;
 	display: flex;
 	flex-direction: column;
@@ -1705,4 +1719,205 @@ a.hx-source:hover {
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 10px;
+}
+
+/* ── Connection and cost ────────────────────────────────────────────────── */
+
+.hx-connection {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--muted);
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+.hx-connection-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--hx-idle);
+}
+
+.hx-connection.live .hx-connection-dot {
+	background: var(--hx-done);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-done) 25%, transparent);
+}
+
+.hx-connection.reconnecting .hx-connection-dot {
+	background: var(--hx-waiting);
+	animation: hx-blink 1.2s ease-in-out infinite;
+}
+
+.hx-connection.polling .hx-connection-dot {
+	background: var(--hx-waiting);
+}
+
+.hx-connection.offline .hx-connection-dot {
+	background: var(--hx-stopped);
+}
+
+.hx-cost {
+	position: relative;
+	display: inline-flex;
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-cost-ghost {
+	position: absolute;
+	left: 100%;
+	bottom: 60%;
+	margin-left: 6px;
+	color: var(--hx-done);
+	font-size: 12px;
+	font-weight: 700;
+	white-space: nowrap;
+	pointer-events: none;
+	animation: hx-rise .9s var(--hx-ease) forwards;
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+/* At most two things move on a screen; tables, findings, counts and words never do. */
+
+.hx-stage-working::after,
+.hx-task-working::after {
+	content: "";
+	position: absolute;
+	inset: -4px;
+	border: 2px solid var(--hx-running);
+	border-radius: 13px;
+	pointer-events: none;
+	animation: hx-pulse 1.8s ease-in-out infinite;
+}
+
+.hx-task-working::after {
+	inset: -3px;
+	border-radius: 10px;
+}
+
+.hx-stage.just-done {
+	animation: hx-glow .4s ease-out;
+}
+
+.hx-check-draw path,
+.hx-check-draw polyline {
+	stroke-dasharray: 24;
+	stroke-dashoffset: 24;
+	animation: hx-check .28s var(--hx-ease) .05s forwards;
+}
+
+.hx-gate-attention {
+	animation: hx-gate-in .22s var(--hx-ease) both, hx-gate-ring 1.2s .3s ease-out both;
+}
+
+.hx-conn.flow {
+	background-size: 32px 2px;
+	animation: hx-flow 1.4s linear infinite;
+}
+
+.hx-edges path.live {
+	animation: hx-edge-flow 1.4s linear infinite;
+}
+
+.hx-stage,
+.hx-task {
+	transition: transform .15s ease, border-color .15s ease;
+}
+
+.hx-stage:hover,
+.hx-task:hover {
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--accent-text) 55%, var(--line));
+}
+
+@keyframes hx-pulse {
+	0%, 100% { opacity: .9; transform: scale(1); }
+	50% { opacity: .25; transform: scale(1.04); }
+}
+
+@keyframes hx-glow {
+	from { box-shadow: 0 0 0 4px color-mix(in srgb, var(--hx-done) 35%, transparent), var(--hx-card-shadow); }
+	to { box-shadow: 0 0 0 4px transparent, var(--hx-card-shadow); }
+}
+
+@keyframes hx-check {
+	to { stroke-dashoffset: 0; }
+}
+
+@keyframes hx-gate-in {
+	from { opacity: 0; transform: translateY(-8px); }
+	to { opacity: 1; transform: none; }
+}
+
+@keyframes hx-gate-ring {
+	from { box-shadow: var(--hx-ring), var(--shadow-soft); }
+	to { box-shadow: 0 0 0 3px transparent, var(--shadow-soft); }
+}
+
+@keyframes hx-flow {
+	to { background-position: 32px 0; }
+}
+
+@keyframes hx-edge-flow {
+	to { stroke-dashoffset: -32; }
+}
+
+@keyframes hx-blink {
+	0%, 100% { opacity: 1; }
+	50% { opacity: .2; }
+}
+
+@keyframes hx-rise {
+	from { opacity: 1; transform: translateY(0); }
+	to { opacity: 0; transform: translateY(-14px); }
+}
+
+@keyframes hx-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* The working ring stays, still. */
+	.hx-stage-working::after,
+	.hx-task-working::after {
+		animation: none;
+		opacity: .9;
+	}
+	.hx-stage.just-done,
+	.hx-cost-ghost {
+		animation: none;
+	}
+	.hx-cost-ghost {
+		display: none;
+	}
+	.hx-check-draw path,
+	.hx-check-draw polyline {
+		animation: none;
+		stroke-dashoffset: 0;
+	}
+	/* A new approval only fades in; no slide and no ring. */
+	.hx-gate-attention {
+		animation: hx-fade-in .22s linear both;
+	}
+	.hx-conn.flow {
+		animation: none;
+		background: var(--hx-running);
+	}
+	.hx-edges path.live {
+		animation: none;
+		stroke-dasharray: none;
+	}
+	/* The words "Reconnecting…" carry the state without the blink. */
+	.hx-connection.reconnecting .hx-connection-dot {
+		animation: none;
+	}
+	.hx-stage,
+	.hx-task {
+		transition: none;
+	}
+	.hx-stage:hover,
+	.hx-task:hover {
+		transform: none;
+	}
 }
