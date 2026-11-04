@@ -10,6 +10,7 @@ import { InboxView } from '../features/harness/InboxView';
 import { ApprovalsView } from '../features/harness/ApprovalsView';
 import { WaveBoard } from '../features/harness/WaveBoard';
 import { RunDrawer } from '../features/harness/RunDrawer';
+import { HarnessSettings } from '../features/harness/HarnessSettings';
 import { planWaves } from '../features/harness/waves';
 import { RunView } from '../features/harness/RunView';
 import { plural } from '../features/harness/vocabulary';
@@ -186,7 +187,7 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 				/>
 			)}
 			{location.view === 'run' && location.runId && location.tab && runTask && drawer(runTask, location.tab, (tab) => onLocationChange({ view: 'run', runId: location.runId, tab }), () => onLocationChange({ view: 'run', runId: location.runId }))}
-			{location.view === 'settings' && <section className="hx-card hx-state"><p>Harness settings are not available yet.</p></section>}
+			{location.view === 'settings' && <HarnessSettings client={harness.client} status={state.status} onPause={harness.pauseRole} onResume={harness.resumeRole} onSaved={() => void harness.refresh()} />}
 		</>
 	);
 }
