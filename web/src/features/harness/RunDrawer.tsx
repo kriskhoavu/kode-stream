@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { ArrowDown, ArrowUp, ExternalLink, Pin, PinOff, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ExternalLink, Pin, PinOff, Play, X } from 'lucide-react';
 import type { HarnessAgentRun, HarnessApproval, HarnessTask, SafeSessionRecord, SessionChanges } from '../../lib/types';
 import type { HarnessRunTab } from '../../app/router';
 import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
@@ -32,7 +32,7 @@ const tabs: { id: HarnessRunTab; label: string }[] = [
  * never means leaving it. The waiting gate sits at the top; the tabs hold
  * the stages, the findings, the changed files, the live agent and the links.
  */
-export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClose, onOpenPipeline, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove }: {
+export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClose, onOpenPipeline, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart }: {
 	state: HarnessState;
 	client: HarnessClient;
 	taskId: string;
@@ -48,6 +48,8 @@ export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClo
 	onReject: (approval: HarnessApproval, reason: string) => void;
 	onPin: (task: HarnessTask, pinned: boolean) => void;
 	onMove: (task: HarnessTask, before?: HarnessTask) => void;
+	/** Starts a task that is up next; absent when nothing can be started here. */
+	onStart?: (task: HarnessTask) => void;
 }) {
 	const task = state.tasks[taskId];
 	const runId = task?.runId;
@@ -112,6 +114,15 @@ export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClo
 							onApprove={(reason) => onApprove(state.approvals[approval.id] ?? approval, reason)}
 							onReject={(reason) => onReject(state.approvals[approval.id] ?? approval, reason)} />
 					))}
+
+					{!run && onStart && (task.state === 'ranked' || task.state === 'discovered') && (
+						<section className="hx-drawer-start" aria-label="Start this task">
+							{task.startRequested
+								? <p><b>Starting soon.</b> The next free Planner takes it, usually within a minute.</p>
+								: <p>{waits.length ? <>Starting now skips the wait for <b>{waits.join(', ')}</b>. </> : ''}The Planner writes a plan first, and you approve it before any code is written.</p>}
+							<button type="button" className="primary hx-small-button" disabled={Boolean(task.startRequested)} onClick={() => onStart(task)}><Play size={14} aria-hidden="true" />{task.startRequested ? 'Starting…' : 'Start'}</button>
+						</section>
+					)}
 
 					<section className="hx-drawer-queue" aria-label="Place in the queue">
 						<p>{waits.length ? <>Waits for: <b>{waits.join(', ')}</b></> : 'Waits for nothing.'}{position >= 0 && <span className="hx-muted"> · {position + 1} of {wave.length} in its wave</span>}</p>

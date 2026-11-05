@@ -16,6 +16,7 @@ export interface HarnessController {
 	reject: (approval: HarnessApproval, reason: string) => Promise<void>;
 	pin: (task: HarnessTask, pinned: boolean) => Promise<void>;
 	setPriority: (task: HarnessTask, input: { priorityOverride?: number; before?: string }) => Promise<void>;
+	start: (task: HarnessTask) => Promise<void>;
 	pauseRole: (role: HarnessRoleId) => Promise<void>;
 	resumeRole: (role: HarnessRoleId) => Promise<void>;
 }
@@ -92,6 +93,7 @@ export function useHarness(client: HarnessClient): HarnessController {
 
 	const pin = useCallback((task: HarnessTask, pinned: boolean) => saveTask(() => client.pin(task, pinned)), [client, saveTask]);
 	const setPriority = useCallback((task: HarnessTask, input: { priorityOverride?: number; before?: string }) => saveTask(() => client.setPriority(task, input)), [client, saveTask]);
+	const start = useCallback((task: HarnessTask) => saveTask(() => client.start(task, newIdempotencyKey())), [client, saveTask]);
 
 	const roleChange = useCallback(async (change: () => Promise<unknown>) => {
 		try {
@@ -104,7 +106,7 @@ export function useHarness(client: HarnessClient): HarnessController {
 	const pauseRole = useCallback((role: HarnessRoleId) => roleChange(() => client.pauseRole(role)), [client, roleChange]);
 	const resumeRole = useCallback((role: HarnessRoleId) => roleChange(() => client.resumeRole(role)), [client, roleChange]);
 
-	return { state, client, dispatch, refresh, loadRun, approve, reject, pin, setPriority, pauseRole, resumeRole };
+	return { state, client, dispatch, refresh, loadRun, approve, reject, pin, setPriority, start, pauseRole, resumeRole };
 }
 
 export function plainError(error: unknown, fallback: string): string {

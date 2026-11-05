@@ -1657,6 +1657,23 @@ a.hx-source:hover {
 	border-bottom: 0;
 }
 
+.hx-drawer-start {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px 16px;
+	padding: 12px 14px;
+	border: 1px solid color-mix(in srgb, var(--hx-running) 45%, var(--line));
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--hx-running) var(--hx-mix), var(--panel));
+}
+
+.hx-drawer-start p {
+	margin: 0;
+	font-size: 13px;
+}
+
 .hx-add-source {
 	display: flex;
 	flex-wrap: wrap;

@@ -137,6 +137,7 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 			onReject={harness.reject}
 			onPin={pin}
 			onMove={move}
+			onStart={harness.start}
 		/>
 	);
 	const runTask = location.view === 'run' && location.runId ? state.runs[location.runId]?.taskId : undefined;

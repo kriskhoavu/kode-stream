@@ -556,6 +556,13 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 			emit({ type: 'task.pinned', task: current } as Omit<HarnessEvent, 'seq' | 'at'>);
 			return clone(current);
 		}),
+		start: (task) => delay(() => {
+			const current = store.tasks.get(task.id) as HarnessTask;
+			current.startRequested = true;
+			current.revision += 1;
+			emit({ type: 'task.updated', task: current } as Omit<HarnessEvent, 'seq' | 'at'>);
+			return clone(current);
+		}),
 		setPriority: (task, input) => delay(() => {
 			const current = store.tasks.get(task.id) as HarnessTask;
 			if (input.before) {

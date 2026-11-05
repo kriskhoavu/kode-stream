@@ -1059,6 +1059,8 @@ export interface HarnessTask {
   priorityOverride: number;
   pinned: boolean;
   needsYou: boolean;
+  /** A person pressed Start; the next free Planner takes it. */
+  startRequested?: boolean;
   note?: string;
   runId?: string;
   attempts: number;
@@ -1202,6 +1204,8 @@ export interface HarnessEngineStatus {
 }
 
 export interface HarnessStatus {
+  /** False means a task waits for a person to press Start. */
+  autoStart?: boolean;
   enabled: boolean;
   storageSupported: boolean;
   mode: 'local' | 'cloud';

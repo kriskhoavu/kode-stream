@@ -68,7 +68,7 @@ export function InboxView({ state, newestApprovalId, onApprove, onReject, onOpen
 			<section className="hx-section" aria-labelledby="hx-working">
 				<h2 className="hx-section-title" id="hx-working">Working now <small>· {working.length}</small></h2>
 				{working.map((run) => <WorkingRow key={run.id} run={run} task={state.tasks[run.taskId]} onOpen={() => onOpenRun(run.id)} />)}
-				{working.length === 0 && <p className="hx-muted hx-empty-line">Nothing is running. The next task in line starts when a Builder is free.</p>}
+				{working.length === 0 && <p className="hx-muted hx-empty-line">{state.status?.autoStart ? 'Nothing is running. The next task in line starts when a Planner is free.' : 'Nothing is running. Open the Queue, choose a task and press Start.'}</p>}
 			</section>
 
 			<section className="hx-section" aria-labelledby="hx-done">

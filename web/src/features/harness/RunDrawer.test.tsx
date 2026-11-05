@@ -17,9 +17,9 @@ async function setup(taskId: string, runId?: string) {
 	return { client, state };
 }
 
-function Harnessed({ state, client, taskId, wave, onMove = vi.fn(), onClose = vi.fn(), initialTab = 'stages' }: { state: HarnessState; client: ReturnType<typeof createFixtureClient>; taskId: string; wave: HarnessTask[]; onMove?: () => void; onClose?: () => void; initialTab?: HarnessRunTab }) {
+function Harnessed({ state, client, taskId, wave, onMove = vi.fn(), onClose = vi.fn(), onStart, initialTab = 'stages' }: { state: HarnessState; client: ReturnType<typeof createFixtureClient>; taskId: string; wave: HarnessTask[]; onMove?: () => void; onClose?: () => void; onStart?: (task: HarnessTask) => void; initialTab?: HarnessRunTab }) {
 	const [tab, setTab] = useState<HarnessRunTab>(initialTab);
-	return <RunDrawer state={state} client={client} taskId={taskId} tab={tab} wave={wave} onTabChange={setTab} onClose={onClose} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onPin={vi.fn()} onMove={onMove} />;
+	return <RunDrawer state={state} client={client} taskId={taskId} tab={tab} wave={wave} onTabChange={setTab} onClose={onClose} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onPin={vi.fn()} onMove={onMove} onStart={onStart} />;
 }
 
 describe('RunDrawer', () => {
@@ -64,5 +64,25 @@ describe('RunDrawer', () => {
 		expect(screen.getByRole('heading', { name: /approve the plan for UX-11/ })).toBeInTheDocument();
 		fireEvent.keyDown(window, { key: 'Escape' });
 		await waitFor(() => expect(onClose).toHaveBeenCalled());
+	});
+
+	it('offers Start on a task that is up next, and says it is starting once pressed', async () => {
+		const { client, state } = await setup('task-pm-04');
+		const onStart = vi.fn();
+		const { rerender } = render(<Harnessed state={state} client={client} taskId="task-pm-04" wave={[]} onStart={onStart} />);
+		const start = screen.getByRole('button', { name: 'Start' });
+		expect(screen.getByRole('region', { name: 'Start this task' })).toHaveTextContent('you approve it before any code is written');
+		fireEvent.click(start);
+		expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-pm-04' }));
+		const started = harnessReducer(state, { type: 'task.saved', task: { ...state.tasks['task-pm-04'], startRequested: true } });
+		rerender(<Harnessed state={started} client={client} taskId="task-pm-04" wave={[]} onStart={onStart} />);
+		expect(screen.getByRole('button', { name: 'Starting…' })).toBeDisabled();
+		expect(screen.getByText('Starting soon.')).toBeInTheDocument();
+	});
+
+	it('hides Start on a task that already has a run', async () => {
+		const { client, state } = await setup('task-pm-02', 'run-pm-02');
+		render(<Harnessed state={state} client={client} taskId="task-pm-02" wave={[]} onStart={vi.fn()} />);
+		expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
 	});
 });
