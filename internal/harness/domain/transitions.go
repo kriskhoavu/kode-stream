@@ -57,7 +57,7 @@ var runTransitions = map[RunState][]RunState{
 var stageTransitions = map[StageState][]StageState{
 	StagePending:          {StageRunning, StageAwaitingApproval, StageCancelled, StageFailed},
 	StageRunning:          {StageRunning, StagePassed, StageAwaitingApproval, StageRetryWait, StageFailed, StageCancelled, StagePending},
-	StageAwaitingApproval: {StagePassed, StageFailed, StageCancelled},
+	StageAwaitingApproval: {StagePassed, StageFailed, StageCancelled, StageRunning},
 	StageRetryWait:        {StagePending, StageFailed, StageCancelled},
 	StageFailed:           {StagePending},
 }

@@ -164,7 +164,8 @@ const approvedWords: Record<HarnessApproval['gate'], string> = {
 	start: 'approved the start of',
 	plan: 'approved the plan for',
 	resume: 'answered and retried',
-	draft_pr: 'approved the draft pull request for'
+	draft_pr: 'approved the draft pull request for',
+	question: 'answered the question on'
 };
 
 function DecisionLine({ approval, task }: { approval: HarnessApproval; task?: HarnessTask }) {

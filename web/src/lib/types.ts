@@ -1027,7 +1027,7 @@ export type HarnessStageKind = 'plan' | 'plan_approval' | 'implement' | 'qa' | '
 export type HarnessStageState = 'pending' | 'running' | 'awaiting_approval' | 'passed' | 'failed' | 'retry_wait' | 'cancelled' | 'skipped';
 export type HarnessAgentRole = 'planner' | 'plan_reviewer' | 'coder' | 'code_reviewer' | 'qa_fixer';
 export type HarnessAgentRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted';
-export type HarnessApprovalGate = 'start' | 'plan' | 'resume' | 'draft_pr';
+export type HarnessApprovalGate = 'start' | 'plan' | 'resume' | 'draft_pr' | 'question';
 export type HarnessApprovalState = 'requested' | 'approved' | 'rejected' | 'expired' | 'superseded';
 export type HarnessChannel = 'dashboard' | 'webex' | 'api';
 /** The orchestrator's loops a person can pause; `reviewer` covers plan and code review. */
@@ -1061,6 +1061,8 @@ export interface HarnessTask {
   needsYou: boolean;
   /** A person pressed Start; the next free Planner takes it. */
   startRequested?: boolean;
+  /** This task's own answer to "may an agent stop and ask"; absent follows the workspace, then the settings. */
+  askQuestions?: boolean | null;
   note?: string;
   runId?: string;
   attempts: number;
@@ -1171,7 +1173,7 @@ export interface HarnessApproval {
   summary?: string;
   /** What the next step usually takes, shown in the consequence sentence. */
   estimate?: { minMinutes?: number; maxMinutes?: number; costUsd?: number };
-  context?: { difficulty?: 'easy' | 'hard'; subtasks?: number; rounds?: number; blocking?: number; advisory?: number; costUsd?: number; durationMs?: number; verdict?: 'approve' | 'changes_requested' };
+  context?: { difficulty?: 'easy' | 'hard'; subtasks?: number; rounds?: number; blocking?: number; advisory?: number; costUsd?: number; durationMs?: number; verdict?: 'approve' | 'changes_requested'; questions?: string[]; role?: HarnessAgentRole };
 }
 
 /** The last turns of an agent run's own transcript, read from the coding tool's file when asked for. */
@@ -1211,6 +1213,8 @@ export interface HarnessEngineStatus {
 export interface HarnessStatus {
   /** False means a task waits for a person to press Start. */
   autoStart?: boolean;
+  /** Whether an agent may stop and ask a person, unless a workspace or task says otherwise. */
+  askQuestions?: boolean;
   enabled: boolean;
   storageSupported: boolean;
   mode: 'local' | 'cloud';
@@ -1245,6 +1249,8 @@ export interface HarnessSourceSettings {
   enabled: boolean;
   /** Jira search query, GitHub `owner/repo`, or Bitbucket `workspace/repo`. */
   query: string;
+  /** The workspace's own answer to "may an agent stop and ask"; absent follows the settings. */
+  askQuestions?: boolean | null;
   labels?: string[];
   tokenEnvVar?: string;
   lastCheckedAt?: string;
@@ -1257,6 +1263,8 @@ export interface HarnessSettings {
   enabled: boolean;
   autoStart: boolean;
   requirePrApproval: boolean;
+  /** Agents may stop and ask a person when they cannot decide alone. */
+  askQuestions: boolean;
   slots: Record<HarnessRoleId, number>;
   paused: Partial<Record<HarnessRoleId, boolean>>;
   sources: HarnessSourceSettings[];

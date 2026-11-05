@@ -36,7 +36,7 @@ const tabs: { id: HarnessRunTab; label: string }[] = [
  * never means leaving it. The waiting gate sits at the top; the tabs hold
  * the stages, the findings, the changed files, the live agent and the links.
  */
-export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClose, onOpenPipeline, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart }: {
+export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClose, onOpenPipeline, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onSetQuestions, askDefault = true }: {
 	state: HarnessState;
 	client: HarnessClient;
 	taskId: string;
@@ -54,6 +54,10 @@ export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClo
 	onMove: (task: HarnessTask, before?: HarnessTask) => void;
 	/** Starts a task that is up next; absent when nothing can be started here. */
 	onStart?: (task: HarnessTask) => void;
+	/** Sets this task's own answer to "may an agent stop and ask"; null follows the workspace and the settings. */
+	onSetQuestions?: (task: HarnessTask, askQuestions: boolean | null) => void;
+	/** What the settings say when the task does not. */
+	askDefault?: boolean;
 }) {
 	const task = state.tasks[taskId];
 	const runId = task?.runId;
@@ -125,6 +129,20 @@ export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClo
 								? <p><b>Starting soon.</b> The next free Planner takes it, usually within a minute.</p>
 								: <p>{waits.length ? <>Starting now skips the wait for <b>{waits.join(', ')}</b>. </> : ''}The Planner writes a plan first, and you approve it before any code is written.</p>}
 							<button type="button" className="primary hx-small-button" disabled={Boolean(task.startRequested)} onClick={() => onStart(task)}><Play size={14} aria-hidden="true" />{task.startRequested ? 'Starting…' : 'Start'}</button>
+						</section>
+					)}
+
+					{onSetQuestions && !['done', 'dismissed', 'stale', 'cancelled'].includes(task.state) && (
+						<section className="hx-drawer-questions" aria-label="Questions">
+							<label className="hx-field hx-field-inline">
+								<span>May an agent stop and ask you?</span>
+								<select aria-label="May an agent stop and ask on this task" value={task.askQuestions === undefined || task.askQuestions === null ? 'default' : task.askQuestions ? 'yes' : 'no'} onChange={(event) => onSetQuestions(task, event.target.value === 'default' ? null : event.target.value === 'yes')}>
+									<option value="default">Same as the workspace ({askDefault ? 'yes' : 'no'})</option>
+									<option value="yes">Yes, stop and ask</option>
+									<option value="no">No, go on with a best guess</option>
+								</select>
+							</label>
+							<p className="hx-muted">{(task.askQuestions ?? askDefault) ? 'An agent that cannot decide alone stops and waits for your answer.' : 'An agent decides alone and its open questions show on the plan approval.'}</p>
 						</section>
 					)}
 

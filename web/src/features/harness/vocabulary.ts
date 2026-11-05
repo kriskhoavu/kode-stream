@@ -105,7 +105,8 @@ export const gateTitles: Record<HarnessApprovalGate, string> = {
 	start: 'start work on',
 	plan: 'approve the plan for',
 	resume: 'decide how to continue',
-	draft_pr: 'open a draft pull request for'
+	draft_pr: 'open a draft pull request for',
+	question: 'answer a question on'
 };
 
 export const sourceLabels: Record<HarnessSourceKind, string> = { jira: 'Jira', github: 'GitHub', bitbucket: 'Bitbucket' };

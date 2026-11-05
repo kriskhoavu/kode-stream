@@ -1532,6 +1532,61 @@ a.hx-source:hover {
 	gap: 6px;
 }
 
+.hx-drawer-questions {
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.hx-drawer-questions p {
+	margin: 0;
+}
+
+.hx-field-inline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+}
+
+.hx-field-inline > span {
+	font-weight: 600;
+}
+
+.hx-field-inline select {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--text);
+	padding: 6px 10px;
+	font: inherit;
+	font-size: 13px;
+}
+
+/* The questions an agent asks sit between the sentence and the facts, numbered, in the gate's own type. */
+.hx-gate-questions ol,
+.hx-dialog-questions {
+	margin: 6px 0 0;
+	padding-left: 22px;
+	display: grid;
+	gap: 4px;
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.hx-gate-questions > p {
+	margin: 6px 0 0;
+	font-size: 13px;
+}
+
+.hx-dialog-questions {
+	margin: 0 0 12px;
+	padding: 10px 10px 10px 30px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+}
+
 .hx-tabs {
 	display: flex;
 	gap: 4px;

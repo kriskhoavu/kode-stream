@@ -475,6 +475,7 @@ type Status struct {
 	Mode             string         `json:"mode"`
 	Running          bool           `json:"running"`
 	AutoStart        bool           `json:"autoStart"`
+	AskQuestions     bool           `json:"askQuestions"`
 	Engines          []EngineStatus `json:"engines"`
 	Roles            []RoleHealth   `json:"roles"`
 	Sources          []SourceHealth `json:"sources"`
@@ -507,6 +508,7 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 	}
 	status.Enabled = settings.Enabled
 	status.AutoStart = settings.AutoStart
+	status.AskQuestions = settings.QuestionGate(domain.Task{})
 	s.mu.Lock()
 	status.Running = s.running
 	s.mu.Unlock()

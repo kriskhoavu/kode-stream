@@ -44,6 +44,8 @@ The harness runs as one replica. SQLite has one connection, so code inside a tra
 <!-- chunkId: platform-harness-reference-stages -->
 <!-- keywords: review rounds, gate, qa twice, draft pr, resume -->
 
+[live] A producer's report that is `blocked` or lists `open` questions stops its round at a `question` gate when the question gate is on: the stage waits in its round, the Inbox shows what the agent asks, and the person's answer sends the same role out again with the questions and the answer in its brief; a rejection cancels the run. With the gate off, a blocked report blocks the run and open questions ride along onto the plan gate. The gate is on unless the settings, the workspace or the task says otherwise, the task's word winning. Evidence: `internal/harness/pipeline.go:208`, `internal/harness/domain/settings.go:132`.
+
 [live] Plan and build each run up to three producer and reviewer rounds; a round with changes requested carries the findings into the next brief, and the last one blocks the run with a resume approval. A failed agent run retries within three attempts; a missing report gets one reminder. Evidence: `internal/harness/pipeline.go:298`, `internal/harness/pipeline.go:239`, `internal/harness/pipeline.go:142`.
 
 [live] After each builder and tester run the harness reverts paths outside the scope, then runs the verification commands itself; a failing gate sends the builder back with the end of the log. Evidence: `internal/harness/build.go:56`, `internal/harness/build.go:89`.

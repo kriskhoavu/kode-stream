@@ -80,8 +80,11 @@ type BitbucketSourceSettings struct {
 }
 
 type WorkspaceSettings struct {
-	WorkspaceID          string   `json:"workspaceId"`
-	MaxConcurrentRuns    int      `json:"maxConcurrentRuns"`
+	WorkspaceID       string `json:"workspaceId"`
+	MaxConcurrentRuns int    `json:"maxConcurrentRuns"`
+	// AskQuestions overrides, for this workspace, whether an agent may stop
+	// and ask a person; nil follows the settings.
+	AskQuestions         *bool    `json:"askQuestions,omitempty"`
 	VerificationCommands []string `json:"verificationCommands"`
 	// Scope lists the path prefixes a builder may change; empty allows any
 	// path that is not protected.
@@ -105,18 +108,38 @@ type RankerSettings struct {
 }
 
 type Settings struct {
-	Enabled           bool                `json:"enabled"`
-	AutoStart         bool                `json:"autoStart"`
-	RequirePRApproval bool                `json:"requirePrApproval"`
-	Slots             Slots               `json:"slots"`
-	Intervals         Intervals           `json:"intervals"`
-	Paused            map[RoleKey]bool    `json:"paused"`
-	Workspaces        []WorkspaceSettings `json:"workspaces"`
-	ModelPolicy       ModelPolicy         `json:"modelPolicy"`
-	Ranker            RankerSettings      `json:"ranker"`
-	RetentionDays     int                 `json:"retentionDays"`
-	Revision          int64               `json:"revision"`
-	UpdatedAt         *time.Time          `json:"updatedAt,omitempty"`
+	Enabled           bool `json:"enabled"`
+	AutoStart         bool `json:"autoStart"`
+	RequirePRApproval bool `json:"requirePrApproval"`
+	// AskQuestions lets an agent stop its round and ask a person when its
+	// report is blocked or lists open questions; nil means yes. A workspace
+	// or a task may override it.
+	AskQuestions  *bool               `json:"askQuestions,omitempty"`
+	Slots         Slots               `json:"slots"`
+	Intervals     Intervals           `json:"intervals"`
+	Paused        map[RoleKey]bool    `json:"paused"`
+	Workspaces    []WorkspaceSettings `json:"workspaces"`
+	ModelPolicy   ModelPolicy         `json:"modelPolicy"`
+	Ranker        RankerSettings      `json:"ranker"`
+	RetentionDays int                 `json:"retentionDays"`
+	Revision      int64               `json:"revision"`
+	UpdatedAt     *time.Time          `json:"updatedAt,omitempty"`
+}
+
+// QuestionGate reports whether an agent working on task may stop and ask a
+// person: the task's own choice first, then its workspace's, then the
+// settings', and yes when none says.
+func (s Settings) QuestionGate(task Task) bool {
+	if task.AskQuestions != nil {
+		return *task.AskQuestions
+	}
+	if workspace, ok := s.Workspace(task.WorkspaceID); ok && workspace.AskQuestions != nil {
+		return *workspace.AskQuestions
+	}
+	if s.AskQuestions != nil {
+		return *s.AskQuestions
+	}
+	return true
 }
 
 func (s Settings) Workspace(id string) (WorkspaceSettings, bool) {

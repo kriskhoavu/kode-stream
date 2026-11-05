@@ -294,7 +294,7 @@ export function decisionLine(approval: HarnessApproval, sent?: SentDecision): st
 		if (sent?.state === 'failed') return sent.error ?? 'Could not send. Try again.';
 		return '';
 	}
-	const verb = approval.state === 'approved' ? 'Approved' : approval.state === 'rejected' ? 'Changes asked' : approval.state === 'expired' ? 'Expired' : 'Replaced by a newer request';
+	const verb = approval.state === 'approved' ? (approval.gate === 'question' ? 'Answered' : 'Approved') : approval.state === 'rejected' ? (approval.gate === 'question' || approval.gate === 'resume' ? 'Stopped' : 'Changes asked') : approval.state === 'expired' ? 'Expired' : 'Replaced by a newer request';
 	if (approval.state === 'expired' || approval.state === 'superseded') return verb;
 	const mine = sent && approval.channel === 'dashboard';
 	if (mine) return `${verb} by you`;

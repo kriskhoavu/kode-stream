@@ -170,6 +170,7 @@ export function createFixtureStore(now = Date.now()): Store {
 			enabled: true,
 			autoStart: false,
 			requirePrApproval: true,
+			askQuestions: true,
 			slots: { scout: 1, sorter: 1, planner: 1, coder: 2, reviewer: 1, qa: 1 },
 			paused: { qa: false },
 			sources: [
@@ -434,6 +435,10 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 					finishStage(run, 'pr_approval');
 					startStage(run, 'draft_pr');
 				}
+			} else if (current.gate === 'question') {
+				const stage = run.currentStageId ? store.stages.get(run.currentStageId) : undefined;
+				if (decision === 'approve' && stage) stage.state = 'running';
+				else if (decision === 'reject') { run.state = 'cancelled'; task.state = 'cancelled'; }
 			} else if (current.gate === 'resume') {
 				if (decision === 'approve') {
 					run.state = 'running';
@@ -563,6 +568,13 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 			current.pinned = pinned;
 			current.revision += 1;
 			emit({ type: 'task.pinned', task: current } as Omit<HarnessEvent, 'seq' | 'at'>);
+			return clone(current);
+		}),
+		setQuestions: (task, askQuestions) => delay(() => {
+			const current = store.tasks.get(task.id) as HarnessTask;
+			current.askQuestions = askQuestions;
+			current.revision += 1;
+			emit({ type: 'task.updated', task: current } as Omit<HarnessEvent, 'seq' | 'at'>);
 			return clone(current);
 		}),
 		start: (task) => delay(() => {

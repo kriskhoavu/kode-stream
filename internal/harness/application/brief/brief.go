@@ -39,6 +39,9 @@ type Input struct {
 	// Findings are the previous round's review findings, or the reason a
 	// person gave when asking for changes.
 	Findings []domain.Finding
+	// Answers are what a person replied when an earlier run of this role
+	// stopped to ask; the agent continues from them instead of asking again.
+	Answers []domain.Answer
 	// Scope lists the paths the producer may change; empty means the plan
 	// decides.
 	Scope        []string
@@ -102,6 +105,22 @@ func Compose(input Input) string {
 			findings.WriteString("\n")
 		}
 		b.WriteString(Data(findings.String()))
+		b.WriteString("\n")
+	}
+	if len(input.Answers) > 0 {
+		b.WriteString("\nYou stopped earlier to ask. A person answered; continue from these answers and do not ask them again:\n\n")
+		var answers strings.Builder
+		for _, answer := range input.Answers {
+			for _, question := range answer.Questions {
+				fmt.Fprintf(&answers, "- Q: %s\n", question)
+			}
+			who := answer.By
+			if who == "" {
+				who = "a person"
+			}
+			fmt.Fprintf(&answers, "  A (%s): %s\n", who, answer.Answer)
+		}
+		b.WriteString(Data(answers.String()))
 		b.WriteString("\n")
 	}
 	if input.LogTail != "" {
@@ -195,7 +214,7 @@ func scope(input Input) string {
 }
 
 func deliverable(role domain.Role) string {
-	common := "- `status`: `done` or `blocked`\n- `summary`: what you did, at most 600 characters\n- `open`: questions a person must answer, if any\n"
+	common := "- `status`: `done`, or `blocked` when you cannot finish without a person\n- `summary`: what you did, at most 600 characters\n- `open`: questions only a person can answer, if any. Decide routine things yourself and say so in the summary; a question here stops the work until someone answers it.\n"
 	switch role {
 	case domain.RolePlanner:
 		return common + "- `planPath`: the plan folder you wrote\n- `difficulty`: `low`, `medium` or `high`\n- `subtasks`: one line per phase\n"

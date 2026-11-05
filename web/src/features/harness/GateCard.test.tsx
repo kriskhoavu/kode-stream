@@ -45,6 +45,26 @@ describe('GateCard', () => {
 		expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
 	});
 
+	it('lists what the agent asks, takes the answers, and sends them as the approval', () => {
+		const onApprove = vi.fn();
+		const onReject = vi.fn();
+		render(<GateCard approval={approval('a1', 'task-S', { gate: 'question', summary: 'The Builder stopped to ask you before going on.', context: { role: 'coder', questions: ['Keep the old endpoint too?', 'Which log level for the retry?'] } })} task={task('S')} onApprove={onApprove} onReject={onReject} />);
+		expect(screen.getByRole('heading', { name: /the Builder asks about/ })).toBeInTheDocument();
+		expect(screen.getByRole('list', { name: 'What the Builder asks' })).toHaveTextContent('Keep the old endpoint too?');
+		fireEvent.click(screen.getByRole('button', { name: 'Answer and continue' }));
+		expect(screen.getByRole('list', { name: 'The questions' })).toHaveTextContent('Which log level for the retry?');
+		fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep it. Warn.' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Send and continue' }));
+		expect(onApprove).toHaveBeenCalledWith('Keep it. Warn.');
+		expect(onReject).not.toHaveBeenCalled();
+	});
+
+	it('shows the open questions a Planner went on without, on the plan approval', () => {
+		render(<GateCard approval={approval('a2', 'task-S', { gate: 'plan', context: { verdict: 'approve', questions: ['Archived offers too?'] } })} task={task('S')} onApprove={vi.fn()} onReject={vi.fn()} />);
+		expect(screen.getByText(/went on with its own best guess/)).toBeInTheDocument();
+		expect(screen.getByRole('list', { name: 'Open questions from the Planner' })).toHaveTextContent('Archived offers too?');
+	});
+
 	it('takes the answer first when a stuck task is retried', () => {
 		const onApprove = vi.fn();
 		render(<GateCard approval={approval('a1', 'task-S', { gate: 'resume', summary: 'The Planner cannot decide that alone.' })} task={task('S')} onApprove={onApprove} onReject={vi.fn()} />);

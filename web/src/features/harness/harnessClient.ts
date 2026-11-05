@@ -50,6 +50,8 @@ export interface HarnessClient {
 	reject(approval: HarnessApproval, idempotencyKey: string, reason: string): Promise<HarnessApproval | undefined>;
 	pin(task: HarnessTask, pinned: boolean): Promise<HarnessTask>;
 	setPriority(task: HarnessTask, input: { priorityOverride?: number; before?: string }): Promise<HarnessTask>;
+	/** Sets, for one task, whether its agents may stop and ask; null follows the workspace and the settings again. */
+	setQuestions(task: HarnessTask, askQuestions: boolean | null): Promise<HarnessTask>;
 	/** Asks the harness to start a task now; the next free Planner takes it. */
 	start(task: HarnessTask, idempotencyKey: string): Promise<HarnessTask>;
 	pauseRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
@@ -81,6 +83,7 @@ export const apiHarnessClient: HarnessClient = {
 	pin: (task, pinned) => api.pinHarnessTask(task, pinned),
 	setPriority: (task, input) => api.setHarnessPriority(task, input),
 	start: (task, idempotencyKey) => api.startHarnessTask(task, idempotencyKey),
+	setQuestions: (task, askQuestions) => api.setHarnessTaskQuestions(task, askQuestions),
 	pauseRole: (role) => api.pauseHarnessRole(role),
 	resumeRole: (role) => api.resumeHarnessRole(role),
 	settings: (signal) => api.harnessSettings(signal),

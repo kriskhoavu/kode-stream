@@ -1,21 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Hand, TriangleAlert } from 'lucide-react';
+import { Check, Hand, MessageCircleQuestion, TriangleAlert } from 'lucide-react';
 import type { HarnessApproval, HarnessApprovalGate, HarnessTask } from '../../lib/types';
 import { useModalDialog } from '../../components/overlay';
 import type { SentDecision } from './harnessState';
 import { decisionLine } from './harnessState';
 import { HxStatusBadge } from './HxStatusBadge';
-import { formatAgo, formatCost, formatMinutes, gateTitles, plural } from './vocabulary';
+import { agentRoleLabels, formatAgo, formatCost, formatMinutes, gateTitles, plural } from './vocabulary';
 import { useNow } from './useNow';
 
-type GateWords = { approve: string; reject: string; askTitle: string; askLabel: string; askPlaceholder: string; answerOnApprove?: boolean };
+type GateWords = { approve: string; reject: string; askTitle: string; askLabel: string; askPlaceholder: string; answerOnApprove?: boolean; answerLabel?: string; answerPlaceholder?: string; answerSubmit?: string };
 
 const gateWords: Record<HarnessApprovalGate, GateWords> = {
 	start: { approve: 'Start', reject: 'Not now', askTitle: 'Why not now?', askLabel: 'Reason', askPlaceholder: 'Say why this task should wait. The Sorter keeps it in line.' },
 	plan: { approve: 'Approve', reject: 'Ask for changes', askTitle: 'What should change?', askLabel: 'What should change?', askPlaceholder: 'Tell the Planner what to change. This is sent back with the plan.' },
 	resume: { approve: 'Answer and retry', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task leaves the queue until its ticket changes.', answerOnApprove: true },
-	draft_pr: { approve: 'Open draft PR', reject: 'Not yet', askTitle: 'Why not yet?', askLabel: 'Reason', askPlaceholder: 'Say what should happen first. The Builder gets this note.' }
+	draft_pr: { approve: 'Open draft PR', reject: 'Not yet', askTitle: 'Why not yet?', askLabel: 'Reason', askPlaceholder: 'Say what should happen first. The Builder gets this note.' },
+	question: { approve: 'Answer and continue', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task leaves the queue until its ticket changes.', answerOnApprove: true, answerLabel: 'Your answers', answerPlaceholder: 'Answer each question in a line or two. The agent continues from your answers and does not ask again.', answerSubmit: 'Send and continue' }
 };
+
+function askerLabel(approval: HarnessApproval): string {
+	return approval.context?.role ? agentRoleLabels[approval.context.role] : 'Planner';
+}
 
 /** The plain sentence that says what approving does, with the usual time and cost when the harness knows them. */
 export function consequence(approval: HarnessApproval): string {
@@ -28,12 +33,14 @@ export function consequence(approval: HarnessApproval): string {
 		case 'plan': return `Approving lets the Builder start writing code.${usually}`;
 		case 'draft_pr': return 'The tests passed twice. Approving pushes the branch and opens a draft pull request for a person to review. Nothing merges on its own.';
 		case 'resume': return approval.summary ?? 'The harness stopped and cannot decide alone how to continue.';
+		case 'question': return `${approval.summary ?? `The ${askerLabel(approval)} stopped to ask you before going on.`} Nothing runs on this task until you answer.`;
 	}
 }
 
 export function gateHeading(approval: HarnessApproval, task?: HarnessTask): string {
 	const name = task ? `${task.source.key} · ${task.title}` : 'this task';
 	if (approval.gate === 'resume') return `Waiting on you: ${name} is stuck`;
+	if (approval.gate === 'question') return `Waiting on you: the ${askerLabel(approval)} asks about ${name}`;
 	return `Waiting on you: ${gateTitles[approval.gate]} ${name}`;
 }
 
@@ -49,7 +56,7 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 	openLabel?: string;
 }) {
 	const now = useNow(30_000);
-	const [asking, setAsking] = useState<'reject' | 'answer' | undefined>();
+	const [dialog, setDialog] = useState<'reject' | 'answer' | undefined>();
 	const approveRef = useRef<HTMLButtonElement | null>(null);
 	const words = gateWords[approval.gate];
 	const decided = approval.state !== 'requested';
@@ -75,6 +82,8 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 
 	const context = approval.context;
 	const stuck = approval.gate === 'resume';
+	const asking = approval.gate === 'question';
+	const questions = context?.questions ?? [];
 	const facts = [
 		context?.blocking !== undefined ? `${context.blocking} must fix` : '',
 		context?.advisory !== undefined ? plural(context.advisory, 'suggestion') : '',
@@ -85,10 +94,18 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 
 	return (
 		<article className={['hx-card', 'hx-gate', attention ? 'hx-gate-attention' : ''].filter(Boolean).join(' ')} aria-label={gateHeading(approval, task)}>
-			<div className="hx-gate-icon" aria-hidden="true">{stuck ? <TriangleAlert /> : <Hand />}</div>
+			<div className="hx-gate-icon" aria-hidden="true">{stuck ? <TriangleAlert /> : asking ? <MessageCircleQuestion /> : <Hand />}</div>
 			<div className="hx-gate-body">
 				<h3>{gateHeading(approval, task)}</h3>
 				<p>{consequence(approval)}</p>
+				{questions.length > 0 && (
+					<div className="hx-gate-questions">
+						{!asking && <p className="hx-muted">The {askerLabel(approval)} left these open and went on with its own best guess:</p>}
+						<ol aria-label={asking ? `What the ${askerLabel(approval)} asks` : `Open questions from the ${askerLabel(approval)}`}>
+							{questions.map((question, index) => <li key={index}>{question}</li>)}
+						</ol>
+					</div>
+				)}
 				<div className="hx-gate-facts">
 					{context?.verdict === 'approve' && <HxStatusBadge status="done" label={approval.gate === 'plan' ? 'Plan check passed' : 'Checks passed'} />}
 					{stuck && <HxStatusBadge status="stopped" />}
@@ -98,19 +115,20 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 				{line && <p className={sent?.state === 'failed' ? 'hx-gate-status error' : 'hx-gate-status'} role={sent?.state === 'failed' ? 'alert' : undefined}>{line}</p>}
 			</div>
 			<div className="hx-gate-actions">
-				<button ref={approveRef} type="button" className="primary" disabled={sending} data-autofocus={autoFocus || undefined} onClick={() => words.answerOnApprove ? setAsking('answer') : onApprove()}>{sending && sent?.decision === 'approve' ? 'Sending…' : words.approve}</button>
-				<button type="button" className="secondary" disabled={sending} onClick={() => setAsking('reject')}>{words.reject}</button>
+				<button ref={approveRef} type="button" className="primary" disabled={sending} data-autofocus={autoFocus || undefined} onClick={() => words.answerOnApprove ? setDialog('answer') : onApprove()}>{sending && sent?.decision === 'approve' ? 'Sending…' : words.approve}</button>
+				<button type="button" className="secondary" disabled={sending} onClick={() => setDialog('reject')}>{words.reject}</button>
 			</div>
-			{asking && (
+			{dialog && (
 				<GateDecisionDialog
-					title={asking === 'answer' ? 'Your answer' : words.askTitle}
-					label={asking === 'answer' ? 'Answer the question the Planner could not decide' : words.askLabel}
-					placeholder={asking === 'answer' ? 'Your answer is added to the task and the Planner starts a fresh round.' : words.askPlaceholder}
-					submitLabel={asking === 'answer' ? 'Send and retry' : approval.gate === 'plan' ? 'Send to Planner' : 'Send'}
-					onCancel={() => setAsking(undefined)}
+					title={dialog === 'answer' ? (words.answerLabel ?? 'Your answer') : words.askTitle}
+					label={dialog === 'answer' ? (words.answerLabel ?? 'Answer the question the Planner could not decide') : words.askLabel}
+					placeholder={dialog === 'answer' ? (words.answerPlaceholder ?? 'Your answer is added to the task and the Planner starts a fresh round.') : words.askPlaceholder}
+					submitLabel={dialog === 'answer' ? (words.answerSubmit ?? 'Send and retry') : approval.gate === 'plan' ? 'Send to Planner' : 'Send'}
+					questions={dialog === 'answer' && asking ? questions : undefined}
+					onCancel={() => setDialog(undefined)}
 					onSubmit={(reason) => {
-						setAsking(undefined);
-						if (asking === 'answer') onApprove(reason);
+						setDialog(undefined);
+						if (dialog === 'answer') onApprove(reason);
 						else onReject(reason);
 					}}
 				/>
@@ -120,11 +138,13 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 }
 
 /** Asks for the reason a decision needs. The reason box comes first; Cmd/Ctrl+Enter sends. */
-export function GateDecisionDialog({ title, label, placeholder, submitLabel, onCancel, onSubmit }: {
+export function GateDecisionDialog({ title, label, placeholder, submitLabel, questions, onCancel, onSubmit }: {
 	title: string;
 	label: string;
 	placeholder: string;
 	submitLabel: string;
+	/** The questions being answered, repeated above the box so nobody has to scroll back. */
+	questions?: string[];
 	onCancel: () => void;
 	onSubmit: (reason: string) => void;
 }) {
@@ -146,6 +166,7 @@ export function GateDecisionDialog({ title, label, placeholder, submitLabel, onC
 					<button className="icon-button" type="button" aria-label="Close dialog" onClick={onCancel}>×</button>
 				</header>
 				<form onSubmit={(event) => { event.preventDefault(); submit(); }}>
+					{questions && questions.length > 0 && <ol className="hx-dialog-questions" aria-label="The questions">{questions.map((question, index) => <li key={index}>{question}</li>)}</ol>}
 					<label className="hx-field">
 						<span>{label}</span>
 						<textarea

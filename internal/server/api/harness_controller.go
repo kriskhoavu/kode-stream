@@ -283,6 +283,24 @@ func (a *harnessController) startTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
 }
 
+type harnessQuestionsRequest struct {
+	AskQuestions     *bool `json:"askQuestions"`
+	ExpectedRevision int64 `json:"expectedRevision"`
+}
+
+func (a *harnessController) setTaskQuestions(w http.ResponseWriter, r *http.Request) {
+	var request harnessQuestionsRequest
+	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	task, err := a.harness.SetTaskQuestions(r.Context(), r.PathValue("id"), request.AskQuestions, request.ExpectedRevision, harnessActor(r))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
+}
+
 type harnessClearRequest struct {
 	WorkspaceID string `json:"workspaceId"`
 }

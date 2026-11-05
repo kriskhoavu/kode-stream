@@ -100,6 +100,21 @@ describe('HarnessSettings', () => {
 		expect(after.some((task) => task.workspaceId === 'airship' && task.state === 'running')).toBe(true);
 	});
 
+	it('turns stop-and-ask off everywhere and back on for one workspace', async () => {
+		const { client } = await setup();
+		const everywhere = screen.getByRole('switch', { name: /Let an agent stop and ask you/ });
+		expect(everywhere).toBeChecked();
+		fireEvent.click(everywhere);
+		const airship = screen.getByRole('combobox', { name: 'May an agent stop and ask in Airship' });
+		expect(airship).toHaveDisplayValue('Same as everywhere (no)');
+		fireEvent.change(airship, { target: { value: 'yes' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved'));
+		const saved = await client.settings();
+		expect(saved.askQuestions).toBe(false);
+		expect(saved.sources.filter((source) => source.workspaceId === 'airship').every((source) => source.askQuestions === true)).toBe(true);
+	});
+
 	it('removes a source and names workspaces by their name', async () => {
 		await setup();
 		expect(screen.getByText('· Airship client')).toBeInTheDocument();

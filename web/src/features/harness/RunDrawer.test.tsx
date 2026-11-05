@@ -104,6 +104,19 @@ describe('RunDrawer', () => {
 		expect(panel).toHaveTextContent('The sample data has no tracker behind it');
 	});
 
+	it('lets a task decide on its own whether an agent may stop and ask', async () => {
+		const { client, state } = await setup('task-pm-04');
+		const onSetQuestions = vi.fn();
+		render(<RunDrawer state={state} client={client} taskId="task-pm-04" tab="ticket" wave={[]} onTabChange={vi.fn()} onClose={vi.fn()} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onPin={vi.fn()} onMove={vi.fn()} onSetQuestions={onSetQuestions} askDefault={false} />);
+		const select = screen.getByRole('combobox', { name: 'May an agent stop and ask on this task' });
+		expect(select).toHaveValue('default');
+		expect(screen.getByText('An agent decides alone and its open questions show on the plan approval.')).toBeInTheDocument();
+		fireEvent.change(select, { target: { value: 'yes' } });
+		expect(onSetQuestions).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-pm-04' }), true);
+		fireEvent.change(select, { target: { value: 'default' } });
+		expect(onSetQuestions).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'task-pm-04' }), null);
+	});
+
 	it('hides Start on a task that already has a run', async () => {
 		const { client, state } = await setup('task-pm-02', 'run-pm-02');
 		render(<Harnessed state={state} client={client} taskId="task-pm-02" wave={[]} onStart={vi.fn()} />);

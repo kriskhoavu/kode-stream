@@ -142,6 +142,7 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 					<Toggle label="Turn the harness on" hint="When off, nothing is found, planned or built." checked={draft.enabled} onChange={(enabled) => update({ enabled })} />
 					<Toggle label="Start tasks on their own" hint="When off, a person approves each task before the Planner starts." checked={draft.autoStart} onChange={(autoStart) => update({ autoStart })} />
 					<Toggle label="Ask before opening a draft pull request" hint="When on, a person approves before the branch leaves this machine." checked={draft.requirePrApproval} onChange={(requirePrApproval) => update({ requirePrApproval })} />
+					<Toggle label="Let an agent stop and ask you" hint="When on, an agent that cannot decide alone stops its round and waits for your answer. When off, it goes on with its best guess and its questions show on the plan approval. A workspace or a task can say otherwise." checked={draft.askQuestions} onChange={(askQuestions) => update({ askQuestions })} />
 				</div>
 			</section>
 
@@ -191,7 +192,7 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 				<div className="hx-sources">
 					{draft.sources.length === 0 && <p className="hx-muted">No sources yet. Add one below.</p>}
 					{draft.sources.map((source, index) => (
-						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} workspaceName={workspaceNames.get(source.workspaceId)} now={now} onChange={(patch) => updateSource(index, patch)} onRemove={() => removeSource(index)} onClear={() => setConfirmClear(source.workspaceId)} clearing={clearing} />
+						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} workspaceName={workspaceNames.get(source.workspaceId)} now={now} askDefault={draft.askQuestions} firstOfWorkspace={draft.sources.findIndex((other) => other.workspaceId === source.workspaceId) === index} onChange={(patch) => updateSource(index, patch)} onWorkspaceQuestions={(askQuestions) => update({ sources: draft.sources.map((other) => other.workspaceId === source.workspaceId ? { ...other, askQuestions } : other) })} onRemove={() => removeSource(index)} onClear={() => setConfirmClear(source.workspaceId)} clearing={clearing} />
 					))}
 				</div>
 				<form className="hx-add-source" aria-label="Add a source" onSubmit={(event) => { event.preventDefault(); addSource(); }}>
@@ -295,7 +296,7 @@ function ModelInput({ label, value, hideLabel = false, onChange }: { label: stri
 	);
 }
 
-function SourceRow({ source, workspaceName, now, onChange, onRemove, onClear, clearing }: { source: HarnessSourceSettings; workspaceName?: string; now: number; onChange: (patch: Partial<HarnessSourceSettings>) => void; onRemove: () => void; onClear: () => void; clearing: boolean }) {
+function SourceRow({ source, workspaceName, now, askDefault, firstOfWorkspace, onChange, onWorkspaceQuestions, onRemove, onClear, clearing }: { source: HarnessSourceSettings; workspaceName?: string; now: number; askDefault: boolean; firstOfWorkspace: boolean; onChange: (patch: Partial<HarnessSourceSettings>) => void; onWorkspaceQuestions: (askQuestions: boolean | null) => void; onRemove: () => void; onClear: () => void; clearing: boolean }) {
 	const checked = source.lastCheckedAt ? `Looked ${formatAgo(source.lastCheckedAt, now)}${source.lastFound !== undefined ? ` · ${source.lastFound} new` : ''}` : 'Not looked yet';
 	const queryLabel = source.kind === 'jira' ? 'Jira search (JQL)' : source.kind === 'github' ? 'Repository (owner/name)' : 'Repository (workspace/name)';
 	return (
@@ -308,6 +309,16 @@ function SourceRow({ source, workspaceName, now, onChange, onRemove, onClear, cl
 				<button type="button" className="ghost" onClick={onRemove} aria-label={`Remove ${sourceLabels[source.kind]} for ${workspaceName ?? source.workspaceId}`}>Remove</button>
 			</div>
 			{source.lastError && <p className="hx-banner" role="alert">{source.lastError}</p>}
+			{firstOfWorkspace && (
+				<label className="hx-field hx-field-inline">
+					<span>May an agent stop and ask you here?</span>
+					<select aria-label={`May an agent stop and ask in ${workspaceName ?? source.workspaceId}`} value={source.askQuestions === undefined || source.askQuestions === null ? 'default' : source.askQuestions ? 'yes' : 'no'} onChange={(event) => onWorkspaceQuestions(event.target.value === 'default' ? null : event.target.value === 'yes')}>
+						<option value="default">Same as everywhere ({askDefault ? 'yes' : 'no'})</option>
+						<option value="yes">Yes, stop and ask</option>
+						<option value="no">No, go on with a best guess</option>
+					</select>
+				</label>
+			)}
 			<details className="hx-advanced" open={source.query === '' ? true : undefined}>
 				<summary>Advanced</summary>
 				<div className="hx-advanced-fields">

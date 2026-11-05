@@ -60,6 +60,9 @@ type Task struct {
 	Pinned           bool      `json:"pinned"`
 	NeedsYou         bool      `json:"needsYou"`
 	StartRequested   bool      `json:"startRequested"`
+	// AskQuestions overrides, for this task, whether an agent may stop and
+	// ask a person; nil follows the workspace, then the settings.
+	AskQuestions     *bool     `json:"askQuestions,omitempty"`
 	Note             string    `json:"note,omitempty"`
 	RunID            string    `json:"runId,omitempty"`
 	Attempts         int       `json:"attempts"`
@@ -190,6 +193,9 @@ type Stage struct {
 	FinishedAt    *time.Time `json:"finishedAt,omitempty"`
 	Rounds        []Round    `json:"rounds"`
 	Findings      []Finding  `json:"findings,omitempty"`
+	// Answers are a person's answers to the questions an agent of this stage
+	// stopped to ask; every later brief of the stage carries them.
+	Answers []Answer `json:"answers,omitempty"`
 	// LastGate is the harness's latest verification run in a QA stage.
 	LastGate *GateRun `json:"lastGate,omitempty"`
 	Revision int64    `json:"revision"`
@@ -362,6 +368,15 @@ func (a AgentRun) Summary() AgentRunSummary {
 // ReportSchema names the structured report version agents write.
 const ReportSchema = "harness.report/v1"
 
+// Answer is what a person replied when an agent stopped to ask.
+type Answer struct {
+	Role      Role     `json:"role"`
+	Round     int      `json:"round"`
+	Questions []string `json:"questions"`
+	Answer    string   `json:"answer"`
+	By        string   `json:"by,omitempty"`
+}
+
 type Finding struct {
 	Severity string `json:"severity"`
 	Title    string `json:"title"`
@@ -412,6 +427,9 @@ const (
 	GatePlan    GateKind = "plan"
 	GateResume  GateKind = "resume"
 	GateDraftPR GateKind = "draft_pr"
+	// GateQuestion is an agent's own stop: it could not decide alone and
+	// asks a person; approving sends the answer back into its round.
+	GateQuestion GateKind = "question"
 )
 
 type ApprovalState string
@@ -443,7 +461,15 @@ type ApprovalContext struct {
 	Subtasks     int     `json:"subtasks,omitempty"`
 	CostSoFarUSD float64 `json:"costSoFarUsd"`
 	Round        int     `json:"round,omitempty"`
+	// Questions are what the agent asked (a question gate), or what the
+	// planner left open for a person to settle (a plan gate).
+	Questions []string `json:"questions,omitempty"`
+	// Role is the agent that asked.
+	Role Role `json:"role,omitempty"`
 }
+
+// MaxQuestions bounds how many questions one report may raise.
+const MaxQuestions = 10
 
 type Approval struct {
 	ID             string          `json:"id"`

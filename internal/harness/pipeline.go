@@ -158,10 +158,82 @@ func (st *step) request(gate domain.GateKind, stage domain.Stage, summary string
 		Summary: boundedText(summary, domain.MaxSummaryChars), Context: domain.ApprovalContext{Difficulty: st.run.Difficulty, CostSoFarUSD: roundCents(st.run.Totals.CostUSD), Round: stage.Round}, RequestedAt: st.now}
 	if report := st.lastReport(domain.RolePlanner); report != nil {
 		approval.Context.Subtasks = len(report.Subtasks)
+		if gate == domain.GatePlan {
+			approval.Context.Questions = questions(report)
+		}
 	}
 	st.approvals = append(st.approvals, approval)
 	st.task.NeedsYou = true
 	st.events = append(st.events, domain.Event{Kind: domain.EventApprovalRequested, TaskID: st.task.ID, RunID: st.run.ID, StageID: stage.ID, ApprovalID: approval.ID, Payload: payload(map[string]any{"gate": gate, "summary": approval.Summary, "sourceKey": st.task.Source.Key, "title": st.task.Title})})
+}
+
+// questions is what a report leaves for a person to settle, bounded.
+func questions(report *domain.Report) []string {
+	if report == nil {
+		return nil
+	}
+	var out []string
+	for _, question := range report.Open {
+		if question = strings.TrimSpace(question); question != "" {
+			out = append(out, boundedText(question, 400))
+		}
+		if len(out) == domain.MaxQuestions {
+			break
+		}
+	}
+	return out
+}
+
+// ask stops the stage on an agent's own questions and asks a person. The
+// stage waits in its round; the answer sends the same role out again with
+// the questions and the answer in its brief.
+func (st *step) ask(agentRun domain.AgentRun, asked []string) {
+	st.stage.State = domain.StageAwaitingApproval
+	summary := "The " + roleWord(agentRun.Role) + " stopped to ask you before going on."
+	if report := agentRun.Report; report != nil && report.Status == "blocked" && report.Summary != "" {
+		summary = "The " + roleWord(agentRun.Role) + " could not go on: " + report.Summary
+	}
+	approval := domain.Approval{ID: domain.NewID("apr"), RunID: st.run.ID, TaskID: st.task.ID, StageID: st.stage.ID, SourceKey: st.task.Source.Key, Title: st.task.Title, Gate: domain.GateQuestion, State: domain.ApprovalRequested,
+		Summary: boundedText(summary, domain.MaxSummaryChars), Context: domain.ApprovalContext{Difficulty: st.run.Difficulty, CostSoFarUSD: roundCents(st.run.Totals.CostUSD), Round: st.stage.Round, Questions: asked, Role: agentRun.Role}, RequestedAt: st.now}
+	st.approvals = append(st.approvals, approval)
+	st.task.NeedsYou = true
+	st.event(domain.EventStageRound, st.stage.ID, map[string]any{"kind": st.stage.Kind, "round": st.stage.Round, "asked": len(asked), "role": agentRun.Role})
+	st.events = append(st.events, domain.Event{Kind: domain.EventApprovalRequested, TaskID: st.task.ID, RunID: st.run.ID, StageID: st.stage.ID, ApprovalID: approval.ID, Payload: payload(map[string]any{"gate": approval.Gate, "summary": approval.Summary, "sourceKey": st.task.Source.Key, "title": st.task.Title, "questions": asked})})
+}
+
+// stopsToAsk decides what a producer's report that is blocked or asks
+// questions does: with the question gate on it asks a person and reports
+// true; with it off a blocked report blocks the run and reports true, and
+// open questions ride along to the plan gate.
+func (st *step) stopsToAsk(agentRun domain.AgentRun) bool {
+	report := agentRun.Report
+	if report == nil {
+		return false
+	}
+	asked := questions(report)
+	blocked := report.Status == "blocked"
+	if !blocked && len(asked) == 0 {
+		return false
+	}
+	if st.settings.QuestionGate(st.task) {
+		if len(asked) == 0 {
+			asked = []string{boundedText(nonEmpty(report.Summary, "The "+roleWord(agentRun.Role)+" could not finish and said no more."), 400)}
+		}
+		st.ask(agentRun, asked)
+		return true
+	}
+	if blocked {
+		st.block("the " + roleWord(agentRun.Role) + " could not go on: " + nonEmpty(report.Summary, "it gave no reason") + ".")
+		return true
+	}
+	return false
+}
+
+func nonEmpty(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 // lastReport returns the newest successful report of role in this run.
@@ -275,6 +347,9 @@ func describeFailure(agentRun domain.AgentRun) string {
 // advance applies a successful agent run's report to its stage.
 func (st *step) advance(agentRun domain.AgentRun) {
 	report := agentRun.Report
+	if producer(agentRun.Role) && st.stopsToAsk(agentRun) {
+		return
+	}
 	switch agentRun.Role {
 	case domain.RolePlanner:
 		st.round(st.stage.Round).ProducerAgentRunID = agentRun.ID

@@ -147,6 +147,8 @@ type DashboardApprovalContext struct {
 	CostUSD    float64        `json:"costUsd"`
 	DurationMs int64          `json:"durationMs,omitempty"`
 	Verdict    domain.Verdict `json:"verdict,omitempty"`
+	Questions  []string       `json:"questions,omitempty"`
+	Role       domain.Role    `json:"role,omitempty"`
 }
 
 type DashboardApproval struct {
@@ -166,7 +168,7 @@ func plainDifficulty(difficulty string) string {
 }
 
 func (s *Service) dashboardApproval(ctx context.Context, approval domain.Approval) DashboardApproval {
-	view := DashboardApproval{Approval: approval, Context: DashboardApprovalContext{Difficulty: plainDifficulty(approval.Context.Difficulty), Subtasks: approval.Context.Subtasks, Rounds: approval.Context.Round, CostUSD: approval.Context.CostSoFarUSD}}
+	view := DashboardApproval{Approval: approval, Context: DashboardApprovalContext{Difficulty: plainDifficulty(approval.Context.Difficulty), Subtasks: approval.Context.Subtasks, Rounds: approval.Context.Round, CostUSD: approval.Context.CostSoFarUSD, Questions: approval.Context.Questions, Role: approval.Context.Role}}
 	if approval.RunID != "" {
 		if run, err := s.repository.GetRun(ctx, approval.RunID); err == nil {
 			view.Context.DurationMs, view.Context.Blocking, view.Context.Advisory = run.Totals.DurationMs, run.Totals.Blocking, run.Totals.Advisory
@@ -281,6 +283,7 @@ type DashboardStatus struct {
 	Mode             string            `json:"mode"`
 	Running          bool              `json:"running"`
 	AutoStart        bool              `json:"autoStart"`
+	AskQuestions     bool              `json:"askQuestions"`
 	WaitingCount     int               `json:"waitingCount"`
 	LastEventSeq     int64             `json:"lastEventSeq"`
 	Roles            []DashboardRole   `json:"roles"`
@@ -301,7 +304,7 @@ var rolePolicyOf = map[domain.RoleKey]domain.Role{
 
 func (s *Service) DashboardStatus(ctx context.Context) (DashboardStatus, error) {
 	status, err := s.Status(ctx)
-	view := DashboardStatus{Enabled: status.Enabled, StorageSupported: status.StorageSupported, Mode: status.Mode, Running: status.Running, AutoStart: status.AutoStart, WaitingCount: status.Counts.WaitingApprovals, LastEventSeq: status.LastEventSeq, Roles: []DashboardRole{}, Engines: []DashboardEngine{}, Sources: status.Sources, Counts: status.Counts, CostTodayUSD: status.CostTodayUSD, Hint: status.Hint}
+	view := DashboardStatus{Enabled: status.Enabled, StorageSupported: status.StorageSupported, Mode: status.Mode, Running: status.Running, AutoStart: status.AutoStart, AskQuestions: status.AskQuestions, WaitingCount: status.Counts.WaitingApprovals, LastEventSeq: status.LastEventSeq, Roles: []DashboardRole{}, Engines: []DashboardEngine{}, Sources: status.Sources, Counts: status.Counts, CostTodayUSD: status.CostTodayUSD, Hint: status.Hint}
 	if err != nil {
 		return view, err
 	}
@@ -373,9 +376,12 @@ func DashboardCostOf(summary domain.CostSummary) DashboardCost {
 // --- settings ---
 
 type DashboardSource struct {
-	WorkspaceID   string     `json:"workspaceId"`
-	Kind          string     `json:"kind"`
-	Enabled       bool       `json:"enabled"`
+	WorkspaceID string `json:"workspaceId"`
+	Kind        string `json:"kind"`
+	Enabled     bool   `json:"enabled"`
+	// AskQuestions is the workspace's own answer to "may an agent stop and
+	// ask", carried on each of its sources; nil follows the settings.
+	AskQuestions  *bool      `json:"askQuestions,omitempty"`
 	Query         string     `json:"query"`
 	Labels        []string   `json:"labels,omitempty"`
 	TokenEnvVar   string     `json:"tokenEnvVar,omitempty"`
@@ -396,6 +402,7 @@ type DashboardSettings struct {
 	Enabled           bool                                `json:"enabled"`
 	AutoStart         bool                                `json:"autoStart"`
 	RequirePRApproval bool                                `json:"requirePrApproval"`
+	AskQuestions      bool                                `json:"askQuestions"`
 	Slots             map[string]int                      `json:"slots"`
 	Paused            map[string]bool                     `json:"paused"`
 	Sources           []DashboardSource                   `json:"sources"`
@@ -408,7 +415,7 @@ func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, err
 	if err != nil {
 		return DashboardSettings{}, err
 	}
-	view := DashboardSettings{Revision: settings.Revision, Enabled: settings.Enabled, AutoStart: settings.AutoStart, RequirePRApproval: settings.RequirePRApproval,
+	view := DashboardSettings{Revision: settings.Revision, Enabled: settings.Enabled, AutoStart: settings.AutoStart, RequirePRApproval: settings.RequirePRApproval, AskQuestions: settings.QuestionGate(domain.Task{}),
 		Slots:  map[string]int{"scout": 1, "sorter": 1, "planner": settings.Slots.Planner, "reviewer": settings.Slots.Reviewer, "coder": settings.Slots.Coder, "qa": settings.Slots.QAFixer},
 		Paused: map[string]bool{}, Sources: []DashboardSource{}, ModelPolicy: map[domain.Role]DashboardRolePolicy{}}
 	for key, paused := range settings.Paused {
@@ -428,13 +435,13 @@ func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, err
 	}
 	for _, workspace := range settings.Workspaces {
 		if jira := workspace.Jira; jira != nil {
-			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceJira), Enabled: jira.Enabled, Query: jira.JQL})
+			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceJira), Enabled: jira.Enabled, Query: jira.JQL, AskQuestions: workspace.AskQuestions})
 		}
 		if github := workspace.GitHub; github != nil {
-			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceGitHub), Enabled: github.Enabled, Query: github.Repo, Labels: github.Labels, TokenEnvVar: github.TokenEnvVar})
+			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceGitHub), Enabled: github.Enabled, Query: github.Repo, Labels: github.Labels, TokenEnvVar: github.TokenEnvVar, AskQuestions: workspace.AskQuestions})
 		}
 		if bitbucket := workspace.Bitbucket; bitbucket != nil {
-			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceBitbucket), Enabled: bitbucket.Enabled, Query: bitbucket.Workspace + "/" + bitbucket.Repo, TokenEnvVar: bitbucket.TokenEnvVar})
+			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceBitbucket), Enabled: bitbucket.Enabled, Query: bitbucket.Workspace + "/" + bitbucket.Repo, TokenEnvVar: bitbucket.TokenEnvVar, AskQuestions: workspace.AskQuestions})
 		}
 	}
 	for _, role := range domain.Roles {
@@ -457,6 +464,8 @@ func (s *Service) SaveDashboardSettings(ctx context.Context, view DashboardSetti
 		expected = *view.ExpectedRevision
 	}
 	settings.Enabled, settings.AutoStart, settings.RequirePRApproval = view.Enabled, view.AutoStart, view.RequirePRApproval
+	ask := view.AskQuestions
+	settings.AskQuestions = &ask
 	slot := func(key string, current int) int {
 		if value, ok := view.Slots[key]; ok && value > 0 {
 			return value
@@ -527,6 +536,13 @@ func applySources(settings *domain.Settings, sources []DashboardSource) error {
 	for i := range settings.Workspaces {
 		workspace := &settings.Workspaces[i]
 		kinds := listed[workspace.WorkspaceID]
+		workspace.AskQuestions = nil
+		for _, source := range kinds {
+			if source.AskQuestions != nil {
+				workspace.AskQuestions = source.AskQuestions
+				break
+			}
+		}
 		workspace.Jira, workspace.GitHub = nil, nil
 		previousBitbucket := workspace.Bitbucket
 		workspace.Bitbucket = nil

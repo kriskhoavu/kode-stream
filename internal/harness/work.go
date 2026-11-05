@@ -501,6 +501,11 @@ func (s *Service) briefInput(ctx context.Context, run domain.Run, stage domain.S
 				input.Findings = append(input.Findings, finding)
 			}
 		}
+		for _, answer := range stage.Answers {
+			if answer.Role == agentRun.Role {
+				input.Answers = append(input.Answers, answer)
+			}
+		}
 	}
 	return s.decorateBrief(ctx, input, run, stage, agentRun)
 }

@@ -54,6 +54,8 @@ func (s *Service) Decide(ctx context.Context, approvalID string, input DecideInp
 	if input.Decision == DecisionReject && input.Reason == "" {
 		return domain.Approval{}, domain.Invalid("a reason is required to ask for changes")
 	}
+	// A question gate's approval is the answer itself; it is checked once the
+	// approval is loaded, below.
 	if input.Channel == "" {
 		input.Channel = domain.ChannelDashboard
 	}
@@ -133,6 +135,29 @@ func (s *Service) applyDecision(ctx context.Context, tx domain.Repository, recor
 	}
 	approve := input.Decision == DecisionApprove
 	switch approval.Gate {
+	case domain.GateQuestion:
+		if st.stage.State != domain.StageAwaitingApproval || st.run.State != domain.RunRunning {
+			return domain.IllegalTransitionError{Entity: "stage", From: string(st.stage.State), To: "answered"}
+		}
+		if !approve {
+			return s.cancelInTx(st, "Stopped at a question: "+input.Reason)
+		}
+		if input.Reason == "" {
+			return domain.Invalid("an answer is required to continue")
+		}
+		st.task.NeedsYou = false
+		st.stage.State = domain.StageRunning
+		role := approval.Context.Role
+		if role == "" {
+			role = domain.RolePlanner
+			if st.stage.Kind == domain.StageImplement {
+				role = domain.RoleCoder
+			}
+		}
+		st.stage.Answers = append(st.stage.Answers, domain.Answer{Role: role, Round: st.stage.Round, Questions: approval.Context.Questions, Answer: input.Reason, By: nonEmptyName(input.Actor)})
+		st.enqueue(role, false)
+		st.event(domain.EventStageRound, st.stage.ID, map[string]any{"kind": st.stage.Kind, "round": st.stage.Round, "answered": true, "role": role})
+		return st.save()
 	case domain.GatePlan, domain.GateDraftPR:
 		if st.stage.State != domain.StageAwaitingApproval || st.run.State != domain.RunRunning {
 			return domain.IllegalTransitionError{Entity: "stage", From: string(st.stage.State), To: "decided"}

@@ -188,6 +188,20 @@ func (s *Service) SetPriority(ctx context.Context, id string, override float64, 
 	})
 }
 
+// SetTaskQuestions records, for one task, whether its agents may stop and
+// ask a person; nil follows the workspace and the settings again.
+func (s *Service) SetTaskQuestions(ctx context.Context, id string, ask *bool, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
+	return s.updateTask(ctx, id, expectedRevision, func(task *domain.Task) error {
+		if domain.TaskTerminal(task.State) {
+			return domain.Invalid("the task is finished")
+		}
+		task.AskQuestions = ask
+		return nil
+	}, func(task domain.Task) []domain.Event {
+		return []domain.Event{{Kind: domain.EventTaskUpdated, TaskID: task.ID, Actor: actorOrNil(actor), Payload: payload(map[string]any{"askQuestions": task.AskQuestions})}}
+	})
+}
+
 func (s *Service) DismissTask(ctx context.Context, id, reason string, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
 	return s.updateTask(ctx, id, expectedRevision, func(task *domain.Task) error {
 		if err := domain.CheckTask(task.State, domain.TaskDismissed); err != nil {

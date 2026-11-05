@@ -98,7 +98,7 @@ func (s *Service) webhookBody(ctx context.Context, seq int64) ([]byte, error) {
 	}
 	if event.ApprovalID != "" {
 		if approval, err := s.repository.GetApproval(ctx, event.ApprovalID); err == nil {
-			body.Approval = &notify.ApprovalRef{ID: approval.ID, Gate: string(approval.Gate), Revision: approval.Revision, ExpiresAt: approval.ExpiresAt}
+			body.Approval = &notify.ApprovalRef{ID: approval.ID, Gate: string(approval.Gate), Revision: approval.Revision, ExpiresAt: approval.ExpiresAt, Questions: approval.Context.Questions, Role: string(approval.Context.Role)}
 			if body.Summary == "" {
 				body.Summary = approval.Summary
 			}

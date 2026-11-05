@@ -79,7 +79,7 @@ Body:
   "at": "2026-11-04T09:12:00Z",
   "task": { "id": "tsk-…", "sourceKey": "PM-02", "title": "…", "url": "https://…" },
   "run": { "id": "run-…", "stage": "plan_approval", "round": 2, "costUsd": 1.42, "turns": 37 },
-  "approval": { "id": "apr-…", "gate": "plan", "revision": 1, "expiresAt": "…" },
+  "approval": { "id": "apr-…", "gate": "plan", "revision": 1, "expiresAt": "…", "questions": ["…"], "role": "planner" },
   "summary": "≤600 characters",
   "links": { "dashboard": "http://127.0.0.1:4317/harness/runs/run-…" }
 }

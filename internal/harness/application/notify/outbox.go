@@ -63,6 +63,10 @@ type ApprovalRef struct {
 	Gate      string     `json:"gate"`
 	Revision  int64      `json:"revision"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	// Questions are what the agent asks on a question gate; the answer is
+	// the approval's reason.
+	Questions []string `json:"questions,omitempty"`
+	Role      string   `json:"role,omitempty"`
 }
 
 // Payload is the webhook body.
