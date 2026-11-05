@@ -1657,6 +1657,25 @@ a.hx-source:hover {
 	border-bottom: 0;
 }
 
+.hx-add-source {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 10px 14px;
+	padding: 14px 20px;
+	border-top: 1px solid var(--line);
+	background: var(--panel-soft);
+}
+
+.hx-add-source .hx-field {
+	min-width: 200px;
+}
+
+.hx-add-source .hx-muted {
+	flex-basis: 100%;
+	font-size: 13px;
+}
+
 .hx-source-head {
 	display: flex;
 	flex-wrap: wrap;

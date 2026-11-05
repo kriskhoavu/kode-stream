@@ -60,4 +60,36 @@ describe('HarnessSettings', () => {
 		expect(onPause).toHaveBeenCalledWith('scout');
 		expect(onResume).not.toHaveBeenCalled();
 	});
+
+	it('adds a Jira source for a workspace with its project as the first query, and saves it', async () => {
+		const { client } = await setup();
+		const form = await screen.findByRole('form', { name: 'Add a source' });
+		fireEvent.change(within(form).getByRole('combobox', { name: 'Workspace' }), { target: { value: 'airship-docs' } });
+		fireEvent.change(within(form).getByRole('combobox', { name: 'Look in' }), { target: { value: 'jira' } });
+		fireEvent.click(within(form).getByRole('button', { name: 'Add source' }));
+		expect(screen.getByRole('status')).toHaveTextContent('Added. Save to let the Finder look there.');
+		expect(screen.getByDisplayValue('project = DOC AND statusCategory != Done ORDER BY updated DESC')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved.'));
+		const sources = (await client.settings()).sources;
+		expect(sources).toHaveLength(4);
+		expect(sources[3]).toMatchObject({ workspaceId: 'airship-docs', kind: 'jira', enabled: true });
+	});
+
+	it('refuses a second source of the same kind for one workspace, and offers only Jira and GitHub', async () => {
+		await setup();
+		const form = await screen.findByRole('form', { name: 'Add a source' });
+		expect(within(form).getAllByRole('option').map((option) => option.textContent)).toEqual(['Airship', 'Airship client', 'Airship docs', 'Jira', 'GitHub']);
+		fireEvent.change(within(form).getByRole('combobox', { name: 'Workspace' }), { target: { value: 'airship' } });
+		expect(within(form).getByRole('button', { name: 'Add source' })).toBeDisabled();
+		expect(form).toHaveTextContent('Jira is already set for this workspace.');
+	});
+
+	it('removes a source and names workspaces by their name', async () => {
+		await setup();
+		expect(screen.getByText('· Airship client')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Remove Bitbucket for Airship client' }));
+		expect(screen.queryByText('· Airship client')).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+	});
 });

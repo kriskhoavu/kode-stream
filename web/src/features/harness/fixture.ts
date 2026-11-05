@@ -584,6 +584,11 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 			return clone(health);
 		}),
 		settings: () => delay(() => clone(store.settings)),
+		workspaces: () => delay(() => [
+			{ id: 'airship', name: 'Airship', jiraProjectKey: 'PM' },
+			{ id: 'airship-client', name: 'Airship client' },
+			{ id: 'airship-docs', name: 'Airship docs', jiraProjectKey: 'DOC' }
+		]),
 		saveSettings: (settings) => delay(() => {
 			if (settings.revision !== store.settings.revision) throw new Error('Someone changed the settings first.');
 			store.settings = { ...clone(settings), revision: settings.revision + 1 };

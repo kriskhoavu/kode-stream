@@ -29,6 +29,12 @@ export interface HarnessFeedHandlers {
  * shared API; the dev fixture implements the same surface in memory, so every
  * view works in `npm run dev` without a backend.
  */
+export interface HarnessWorkspaceOption {
+	id: string;
+	name: string;
+	jiraProjectKey?: string;
+}
+
 export interface HarnessClient {
 	status(signal?: AbortSignal): Promise<HarnessStatus>;
 	tasks(signal?: AbortSignal): Promise<HarnessTask[]>;
@@ -46,6 +52,8 @@ export interface HarnessClient {
 	resumeRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
 	settings(signal?: AbortSignal): Promise<HarnessSettings>;
 	saveSettings(settings: HarnessSettings): Promise<HarnessSettings>;
+	/** The workspaces a source can look in, with the Jira project key when the workspace has a Jira connection. */
+	workspaces?(signal?: AbortSignal): Promise<HarnessWorkspaceOption[]>;
 	/** Opens the live event feed after `afterSeq`; returns a function that closes it. */
 	subscribe?(afterSeq: number, handlers: HarnessFeedHandlers): () => void;
 	/** True for the in-memory fixture, so the page can say so. */
@@ -69,6 +77,7 @@ export const apiHarnessClient: HarnessClient = {
 	resumeRole: (role) => api.resumeHarnessRole(role),
 	settings: (signal) => api.harnessSettings(signal),
 	saveSettings: (settings) => api.saveHarnessSettings(settings),
+	workspaces: async (signal) => (await api.workspaces(signal)).map((workspace) => ({ id: workspace.id, name: workspace.name, jiraProjectKey: workspace.jira?.projectKey || undefined })),
 	subscribe: (afterSeq, handlers) => typeof EventSource === 'undefined'
 		? (handlers.onError(), () => undefined)
 		: openEventSourceFeed(api.harnessEventsURL(afterSeq || undefined), handlers)

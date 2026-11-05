@@ -1,13 +1,24 @@
 import { useEffect, useId, useState } from 'react';
 import { Workflow } from 'lucide-react';
-import type { HarnessAgentRole, HarnessEngineId, HarnessRoleHealth, HarnessRoleId, HarnessRolePolicy, HarnessSettings as Settings, HarnessSourceSettings, HarnessStatus } from '../../lib/types';
+import type { HarnessAgentRole, HarnessEngineId, HarnessRoleHealth, HarnessRoleId, HarnessRolePolicy, HarnessSettings as Settings, HarnessSourceKind, HarnessSourceSettings, HarnessStatus } from '../../lib/types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import type { HarnessClient } from './harnessClient';
+import type { HarnessClient, HarnessWorkspaceOption } from './harnessClient';
 import { plainError } from './useHarness';
 import { useNow } from './useNow';
 import { engineLabel, formatAgo, modelLabel, plural, roleLabels, roleOrder, sourceLabels } from './vocabulary';
 
 const modelSuggestions = ['opus', 'sonnet', 'haiku'];
+
+/** The kinds a person can add. Bitbucket Server has no issue tracker, so its work comes in through Jira. */
+const addableKinds: HarnessSourceKind[] = ['jira', 'github'];
+
+/** A sensible first query: the workspace's own Jira project, open issues, newest change first. */
+export function defaultSourceQuery(kind: HarnessSourceKind, workspace?: HarnessWorkspaceOption): string {
+	if (kind === 'jira' && workspace?.jiraProjectKey) {
+		return `project = ${workspace.jiraProjectKey} AND statusCategory != Done ORDER BY updated DESC`;
+	}
+	return '';
+}
 
 const policyRows: { role: HarnessAgentRole; name: string; does: string }[] = [
 	{ role: 'planner', name: 'Planner', does: 'Writes the plan' },
@@ -40,6 +51,9 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 	const [notice, setNotice] = useState('');
 	const [saving, setSaving] = useState(false);
 	const [confirmPause, setConfirmPause] = useState<HarnessRoleHealth | undefined>();
+	const [workspaces, setWorkspaces] = useState<HarnessWorkspaceOption[]>([]);
+	const [addKind, setAddKind] = useState<HarnessSourceKind>('jira');
+	const [addWorkspace, setAddWorkspace] = useState('');
 	const now = useNow(60_000);
 
 	const load = () => {
@@ -47,6 +61,12 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 		client.settings().then((settings) => { setSaved(settings); setDraft(settings); }).catch((caught) => setError(plainError(caught, 'The harness settings could not be loaded.')));
 	};
 	useEffect(load, [client]);
+	useEffect(() => {
+		if (!client.workspaces) return;
+		const controller = new AbortController();
+		client.workspaces(controller.signal).then((list) => { setWorkspaces(list); setAddWorkspace((current) => current || list[0]?.id || ''); }).catch(() => setWorkspaces([]));
+		return () => controller.abort();
+	}, [client]);
 
 	if (!draft || !saved) {
 		return error
@@ -58,8 +78,20 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 	const update = (patch: Partial<Settings>) => { setDraft({ ...draft, ...patch }); setNotice(''); };
 	const updatePolicy = (role: HarnessAgentRole, patch: Partial<HarnessRolePolicy>) => update({ modelPolicy: { ...draft.modelPolicy, [role]: { ...draft.modelPolicy[role], ...patch } } });
 	const updateSource = (index: number, patch: Partial<HarnessSourceSettings>) => update({ sources: draft.sources.map((source, position) => position === index ? { ...source, ...patch } : source) });
+	const removeSource = (index: number) => update({ sources: draft.sources.filter((_, position) => position !== index) });
 	const engines = status?.engines ?? [];
 	const roles = new Map((status?.roles ?? []).map((role) => [role.role, role]));
+	const workspaceNames = new Map(workspaces.map((workspace) => [workspace.id, workspace.name]));
+	const addTarget = workspaces.find((workspace) => workspace.id === addWorkspace);
+	const addWorkspaceId = addTarget?.id ?? addWorkspace.trim();
+	const duplicateSource = draft.sources.some((source) => source.workspaceId === addWorkspaceId && source.kind === addKind);
+	const addSource = () => {
+		if (!addWorkspaceId || duplicateSource) return;
+		const source: HarnessSourceSettings = { workspaceId: addWorkspaceId, kind: addKind, enabled: true, query: defaultSourceQuery(addKind, addTarget) };
+		if (addKind === 'github') { source.labels = []; source.tokenEnvVar = 'GITHUB_TOKEN'; }
+		update({ sources: [...draft.sources, source] });
+		setNotice(source.query ? 'Added. Save to let the Finder look there.' : 'Added. Fill in the repository under Advanced, then save.');
+	};
 
 	const save = async () => {
 		setSaving(true);
@@ -141,11 +173,24 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 			<section className="settings-section">
 				<header><div><span className="settings-group-label">Sources</span><h2>Where work comes from</h2><p>The Finder looks at these and adds new tasks to the queue.</p></div></header>
 				<div className="hx-sources">
-					{draft.sources.length === 0 && <p className="hx-muted">No sources yet. Add one in the harness settings file.</p>}
+					{draft.sources.length === 0 && <p className="hx-muted">No sources yet. Add one below.</p>}
 					{draft.sources.map((source, index) => (
-						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} now={now} onChange={(patch) => updateSource(index, patch)} />
+						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} workspaceName={workspaceNames.get(source.workspaceId)} now={now} onChange={(patch) => updateSource(index, patch)} onRemove={() => removeSource(index)} />
 					))}
 				</div>
+				<form className="hx-add-source" aria-label="Add a source" onSubmit={(event) => { event.preventDefault(); addSource(); }}>
+					<label className="hx-field"><span>Workspace</span>
+						{workspaces.length > 0
+							? <select value={addWorkspace} onChange={(event) => setAddWorkspace(event.target.value)}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select>
+							: <input value={addWorkspace} placeholder="Workspace id" onChange={(event) => setAddWorkspace(event.target.value)} />}
+					</label>
+					<label className="hx-field"><span>Look in</span>
+						<select value={addKind} onChange={(event) => setAddKind(event.target.value as HarnessSourceKind)}>{addableKinds.map((kind) => <option key={kind} value={kind}>{sourceLabels[kind]}</option>)}</select>
+					</label>
+					<button type="submit" className="secondary" disabled={!addWorkspaceId || duplicateSource}>Add source</button>
+					{duplicateSource && <span className="hx-muted">{sourceLabels[addKind]} is already set for this workspace.</span>}
+					{!duplicateSource && addKind === 'jira' && addTarget && !addTarget.jiraProjectKey && <span className="hx-muted">This workspace has no Jira connection yet. Set one in the workspace settings, or type a search under Advanced after adding.</span>}
+				</form>
 			</section>
 
 			<section className="settings-section">
@@ -224,18 +269,19 @@ function ModelInput({ label, value, hideLabel = false, onChange }: { label: stri
 	);
 }
 
-function SourceRow({ source, now, onChange }: { source: HarnessSourceSettings; now: number; onChange: (patch: Partial<HarnessSourceSettings>) => void }) {
+function SourceRow({ source, workspaceName, now, onChange, onRemove }: { source: HarnessSourceSettings; workspaceName?: string; now: number; onChange: (patch: Partial<HarnessSourceSettings>) => void; onRemove: () => void }) {
 	const checked = source.lastCheckedAt ? `Looked ${formatAgo(source.lastCheckedAt, now)}${source.lastFound !== undefined ? ` · ${source.lastFound} new` : ''}` : 'Not looked yet';
 	const queryLabel = source.kind === 'jira' ? 'Jira search (JQL)' : source.kind === 'github' ? 'Repository (owner/name)' : 'Repository (workspace/name)';
 	return (
 		<div className="hx-source-row">
 			<div className="hx-source-head">
-				<span><Workflow size={14} aria-hidden="true" /> <b>{sourceLabels[source.kind]}</b> <span className="hx-muted">· {source.workspaceId}</span></span>
+				<span><Workflow size={14} aria-hidden="true" /> <b>{sourceLabels[source.kind]}</b> <span className="hx-muted">· {workspaceName ?? source.workspaceId}</span></span>
 				<span className="hx-muted">{checked}</span>
 				<label className="hx-inline-switch"><input type="checkbox" role="switch" checked={source.enabled} onChange={(event) => onChange({ enabled: event.target.checked })} /> Look here</label>
+				<button type="button" className="ghost" onClick={onRemove} aria-label={`Remove ${sourceLabels[source.kind]} for ${workspaceName ?? source.workspaceId}`}>Remove</button>
 			</div>
 			{source.lastError && <p className="hx-banner" role="alert">{source.lastError}</p>}
-			<details className="hx-advanced">
+			<details className="hx-advanced" open={source.query === '' ? true : undefined}>
 				<summary>Advanced</summary>
 				<div className="hx-advanced-fields">
 					<label className="hx-field"><span>{queryLabel}</span><input value={source.query} onChange={(event) => onChange({ query: event.target.value })} /></label>
