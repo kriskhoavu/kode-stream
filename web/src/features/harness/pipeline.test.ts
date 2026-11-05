@@ -42,4 +42,13 @@ describe('pipeline model', () => {
 		expect(groups[0].note).toBe('Anna approved via Webex');
 		expect(groups[0].rows.map((row) => row.step)).toEqual(['Round 1 · plan', 'Round 1 · plan check', 'Round 2 · plan again', 'Round 2 · plan check']);
 	});
+
+	it('names a retried try of a round so three rows are not three rounds', async () => {
+		const run = await detail('run-pm-02');
+		const planner = run.agentRuns.find((agentRun) => agentRun.role === 'planner' && agentRun.round === 2);
+		if (!planner) throw new Error('fixture has no round-2 planner');
+		run.agentRuns.push({ ...planner, id: 'agr-retry', attempt: 2, startedAt: '2099-01-01T00:00:00Z' });
+		const groups = ledgerGroups(run);
+		expect(groups[0].rows.map((row) => row.step)).toContain('Round 2 · plan again · try 2');
+	});
 });

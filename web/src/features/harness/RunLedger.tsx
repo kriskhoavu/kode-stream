@@ -31,7 +31,8 @@ export function ledgerGroups(detail: HarnessRunDetail): LedgerGroup[] {
 			.sort((a, b) => a.round - b.round || Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? ''));
 		const rows: LedgerRow[] = agentRuns.map((agentRun) => {
 			const again = agentRun.round > 1 && (agentRun.role === 'planner' || agentRun.role === 'coder') ? ' again' : '';
-			return { id: agentRun.id, step: `Round ${agentRun.round} · ${stepWords[agentRun.role]}${again}`, agentRun };
+			const retry = (agentRun.attempt ?? 1) > 1 ? ` · try ${agentRun.attempt}` : '';
+			return { id: agentRun.id, step: `Round ${agentRun.round} · ${stepWords[agentRun.role]}${again}${retry}`, agentRun };
 		});
 		if (stage.kind === 'qa' && stage.state !== 'pending') rows.unshift({ id: stage.id, step: `Run ${stage.round} of ${stage.maxRounds} · tests`, stage });
 		if (stage.kind === 'plan') groups.push({ id: stage.id, title: 'Plan', note: decidedNote(approvalOf('plan')), rows });
