@@ -41,7 +41,21 @@ describe('RunDrawer', () => {
 		expect(await screen.findByText('web/src/features/auth/LoginForm.tsx')).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('tab', { name: 'Live' }));
 		expect(await screen.findByText('Writing LoginForm.tsx and its test')).toBeInTheDocument();
-		expect(screen.getByText(/Builder/)).toBeInTheDocument();
+		expect(screen.getAllByText(/Builder/).length).toBeGreaterThan(0);
+		const conversation = await screen.findByRole('list', { name: 'Builder conversation' });
+		await waitFor(() => expect(conversation).toHaveTextContent('Harness'));
+		expect(conversation).toHaveTextContent('Writing LoginForm.tsx and its test');
+	});
+
+	it('lists every agent round of the run on the Live tab and switches the conversation', async () => {
+		const { client, state } = await setup('task-pm-02', 'run-pm-02');
+		render(<Harnessed state={state} client={client} taskId="task-pm-02" wave={[]} initialTab="live" />);
+		const rounds = await screen.findByRole('tablist', { name: 'Agent rounds' });
+		const checker = within(rounds).getByRole('tab', { name: /Checker · round 1/ });
+		expect(within(rounds).getByRole('tab', { name: /Builder · round 1/ })).toHaveAttribute('aria-selected', 'true');
+		fireEvent.click(checker);
+		expect(checker).toHaveAttribute('aria-selected', 'true');
+		await waitFor(() => expect(screen.getByRole('list', { name: 'Checker conversation' })).toHaveTextContent('Brief for the plan reviewer, round 1.'));
 	});
 
 	it('says what a task waits for and moves it within its wave from the keyboard', async () => {

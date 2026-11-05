@@ -291,6 +291,9 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 	if poll.Code != http.StatusOK || !strings.Contains(poll.Body.String(), `"started":true`) {
 		t.Fatalf("poll = %d %s", poll.Code, poll.Body.String())
 	}
+	if noTranscript := serveHarness(handler, http.MethodGet, "/api/harness/agent-runs/missing/transcript", ""); noTranscript.Code != http.StatusNotFound {
+		t.Fatalf("missing transcript = %d %s", noTranscript.Code, noTranscript.Body.String())
+	}
 	cleared := serveHarness(handler, http.MethodPost, "/api/harness/queue/clear", "")
 	if cleared.Code != http.StatusOK || !strings.Contains(cleared.Body.String(), `"removed":2`) {
 		t.Fatalf("clear = %d %s", cleared.Code, cleared.Body.String())

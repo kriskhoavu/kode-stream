@@ -210,11 +210,19 @@ func (s *Service) ClaudeTranscriptTail(workspaceID, sessionID string, limit int)
 	if err != nil {
 		return nil, err
 	}
+	return ReadClaudeTranscriptTail(path, limit)
+}
+
+// ReadClaudeTranscriptTail returns the last limit user and assistant text
+// turns of the transcript at path, read now and kept nowhere. A file that
+// does not exist yet reads as no turns, since Claude Code creates it on its
+// first turn.
+func ReadClaudeTranscriptTail(path string, limit int) ([]ClaudeTurn, error) {
 	if limit <= 0 || limit > ClaudeTranscriptMaxTail {
 		limit = ClaudeTranscriptMaxTail
 	}
 	turns := []ClaudeTurn{}
-	err = readTranscriptLines(path, func(line claudeTranscriptLine, _ []byte) {
+	err := readTranscriptLines(path, func(line claudeTranscriptLine, _ []byte) {
 		if turn, ok := transcriptTurn(line); ok {
 			turns = append(turns, turn)
 			if len(turns) > limit {
@@ -222,7 +230,13 @@ func (s *Service) ClaudeTranscriptTail(workspaceID, sessionID string, limit int)
 			}
 		}
 	})
-	return turns, err
+	if errors.Is(err, os.ErrNotExist) {
+		return turns, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return turns, nil
 }
 
 // claudeTranscriptPath resolves a conversation of the workspace, refusing an ID

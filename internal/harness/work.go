@@ -314,6 +314,13 @@ func (s *Service) execute(agentRun domain.AgentRun, settings domain.Settings, po
 	s.mu.Lock()
 	s.handles[agentRun.ID] = agentProcess{runID: agentRun.RunID, pool: pool, handle: handle}
 	s.mu.Unlock()
+	// The session id is the harness's own and the transcript path follows
+	// from it, so the dashboard can read the agent while it works.
+	transcriptRef := ""
+	if locator, ok := engine.(ports.TranscriptLocator); ok {
+		transcriptRef = locator.TranscriptRef(run.WorktreePath, invocation.SessionID)
+	}
+	s.recordSession(ctx, agentRun.ID, invocation.SessionID, transcriptRef)
 	s.emit(ctx, domain.Event{Kind: domain.EventAgentStarted, TaskID: run.TaskID, RunID: run.ID, StageID: stage.ID, AgentRunID: agentRun.ID, Payload: payload(map[string]any{"role": agentRun.Role, "engine": agentRun.Engine, "model": agentRun.Model, "round": agentRun.Round, "attempt": agentRun.Attempt})})
 
 	heartbeat := time.NewTicker(heartbeatEvery)
@@ -362,7 +369,12 @@ func (s *Service) execute(agentRun domain.AgentRun, settings domain.Settings, po
 		commit, checkErr = s.commitRun(ctx, run, "")
 	}
 	s.finishAgentRun(ctx, agentRun.ID, func(current *domain.AgentRun) {
-		current.EngineSessionID, current.TranscriptRef = result.SessionID, result.TranscriptRef
+		if result.SessionID != "" {
+			current.EngineSessionID = result.SessionID
+		}
+		if result.TranscriptRef != "" {
+			current.TranscriptRef = result.TranscriptRef
+		}
 		current.Usage, current.CostUSD, current.Turns, current.DurationMs = result.Usage, result.CostUSD, result.Turns, result.DurationMs
 		current.Usage.CostUSD = result.CostUSD
 		exitCode := result.ExitCode
@@ -398,8 +410,16 @@ func failureText(result ports.Result) string {
 		reason = "ran out of turns"
 	case "timeout":
 		reason = "ran past its time limit"
-	case "":
+	case "", "success":
+		// The CLI ended without a stop reason of its own: a non-zero exit, or
+		// a run cut short. Its last words say why ("Not logged in"), so they
+		// are the reason; the exit code is the fallback.
 		reason = "failed"
+		if last := strings.TrimSpace(result.FinalText); last != "" {
+			reason = "stopped: " + boundedText(last, 200)
+		} else if result.ExitCode != 0 {
+			reason = fmt.Sprintf("exited with code %d", result.ExitCode)
+		}
 	}
 	if tail := strings.TrimSpace(result.Stderr); tail != "" {
 		if len(tail) > 400 {
@@ -412,6 +432,20 @@ func failureText(result ports.Result) string {
 
 // heartbeat extends a running agent run's lease. It reports false when the
 // row is no longer running, such as after a cancel.
+// recordSession stores the session the CLI was started with and where its
+// transcript will be, on the running row; a row that moved meanwhile is left.
+func (s *Service) recordSession(ctx context.Context, agentRunID, sessionID, transcriptRef string) {
+	current, err := s.repository.GetAgentRun(ctx, agentRunID)
+	if err != nil || current.State != domain.AgentRunning {
+		return
+	}
+	expect := domain.Expect{State: string(current.State), Revision: current.Revision}
+	current.EngineSessionID, current.TranscriptRef = sessionID, transcriptRef
+	if _, err := s.repository.SaveAgentRun(ctx, current, expect); err != nil && !errors.Is(err, domain.ErrStateMoved) {
+		log.Printf("harness: record session of agent run %s: %v", agentRunID, err)
+	}
+}
+
 func (s *Service) heartbeat(ctx context.Context, agentRunID string, lease time.Duration) bool {
 	current, err := s.repository.GetAgentRun(ctx, agentRunID)
 	if err != nil || current.State != domain.AgentRunning {

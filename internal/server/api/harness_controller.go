@@ -175,6 +175,15 @@ func (a *harnessController) agentRun(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, agentRun)
 }
 
+func (a *harnessController) agentRunTranscript(w http.ResponseWriter, r *http.Request) {
+	transcript, err := a.harness.AgentRunTranscript(r.Context(), r.PathValue("id"), queryLimit(r, 50, 200))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, transcript)
+}
+
 func (a *harnessController) approvals(w http.ResponseWriter, r *http.Request) {
 	states := queryStates[domain.ApprovalState](r, "state")
 	if states == nil {

@@ -113,7 +113,13 @@ func newPipeline(t *testing.T, s script, adjust ...func(*domain.Settings)) *pipe
 	workspace := models.WorkspaceConfig{ID: "ws", Name: "App", Path: repo, BaselineBranch: "main"}
 	repository := newTestRepository(t)
 	engine := newFakeEngine(s)
-	service := New(Dependencies{Repository: repository, Workspaces: fakeWorkspaces{"ws": workspace}, Engines: []ports.Engine{engine}, Worktrees: gitworktree.New(filepath.Join(t.TempDir(), "worktrees"), appgit.New()), Config: Config{LocalMode: true}})
+	transcripts := func(path string, limit int) ([]domain.TranscriptTurn, error) {
+		if !strings.HasPrefix(path, "/transcripts/") {
+			return nil, errors.New("unexpected transcript path " + path)
+		}
+		return []domain.TranscriptTurn{{Role: "user", Text: "brief"}, {Role: "assistant", Text: "Reading the code."}}, nil
+	}
+	service := New(Dependencies{Repository: repository, Workspaces: fakeWorkspaces{"ws": workspace}, Engines: []ports.Engine{engine}, Worktrees: gitworktree.New(filepath.Join(t.TempDir(), "worktrees"), appgit.New()), Transcripts: transcripts, Config: Config{LocalMode: true}})
 	settings := domain.DefaultSettings()
 	settings.Enabled = true
 	settings.Workspaces = []domain.WorkspaceSettings{{WorkspaceID: "ws", VerificationCommands: []string{"true"}}}
@@ -251,6 +257,10 @@ func TestPlanStageReachesThePlanApprovalAndApprovalStartsTheBuild(t *testing.T) 
 	agentRun, err := fixture.service.AgentRun(ctx, plan.AgentRuns[0].ID)
 	if err != nil || agentRun.TranscriptRef == "" || agentRun.EngineSessionID == "" || agentRun.Report == nil || agentRun.DiffStat != "" && !strings.Contains(agentRun.DiffStat, "file") {
 		t.Fatalf("agent run = %#v err=%v", agentRun, err)
+	}
+	transcript, err := fixture.service.AgentRunTranscript(ctx, agentRun.ID, 20)
+	if err != nil || !transcript.Available || len(transcript.Turns) != 2 || transcript.Turns[1].Text != "Reading the code." || transcript.SessionID != agentRun.EngineSessionID {
+		t.Fatalf("transcript = %#v err=%v", transcript, err)
 	}
 
 	if _, err := fixture.service.Decide(ctx, approval.ID, DecideInput{Decision: DecisionReject, IdempotencyKey: "k0"}); !IsInvalid(err) {

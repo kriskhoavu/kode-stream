@@ -387,45 +387,6 @@
 	margin: 0 12px;
 }
 
-.agent-transcript {
-	flex: 1;
-	min-height: 0;
-	list-style: none;
-	margin: 0;
-	padding: 0 12px 14px;
-	display: grid;
-	gap: 10px;
-	overflow: auto;
-}
-
-.agent-turn {
-	display: grid;
-	gap: 4px;
-	max-width: 88%;
-	padding: 8px 12px;
-	border-radius: 10px;
-	background: var(--panel-soft);
-}
-
-.agent-turn.role-user {
-	justify-self: end;
-	background: color-mix(in srgb, var(--blue) 8%, var(--panel));
-}
-
-.agent-turn-role {
-	font-size: 11px;
-	font-weight: 700;
-	color: var(--muted);
-}
-
-.agent-turn p {
-	margin: 0;
-	white-space: pre-wrap;
-	overflow-wrap: anywhere;
-	font-size: 13px;
-	line-height: 1.5;
-}
-
 /* The Changes view fills the agent pane: header lines on top, then the file
  * list and the diff side by side, each scrolling on its own. */
 .agent-pane-body > .session-changes-panel {

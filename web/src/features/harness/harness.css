@@ -1641,6 +1641,40 @@ a.hx-source:hover {
 	margin: 0;
 }
 
+.hx-live-rounds {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.hx-live-rounds button {
+	padding: 2px;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	background: transparent;
+	cursor: pointer;
+}
+
+.hx-live-rounds button.on {
+	border-color: var(--accent-text);
+}
+
+.hx-live-rounds button:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 2px;
+}
+
+/* The drawer's own padding frames the turns; the list is not a scroll box of its own. */
+.hx-transcript.agent-transcript {
+	padding: 0;
+	overflow: visible;
+	max-height: none;
+}
+
+.hx-transcript .agent-turn {
+	max-width: 100%;
+}
+
 .hx-live-line {
 	padding: 10px 12px;
 	border: 1px solid var(--line);

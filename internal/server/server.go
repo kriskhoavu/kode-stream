@@ -34,6 +34,7 @@ import (
 	harnessgithub "kode-stream/internal/harness/adapters/scout/github"
 	harnessjira "kode-stream/internal/harness/adapters/scout/jira"
 	harnessworktree "kode-stream/internal/harness/adapters/worktree/gitworktree"
+	"kode-stream/internal/harness/domain"
 	"kode-stream/internal/harness/ports"
 	"kode-stream/internal/item/writer"
 	appjira "kode-stream/internal/jira"
@@ -101,11 +102,22 @@ func NewServer(port int) (*Server, error) {
 		harnessNotifier = harnesswebhook.New(harnessConfig.WebhookURL, harnessConfig.WebhookSecret)
 	}
 	harnessService := harness.New(harness.Dependencies{
-		Repository:   state.Harness,
-		Workspaces:   reg,
-		Scouts:       []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New()},
-		Engines:      []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath), harnesscodex.New(), harnessopencode.New()},
-		Reranker:     harnessranker.New(),
+		Repository: state.Harness,
+		Workspaces: reg,
+		Scouts:     []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New()},
+		Engines:    []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath), harnesscodex.New(), harnessopencode.New()},
+		Reranker:   harnessranker.New(),
+		Transcripts: func(path string, limit int) ([]domain.TranscriptTurn, error) {
+			turns, err := ai.ReadClaudeTranscriptTail(path, limit)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]domain.TranscriptTurn, 0, len(turns))
+			for _, turn := range turns {
+				out = append(out, domain.TranscriptTurn{Role: turn.Role, Text: turn.Text, At: turn.At})
+			}
+			return out, nil
+		},
 		Worktrees:    harnessworktree.New(harnessConfig.WorktreeRoot, git),
 		PullRequests: harnessPullRequests(git),
 		Audit:        auditStore,

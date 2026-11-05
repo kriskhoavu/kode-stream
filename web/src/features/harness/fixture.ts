@@ -13,7 +13,7 @@ import type {
 	HarnessStage,
 	HarnessStageKind,
 	HarnessStatus,
-	HarnessTask,
+	HarnessTask, ClaudeTurn,
 	SafeSessionRecord,
 	SessionChanges
 } from '../../lib/types';
@@ -546,6 +546,15 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 			const agentRun = store.agentRuns.get(agentRunId);
 			if (!agentRun) throw new Error('This agent run does not exist in the demo data.');
 			return { agentRun: clone(agentRun), session: undefined as SafeSessionRecord | undefined };
+		}),
+		agentRunTranscript: (agentRunId) => delay(() => {
+			const agentRun = store.agentRuns.get(agentRunId);
+			if (!agentRun) throw new Error('This agent run does not exist in the demo data.');
+			const turns: ClaudeTurn[] = [
+				{ role: 'user', text: `Brief for the ${agentRun.role.replace('_', ' ')}, round ${agentRun.round}.` },
+				{ role: 'assistant', text: agentRun.progress ?? agentRun.summary ?? 'Reading the code.' }
+			];
+			return { agentRunId, sessionId: `sess-${agentRunId}`, available: true, turns };
 		}),
 		approve: (approval, _key, reason) => delay(() => decide(approval, 'approve', reason)),
 		reject: (approval, _key, reason) => delay(() => decide(approval, 'reject', reason)),

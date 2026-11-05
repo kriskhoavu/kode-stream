@@ -1,0 +1,39 @@
+/* A conversation's text turns, shared by the Workstream card drawer and the harness drawer. */
+.agent-transcript {
+	flex: 1;
+	min-height: 0;
+	list-style: none;
+	margin: 0;
+	padding: 0 12px 14px;
+	display: grid;
+	gap: 10px;
+	overflow: auto;
+}
+
+.agent-turn {
+	display: grid;
+	gap: 4px;
+	max-width: 88%;
+	padding: 8px 12px;
+	border-radius: 10px;
+	background: var(--panel-soft);
+}
+
+.agent-turn.role-user {
+	justify-self: end;
+	background: color-mix(in srgb, var(--blue) 8%, var(--panel));
+}
+
+.agent-turn-role {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--muted);
+}
+
+.agent-turn p {
+	margin: 0;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	font-size: 13px;
+	line-height: 1.5;
+}

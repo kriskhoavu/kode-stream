@@ -330,6 +330,14 @@ type AgentRun struct {
 	Revision    int64      `json:"revision"`
 }
 
+// TranscriptTurn is one text turn of an agent's own transcript, read from the
+// CLI's file when asked for and kept nowhere.
+type TranscriptTurn struct {
+	Role string    `json:"role"`
+	Text string    `json:"text"`
+	At   time.Time `json:"at,omitempty"`
+}
+
 // AgentRunSummary is the list form shown on a stage.
 type AgentRunSummary struct {
 	ID         string        `json:"id"`

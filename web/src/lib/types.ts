@@ -1172,6 +1172,9 @@ export interface HarnessApproval {
   context?: { difficulty?: 'easy' | 'hard'; subtasks?: number; rounds?: number; blocking?: number; advisory?: number; costUsd?: number; durationMs?: number; verdict?: 'approve' | 'changes_requested' };
 }
 
+/** The last turns of an agent run's own transcript, read from the coding tool's file when asked for. */
+export interface HarnessTranscript { agentRunId: string; sessionId?: string; available: boolean; turns: ClaudeTurn[] }
+
 export interface HarnessRunDetail {
   run: HarnessRun;
   task: HarnessTask;

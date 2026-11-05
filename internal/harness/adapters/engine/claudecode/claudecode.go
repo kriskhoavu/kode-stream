@@ -100,6 +100,16 @@ func (e *Engine) Start(ctx context.Context, invocation ports.Invocation) (ports.
 	return process.Start(ctx, spec, &parser{})
 }
 
+// TranscriptRef is where Claude Code writes the session's transcript; "" when
+// the adapter was built without a locator.
+func (e *Engine) TranscriptRef(worktreePath, sessionID string) string {
+	if e.TranscriptPath == nil {
+		return ""
+	}
+	ref, _ := e.TranscriptPath(worktreePath, sessionID)
+	return ref
+}
+
 // parser reads Claude Code's stream-json lines.
 type parser struct {
 	result   ports.Result

@@ -102,7 +102,8 @@ import type {
   HarnessRunDetail,
   HarnessSettings,
   HarnessStatus,
-  HarnessTask
+  HarnessTask,
+  HarnessTranscript
 } from '../../lib/types';
 
 export class ApiError extends Error {
@@ -548,6 +549,7 @@ export const api = {
   harnessRuns: async (signal?: AbortSignal) => (await request<{ runs?: HarnessRun[] | null }>('/api/harness/runs', { signal }, !signal)).runs ?? [],
   harnessRun: async (runId: string, signal?: AbortSignal) => normalizeHarnessRunDetail(await request<HarnessRunDetail>(`/api/harness/runs/${encodeURIComponent(runId)}`, { signal }, !signal)),
   harnessRunChanges: (runId: string, signal?: AbortSignal) => request<SessionChanges>(`/api/harness/runs/${encodeURIComponent(runId)}/changes`, { signal }, !signal),
+  harnessAgentRunTranscript: (agentRunId: string, limit = 50, signal?: AbortSignal) => request<HarnessTranscript>(`/api/harness/agent-runs/${encodeURIComponent(agentRunId)}/transcript?limit=${limit}`, { signal }, false),
   harnessAgentRun: (agentRunId: string, signal?: AbortSignal) => request<{ agentRun: HarnessAgentRun; session?: SafeSessionRecord }>(`/api/harness/agent-runs/${encodeURIComponent(agentRunId)}`, { signal }, !signal),
   cancelHarnessRun: (runId: string, expectedRevision: number) => request<HarnessRun>(`/api/harness/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST', body: JSON.stringify({ expectedRevision }) }, false),
   harnessApprovals: async (signal?: AbortSignal) => (await request<{ approvals?: HarnessApproval[] | null }>('/api/harness/approvals', { signal }, !signal)).approvals ?? [],

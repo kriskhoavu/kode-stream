@@ -80,4 +80,6 @@ Codex runs `codex exec --json` with its sandbox standing in for the permission m
 
 [live] A task's drawer opens on its Ticket tab, the Workstream page's Jira panel read by key in the task's workspace: `GET /api/workspaces/{id}/jira/issues/{key}` takes `?refresh=1`, and `…/attachments/{attachmentId}` serves an attachment of that issue. The harness stores none of it; a task carries only the tracker's status, priority, assignee and labels. Evidence: `internal/jira/jira_service.go:293`.
 
+[live] The drawer's Live tab lists the run's agent rounds and shows the chosen agent's conversation: `GET /api/harness/agent-runs/{id}/transcript?limit=` reads the last text turns of the coding tool's own transcript, whose path and session id the harness records when the CLI starts, and re-reads it every few seconds while the agent runs. The harness stores the path, never the turns, and the Workstream page's transcript list draws them. Evidence: `internal/harness/harness.go:377`.
+
 The route list and every shape are in the PM-044 backend solution page. The feature itself is [[platform-harness]].

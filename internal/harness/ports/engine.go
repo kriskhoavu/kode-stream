@@ -77,6 +77,16 @@ type Result struct {
 	TranscriptRef string
 }
 
+// TranscriptLocator is an engine that knows, before the CLI finishes, where
+// it will write the transcript of a session the harness named.
+type TranscriptLocator interface {
+	TranscriptRef(worktreePath, sessionID string) string
+}
+
+// TranscriptReader reads the last limit text turns of a CLI transcript at
+// path. A file that does not exist yet reads as no turns.
+type TranscriptReader func(path string, limit int) ([]domain.TranscriptTurn, error)
+
 // Handle is one running CLI process.
 type Handle interface {
 	Events() <-chan EngineEvent

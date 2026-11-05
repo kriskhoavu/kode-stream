@@ -11,7 +11,7 @@ import type {
 	HarnessRunDetail,
 	HarnessSettings,
 	HarnessStatus,
-	HarnessTask,
+	HarnessTask, HarnessTranscript,
 	SafeSessionRecord,
 	SessionChanges
 } from '../../lib/types';
@@ -44,6 +44,8 @@ export interface HarnessClient {
 	run(runId: string, signal?: AbortSignal): Promise<HarnessRunDetail>;
 	runChanges(runId: string, signal?: AbortSignal): Promise<SessionChanges>;
 	agentRun(agentRunId: string, signal?: AbortSignal): Promise<{ agentRun: HarnessAgentRun; session?: SafeSessionRecord }>;
+	/** The last turns of an agent run's transcript; polled while the agent works. */
+	agentRunTranscript(agentRunId: string, limit?: number, signal?: AbortSignal): Promise<HarnessTranscript>;
 	approve(approval: HarnessApproval, idempotencyKey: string, reason?: string): Promise<HarnessApproval | undefined>;
 	reject(approval: HarnessApproval, idempotencyKey: string, reason: string): Promise<HarnessApproval | undefined>;
 	pin(task: HarnessTask, pinned: boolean): Promise<HarnessTask>;
@@ -73,6 +75,7 @@ export const apiHarnessClient: HarnessClient = {
 	run: (runId, signal) => api.harnessRun(runId, signal),
 	runChanges: (runId, signal) => api.harnessRunChanges(runId, signal),
 	agentRun: (agentRunId, signal) => api.harnessAgentRun(agentRunId, signal),
+	agentRunTranscript: (agentRunId, limit, signal) => api.harnessAgentRunTranscript(agentRunId, limit, signal),
 	approve: (approval, key, reason) => api.approveHarnessGate(approval, key, reason),
 	reject: (approval, key, reason) => api.rejectHarnessGate(approval, key, reason),
 	pin: (task, pinned) => api.pinHarnessTask(task, pinned),

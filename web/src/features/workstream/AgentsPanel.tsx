@@ -7,6 +7,7 @@ import type { ClaudeTranscript, ClaudeTurn, EmbeddedAISessionResult, SafeSession
 import { AISessionLaunchControl } from '../ai-session/AISessionLaunchControl';
 import { AgentChip, providerLabel } from '../ai-session/providerDisplay';
 import { SessionTerminal } from '../ai-session/SessionTerminal';
+import { TranscriptTurns } from '../ai-session/TranscriptTurns';
 import { attachEmbeddedSession } from '../ai-session/terminalSessions';
 import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
 import { sessionGlyph } from '../sessions/SessionCard';
@@ -252,9 +253,6 @@ function TranscriptPane({ conversation, transcript, itemId, workspaceId, back, o
 		</header>
 		{mayBeOpen && <p className="agent-pane-warning" role="note">This conversation may still be open in your terminal; continuing here forks it.</p>}
 		{error && <p className="error" role="alert">{error}</p>}
-		<ol className="agent-transcript" aria-label="Latest turns">
-			{turns === undefined && !error && <li className="agent-pane-placeholder" role="status">Reading the conversation…</li>}
-			{turns?.map((turn, index) => <li key={index} className={`agent-turn role-${turn.role}`}><span className="agent-turn-role">{turn.role === 'user' ? 'You' : 'Claude'}</span><p>{turn.text}</p></li>)}
-		</ol>
+		<TranscriptTurns turns={turns} label="Latest turns" placeholder={error ? undefined : 'Reading the conversation…'} />
 	</section>;
 }

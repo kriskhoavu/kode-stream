@@ -76,19 +76,23 @@ type Dependencies struct {
 	RuntimeVerifyCommand func(*models.WorkspaceRuntimeConfig) string
 	// Reranker may reorder the rules' top N when the settings enable it.
 	Reranker queue.Reranker
-	Now      func() time.Time
-	Config   Config
+	// Transcripts reads an agent run's transcript for the dashboard; nil
+	// when no engine writes one the platform can read.
+	Transcripts ports.TranscriptReader
+	Now         func() time.Time
+	Config      Config
 }
 
 type Service struct {
-	repository domain.Repository
-	workspaces ports.Workspaces
-	now        func() time.Time
-	config     Config
-	feed       *feed.Broadcaster
-	poller     *scout.Poller
-	rules      queue.RuleRanker
-	reranker   queue.Reranker
+	repository  domain.Repository
+	workspaces  ports.Workspaces
+	now         func() time.Time
+	config      Config
+	feed        *feed.Broadcaster
+	poller      *scout.Poller
+	rules       queue.RuleRanker
+	reranker    queue.Reranker
+	transcripts ports.TranscriptReader
 
 	engines    map[string]ports.Engine
 	engineList []ports.Engine
@@ -120,7 +124,7 @@ func New(deps Dependencies) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	service := &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), reranker: deps.Reranker, progress: map[string]string{},
+	service := &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), reranker: deps.Reranker, transcripts: deps.Transcripts, progress: map[string]string{},
 		pollWake: make(chan struct{}, 1), sortWake: make(chan struct{}, 1), workWakes: map[string]chan struct{}{},
 		engines: map[string]ports.Engine{}, engineList: deps.Engines, worktrees: deps.Worktrees, pulls: deps.PullRequests, notifier: deps.Notifier, audit: deps.Audit, runtimeCmd: deps.RuntimeVerifyCommand, handles: map[string]agentProcess{}, busy: map[domain.RoleKey]int{}}
 	for _, name := range workLoopNames {
@@ -357,6 +361,37 @@ func (s *Service) Run(ctx context.Context, id string) (RunView, error) {
 		view.Stages = append(view.Stages, StageView{Stage: stage, AgentRuns: runs})
 	}
 	return view, nil
+}
+
+// AgentRunTranscript is the last limit text turns of an agent run's own
+// transcript, read from the CLI's file now and kept nowhere. An agent run
+// whose engine writes no readable transcript, or whose file does not exist
+// yet, answers no turns.
+type AgentRunTranscript struct {
+	AgentRunID string                  `json:"agentRunId"`
+	SessionID  string                  `json:"sessionId,omitempty"`
+	Available  bool                    `json:"available"`
+	Turns      []domain.TranscriptTurn `json:"turns"`
+}
+
+func (s *Service) AgentRunTranscript(ctx context.Context, id string, limit int) (AgentRunTranscript, error) {
+	agentRun, err := s.AgentRun(ctx, id)
+	if err != nil {
+		return AgentRunTranscript{}, err
+	}
+	out := AgentRunTranscript{AgentRunID: agentRun.ID, SessionID: agentRun.EngineSessionID, Turns: []domain.TranscriptTurn{}}
+	if s.transcripts == nil || agentRun.TranscriptRef == "" {
+		return out, nil
+	}
+	turns, err := s.transcripts(agentRun.TranscriptRef, limit)
+	if err != nil {
+		return out, err
+	}
+	out.Available, out.Turns = true, turns
+	if out.Turns == nil {
+		out.Turns = []domain.TranscriptTurn{}
+	}
+	return out, nil
 }
 
 func (s *Service) AgentRun(ctx context.Context, id string) (domain.AgentRun, error) {

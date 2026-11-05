@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, ExternalLink, Pin, PinOff, Play, X } from 'lucide-react';
-import type { HarnessAgentRun, HarnessApproval, HarnessTask, SafeSessionRecord, SessionChanges } from '../../lib/types';
+import type { ClaudeTurn, HarnessAgentRun, HarnessApproval, HarnessTask, SafeSessionRecord, SessionChanges } from '../../lib/types';
 import type { HarnessRunTab } from '../../app/router';
 import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
+import { TranscriptTurns } from '../ai-session/TranscriptTurns';
 import { JiraItemPanel } from '../jira/JiraItemPanel';
 import type { HarnessClient } from './harnessClient';
 import type { HarnessState } from './harnessState';
@@ -15,7 +16,8 @@ import { PipelineStepper } from './PipelineStepper';
 import { SourceBadge } from './SourceBadge';
 import { pipelineModel, prLabel, runStatus } from './pipeline';
 import { useNow } from './useNow';
-import { agentRoleLabels, formatCost, hxSteps, modelLabel, plural, sourceLabels, taskStatus } from './vocabulary';
+import { agentRoleLabels, formatCost, hxSteps, hxStatuses, modelLabel, plural, sourceLabels, taskStatus } from './vocabulary';
+import type { HxStatus } from './vocabulary';
 
 // The live terminal pulls in xterm; load it only when someone opens the Live tab.
 const SessionTerminal = lazy(() => import('../ai-session/SessionTerminal').then((module) => ({ default: module.SessionTerminal })));
@@ -145,7 +147,7 @@ export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClo
 						{tab === 'stages' && (detail ? <PipelineStepper model={pipelineModel(detail, now)} label={`Progress for ${task.source.key}`} orientation="vertical" /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'findings' && (detail ? <FindingsByRound agentRuns={detail.agentRuns} /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'changes' && (runId ? <ChangesTab client={client} runId={runId} agentRun={latestAgentRun(detail?.agentRuns)} /> : <NoRun run={false} />)}
-						{tab === 'live' && (runId ? <LiveTab client={client} agentRun={run?.activeAgentRun ?? detail?.agentRuns.find((agentRun) => agentRun.state === 'running')} onReload={() => loadRun(runId)} /> : <NoRun run={false} />)}
+						{tab === 'live' && (runId ? <LiveTab client={client} agentRuns={detail?.agentRuns ?? (run?.activeAgentRun ? [run.activeAgentRun] : [])} onReload={() => loadRun(runId)} /> : <NoRun run={false} />)}
 						{tab === 'links' && (
 							<ul className="hx-links">
 								{run?.prUrl && <li><a href={run.prUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} aria-hidden="true" />Draft pull request {prLabel(run.prUrl)}</a></li>}
@@ -233,24 +235,87 @@ function ChangesTab({ client, runId, agentRun }: { client: HarnessClient; runId:
 	);
 }
 
-/** The working agent: its live terminal when it runs as a session, else its latest progress line. */
-function LiveTab({ client, agentRun, onReload }: { client: HarnessClient; agentRun?: HarnessAgentRun; onReload: () => Promise<unknown> }) {
-	const session = useAgentSession(client, agentRun?.id);
-	if (!agentRun) return <p className="hx-muted">No agent is working on this task right now.</p>;
-	if (session.record?.live) {
-		return (
-			<Suspense fallback={<p className="hx-muted">Opening the live view…</p>}>
-				<SessionTerminal record={session.record} visible onReload={onReload} classPrefix="hx-terminal" ariaLabel={`${agentRoleLabels[agentRun.role]} live terminal`} />
-			</Suspense>
-		);
-	}
+const transcriptEvery = 5_000;
+
+/**
+ * What each agent said, one round at a time: the working agent first, then
+ * every earlier round of the run. A running agent's transcript is read again
+ * every few seconds; its live terminal is shown instead when the backend
+ * exposes the run as a session.
+ */
+function LiveTab({ client, agentRuns, onReload }: { client: HarnessClient; agentRuns: HarnessAgentRun[]; onReload: () => Promise<unknown> }) {
+	const rounds = useMemo(() => [...agentRuns].filter((agentRun) => agentRun.state !== 'queued').sort((a, b) => Date.parse(b.startedAt ?? '') - Date.parse(a.startedAt ?? '')), [agentRuns]);
+	const working = rounds.find((agentRun) => agentRun.state === 'running');
+	const [chosen, setChosen] = useState<string | undefined>();
+	const selected = rounds.find((agentRun) => agentRun.id === chosen) ?? working ?? rounds[0];
+	const session = useAgentSession(client, selected?.id);
+	const transcript = useAgentTranscript(client, selected);
+	if (!selected) return <p className="hx-muted">No agent has worked on this task yet.</p>;
 	return (
 		<div className="hx-live">
-			<p><b>{agentRoleLabels[agentRun.role]}</b> · {modelLabel(agentRun.model)} · <span className="hx-num">{plural(agentRun.turns, 'turn')} · {formatCost(agentRun.costUsd)}</span></p>
-			<p className="hx-live-line">{agentRun.progress ?? 'Starting…'}</p>
-			<p className="hx-muted">This view shows the agent's latest step. The full conversation is kept by the coding tool, not here.</p>
+			{rounds.length > 1 && (
+				<div className="hx-live-rounds" role="tablist" aria-label="Agent rounds">
+					{rounds.map((agentRun) => (
+						<button key={agentRun.id} type="button" role="tab" aria-selected={agentRun.id === selected.id} className={agentRun.id === selected.id ? 'on' : undefined} onClick={() => setChosen(agentRun.id)}>
+							<HxStatusBadge status={agentStatus(agentRun)} size="sm" label={`${agentRoleLabels[agentRun.role]} · round ${agentRun.round}`} />
+						</button>
+					))}
+				</div>
+			)}
+			<p><b>{agentRoleLabels[selected.role]}</b> · {modelLabel(selected.model)} · <span className="hx-num">{plural(selected.turns, 'turn')} · {formatCost(selected.costUsd)}</span>{selected.state !== 'running' && <span className="hx-muted"> · {hxStatuses[agentStatus(selected)].label.toLowerCase()}</span>}</p>
+			{selected.state === 'running' && <p className="hx-live-line">{selected.progress ?? 'Starting…'}</p>}
+			{session.record?.live
+				? (
+					<Suspense fallback={<p className="hx-muted">Opening the live view…</p>}>
+						<SessionTerminal record={session.record} visible onReload={onReload} classPrefix="hx-terminal" ariaLabel={`${agentRoleLabels[selected.role]} live terminal`} />
+					</Suspense>
+				)
+				: transcript.error
+					? <p className="hx-banner" role="alert">{transcript.error}</p>
+					: transcript.turns && transcript.turns.length === 0
+						? <p className="hx-muted">{selected.state === 'running' ? 'The conversation has not started yet.' : 'This agent left no conversation the harness can read.'}</p>
+						: <TranscriptTurns className="hx-transcript" turns={transcript.turns} label={`${agentRoleLabels[selected.role]} conversation`} placeholder="Reading the conversation…" names={{ user: 'Harness', assistant: agentRoleLabels[selected.role] }} />}
+			<p className="hx-muted">Text turns only: what the harness asked and what the {agentRoleLabels[selected.role]} answered. The coding tool keeps the full conversation.</p>
 		</div>
 	);
+}
+
+function agentStatus(agentRun: HarnessAgentRun): HxStatus {
+	switch (agentRun.state) {
+		case 'running': return 'working';
+		case 'succeeded': return 'done';
+		case 'failed': return 'failed';
+		case 'cancelled': return 'stopped';
+		default: return 'not_started';
+	}
+}
+
+/** The transcript of one agent run, read once when it is finished and every few seconds while it runs. */
+function useAgentTranscript(client: HarnessClient, agentRun?: HarnessAgentRun): { turns?: ClaudeTurn[]; error: string } {
+	const [turns, setTurns] = useState<ClaudeTurn[] | undefined>();
+	const [error, setError] = useState('');
+	const id = agentRun?.id;
+	const running = agentRun?.state === 'running';
+	useEffect(() => {
+		setTurns(undefined);
+		setError('');
+		if (!id) return;
+		const controller = new AbortController();
+		let timer: number | undefined;
+		const read = () => {
+			client.agentRunTranscript(id, 50, controller.signal)
+				.then((result) => {
+					if (controller.signal.aborted) return;
+					setTurns(result.turns);
+					if (running && document.visibilityState !== 'hidden') timer = window.setTimeout(read, transcriptEvery);
+					else if (running) timer = window.setTimeout(read, transcriptEvery * 4);
+				})
+				.catch(() => { if (!controller.signal.aborted) setError('The conversation could not be read.'); });
+		};
+		read();
+		return () => { controller.abort(); window.clearTimeout(timer); };
+	}, [client, id, running]);
+	return { turns, error };
 }
 
 function useAgentSession(client: HarnessClient, agentRunId?: string): { record?: SafeSessionRecord } {
