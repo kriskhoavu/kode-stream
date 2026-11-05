@@ -601,6 +601,15 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 			store.settings = { ...clone(settings), revision: settings.revision + 1 };
 			return clone(store.settings);
 		}),
+		clearQueue: (workspaceId) => delay(() => {
+			const clearable = new Set(['discovered', 'ranked', 'stale', 'dismissed']);
+			const gone = [...store.tasks.values()].filter((task) => clearable.has(task.state) && (!workspaceId || task.workspaceId === workspaceId));
+			for (const task of gone) {
+				store.tasks.delete(task.id);
+				emit({ type: 'task.removed', taskId: task.id } as Omit<HarnessEvent, 'seq' | 'at'>);
+			}
+			return { removed: gone.length };
+		}),
 		subscribe: (_afterSeq, handlers) => {
 			listeners.add(handlers);
 			ensureTimers();

@@ -557,6 +557,7 @@ export const api = {
   setHarnessPriority: (task: Pick<HarnessTask, 'id' | 'revision'>, input: { priorityOverride?: number; before?: string }) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/priority`, { method: 'POST', body: JSON.stringify({ ...input, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   startHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, idempotencyKey: string) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/start`, { method: 'POST', body: JSON.stringify({ idempotencyKey, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   dismissHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, reason?: string) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/dismiss`, { method: 'POST', body: JSON.stringify({ reason, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
+  clearHarnessQueue: (workspaceId?: string) => request<{ removed: number }>('/api/harness/queue/clear', { method: 'POST', body: JSON.stringify({ workspaceId }) }, false),
   pollHarnessScouts: () => request<{ started: boolean }>('/api/harness/scout/poll', { method: 'POST' }, false),
   pauseHarnessRole: (role: HarnessRoleId) => request<HarnessRoleHealth>(`/api/harness/roles/${encodeURIComponent(role)}/pause`, { method: 'POST' }, false),
   resumeHarnessRole: (role: HarnessRoleId) => request<HarnessRoleHealth>(`/api/harness/roles/${encodeURIComponent(role)}/resume`, { method: 'POST' }, false),

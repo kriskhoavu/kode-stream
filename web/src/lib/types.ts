@@ -1260,6 +1260,7 @@ export interface HarnessSettings {
 
 export type HarnessEvent =
   | { seq: number; at: string; type: 'task.discovered' | 'task.updated' | 'task.ranked' | 'task.pinned'; task: HarnessTask }
+  | { seq: number; at: string; type: 'task.removed'; taskId: string }
   | { seq: number; at: string; type: 'run.started' | 'run.blocked' | 'run.finished'; run: HarnessRun }
   | { seq: number; at: string; type: 'stage.started' | 'stage.round' | 'stage.finished'; stage: HarnessStage }
   | { seq: number; at: string; type: 'agent.started' | 'agent.progress' | 'agent.finished'; agentRun: HarnessAgentRun }

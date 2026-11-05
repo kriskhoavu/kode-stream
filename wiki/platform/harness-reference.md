@@ -38,6 +38,8 @@ The harness runs as one replica. SQLite has one connection, so code inside a tra
 
 [live] A task a source stops listing goes stale after three successful polls; a done, dismissed or cancelled task never reopens. Evidence: `internal/harness/application/scout/poller.go:23`.
 
+[live] `POST /api/harness/queue/clear` deletes every task no run has touched, discovered, ranked, stale or dismissed, in one workspace or all, and records `task.removed` for each; the next poll adds back what a source still returns. It is the way to drop what an old search query found instead of waiting for three polls. Evidence: `internal/harness/queue.go:212`.
+
 ## Stages
 <!-- chunkId: platform-harness-reference-stages -->
 <!-- keywords: review rounds, gate, qa twice, draft pr, resume -->

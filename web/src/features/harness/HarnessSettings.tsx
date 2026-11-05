@@ -15,7 +15,7 @@ const addableKinds: HarnessSourceKind[] = ['jira', 'github'];
 /** A sensible first query: the workspace's own Jira project, open issues, newest change first. */
 export function defaultSourceQuery(kind: HarnessSourceKind, workspace?: HarnessWorkspaceOption): string {
 	if (kind === 'jira' && workspace?.jiraProjectKey) {
-		return `project = ${workspace.jiraProjectKey} AND statusCategory != Done ORDER BY updated DESC`;
+		return `project = ${workspace.jiraProjectKey} AND sprint in openSprints() AND statusCategory != Done ORDER BY updated DESC`;
 	}
 	return '';
 }
@@ -51,6 +51,8 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 	const [notice, setNotice] = useState('');
 	const [saving, setSaving] = useState(false);
 	const [confirmPause, setConfirmPause] = useState<HarnessRoleHealth | undefined>();
+	const [confirmClear, setConfirmClear] = useState<string | undefined>();
+	const [clearing, setClearing] = useState(false);
 	const [workspaces, setWorkspaces] = useState<HarnessWorkspaceOption[]>([]);
 	const [addKind, setAddKind] = useState<HarnessSourceKind>('jira');
 	const [addWorkspace, setAddWorkspace] = useState('');
@@ -79,6 +81,20 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 	const updatePolicy = (role: HarnessAgentRole, patch: Partial<HarnessRolePolicy>) => update({ modelPolicy: { ...draft.modelPolicy, [role]: { ...draft.modelPolicy[role], ...patch } } });
 	const updateSource = (index: number, patch: Partial<HarnessSourceSettings>) => update({ sources: draft.sources.map((source, position) => position === index ? { ...source, ...patch } : source) });
 	const removeSource = (index: number) => update({ sources: draft.sources.filter((_, position) => position !== index) });
+	const clearQueue = async (workspaceId: string) => {
+		setConfirmClear(undefined);
+		setClearing(true);
+		setError('');
+		try {
+			const { removed } = await client.clearQueue(workspaceId);
+			setNotice(removed === 0 ? 'The queue had nothing to clear.' : `Cleared ${plural(removed, 'task')} from the queue. The Finder adds back what it still finds.`);
+			onSaved();
+		} catch (caught) {
+			setError(plainError(caught, 'The queue could not be cleared.'));
+		} finally {
+			setClearing(false);
+		}
+	};
 	const engines = status?.engines ?? [];
 	const roles = new Map((status?.roles ?? []).map((role) => [role.role, role]));
 	const workspaceNames = new Map(workspaces.map((workspace) => [workspace.id, workspace.name]));
@@ -175,7 +191,7 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 				<div className="hx-sources">
 					{draft.sources.length === 0 && <p className="hx-muted">No sources yet. Add one below.</p>}
 					{draft.sources.map((source, index) => (
-						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} workspaceName={workspaceNames.get(source.workspaceId)} now={now} onChange={(patch) => updateSource(index, patch)} onRemove={() => removeSource(index)} />
+						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} workspaceName={workspaceNames.get(source.workspaceId)} now={now} onChange={(patch) => updateSource(index, patch)} onRemove={() => removeSource(index)} onClear={() => setConfirmClear(source.workspaceId)} clearing={clearing} />
 					))}
 				</div>
 				<form className="hx-add-source" aria-label="Add a source" onSubmit={(event) => { event.preventDefault(); addSource(); }}>
@@ -221,6 +237,16 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 				<span role="status" className="hx-muted">{notice}</span>
 				{error && <p className="hx-banner" role="alert">{error} <button type="button" className="hx-link" onClick={load}>Reload</button></p>}
 			</div>
+
+			{confirmClear !== undefined && (
+				<ConfirmDialog
+					title={`Clear the queue for ${workspaceNames.get(confirmClear) ?? confirmClear}?`}
+					message="Every task that has not started yet is deleted from the queue, including stale and dismissed ones. Work that is running, waiting on you or done stays. The Finder adds back whatever its search still returns on its next look."
+					confirmLabel="Clear the queue"
+					onCancel={() => setConfirmClear(undefined)}
+					onConfirm={() => void clearQueue(confirmClear)}
+				/>
+			)}
 
 			{confirmPause && (
 				<ConfirmDialog
@@ -269,7 +295,7 @@ function ModelInput({ label, value, hideLabel = false, onChange }: { label: stri
 	);
 }
 
-function SourceRow({ source, workspaceName, now, onChange, onRemove }: { source: HarnessSourceSettings; workspaceName?: string; now: number; onChange: (patch: Partial<HarnessSourceSettings>) => void; onRemove: () => void }) {
+function SourceRow({ source, workspaceName, now, onChange, onRemove, onClear, clearing }: { source: HarnessSourceSettings; workspaceName?: string; now: number; onChange: (patch: Partial<HarnessSourceSettings>) => void; onRemove: () => void; onClear: () => void; clearing: boolean }) {
 	const checked = source.lastCheckedAt ? `Looked ${formatAgo(source.lastCheckedAt, now)}${source.lastFound !== undefined ? ` · ${source.lastFound} new` : ''}` : 'Not looked yet';
 	const queryLabel = source.kind === 'jira' ? 'Jira search (JQL)' : source.kind === 'github' ? 'Repository (owner/name)' : 'Repository (workspace/name)';
 	return (
@@ -278,6 +304,7 @@ function SourceRow({ source, workspaceName, now, onChange, onRemove }: { source:
 				<span><Workflow size={14} aria-hidden="true" /> <b>{sourceLabels[source.kind]}</b> <span className="hx-muted">· {workspaceName ?? source.workspaceId}</span></span>
 				<span className="hx-muted">{checked}</span>
 				<label className="hx-inline-switch"><input type="checkbox" role="switch" checked={source.enabled} onChange={(event) => onChange({ enabled: event.target.checked })} /> Look here</label>
+				<button type="button" className="ghost" disabled={clearing} onClick={onClear} aria-label={`Clear the queue for ${workspaceName ?? source.workspaceId}`}>{clearing ? 'Clearing…' : 'Clear the queue'}</button>
 				<button type="button" className="ghost" onClick={onRemove} aria-label={`Remove ${sourceLabels[source.kind]} for ${workspaceName ?? source.workspaceId}`}>Remove</button>
 			</div>
 			{source.lastError && <p className="hx-banner" role="alert">{source.lastError}</p>}

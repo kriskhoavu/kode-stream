@@ -123,6 +123,12 @@ function applyEvent(state: HarnessState, event: HarnessEvent): HarnessState {
 		case 'task.pinned':
 			next.tasks = { ...next.tasks, [event.task.id]: event.task };
 			return next;
+		case 'task.removed': {
+			if (!(event.taskId in next.tasks)) return next;
+			const { [event.taskId]: _gone, ...tasks } = next.tasks;
+			next.tasks = tasks;
+			return next;
+		}
 		case 'run.started':
 		case 'run.blocked':
 		case 'run.finished': {

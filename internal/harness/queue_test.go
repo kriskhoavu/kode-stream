@@ -114,6 +114,45 @@ func TestPinPriorityDismissAndStartChangeTheQueue(t *testing.T) {
 	}
 }
 
+func TestClearQueueDeletesTasksNoRunTouchedAndTheFinderRefillsIt(t *testing.T) {
+	ctx := context.Background()
+	service, repository := newQueueService(t, jiraCandidate("PM-1", "Low"), jiraCandidate("PM-2", "High"))
+	if _, err := service.PollNow(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	low, _, _ := repository.FindTaskBySource(ctx, domain.SourceJira, "PM-1")
+	if _, err := service.DismissTask(ctx, low.ID, "not now", low.Revision, domain.Actor{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ClearQueue(ctx, "other", domain.Actor{}); !IsInvalid(err) {
+		t.Fatalf("unknown workspace err = %v", err)
+	}
+	removed, err := service.ClearQueue(ctx, "ws", domain.Actor{ActorID: "local"})
+	if err != nil || removed != 2 {
+		t.Fatalf("removed = %d err = %v", removed, err)
+	}
+	if left, _ := repository.ListTasks(ctx, domain.TaskFilter{}); len(left) != 0 {
+		t.Fatalf("tasks left = %#v", left)
+	}
+	events, _ := repository.EventsAfter(ctx, 0, 100)
+	gone := 0
+	for _, event := range events {
+		if event.Kind == domain.EventTaskRemoved {
+			gone++
+		}
+	}
+	if gone != 2 {
+		t.Fatalf("task.removed events = %d", gone)
+	}
+	if _, err := service.PollNow(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	back, _ := repository.ListTasks(ctx, domain.TaskFilter{})
+	if len(back) != 2 || back[0].State == domain.TaskDismissed || back[1].State == domain.TaskDismissed {
+		t.Fatalf("after poll = %#v", back)
+	}
+}
+
 func TestPausingARoleIsRecordedAndReported(t *testing.T) {
 	ctx := context.Background()
 	service, _ := newQueueService(t)

@@ -274,6 +274,23 @@ func (a *harnessController) startTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
 }
 
+type harnessClearRequest struct {
+	WorkspaceID string `json:"workspaceId"`
+}
+
+func (a *harnessController) clearQueue(w http.ResponseWriter, r *http.Request) {
+	var request harnessClearRequest
+	if r.ContentLength != 0 && !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	removed, err := a.harness.ClearQueue(r.Context(), request.WorkspaceID, harnessActor(r))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"removed": removed})
+}
+
 type harnessPollRequest struct {
 	WorkspaceID string `json:"workspaceId"`
 }

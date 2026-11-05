@@ -32,6 +32,15 @@ describe('harness reducer', () => {
 		expect(fresh.lastSeq).toBe(11);
 	});
 
+	it('drops a task the harness removed, and ignores one it never held', () => {
+		const state = loaded();
+		const removed = harnessReducer(state, { type: 'event', event: { seq: 11, at: '', type: 'task.removed', taskId: 'task-A' } });
+		expect(removed.tasks['task-A']).toBeUndefined();
+		expect(removed.lastSeq).toBe(11);
+		const unknown = harnessReducer(removed, { type: 'event', event: { seq: 12, at: '', type: 'task.removed', taskId: 'task-nobody' } });
+		expect(unknown.tasks).toBe(removed.tasks);
+	});
+
 	it('announces a new approval assertively and a finished stage politely', () => {
 		let state = loaded();
 		state = harnessReducer(state, { type: 'event', event: { seq: 11, at: '', type: 'approval.requested', approval: approval('ap-2', 'task-A', { gate: 'draft_pr' }) } });

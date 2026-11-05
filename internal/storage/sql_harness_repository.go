@@ -229,6 +229,30 @@ func (r *SQLHarnessRepository) SaveTask(ctx context.Context, task domain.Task, e
 	return task, err
 }
 
+func (r *SQLHarnessRepository) DeleteTasks(ctx context.Context, filter domain.TaskFilter) ([]domain.Task, error) {
+	removed := []domain.Task{}
+	for {
+		batch, err := r.ListTasks(ctx, domain.TaskFilter{WorkspaceID: filter.WorkspaceID, States: filter.States, Limit: 1000})
+		if err != nil {
+			return removed, err
+		}
+		if len(batch) == 0 {
+			return removed, nil
+		}
+		ids := make([]string, 0, len(batch))
+		for _, task := range batch {
+			ids = append(ids, task.ID)
+		}
+		if _, err := r.exec(ctx, `DELETE FROM harness_tasks WHERE id IN `+inClause(len(ids)), stringArgs(ids)...); err != nil {
+			return removed, err
+		}
+		removed = append(removed, batch...)
+		if len(batch) < 1000 {
+			return removed, nil
+		}
+	}
+}
+
 // --- runs ---
 
 func (r *SQLHarnessRepository) InsertRun(ctx context.Context, run domain.Run) error {

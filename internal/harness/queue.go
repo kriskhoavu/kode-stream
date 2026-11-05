@@ -205,6 +205,36 @@ func (s *Service) DismissTask(ctx context.Context, id, reason string, expectedRe
 	})
 }
 
+// ClearQueue deletes every task that no run has touched: discovered, ranked,
+// stale and dismissed ones, in one workspace or all. The Finder adds back
+// whatever its sources still return on the next poll, so this is the way to
+// drop what an old query found rather than waiting for it to go stale.
+func (s *Service) ClearQueue(ctx context.Context, workspaceID string, actor domain.Actor) (int, error) {
+	if err := s.mutable(); err != nil {
+		return 0, err
+	}
+	if workspaceID != "" {
+		if _, ok := s.settingsNow(ctx).Workspace(workspaceID); !ok {
+			return 0, domain.Invalid("workspace %s has no harness sources", workspaceID)
+		}
+	}
+	removed := 0
+	err := s.atomic(ctx, func(tx domain.Repository, record func(domain.Event) error) error {
+		tasks, err := tx.DeleteTasks(ctx, domain.TaskFilter{WorkspaceID: workspaceID, States: []domain.TaskState{domain.TaskDiscovered, domain.TaskRanked, domain.TaskStale, domain.TaskDismissed}})
+		if err != nil {
+			return err
+		}
+		removed = len(tasks)
+		for _, task := range tasks {
+			if err := record(domain.Event{Kind: domain.EventTaskRemoved, TaskID: task.ID, Actor: actorOrNil(actor), Payload: payload(map[string]any{"sourceKey": task.Source.Key, "title": boundedText(task.Title, 200), "state": task.State})}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return removed, err
+}
+
 // StartTask records a person's start approval. The dispatcher takes the task
 // on its next cycle; with autoStart off this is the only way work begins.
 // Replaying the same idempotency key returns the task unchanged.

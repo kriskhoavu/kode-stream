@@ -566,6 +566,8 @@ func (s *Service) DashboardEvent(ctx context.Context, event domain.Event) (map[s
 			return nil, false
 		}
 		out["task"] = dashboardTask(task)
+	case domain.EventTaskRemoved:
+		out["taskId"] = event.TaskID
 	case domain.EventRunStarted, domain.EventRunBlocked, domain.EventRunFinished:
 		run, err := s.repository.GetRun(ctx, event.RunID)
 		if err != nil {

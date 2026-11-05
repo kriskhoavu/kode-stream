@@ -466,6 +466,7 @@ const (
 	EventTaskUpdated        EventKind = "task.updated"
 	EventTaskRanked         EventKind = "task.ranked"
 	EventTaskPinned         EventKind = "task.pinned"
+	EventTaskRemoved        EventKind = "task.removed"
 	EventRunStarted         EventKind = "run.started"
 	EventRunBlocked         EventKind = "run.blocked"
 	EventRunFinished        EventKind = "run.finished"

@@ -68,7 +68,7 @@ describe('HarnessSettings', () => {
 		fireEvent.change(within(form).getByRole('combobox', { name: 'Look in' }), { target: { value: 'jira' } });
 		fireEvent.click(within(form).getByRole('button', { name: 'Add source' }));
 		expect(screen.getByRole('status')).toHaveTextContent('Added. Save to let the Finder look there.');
-		expect(screen.getByDisplayValue('project = DOC AND statusCategory != Done ORDER BY updated DESC')).toBeInTheDocument();
+		expect(screen.getByDisplayValue('project = DOC AND sprint in openSprints() AND statusCategory != Done ORDER BY updated DESC')).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved.'));
 		const sources = (await client.settings()).sources;
@@ -83,6 +83,21 @@ describe('HarnessSettings', () => {
 		fireEvent.change(within(form).getByRole('combobox', { name: 'Workspace' }), { target: { value: 'airship' } });
 		expect(within(form).getByRole('button', { name: 'Add source' })).toBeDisabled();
 		expect(form).toHaveTextContent('Jira is already set for this workspace.');
+	});
+
+	it('clears a workspace queue after a confirmation and says how many tasks went', async () => {
+		const { client, onSaved } = await setup();
+		const before = (await client.tasks()).filter((task) => task.workspaceId === 'airship' && (task.state === 'ranked' || task.state === 'discovered' || task.state === 'stale' || task.state === 'dismissed')).length;
+		expect(before).toBeGreaterThan(0);
+		fireEvent.click(screen.getAllByRole('button', { name: 'Clear the queue for Airship' })[0]);
+		const dialog = await screen.findByRole('dialog');
+		expect(within(dialog).getByText(/Work that is running, waiting on you or done stays/)).toBeInTheDocument();
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Clear the queue' }));
+		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(`Cleared ${before} tasks from the queue`));
+		expect(onSaved).toHaveBeenCalled();
+		const after = await client.tasks();
+		expect(after.filter((task) => task.workspaceId === 'airship' && task.state === 'ranked')).toHaveLength(0);
+		expect(after.some((task) => task.workspaceId === 'airship' && task.state === 'running')).toBe(true);
 	});
 
 	it('removes a source and names workspaces by their name', async () => {

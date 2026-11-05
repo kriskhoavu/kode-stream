@@ -90,6 +90,8 @@ type Repository interface {
 	FindTaskBySource(ctx context.Context, kind SourceKind, key string) (Task, bool, error)
 	ListTasks(ctx context.Context, filter TaskFilter) ([]Task, error)
 	SaveTask(ctx context.Context, task Task, expect Expect) (Task, error)
+	// DeleteTasks removes every task the filter matches and returns them.
+	DeleteTasks(ctx context.Context, filter TaskFilter) ([]Task, error)
 
 	InsertRun(ctx context.Context, run Run) error
 	GetRun(ctx context.Context, id string) (Run, error)
