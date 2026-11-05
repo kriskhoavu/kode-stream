@@ -44,3 +44,18 @@ func TestGitHubAdapterOpensADraftThroughRESTOrTheCLI(t *testing.T) {
 		t.Fatalf("cli url = %q args=%v err=%v", url, args, err)
 	}
 }
+
+func TestGitHubRepoFallsBackToTheCheckoutOrigin(t *testing.T) {
+	adapter := &Adapter{RemoteURL: func(path string) (string, error) { return "ssh://git@github.com/acme/app.git", nil }}
+	byPath := models.WorkspaceConfig{ID: "ws", Path: "/tmp/app"}
+	if !adapter.Supports(byPath, domain.WorkspaceSettings{}) || adapter.repo(byPath, domain.WorkspaceSettings{}) != "acme/app" {
+		t.Fatal("the checkout origin must name the repository")
+	}
+	if (&Adapter{}).Supports(byPath, domain.WorkspaceSettings{}) {
+		t.Fatal("without a reader, a path alone names nothing")
+	}
+	other := &Adapter{RemoteURL: func(string) (string, error) { return "ssh://git@bitbucket.example.com:7999/proj/app.git", nil }}
+	if other.Supports(byPath, domain.WorkspaceSettings{}) {
+		t.Fatal("a Bitbucket origin is not a GitHub repository")
+	}
+}

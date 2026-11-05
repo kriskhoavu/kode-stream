@@ -107,7 +107,7 @@ func NewServer(port int) (*Server, error) {
 		Engines:      []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath), harnesscodex.New(), harnessopencode.New()},
 		Reranker:     harnessranker.New(),
 		Worktrees:    harnessworktree.New(harnessConfig.WorktreeRoot, git),
-		PullRequests: []ports.PullRequests{harnessprgithub.New(), harnessprbitbucket.New()},
+		PullRequests: harnessPullRequests(git),
 		Audit:        auditStore,
 		Notifier:     harnessNotifier,
 		RuntimeVerifyCommand: func(config *models.WorkspaceRuntimeConfig) string {
@@ -252,4 +252,15 @@ func deprecatedSPAPath(path string) bool {
 		strings.HasPrefix(path, "/workbench/") ||
 		path == "/workspace" ||
 		strings.HasPrefix(path, "/workspace/")
+}
+
+// harnessPullRequests opens pull requests where the workspace's checkout
+// points: GitHub or Bitbucket, read from its origin when the registry holds
+// no remote.
+func harnessPullRequests(git *appgit.GitAdapter) []ports.PullRequests {
+	github := harnessprgithub.New()
+	github.RemoteURL = git.RemoteURL
+	bitbucket := harnessprbitbucket.New()
+	bitbucket.RemoteURL = git.RemoteURL
+	return []ports.PullRequests{github, bitbucket}
 }

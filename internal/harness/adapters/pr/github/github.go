@@ -26,6 +26,9 @@ type Adapter struct {
 	Tokens     credential.Resolver
 	// GH runs the gh CLI in dir; nil means exec.
 	GH func(ctx context.Context, dir string, args ...string) (string, error)
+	// RemoteURL reads a checkout's origin for a workspace registered by path
+	// alone; nil means only the registered remote and the settings count.
+	RemoteURL func(path string) (string, error)
 }
 
 func New() *Adapter {
@@ -47,12 +50,28 @@ func Repo(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) s
 	return ""
 }
 
+// repo is Repo with one more fallback: the origin of the checkout at the
+// workspace's path, for a workspace registered without a remote.
+func (a *Adapter) repo(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) string {
+	if repo := Repo(workspace, settings); repo != "" {
+		return repo
+	}
+	if a.RemoteURL == nil || workspace.Path == "" {
+		return ""
+	}
+	origin, err := a.RemoteURL(workspace.Path)
+	if err != nil {
+		return ""
+	}
+	return Repo(models.WorkspaceConfig{RemoteURL: origin}, domain.WorkspaceSettings{})
+}
+
 func (a *Adapter) Supports(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) bool {
-	return Repo(workspace, settings) != ""
+	return a.repo(workspace, settings) != ""
 }
 
 func (a *Adapter) CreateDraft(ctx context.Context, request ports.PullRequest) (string, error) {
-	repo := Repo(request.Workspace, request.Settings)
+	repo := a.repo(request.Workspace, request.Settings)
 	if repo == "" {
 		return "", fmt.Errorf("workspace %s has no GitHub repository", request.Workspace.ID)
 	}

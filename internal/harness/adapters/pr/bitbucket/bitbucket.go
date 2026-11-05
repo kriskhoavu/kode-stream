@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -24,6 +25,74 @@ type Adapter struct {
 	CloudURL   string
 	HTTPClient *http.Client
 	Tokens     credential.Resolver
+	// RemoteURL reads a checkout's origin; nil means only the registered
+	// remote and the settings are consulted.
+	RemoteURL func(path string) (string, error)
+}
+
+const defaultTokenEnvVar = "BITBUCKET_TOKEN"
+
+// Target names where the pull request goes: the settings' Bitbucket entry when
+// it is complete, else the workspace's origin when that is a Bitbucket host.
+// bitbucket.org is Cloud (workspace/repo); any other Bitbucket host is Server
+// (project/repo under https://host).
+func (a *Adapter) Target(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) (domain.BitbucketSourceSettings, bool) {
+	if config := settings.Bitbucket; config != nil && config.Workspace != "" && config.Repo != "" && (config.Cloud || config.BaseURL != "") {
+		out := *config
+		if out.TokenEnvVar == "" {
+			out.TokenEnvVar = defaultTokenEnvVar
+		}
+		return out, true
+	}
+	remote := strings.TrimSpace(workspace.RemoteURL)
+	if remote == "" && a.RemoteURL != nil && workspace.Path != "" {
+		if origin, err := a.RemoteURL(workspace.Path); err == nil {
+			remote = strings.TrimSpace(origin)
+		}
+	}
+	target, ok := ParseRemote(remote)
+	if !ok {
+		return domain.BitbucketSourceSettings{}, false
+	}
+	if config := settings.Bitbucket; config != nil && config.TokenEnvVar != "" {
+		target.TokenEnvVar = config.TokenEnvVar
+	}
+	return target, true
+}
+
+var (
+	sshRemote   = regexp.MustCompile(`^ssh://(?:[^@/]+@)?([^/:]+)(?::\d+)?/(.+)$`)
+	scpRemote   = regexp.MustCompile(`^(?:[^@/]+@)?([^/:]+):(.+)$`)
+	httpsRemote = regexp.MustCompile(`^https?://(?:[^@/]+@)?([^/:]+)(?::\d+)?/(.+)$`)
+)
+
+// ParseRemote turns a git origin into a Bitbucket target. It accepts the three
+// shapes git uses (ssh://, scp-like and https) and Bitbucket Server's /scm/
+// prefix on https clones; a host that is not Bitbucket answers false.
+func ParseRemote(remote string) (domain.BitbucketSourceSettings, bool) {
+	var host, path string
+	for _, pattern := range []*regexp.Regexp{sshRemote, httpsRemote, scpRemote} {
+		if match := pattern.FindStringSubmatch(remote); match != nil {
+			host, path = strings.ToLower(match[1]), match[2]
+			break
+		}
+	}
+	if host == "" || !strings.Contains(host, "bitbucket") {
+		return domain.BitbucketSourceSettings{}, false
+	}
+	path = strings.TrimSuffix(strings.Trim(path, "/"), ".git")
+	path = strings.TrimPrefix(path, "scm/")
+	parts := strings.Split(path, "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return domain.BitbucketSourceSettings{}, false
+	}
+	target := domain.BitbucketSourceSettings{Workspace: parts[0], Repo: parts[1], TokenEnvVar: defaultTokenEnvVar}
+	if host == "bitbucket.org" {
+		target.Cloud = true
+	} else {
+		target.BaseURL = "https://" + host
+	}
+	return target, true
 }
 
 func New() *Adapter {
@@ -32,15 +101,17 @@ func New() *Adapter {
 
 func (a *Adapter) ID() string { return "bitbucket" }
 
-func (a *Adapter) Supports(_ models.WorkspaceConfig, settings domain.WorkspaceSettings) bool {
-	return settings.Bitbucket != nil && settings.Bitbucket.Workspace != "" && settings.Bitbucket.Repo != "" && (settings.Bitbucket.Cloud || settings.Bitbucket.BaseURL != "")
+func (a *Adapter) Supports(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) bool {
+	_, ok := a.Target(workspace, settings)
+	return ok
 }
 
 func (a *Adapter) CreateDraft(ctx context.Context, request ports.PullRequest) (string, error) {
-	config := request.Settings.Bitbucket
-	if config == nil {
-		return "", fmt.Errorf("workspace %s has no Bitbucket repository", request.Workspace.ID)
+	target, ok := a.Target(request.Workspace, request.Settings)
+	if !ok {
+		return "", fmt.Errorf("workspace %s has no Bitbucket repository: its origin is not a Bitbucket host and Harness settings name none", request.Workspace.ID)
 	}
+	config := &target
 	token, err := a.Tokens.Resolve(config.TokenEnvVar)
 	if err != nil {
 		return "", err

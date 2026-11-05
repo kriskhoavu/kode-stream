@@ -45,3 +45,47 @@ func TestBitbucketAdapterOpensCloudDraftsAndServerDraftTitles(t *testing.T) {
 		t.Fatalf("server url = %q err=%v body=%#v", url, err, bodies[1])
 	}
 }
+
+func TestBitbucketTargetComesFromTheOriginWhenSettingsNameNone(t *testing.T) {
+	cases := []struct {
+		remote    string
+		workspace string
+		repo      string
+		baseURL   string
+		cloud     bool
+	}{
+		{"ssh://git@bitbucket.example.com:7999/proj/app.git", "proj", "app", "https://bitbucket.example.com", false},
+		{"https://user@bitbucket.example.com/scm/proj/app.git", "proj", "app", "https://bitbucket.example.com", false},
+		{"git@bitbucket.org:team/app.git", "team", "app", "", true},
+		{"https://bitbucket.org/team/app", "team", "app", "", true},
+	}
+	for _, c := range cases {
+		target, ok := ParseRemote(c.remote)
+		if !ok || target.Workspace != c.workspace || target.Repo != c.repo || target.BaseURL != c.baseURL || target.Cloud != c.cloud || target.TokenEnvVar != "BITBUCKET_TOKEN" {
+			t.Fatalf("%s -> %#v ok=%v", c.remote, target, ok)
+		}
+	}
+	for _, remote := range []string{"", "git@github.com:acme/app.git", "ssh://git@bitbucket.example.com/onlyproject", "https://example.com/proj/app.git"} {
+		if _, ok := ParseRemote(remote); ok {
+			t.Fatalf("%q must not parse as Bitbucket", remote)
+		}
+	}
+
+	adapter := &Adapter{RemoteURL: func(path string) (string, error) { return "ssh://git@bitbucket.example.com:7999/proj/app.git", nil }}
+	byPath := models.WorkspaceConfig{ID: "ws", Path: "/tmp/app"}
+	target, ok := adapter.Target(byPath, domain.WorkspaceSettings{})
+	if !ok || target.BaseURL != "https://bitbucket.example.com" || target.Workspace != "proj" || !adapter.Supports(byPath, domain.WorkspaceSettings{}) {
+		t.Fatalf("origin read from the checkout: %#v ok=%v", target, ok)
+	}
+	target, _ = adapter.Target(byPath, domain.WorkspaceSettings{Bitbucket: &domain.BitbucketSourceSettings{TokenEnvVar: "BB_SERVER"}})
+	if target.TokenEnvVar != "BB_SERVER" {
+		t.Fatalf("a settings token name must win: %#v", target)
+	}
+	registered := models.WorkspaceConfig{ID: "ws", RemoteURL: "git@bitbucket.org:team/app.git"}
+	if target, ok := (&Adapter{}).Target(registered, domain.WorkspaceSettings{}); !ok || !target.Cloud || target.Workspace != "team" {
+		t.Fatalf("registered remote: %#v ok=%v", target, ok)
+	}
+	if (&Adapter{}).Supports(models.WorkspaceConfig{ID: "ws", RemoteURL: "git@github.com:acme/app.git"}, domain.WorkspaceSettings{}) {
+		t.Fatal("a GitHub origin is not a Bitbucket target")
+	}
+}
