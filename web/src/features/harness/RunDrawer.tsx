@@ -257,7 +257,7 @@ function LiveTab({ client, agentRuns, onReload }: { client: HarnessClient; agent
 				<div className="hx-live-rounds" role="tablist" aria-label="Agent rounds">
 					{rounds.map((agentRun) => (
 						<button key={agentRun.id} type="button" role="tab" aria-selected={agentRun.id === selected.id} className={agentRun.id === selected.id ? 'on' : undefined} onClick={() => setChosen(agentRun.id)}>
-							<HxStatusBadge status={agentStatus(agentRun)} size="sm" label={`${agentRoleLabels[agentRun.role]} · round ${agentRun.round}${agentRun.attempt > 1 ? ` · try ${agentRun.attempt}` : ''}`} />
+							<HxStatusBadge status={agentStatus(agentRun)} size="sm" label={`${agentRoleLabels[agentRun.role]} · round ${agentRun.round}${(agentRun.attempt ?? 1) > 1 ? ` · try ${agentRun.attempt}` : ''}`} />
 						</button>
 					))}
 				</div>

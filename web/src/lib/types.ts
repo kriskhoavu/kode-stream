@@ -1117,6 +1117,8 @@ export interface HarnessAgentRun {
   stageId: string;
   role: HarnessAgentRole;
   round: number;
+  /** The try within the round; a run interrupted or without a report is tried again. */
+  attempt?: number;
   engine: HarnessEngineId;
   model: string;
   state: HarnessAgentRunState;
