@@ -153,6 +153,7 @@ func routeManifest(a *API) []routeSpec {
 		{http.MethodGet, "/items/:id/files/:fileID", "item", protectedRoute, a.item.route(a.item.itemFileContent)},
 		{http.MethodGet, "/items/:id/diff", "item", protectedRoute, a.item.route(a.item.itemDiff)},
 		{http.MethodGet, "/workspaces/:id/jira/issues/:issueKey", "jira", protectedRoute, ginHTTPHandler(a.jira.workspaceJiraIssue)},
+		{http.MethodGet, "/workspaces/:id/jira/issues/:issueKey/attachments/:attachmentId", "jira", protectedRoute, ginHTTPHandler(a.jira.workspaceJiraAttachment)},
 		{http.MethodPost, "/workspaces", "workspace", protectedRoute, a.workspace.route(a.workspace.createWorkspace)},
 		{http.MethodPost, "/workspaces/import-preview", "workspace", protectedRoute, a.workspace.route(a.workspace.previewWorkspaceImport)},
 		{http.MethodPost, "/workspaces/import", "workspace", protectedRoute, a.workspace.route(a.workspace.importWorkspaces)},

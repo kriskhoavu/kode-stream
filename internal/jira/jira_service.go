@@ -267,18 +267,9 @@ func (s *Service) Attachment(ctx context.Context, itemID, attachmentID string) (
 	if err != nil {
 		return AttachmentContent{}, err
 	}
-	if state.State != "available" || state.Issue == nil {
-		return AttachmentContent{}, errors.New("Jira issue is unavailable")
-	}
-	var attachment *Attachment
-	for index := range state.Issue.Attachments {
-		if state.Issue.Attachments[index].ID == attachmentID {
-			attachment = &state.Issue.Attachments[index]
-			break
-		}
-	}
-	if attachment == nil {
-		return AttachmentContent{}, errors.New("Jira attachment does not belong to this issue")
+	attachment, err := issueAttachment(state, attachmentID)
+	if err != nil {
+		return AttachmentContent{}, err
 	}
 	item, found, err := s.index.Get(itemID)
 	if err != nil || !found {
@@ -295,4 +286,37 @@ func (s *Service) Attachment(ctx context.Context, itemID, attachmentID string) (
 		return AttachmentContent{}, errors.New("workspace not found")
 	}
 	return s.client.GetAttachment(ctx, *workspace.Jira, *attachment)
+}
+
+// WorkspaceAttachment serves an attachment of an issue looked up by key in a
+// workspace, for a ticket that is not a Kode Stream item.
+func (s *Service) WorkspaceAttachment(ctx context.Context, workspaceID, issueKey, attachmentID string) (AttachmentContent, error) {
+	state, err := s.WorkspaceIssue(ctx, workspaceID, issueKey, false)
+	if err != nil {
+		return AttachmentContent{}, err
+	}
+	attachment, err := issueAttachment(state, attachmentID)
+	if err != nil {
+		return AttachmentContent{}, err
+	}
+	workspace, found, err := s.registry.Get(workspaceID)
+	if err != nil || !found || workspace.Jira == nil {
+		if err != nil {
+			return AttachmentContent{}, err
+		}
+		return AttachmentContent{}, errors.New("workspace not found")
+	}
+	return s.client.GetAttachment(ctx, *workspace.Jira, *attachment)
+}
+
+func issueAttachment(state IssueState, attachmentID string) (*Attachment, error) {
+	if state.State != "available" || state.Issue == nil {
+		return nil, errors.New("Jira issue is unavailable")
+	}
+	for index := range state.Issue.Attachments {
+		if state.Issue.Attachments[index].ID == attachmentID {
+			return &state.Issue.Attachments[index], nil
+		}
+	}
+	return nil, errors.New("Jira attachment does not belong to this issue")
 }

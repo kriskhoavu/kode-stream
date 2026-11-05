@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, ExternalLink, Pin, PinOff, Play, X } from 'lucide-r
 import type { HarnessAgentRun, HarnessApproval, HarnessTask, SafeSessionRecord, SessionChanges } from '../../lib/types';
 import type { HarnessRunTab } from '../../app/router';
 import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
+import { JiraItemPanel } from '../jira/JiraItemPanel';
 import type { HarnessClient } from './harnessClient';
 import type { HarnessState } from './harnessState';
 import { waitsFor } from './harnessState';
@@ -20,6 +21,7 @@ import { agentRoleLabels, formatCost, hxSteps, modelLabel, plural, sourceLabels,
 const SessionTerminal = lazy(() => import('../ai-session/SessionTerminal').then((module) => ({ default: module.SessionTerminal })));
 
 const tabs: { id: HarnessRunTab; label: string }[] = [
+	{ id: 'ticket', label: 'Ticket' },
 	{ id: 'stages', label: 'Stages' },
 	{ id: 'findings', label: 'Findings' },
 	{ id: 'changes', label: 'Changes' },
@@ -139,6 +141,7 @@ export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClo
 						))}
 					</div>
 					<section className="hx-tab-panel" role="tabpanel" id={`hx-panel-${tab}`} aria-labelledby={`hx-tab-${tab}`}>
+						{tab === 'ticket' && <TicketTab task={task} fixture={Boolean(client.fixture)} />}
 						{tab === 'stages' && (detail ? <PipelineStepper model={pipelineModel(detail, now)} label={`Progress for ${task.source.key}`} orientation="vertical" /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'findings' && (detail ? <FindingsByRound agentRuns={detail.agentRuns} /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'changes' && (runId ? <ChangesTab client={client} runId={runId} agentRun={latestAgentRun(detail?.agentRuns)} /> : <NoRun run={false} />)}
@@ -156,6 +159,23 @@ export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClo
 				</div>
 			</aside>
 		</>
+	);
+}
+
+/** The ticket as its tracker shows it: the Jira panel the Workstream page uses, read by key in the task's workspace. */
+function TicketTab({ task, fixture }: { task: HarnessTask; fixture: boolean }) {
+	if (task.source.kind === 'jira' && !fixture) return <div className="hx-ticket"><JiraItemPanel workspaceId={task.workspaceId} issueKey={task.source.key} /></div>;
+	return (
+		<div className="hx-ticket hx-ticket-summary">
+			<dl>
+				{task.source.status && <><dt>Status</dt><dd>{task.source.status}</dd></>}
+				{task.source.priority && <><dt>Priority</dt><dd>{task.source.priority}</dd></>}
+				{task.source.assignee && <><dt>Assignee</dt><dd>{task.source.assignee}</dd></>}
+				{task.source.labels.length > 0 && <><dt>Labels</dt><dd>{task.source.labels.join(', ')}</dd></>}
+			</dl>
+			{task.source.url && <a href={task.source.url} target="_blank" rel="noreferrer"><ExternalLink size={14} aria-hidden="true" />Open {task.source.key} in {sourceLabels[task.source.kind]}</a>}
+			{fixture && <p className="hx-muted">The sample data has no tracker behind it; a real task shows the whole ticket here.</p>}
+		</div>
 	);
 }
 

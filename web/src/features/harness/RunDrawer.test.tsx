@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import type { HarnessRunTab } from '../../app/router';
@@ -78,6 +78,16 @@ describe('RunDrawer', () => {
 		rerender(<Harnessed state={started} client={client} taskId="task-pm-04" wave={[]} onStart={onStart} />);
 		expect(screen.getByRole('button', { name: 'Starting…' })).toBeDisabled();
 		expect(screen.getByText('Starting soon.')).toBeInTheDocument();
+	});
+
+	it('opens an unstarted task on its ticket, with what the tracker said about it', async () => {
+		const { client, state } = await setup('task-pm-04');
+		render(<Harnessed state={state} client={client} taskId="task-pm-04" wave={[]} initialTab="ticket" />);
+		expect(screen.getByRole('tab', { name: 'Ticket' })).toHaveAttribute('aria-selected', 'true');
+		const panel = screen.getByRole('tabpanel');
+		expect(panel).toHaveTextContent(/Status/);
+		expect(within(panel).getByRole('link', { name: /Open PM-04 in Jira/ })).toBeInTheDocument();
+		expect(panel).toHaveTextContent('The sample data has no tracker behind it');
 	});
 
 	it('hides Start on a task that already has a run', async () => {

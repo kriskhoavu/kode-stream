@@ -78,4 +78,6 @@ Codex runs `codex exec --json` with its sandbox standing in for the permission m
 
 [live] `GET /api/harness/events` replays stored events after `Last-Event-ID`, then streams live ones with a keepalive every 15 seconds; a subscriber that falls behind gets `reset` and refetches. Evidence: `internal/server/api/harness_sse.go:27`.
 
+[live] A task's drawer opens on its Ticket tab, the Workstream page's Jira panel read by key in the task's workspace: `GET /api/workspaces/{id}/jira/issues/{key}` takes `?refresh=1`, and `…/attachments/{attachmentId}` serves an attachment of that issue. The harness stores none of it; a task carries only the tracker's status, priority, assignee and labels. Evidence: `internal/jira/jira_service.go:293`.
+
 The route list and every shape are in the PM-044 backend solution page. The feature itself is [[platform-harness]].

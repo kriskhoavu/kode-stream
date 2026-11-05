@@ -1070,7 +1070,7 @@ func TestWorkspaceJiraIssueRouteRequiresService(t *testing.T) {
 
 func TestItemJiraRoutesRequireService(t *testing.T) {
 	handler := (&API{}).Routes()
-	for _, path := range []string{"/api/items/item-1/jira", "/api/items/item-1/jira/attachments/attachment-1"} {
+	for _, path := range []string{"/api/items/item-1/jira", "/api/items/item-1/jira/attachments/attachment-1", "/api/workspaces/w1/jira/issues/DI-1/attachments/attachment-1"} {
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
 		if response.Code != http.StatusServiceUnavailable {

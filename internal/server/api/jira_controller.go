@@ -27,6 +27,23 @@ func (a *jiraController) jiraAttachment(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	a.serveAttachment(w, content)
+}
+
+func (a *jiraController) workspaceJiraAttachment(w http.ResponseWriter, r *http.Request) {
+	if a.jira == nil {
+		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
+		return
+	}
+	content, err := a.jira.WorkspaceAttachment(r.Context(), r.PathValue("id"), r.PathValue("issueKey"), r.PathValue("attachmentId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	a.serveAttachment(w, content)
+}
+
+func (a *jiraController) serveAttachment(w http.ResponseWriter, content appjira.AttachmentContent) {
 	defer content.Body.Close()
 	filename := sanitizeDownloadName(content.Filename)
 	disposition := "attachment"
@@ -101,7 +118,8 @@ func (a *jiraController) workspaceJiraIssue(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusServiceUnavailable, "Jira integration is unavailable")
 		return
 	}
-	result, err := a.jira.WorkspaceIssue(r.Context(), r.PathValue("id"), r.PathValue("issueKey"), false)
+	refresh := r.URL.Query().Get("refresh") == "1" || r.URL.Query().Get("refresh") == "true"
+	result, err := a.jira.WorkspaceIssue(r.Context(), r.PathValue("id"), r.PathValue("issueKey"), refresh)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			writeError(w, http.StatusNotFound, err.Error())

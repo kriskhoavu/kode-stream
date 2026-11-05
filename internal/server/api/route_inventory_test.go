@@ -21,8 +21,8 @@ func TestRouteManifestMatchesRegisteredAPIInventory(t *testing.T) {
 	}
 
 	manifest := routeManifest(apiHandler)
-	if got := len(manifest); got != 155 {
-		t.Fatalf("API route baseline = %d, want 155", got)
+	if got := len(manifest); got != 156 {
+		t.Fatalf("API route baseline = %d, want 156", got)
 	}
 	expected := make(map[string]routeSpec, len(manifest))
 	owners := map[string]bool{}

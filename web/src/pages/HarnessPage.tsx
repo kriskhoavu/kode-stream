@@ -172,7 +172,7 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 					allTasks={state.tasks}
 					runs={state.runs}
 					pendingIds={pendingIds}
-					onOpenTask={(task) => setQueueDrawer({ taskId: task.id, tab: task.runId ? 'stages' : 'links' })}
+					onOpenTask={(task) => setQueueDrawer({ taskId: task.id, tab: task.runId ? 'stages' : 'ticket' })}
 					onPin={pin}
 					onMove={move}
 					onRefresh={() => void harness.refresh()}

@@ -4,8 +4,8 @@ export type WorkbenchView = 'canvas' | 'sessions';
 export interface CanvasLocation { workspaceId?: string; selectedNodeId?: string; view?: WorkbenchView; }
 export interface ReviewLocation { workspaceId?: string; branch?: string; }
 export type HarnessView = 'inbox' | 'queue' | 'run' | 'approvals' | 'settings';
-export type HarnessRunTab = 'stages' | 'findings' | 'changes' | 'live' | 'links';
-export const harnessRunTabs: readonly HarnessRunTab[] = ['stages', 'findings', 'changes', 'live', 'links'];
+export type HarnessRunTab = 'ticket' | 'stages' | 'findings' | 'changes' | 'live' | 'links';
+export const harnessRunTabs: readonly HarnessRunTab[] = ['ticket', 'stages', 'findings', 'changes', 'live', 'links'];
 export interface HarnessLocation { view: HarnessView; runId?: string; tab?: HarnessRunTab; }
 
 export type Route =

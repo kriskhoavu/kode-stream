@@ -1196,7 +1196,7 @@ a.hx-source:hover {
 .hx-wave {
 	position: relative;
 	z-index: 1;
-	width: 228px;
+	width: 260px;
 	flex: none;
 	display: flex;
 	flex-direction: column;
@@ -1253,9 +1253,9 @@ a.hx-source:hover {
 
 .hx-task {
 	position: relative;
-	height: 74px;
+	min-height: 84px;
 	border: 1px solid var(--line);
-	border-radius: 8px;
+	border-radius: 10px;
 	background: var(--panel);
 	box-shadow: var(--hx-card-shadow);
 }
@@ -1269,9 +1269,9 @@ a.hx-source:hover {
 	width: 100%;
 	height: 100%;
 	display: grid;
-	gap: 3px;
+	gap: 6px;
 	align-content: start;
-	padding: 8px 26px 8px 10px;
+	padding: 10px 30px 10px 12px;
 	border: 0;
 	border-radius: inherit;
 	background: transparent;
@@ -1292,56 +1292,109 @@ a.hx-source:hover {
 	min-width: 0;
 	color: var(--muted);
 	font-size: 11px;
-	font-weight: 700;
+	font-weight: 600;
 }
 
 .hx-task-r1 b {
 	color: var(--text);
 	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .01em;
 	white-space: nowrap;
+}
+
+.hx-task-r1 .hx-source {
+	color: var(--muted);
 }
 
 .hx-task-r1 .hx-source span {
 	display: none;
 }
 
-.hx-task-r1 .hx-badge {
-	margin-left: auto;
+.hx-task-tracker {
 	min-width: 0;
 	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+}
+
+.hx-task-tracker::before {
+	content: "·";
+	margin-right: 6px;
+	color: var(--muted);
+}
+
+.hx-task-r3 .hx-badge {
+	flex: none;
 }
 
 .hx-task-title {
-	font-size: 12px;
-	font-weight: 600;
-	white-space: nowrap;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
 	overflow: hidden;
-	text-overflow: ellipsis;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
 }
 
 .hx-task-r3 {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
 	min-width: 0;
+	margin-top: auto;
 	color: var(--muted);
 	font-size: 11px;
 	font-weight: 600;
 	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
 }
 
 .hx-task-worker {
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
+.hx-task-meta {
+	flex: none;
+	padding: 1px 6px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--muted) 12%, var(--panel));
+	font-weight: 600;
+}
+
+.hx-task-priority {
+	flex: none;
+	color: var(--hx-stopped);
+	font-weight: 700;
+}
+
+.hx-task-avatar {
+	flex: none;
+	margin-left: auto;
+	margin-right: -2px;
+	width: 20px;
+	height: 20px;
+	display: grid;
+	place-items: center;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--accent-text) 16%, var(--panel));
+	color: var(--accent-text);
+	font-size: 9px;
+	font-weight: 800;
+	letter-spacing: .03em;
+}
+
 .hx-critical-word {
+	flex: none;
 	color: var(--hx-path);
 }
 
 .hx-risk {
+	flex: none;
 	color: var(--hx-stopped);
 }
 
@@ -1350,7 +1403,7 @@ a.hx-source:hover {
 }
 
 .hx-task-not_started {
-	opacity: .72;
+	opacity: .8;
 }
 
 .hx-task-not_started:hover,
@@ -1382,8 +1435,8 @@ a.hx-source:hover {
 
 .hx-task-pin {
 	position: absolute;
-	top: 30px;
-	right: 4px;
+	top: 8px;
+	right: 6px;
 	width: 22px;
 	height: 22px;
 	display: grid;
@@ -1501,6 +1554,42 @@ a.hx-source:hover {
 
 .hx-tab-panel {
 	min-height: 0;
+}
+
+/* The Ticket tab hosts the shell's Jira panel; its own padding is the drawer's. */
+.hx-ticket .jira-item-panel,
+.hx-ticket .jira-panel-state {
+	padding: 0;
+}
+
+.hx-ticket-summary {
+	display: grid;
+	gap: 12px;
+	font-size: 13px;
+}
+
+.hx-ticket-summary dl {
+	margin: 0;
+	display: grid;
+	grid-template-columns: minmax(70px, auto) 1fr;
+	gap: 6px 10px;
+}
+
+.hx-ticket-summary dt {
+	color: var(--muted);
+}
+
+.hx-ticket-summary dd {
+	margin: 0;
+}
+
+.hx-ticket-summary a {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--accent-text);
+	font-weight: 600;
+	text-decoration: none;
 }
 
 .hx-findings-rounds {
@@ -1828,7 +1917,7 @@ a.hx-source:hover {
 
 .hx-task-working::after {
 	inset: -3px;
-	border-radius: 10px;
+	border-radius: 12px;
 }
 
 .hx-stage.just-done {

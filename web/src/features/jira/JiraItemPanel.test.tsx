@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../shared/api';
 import { JiraItemPanel } from './JiraItemPanel';
 
-vi.mock('../../shared/api', () => ({ api: { jiraIssue: vi.fn(), refreshJiraIssue: vi.fn(), jiraAttachmentURL: (itemId:string,id:string)=>`/api/items/${itemId}/jira/attachments/${id}` } }));
+vi.mock('../../shared/api', () => ({ api: { jiraIssue: vi.fn(), refreshJiraIssue: vi.fn(), workspaceJiraIssue: vi.fn(), refreshWorkspaceJiraIssue: vi.fn(), jiraAttachmentURL: (itemId:string,id:string)=>`/api/items/${itemId}/jira/attachments/${id}`, workspaceJiraAttachmentURL: (workspaceId:string,key:string,id:string)=>`/api/workspaces/${workspaceId}/jira/issues/${key}/attachments/${id}` } }));
 
 describe('JiraItemPanel', () => {
   afterEach(() => vi.clearAllMocks());
@@ -18,6 +18,17 @@ describe('JiraItemPanel', () => {
     expect(screen.queryByRole('link',{name:'Open spec.pdf'})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Attachments/ }));
     expect(screen.getByRole('link',{name:'Open spec.pdf'})).toHaveAttribute('href','/api/items/item-1/jira/attachments/9');
+  });
+  it('reads a ticket by key in a workspace, with attachments served from that route', async () => {
+    vi.mocked(api.workspaceJiraIssue).mockResolvedValue({ state:'available', issue:{ key:'APP-562', summary:'Articles not shown', status:'In Progress', statusCategory:'indeterminate', description:'Surcharge rows vanish.', issueType:'Bug', labels:[], browserUrl:'https://jira/browse/APP-562', attachments:[{id:'3',filename:'offer.pdf',mediaType:'application/pdf',sizeBytes:100,author:{displayName:'Kim'}}] } });
+    render(<JiraItemPanel workspaceId="ws-1" issueKey="APP-562" />);
+    expect(await screen.findByText('Articles not shown')).toBeInTheDocument();
+    expect(api.workspaceJiraIssue).toHaveBeenCalledWith('ws-1', 'APP-562', expect.any(AbortSignal));
+    expect(api.jiraIssue).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Attachments/ }));
+    expect(screen.getByRole('link',{name:'Open offer.pdf'})).toHaveAttribute('href','/api/workspaces/ws-1/jira/issues/APP-562/attachments/3');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh Jira ticket' }));
+    await waitFor(() => expect(api.refreshWorkspaceJiraIssue).toHaveBeenCalledWith('ws-1', 'APP-562', expect.any(AbortSignal)));
   });
   it('loads image thumbnails only after attachments expand', async () => {
     vi.mocked(api.jiraIssue).mockResolvedValue({ state:'available', issue:{ key:'DI-171', summary:'Screenshot', status:'Open', description:'', issueType:'Bug', labels:[], browserUrl:'https://jira/browse/DI-171', attachments:[{id:'10',filename:'screen.png',mediaType:'image/png',sizeBytes:4096,author:{displayName:'Kim'}}] } });

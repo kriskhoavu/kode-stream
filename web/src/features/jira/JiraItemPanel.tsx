@@ -3,10 +3,16 @@ import { useState } from 'react';
 import { api } from '../../shared/api';
 import { MarkdownPreview } from '../content-viewer/renderers/MarkdownPreview';
 import { useJiraIssue } from './useJiraIssue';
+import type { JiraIssueSource } from './useJiraIssue';
 
-export function JiraItemPanel({ itemId }: { itemId: string }) {
+type JiraItemPanelProps = { itemId: string; workspaceId?: undefined; issueKey?: undefined } | { itemId?: undefined; workspaceId: string; issueKey: string };
+
+/** A Jira ticket, read through a Kode Stream item or by key in a workspace. */
+export function JiraItemPanel(props: JiraItemPanelProps) {
+  const source: JiraIssueSource = props.itemId !== undefined ? { itemId: props.itemId } : { workspaceId: props.workspaceId, issueKey: props.issueKey };
+  const attachmentURL = (attachmentId: string) => 'itemId' in source ? api.jiraAttachmentURL(source.itemId, attachmentId) : api.workspaceJiraAttachmentURL(source.workspaceId, source.issueKey, attachmentId);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
-  const jira = useJiraIssue(itemId);
+  const jira = useJiraIssue(source);
   if (jira.loading) return <div className="jira-panel-state" role="status">Loading Jira ticket...</div>;
   if (jira.error) return <div className="jira-panel-state error" role="alert">{jira.error}</div>;
   if (!jira.result) return null;
@@ -35,7 +41,7 @@ export function JiraItemPanel({ itemId }: { itemId: string }) {
         <span className="jira-attachment-count">{issue.attachments.length}</span>
       </button>
       {attachmentsOpen && (issue.attachments.length === 0 ? <p>No attachments.</p> : <ul className="jira-attachments">{issue.attachments.map((attachment) => {
-        const url = api.jiraAttachmentURL(itemId, attachment.id);
+        const url = attachmentURL(attachment.id);
         const previewable = isPreviewableImage(attachment.mediaType);
         return <li className={previewable ? 'jira-attachment image' : 'jira-attachment'} key={attachment.id}>
           {previewable && <a className="jira-attachment-thumbnail" href={url} target="_blank" rel="noreferrer" aria-label={`View ${attachment.filename}`}><img src={url} alt={attachment.filename} loading="lazy" /></a>}
