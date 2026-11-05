@@ -702,7 +702,8 @@ a.hx-source:hover {
 	display: flex;
 	flex-direction: column;
 	gap: 24px;
-	max-width: 1180px;
+	/* The stepper scrolls sideways, so the page takes the whole width a wide screen offers. */
+	max-width: none;
 }
 
 .hx-run-head {
@@ -1652,7 +1653,7 @@ a.hx-source:hover {
 /* ── Settings ───────────────────────────────────────────────────────────── */
 
 .hx-settings {
-	max-width: 1040px;
+	max-width: 1180px;
 }
 
 .hx-settings .settings-toggle-row strong {
