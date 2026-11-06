@@ -126,3 +126,12 @@ export function syntheticItem(task: HarnessTask): ItemSummary {
 		itemPath: ''
 	};
 }
+
+/** The harness's work on one item, by its Jira key; nothing while the harness is off or holds no task for it. */
+export function workForItem(item: Pick<ItemSummary, 'identifier' | 'workspaceId'> | null | undefined, state: HarnessState): CardWork | undefined {
+	if (!item || !state.loaded) return undefined;
+	const key = itemJoinKey(item);
+	if (!key) return undefined;
+	const task = queueTasks(state.tasks).find((candidate) => candidate.workspaceId === item.workspaceId && taskJoinKey(candidate) === key);
+	return task ? cardWork(task, state, false) : undefined;
+}

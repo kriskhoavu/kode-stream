@@ -40,7 +40,10 @@ import { MarkdownPreview } from '../features/content-viewer/renderers/MarkdownPr
 import { lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
-import { AgentCluster, AgentPane, AgentsTab, agentFocusKey, useHeldAgentSessions, type AgentFocus } from '../features/workstream/AgentsPanel';
+import { AgentCluster, AgentPane, AgentsTab, agentFocusKey, useHeldAgentSessions, type AgentFocus, type AgentPaneHarness, type AgentsMode } from '../features/workstream/AgentsPanel';
+import { HarnessRunTab } from '../features/workstream/HarnessRunTab';
+import { takeOverByHand } from '../features/workstream/takeOver';
+import type { HarnessController } from '../features/harness/useHarness';
 import { useItemSessions, type ItemAgents } from '../features/workstream/useItemSessions';
 import { useBoardHarness } from '../features/workstream/useBoardHarness';
 import { isSyntheticItem, joinHarness, workedBy, workedByLabels, type CardWork } from '../features/workstream/harnessJoin';
@@ -94,7 +97,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   focusedItemId?: string;
   /** A session to open in the focused card's drawer. */
   focusedSessionId?: string;
-  onOpenPlan: (itemId: string) => void;
+  /** Opens the item page; `run` opens it on the harness run, full width. */
+  onOpenPlan: (itemId: string, view?: 'run') => void;
   onWorkspacesChanged: () => void | Promise<void>;
   onOpenWorkspaces?: () => void;
   onOpenReview?: () => void;
@@ -824,8 +828,11 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           agentFocus={drawerAgent}
           onAgentFocus={setDrawerAgent}
           onAgentsChanged={reloadItemAgents}
+          work={harnessJoin.byItemId.get(drawerPlanId)}
+          harness={harness}
           onClose={() => { setDrawerPlanId(''); setDrawerAgent(undefined); }}
           onOpenFull={() => onOpenPlan(drawerPlanId)}
+          onOpenRun={() => onOpenPlan(drawerPlanId, 'run')}
           onChanged={async () => {
             await onWorkspacesChanged();
             await reloadPlans();
@@ -1493,7 +1500,10 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   );
 });
 
-function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus, onAgentFocus, onAgentsChanged, onClose, onOpenFull, onChanged }: { itemId: string; refreshKey: number; workspaceId?: string; agents?: ItemAgents; agentFocus?: AgentFocus; onAgentFocus: (focus: AgentFocus | undefined) => void; onAgentsChanged: () => Promise<unknown> | void; onClose: () => void; onOpenFull: () => void; onChanged: () => void | Promise<void> }) {
+function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus, onAgentFocus, onAgentsChanged, work, harness, onClose, onOpenFull, onOpenRun, onChanged }: { itemId: string; refreshKey: number; workspaceId?: string; agents?: ItemAgents; agentFocus?: AgentFocus; onAgentFocus: (focus: AgentFocus | undefined) => void; onAgentsChanged: () => Promise<unknown> | void; work?: CardWork; harness: HarnessController; onClose: () => void; onOpenFull: () => void; onOpenRun: () => void; onChanged: () => void | Promise<void> }) {
+  const [agentsMode, setAgentsMode] = useState<AgentsMode>('run');
+  const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => onAgentFocus({ kind: 'harness', id })} onOpenFull={onOpenRun} onTakeOver={() => { void takeOverByHand(work, harness); setAgentsMode('sessions'); onAgentFocus({ kind: 'launch' }); }} /> : undefined;
+  const paneHarness: AgentPaneHarness = { client: harness.client, run: work?.run, detail: work?.run ? harness.state.details[work.run.id] : undefined, reload: () => (work?.run ? harness.loadRun(work.run.id) : Promise.resolve()) };
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [file, setFile] = useState<FileContent | null>(null);
@@ -1986,7 +1996,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
         <div className={['plan-drawer-body', agentFocus || sideTab === 'agents' ? 'agents-open' : '', workItemCollapsed ? 'work-item-collapsed' : ''].filter(Boolean).join(' ')}>
           {(agentFocus || heldLiveSessionIds.length > 0) && (
           <section className="drawer-main drawer-agent-main" hidden={!agentFocus}>
-            <AgentPane focus={agentFocus} heldSessionIds={heldLiveSessionIds} itemId={itemId} workspaceId={workspaceId ?? plan?.workspaceId} agents={agents} onBack={() => onAgentFocus(undefined)} onFocus={onAgentFocus} onRelease={releaseHeldSession} onReload={onAgentsChanged} />
+            <AgentPane focus={agentFocus} heldSessionIds={heldLiveSessionIds} itemId={itemId} workspaceId={workspaceId ?? plan?.workspaceId} agents={agents} harness={paneHarness} onBack={() => onAgentFocus(undefined)} onFocus={onAgentFocus} onRelease={releaseHeldSession} onReload={onAgentsChanged} />
           </section>
           )}
           {agentFocus ? null : (
@@ -2129,7 +2139,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
                 )
               )}
               {sideTab === 'jira' && <JiraItemPanel itemId={itemId} />}
-              {sideTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={onAgentFocus} onError={setError} onLaunched={(result) => { void Promise.resolve(onAgentsChanged()).then(() => onAgentFocus({ kind: 'session', id: result.session.id })); }} />}
+              {sideTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={onAgentFocus} onError={setError} harnessRun={harnessRun} mode={agentsMode} onModeChange={setAgentsMode} onLaunched={(result) => { void Promise.resolve(onAgentsChanged()).then(() => onAgentFocus({ kind: 'session', id: result.session.id })); }} />}
             </div>
           </aside>
           )}

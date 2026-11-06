@@ -44,7 +44,15 @@ import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
 import { JiraItemPanel } from '../features/jira/JiraItemPanel';
 import { WorkstreamExplorer } from './WorkstreamExplorer';
-import { AgentPane, AgentsTab, useHeldAgentSessions, type AgentFocus } from '../features/workstream/AgentsPanel';
+import { AgentPane, AgentsTab, useHeldAgentSessions, type AgentFocus, type AgentPaneHarness, type AgentsMode } from '../features/workstream/AgentsPanel';
+import { HarnessRunTab } from '../features/workstream/HarnessRunTab';
+import { takeOverByHand } from '../features/workstream/takeOver';
+import { useBoardHarness } from '../features/workstream/useBoardHarness';
+import { workForItem } from '../features/workstream/harnessJoin';
+import { RunView } from '../features/harness/RunView';
+import { RunDrawer } from '../features/harness/RunDrawer';
+import type { HarnessRunTab as HarnessRunTabId, ItemView } from '../app/router';
+import '../features/harness/harness.css';
 import { useItemSessions } from '../features/workstream/useItemSessions';
 import type { ExplorerLocation } from '../features/workstream-explorer/types';
 import { E2EQualityPanel } from '../features/e2e-testing/E2EQualityPanel';
@@ -59,7 +67,7 @@ type PendingConfirm = { title: string; message: string; confirmLabel: string; da
 type DetailViewMode = 'plan' | 'workspace' | 'git';
 type OpenItemFileTab = { id: string; path: string; name: string; editable: boolean };
 
-export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOpenItem, onContentChanged, allowEmbeddedAISessions = true }: { itemId: string; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onOpenItem: (itemId: string) => void; onContentChanged?: () => void | Promise<void>; allowEmbeddedAISessions?: boolean }) {
+export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, workspaces, onBack, onOpenItem, onContentChanged, allowEmbeddedAISessions = true }: { itemId: string; /** `run` shows the item's harness run whole, full width. */ view?: ItemView; onViewChange?: (view?: ItemView) => void; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onOpenItem: (itemId: string) => void; onContentChanged?: () => void | Promise<void>; allowEmbeddedAISessions?: boolean }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
@@ -86,6 +94,13 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
   const { byItem: itemAgents, reload: reloadAgents } = useItemSessions(plan?.workspaceId, plan?.branch ?? '');
   const agents = itemAgents.get(itemId);
   const { heldLiveSessionIds, release: releaseHeldSession } = useHeldAgentSessions(agents, agentFocus, itemId);
+  // The harness's work on this item, for the Agents tab's "Harness run" mode and the full-width run view.
+  const harness = useBoardHarness();
+  const work = useMemo(() => workForItem(plan, harness.state), [plan, harness.state]);
+  const [agentsMode, setAgentsMode] = useState<AgentsMode>('run');
+  const [runTab, setRunTab] = useState<{ tab: HarnessRunTabId; agentRunId?: string } | undefined>();
+  const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => setAgentFocus({ kind: 'harness', id })} onOpenFull={onViewChange ? () => onViewChange('run') : undefined} onTakeOver={() => { void takeOverByHand(work, harness); setAgentsMode('sessions'); setAgentFocus({ kind: 'launch' }); }} /> : undefined;
+  const paneHarness: AgentPaneHarness = { client: harness.client, run: work?.run, detail: work?.run ? harness.state.details[work.run.id] : undefined, reload: () => (work?.run ? harness.loadRun(work.run.id) : Promise.resolve()) };
   const [error, setError] = useState('');
   const [recoveryHint, setRecoveryHint] = useState('');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -1196,7 +1211,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
       )}
       {rightPanelTab === 'jira' && <JiraItemPanel itemId={itemId} />}
       {rightPanelTab === 'quality' && qualityPanel}
-      {rightPanelTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={setAgentFocus} onError={setError} allowEmbedded={allowEmbeddedAISessions} onLaunched={(result) => { void Promise.resolve(reloadAgents()).then(() => setAgentFocus({ kind: 'session', id: result.session.id })); }} />}
+      {rightPanelTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={setAgentFocus} onError={setError} allowEmbedded={allowEmbeddedAISessions} harnessRun={harnessRun} mode={agentsMode} onModeChange={setAgentsMode} onLaunched={(result) => { void Promise.resolve(reloadAgents()).then(() => setAgentFocus({ kind: 'session', id: result.session.id })); }} />}
       {error && (
         <div className="operation-error">
           <p className="error">{error}</p>
@@ -1220,6 +1235,25 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
    */
   if (!plan || (!workspaceConfig && workspaces.length === 0)) {
     return <section className="empty-state"><button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button>{error ? <p className="error">{error}</p> : <p>Loading item...</p>}</section>;
+  }
+
+  if (view === 'run' && work?.run) {
+    const run = work.run;
+    return (
+      <section className="workspace-page item-run-page hx" aria-label="Harness run, full width">
+        <header className="workspace-header">
+          <div className="workspace-header-main">
+            <button className="ghost" type="button" onClick={() => (onViewChange ? onViewChange(undefined) : goBack())}><ArrowLeft size={16} /> Back to the card</button>
+          </div>
+          <div className="workspace-header-title">
+            <h1>{plan.title}</h1>
+            <div className="workspace-item-path" aria-label="Item location"><span className="workspace-item-path-segment">{plan.scope}</span><span className="workspace-item-path-separator">/</span><span className="workspace-item-path-segment">{plan.identifier}</span></div>
+          </div>
+        </header>
+        <RunView state={harness.state} runId={run.id} onSelectRun={() => undefined} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onCancel={harness.cancelRun} onOpenTab={(tab, agentRunId) => setRunTab({ tab, agentRunId })} />
+        {runTab && <RunDrawer state={harness.state} client={harness.client} taskId={work.task.id} tab={runTab.tab} agentRunId={runTab.agentRunId} wave={[]} onTabChange={(tab) => setRunTab({ tab })} onClose={() => setRunTab(undefined)} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={harness.pin} onMove={() => undefined} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />}
+      </section>
+    );
   }
 
   return (
@@ -1259,7 +1293,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, workspaces, onBack, onOp
           leftPanelContent={detailViewMode === 'git' ? gitPanel : undefined}
           agentArea={agentFocus || heldLiveSessionIds.length > 0 ? {
             active: Boolean(agentFocus),
-            content: <section className="drawer-main drawer-agent-main"><AgentPane focus={agentFocus} heldSessionIds={heldLiveSessionIds} itemId={itemId} workspaceId={plan?.workspaceId} agents={agents} onBack={() => setAgentFocus(undefined)} onFocus={setAgentFocus} onRelease={releaseHeldSession} onReload={reloadAgents} /></section>
+            content: <section className="drawer-main drawer-agent-main"><AgentPane focus={agentFocus} heldSessionIds={heldLiveSessionIds} itemId={itemId} workspaceId={plan?.workspaceId} agents={agents} harness={paneHarness} onBack={() => setAgentFocus(undefined)} onFocus={setAgentFocus} onRelease={releaseHeldSession} onReload={reloadAgents} /></section>
           } : undefined}
           rightPanel={{
             title: <><Info size={16} /> Work Item</>,

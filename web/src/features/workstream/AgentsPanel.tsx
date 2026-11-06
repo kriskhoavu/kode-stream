@@ -3,7 +3,9 @@ import type { MouseEvent, PointerEvent } from 'react';
 import { ArrowLeft, Bot, ChevronRight, GitCompare, PanelBottomOpen, Plus, TerminalSquare } from 'lucide-react';
 import { ApiError, api } from '../../shared/api';
 import { newIdempotencyKey } from '../../shared/api/idempotency';
-import type { ClaudeTranscript, ClaudeTurn, EmbeddedAISessionResult, SafeSessionRecord } from '../../lib/types';
+import type { ClaudeTranscript, ClaudeTurn, EmbeddedAISessionResult, HarnessRun, HarnessRunDetail, SafeSessionRecord } from '../../lib/types';
+import type { HarnessClient } from '../harness/harnessClient';
+import { LiveTab } from '../harness/RunDrawer';
 import { AISessionLaunchControl } from '../ai-session/AISessionLaunchControl';
 import { AgentChip, providerLabel } from '../ai-session/providerDisplay';
 import { SessionTerminal } from '../ai-session/SessionTerminal';
@@ -13,10 +15,17 @@ import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
 import { sessionGlyph } from '../sessions/SessionCard';
 import { formatAge } from '../sessions/sessionDisplay';
 import { transcriptActive, type ItemAgents } from './useItemSessions';
+import { agentRoleLabels } from '../harness/vocabulary';
 import './agents.css';
 
-/** What the card drawer's main pane shows: the document, a session, a transcript, or the launcher. */
-export type AgentFocus = { kind: 'session'; id: string } | { kind: 'transcript'; id: string } | { kind: 'launch' };
+/** What the card drawer's main pane shows: the document, a session, a transcript, a harness agent's conversation, or the launcher. */
+export type AgentFocus = { kind: 'session'; id: string } | { kind: 'transcript'; id: string } | { kind: 'harness'; id: string } | { kind: 'launch' };
+
+/** The card's Agents tab has two modes once the harness works on the card: its run, and the hand-driven sessions. */
+export type AgentsMode = 'run' | 'sessions';
+
+/** The harness run the card's main pane can show a conversation of. */
+export interface AgentPaneHarness { client: HarnessClient; run?: HarnessRun; detail?: HarnessRunDetail; reload: () => Promise<unknown> }
 
 const CLUSTER_LIMIT = 3;
 const FORK_WARNING_MS = 2 * 60_000;
@@ -61,15 +70,28 @@ export function AgentCluster({ agents, title, onOpen }: { agents?: ItemAgents; t
 	</span>;
 }
 
-/** The drawer's Agents side tab: a launcher, then the card's live sessions, its Claude conversations, and its ended sessions. */
-export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError, allowEmbedded = true }: { itemId: string; agents?: ItemAgents; focus?: AgentFocus; onFocus: (focus: AgentFocus) => void; onLaunched: (result: EmbeddedAISessionResult) => void; onError: (message: string) => void; allowEmbedded?: boolean }) {
+/**
+ * The drawer's Agents side tab. With a harness run on the card it has two
+ * modes: "Harness run" (given as `harnessRun`) and "Sessions", the launcher,
+ * the card's live sessions, its Claude conversations and its ended sessions.
+ */
+export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError, allowEmbedded = true, harnessRun, mode, onModeChange }: { itemId: string; agents?: ItemAgents; focus?: AgentFocus; onFocus: (focus: AgentFocus) => void; onLaunched: (result: EmbeddedAISessionResult) => void; onError: (message: string) => void; allowEmbedded?: boolean; harnessRun?: React.ReactNode; mode?: AgentsMode; onModeChange?: (mode: AgentsMode) => void }) {
 	const [earlierOpen, setEarlierOpen] = useState(false);
 	const [message, setMessage] = useState('');
+	const [ownMode, setOwnMode] = useState<AgentsMode>('run');
 	const selected = agentFocusKey(focus);
 	const live = agents?.live ?? [];
 	const transcripts = agents?.transcripts ?? [];
 	const ended = agents?.ended ?? [];
+	const current: AgentsMode = harnessRun ? (mode ?? ownMode) : 'sessions';
+	const setMode = (next: AgentsMode) => { setOwnMode(next); onModeChange?.(next); };
 	return <section className="agents-tab" aria-label="Agents">
+		{harnessRun && <div className="segmented-control segmented-control-compact agents-mode" role="tablist" aria-label="Agents mode">
+			<button type="button" role="tab" aria-selected={current === 'run'} className={current === 'run' ? 'active' : ''} onClick={() => setMode('run')}>Harness run</button>
+			<button type="button" role="tab" aria-selected={current === 'sessions'} className={current === 'sessions' ? 'active' : ''} onClick={() => setMode('sessions')}>Sessions</button>
+		</div>}
+		{current === 'run' && harnessRun}
+		{current === 'sessions' && <>
 		<div className="agents-tab-launch">
 			<AISessionLaunchControl itemId={itemId} buttonLabel="New session" onLaunched={setMessage} onError={(caught) => onError(caught instanceof Error ? caught.message : 'The session could not be started.')} onEmbeddedLaunched={onLaunched} allowEmbedded={allowEmbedded} />
 			{message && <p className="agents-tab-message" role="status">{message}</p>}
@@ -84,6 +106,7 @@ export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError,
 			<button type="button" className="agents-group-toggle" aria-expanded={earlierOpen} onClick={() => setEarlierOpen((open) => !open)}><ChevronRight size={13} /> Earlier <span>{ended.length}</span></button>
 			{earlierOpen && <ul>{ended.map((record) => <AgentRow key={record.id} selected={selected === `session:${record.id}`} chip={<AgentChip />} title={providerLabel(record.provider)} meta={[sessionGlyph(record).label, formatAge(record.startedAt), record.requestedBranch]} onClick={() => onFocus({ kind: 'session', id: record.id })} />)}</ul>}
 		</section>}
+		</>}
 	</section>;
 }
 
@@ -146,7 +169,7 @@ export function useHeldAgentSessions(agents: ItemAgents | undefined, focus: Agen
  * cancelled shortly after its last viewer leaves, so leaving a live session's
  * pane must not unmount its terminal.
  */
-export function AgentPane({ focus, heldSessionIds, itemId, workspaceId, agents, onBack, onFocus, onRelease, onReload }: { focus?: AgentFocus; heldSessionIds: string[]; itemId: string; workspaceId?: string; agents?: ItemAgents; onBack: () => void; onFocus: (focus: AgentFocus) => void; onRelease: (sessionId: string) => void; onReload: () => Promise<unknown> | void }) {
+export function AgentPane({ focus, heldSessionIds, itemId, workspaceId, agents, harness, onBack, onFocus, onRelease, onReload }: { focus?: AgentFocus; heldSessionIds: string[]; itemId: string; workspaceId?: string; agents?: ItemAgents; harness?: AgentPaneHarness; onBack: () => void; onFocus: (focus: AgentFocus) => void; onRelease: (sessionId: string) => void; onReload: () => Promise<unknown> | void }) {
 	const back = <button type="button" className="secondary agent-pane-back" onClick={onBack}><ArrowLeft size={14} /> Back to document</button>;
 	const focusedSession = focus?.kind === 'session' ? focus.id : undefined;
 	const sessionIds = focusedSession && !heldSessionIds.includes(focusedSession) ? [...heldSessionIds, focusedSession] : heldSessionIds;
@@ -157,6 +180,7 @@ export function AgentPane({ focus, heldSessionIds, itemId, workspaceId, agents, 
 			<div className="agent-pane-placeholder"><Bot size={28} /><p>Start a session from the Agents tab. Its terminal opens here, and you can keep prompting it.</p></div>
 		</section>}
 		{focus?.kind === 'transcript' && <TranscriptPane conversation={focus.id} transcript={transcript} itemId={itemId} workspaceId={workspaceId} back={back} onResumed={(result) => { void onReload(); onFocus({ kind: 'session', id: result.session.id }); }} />}
+		{focus?.kind === 'harness' && <HarnessConversationPane agentRunId={focus.id} harness={harness} back={back} />}
 		{sessionIds.map((id) => {
 			const record = agents?.live.find((candidate) => candidate.id === id) ?? agents?.ended.find((candidate) => candidate.id === id);
 			return <SessionPane key={id} hidden={id !== focusedSession} record={record} itemId={itemId} back={back} onBack={onBack} onRelease={() => onRelease(id)} onReload={onReload} onFocus={onFocus} />;
@@ -254,5 +278,21 @@ function TranscriptPane({ conversation, transcript, itemId, workspaceId, back, o
 		{mayBeOpen && <p className="agent-pane-warning" role="note">This conversation may still be open in your terminal; continuing here forks it.</p>}
 		{error && <p className="error" role="alert">{error}</p>}
 		<TranscriptTurns turns={turns} label="Latest turns" placeholder={error ? undefined : 'Reading the conversation…'} />
+	</section>;
+}
+
+/** A harness agent's conversation, read the way the run page reads it, with the other rounds of the run beside it. */
+function HarnessConversationPane({ agentRunId, harness, back }: { agentRunId: string; harness?: AgentPaneHarness; back: React.ReactNode }) {
+	const detail = harness?.detail;
+	const agentRuns = detail?.agentRuns ?? (harness?.run?.activeAgentRun ? [harness.run.activeAgentRun] : []);
+	const selected = agentRuns.find((agentRun) => agentRun.id === agentRunId);
+	return <section className="agent-pane agent-pane-harness hx" aria-label="Harness conversation">
+		<header className="agent-pane-header">
+			{back}
+			<span className="agent-pane-title"><Bot size={14} aria-hidden="true" /><strong>Harness</strong><span>{selected ? `${agentRoleLabels[selected.role]} · round ${selected.round}` : 'Conversation'}</span></span>
+		</header>
+		<div className="agent-pane-body agent-pane-harness-body">
+			{harness ? <LiveTab client={harness.client} focus={agentRunId} stages={detail?.stages ?? []} agentRuns={agentRuns} onReload={harness.reload} /> : <p className="agents-empty">The harness is not available here.</p>}
+		</div>
 	</section>;
 }

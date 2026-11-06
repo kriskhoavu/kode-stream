@@ -264,7 +264,7 @@ const transcriptEvery = 5_000;
  * read again every few seconds; its live terminal is shown instead when the
  * backend exposes the run as a session.
  */
-function LiveTab({ client, focus, stages, agentRuns, onReload }: { client: HarnessClient; focus?: string; stages: HarnessStage[]; agentRuns: HarnessAgentRun[]; onReload: () => Promise<unknown> }) {
+export function LiveTab({ client, focus, stages, agentRuns, onReload }: { client: HarnessClient; focus?: string; stages: HarnessStage[]; agentRuns: HarnessAgentRun[]; onReload: () => Promise<unknown> }) {
 	const steps = useMemo(() => liveSteps(stages, agentRuns), [stages, agentRuns]);
 	const rounds = useMemo(() => steps.flatMap((step) => step.agentRuns), [steps]);
 	const working = rounds.find((agentRun) => agentRun.state === 'running');

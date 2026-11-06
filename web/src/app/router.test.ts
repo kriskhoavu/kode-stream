@@ -111,3 +111,14 @@ describe('router', () => {
     expect(pathForRoute({ name: 'harness', location: { view: 'inbox' } })).toBe('/harness');
   });
 });
+
+describe('item run view', () => {
+  it('parses ?view=run on an item and writes it back', () => {
+    window.history.pushState(null, '', '/items/p1?view=run');
+    expect(routeFromLocation()).toEqual({ name: 'item', itemId: 'p1', view: 'run' });
+    window.history.pushState(null, '', '/items/p1?view=other');
+    expect(routeFromLocation()).toEqual({ name: 'item', itemId: 'p1' });
+    expect(pathForRoute({ name: 'item', itemId: 'p1', view: 'run' })).toBe('/items/p1?view=run');
+    expect(pathForRoute({ name: 'item', itemId: 'p1' })).toBe('/items/p1');
+  });
+});

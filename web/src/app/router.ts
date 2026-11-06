@@ -3,6 +3,7 @@ export interface KnowledgeLocation { workspaceId?: string; root?: string; slug?:
 export type WorkbenchView = 'canvas' | 'sessions';
 export interface CanvasLocation { workspaceId?: string; selectedNodeId?: string; view?: WorkbenchView; }
 export interface ReviewLocation { workspaceId?: string; branch?: string; }
+export type ItemView = 'run';
 export type HarnessView = 'inbox' | 'queue' | 'run' | 'approvals' | 'settings';
 export type HarnessRunTab = 'ticket' | 'stages' | 'findings' | 'changes' | 'live' | 'links';
 export const harnessRunTabs: readonly HarnessRunTab[] = ['ticket', 'stages', 'findings', 'changes', 'live', 'links'];
@@ -15,7 +16,7 @@ export type Route =
   | { name: 'knowledge'; location?: KnowledgeLocation }
   | { name: 'canvas'; location?: CanvasLocation }
   | { name: 'review'; location?: ReviewLocation }
-  | { name: 'item'; itemId: string }
+  | { name: 'item'; itemId: string; /** `run` shows the item's harness run whole, full width. */ view?: ItemView }
   | { name: 'harness'; location: HarnessLocation }
   | { name: 'not-found'; path: string };
 
@@ -38,7 +39,9 @@ export function routeFromLocation(): Route {
 export function routeFromPath(path: string, search = ''): Route {
   if (path.startsWith('/items/')) {
     const itemId = decodeURIComponent(path.split('/')[2] ?? '');
-    return itemId ? { name: 'item', itemId } : { name: 'not-found', path };
+    if (!itemId) return { name: 'not-found', path };
+    const view = new URLSearchParams(search).get('view') === 'run' ? 'run' : undefined;
+    return view ? { name: 'item', itemId, view } : { name: 'item', itemId };
   }
   if (path === '/harness' || path.startsWith('/harness/')) {
     const location = harnessLocationFromPath(path, search);
@@ -75,7 +78,7 @@ export function pathForRoute(route: Route): string {
   if (route.name === 'harness') return harnessPath(route.location);
   return route.name === 'not-found' ? route.path
     : route.name === 'item'
-    ? `/items/${encodeURIComponent(route.itemId)}`
+    ? `/items/${encodeURIComponent(route.itemId)}${route.view ? `?view=${route.view}` : ''}`
     : route.name === 'workspaces'
       ? '/workspaces'
       : route.name === 'settings'

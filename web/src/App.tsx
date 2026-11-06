@@ -288,13 +288,13 @@ export function App() {
             visibleStatuses={appSettings.visibleWorkstreamStatuses}
             focusedItemId={route.focusedItemId}
             focusedSessionId={route.focusedSessionId}
-            onOpenPlan={(itemId) => navigate({ name: 'item', itemId })}
+            onOpenPlan={(itemId, view) => navigate({ name: 'item', itemId, view })}
             onWorkspacesChanged={async () => { await refreshAppData(); }}
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
             onOpenReview={() => navigate({ name: 'review', location: { workspaceId: activeRepo?.id } })}
           />
         </Suspense>}
-        {route.name === 'item' && <Suspense fallback={<section className="empty-state">Loading item...</section>}><ItemWorkspacePage key={route.itemId} itemId={route.itemId} refreshKey={contentRefreshKey} workspaces={workspaces} allowEmbeddedAISessions={!extensionSurface} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={async () => { await refreshAppStateOnly(); }} /></Suspense>}
+        {route.name === 'item' && <Suspense fallback={<section className="empty-state">Loading item...</section>}><ItemWorkspacePage key={route.itemId} itemId={route.itemId} view={route.view} onViewChange={(view) => navigate({ name: 'item', itemId: route.itemId, view })} refreshKey={contentRefreshKey} workspaces={workspaces} allowEmbeddedAISessions={!extensionSurface} onBack={() => navigate({ name: 'workstream' })} onOpenItem={(nextItemId) => navigate({ name: 'item', itemId: nextItemId })} onContentChanged={async () => { await refreshAppStateOnly(); }} /></Suspense>}
         {route.name === 'workspaces' && <Suspense fallback={<section className="empty-state">Loading workspaces...</section>}><WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={async () => { await refreshAppData(); }} /></Suspense>}
         {route.name === 'settings' && <Suspense fallback={<section className="empty-state">Loading settings...</section>}><SettingsPage settings={appSettings} onChange={setAppSettings} /></Suspense>}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} activeWorkspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}

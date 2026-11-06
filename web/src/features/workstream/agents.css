@@ -420,3 +420,59 @@
 	max-height: none;
 	min-height: 0;
 }
+
+/* The Agents tab's two modes once the harness works on the card. */
+.agents-mode {
+	margin-bottom: 10px;
+}
+
+.harness-run-tab {
+	display: grid;
+	gap: 10px;
+}
+
+.harness-run-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.harness-run-full {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.harness-run-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.harness-run-note {
+	display: grid;
+	gap: 8px;
+}
+
+.harness-run-note label {
+	display: grid;
+	gap: 4px;
+	font-size: 12px;
+}
+
+.harness-run-note textarea {
+	width: 100%;
+	resize: vertical;
+}
+
+.harness-run-note-actions {
+	display: flex;
+	gap: 6px;
+}
+
+.agent-pane-harness-body {
+	overflow: auto;
+	padding: 12px;
+}
