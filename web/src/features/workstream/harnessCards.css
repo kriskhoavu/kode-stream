@@ -133,3 +133,98 @@
 	width: 100%;
 	resize: vertical;
 }
+
+/* The board's Waves and Queue views. */
+.board-view-switcher {
+	margin-left: auto;
+}
+
+.queue-view {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 300px;
+	gap: 16px;
+	align-items: start;
+}
+
+.queue-view .hx-queue-list {
+	max-width: none;
+}
+
+.queue-view .hx-queue-row {
+	grid-template-columns: 40px 120px minmax(0, 1fr) 48px 160px auto;
+}
+
+.hx-queue-row.draggable {
+	cursor: grab;
+}
+
+.hx-queue-row.dragging {
+	opacity: .4;
+}
+
+.hx-queue-row.selected {
+	border-color: color-mix(in srgb, var(--button-accent) 55%, var(--line));
+}
+
+.hx-queue-grip {
+	color: var(--muted);
+	margin-right: 2px;
+	vertical-align: -2px;
+}
+
+.hx-queue-score {
+	font-weight: 700;
+	text-align: right;
+}
+
+.hx-queue-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	justify-content: flex-end;
+}
+
+.queue-side {
+	display: grid;
+	gap: 14px;
+	position: sticky;
+	top: 12px;
+}
+
+.queue-side-section {
+	display: grid;
+	gap: 6px;
+}
+
+.queue-side-section h3 {
+	margin: 0;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--muted);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.queue-side-section p {
+	margin: 0;
+}
+
+.queue-side-reasons {
+	margin: 0;
+	padding-left: 18px;
+	display: grid;
+	gap: 2px;
+	font-size: 13px;
+}
+
+@media (max-width: 900px) {
+	.queue-view {
+		grid-template-columns: 1fr;
+	}
+	.queue-view .hx-queue-row {
+		grid-template-columns: 1fr;
+	}
+}

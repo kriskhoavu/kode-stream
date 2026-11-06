@@ -135,3 +135,15 @@ export function workForItem(item: Pick<ItemSummary, 'identifier' | 'workspaceId'
 	const task = queueTasks(state.tasks).find((candidate) => candidate.workspaceId === item.workspaceId && taskJoinKey(candidate) === key);
 	return task ? cardWork(task, state, false) : undefined;
 }
+
+/** The harness's tasks on one workspace's board, in queue order. */
+export function tasksForWorkspace(state: HarnessState, workspaceId?: string): HarnessTask[] {
+	if (!state.loaded) return [];
+	return queueTasks(state.tasks).filter((task) => !workspaceId || task.workspaceId === workspaceId);
+}
+
+/** The approval a stuck task retries through: its waiting resume gate. */
+export function retryApproval(task: HarnessTask, state: HarnessState): HarnessApproval | undefined {
+	if (task.state !== 'blocked') return undefined;
+	return Object.values(state.approvals).find((approval) => approval.taskId === task.id && approval.state === 'requested' && approval.gate === 'resume');
+}
