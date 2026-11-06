@@ -190,6 +190,7 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 					loadRun={harness.loadRun}
 					onApprove={harness.approve}
 					onReject={harness.reject}
+					onCancel={harness.cancelRun}
 					onOpenTab={(tab) => location.runId && onLocationChange({ view: 'run', runId: location.runId, tab })}
 				/>
 			)}

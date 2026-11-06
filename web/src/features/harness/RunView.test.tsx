@@ -40,6 +40,16 @@ describe('RunView', () => {
 		expect(screen.getByText('Round 1 · plan')).toBeInTheDocument();
 	});
 
+	it('stops a working run after a confirmation that names the agent it kills', async () => {
+		const state = await stateWith('run-pm-02');
+		const onCancel = vi.fn().mockResolvedValue(undefined);
+		render(<RunView state={state} runId="run-pm-02" onSelectRun={vi.fn()} onRefresh={vi.fn()} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onCancel={onCancel} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+		expect(screen.getByRole('dialog', { name: 'Stop PM-02?' })).toHaveTextContent(/The Builder is killed mid-step/);
+		fireEvent.click(screen.getByRole('button', { name: 'Stop this task' }));
+		expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ id: 'run-pm-02' }));
+	});
+
 	it('puts the waiting gate above the stepper', async () => {
 		const state = await stateWith('run-ux-11');
 		render(<RunView state={state} runId="run-ux-11" onSelectRun={vi.fn()} onRefresh={vi.fn()} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} />);

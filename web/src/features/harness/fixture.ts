@@ -622,6 +622,19 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 			store.settings = { ...clone(settings), revision: settings.revision + 1 };
 			return clone(store.settings);
 		}),
+		cancelRun: (target, reason) => delay(() => {
+			const run = store.runs.get(target.id) as HarnessRun;
+			const task = store.tasks.get(run.taskId) as HarnessTask;
+			run.state = 'cancelled';
+			run.revision += 1;
+			task.state = 'cancelled';
+			task.revision += 1;
+			for (const agentRun of store.agentRuns.values()) if (agentRun.runId === run.id && agentRun.state === 'running') agentRun.state = 'cancelled';
+			sync(run);
+			emit({ type: 'run.finished', run } as Omit<HarnessEvent, 'seq' | 'at'>);
+			emit({ type: 'task.updated', task } as Omit<HarnessEvent, 'seq' | 'at'>);
+			return clone(run);
+		}),
 		clearQueue: (workspaceId) => delay(() => {
 			const clearable = new Set(['discovered', 'ranked', 'stale', 'dismissed']);
 			const gone = [...store.tasks.values()].filter((task) => clearable.has(task.state) && (!workspaceId || task.workspaceId === workspaceId));

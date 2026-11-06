@@ -36,6 +36,16 @@ describe('pipeline model', () => {
 		expect(plan?.cards[1]).toMatchObject({ status: 'needs_fix', meta: ['1 must fix', '9 min', '$1.80'] });
 	});
 
+	it('shows the stage a resume started, not the one it replaced', async () => {
+		const run = await detail('run-srv-04');
+		const stuck = run.stages.find((stage) => stage.kind === 'plan');
+		if (!stuck) throw new Error('fixture has no plan stage');
+		run.stages.push({ ...stuck, id: 'stg-resumed', state: 'running', round: 1, turns: 0, durationMs: 0, costUsd: 0, blocking: 0, failureReason: undefined });
+		const plan = pipelineModel(run).groups.find((group) => group.id === 'plan');
+		expect(plan?.label).toBe('Plan · round 1 of 3');
+		expect(plan?.cards[0].status).toBe('working');
+	});
+
 	it('groups the ledger by stage and names each round', async () => {
 		const groups = ledgerGroups(await detail('run-pm-02'));
 		expect(groups.map((group) => group.title)).toEqual(['Plan', 'Build']);

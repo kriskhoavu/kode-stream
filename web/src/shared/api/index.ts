@@ -551,7 +551,7 @@ export const api = {
   harnessRunChanges: (runId: string, signal?: AbortSignal) => request<SessionChanges>(`/api/harness/runs/${encodeURIComponent(runId)}/changes`, { signal }, !signal),
   harnessAgentRunTranscript: (agentRunId: string, limit = 50, signal?: AbortSignal) => request<HarnessTranscript>(`/api/harness/agent-runs/${encodeURIComponent(agentRunId)}/transcript?limit=${limit}`, { signal }, false),
   harnessAgentRun: (agentRunId: string, signal?: AbortSignal) => request<{ agentRun: HarnessAgentRun; session?: SafeSessionRecord }>(`/api/harness/agent-runs/${encodeURIComponent(agentRunId)}`, { signal }, !signal),
-  cancelHarnessRun: (runId: string, expectedRevision: number) => request<HarnessRun>(`/api/harness/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST', body: JSON.stringify({ expectedRevision }) }, false),
+  cancelHarnessRun: (runId: string, expectedRevision: number, reason?: string) => request<HarnessRun>(`/api/harness/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST', body: JSON.stringify({ expectedRevision, reason }) }, false),
   harnessApprovals: async (signal?: AbortSignal) => (await request<{ approvals?: HarnessApproval[] | null }>('/api/harness/approvals', { signal }, !signal)).approvals ?? [],
   /** Resolves to the decided approval, or `undefined` when someone else already decided it (409 `already_decided`). */
   approveHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason?: string) => decideHarnessGate(approval, 'approve', idempotencyKey, reason),

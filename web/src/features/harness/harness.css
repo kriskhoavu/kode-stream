@@ -736,6 +736,11 @@ a.hx-source:hover {
 	font-weight: 600;
 }
 
+.hx-stop-button {
+	color: var(--danger);
+	border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
 .hx-small-button {
 	display: inline-flex;
 	align-items: center;
@@ -1018,10 +1023,16 @@ a.hx-source:hover {
 	transform: rotate(90deg);
 }
 
+.hx-ledger-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
 .hx-ledger tr.grp .hx-ledger-count {
-	margin-left: 6px;
 	color: var(--muted);
 	font-weight: 500;
+	white-space: nowrap;
 }
 
 .hx-ledger tr.total th,
@@ -1067,23 +1078,76 @@ a.hx-source:hover {
 	font-size: 13px;
 }
 
-.hx-findings li {
-	display: grid;
-	grid-template-columns: 18px minmax(0, 1fr);
-	gap: 2px 8px;
-	align-items: start;
-	padding: 10px 12px;
+.hx-findings-section > summary {
+	list-style: none;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.hx-findings-section > summary::-webkit-details-marker {
+	display: none;
+}
+
+.hx-findings-section > summary::before,
+.hx-finding > details > summary::before {
+	content: '';
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-right: 1.5px solid var(--muted);
+	border-bottom: 1.5px solid var(--muted);
+	transform: rotate(-45deg);
+	transition: transform 150ms var(--hx-ease);
+}
+
+.hx-findings-section[open] > summary::before,
+.hx-finding > details[open] > summary::before {
+	transform: rotate(45deg);
+}
+
+.hx-findings-section > summary h3 {
+	margin: 0;
+}
+
+.hx-findings-section > ul {
+	margin-top: 8px;
+}
+
+.hx-finding {
+	padding: 8px 12px;
 	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: var(--panel);
 }
 
-.hx-findings li > :first-child {
-	grid-row: 1 / span 3;
-	margin-top: 1px;
+.hx-finding > details > summary {
+	list-style: none;
+	cursor: pointer;
+	display: grid;
+	grid-template-columns: 12px minmax(0, 1fr);
+	gap: 2px 8px;
+	align-items: baseline;
+}
+
+.hx-finding > details > summary::-webkit-details-marker {
+	display: none;
+}
+
+.hx-finding > details > summary::before {
+	margin-top: 5px;
+	align-self: start;
+}
+
+.hx-finding > details > summary > .hx-finding-where {
+	grid-column: 2;
 }
 
 .hx-finding-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
 	font-weight: 600;
 	line-height: 1.4;
 }
@@ -1093,7 +1157,7 @@ a.hx-source:hover {
 }
 
 .hx-finding-detail {
-	margin: 4px 0 0;
+	margin: 8px 0 2px 20px;
 	color: var(--muted);
 	font-size: 13px;
 	line-height: 1.55;

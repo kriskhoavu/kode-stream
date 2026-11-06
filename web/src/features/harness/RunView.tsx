@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react';
-import { RefreshCw } from 'lucide-react';
-import type { HarnessApproval } from '../../lib/types';
+import { useEffect, useMemo, useState } from 'react';
+import { RefreshCw, Square } from 'lucide-react';
+import type { HarnessApproval, HarnessRun } from '../../lib/types';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import type { HarnessRunTab } from '../../app/router';
 import type { HarnessState } from './harnessState';
 import { GateCard } from './GateCard';
@@ -16,7 +17,7 @@ import { useNow } from './useNow';
 import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, plural, sourceLabels, stageKindLabels } from './vocabulary';
 
 /** The pipeline for one run: where it stands, what waits on a person, and what each step took. */
-export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onApprove, onReject, onOpenTab }: {
+export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onApprove, onReject, onCancel, onOpenTab }: {
 	state: HarnessState;
 	runId?: string;
 	onSelectRun: (runId: string) => void;
@@ -24,10 +25,14 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 	loadRun: (runId: string) => Promise<void>;
 	onApprove: (approval: HarnessApproval, reason?: string) => void;
 	onReject: (approval: HarnessApproval, reason: string) => void;
+	/** Stops the run: kills the working agent and cancels the task. */
+	onCancel?: (run: HarnessRun) => Promise<void>;
 	/** Opens the run's drawer on a tab: changed files, the live agent, every finding. */
 	onOpenTab?: (tab: HarnessRunTab) => void;
 }) {
 	const now = useNow(30_000);
+	const [confirmStop, setConfirmStop] = useState(false);
+	const [stopping, setStopping] = useState(false);
 	const summary = runId ? state.runs[runId] : undefined;
 	const detail = runId ? state.details[runId] : undefined;
 	// Reload the detail whenever the run's summary moves, so polling and events both keep it current.
@@ -70,7 +75,21 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 				<span className="hx-run-head-spacer" />
 				<span className="hx-muted hx-num">So far: {plural(agentRunCount, 'agent run')} · {formatMinutes(run.totals.durationMs)} · <CostCounter value={run.totals.costUsd} /></span>
 				<button type="button" className="secondary hx-small-button" onClick={() => { onRefresh(); void loadRun(run.id); }}><RefreshCw size={14} aria-hidden="true" />Refresh</button>
+				{onCancel && (run.state === 'running' || run.state === 'blocked') && (
+					<button type="button" className="secondary hx-small-button hx-stop-button" disabled={stopping} onClick={() => setConfirmStop(true)}><Square size={14} aria-hidden="true" />{stopping ? 'Stopping…' : 'Stop'}</button>
+				)}
 			</div>
+
+			{confirmStop && (
+				<ConfirmDialog
+					title={`Stop ${task.source.key}?`}
+					message={working ? `The ${agentRoleLabels[working.role]} is killed mid-step and the run is cancelled. ${task.source.key} leaves the queue until its ticket changes. Nothing is committed to the baseline.` : `The run is cancelled and ${task.source.key} leaves the queue until its ticket changes. Nothing is committed to the baseline.`}
+					confirmLabel="Stop this task"
+					danger
+					onCancel={() => setConfirmStop(false)}
+					onConfirm={() => { setConfirmStop(false); setStopping(true); void onCancel?.(run).finally(() => setStopping(false)); }}
+				/>
+			)}
 
 			{waiting.map((approval) => (
 				<GateCard

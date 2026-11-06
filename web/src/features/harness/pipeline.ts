@@ -96,7 +96,8 @@ function roundLabel(name: string, stage: HarnessStage | undefined): string {
 }
 
 export function pipelineModel(detail: HarnessRunDetail, now = Date.now()): PipelineModel {
-	const stageOf = (kind: HarnessStageKind) => detail.stages.find((stage) => stage.kind === kind);
+	// Stages arrive by ordinal then creation, so a resumed stage follows the one it replaced and is the one in play.
+	const stageOf = (kind: HarnessStageKind) => detail.stages.filter((stage) => stage.kind === kind).at(-1);
 	const approvalOf = (gate: HarnessApproval['gate']) => detail.approvals
 		.filter((approval) => approval.gate === gate)
 		.sort((a, b) => Date.parse(a.requestedAt) - Date.parse(b.requestedAt))

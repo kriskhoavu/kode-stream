@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { ApiError } from '../../shared/api';
 import { newIdempotencyKey } from '../../shared/api/idempotency';
-import type { HarnessApproval, HarnessRoleId, HarnessTask } from '../../lib/types';
+import type { HarnessApproval, HarnessRoleId, HarnessTask, HarnessRun } from '../../lib/types';
 import type { HarnessClient } from './harnessClient';
 import { harnessReducer, initialHarnessState, startOfDay } from './harnessState';
 import type { HarnessAction, HarnessState } from './harnessState';
@@ -18,6 +18,7 @@ export interface HarnessController {
 	setPriority: (task: HarnessTask, input: { priorityOverride?: number; before?: string }) => Promise<void>;
 	start: (task: HarnessTask) => Promise<void>;
 	setQuestions: (task: HarnessTask, askQuestions: boolean | null) => Promise<void>;
+	cancelRun: (run: HarnessRun, reason?: string) => Promise<void>;
 	pauseRole: (role: HarnessRoleId) => Promise<void>;
 	resumeRole: (role: HarnessRoleId) => Promise<void>;
 }
@@ -97,6 +98,16 @@ export function useHarness(client: HarnessClient): HarnessController {
 	const start = useCallback((task: HarnessTask) => saveTask(() => client.start(task, newIdempotencyKey())), [client, saveTask]);
 	const setQuestions = useCallback((task: HarnessTask, askQuestions: boolean | null) => saveTask(() => client.setQuestions(task, askQuestions)), [client, saveTask]);
 
+	const cancelRun = useCallback(async (run: HarnessRun, reason?: string) => {
+		try {
+			await client.cancelRun(run, reason);
+		} catch (error) {
+			dispatch({ type: 'snapshot.failed', error: plainError(error, 'The run could not be stopped.') });
+		}
+		await refresh();
+		await loadRun(run.id);
+	}, [client, loadRun, refresh]);
+
 	const roleChange = useCallback(async (change: () => Promise<unknown>) => {
 		try {
 			await change();
@@ -108,7 +119,7 @@ export function useHarness(client: HarnessClient): HarnessController {
 	const pauseRole = useCallback((role: HarnessRoleId) => roleChange(() => client.pauseRole(role)), [client, roleChange]);
 	const resumeRole = useCallback((role: HarnessRoleId) => roleChange(() => client.resumeRole(role)), [client, roleChange]);
 
-	return { state, client, dispatch, refresh, loadRun, approve, reject, pin, setPriority, start, setQuestions, pauseRole, resumeRole };
+	return { state, client, dispatch, refresh, loadRun, approve, reject, pin, setPriority, start, setQuestions, cancelRun, pauseRole, resumeRole };
 }
 
 export function plainError(error: unknown, fallback: string): string {

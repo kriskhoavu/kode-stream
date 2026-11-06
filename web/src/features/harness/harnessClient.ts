@@ -60,6 +60,8 @@ export interface HarnessClient {
 	saveSettings(settings: HarnessSettings): Promise<HarnessSettings>;
 	/** Deletes every task no run has touched, in one workspace or all; the Finder refills the queue on its next look. */
 	clearQueue(workspaceId?: string): Promise<{ removed: number }>;
+	/** Stops a run: the working agent is killed and the task leaves the queue. */
+	cancelRun(run: HarnessRun, reason?: string): Promise<HarnessRun>;
 	/** The workspaces a source can look in, with the Jira project key when the workspace has a Jira connection. */
 	workspaces?(signal?: AbortSignal): Promise<HarnessWorkspaceOption[]>;
 	/** Opens the live event feed after `afterSeq`; returns a function that closes it. */
@@ -89,6 +91,7 @@ export const apiHarnessClient: HarnessClient = {
 	settings: (signal) => api.harnessSettings(signal),
 	saveSettings: (settings) => api.saveHarnessSettings(settings),
 	clearQueue: (workspaceId) => api.clearHarnessQueue(workspaceId),
+	cancelRun: (run, reason) => api.cancelHarnessRun(run.id, run.revision, reason),
 	workspaces: async (signal) => (await api.workspaces(signal)).map((workspace) => ({ id: workspace.id, name: workspace.name, jiraProjectKey: workspace.jira?.projectKey || undefined })),
 	subscribe: (afterSeq, handlers) => typeof EventSource === 'undefined'
 		? (handlers.onError(), () => undefined)

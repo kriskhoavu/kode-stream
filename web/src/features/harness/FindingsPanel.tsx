@@ -18,29 +18,37 @@ export function FindingsList({ findings, fixedInRound }: { findings: HarnessFind
 	return (
 		<div className="hx-findings">
 			{blocking.length > 0 && (
-				<div>
-					<h3 className="hx-findings-head must">Must fix · {blocking.length}{resolved && fixedInRound ? ` · fixed in round ${fixedInRound}` : ''}</h3>
-					<ul>{blocking.map((finding, index) => <FindingItem key={index} finding={finding} />)}</ul>
-				</div>
+				<details className="hx-findings-section" open>
+					<summary><h3 className="hx-findings-head must">Must fix · {blocking.length}{resolved && fixedInRound ? ` · fixed in round ${fixedInRound}` : ''}</h3></summary>
+					<ul>{blocking.map((finding, index) => <FindingItem key={index} finding={finding} open />)}</ul>
+				</details>
 			)}
 			{advisory.length > 0 && (
-				<div>
-					<h3 className="hx-findings-head">Suggestions · {advisory.length}</h3>
+				<details className="hx-findings-section" open={blocking.length === 0}>
+					<summary><h3 className="hx-findings-head">Suggestions · {advisory.length}</h3></summary>
 					<ul>{advisory.map((finding, index) => <FindingItem key={index} finding={finding} />)}</ul>
-				</div>
+				</details>
 			)}
 			{findings.length === 0 && <p className="hx-muted">Nothing to fix and no suggestions.</p>}
 		</div>
 	);
 }
 
-function FindingItem({ finding }: { finding: HarnessFinding }) {
-	return (
-		<li>
-			{finding.resolved ? <Check aria-label="Fixed" size={16} className="hx-finding-fixed" /> : <span className="hx-muted" aria-hidden="true">·</span>}
-			<span className="hx-finding-title">{finding.title}</span>
+/** The title and place always show; the Checker's reasoning folds under them. Must-fix items start open. */
+function FindingItem({ finding, open = false }: { finding: HarnessFinding; open?: boolean }) {
+	const head = (
+		<>
+			<span className="hx-finding-title">{finding.resolved && <Check aria-label="Fixed" size={14} className="hx-finding-fixed" />}{finding.title}</span>
 			{finding.path && <span className="hx-finding-where"><code>{finding.path}{finding.line ? `:${finding.line}` : ''}</code></span>}
-			{finding.detail && <p className="hx-finding-detail">{finding.detail}</p>}
+		</>
+	);
+	if (!finding.detail) return <li className="hx-finding">{head}</li>;
+	return (
+		<li className="hx-finding">
+			<details open={open}>
+				<summary>{head}</summary>
+				<p className="hx-finding-detail">{finding.detail}</p>
+			</details>
 		</li>
 	);
 }

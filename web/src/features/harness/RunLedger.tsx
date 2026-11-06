@@ -73,10 +73,12 @@ export function RunLedger({ detail }: { detail: HarnessRunDetail }) {
 						return [
 							<tr className="grp" key={group.id}>
 								<th scope="rowgroup">
-									<button type="button" className="hx-ledger-fold" aria-expanded={open} onClick={() => setFolded((prev) => ({ ...prev, [group.id]: !open }))}>
-										<ChevronRight size={14} aria-hidden="true" />{group.title}
-									</button>
-									<span className="hx-ledger-count">{plural(group.rows.length, 'step')}</span>
+									<span className="hx-ledger-group">
+										<button type="button" className="hx-ledger-fold" aria-expanded={open} onClick={() => setFolded((prev) => ({ ...prev, [group.id]: !open }))}>
+											<ChevronRight size={14} aria-hidden="true" />{group.title}
+										</button>
+										<span className="hx-ledger-count">{plural(group.rows.length, 'step')}</span>
+									</span>
 								</th>
 								<td className="note">{group.note}</td>
 								<td className="num">{sum.turns}</td>
