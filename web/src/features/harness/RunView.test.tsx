@@ -48,6 +48,15 @@ describe('RunView', () => {
 		expect(onOpenTab).toHaveBeenCalledWith('live');
 	});
 
+	it('opens the conversation of a ledger step from its row', async () => {
+		const state = await stateWith('run-pm-02');
+		const onOpenTab = vi.fn();
+		render(<RunView state={state} runId="run-pm-02" onSelectRun={vi.fn()} onRefresh={vi.fn()} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onOpenTab={onOpenTab} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Round 1 · build' }));
+		const builder = state.details['run-pm-02'].agentRuns.find((agentRun) => agentRun.role === 'coder');
+		expect(onOpenTab).toHaveBeenCalledWith('live', builder?.id);
+	});
+
 	it('stops a working run after a confirmation that names the agent it kills', async () => {
 		const state = await stateWith('run-pm-02');
 		const onCancel = vi.fn().mockResolvedValue(undefined);

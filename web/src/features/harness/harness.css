@@ -1845,11 +1845,59 @@ a.hx-source:hover {
 }
 
 .hx-live-stage-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
 	font-size: 12px;
 	font-weight: 700;
 	letter-spacing: 0.02em;
 	text-transform: uppercase;
-	color: var(--muted);
+	cursor: pointer;
+}
+
+.hx-live-stage-title svg {
+	transition: transform 150ms var(--hx-ease);
+}
+
+.hx-live-stage-title[aria-expanded="true"] svg {
+	transform: rotate(90deg);
+}
+
+.hx-live-stage-title:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+.hx-live-stage-count {
+	margin-left: 4px;
+	font-weight: 500;
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+.hx-ledger-step {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--accent-text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	text-decoration: underline;
+	text-decoration-color: transparent;
+	text-underline-offset: 3px;
+}
+
+.hx-ledger-step:hover,
+.hx-ledger-step:focus-visible {
+	text-decoration-color: currentColor;
+	outline: none;
 }
 
 .hx-live-steps button {

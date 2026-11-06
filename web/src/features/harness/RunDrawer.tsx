@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { ArrowDown, ArrowUp, ExternalLink, Pin, PinOff, Play, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronRight, ExternalLink, Pin, PinOff, Play, X } from 'lucide-react';
 import type { ClaudeTurn, HarnessAgentRun, HarnessApproval, HarnessStage, HarnessTask, SafeSessionRecord, SessionChanges } from '../../lib/types';
 import type { HarnessRunTab } from '../../app/router';
 import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
@@ -36,11 +36,13 @@ const tabs: { id: HarnessRunTab; label: string }[] = [
  * never means leaving it. The waiting gate sits at the top; the tabs hold
  * the stages, the findings, the changed files, the live agent and the links.
  */
-export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClose, onOpenPipeline, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onSetQuestions, askDefault = true }: {
+export function RunDrawer({ state, client, taskId, tab, agentRunId, wave, onTabChange, onClose, onOpenPipeline, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onSetQuestions, askDefault = true }: {
 	state: HarnessState;
 	client: HarnessClient;
 	taskId: string;
 	tab: HarnessRunTab;
+	/** The conversation the Live tab opens on; otherwise the working or latest agent. */
+	agentRunId?: string;
 	/** The task's wave in queue order, for Move up and Move down. */
 	wave: HarnessTask[];
 	onTabChange: (tab: HarnessRunTab) => void;
@@ -165,7 +167,7 @@ export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClo
 						{tab === 'stages' && (detail ? <PipelineStepper model={pipelineModel(detail, now)} label={`Progress for ${task.source.key}`} orientation="vertical" /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'findings' && (detail ? <FindingsByRound agentRuns={detail.agentRuns} /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'changes' && (runId ? <ChangesTab client={client} runId={runId} agentRun={latestAgentRun(detail?.agentRuns)} /> : <NoRun run={false} />)}
-						{tab === 'live' && (runId ? <LiveTab client={client} stages={detail?.stages ?? []} agentRuns={detail?.agentRuns ?? (run?.activeAgentRun ? [run.activeAgentRun] : [])} onReload={() => loadRun(runId)} /> : <NoRun run={false} />)}
+						{tab === 'live' && (runId ? <LiveTab client={client} focus={agentRunId} stages={detail?.stages ?? []} agentRuns={detail?.agentRuns ?? (run?.activeAgentRun ? [run.activeAgentRun] : [])} onReload={() => loadRun(runId)} /> : <NoRun run={false} />)}
 						{tab === 'links' && (
 							<ul className="hx-links">
 								{run?.prUrl && <li><a href={run.prUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} aria-hidden="true" />Draft pull request {prLabel(run.prUrl)}</a></li>}
@@ -262,12 +264,16 @@ const transcriptEvery = 5_000;
  * read again every few seconds; its live terminal is shown instead when the
  * backend exposes the run as a session.
  */
-function LiveTab({ client, stages, agentRuns, onReload }: { client: HarnessClient; stages: HarnessStage[]; agentRuns: HarnessAgentRun[]; onReload: () => Promise<unknown> }) {
+function LiveTab({ client, focus, stages, agentRuns, onReload }: { client: HarnessClient; focus?: string; stages: HarnessStage[]; agentRuns: HarnessAgentRun[]; onReload: () => Promise<unknown> }) {
 	const steps = useMemo(() => liveSteps(stages, agentRuns), [stages, agentRuns]);
 	const rounds = useMemo(() => steps.flatMap((step) => step.agentRuns), [steps]);
 	const working = rounds.find((agentRun) => agentRun.state === 'running');
-	const [chosen, setChosen] = useState<string | undefined>();
+	const [chosen, setChosen] = useState<string | undefined>(focus);
+	useEffect(() => { if (focus) setChosen(focus); }, [focus]);
 	const selected = rounds.find((agentRun) => agentRun.id === chosen) ?? working ?? rounds.at(-1);
+	// Which stages the person folded or unfolded by hand; the rest fold unless they hold the chosen or the working agent.
+	const [folded, setFolded] = useState<Record<string, boolean>>({});
+	const stageOpen = (step: LiveStep) => folded[step.id] ?? step.agentRuns.some((agentRun) => agentRun.id === selected?.id || agentRun.state === 'running');
 	const session = useAgentSession(client, selected?.id);
 	const transcript = useAgentTranscript(client, selected);
 	if (!selected) return <p className="hx-muted">No agent has worked on this task yet.</p>;
@@ -276,10 +282,17 @@ function LiveTab({ client, stages, agentRuns, onReload }: { client: HarnessClien
 		<div className="hx-live">
 			{rounds.length > 1 && (
 				<ol className="hx-live-steps" role="tablist" aria-orientation="vertical" aria-label="Agent rounds">
-					{steps.map((step) => (
+					{steps.map((step) => {
+						const open = stageOpen(step);
+						const first = number + 1;
+						if (!open) number += step.agentRuns.length;
+						return (
 						<li key={step.id} className="hx-live-stage">
-							<span className="hx-live-stage-title">{step.title}</span>
-							<ol>
+							<button type="button" className="hx-live-stage-title" aria-expanded={open} onClick={() => setFolded((prev) => ({ ...prev, [step.id]: !open }))}>
+								<ChevronRight size={14} aria-hidden="true" />{step.title}
+								<span className="hx-live-stage-count hx-num">{open ? plural(step.agentRuns.length, 'step') : first === number ? `step ${first}` : `steps ${first}–${number}`}</span>
+							</button>
+							{open && <ol>
 								{step.agentRuns.map((agentRun) => {
 									number += 1;
 									const on = agentRun.id === selected.id;
@@ -293,9 +306,10 @@ function LiveTab({ client, stages, agentRuns, onReload }: { client: HarnessClien
 										</li>
 									);
 								})}
-							</ol>
+							</ol>}
 						</li>
-					))}
+						);
+					})}
 				</ol>
 			)}
 			<p><b>{agentRoleLabels[selected.role]}</b> · {modelLabel(selected.model)} · <span className="hx-num">{plural(selected.turns, 'turn')} · {formatCost(selected.costUsd)}</span>{selected.state !== 'running' && <span className="hx-muted"> · {hxStatuses[agentStatus(selected)].label.toLowerCase()}</span>}</p>

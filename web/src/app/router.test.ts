@@ -99,6 +99,8 @@ describe('router', () => {
     expect(routeFromLocation()).toEqual({ name: 'harness', location: { view: 'queue' } });
     window.history.pushState(null, '', '/harness/runs/run%201?tab=live');
     expect(routeFromLocation()).toEqual({ name: 'harness', location: { view: 'run', runId: 'run 1', tab: 'live' } });
+    window.history.pushState(null, '', '/harness/runs/r1?tab=live&agent=agent%202');
+    expect(routeFromLocation()).toEqual({ name: 'harness', location: { view: 'run', runId: 'r1', tab: 'live', agentRunId: 'agent 2' } });
     window.history.pushState(null, '', '/harness/runs/r1?tab=bogus');
     expect(routeFromLocation()).toEqual({ name: 'harness', location: { view: 'run', runId: 'r1' } });
     window.history.pushState(null, '', '/harness/nowhere');

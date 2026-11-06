@@ -28,7 +28,7 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 	/** Stops the run: kills the working agent and cancels the task. */
 	onCancel?: (run: HarnessRun) => Promise<void>;
 	/** Opens the run's drawer on a tab: changed files, the live agent, every finding. */
-	onOpenTab?: (tab: HarnessRunTab) => void;
+	onOpenTab?: (tab: HarnessRunTab, agentRunId?: string) => void;
 }) {
 	const now = useNow(30_000);
 	const [confirmStop, setConfirmStop] = useState(false);
@@ -107,7 +107,7 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 			</section>
 
 			<div className="hx-run-split">
-				<RunLedger detail={detail} />
+				<RunLedger detail={detail} onOpenAgentRun={onOpenTab ? (agentRunId) => onOpenTab('live', agentRunId) : undefined} />
 				<FindingsPanel agentRuns={detail.agentRuns}>
 					{onOpenTab && <button type="button" className="hx-link" onClick={() => onOpenTab('findings')}>Every finding</button>}
 					{onOpenTab && <button type="button" className="hx-link" onClick={() => onOpenTab('changes')}>Changes so far</button>}

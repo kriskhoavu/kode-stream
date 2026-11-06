@@ -113,7 +113,7 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 		}
 	};
 	// The queue's drawer lives in the page; the pipeline's drawer lives in the URL (`?tab=`).
-	const [queueDrawer, setQueueDrawer] = useState<{ taskId: string; tab: HarnessRunTab } | undefined>();
+	const [queueDrawer, setQueueDrawer] = useState<{ taskId: string; tab: HarnessRunTab; agentRunId?: string } | undefined>();
 	const plan = useMemo(() => planWaves(tasks), [tasks]);
 	const waveOf = (taskId: string) => {
 		const wave = plan.waveOf.get(taskId);
@@ -121,12 +121,13 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 	};
 	const pin = (task: HarnessTask, pinned: boolean) => void track(task, () => harness.pin(task, pinned));
 	const move = (task: HarnessTask, before?: HarnessTask) => void track(task, () => harness.setPriority(task, { before: before?.id }));
-	const drawer = (taskId: string, tab: HarnessRunTab, onTabChange: (tab: HarnessRunTab) => void, onClose: () => void) => (
+	const drawer = (taskId: string, tab: HarnessRunTab, onTabChange: (tab: HarnessRunTab) => void, onClose: () => void, agentRunId?: string) => (
 		<RunDrawer
 			state={state}
 			client={harness.client}
 			taskId={taskId}
 			tab={tab}
+			agentRunId={agentRunId}
 			wave={waveOf(taskId)}
 			onTabChange={onTabChange}
 			onClose={onClose}
@@ -191,10 +192,10 @@ function HarnessBody({ harness, location, newestApprovalId, onOpenRun, onLocatio
 					onApprove={harness.approve}
 					onReject={harness.reject}
 					onCancel={harness.cancelRun}
-					onOpenTab={(tab) => location.runId && onLocationChange({ view: 'run', runId: location.runId, tab })}
+					onOpenTab={(tab, agentRunId) => location.runId && onLocationChange({ view: 'run', runId: location.runId, tab, agentRunId })}
 				/>
 			)}
-			{location.view === 'run' && location.runId && location.tab && runTask && drawer(runTask, location.tab, (tab) => onLocationChange({ view: 'run', runId: location.runId, tab }), () => onLocationChange({ view: 'run', runId: location.runId }))}
+			{location.view === 'run' && location.runId && location.tab && runTask && drawer(runTask, location.tab, (tab) => onLocationChange({ view: 'run', runId: location.runId, tab }), () => onLocationChange({ view: 'run', runId: location.runId }), location.agentRunId)}
 			{location.view === 'settings' && <HarnessSettings client={harness.client} status={state.status} onPause={harness.pauseRole} onResume={harness.resumeRole} onSaved={() => void harness.refresh()} />}
 		</>
 	);

@@ -54,7 +54,7 @@ function sumRows(rows: LedgerRow[]) {
 	}, { turns: 0, durationMs: 0, costUsd: 0 });
 }
 
-export function RunLedger({ detail }: { detail: HarnessRunDetail }) {
+export function RunLedger({ detail, onOpenAgentRun }: { detail: HarnessRunDetail; onOpenAgentRun?: (agentRunId: string) => void }) {
 	const groups = ledgerGroups(detail);
 	const rows = groups.flatMap((group) => group.rows);
 	const total = sumRows(rows);
@@ -85,7 +85,7 @@ export function RunLedger({ detail }: { detail: HarnessRunDetail }) {
 								<td className="num">{formatMinutes(sum.durationMs)}</td>
 								<td className="num">{formatCost(sum.costUsd)}</td>
 							</tr>,
-							...(open ? group.rows.map((row) => <LedgerRowView key={row.id} row={row} />) : [])
+							...(open ? group.rows.map((row) => <LedgerRowView key={row.id} row={row} onOpen={onOpenAgentRun} />) : [])
 						];
 					})}
 					{rows.length > 0 && (
@@ -97,7 +97,7 @@ export function RunLedger({ detail }: { detail: HarnessRunDetail }) {
 	);
 }
 
-function LedgerRowView({ row }: { row: LedgerRow }) {
+function LedgerRowView({ row, onOpen }: { row: LedgerRow; onOpen?: (agentRunId: string) => void }) {
 	const agentRun = row.agentRun;
 	const stage = row.stage;
 	const status = agentRun ? agentRunStatus(agentRun.state, agentRun.verdict) : stage ? stageStatus(stage.state) : 'not_started';
@@ -106,7 +106,7 @@ function LedgerRowView({ row }: { row: LedgerRow }) {
 	const running = agentRun?.state === 'running' || stage?.state === 'running';
 	return (
 		<tr>
-			<td>{row.step}</td>
+			<td>{agentRun && onOpen ? <button type="button" className="hx-ledger-step" onClick={() => onOpen(agentRun.id)} title="Open this conversation">{row.step}</button> : row.step}</td>
 			<td>
 				<HxStatusBadge status={status} label={label} size="sm" />
 				{review && agentRun.state === 'succeeded' && <span className="hx-muted"> {agentRun.blocking} must fix · {plural(agentRun.advisory, 'suggestion')}</span>}

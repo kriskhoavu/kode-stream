@@ -17,9 +17,9 @@ async function setup(taskId: string, runId?: string) {
 	return { client, state };
 }
 
-function Harnessed({ state, client, taskId, wave, onMove = vi.fn(), onClose = vi.fn(), onStart, initialTab = 'stages' }: { state: HarnessState; client: ReturnType<typeof createFixtureClient>; taskId: string; wave: HarnessTask[]; onMove?: () => void; onClose?: () => void; onStart?: (task: HarnessTask) => void; initialTab?: HarnessRunTab }) {
+function Harnessed({ state, client, taskId, wave, onMove = vi.fn(), onClose = vi.fn(), onStart, initialTab = 'stages', agentRunId }: { state: HarnessState; client: ReturnType<typeof createFixtureClient>; taskId: string; wave: HarnessTask[]; onMove?: () => void; onClose?: () => void; onStart?: (task: HarnessTask) => void; initialTab?: HarnessRunTab; agentRunId?: string }) {
 	const [tab, setTab] = useState<HarnessRunTab>(initialTab);
-	return <RunDrawer state={state} client={client} taskId={taskId} tab={tab} wave={wave} onTabChange={setTab} onClose={onClose} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onPin={vi.fn()} onMove={onMove} onStart={onStart} />;
+	return <RunDrawer state={state} client={client} taskId={taskId} tab={tab} agentRunId={agentRunId} wave={wave} onTabChange={setTab} onClose={onClose} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onPin={vi.fn()} onMove={onMove} onStart={onStart} />;
 }
 
 describe('RunDrawer', () => {
@@ -51,15 +51,29 @@ describe('RunDrawer', () => {
 		const { client, state } = await setup('task-pm-02', 'run-pm-02');
 		render(<Harnessed state={state} client={client} taskId="task-pm-02" wave={[]} initialTab="live" />);
 		const rounds = await screen.findByRole('tablist', { name: 'Agent rounds' });
-		const names = within(rounds).getAllByRole('tab').map((tab) => tab.textContent ?? '');
-		expect(names.map((name) => name.replace(/\s+/g, ' '))).toEqual(names.map((name) => name.replace(/\s+/g, ' ')).slice().sort((a, b) => Number(a.match(/^\d+/)?.[0]) - Number(b.match(/^\d+/)?.[0])));
-		expect(names[0]).toMatch(/^1/);
-		expect(within(rounds).getByText('Plan')).toBeInTheDocument();
-		const checker = within(rounds).getByRole('tab', { name: /Checker · round 1/ });
+		// The Builder is step 5: the four Plan conversations come before it.
+		expect(within(rounds).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['5Builder · round 1working']);
+		// The finished Plan stage is folded; the Build stage, where the Builder works, is open.
+		const plan = within(rounds).getByRole('button', { name: /^Plan/ });
+		expect(plan).toHaveAttribute('aria-expanded', 'false');
+		expect(plan).toHaveTextContent('steps 1–4');
+		expect(within(rounds).queryByRole('tab', { name: /Checker · round 1/ })).toBeNull();
 		expect(within(rounds).getByRole('tab', { name: /Builder · round 1/ })).toHaveAttribute('aria-selected', 'true');
+		fireEvent.click(plan);
+		expect(within(rounds).getAllByRole('tab').map((tab) => tab.textContent?.match(/^\d+/)?.[0])).toEqual(['1', '2', '3', '4', '5']);
+		const checker = within(rounds).getByRole('tab', { name: /Checker · round 1/ });
 		fireEvent.click(checker);
 		expect(checker).toHaveAttribute('aria-selected', 'true');
 		await waitFor(() => expect(screen.getByRole('list', { name: 'Checker conversation' })).toHaveTextContent('Brief for the plan reviewer, round 1.'));
+	});
+
+	it('opens the Live tab on the conversation it was pointed at, with its stage unfolded', async () => {
+		const { client, state } = await setup('task-pm-02', 'run-pm-02');
+		const checker = state.details['run-pm-02'].agentRuns.find((agentRun) => agentRun.role === 'plan_reviewer' && agentRun.round === 2);
+		render(<Harnessed state={state} client={client} taskId="task-pm-02" wave={[]} initialTab="live" agentRunId={checker?.id} />);
+		const rounds = await screen.findByRole('tablist', { name: 'Agent rounds' });
+		expect(within(rounds).getByRole('button', { name: /^Plan/ })).toHaveAttribute('aria-expanded', 'true');
+		expect(within(rounds).getByRole('tab', { name: /Checker · round 2/ })).toHaveAttribute('aria-selected', 'true');
 	});
 
 	it('says what a task waits for and moves it within its wave from the keyboard', async () => {

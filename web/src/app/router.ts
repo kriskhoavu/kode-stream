@@ -6,7 +6,7 @@ export interface ReviewLocation { workspaceId?: string; branch?: string; }
 export type HarnessView = 'inbox' | 'queue' | 'run' | 'approvals' | 'settings';
 export type HarnessRunTab = 'ticket' | 'stages' | 'findings' | 'changes' | 'live' | 'links';
 export const harnessRunTabs: readonly HarnessRunTab[] = ['ticket', 'stages', 'findings', 'changes', 'live', 'links'];
-export interface HarnessLocation { view: HarnessView; runId?: string; tab?: HarnessRunTab; }
+export interface HarnessLocation { view: HarnessView; runId?: string; tab?: HarnessRunTab; /** The conversation the Live tab opens on. */ agentRunId?: string; }
 
 export type Route =
   | { name: 'workstream'; focusedItemId?: string; focusedSessionId?: string }
@@ -89,9 +89,12 @@ export function harnessLocationFromPath(path: string, search = ''): HarnessLocat
   if (segments.length === 1 && (segments[0] === 'queue' || segments[0] === 'approvals' || segments[0] === 'settings')) return { view: segments[0] };
   if (segments.length === 2 && segments[0] === 'runs' && segments[1]) {
     const runId = decodeURIComponent(segments[1]);
-    const rawTab = new URLSearchParams(search).get('tab');
+    const params = new URLSearchParams(search);
+    const rawTab = params.get('tab');
     const tab = harnessRunTabs.find((candidate) => candidate === rawTab);
-    return tab ? { view: 'run', runId, tab } : { view: 'run', runId };
+    const agentRunId = tab === 'live' ? params.get('agent') ?? undefined : undefined;
+    if (!tab) return { view: 'run', runId };
+    return agentRunId ? { view: 'run', runId, tab, agentRunId } : { view: 'run', runId, tab };
   }
   return undefined;
 }
@@ -99,7 +102,9 @@ export function harnessLocationFromPath(path: string, search = ''): HarnessLocat
 export function harnessPath(location: HarnessLocation): string {
   if (location.view === 'run' && location.runId) {
     const base = `/harness/runs/${encodeURIComponent(location.runId)}`;
-    return location.tab ? `${base}?tab=${location.tab}` : base;
+    if (!location.tab) return base;
+    const agent = location.tab === 'live' && location.agentRunId ? `&agent=${encodeURIComponent(location.agentRunId)}` : '';
+    return `${base}?tab=${location.tab}${agent}`;
   }
   return location.view === 'inbox' || location.view === 'run' ? '/harness' : `/harness/${location.view}`;
 }
