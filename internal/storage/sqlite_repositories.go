@@ -1403,7 +1403,7 @@ func databaseBoolValue(driver string, value bool) any {
 
 func normalizeWorkspaceForSQL(workspace models.WorkspaceConfig) models.WorkspaceConfig {
 	if workspace.Sources == nil {
-		workspace.Sources = []string{}
+		workspace.Sources = []models.WorkspaceSource{}
 	}
 	return workspace
 }

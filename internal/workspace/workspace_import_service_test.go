@@ -21,7 +21,7 @@ func TestPreviewImportValidatesCandidatesAndDetectsDuplicates(t *testing.T) {
 	second := importGitRepo(t)
 	dataDir := t.TempDir()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
-	if _, err := reg.Create(models.WorkspaceInput{Name: "Registered", Path: second, BaselineBranch: "main", Sources: []string{"plans"}}); err != nil {
+	if _, err := reg.Create(models.WorkspaceInput{Name: "Registered", Path: second, BaselineBranch: "main", Sources: models.SourceList("plans")}); err != nil {
 		t.Fatal(err)
 	}
 	indexPath := filepath.Join(dataDir, "items.yaml")
@@ -136,7 +136,7 @@ func TestExistingWorkspaceDeletionNeverRemovesDirectory(t *testing.T) {
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
 	idx := itemindex.New(filepath.Join(dataDir, "items.yaml"))
 	service := New(ServiceDependencies{Registry: reg, Index: idx})
-	created, err := reg.Create(models.WorkspaceInput{Name: "Imported", Path: root, BaselineBranch: "main", Sources: []string{"plans"}, RegistrationMode: models.WorkspaceRegistrationModeExisting})
+	created, err := reg.Create(models.WorkspaceInput{Name: "Imported", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans"), RegistrationMode: models.WorkspaceRegistrationModeExisting})
 	if err != nil {
 		t.Fatal(err)
 	}

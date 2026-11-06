@@ -1,5 +1,6 @@
 import { Search, SquareCheckBig } from 'lucide-react';
 import type { WorkspaceConfig } from '../../lib/types';
+import { sourcePaths } from '../../lib/sources';
 
 export function filterWorkspaces(workspaces: WorkspaceConfig[], query: string): WorkspaceConfig[] {
   const normalized = query.trim().toLocaleLowerCase();
@@ -67,7 +68,7 @@ export function WorkspaceList({
             </span>
             <span className="workspace-manager-item-path" title={workspace.location === 'cloud_agent' ? workspace.localRootLabel : workspace.path}>{workspace.location === 'cloud_agent' ? workspace.localRootLabel || 'Cloud Agent workspace' : workspace.path}</span>
             <span className="workspace-manager-item-meta">
-              {workspace.location === 'cloud_agent' ? 'Cloud Agent' : workspace.registrationMode === 'remote_clone' ? 'Remote' : workspace.registrationMode === 'existing_workspace' ? 'Imported' : 'Local'} · {workspace.sources.length} source{workspace.sources.length === 1 ? '' : 's'}
+              {workspace.location === 'cloud_agent' ? 'Cloud Agent' : workspace.registrationMode === 'remote_clone' ? 'Remote' : workspace.registrationMode === 'existing_workspace' ? 'Imported' : 'Local'} · {sourcePaths(workspace).length} source{sourcePaths(workspace).length === 1 ? '' : 's'}
             </span>
           </button>
         </div>;

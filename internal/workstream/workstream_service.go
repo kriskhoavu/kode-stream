@@ -134,7 +134,7 @@ func (s *Service) load(ctx context.Context, workspace models.WorkspaceConfig, se
 	sourceHash := sourceConfigurationHash(workspace)
 	workingTreeHash := ""
 	if sourceMode == "working_tree" {
-		workingTreeHash, err = workingTreeSourceHash(workspace.Path, workspace.Sources)
+		workingTreeHash, err = workingTreeSourceHash(workspace.Path, workspace.SourcesShownIn(models.SourceSurfaceWorkstream))
 		if err != nil {
 			return models.WorkstreamBranchLoadResult{}, err
 		}
@@ -193,7 +193,7 @@ func (s *Service) load(ctx context.Context, workspace models.WorkspaceConfig, se
 func sourceConfigurationHash(workspace models.WorkspaceConfig) string {
 	payload := struct {
 		Sources []string `json:"sources"`
-	}{Sources: workspace.Sources}
+	}{Sources: workspace.SourcesShownIn(models.SourceSurfaceWorkstream)}
 	data, _ := json.Marshal(payload)
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])

@@ -20,12 +20,12 @@ func TestScanContextHonorsCancellationAndFileBudget(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	service := New(gitadapter.New())
-	if _, err := service.ScanContext(ctx, models.WorkspaceConfig{ID: "w", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}, DefaultScanBudget()); !errors.Is(err, context.Canceled) {
+	if _, err := service.ScanContext(ctx, models.WorkspaceConfig{ID: "w", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")}, DefaultScanBudget()); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancel error=%v", err)
 	}
 	budget := DefaultScanBudget()
 	budget.MaxFileBytes = 8
-	if _, err := service.ScanContext(context.Background(), models.WorkspaceConfig{ID: "w", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}, budget); !errors.Is(err, ErrScanLimit) {
+	if _, err := service.ScanContext(context.Background(), models.WorkspaceConfig{ID: "w", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")}, budget); !errors.Is(err, ErrScanLimit) {
 		t.Fatalf("budget error=%v", err)
 	}
 }
@@ -201,7 +201,7 @@ cards:
 	writeTestFile(t, root, "docs/webapp/feature/DI-202/README.md", "# Web UI\n\nUI docs.\n")
 
 	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
-		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"},
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("docs"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ cards:
 	writeTestFile(t, root, "docs/a12/test/README.md", "# Test Profile\n")
 
 	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
-		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"},
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("docs"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -371,7 +371,8 @@ cards:
 			writeTestFile(t, root, source+"/a12/guide.md", "# Guide\n\nDocumentation.\n")
 
 			data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
-				ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{source},
+				ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main",
+				Sources: []models.WorkspaceSource{{Path: source, ShownIn: []models.SourceSurface{models.SourceSurfaceWorkstream}}},
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -413,7 +414,7 @@ cards:
 `)
 
 	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
-		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"},
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("docs"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -449,7 +450,7 @@ documents:
 `)
 
 	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
-		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"plans"},
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -486,7 +487,7 @@ func TestMinimalPlanYAMLInfersIdentityTitleAndDocuments(t *testing.T) {
 `)
 
 	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
-		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"plans"},
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -523,7 +524,7 @@ documents:
 `)
 
 	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
-		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"plans"},
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -544,7 +545,7 @@ func TestScanWithRequestMatchesFilesystemAndGitTreeForCommittedContent(t *testin
 	writeReaderGitFile(t, root, "plans/platform/PM-013/design/design-01-backend.md", "# Backend\n")
 	readerGitCommit(t, root, "add plan")
 
-	workspace := models.WorkspaceConfig{ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")}
 	git := gitadapter.New()
 	scan := New(git)
 	fsData, err := scan.ScanWithRequest(ScanRequest{
@@ -591,7 +592,7 @@ func TestScanWithRequestDocsSnapshotDoesNotWarnOnMissingPlanYAML(t *testing.T) {
 	writeReaderGitFile(t, root, "docs/a12/a12-in-discovery.md", "# A12 in Discovery\n")
 	readerGitCommit(t, root, "add docs")
 
-	workspace := models.WorkspaceConfig{ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"}}
+	workspace := models.WorkspaceConfig{ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("docs")}
 	git := gitadapter.New()
 	ref, commit, err := git.ResolveBranch(root, "main")
 	if err != nil {
@@ -628,5 +629,27 @@ func writeTestFile(t *testing.T, root, rel, content string) {
 	}
 	if err := osWriteFile(path, content); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestScanReadsOnlySourcesShownInWorkstream(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "plans/a12/PM-1/plan.md", "# Plan\n")
+	writeTestFile(t, root, "wiki/index.md", "# Wiki\n")
+	writeTestFile(t, root, "wiki/guide.md", "# Guide\n\nDocumentation.\n")
+
+	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans", "wiki"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range data.Items {
+		if strings.HasPrefix(item.ItemPath, "wiki/") {
+			t.Fatalf("wiki page %q reached the board", item.ItemPath)
+		}
+	}
+	if len(data.Items) == 0 {
+		t.Fatal("expected the plan on the board")
 	}
 }

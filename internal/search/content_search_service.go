@@ -97,7 +97,7 @@ func (s *Service) SearchExplorer(ctx context.Context, mode, workspaceID string, 
 	for _, workspace := range workspaces {
 		paths := []string{""}
 		if mode == ModeSources {
-			paths = workspace.Sources
+			paths = workspace.SourcePaths()
 		}
 		roots, err := canonicalRoots(workspace, paths, mode == ModeSources)
 		if err != nil {

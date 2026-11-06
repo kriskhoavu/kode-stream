@@ -94,7 +94,7 @@ func (s *KnowledgeService) Rescan(ctx context.Context, workspaceID, root string)
 	if err := requireKnowledgeEnabled(workspace); err != nil {
 		return KnowledgeActionResult{}, err
 	}
-	if !containsSource(workspace.Sources, root) {
+	if !containsSource(workspace.SourcesShownIn(models.SourceSurfaceKnowledge), root) {
 		return KnowledgeActionResult{}, ErrWikiNotFound
 	}
 	var wiki KnowledgeWiki
@@ -355,7 +355,7 @@ func (s *KnowledgeService) WikisContext(ctx context.Context, workspaceID string)
 	if err != nil {
 		return nil, err
 	}
-	wikis = configuredWikis(wikis, workspace.Sources)
+	wikis = configuredWikis(wikis, workspace.SourcesShownIn(models.SourceSurfaceKnowledge))
 	if wikis == nil {
 		wikis = []KnowledgeWiki{}
 	}
@@ -652,7 +652,7 @@ func (s *KnowledgeService) wikiContext(ctx context.Context, workspaceID, root st
 	if clean := filepath.ToSlash(filepath.Clean(root)); clean != root || clean == "." || filepath.IsAbs(root) || strings.HasPrefix(clean, "../") {
 		return KnowledgeWiki{}, ErrUnsafePath
 	}
-	if !containsSource(workspace.Sources, root) {
+	if !containsSource(workspace.SourcesShownIn(models.SourceSurfaceKnowledge), root) {
 		return KnowledgeWiki{}, ErrWikiNotFound
 	}
 	wikis, err := s.store.List(workspaceID)

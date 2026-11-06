@@ -292,7 +292,7 @@ func TestOpenAppOwnedStateImportsLegacyAppOwnedFiles(t *testing.T) {
 	paths := testPaths(dataDir)
 	git := gitadapter.New()
 	legacyRegistry := registry.New(paths.RegistryFile, git)
-	workspace, err := legacyRegistry.Create(models.WorkspaceInput{Name: "Workspace", Path: workspaceRoot, BaselineBranch: "master", Sources: []string{"plans"}})
+	workspace, err := legacyRegistry.Create(models.WorkspaceInput{Name: "Workspace", Path: workspaceRoot, BaselineBranch: "master", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +369,7 @@ func TestStorageSyncDataDirToDatabaseCreatesBackupAndCopiesState(t *testing.T) {
 	dataDir := t.TempDir()
 	paths := testPaths(dataDir)
 	source := registry.New(paths.RegistryFile, nil)
-	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: t.TempDir(), BaselineBranch: "main", Sources: []string{"plans"}, CreatedAt: time.Now().UTC()}
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: t.TempDir(), BaselineBranch: "main", Sources: models.SourceList("plans"), CreatedAt: time.Now().UTC()}
 	if err := writeYAMLFile(paths.RegistryFile, []models.WorkspaceConfig{workspace}); err != nil {
 		t.Fatal(err)
 	}
@@ -432,7 +432,7 @@ func TestStorageSyncDatabaseToDataDirCreatesBackupAndCopiesState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenAppOwnedState returned error: %v", err)
 	}
-	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: t.TempDir(), BaselineBranch: "main", Sources: []string{"plans"}, CreatedAt: time.Now().UTC()}
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: t.TempDir(), BaselineBranch: "main", Sources: models.SourceList("plans"), CreatedAt: time.Now().UTC()}
 	if err := state.Workspaces.(*SQLiteWorkspaceRepository).upsert(workspace); err != nil {
 		t.Fatal(err)
 	}
@@ -455,7 +455,7 @@ func TestStorageSyncDatabaseToDataDirCreatesBackupAndCopiesState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := writeYAMLFile(paths.RegistryFile, []models.WorkspaceConfig{{ID: "old-workspace", Name: "Old", Path: t.TempDir(), BaselineBranch: "main", Sources: []string{"plans"}, CreatedAt: time.Now().UTC()}}); err != nil {
+	if err := writeYAMLFile(paths.RegistryFile, []models.WorkspaceConfig{{ID: "old-workspace", Name: "Old", Path: t.TempDir(), BaselineBranch: "main", Sources: models.SourceList("plans"), CreatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}
 	service := NewStorageSyncService(Config{StorageOption: StorageOptionDatabase, Driver: StorageDriverSQLite, SQLitePath: paths.SQLiteDatabaseFile, Migrations: "auto"}, paths, system.RuntimeConfig{Mode: models.RuntimeModeLocal}, nil)
@@ -576,7 +576,7 @@ func TestOpenAppOwnedStatePostgresIntegration(t *testing.T) {
 		t.Fatalf("health = %#v", health)
 	}
 	runSQLAppOwnedRepositoryContract(t, state, "postgres-shared")
-	workspace := models.WorkspaceConfig{ID: "workspace-contract", Name: "Contract", Path: ".../contract", BaselineBranch: "main", RegistrationMode: models.WorkspaceRegistrationModeExisting, Sources: []string{"plans"}, ClonePathManaged: true, CreatedAt: time.Now().UTC()}
+	workspace := models.WorkspaceConfig{ID: "workspace-contract", Name: "Contract", Path: ".../contract", BaselineBranch: "main", RegistrationMode: models.WorkspaceRegistrationModeExisting, Sources: models.SourceList("plans"), ClonePathManaged: true, CreatedAt: time.Now().UTC()}
 	if err := state.Workspaces.(*SQLiteWorkspaceRepository).upsert(workspace); err != nil {
 		t.Fatal(err)
 	}
@@ -671,7 +671,7 @@ INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUE
 		t.Fatalf("integer Boolean schema upgrade: %v", err)
 	}
 	defer legacyState.SQLStore.Close()
-	legacyWorkspace := models.WorkspaceConfig{ID: "legacy-boolean", Name: "Legacy", Path: ".../legacy", BaselineBranch: "main", Sources: []string{}, ClonePathManaged: true, CreatedAt: time.Now().UTC()}
+	legacyWorkspace := models.WorkspaceConfig{ID: "legacy-boolean", Name: "Legacy", Path: ".../legacy", BaselineBranch: "main", Sources: models.SourceList(), ClonePathManaged: true, CreatedAt: time.Now().UTC()}
 	if err := legacyState.Workspaces.(*SQLiteWorkspaceRepository).upsert(legacyWorkspace); err != nil {
 		t.Fatal(err)
 	}
@@ -709,7 +709,7 @@ func TestSQLiteSharedAppOwnedRepositoryContract(t *testing.T) {
 func runSQLAppOwnedRepositoryContract(t *testing.T, state *AppOwnedState, prefix string) {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	workspace := models.WorkspaceConfig{ID: prefix + "-workspace", Name: "Contract", Path: ".../contract", BaselineBranch: "main", RegistrationMode: models.WorkspaceRegistrationModeExisting, Sources: []string{"plans"}, ClonePathManaged: true, CreatedAt: now}
+	workspace := models.WorkspaceConfig{ID: prefix + "-workspace", Name: "Contract", Path: ".../contract", BaselineBranch: "main", RegistrationMode: models.WorkspaceRegistrationModeExisting, Sources: models.SourceList("plans"), ClonePathManaged: true, CreatedAt: now}
 	workspaces := state.Workspaces.(*SQLiteWorkspaceRepository)
 	if err := workspaces.upsert(workspace); err != nil {
 		t.Fatal(err)
@@ -786,7 +786,7 @@ func TestSQLCloudRepositoryPersistsAcrossReconstructionAndScopesOwners(t *testin
 		t.Fatal(err)
 	}
 	repositoryA := &SQLCloudRepository{db: store.db, driver: store.driver, now: time.Now}
-	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Owned", OwnerUserID: "owner-a", Sources: []string{}}
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Owned", OwnerUserID: "owner-a", Sources: models.SourceList()}
 	if _, err := repositoryA.UpsertWorkspace(context.Background(), "owner-a", workspace); err != nil {
 		t.Fatal(err)
 	}
@@ -823,7 +823,7 @@ func TestSQLCloudRepositoryPublishesAgentWorkspaceWithCompareAndSwap(t *testing.
 	}
 	defer store.Close()
 	repository := &SQLCloudRepository{db: store.db, driver: store.driver, now: time.Now}
-	workspace := models.WorkspaceConfig{ID: "agent-workspace", Name: "First", OwnerUserID: "owner", Sources: []string{}}
+	workspace := models.WorkspaceConfig{ID: "agent-workspace", Name: "First", OwnerUserID: "owner", Sources: models.SourceList()}
 	published, conflict, err := repository.PublishAgentWorkspace(context.Background(), "owner", workspace, 0)
 	if err != nil || conflict || published.CloudPublicationRevision != 1 {
 		t.Fatalf("first publish=%#v conflict=%v err=%v", published, conflict, err)
@@ -969,7 +969,7 @@ func TestSQLWorkspaceDeletionRollsBackAllOwnedStateOnFailure(t *testing.T) {
 	}
 	defer store.Close()
 	workspaces := newSQLiteWorkspaceRepository(store, testPaths(t.TempDir()), nil)
-	workspace := models.WorkspaceConfig{ID: "workspace-delete", Name: "Delete", Path: ".../delete", BaselineBranch: "main", Sources: []string{}, CreatedAt: time.Now().UTC()}
+	workspace := models.WorkspaceConfig{ID: "workspace-delete", Name: "Delete", Path: ".../delete", BaselineBranch: "main", Sources: models.SourceList(), CreatedAt: time.Now().UTC()}
 	if err := workspaces.upsert(workspace); err != nil {
 		t.Fatal(err)
 	}

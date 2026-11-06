@@ -28,7 +28,7 @@ func TestDetectorFindsOnlyRegisteredCompatibleWikiSources(t *testing.T) {
 	writePage(t, root, "docs/index.md", "index", "Index", "[[guide]]")
 	writePage(t, root, "docs/guide.md", "guide", "Guide", "[Index](index.md)")
 	writePage(t, root, "other/index.md", "other", "Other", "")
-	workspace := models.WorkspaceConfig{ID: "ws", Path: root, Sources: []string{"docs", "missing"}}
+	workspace := models.WorkspaceConfig{ID: "ws", Path: root, Sources: models.SourceList("docs", "missing")}
 
 	wikis, err := NewDetector().DetectWorkspace(context.Background(), workspace)
 	if err != nil {
@@ -48,7 +48,7 @@ func TestDetectorRejectsSymlinkSourceEscape(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(root, "docs")); err != nil {
 		t.Fatal(err)
 	}
-	_, err := NewDetector().DetectWorkspace(context.Background(), models.WorkspaceConfig{ID: "ws", Path: root, Sources: []string{"docs"}})
+	_, err := NewDetector().DetectWorkspace(context.Background(), models.WorkspaceConfig{ID: "ws", Path: root, Sources: models.SourceList("docs")})
 	if err == nil {
 		t.Fatal("expected escaped source rejection")
 	}
@@ -60,7 +60,7 @@ func TestDetectorPreservesPartialPagesForOversizedFiles(t *testing.T) {
 	writePage(t, root, "docs/large.md", "large", "Large", strings.Repeat("long body ", 30))
 	detector := NewDetector()
 	detector.Limits.MaxFileBytes = 80
-	wikis, err := detector.DetectWorkspace(context.Background(), models.WorkspaceConfig{ID: "ws", Path: root, Sources: []string{"docs"}})
+	wikis, err := detector.DetectWorkspace(context.Background(), models.WorkspaceConfig{ID: "ws", Path: root, Sources: models.SourceList("docs")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestDetectorExcludesGitIgnoredMarkdownAndDeduplicatesSources(t *testing.T) 
 	writePage(t, root, "docs/private.md", "private", "Private", "")
 	detector := NewDetector()
 	detector.ignore = detectorIgnoreChecker{}
-	wikis, err := detector.DetectWorkspace(context.Background(), models.WorkspaceConfig{ID: "ws", Path: root, Sources: []string{"docs", "docs"}})
+	wikis, err := detector.DetectWorkspace(context.Background(), models.WorkspaceConfig{ID: "ws", Path: root, Sources: models.SourceList("docs", "docs")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,5 +189,20 @@ func writePage(t *testing.T, root, relative, slug, title, body string) {
 	content := "---\nslug: " + slug + "\ntitle: " + title + "\n---\n" + body
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDetectorReadsOnlySourcesShownInKnowledge(t *testing.T) {
+	root := t.TempDir()
+	writePage(t, root, "plans/index.md", "plans-index", "Plans", "")
+	writePage(t, root, "wiki/index.md", "wiki-index", "Wiki", "")
+	workspace := models.WorkspaceConfig{ID: "ws", Path: root, Sources: models.SourceList("plans", "wiki")}
+
+	wikis, err := NewDetector().DetectWorkspace(context.Background(), workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wikis) != 1 || wikis[0].Root != "wiki" {
+		t.Fatalf("wikis = %#v", wikis)
 	}
 }

@@ -28,7 +28,7 @@ describe('existing workspace import state', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Save sources' }));
 
 		await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
-		expect(update.mock.calls[0][1]).toEqual(expect.objectContaining({ sources: ['plans'] }));
+		expect(update.mock.calls[0][1]).toEqual(expect.objectContaining({ sources: [{ path: 'plans', shownIn: ['workstream'] }] }));
 		expect(update.mock.calls[0][1]).not.toHaveProperty('runtime');
 		expect(saveRuntime).not.toHaveBeenCalled();
 	});

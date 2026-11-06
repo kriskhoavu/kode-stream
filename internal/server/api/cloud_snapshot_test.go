@@ -42,7 +42,7 @@ func TestCloudSnapshotReadsCommitPinnedProviderContent(t *testing.T) {
 	if err := apiHandler.cloud.providers.connections.Save(userID, "github", "read-token"); err != nil {
 		t.Fatal(err)
 	}
-	workspace, err := apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "snapshot", Name: "Snapshot", OwnerUserID: userID, AccessMode: models.WorkspaceAccessModeRemoteSnapshot, Provider: "github", ProviderInstanceID: "github", ProviderRepository: "acme/repo", SelectedRef: "main", ResolvedCommitSHA: "commit-1", Sources: []string{}})
+	workspace, err := apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "snapshot", Name: "Snapshot", OwnerUserID: userID, AccessMode: models.WorkspaceAccessModeRemoteSnapshot, Provider: "github", ProviderInstanceID: "github", ProviderRepository: "acme/repo", SelectedRef: "main", ResolvedCommitSHA: "commit-1", Sources: models.SourceList()})
 	if err != nil {
 		t.Fatal(err)
 	}

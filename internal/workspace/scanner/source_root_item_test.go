@@ -31,7 +31,7 @@ func TestScanSurfacesSourceRootScopeItem(t *testing.T) {
 
 	s := New(gitadapter.New())
 	data, err := s.ScanWithRequest(ScanRequest{
-		Workspace:  models.WorkspaceConfig{Path: root, Sources: []string{"plans"}},
+		Workspace:  models.WorkspaceConfig{Path: root, Sources: models.SourceList("plans")},
 		Branch:     "master",
 		SourceMode: "working_tree",
 		Reader:     NewFilesystemSourceReader(root),

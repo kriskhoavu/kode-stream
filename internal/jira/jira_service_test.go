@@ -274,7 +274,7 @@ func jiraTestService(t *testing.T, baseURL, identifier string) (*Service, models
 	}
 	dir := t.TempDir()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), gitadapter.New())
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: []string{"plans"}, Jira: &models.JiraConnection{DeploymentType: "server", BaseURL: baseURL, ProjectKey: "DI", TokenEnvVar: "JIRA_TEST_TOKEN"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans"), Jira: &models.JiraConnection{DeploymentType: "server", BaseURL: baseURL, ProjectKey: "DI", TokenEnvVar: "JIRA_TEST_TOKEN"}})
 	if err != nil {
 		t.Fatal(err)
 	}

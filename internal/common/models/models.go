@@ -133,7 +133,7 @@ type WorkspaceConfig struct {
 	ManagedCloneVerified       bool                      `json:"managedCloneVerified,omitempty" yaml:"managedCloneVerified,omitempty"`
 	ManagedCloneCleanupPending bool                      `json:"managedCloneCleanupPending,omitempty" yaml:"managedCloneCleanupPending,omitempty"`
 	LastSelectedBranch         string                    `json:"lastSelectedBranch,omitempty" yaml:"lastSelectedBranch,omitempty"`
-	Sources                    []string                  `json:"sources" yaml:"sources"`
+	Sources                    []WorkspaceSource         `json:"sources" yaml:"sources"`
 	CreatedAt                  time.Time                 `json:"createdAt" yaml:"createdAt"`
 	LastScannedAt              time.Time                 `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
 	Jira                       *JiraConnection           `json:"jira,omitempty" yaml:"jira,omitempty"`
@@ -457,7 +457,7 @@ type WorkspaceInput struct {
 	ProviderRepository string                    `json:"providerRepository,omitempty" yaml:"providerRepository,omitempty"`
 	SelectedRef        string                    `json:"selectedRef,omitempty" yaml:"selectedRef,omitempty"`
 	BaselineBranch     string                    `json:"baselineBranch" yaml:"baselineBranch"`
-	Sources            []string                  `json:"sources" yaml:"sources"`
+	Sources            []WorkspaceSource         `json:"sources" yaml:"sources"`
 	RegistrationMode   WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
 	RemoteURL          string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
 	CloneRoot          string                    `json:"cloneRoot,omitempty" yaml:"cloneRoot,omitempty"`

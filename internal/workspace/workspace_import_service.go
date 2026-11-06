@@ -281,7 +281,7 @@ func readWorkspaceImport(sourcePath string) (string, []byte, []models.WorkspaceC
 func importInput(record models.WorkspaceConfig) models.WorkspaceInput {
 	return models.WorkspaceInput{
 		Name: strings.TrimSpace(record.Name), Path: strings.TrimSpace(record.Path),
-		BaselineBranch: strings.TrimSpace(record.BaselineBranch), Sources: append([]string(nil), record.Sources...),
+		BaselineBranch: strings.TrimSpace(record.BaselineBranch), Sources: append([]models.WorkspaceSource(nil), record.Sources...),
 		RegistrationMode: models.WorkspaceRegistrationModeExisting, RemoteURL: strings.TrimSpace(record.RemoteURL),
 		Jira: record.Jira, Knowledge: record.Knowledge, Runtime: record.Runtime,
 	}

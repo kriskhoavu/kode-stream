@@ -203,7 +203,7 @@ func newTestService(t *testing.T) (*WorkspaceFileService, models.WorkspaceConfig
 			t.Fatal(err)
 		}
 	}
-	workspace := models.WorkspaceConfig{ID: "ws", Path: root, Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{ID: "ws", Path: root, Sources: models.SourceList("plans")}
 	audit := &fakeAudit{}
 	refresher := &fakeRefresher{}
 	return NewWorkspaceFileService(fakeRegistry{workspace}, workspaceaccess.NewWithIgnoreChecker(nil), &fakeGit{}, audit, refresher), workspace, audit, refresher

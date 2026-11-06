@@ -21,7 +21,7 @@ func TestRuntimeVerificationModeRemainsDefault(t *testing.T) {
 		Name:           "Workspace",
 		Path:           workspacePath,
 		BaselineBranch: "main",
-		Sources:        []string{"plans"},
+		Sources: models.SourceList("plans"),
 		Runtime:        verificationRuntime("printf verify > verify.out", nil),
 	})
 	service := NewService(reg, appruntime.NewService())
@@ -56,7 +56,7 @@ func TestAutomationVerificationRunsSelectedSpecsAndCollectsArtifacts(t *testing.
 		Name:           "Workspace",
 		Path:           workspacePath,
 		BaselineBranch: "main",
-		Sources:        []string{"plans"},
+		Sources: models.SourceList("plans"),
 		Runtime:        verificationRuntime("printf runtime > verify.out", config),
 	})
 	service := NewService(reg, appruntime.NewService())
@@ -116,7 +116,7 @@ func TestAutomationVerificationFailureRunsTeardown(t *testing.T) {
 		Name:           "Workspace",
 		Path:           workspacePath,
 		BaselineBranch: "main",
-		Sources:        []string{"plans"},
+		Sources: models.SourceList("plans"),
 		Runtime:        verificationRuntime("true", config),
 	})
 	service := NewService(reg, appruntime.NewService())
@@ -150,7 +150,7 @@ func TestAutomationVerificationSkipsSpecsWhenBootFails(t *testing.T) {
 		Name:           "Workspace",
 		Path:           workspacePath,
 		BaselineBranch: "main",
-		Sources:        []string{"plans"},
+		Sources: models.SourceList("plans"),
 		Runtime:        runtimeConfig,
 	})
 	service := NewService(reg, appruntime.NewService())
@@ -175,7 +175,7 @@ func TestAutomationVerificationRejectsPathTraversal(t *testing.T) {
 		Name:           "Workspace",
 		Path:           t.TempDir(),
 		BaselineBranch: "main",
-		Sources:        []string{"plans"},
+		Sources: models.SourceList("plans"),
 		Runtime: verificationRuntime("true", &models.RuntimeAutomationConfig{
 			Enabled:         true,
 			RepositoryPath:  automationRepo,
@@ -196,7 +196,7 @@ func TestAutomationVerificationRejectsShellEnvironmentBeforeStarting(t *testing.
 	automationRepo := t.TempDir()
 	marker := filepath.Join(automationRepo, "injected")
 	service := NewService(verificationRegistry(t, models.WorkspaceConfig{
-		ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"},
+		ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: models.SourceList("plans"),
 		Runtime: verificationRuntime("true", &models.RuntimeAutomationConfig{Enabled: true, RepositoryPath: automationRepo, Runner: models.AutomationRunnerCypress, CommandTemplate: "touch " + marker + " {env} {specs}"}),
 	}), appruntime.NewService())
 	if _, err := service.Start("workspace-1", CreateInput{Mode: JobModeAutomation, Environment: "local; touch " + marker, SelectedSpecs: []string{"safe.cy.ts"}}); err == nil {
@@ -218,7 +218,7 @@ func TestAutomationArtifactSymlinkOutsideRepositoryIsSkipped(t *testing.T) {
 		t.Skipf("symlink unavailable: %v", err)
 	}
 	service := NewService(verificationRegistry(t, models.WorkspaceConfig{
-		ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"},
+		ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: models.SourceList("plans"),
 		Runtime: verificationRuntime("true", &models.RuntimeAutomationConfig{Enabled: true, RepositoryPath: automationRepo, Runner: models.AutomationRunnerCypress, CommandTemplate: "true", ArtifactPaths: []string{"escape"}}),
 	}), appruntime.NewService())
 	job, err := service.Start("workspace-1", CreateInput{Mode: JobModeAutomation, SelectedSpecs: []string{"safe.cy.ts"}})
@@ -239,7 +239,7 @@ func TestAutomationArtifactLocatorIncludesConfiguredRoot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(automationRepo, "reports", "result.txt"), []byte("ok"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	service := NewService(verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", &models.RuntimeAutomationConfig{Enabled: true, RepositoryPath: automationRepo, Runner: models.AutomationRunnerCypress, CommandTemplate: "true", ArtifactPaths: []string{"reports"}})}), appruntime.NewService())
+	service := NewService(verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: models.SourceList("plans"), Runtime: verificationRuntime("true", &models.RuntimeAutomationConfig{Enabled: true, RepositoryPath: automationRepo, Runner: models.AutomationRunnerCypress, CommandTemplate: "true", ArtifactPaths: []string{"reports"}})}), appruntime.NewService())
 	job, err := service.Start("workspace-1", CreateInput{Mode: JobModeAutomation, SelectedSpecs: []string{"safe.cy.ts"}})
 	if err != nil {
 		t.Fatal(err)
@@ -259,7 +259,7 @@ func TestAutomationArtifactLocatorIncludesConfiguredRoot(t *testing.T) {
 func TestVerificationRetentionPrunesOldTerminalJobsAndTheirOwnedArtifacts(t *testing.T) {
 	workspacePath := t.TempDir()
 	service := NewService(verificationRegistry(t, models.WorkspaceConfig{
-		ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", nil),
+		ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: models.SourceList("plans"), Runtime: verificationRuntime("true", nil),
 	}), appruntime.NewService()).ConfigureRetention(1, time.Hour)
 	first, err := service.Start("workspace-1", CreateInput{})
 	if err != nil {
@@ -284,7 +284,7 @@ func TestVerificationRetentionPrunesOldTerminalJobsAndTheirOwnedArtifacts(t *tes
 
 func TestVerificationRetentionRecordsArtifactCleanupFailure(t *testing.T) {
 	workspacePath := t.TempDir()
-	service := NewService(verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", nil)}), appruntime.NewService()).ConfigureRetention(1, time.Hour)
+	service := NewService(verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: models.SourceList("plans"), Runtime: verificationRuntime("true", nil)}), appruntime.NewService()).ConfigureRetention(1, time.Hour)
 	service.removeArtifact = func(string) error { return errors.New("disk busy") }
 	first, err := service.Start("workspace-1", CreateInput{})
 	if err != nil {
@@ -303,7 +303,7 @@ func TestVerificationRetentionRecordsArtifactCleanupFailure(t *testing.T) {
 
 func TestVerificationRetentionPrunesExpiredTerminalJob(t *testing.T) {
 	workspacePath := t.TempDir()
-	service := NewService(verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", nil)}), appruntime.NewService()).ConfigureRetention(10, time.Nanosecond)
+	service := NewService(verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: models.SourceList("plans"), Runtime: verificationRuntime("true", nil)}), appruntime.NewService()).ConfigureRetention(10, time.Nanosecond)
 	service.mu.Lock()
 	service.jobs["old"] = &Job{ID: "old", WorkspaceID: "workspace-1", Status: JobStatusPassed, FinishedAt: time.Now().Add(-time.Hour)}
 	service.jobs["new"] = &Job{ID: "new", WorkspaceID: "workspace-1", Status: JobStatusPassed, FinishedAt: time.Now()}
@@ -316,7 +316,7 @@ func TestVerificationRetentionPrunesExpiredTerminalJob(t *testing.T) {
 
 func TestVerificationServiceStartupCleansOnlyOwnedOrphanArtifactGenerations(t *testing.T) {
 	workspacePath := t.TempDir()
-	reg := verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: verificationRuntime("true", nil)})
+	reg := verificationRegistry(t, models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: workspacePath, BaselineBranch: "main", Sources: models.SourceList("plans"), Runtime: verificationRuntime("true", nil)})
 	orphan := filepath.Join(workspacePath, ".artifacts", "verification", "verify-orphan")
 	keep := filepath.Join(workspacePath, ".artifacts", "verification", "not-a-job")
 	if err := os.MkdirAll(orphan, 0o755); err != nil {
@@ -341,7 +341,7 @@ func TestVerificationRejectsWhenConcurrencyLimitIsFull(t *testing.T) {
 		Name:           "Workspace",
 		Path:           workspacePath,
 		BaselineBranch: "main",
-		Sources:        []string{"plans"},
+		Sources: models.SourceList("plans"),
 		Runtime:        verificationRuntime("sleep 0.2", nil),
 	})
 	service := NewServiceWithPolicy(reg, appruntime.NewService(), 1, time.Minute)
@@ -364,7 +364,7 @@ func TestVerificationShutdownCancelsRunningJob(t *testing.T) {
 		Name:           "Workspace",
 		Path:           workspacePath,
 		BaselineBranch: "main",
-		Sources:        []string{"plans"},
+		Sources: models.SourceList("plans"),
 		Runtime:        verificationRuntime("sleep 5", nil),
 	})
 	service := NewServiceWithPolicy(reg, appruntime.NewService(), 1, time.Minute)
@@ -392,7 +392,7 @@ func TestVerificationBoundsRuntimeCleanupAfterTimeout(t *testing.T) {
 		Name:           "Workspace",
 		Path:           workspacePath,
 		BaselineBranch: "main",
-		Sources:        []string{"plans"},
+		Sources: models.SourceList("plans"),
 		Runtime:        runtimeConfig,
 	})
 	service := NewServiceWithPolicy(reg, appruntime.NewService(), 1, 50*time.Millisecond)

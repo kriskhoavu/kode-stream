@@ -47,7 +47,7 @@ func TestSaveMetadataCreatesPlanYAML(t *testing.T) {
 	writeFile(t, itemRoot, "README.md", "# PM-002\n")
 
 	writer := New(fileaccess.New(), nil, nil, nil)
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{
 		ItemPath:   "items/platform/PM-002",
 		Scope:      "platform",
@@ -84,7 +84,7 @@ func TestSaveMetadataRejectsDocumentationRoots(t *testing.T) {
 	writer := New(fileaccess.New(), nil, nil, nil)
 	for _, source := range []string{"docs", "wiki"} {
 		t.Run(source, func(t *testing.T) {
-			workspace := models.WorkspaceConfig{Path: t.TempDir(), Sources: []string{source}}
+			workspace := models.WorkspaceConfig{Path: t.TempDir(), Sources: models.SourceList(source)}
 			item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: source, MetadataSource: source}}
 			if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); err == nil {
 				t.Fatalf("expected %s root metadata edit to be rejected", source)
@@ -117,7 +117,7 @@ documents:
 `)
 
 	writer := New(fileaccess.New(), nil, nil, nil)
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("plans")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{
 		ItemPath: "plans/api/DI-170", Scope: "api", Identifier: "DI-170", Title: "Custom Assortment Level 2", Status: models.StatusDraft,
 	}}
@@ -151,7 +151,7 @@ func TestCreateItemRejectsDuplicate(t *testing.T) {
 	}
 
 	writer := New(fileaccess.New(), nil, nil, nil)
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	_, err := writer.CreateItem(workspace, models.NewItemInput{
 		Source:     "items",
 		Scope:      "platform",
@@ -170,7 +170,7 @@ func TestCreateItemWritesOnlyEmptyReadme(t *testing.T) {
 	}
 
 	writer := New(fileaccess.New(), nil, nil, nil)
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	if _, err := writer.CreateItem(workspace, models.NewItemInput{
 		Source:     "items",
 		Scope:      "platform",
@@ -210,7 +210,7 @@ func TestCreateItemUsesSourceStructurePathPattern(t *testing.T) {
 	}
 
 	writer := New(fileaccess.New(), nil, nil, nil)
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("plans")}
 	if _, err := writer.CreateItem(workspace, models.NewItemInput{
 		Source:     "plans",
 		Scope:      "plans",
@@ -235,7 +235,7 @@ func TestCreateItemDoesNotDuplicateSourceWhenScopeDefaultsToSource(t *testing.T)
 	}
 
 	writer := New(fileaccess.New(), nil, nil, nil)
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"plans", "docs"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("plans", "docs")}
 	if _, err := writer.CreateItem(workspace, models.NewItemInput{
 		Source:     "plans",
 		Scope:      "plans",
@@ -260,7 +260,7 @@ func TestCreateJiraBackedItemWritesReadmeAndMetadata(t *testing.T) {
 	}
 
 	writer := New(fileaccess.New(), nil, nil, nil)
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	if _, err := writer.CreateItem(workspace, models.NewItemInput{
 		Source:        "items",
 		Scope:         "platform",
@@ -308,7 +308,7 @@ func TestCreateJiraBackedItemRefreshesIndex(t *testing.T) {
 	git := gitadapter.New()
 	idx := itemindex.New(filepath.Join(t.TempDir(), "index.yaml"))
 	writer := New(fileaccess.New(), scanner.New(git), idx, nil)
-	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "workspace", Path: root, BaselineBranch: "main", Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("items")}
 	result, err := writer.CreateItem(workspace, models.NewItemInput{
 		Source:        "items",
 		Scope:         "platform",
@@ -343,7 +343,7 @@ func TestSaveMetadataRefreshesIndex(t *testing.T) {
 	git := gitadapter.New()
 	idx := itemindex.New(filepath.Join(t.TempDir(), "index.yaml"))
 	writer := New(fileaccess.New(), scanner.New(git), idx, nil)
-	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "workspace", Path: root, BaselineBranch: "main", Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{
 		WorkspaceID: workspace.ID,
 		ItemPath:    "items/platform/PM-002",
@@ -378,7 +378,7 @@ func TestSaveMetadataRequiresFreshRevisionAndReportsCommittedRefreshFailure(t *t
 	itemRoot := filepath.Join(root, "plans", "platform", "PM-100")
 	writeFile(t, itemRoot, "README.md", "# PM-100\n")
 	writeFile(t, itemRoot, "plan.yaml", "plan:\n  status: draft\n")
-	workspace := models.WorkspaceConfig{ID: "w", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{ID: "w", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "plans/platform/PM-100", Status: models.StatusDraft}}
 	writer := New(fileaccess.New(), scanner.New(gitadapter.New()), failingRefreshIndex{}, nil)
 	before, err := os.ReadFile(filepath.Join(itemRoot, "plan.yaml"))
@@ -423,7 +423,7 @@ func TestStructuredSnapshotFailureLeavesNoTargetAndCanRetry(t *testing.T) {
 	writer.snapshotReader = func(models.WorkspaceConfig, models.ItemDetail) scanner.SourceReader {
 		return &failingSnapshotReader{SourceReader: baseReader}
 	}
-	workspace := models.WorkspaceConfig{Path: targetRoot, Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{Path: targetRoot, Sources: models.SourceList("plans")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{Commit: "captured", SourceMode: "snapshot", MetadataSource: "plan.yaml", ItemPath: itemPath}}
 
 	_, err := writer.ImportSnapshotPlan(workspace, item)
@@ -457,7 +457,7 @@ func TestImportSnapshotPlanRollsBackPublicationWhenRefreshFails(t *testing.T) {
 	baseReader := scanner.NewFilesystemSourceReader(sourceRoot)
 	writer := New(fileaccess.New(), scanner.New(gitadapter.New()), failingRefreshIndex{}, nil)
 	writer.snapshotReader = func(models.WorkspaceConfig, models.ItemDetail) scanner.SourceReader { return baseReader }
-	workspace := models.WorkspaceConfig{ID: "workspace-1", Path: targetRoot, BaselineBranch: "main", Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Path: targetRoot, BaselineBranch: "main", Sources: models.SourceList("plans")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{Commit: "captured", SourceMode: "snapshot", MetadataSource: "plan.yaml", ItemPath: itemPath}}
 
 	_, err := writer.ImportSnapshotPlan(workspace, item)
@@ -510,7 +510,7 @@ func TestCreateItemReusesEmptyLeftoverDirectory(t *testing.T) {
 	}
 
 	writer := New(fileaccess.New(), nil, nil, nil)
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	if _, err := writer.CreateItem(workspace, models.NewItemInput{
 		Source:     "items",
 		Scope:      "platform",

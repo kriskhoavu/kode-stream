@@ -188,7 +188,7 @@ func pageBySlug(t *testing.T, wiki KnowledgeWiki, slug string) KnowledgePage {
 func detectReferenceWiki(t *testing.T, root string) KnowledgeWiki {
 	t.Helper()
 	wikis, err := NewDetector().DetectWorkspace(context.Background(), models.WorkspaceConfig{
-		ID: "ws", Path: root, Sources: []string{"wiki"},
+		ID: "ws", Path: root, Sources: models.SourceList("wiki"),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -19,7 +19,7 @@ func TestCreateDefaultsRegistrationModeToLocalPath(t *testing.T) {
 	root := newRegistryGitRepo(t)
 	registry := New(filepath.Join(t.TempDir(), "workspaces.yaml"), gitadapter.New())
 
-	workspace, err := registry.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := registry.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestDeleteWriteFailureKeepsWorkspaceRecoverableInMemoryAndOnDisk(t *testing
 	stateDir := filepath.Join(base, "state")
 	path := filepath.Join(stateDir, "workspaces.yaml")
 	repository := New(path, gitadapter.New())
-	workspace, err := repository.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := repository.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,14 +72,14 @@ func TestKnowledgeSettingsRoundTripAndSurviveUnrelatedUpdate(t *testing.T) {
 	root := newRegistryGitRepo(t)
 	registry := New(filepath.Join(t.TempDir(), "workspaces.yaml"), gitadapter.New())
 	disabled := false
-	created, err := registry.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}, Knowledge: &models.KnowledgeSettings{Enabled: &disabled, EnrichExecutable: " tool ", EnrichArgs: []string{"--sync"}}})
+	created, err := registry.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans"), Knowledge: &models.KnowledgeSettings{Enabled: &disabled, EnrichExecutable: " tool ", EnrichArgs: []string{"--sync"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if created.Knowledge == nil || created.Knowledge.EnrichExecutable != "tool" || *created.Knowledge.Enabled {
 		t.Fatalf("knowledge = %#v", created.Knowledge)
 	}
-	updated, err := registry.Update(created.ID, models.WorkspaceInput{Name: "Renamed", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	updated, err := registry.Update(created.ID, models.WorkspaceInput{Name: "Renamed", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestUnrelatedUpdatePreservesLegacyRuntimeWithoutRevalidatingIt(t *testing.T
 	registryPath := filepath.Join(t.TempDir(), "workspaces.yaml")
 	repository := New(registryPath, gitadapter.New())
 	created, err := repository.Create(models.WorkspaceInput{
-		Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans", "wiki"},
+		Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans", "wiki"),
 		Runtime: &models.WorkspaceRuntimeConfig{
 			Type:       models.RuntimeTypeCustom,
 			Commands:   models.RuntimeCommandSet{Up: "start", Down: "stop", Verify: models.RuntimeVerifyCommands{Smoke: "verify"}},
@@ -122,11 +122,11 @@ func TestUnrelatedUpdatePreservesLegacyRuntimeWithoutRevalidatingIt(t *testing.T
 	repository.records[0].Runtime = &legacyRuntime
 	repository.mu.Unlock()
 
-	updated, err := repository.Update(created.ID, models.WorkspaceInput{Name: created.Name, Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	updated, err := repository.Update(created.ID, models.WorkspaceInput{Name: created.Name, Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(updated.Sources) != 1 || updated.Sources[0] != "plans" {
+	if len(updated.Sources) != 1 || updated.Sources[0].Path != "plans" {
 		t.Fatalf("sources = %#v", updated.Sources)
 	}
 	reloaded := New(registryPath, gitadapter.New())
@@ -178,7 +178,7 @@ func TestCreateRemoteCloneRequiresRemoteURL(t *testing.T) {
 		Path:             root,
 		RegistrationMode: models.WorkspaceRegistrationModeRemoteClone,
 		BaselineBranch:   "main",
-		Sources:          []string{"plans"},
+		Sources: models.SourceList("plans"),
 	})
 	if err == nil || !strings.Contains(err.Error(), "remote URL") {
 		t.Fatalf("err = %v", err)
@@ -192,19 +192,19 @@ func TestValidateRejectsSourceSymlinkEscapeAliasAndOverlap(t *testing.T) {
 		t.Skip(err)
 	}
 	repository := New(filepath.Join(t.TempDir(), "workspaces.yaml"), gitadapter.New())
-	if _, err := repository.Validate(models.WorkspaceInput{Name: "Escape", Path: root, BaselineBranch: "main", Sources: []string{"escape"}}); err == nil {
+	if _, err := repository.Validate(models.WorkspaceInput{Name: "Escape", Path: root, BaselineBranch: "main", Sources: models.SourceList("escape")}); err == nil {
 		t.Fatal("expected source escape rejection")
 	}
 	if err := os.MkdirAll(filepath.Join(root, "plans", "nested"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repository.Validate(models.WorkspaceInput{Name: "Overlap", Path: root, BaselineBranch: "main", Sources: []string{"plans", "plans/nested"}}); err == nil {
+	if _, err := repository.Validate(models.WorkspaceInput{Name: "Overlap", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans", "plans/nested")}); err == nil {
 		t.Fatal("expected nested source rejection")
 	}
 	if err := os.Symlink(filepath.Join(root, "plans"), filepath.Join(root, "alias")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repository.Validate(models.WorkspaceInput{Name: "Alias", Path: root, BaselineBranch: "main", Sources: []string{"plans", "alias"}}); err == nil {
+	if _, err := repository.Validate(models.WorkspaceInput{Name: "Alias", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans", "alias")}); err == nil {
 		t.Fatal("expected source alias rejection")
 	}
 }
@@ -220,7 +220,7 @@ func TestCreatePersistenceFailureDoesNotPublishMemory(t *testing.T) {
 	if err := os.Mkdir(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repository.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}); err == nil {
+	if _, err := repository.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")}); err == nil {
 		t.Fatal("expected write failure")
 	}
 	listed, err := repository.List()
@@ -244,7 +244,7 @@ func TestPersistencePhaseFailuresPreserveMemoryAndDurableGeneration(t *testing.T
 			secondRoot := newRegistryGitRepo(t)
 			path := filepath.Join(t.TempDir(), "workspaces.yaml")
 			registry := New(path, gitadapter.New())
-			if _, err := registry.Create(models.WorkspaceInput{Name: "First", Path: firstRoot, BaselineBranch: "main", Sources: []string{"plans"}}); err != nil {
+			if _, err := registry.Create(models.WorkspaceInput{Name: "First", Path: firstRoot, BaselineBranch: "main", Sources: models.SourceList("plans")}); err != nil {
 				t.Fatal(err)
 			}
 			before, err := os.ReadFile(path)
@@ -252,7 +252,7 @@ func TestPersistencePhaseFailuresPreserveMemoryAndDurableGeneration(t *testing.T
 				t.Fatal(err)
 			}
 			registry.hooks = hooks
-			if _, err := registry.Create(models.WorkspaceInput{Name: "Second", Path: secondRoot, BaselineBranch: "main", Sources: []string{"plans"}}); !errors.Is(err, failure) {
+			if _, err := registry.Create(models.WorkspaceInput{Name: "Second", Path: secondRoot, BaselineBranch: "main", Sources: models.SourceList("plans")}); !errors.Is(err, failure) {
 				t.Fatalf("error=%v", err)
 			}
 			listed, err := registry.List()
@@ -264,7 +264,7 @@ func TestPersistencePhaseFailuresPreserveMemoryAndDurableGeneration(t *testing.T
 				t.Fatalf("durable generation changed: %q err=%v", after, err)
 			}
 			registry.hooks = persistenceHooks{}
-			if _, err := registry.Create(models.WorkspaceInput{Name: "Second", Path: secondRoot, BaselineBranch: "main", Sources: []string{"plans"}}); err != nil {
+			if _, err := registry.Create(models.WorkspaceInput{Name: "Second", Path: secondRoot, BaselineBranch: "main", Sources: models.SourceList("plans")}); err != nil {
 				t.Fatalf("retry: %v", err)
 			}
 		})
@@ -277,9 +277,9 @@ func TestBatchCreateWritesAcceptedWorkspacesAtomicallyWithPrivateMode(t *testing
 	path := filepath.Join(t.TempDir(), "workspaces.yaml")
 	registry := New(path, gitadapter.New())
 	results, err := registry.BatchCreate([]models.WorkspaceInput{
-		{Name: "First", Path: first, BaselineBranch: "main", Sources: []string{"plans"}, RegistrationMode: models.WorkspaceRegistrationModeExisting},
-		{Name: "Duplicate", Path: first, BaselineBranch: "main", Sources: []string{"plans"}, RegistrationMode: models.WorkspaceRegistrationModeExisting},
-		{Name: "Second", Path: second, BaselineBranch: "main", Sources: []string{"plans"}, RegistrationMode: models.WorkspaceRegistrationModeExisting},
+		{Name: "First", Path: first, BaselineBranch: "main", Sources: models.SourceList("plans"), RegistrationMode: models.WorkspaceRegistrationModeExisting},
+		{Name: "Duplicate", Path: first, BaselineBranch: "main", Sources: models.SourceList("plans"), RegistrationMode: models.WorkspaceRegistrationModeExisting},
+		{Name: "Second", Path: second, BaselineBranch: "main", Sources: models.SourceList("plans"), RegistrationMode: models.WorkspaceRegistrationModeExisting},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -315,7 +315,7 @@ func TestBatchCreatePersistenceFailureDoesNotMutateLoadedRecords(t *testing.T) {
 	if err := os.Mkdir(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := registry.BatchCreate([]models.WorkspaceInput{{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}}); err == nil {
+	if _, err := registry.BatchCreate([]models.WorkspaceInput{{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")}}); err == nil {
 		t.Fatal("expected atomic replacement failure")
 	}
 	listed, err := registry.List()
@@ -327,7 +327,7 @@ func TestBatchCreatePersistenceFailureDoesNotMutateLoadedRecords(t *testing.T) {
 func TestConcurrentBatchCreateRechecksDuplicateUnderLock(t *testing.T) {
 	root := newRegistryGitRepo(t)
 	registry := New(filepath.Join(t.TempDir(), "workspaces.yaml"), gitadapter.New())
-	input := []models.WorkspaceInput{{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}}}
+	input := []models.WorkspaceInput{{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")}}
 	start := make(chan struct{})
 	results := make(chan []BatchCreateResult, 2)
 	errors := make(chan error, 2)

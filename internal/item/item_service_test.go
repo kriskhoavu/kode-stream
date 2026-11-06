@@ -283,7 +283,7 @@ automation-test:
 	dataDir := t.TempDir()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), git)
 	workspace, err := reg.Create(models.WorkspaceInput{
-		Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"},
+		Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans"),
 		Runtime: &models.WorkspaceRuntimeConfig{
 			Type: models.RuntimeTypeCustom, RebuildPolicy: models.RebuildPolicyNever,
 			Commands:   models.RuntimeCommandSet{Up: "true", Down: "true", Verify: models.RuntimeVerifyCommands{Smoke: "true"}},
@@ -327,7 +327,7 @@ func TestSnapshotEditsAreReadOnly(t *testing.T) {
 	indexPath := filepath.Join(t.TempDir(), "item-index.yaml")
 	git := gitadapter.New()
 	reg := registry.New(registryPath, git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -394,7 +394,7 @@ func TestImportReviewedPlanCopiesPinnedStructuredPlan(t *testing.T) {
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -503,7 +503,7 @@ func TestImportReviewedPlanRejectsOccupiedTargetRootWithoutMatchingFiles(t *test
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -554,7 +554,7 @@ func TestSnapshotImportReadsCapturedCommitAfterBranchAdvances(t *testing.T) {
 	itemGitRun(t, root, "switch", "main")
 
 	writer := itemwriter.New(fileaccess.New(), scanner.New(git), nil, nil)
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("plans")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{Branch: "feature", BranchRef: ref, Commit: commit, SourceMode: "snapshot", MetadataSource: "plan.yaml", ItemPath: "plans/platform/PM-038"}}
 	if _, err := writer.ImportSnapshotPlan(workspace, item); err != nil {
 		t.Fatal(err)
@@ -576,7 +576,7 @@ func TestWorkingTreeWriteRequiresCurrentCheckoutBranch(t *testing.T) {
 	indexPath := filepath.Join(t.TempDir(), "item-index.yaml")
 	git := gitadapter.New()
 	reg := registry.New(registryPath, git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -619,7 +619,7 @@ func TestSnapshotFileContentResolvesNestedDocsPath(t *testing.T) {
 	indexPath := filepath.Join(t.TempDir(), "item-index.yaml")
 	git := gitadapter.New()
 	reg := registry.New(registryPath, git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"docs"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("docs")})
 	if err != nil {
 		t.Fatal(err)
 	}

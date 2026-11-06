@@ -56,7 +56,7 @@ func newSessionsTestFixture(t *testing.T, mode models.RuntimeMode) sessionsTestF
 
 	dataDir := t.TempDir()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestSessionChangesReportsContentProviderUnsupported(t *testing.T) {
 		Path:           t.TempDir(),
 		AccessMode:     models.WorkspaceAccessModeRemoteSnapshot,
 		BaselineBranch: "main",
-		Sources:        []string{"plans"},
+		Sources: models.SourceList("plans"),
 		CreatedAt:      time.Now().UTC(),
 	}
 	yamlBytes, err := yaml.Marshal([]models.WorkspaceConfig{workspace})

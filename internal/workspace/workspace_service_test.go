@@ -93,7 +93,7 @@ func TestSourceStructureIncludesProposalsAndPreview(t *testing.T) {
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"docs"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("docs")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestSourceStructureSaveRevalidatesSymlinkBoundaryAtUseTime(t *testing.T) {
 	dataDir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"docs"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("docs")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestCreateRemoteCloneWorkspace(t *testing.T) {
 		RemoteURL:        "https://example.com/org/remote.git",
 		CloneRoot:        cloneRoot,
 		BaselineBranch:   "main",
-		Sources:          []string{"plans"},
+		Sources: models.SourceList("plans"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +194,7 @@ func TestCreateRemoteCloneWorkspaceRejectsInvalidURL(t *testing.T) {
 		RemoteURL:        "not-a-url",
 		CloneRoot:        t.TempDir(),
 		BaselineBranch:   "main",
-		Sources:          []string{"plans"},
+		Sources: models.SourceList("plans"),
 	})
 	if err == nil || !strings.Contains(err.Error(), "remote URL") {
 		t.Fatalf("err = %v", err)
@@ -229,7 +229,7 @@ func TestDeleteRefusesLegacyManagedCloneWithoutOwnershipProof(t *testing.T) {
 		RegistrationMode: models.WorkspaceRegistrationModeRemoteClone,
 		RemoteURL:        "https://example.com/org/repo.git",
 		BaselineBranch:   "main",
-		Sources:          []string{"plans"},
+		Sources: models.SourceList("plans"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -278,7 +278,7 @@ func TestFileWorkspaceDeleteRegistryFailureLeavesRecoverableRegisteredWorkspace(
 	registryPath := filepath.Join(stateDir, "workspaces.yaml")
 	git := gitadapter.New()
 	reg := registry.New(registryPath, git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Recoverable", Path: repositoryPath, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Recoverable", Path: repositoryPath, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +332,7 @@ cards:
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"docs"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("docs")})
 	if err != nil {
 		t.Fatal(err)
 	}

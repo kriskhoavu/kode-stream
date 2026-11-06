@@ -3,8 +3,9 @@ import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ExternalLink, Folde
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../shared/api';
-import type { JiraConnection, KnowledgeSettings, RuntimeContext, RuntimeType, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
+import type { JiraConnection, KnowledgeSettings, RuntimeContext, RuntimeType, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceSurface, WorkspaceSource, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
+import { defaultShownIn, sourcePaths, sourceSurfaces, workspaceSources } from '../lib/sources';
 import { applySegmentRole, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -12,6 +13,8 @@ import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
 import { useModalDialog } from '../components/overlay';
 
 export { applySegmentRole, normalizeDroppedPath, parseSources, previewPathSegments };
+
+const sourceSurfaceLabels: Record<SourceSurface, string> = { workstream: 'Workstream', knowledge: 'Knowledge' };
 
 const DEFAULT_SOURCES = ['wiki', 'plans'];
 const maxRegistrationLogChars = 256 * 1024;
@@ -78,7 +81,7 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [editingSection, setEditingSection] = useState<WorkspaceEditSection>('');
-  const [editDraft, setEditDraft] = useState<{ name: string; path: string; baselineBranch: string; sources: string; jira: JiraConnection | null; knowledge: KnowledgeSettings; runtime: WorkspaceRuntimeConfig | null }>({ name: '', path: '', baselineBranch: '', sources: '', jira: null, knowledge: {}, runtime: null });
+  const [editDraft, setEditDraft] = useState<{ name: string; path: string; baselineBranch: string; sources: string; shownIn: Record<string, SourceSurface[]>; jira: JiraConnection | null; knowledge: KnowledgeSettings; runtime: WorkspaceRuntimeConfig | null }>({ name: '', path: '', baselineBranch: '', sources: '', shownIn: {}, jira: null, knowledge: {}, runtime: null });
   const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([]);
   const [workspacesToRemove, setWorkspacesToRemove] = useState<WorkspaceConfig[] | null>(null);
   const [settingsEditor, setSettingsEditor] = useState<SettingsEditorState | null>(null);
@@ -249,7 +252,8 @@ const busy = pendingOperations.length > 0;
         name: repo.name,
         path: repo.path,
         baselineBranch: repo.baselineBranch,
-        sources: repo.sources.join(', '),
+        sources: sourcePaths(repo).join(', '),
+        shownIn: shownInByPath(repo),
         jira: repo.jira ? { ...repo.jira } : null,
         knowledge: { enabled: repo.knowledge?.enabled ?? true, enrichExecutable: repo.knowledge?.enrichExecutable ?? '', enrichArgs: [...(repo.knowledge?.enrichArgs ?? [])] },
         runtime: cloneRuntimeConfig(repo.runtime)
@@ -402,7 +406,7 @@ const busy = pendingOperations.length > 0;
           name: editDraft.name,
           path: editDraft.path,
           baselineBranch: editDraft.baselineBranch,
-          sources: parseSources(editDraft.sources),
+          sources: sourcesFromDraft(parseSources(editDraft.sources), editDraft.shownIn),
           registrationMode: repo.registrationMode,
           remoteUrl: repo.remoteUrl,
           jira: editDraft.jira ?? undefined,
@@ -540,6 +544,31 @@ const busy = pendingOperations.length > 0;
       setNotice({ tone: 'error', title: 'Cloud Agent connection failed', details: [errorMessage(err)] });
     } finally {
       setBusy(false, 'connect-agent');
+    }
+  };
+
+  const saveShownIn = async (repo: WorkspaceConfig, path: string, surface: SourceSurface) => {
+    const sources = toggleSourceSurface(workspaceSources(repo), path, surface);
+    if (!sources) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await api.updateWorkspace(repo.id, {
+        name: repo.name,
+        path: repo.path,
+        baselineBranch: repo.baselineBranch,
+        sources,
+        registrationMode: repo.registrationMode,
+        remoteUrl: repo.remoteUrl,
+        jira: repo.jira,
+        knowledge: normalizeKnowledgeSettings({ enabled: repo.knowledge?.enabled ?? true, enrichExecutable: repo.knowledge?.enrichExecutable ?? '', enrichArgs: [...(repo.knowledge?.enrichArgs ?? [])] })
+      });
+      setNotice({ tone: 'success', title: 'Source updated', details: [`${path} shows in ${sources.find((source) => source.path === path)?.shownIn.map((item) => sourceSurfaceLabels[item]).join(' and ') ?? ''}`] });
+      onChanged();
+    } catch (err) {
+      setNotice({ tone: 'error', title: 'Could not update the source', details: [errorMessage(err)] });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -757,11 +786,18 @@ const busy = pendingOperations.length > 0;
                       <div className="repo-row-actions"><button className="secondary" type="button" onClick={discardEdit}>Cancel</button><button className="primary" type="button" onClick={() => saveEdit(repo)}>Save sources</button></div>
                     </> : <>
                       <div className="workspace-source-list">
-                        {repo.sources.map((directory) => <div className="workspace-source-row" key={directory}>
-                          <div><strong>{directory}</strong><span>Workspace source directory</span></div>
-                          <button className="secondary" type="button" onClick={() => void openSourceSettings(repo, directory)} disabled={!canWrite}><SlidersHorizontal size={15} /> Configure structure</button>
+                        {workspaceSources(repo).map((source) => <div className="workspace-source-row" key={source.path}>
+                          <div><strong>{source.path}</strong><span>Workspace source directory</span></div>
+                          <fieldset className="workspace-source-shown-in" aria-label={`Shown in for ${source.path}`}>
+                            <legend>Shown in</legend>
+                            {sourceSurfaces.map((surface) => <label key={surface}>
+                              <input type="checkbox" checked={source.shownIn.includes(surface)} disabled={!canWrite || busy || (source.shownIn.length === 1 && source.shownIn[0] === surface)} onChange={() => void saveShownIn(repo, source.path, surface)} />
+                              {sourceSurfaceLabels[surface]}
+                            </label>)}
+                          </fieldset>
+                          <button className="secondary" type="button" onClick={() => void openSourceSettings(repo, source.path)} disabled={!canWrite}><SlidersHorizontal size={15} /> Configure structure</button>
                         </div>)}
-                        {repo.sources.length === 0 && <div className="empty-inline">No sources configured.</div>}
+                        {sourcePaths(repo).length === 0 && <div className="empty-inline">No sources configured.</div>}
                       </div>
                       <div className="workspace-detail-actions"><button className="primary" type="button" onClick={() => startEdit(repo, 'sources')} disabled={!canWrite}><Pencil size={16} /> Edit sources</button></div>
                     </>}
@@ -1019,7 +1055,7 @@ function WorkspaceImportCandidateCard({ candidate, selected, onToggle }: { candi
 		</header>
 		<dl>
 			<div className="workspace-import-detail-card"><dt>Base branch</dt><dd>{workspace.baselineBranch || 'Not set'}</dd></div>
-			<div className="workspace-import-detail-card"><dt>Sources</dt><dd>{workspace.sources.join(', ') || 'None'}</dd></div>
+			<div className="workspace-import-detail-card"><dt>Sources</dt><dd>{sourcePaths(workspace).join(', ') || 'None'}</dd></div>
 			{workspace.remoteUrl && <div className="workspace-import-detail-card workspace-import-detail-card-wide"><dt>Original remote</dt><dd>{workspace.remoteUrl}</dd></div>}
 			{workspace.jira && <WorkspaceImportJiraSummary jira={workspace.jira} />}
 			{workspace.knowledge && <div className="workspace-import-detail-card workspace-import-detail-card-wide"><dt>Knowledge</dt><dd>{workspace.knowledge.enabled === false ? 'Disabled' : `Enabled${workspace.knowledge.enrichExecutable ? ` · ${workspace.knowledge.enrichExecutable}` : ''}${workspace.knowledge.enrichArgs?.length ? ` · arguments: ${workspace.knowledge.enrichArgs.join(', ')}` : ''}`}</dd></div>}
@@ -1744,4 +1780,23 @@ function pathPatternCaptures(directory: string, pathPattern: string, rowPath: st
 
 function renderTemplateWithCaptures(template: string, captures: Record<string, string>): string {
   return Object.entries(captures).reduce((result, [name, value]) => result.replaceAll(`{${name}}`, value), template).trim();
+}
+
+function shownInByPath(repo: WorkspaceConfig): Record<string, SourceSurface[]> {
+  return Object.fromEntries(workspaceSources(repo).map((source) => [source.path, source.shownIn]));
+}
+
+// A path kept from the saved workspace keeps its surfaces; a new one gets the defaults for its name.
+export function sourcesFromDraft(paths: string[], shownIn: Record<string, SourceSurface[]>): WorkspaceSource[] {
+  return paths.map((path) => ({ path, shownIn: shownIn[path]?.length ? shownIn[path] : defaultShownIn(path) }));
+}
+
+// Returns the sources with the surface toggled on the named path, or null when
+// the toggle would leave the source shown nowhere.
+export function toggleSourceSurface(sources: WorkspaceSource[], path: string, surface: SourceSurface): WorkspaceSource[] | null {
+  const current = sources.find((source) => source.path === path);
+  if (!current) return null;
+  const shownIn = current.shownIn.includes(surface) ? current.shownIn.filter((item) => item !== surface) : sourceSurfaces.filter((item) => item === surface || current.shownIn.includes(item));
+  if (shownIn.length === 0) return null;
+  return sources.map((source) => (source.path === path ? { path, shownIn } : source));
 }

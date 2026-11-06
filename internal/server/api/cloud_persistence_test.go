@@ -85,7 +85,7 @@ func TestCloudPostgresPersistenceAcrossAPIReconstruction(t *testing.T) {
 	defer state.SQLStore.Close()
 	first := New(Dependencies{RuntimeConfig: runtime, CloudPersistence: state.Cloud})
 	owner := stableCloudUserID("postgres-owner")
-	workspace := models.WorkspaceConfig{ID: "postgres-workspace", Name: "Durable", OwnerUserID: owner, Sources: []string{}}
+	workspace := models.WorkspaceConfig{ID: "postgres-workspace", Name: "Durable", OwnerUserID: owner, Sources: models.SourceList()}
 	if _, err := first.cloud.workspaces.Upsert(context.Background(), workspace); err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +431,7 @@ func TestCloudPersistenceSurvivesAPIReconstructionAndIsolatesHTTPReads(t *testin
 	runtime := system.RuntimeConfig{Mode: models.RuntimeModeCloud, AuthMode: "oauth2_proxy", CookieSecret: "shared-secret", TrustedProxyCIDRs: []string{"192.0.2.0/24"}}
 	first := New(Dependencies{RuntimeConfig: runtime, CloudPersistence: persistence})
 	ownerA := stableCloudUserID("owner-a")
-	workspace := models.WorkspaceConfig{ID: "workspace", Name: "Durable", OwnerUserID: ownerA, Sources: []string{}}
+	workspace := models.WorkspaceConfig{ID: "workspace", Name: "Durable", OwnerUserID: ownerA, Sources: models.SourceList()}
 	if _, err := first.cloud.workspaces.Upsert(context.Background(), workspace); err != nil {
 		t.Fatal(err)
 	}

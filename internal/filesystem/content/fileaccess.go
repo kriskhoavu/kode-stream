@@ -92,7 +92,7 @@ func (a *Access) safeItemPath(workspace models.WorkspaceConfig, item models.Item
 	if err != nil {
 		return "", err
 	}
-	sources, err := sourceguard.ResolveAll(workspace.Path, workspace.Sources)
+	sources, err := sourceguard.ResolveAll(workspace.Path, workspace.SourcePaths())
 	if err != nil {
 		return "", fmt.Errorf("configured source boundary is unsafe: %w", err)
 	}

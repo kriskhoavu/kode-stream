@@ -774,7 +774,7 @@ func compactDocumentOverrides(root string, documents []models.ItemDocument) []mo
 
 func validateSource(workspace models.WorkspaceConfig, dir string) (string, error) {
 	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(dir)))
-	for _, allowed := range workspace.Sources {
+	for _, allowed := range workspace.SourcePaths() {
 		if clean == allowed {
 			if _, err := sourceguard.ResolveOne(workspace.Path, clean); err != nil {
 				return "", err
@@ -800,7 +800,7 @@ func safeItemPath(workspace models.WorkspaceConfig, item models.ItemDetail) (str
 func safeItemPathForRelative(workspace models.WorkspaceConfig, relative string) (string, error) {
 	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(relative)))
 	var selected string
-	for _, source := range workspace.Sources {
+	for _, source := range workspace.SourcePaths() {
 		source = filepath.ToSlash(filepath.Clean(strings.TrimSpace(source)))
 		if clean == source || strings.HasPrefix(clean, source+"/") {
 			selected = source

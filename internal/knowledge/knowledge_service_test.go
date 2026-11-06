@@ -162,7 +162,7 @@ func TestEnrichRequiresConfirmationAndConfiguration(t *testing.T) {
 func TestDisabledKnowledgeRejectsActionsAndHidesPersistedWikis(t *testing.T) {
 	disabled := false
 	directory, workspaceRoot := t.TempDir(), t.TempDir()
-	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: workspaceRoot, Sources: []string{"docs"}, Knowledge: &models.KnowledgeSettings{Enabled: &disabled, EnrichExecutable: "/bin/echo"}}
+	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: workspaceRoot, Sources: models.SourceList("docs"), Knowledge: &models.KnowledgeSettings{Enabled: &disabled, EnrichExecutable: "/bin/echo"}}
 	data, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +194,7 @@ func TestDisabledKnowledgeRejectsActionsAndHidesPersistedWikis(t *testing.T) {
 
 func TestKnowledgeRebuildsWhenCheckoutIdentityChanges(t *testing.T) {
 	directory := t.TempDir()
-	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: directory, Sources: []string{"docs"}}
+	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: directory, Sources: models.SourceList("docs")}
 	data, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
 	if err != nil {
 		t.Fatal(err)
@@ -223,7 +223,7 @@ func TestKnowledgeRebuildsWhenCheckoutIdentityChanges(t *testing.T) {
 
 func TestKnowledgeFreshnessCancellationDoesNotPublish(t *testing.T) {
 	directory := t.TempDir()
-	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: directory, Sources: []string{"docs"}}
+	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: directory, Sources: models.SourceList("docs")}
 	data, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
 	if err != nil {
 		t.Fatal(err)
@@ -378,7 +378,7 @@ func newActionServiceAt(t *testing.T, workspaceRoot, executable string, args []s
 	t.Helper()
 	directory := t.TempDir()
 	settings := &models.KnowledgeSettings{EnrichExecutable: executable, EnrichArgs: args}
-	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: workspaceRoot, Sources: []string{"docs"}, Knowledge: settings}
+	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: workspaceRoot, Sources: models.SourceList("docs"), Knowledge: settings}
 	data, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
 	if err != nil {
 		t.Fatal(err)

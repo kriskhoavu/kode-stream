@@ -44,7 +44,7 @@ func TestCheckReturnsHealthyWorkspace(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(root, "plans"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	workspace := models.WorkspaceConfig{ID: "workspace", Path: root, Sources: []string{"plans"}, BaselineBranch: "main", LastScannedAt: time.Now()}
+	workspace := models.WorkspaceConfig{ID: "workspace", Path: root, Sources: models.SourceList("plans"), BaselineBranch: "main", LastScannedAt: time.Now()}
 	service := NewHealthService(workspaceStub{workspace}, itemStub{}, gitStub{root: root})
 
 	health, err := service.Check(workspace.ID)
@@ -77,7 +77,7 @@ func TestCheckReturnsWarningsForRecoverableState(t *testing.T) {
 
 func TestCheckReturnsFailedForMissingWorkspacePath(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "missing")
-	workspace := models.WorkspaceConfig{ID: "workspace", Path: root, Sources: []string{"plans"}, BaselineBranch: "main", LastScannedAt: time.Now()}
+	workspace := models.WorkspaceConfig{ID: "workspace", Path: root, Sources: models.SourceList("plans"), BaselineBranch: "main", LastScannedAt: time.Now()}
 	service := NewHealthService(workspaceStub{workspace}, itemStub{err: errors.New("corrupt")}, gitStub{root: root, rootErr: errors.New("not git")})
 
 	health, err := service.Check(workspace.ID)

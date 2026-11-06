@@ -28,7 +28,7 @@ func TestReadStaysInsidePlanDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	access := New()
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
 	content, err := access.Read(workspace, item, fileid.Encode("README.md"))
 	if err != nil {
@@ -53,7 +53,7 @@ func TestWriteMarkdownRejectsStaleHash(t *testing.T) {
 	}
 
 	access := New()
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
 	if _, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: fileid.Encode("README.md"), Content: "changed", ExpectedHash: "stale"}); err == nil {
 		t.Fatal("expected stale hash to be rejected")
@@ -73,7 +73,7 @@ func TestWriteMarkdownUpdatesTextFile(t *testing.T) {
 	}
 
 	access := New()
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
 	content, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: fileid.Encode("main.go"), Content: "package planmanager\n", ExpectedHash: contentHash(original)})
 	if err != nil {
@@ -99,7 +99,7 @@ func TestWriteMarkdownRejectsSymlinkEscape(t *testing.T) {
 	}
 
 	access := New()
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
 	if _, err := access.WriteMarkdown(workspace, item, models.FileSaveInput{FileID: fileid.Encode("escape.md"), Content: "changed"}); err == nil {
 		t.Fatal("expected symlink escape to be rejected")
@@ -130,7 +130,7 @@ func TestItemAccessRejectsStoredSourceSymlinkEscape(t *testing.T) {
 		t.Skipf("symlink unavailable: %v", err)
 	}
 	access := New()
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
 	if _, err := access.Read(workspace, item, fileid.Encode("README.md")); err == nil {
 		t.Fatal("expected escaped source read to be rejected")
@@ -157,7 +157,7 @@ func TestCollidingLegacyNamesResolveByExactCanonicalID(t *testing.T) {
 		t.Fatal(err)
 	}
 	access := New()
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-1"}}
 	nested, err := access.Read(workspace, item, fileid.Encode("a/b.md"))
 	if err != nil {
@@ -193,7 +193,7 @@ func TestTreeSortsDirectoriesFirstWithNaturalNames(t *testing.T) {
 	}
 
 	access := New()
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}}
 	tree, err := access.Tree(workspace, item)
 	if err != nil {
@@ -226,7 +226,7 @@ func TestTreeMarksDepthTruncationWithoutRecursingPastBudget(t *testing.T) {
 	}
 	access := New()
 	tree, err := access.Tree(
-		models.WorkspaceConfig{Path: root, Sources: []string{"items"}},
+		models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")},
 		models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-001"}},
 	)
 	if err != nil {

@@ -1,4 +1,5 @@
 import type { ItemSummary, WorkspaceConfig } from '../../lib/types';
+import { sourcesShownIn } from '../../lib/sources';
 
 export type FilterKey = 'sources' | 'scopes' | 'statuses' | 'branches' | 'authors';
 export type Filters = Record<FilterKey, string[]>;
@@ -40,7 +41,7 @@ export function sourceLabel(plan: ItemSummary, workspace?: WorkspaceConfig): str
 
 function sourceRoot(plan: ItemSummary, workspace?: WorkspaceConfig): string {
   const root = plan.itemPath || '';
-  const directories = workspace?.sources ?? [];
+  const directories = sourcesShownIn(workspace, 'workstream');
   const matched = directories
     .filter((directory) => root === directory || root.startsWith(`${directory}/`))
     .sort((a, b) => b.length - a.length)[0];

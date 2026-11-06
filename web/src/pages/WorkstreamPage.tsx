@@ -31,6 +31,7 @@ import type {
   WorkspaceConfig
 } from '../lib/types';
 import { isDocumentationMetadataSource, labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
+import { sourcesShownIn } from '../lib/sources';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/workstream/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
@@ -354,9 +355,9 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         .map((item) => sourceLabel(item, workspace))
         .filter(Boolean)
     );
-    const firstWorkspaceUnsortedSource = workspace.sources.find((source) => unsortedSources.has(source));
+    const firstWorkspaceUnsortedSource = sourcesShownIn(workspace, 'workstream').find((source) => unsortedSources.has(source));
     if (firstWorkspaceUnsortedSource) return firstWorkspaceUnsortedSource;
-    return Array.from(unsortedSources)[0] ?? workspace.sources[0] ?? '';
+    return Array.from(unsortedSources)[0] ?? sourcesShownIn(workspace, 'workstream')[0] ?? '';
   }, [items, workspace]);
   const activeItem = activeItemId ? items.find((item) => item.id === activeItemId) : undefined;
 
@@ -509,7 +510,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     setCreatingPlan(true);
     setNewPlanError('');
     try {
-      const source = newPlanDraft.source || workspace.sources[0] || 'plans';
+      const source = newPlanDraft.source || sourcesShownIn(workspace, 'workstream')[0] || 'plans';
       const jiraIssue = newPlanDraft.origin === 'jira' && jiraLookup?.state === 'available' ? jiraLookup.issue : undefined;
       const result = await api.createItem({
         workspaceId: workspace.id,
@@ -565,7 +566,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   };
 
   const openSourceItemsDialog = async () => {
-    if (!workspace || workspace.sources.length === 0) {
+    if (!workspace || sourcesShownIn(workspace, 'workstream').length === 0) {
       onOpenWorkspaces?.();
       return;
     }
@@ -679,7 +680,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           <div className="workspace-context" aria-label="Workspace context">
             <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} gitStatus={workspaceGitStatus} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await loadCheckout(true); await onWorkspacesChanged(); }} />
             {onOpenReview && <button className="secondary" type="button" onClick={onOpenReview}>Review branch</button>}
-            {workspace.sources.slice(0, 3).map((directory) => (
+            {sourcesShownIn(workspace, 'workstream').slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
             ))}
           </div>
@@ -751,7 +752,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
               onDragLeave={handleColumnDragLeave}
               onDrop={handleColumnDrop}
               onCreate={column === 'unsorted' ? undefined : () => {
-                setNewPlanDraft((draft) => ({ ...draft, status: column, source: workspace?.sources[0] ?? '' }));
+                setNewPlanDraft((draft) => ({ ...draft, status: column, source: sourcesShownIn(workspace, 'workstream')[0] ?? '' }));
                 setNewPlanOpen(true);
               }}
             >
@@ -818,17 +819,17 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
             <header>
               <div>
                 <h2>{labels.sourceStructure}</h2>
-                <span>{workspace.name} / {sourceItemsDirectory || workspace.sources[0]}</span>
+                <span>{workspace.name} / {sourceItemsDirectory || sourcesShownIn(workspace, 'workstream')[0]}</span>
               </div>
               <button data-autofocus className="icon-button" type="button" onClick={() => setSourceItemsOpen(false)} disabled={sourceItemsSaving} aria-label="Close source items">
                 <X size={16} />
               </button>
             </header>
-            {workspace.sources.length > 1 && (
+            {sourcesShownIn(workspace, 'workstream').length > 1 && (
               <label className="repo-field">
                 Source
                 <select value={sourceItemsDirectory} onChange={(event) => void loadSourceItemsSettings(event.target.value)} disabled={sourceItemsLoading || sourceItemsSaving}>
-                  {workspace.sources.map((directory) => <option key={directory} value={directory}>{directory}</option>)}
+                  {sourcesShownIn(workspace, 'workstream').map((directory) => <option key={directory} value={directory}>{directory}</option>)}
                 </select>
               </label>
             )}
@@ -920,8 +921,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
               </div>
               {newPlanDraft.origin === 'blank' ? (
                 <>
-                  <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
-                    {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
+                  <label>Source<select value={newPlanDraft.source || sourcesShownIn(workspace, 'workstream')[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
+                    {sourcesShownIn(workspace, 'workstream').map((directory) => <option value={directory} key={directory}>{directory}</option>)}
                   </select></label>
                   <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Any item name" /></label>
                   <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
@@ -933,8 +934,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                       <strong>Jira ticket</strong>
                       <span>Fetch the source issue and review its context.</span>
                     </div>
-                    <label>Source<select value={newPlanDraft.source || workspace.sources[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
-                      {workspace.sources.map((directory) => <option value={directory} key={directory}>{directory}</option>)}
+                    <label>Source<select value={newPlanDraft.source || sourcesShownIn(workspace, 'workstream')[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
+                      {sourcesShownIn(workspace, 'workstream').map((directory) => <option value={directory} key={directory}>{directory}</option>)}
                     </select></label>
                     <div className="jira-intake">
                       <label>Jira key<input

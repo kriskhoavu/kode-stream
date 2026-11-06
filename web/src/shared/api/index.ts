@@ -105,6 +105,7 @@ import type {
   HarnessTask,
   HarnessTranscript
 } from '../../lib/types';
+import { normalizeSources } from '../../lib/sources';
 
 export class ApiError extends Error {
   recoveryHint?: string;
@@ -627,7 +628,7 @@ function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
     managedCloneRoot: workspace.managedCloneRoot ?? '',
     managedCloneId: workspace.managedCloneId ?? '',
     managedCloneVerified: Boolean(workspace.managedCloneVerified),
-    sources: Array.isArray(workspace.sources) ? workspace.sources : [],
+    sources: normalizeSources(workspace.sources),
     runtime: workspace.runtime ? {
       ...workspace.runtime,
       rebuildPolicy: workspace.runtime.rebuildPolicy ?? 'changed-only',
@@ -729,7 +730,7 @@ function normalizeWorkspaceImportPreview(input: WorkspaceImportPreview): Workspa
 			workspace: {
 				...candidate.workspace,
 				registrationMode: 'existing_workspace',
-				sources: Array.isArray(candidate.workspace?.sources) ? candidate.workspace.sources : []
+				sources: normalizeSources(candidate.workspace?.sources)
 			},
 			issues: Array.isArray(candidate.issues) ? candidate.issues : [],
 			selected: candidate.status === 'valid' && Boolean(candidate.selected)

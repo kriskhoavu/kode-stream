@@ -84,8 +84,8 @@ func TestCloudWorkspaceStoreMigratesLegacyAgentWorkspaceAccessMode(t *testing.T)
 func TestCloudWorkspacesAreScopedToSessionUser(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
 	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
-	_, _ = apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "ws-a", Name: "A", OwnerUserID: stableCloudUserID("user-a"), Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-a", Sources: []string{}})
-	_, _ = apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "ws-b", Name: "B", OwnerUserID: stableCloudUserID("user-b"), Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-b", Sources: []string{}})
+	_, _ = apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "ws-a", Name: "A", OwnerUserID: stableCloudUserID("user-a"), Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-a", Sources: models.SourceList()})
+	_, _ = apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "ws-b", Name: "B", OwnerUserID: stableCloudUserID("user-b"), Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-b", Sources: models.SourceList()})
 	handler := apiHandler.Routes()
 
 	response := httptest.NewRecorder()
@@ -129,7 +129,7 @@ func TestCloudWorkspaceListShowsOfflineAgentMetadata(t *testing.T) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
 	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
 	userID := stableCloudUserID("viewer")
-	_, _ = apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "ws-offline", Name: "Offline", OwnerUserID: userID, Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-offline", ScanStatus: "offline", Sources: []string{}})
+	_, _ = apiHandler.cloud.workspaces.Upsert(context.Background(), models.WorkspaceConfig{ID: "ws-offline", Name: "Offline", OwnerUserID: userID, Location: models.WorkspaceLocationCloudAgent, AgentID: "agent-offline", ScanStatus: "offline", Sources: models.SourceList()})
 	handler := apiHandler.Routes()
 
 	response := httptest.NewRecorder()

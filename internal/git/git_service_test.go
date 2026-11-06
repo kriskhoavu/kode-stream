@@ -26,7 +26,7 @@ func TestServiceMutationsWaitForSharedWorkspaceLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	adapter := New()
-	service := NewService(serviceRegistry{models.WorkspaceConfig{ID: "ws", Path: root, Sources: []string{"plans"}}}, nil, adapter)
+	service := NewService(serviceRegistry{models.WorkspaceConfig{ID: "ws", Path: root, Sources: models.SourceList("plans")}}, nil, adapter)
 	entered, release := make(chan struct{}), make(chan struct{})
 	go func() {
 		_ = adapter.WithWorkspaceMutation(root, func() error { close(entered); <-release; return nil })
@@ -64,14 +64,14 @@ func TestServiceMutationsWaitForSharedWorkspaceLock(t *testing.T) {
 }
 
 func TestValidatePathsRequiresConfiguredSourcePaths(t *testing.T) {
-	workspace := models.WorkspaceConfig{Sources: []string{"plans", "docs"}}
+	workspace := models.WorkspaceConfig{Sources: models.SourceList("plans", "docs")}
 	if err := ValidatePaths(workspace, []string{"plans/platform/PM-003/README.md", "docs/guide.md"}); err != nil {
 		t.Fatalf("expected valid paths: %v", err)
 	}
 }
 
 func TestValidatePathsRejectsEmptyEscapedAndUnregisteredPaths(t *testing.T) {
-	workspace := models.WorkspaceConfig{Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{Sources: models.SourceList("plans")}
 	for _, paths := range [][]string{
 		{},
 		{"../secret.md"},

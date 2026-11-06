@@ -3,6 +3,7 @@ import type { ExplorerLocation } from './types';
 import { api } from '../../shared/api';
 import { readPreference, readStringPreference, writePreference } from '../../shared/preferences/store';
 import type { ExplorerTreeMode, WorkspaceConfig } from '../../lib/types';
+import { sourcePaths } from '../../lib/sources';
 import { buildItemDecorations, directoryCacheKey, explorerNodeId, flattenVisibleTree } from './tree';
 import type { DirectoryCacheEntry, ExplorerSelection } from './types';
 import { ancestorDirectoryPaths, buildWorkspaceGitStateMap } from './productivity';
@@ -14,7 +15,7 @@ const modeStorageKey = 'workstreamExplorer.treeMode';
 
 export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: ExplorerLocation, onLocationChange?: (location?: ExplorerLocation) => void) {
   const workspaceKey = workspaces
-    .map((workspace) => [workspace.id, workspace.name, workspace.baselineBranch, workspace.sources.join('|')].join(':'))
+    .map((workspace) => [workspace.id, workspace.name, workspace.baselineBranch, sourcePaths(workspace).join('|')].join(':'))
     .join('\u0000');
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() => readExpanded());
   const [showIgnored, setShowIgnoredState] = useState(() => readStringPreference(ignoredStorageKey) === 'true');

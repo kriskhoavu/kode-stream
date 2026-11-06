@@ -360,17 +360,23 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 	if err := r.git.ValidateBranch(root, branch); err != nil {
 		return models.WorkspaceConfig{}, fmt.Errorf("baseline branch is invalid: %w", err)
 	}
-	dirs := input.Sources
-	if len(dirs) == 0 {
+	if len(input.Sources) == 0 {
 		return models.WorkspaceConfig{}, errors.New("at least one workspace source is required")
 	}
-	validatedSources, err := sourceguard.ResolveAll(root, dirs)
+	validatedSources, err := sourceguard.ResolveAll(root, input.SourcePaths())
 	if err != nil {
 		return models.WorkspaceConfig{}, err
 	}
-	cleanDirs := make([]string, 0, len(validatedSources))
-	for _, source := range validatedSources {
-		cleanDirs = append(cleanDirs, source.Relative)
+	cleanDirs := make([]models.WorkspaceSource, 0, len(validatedSources))
+	for index, source := range validatedSources {
+		normalized, err := models.WorkspaceSource{Path: source.Relative, ShownIn: input.Sources[index].ShownIn}.Normalized()
+		if err != nil {
+			return models.WorkspaceConfig{}, err
+		}
+		if len(normalized.ShownIn) == 0 {
+			return models.WorkspaceConfig{}, fmt.Errorf("source %q must show in Workstream or Knowledge", source.Relative)
+		}
+		cleanDirs = append(cleanDirs, normalized)
 	}
 	jira, err := ValidateJiraConnection(input.Jira)
 	if err != nil {
@@ -442,7 +448,7 @@ func ValidateJiraConnection(input *models.JiraConnection) (*models.JiraConnectio
 
 func normalizeWorkspace(workspace models.WorkspaceConfig) models.WorkspaceConfig {
 	if workspace.Sources == nil {
-		workspace.Sources = []string{}
+		workspace.Sources = []models.WorkspaceSource{}
 	}
 	if workspace.Location != models.WorkspaceLocationCloudAgent {
 		workspace.Location = models.WorkspaceLocationLocalPath

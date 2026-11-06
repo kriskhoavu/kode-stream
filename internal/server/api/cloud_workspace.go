@@ -142,7 +142,7 @@ func (a *cloudController) registerCloudWorkspaceFromAgent(w http.ResponseWriter,
 		ScanStatus:       input.ScanStatus,
 		BaselineBranch:   branch,
 		RegistrationMode: models.WorkspaceRegistrationModeExisting,
-		Sources:          sources,
+		Sources:          models.SourceList(sources...),
 		CreatedAt:        time.Now().UTC(),
 		LastScannedAt:    time.Now().UTC(),
 	}
@@ -221,7 +221,7 @@ func (a *workspaceController) createCloudRemoteSnapshotWorkspace(w http.Response
 		writeError(w, http.StatusBadRequest, "workspace name, provider instance, repository, and ref are required")
 		return
 	}
-	workspace := models.WorkspaceConfig{ID: stableCloudUserID(session.User.ID + ":snapshot:" + input.ProviderInstanceID + ":" + input.ProviderRepository), Name: name, AccessMode: models.WorkspaceAccessModeRemoteSnapshot, OwnerUserID: session.User.ID, Provider: strings.TrimSpace(input.Provider), ProviderInstanceID: strings.TrimSpace(input.ProviderInstanceID), ProviderRepository: strings.TrimSpace(input.ProviderRepository), SelectedRef: strings.TrimSpace(input.SelectedRef), BaselineBranch: strings.TrimSpace(input.SelectedRef), Sources: normalizeCloudSources(input.Sources), CreatedAt: time.Now().UTC(), LastScannedAt: time.Now().UTC()}
+	workspace := models.WorkspaceConfig{ID: stableCloudUserID(session.User.ID + ":snapshot:" + input.ProviderInstanceID + ":" + input.ProviderRepository), Name: name, AccessMode: models.WorkspaceAccessModeRemoteSnapshot, OwnerUserID: session.User.ID, Provider: strings.TrimSpace(input.Provider), ProviderInstanceID: strings.TrimSpace(input.ProviderInstanceID), ProviderRepository: strings.TrimSpace(input.ProviderRepository), SelectedRef: strings.TrimSpace(input.SelectedRef), BaselineBranch: strings.TrimSpace(input.SelectedRef), Sources: models.SourceList(normalizeCloudSources(input.SourcePaths())...), CreatedAt: time.Now().UTC(), LastScannedAt: time.Now().UTC()}
 	adapter := remoteSnapshotAdapter{providers: a.cloudProviders}
 	resolved, _, err := adapter.Resolve(r.Context(), session, workspace)
 	if err != nil {

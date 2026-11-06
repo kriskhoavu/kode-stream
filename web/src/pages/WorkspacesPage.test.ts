@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySegmentRole, buildWorkspaceInput, defaultWorkspaceImportSelection, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, normalizeKnowledgeSettings, parseSources, previewPathSegments, settingsEditorFromResult, workspaceRemovalMessage } from './WorkspacesPage';
+import { applySegmentRole, buildWorkspaceInput, defaultWorkspaceImportSelection, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, normalizeKnowledgeSettings, parseSources, previewPathSegments, settingsEditorFromResult, sourcesFromDraft, toggleSourceSurface, workspaceRemovalMessage } from './WorkspacesPage';
 
 describe('normalizeDroppedPath', () => {
   it('decodes file URLs dropped onto the path field', () => {
@@ -192,5 +192,22 @@ describe('workspaceRemovalMessage', () => {
 			{ id: 'w1', name: 'Workspace A', path: '/repo-a', baselineBranch: 'main', sources: ['docs'], createdAt: '', clonePathManaged: true, managedCloneVerified: true },
       { id: 'w2', name: 'Workspace B', path: '/repo-b', baselineBranch: 'main', sources: ['docs'], createdAt: '', clonePathManaged: false }
     ])).toContain('and 1 managed cloned repository folder will be deleted');
+  });
+});
+
+describe('source surfaces', () => {
+  it('keeps a saved source\'s surfaces and defaults a new path by its name', () => {
+    expect(sourcesFromDraft(['plans', 'wiki', 'notes'], { wiki: ['workstream'] })).toEqual([
+      { path: 'plans', shownIn: ['workstream'] },
+      { path: 'wiki', shownIn: ['workstream'] },
+      { path: 'notes', shownIn: ['workstream', 'knowledge'] }
+    ]);
+  });
+
+  it('toggles one surface and never leaves a source shown nowhere', () => {
+    const sources = [{ path: 'wiki', shownIn: ['knowledge' as const] }, { path: 'plans', shownIn: ['workstream' as const] }];
+    expect(toggleSourceSurface(sources, 'wiki', 'workstream')).toEqual([{ path: 'wiki', shownIn: ['workstream', 'knowledge'] }, sources[1]]);
+    expect(toggleSourceSurface(sources, 'wiki', 'knowledge')).toBeNull();
+    expect(toggleSourceSurface(sources, 'missing', 'knowledge')).toBeNull();
   });
 });

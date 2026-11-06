@@ -53,7 +53,7 @@ func (d *Detector) DetectWorkspace(ctx context.Context, workspace models.Workspa
 	}
 	wikis := make([]KnowledgeWiki, 0)
 	seen := make(map[string]struct{}, len(workspace.Sources))
-	for _, source := range workspace.Sources {
+	for _, source := range workspace.SourcesShownIn(models.SourceSurfaceKnowledge) {
 		key := filepath.ToSlash(filepath.Clean(strings.TrimSpace(source)))
 		if _, exists := seen[key]; exists {
 			continue

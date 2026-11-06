@@ -148,7 +148,7 @@ func (s *SourceSettingsService) sourceRoot(id, directory string) (string, string
 		return "", "", fmt.Errorf("source directory is invalid")
 	}
 	allowed := false
-	for _, source := range workspace.Sources {
+	for _, source := range workspace.SourcePaths() {
 		if cleanDirectory == source {
 			allowed = true
 			break
@@ -157,7 +157,7 @@ func (s *SourceSettingsService) sourceRoot(id, directory string) (string, string
 	if !allowed {
 		return "", "", fmt.Errorf("source directory is not registered")
 	}
-	resolved, err := sourceguard.ResolveAll(workspace.Path, workspace.Sources)
+	resolved, err := sourceguard.ResolveAll(workspace.Path, workspace.SourcePaths())
 	if err != nil {
 		return "", "", fmt.Errorf("configured source boundary is unsafe: %w", err)
 	}

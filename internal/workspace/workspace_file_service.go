@@ -291,7 +291,7 @@ func (s *WorkspaceFileService) workspace(id string) (models.WorkspaceConfig, err
 
 func (s *WorkspaceFileService) refreshIfSource(workspace models.WorkspaceConfig, path string) (bool, error) {
 	clean := filepath.ToSlash(filepath.Clean(path))
-	for _, source := range workspace.Sources {
+	for _, source := range workspace.SourcesShownIn(models.SourceSurfaceWorkstream) {
 		source = strings.TrimSuffix(filepath.ToSlash(filepath.Clean(source)), "/")
 		if clean == source || strings.HasPrefix(clean, source+"/") {
 			if s.refresher == nil {
@@ -307,7 +307,7 @@ func (s *WorkspaceFileService) refreshIfSource(workspace models.WorkspaceConfig,
 func (s *WorkspaceFileService) refreshIfAnySource(workspace models.WorkspaceConfig, paths []string) (bool, error) {
 	for _, path := range paths {
 		clean := filepath.ToSlash(filepath.Clean(path))
-		for _, source := range workspace.Sources {
+		for _, source := range workspace.SourcesShownIn(models.SourceSurfaceWorkstream) {
 			source = strings.TrimSuffix(filepath.ToSlash(filepath.Clean(source)), "/")
 			if clean == source || strings.HasPrefix(clean, source+"/") {
 				if s.refresher == nil {

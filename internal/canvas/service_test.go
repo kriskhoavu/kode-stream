@@ -276,7 +276,7 @@ func canvasServiceFixture(t *testing.T) (*FileRepository, *registry.Registry, *i
 	dataDir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), git)
-	workspaceConfig, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspaceConfig, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}

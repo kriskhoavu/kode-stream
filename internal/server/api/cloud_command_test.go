@@ -85,7 +85,7 @@ func TestCloudCommandRejectsRemoteSnapshotExecutionWithoutProviderCall(t *testin
 		ProviderInstanceID: "github",
 		ProviderRepository: "acme/repo",
 		SelectedRef:        "main",
-		Sources:            []string{},
+		Sources: models.SourceList(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +125,7 @@ func cloudCommandTestAPI(t *testing.T, connected bool) (*API, string) {
 	apiHandler, _, _, _ := reliabilityTestAPI(t)
 	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
 	userID := stableCloudUserID("editor")
-	workspace := models.WorkspaceConfig{ID: "ws-command", Name: "Command", OwnerUserID: userID, AgentID: "agent-1", Location: models.WorkspaceLocationCloudAgent, Sources: []string{}}
+	workspace := models.WorkspaceConfig{ID: "ws-command", Name: "Command", OwnerUserID: userID, AgentID: "agent-1", Location: models.WorkspaceLocationCloudAgent, Sources: models.SourceList()}
 	if _, err := apiHandler.cloud.workspaces.Upsert(context.Background(), workspace); err != nil {
 		t.Fatal(err)
 	}

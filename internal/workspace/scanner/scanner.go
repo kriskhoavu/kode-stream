@@ -69,7 +69,7 @@ func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
 }
 
 func (s *Scanner) ScanContext(ctx context.Context, workspace models.WorkspaceConfig, budget ScanBudget) (ScanData, error) {
-	if _, err := sourceguard.ResolveAll(workspace.Path, workspace.Sources); err != nil {
+	if _, err := sourceguard.ResolveAll(workspace.Path, workspace.SourcePaths()); err != nil {
 		return ScanData{}, fmt.Errorf("configured source boundary is unsafe: %w", err)
 	}
 	branch, err := s.git.CurrentBranch(workspace.Path)
@@ -116,7 +116,7 @@ func (s *Scanner) ScanWithRequestContext(ctx context.Context, request ScanReques
 	request.SourceMode = sourceMode
 	request.Branch = branch
 	var out ScanData
-	for _, source := range workspace.Sources {
+	for _, source := range workspace.SourcesShownIn(models.SourceSurfaceWorkstream) {
 		if err := ctx.Err(); err != nil {
 			return ScanData{}, err
 		}

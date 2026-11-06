@@ -66,10 +66,10 @@ func (s *HealthService) pathCheck(workspace models.WorkspaceConfig) models.Healt
 }
 
 func (s *HealthService) sourcesCheck(workspace models.WorkspaceConfig) models.HealthCheck {
-	if len(workspace.Sources) == 0 {
+	if len(workspace.SourcePaths()) == 0 {
 		return warning("sources", "No sources are configured.", "Add at least one source to scan items.")
 	}
-	if _, err := sourceguard.ResolveAll(workspace.Path, workspace.Sources); err != nil {
+	if _, err := sourceguard.ResolveAll(workspace.Path, workspace.SourcePaths()); err != nil {
 		return failed("sources", "Configured source boundary is unsafe: "+err.Error(), "Restore the source inside the workspace or update workspace sources.")
 	}
 	return ok("sources", "All configured sources are available.")

@@ -13,6 +13,7 @@ import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/use
 import { FileStateIcon } from '../features/file-tree/FileStateIcon';
 import { treeKeyboardAction } from '../features/workstream-explorer/keyboard';
 import { explorerNodeId, normalizeExplorerPath } from '../features/workstream-explorer/tree';
+import { sourcePaths } from '../lib/sources';
 import type { ExplorerLocation, VisibleExplorerRow } from '../features/workstream-explorer/types';
 import { useWorkstreamExplorer } from '../features/workstream-explorer/useWorkstreamExplorer';
 import { WorkspaceBranchSelector } from '../features/workstream-explorer/WorkspaceBranchSelector';
@@ -439,7 +440,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
               <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={row.node.type === 'file' ? explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path)) : undefined} branchState={workspaceBranches.states[row.workspaceId]} decision={workspaceBranches.decision} onDecision={(strategy, message) => void workspaceBranches.resolveDecision(strategy, message)} onCancelDecision={workspaceBranches.cancelDecision} showBranchSelector={!embedded} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} onBranchChange={(workspace, branch) => void switchWorkspaceBranch(workspace, branch)} />
             ))}
             {visibleRows.length === 0 && <p className="explorer-empty">No matching paths.</p>}
-			{showModeSelector && explorer.mode === 'sources' && workspaces.every((item) => item.sources.length === 0) && <button className="secondary" type="button" onClick={() => explorer.setMode('all')}>Browse All Files</button>}
+			{showModeSelector && explorer.mode === 'sources' && workspaces.every((item) => sourcePaths(item).length === 0) && <button className="secondary" type="button" onClick={() => explorer.setMode('all')}>Browse All Files</button>}
           </div>}
           {!leftCollapsed && <button className="explorer-resize-handle left" aria-label="Resize workspace tree" onPointerDown={(event) => startResize('left', event)} />}
         </aside>

@@ -128,7 +128,7 @@ func TestReadRejectsSymlinkEscape(t *testing.T) {
 	}
 
 	access := New()
-	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Path: root, Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "items/platform/PM-006"}}
 	if _, err := access.Read(workspace, item, "escape_txt"); err == nil {
 		t.Fatal("expected symlink escape to be rejected")

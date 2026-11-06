@@ -648,10 +648,14 @@ func snapshotCommit(item models.ItemDetail) (string, error) {
 }
 
 func FallbackPath(workspace models.WorkspaceConfig, item models.ItemDetail) string {
-	if len(workspace.Sources) == 0 || item.Scope == "" || item.Identifier == "" {
+	sources := workspace.SourcesShownIn(models.SourceSurfaceWorkstream)
+	if len(sources) == 0 {
+		sources = workspace.SourcePaths()
+	}
+	if len(sources) == 0 || item.Scope == "" || item.Identifier == "" {
 		return ""
 	}
-	return filepath.ToSlash(filepath.Join(workspace.Sources[0], item.Scope, item.Identifier))
+	return filepath.ToSlash(filepath.Join(sources[0], item.Scope, item.Identifier))
 }
 
 func insertFileNode(nodes []models.FileNode, relPath string) []models.FileNode {

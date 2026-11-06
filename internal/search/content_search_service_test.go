@@ -46,7 +46,7 @@ func TestSearchItemUsesOnlyTheItemRoot(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "plans/PM-1/readme.md", "private needle")
 	writeFile(t, root, "plans/PM-2/readme.md", "sibling needle")
-	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: root, Sources: []string{"plans"}}
+	workspace := models.WorkspaceConfig{ID: "ws", Name: "Workspace", Path: root, Sources: models.SourceList("plans")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-1", WorkspaceID: "ws", ItemPath: "plans/PM-1"}}
 	service := NewContentSearchService(fakeRegistry{[]models.WorkspaceConfig{workspace}}, fakeIndex{item}, workspacefiles.NewWithIgnoreChecker(nil))
 	response, err := service.SearchItem(context.Background(), "item-1", models.WorkspaceContentSearchRequest{Query: "needle"})
@@ -63,7 +63,7 @@ func TestSearchExplorerResolvesSourcesAndAllModes(t *testing.T) {
 	writeFile(t, root, "root.txt", "root needle")
 	writeFile(t, root, "plans/a.md", "source needle")
 	writeFile(t, root, "docs/b.md", "nested needle")
-	workspace := models.WorkspaceConfig{ID: "ws", Path: root, Sources: []string{"plans", "plans", "docs"}}
+	workspace := models.WorkspaceConfig{ID: "ws", Path: root, Sources: models.SourceList("plans", "plans", "docs")}
 	service := NewContentSearchService(fakeRegistry{[]models.WorkspaceConfig{workspace}}, fakeIndex{}, workspacefiles.NewWithIgnoreChecker(nil))
 	sources, err := service.SearchExplorer(context.Background(), ModeSources, "", models.WorkspaceContentSearchRequest{Query: "needle"})
 	if err != nil || len(sources.Results) != 2 {

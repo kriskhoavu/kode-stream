@@ -129,7 +129,7 @@ func e2eRunbookTestService(t *testing.T) (*Service, models.WorkspaceConfig, mode
 	}
 	dataDir := t.TempDir()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}

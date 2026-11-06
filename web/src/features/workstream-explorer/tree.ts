@@ -1,4 +1,5 @@
 import type { ExplorerTreeMode, ItemSummary, WorkspaceConfig, WorkspaceTreeEntry } from '../../lib/types';
+import { sourcePaths } from '../../lib/sources';
 import type { DirectoryCacheEntry, ExplorerItemDecoration, VisibleExplorerRow, WorkspaceRootNode } from './types';
 
 export function explorerNodeId(workspaceId: string, path: string): string {
@@ -76,7 +77,7 @@ export function flattenVisibleTree({
 }
 
 export function configuredSourceEntries(workspace?: WorkspaceConfig): WorkspaceTreeEntry[] {
-	return (workspace?.sources ?? []).map((path) => {
+	return sourcePaths(workspace).map((path) => {
 		const normalized = normalizeExplorerPath(path);
 		return {
 			id: `source:${normalized}`,

@@ -25,7 +25,7 @@ func TestCheckoutLoadWaitsForWorkspaceMutation(t *testing.T) {
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestLoadBranchRejectsNonCheckoutOperationalContext(t *testing.T) {
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestReviewBranchScansSnapshotWithoutCheckout(t *testing.T) {
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestReviewBranchWaitsForSwitchAndDoesNotOverwriteCheckoutIndex(t *testing.T
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestLoadBranchRescansWorkingTreeWhenItemDirectoryIsDeleted(t *testing.T) {
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestLoadBranchReusesUnchangedWorkingTreeScan(t *testing.T) {
 	dir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestLoadBranchKeepsSameIdentifierContentSeparateInSQLite(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer state.SQLStore.Close()
-	workspace, err := state.Workspaces.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := state.Workspaces.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}

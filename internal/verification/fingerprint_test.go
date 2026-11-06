@@ -68,7 +68,7 @@ func TestVerificationFreshnessBecomesStaleAndDetectsDuringRunChanges(t *testing.
 	root := verificationGitWorkspace(t)
 	runtimeConfig := verificationRuntime("true", nil)
 	runtimeConfig.Commands.Down = "true"
-	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}, Runtime: runtimeConfig}
+	workspace := models.WorkspaceConfig{ID: "workspace-1", Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans"), Runtime: runtimeConfig}
 	service := NewService(verificationRegistry(t, workspace), appruntime.NewService())
 	t.Cleanup(service.Close)
 	job, err := service.Start(workspace.ID, CreateInput{})

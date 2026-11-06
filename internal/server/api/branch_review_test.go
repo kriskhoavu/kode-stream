@@ -38,7 +38,7 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	dataDir := t.TempDir()
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestCheckoutReviewAndExplicitImportRoutes(t *testing.T) {
 	branchReviewWrite(t, otherRoot, "plans/.keep", "")
 	branchReviewGit(t, otherRoot, "add", ".")
 	branchReviewGit(t, otherRoot, "commit", "-m", "other workspace")
-	otherWorkspace, err := reg.Create(models.WorkspaceInput{Name: "Other Workspace", Path: otherRoot, BaselineBranch: "main", Sources: []string{"plans"}})
+	otherWorkspace, err := reg.Create(models.WorkspaceInput{Name: "Other Workspace", Path: otherRoot, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}

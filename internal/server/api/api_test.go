@@ -290,7 +290,7 @@ func TestWorkspaceAISessionRoutesUseWorkspaceCapabilitiesAndValidateContext(t *t
 	}
 	dataDir := t.TempDir()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,7 +370,7 @@ func TestE2ERunbookReadRoutesReturnLocalAndCanonicalCoverage(t *testing.T) {
 	}
 	dataDir := t.TempDir()
 	reg := registry.New(filepath.Join(dataDir, "workspaces.yaml"), gitadapter.New())
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: []string{"plans", "wiki"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans", "wiki")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -701,7 +701,7 @@ func TestAILaunchRouteValidatesBodyAndReportsUnavailableLauncher(t *testing.T) {
 }
 
 func TestFallbackItemPath(t *testing.T) {
-	workspace := models.WorkspaceConfig{Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Sources: models.SourceList("items")}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{Scope: "api", Identifier: "DI-170"}}
 
 	got := fallbackItemPath(workspace, item)
@@ -744,14 +744,14 @@ func TestNormalizeItemDetailUsesEmptyCollections(t *testing.T) {
 }
 
 func TestValidateGitPathsStaysInsideSources(t *testing.T) {
-	workspace := models.WorkspaceConfig{Sources: []string{"items", "docs"}}
+	workspace := models.WorkspaceConfig{Sources: models.SourceList("items", "docs")}
 	if err := validateGitPaths(workspace, []string{"items/platform/PM-002/README.md", "docs/guide.md"}); err != nil {
 		t.Fatalf("expected paths to be valid: %v", err)
 	}
 }
 
 func TestValidateGitPathsRejectsEscapesAndUnregisteredPaths(t *testing.T) {
-	workspace := models.WorkspaceConfig{Sources: []string{"items"}}
+	workspace := models.WorkspaceConfig{Sources: models.SourceList("items")}
 	for _, paths := range [][]string{
 		{},
 		{"../secret.md"},
@@ -1872,7 +1872,7 @@ func reliabilityTestAPI(t testing.TB) (*API, models.WorkspaceConfig, *itemindex.
 	}
 	git := gitadapter.New()
 	reg := registry.New(filepath.Join(t.TempDir(), "workspaces.yaml"), git)
-	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: []string{"plans"}})
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Test", Path: root, BaselineBranch: "main", Sources: models.SourceList("plans")})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -441,5 +441,5 @@ func (s *Service) result(workspace models.WorkspaceConfig, opErr error) models.G
 }
 
 func ValidatePaths(workspace models.WorkspaceConfig, paths []string) error {
-	return pathguard.ValidateSourcePaths(workspace.Sources, paths)
+	return pathguard.ValidateSourcePaths(workspace.SourcePaths(), paths)
 }

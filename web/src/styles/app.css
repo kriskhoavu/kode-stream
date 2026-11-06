@@ -5060,6 +5060,30 @@ body.is-resizing-drawer {
   gap: 8px;
 }
 
+.workspace-source-shown-in {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 0.85rem;
+}
+
+.workspace-source-shown-in legend {
+  float: left;
+  padding: 0;
+  margin-right: 4px;
+  color: var(--muted);
+}
+
+.workspace-source-shown-in label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .workspace-overview-sections {
   display: grid;
 }

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Search, Sun, Boxes, FolderGit2, PanelLeftClose, PanelLeftOpen, Settings, Bot, Workflow } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
+import { sourcePaths } from './lib/sources';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
 export { routeFromLocation } from './app/router';
@@ -186,7 +187,7 @@ export function App() {
                     <FolderGit2 size={16} />
                     <span>
                       <strong>{repo.name}</strong>
-                      <small>{repo.location === 'cloud_agent' ? 'Cloud Agent' : 'Local'} · {repo.baselineBranch} · {repo.sources.join(', ') || 'plans'}</small>
+                      <small>{repo.location === 'cloud_agent' ? 'Cloud Agent' : 'Local'} · {repo.baselineBranch} · {sourcePaths(repo).join(', ') || 'plans'}</small>
                     </span>
                   </button>
                 ))}
