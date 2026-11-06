@@ -61,4 +61,19 @@ describe('pipeline model', () => {
 		const groups = ledgerGroups(run);
 		expect(groups[0].rows.map((row) => row.step)).toContain('Round 2 · plan again · try 2');
 	});
+
+	it('opens only the latest stage, and numbers a stage that ran again after a stop', async () => {
+		const run = await detail('run-pm-02');
+		expect(groups_open(ledgerGroups(run))).toEqual([false, true]);
+		const plan = run.stages.find((stage) => stage.kind === 'plan');
+		const planner = run.agentRuns.find((agentRun) => agentRun.role === 'planner');
+		if (!plan || !planner) throw new Error('fixture has no plan stage');
+		run.stages.push({ ...plan, id: 'stage-plan-2', ordinal: plan.ordinal + 0.5, state: 'failed' });
+		run.agentRuns.push({ ...planner, id: 'agr-plan-2', stageId: 'stage-plan-2', state: 'cancelled' });
+		const groups = ledgerGroups(run);
+		expect(groups.map((group) => group.title)).toEqual(['Plan 1', 'Plan 2', 'Build']);
+		expect(groups_open(groups)).toEqual([false, false, true]);
+	});
 });
+
+const groups_open = (groups: ReturnType<typeof ledgerGroups>) => groups.map((group) => group.open);

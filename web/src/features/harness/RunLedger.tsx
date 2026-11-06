@@ -37,14 +37,27 @@ export function ledgerGroups(detail: HarnessRunDetail): LedgerGroup[] {
 			return { id: agentRun.id, step: `Round ${agentRun.round} · ${stepWords[agentRun.role]}${again}${retry}`, agentRun };
 		});
 		if (stage.kind === 'qa' && stage.state !== 'pending') rows.unshift({ id: stage.id, step: `Run ${stage.round} of ${stage.maxRounds} · tests`, stage });
-		// A stage that is over folds up; the one still in play, or the one that stopped, stays open.
-		const open = stage.state !== 'passed';
+		const open = false;
 		if (stage.kind === 'plan') groups.push({ id: stage.id, title: 'Plan', note: decidedNote(approvalOf('plan')), rows, open });
 		if (stage.kind === 'implement') groups.push({ id: stage.id, title: 'Build', rows, open });
 		if (stage.kind === 'qa') groups.push({ id: stage.id, title: 'Test', note: decidedNote(approvalOf('draft_pr')), rows, open });
 		if (stage.kind === 'draft_pr' && stage.state !== 'pending') groups.push({ id: stage.id, title: 'Draft pull request', rows: [{ id: stage.id, step: 'Push and open', stage }], open });
 	}
-	return groups.filter((group) => group.rows.length > 0);
+	const kept = groups.filter((group) => group.rows.length > 0);
+	// A stage kind that ran more than once (a retry after a stop) is numbered: "Plan 2" is the second Plan stage.
+	const counts = new Map<string, number>();
+	for (const group of kept) counts.set(group.title, (counts.get(group.title) ?? 0) + 1);
+	const seen = new Map<string, number>();
+	for (const group of kept) {
+		if ((counts.get(group.title) ?? 0) < 2) continue;
+		const nth = (seen.get(group.title) ?? 0) + 1;
+		seen.set(group.title, nth);
+		group.title = `${group.title} ${nth}`;
+	}
+	// Only the latest stage starts open; everything before it is history and folds.
+	const last = kept.at(-1);
+	if (last) last.open = true;
+	return kept;
 }
 
 function sumRows(rows: LedgerRow[]) {
