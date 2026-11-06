@@ -1,0 +1,135 @@
+/* The harness on the Workstream board: card chips, the amber ring and the Needs you strip. Tokens come from harness.css. */
+
+.plan-card.needs-you-card {
+	border-color: color-mix(in srgb, var(--hx-waiting) 55%, var(--line));
+	box-shadow: var(--hx-ring), 0 8px 18px rgba(17, 24, 39, 0.06);
+}
+
+.plan-card.harness-card.no-plan {
+	border-style: dashed;
+}
+
+.plan-card-harness {
+	display: grid;
+	gap: 6px;
+}
+
+.plan-card-harness-chips {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.plan-card-no-plan {
+	font-size: 11px;
+	color: var(--muted);
+	font-style: italic;
+}
+
+.plan-card-progress {
+	display: block;
+	height: 4px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--hx-running) 18%, var(--line));
+	overflow: hidden;
+}
+
+.plan-card-progress > span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: var(--hx-running);
+	transition: width .4s var(--hx-ease);
+}
+
+.plan-card-by-hand {
+	opacity: .8;
+}
+
+.needs-you {
+	margin: 0 0 12px;
+	padding: 10px 12px;
+	border: 1px solid color-mix(in srgb, var(--hx-waiting) 50%, var(--line));
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--hx-waiting) 8%, var(--panel));
+	display: grid;
+	gap: 8px;
+}
+
+.needs-you-title {
+	margin: 0;
+	font-size: 13px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--hx-waiting);
+}
+
+.needs-you-title small {
+	font-weight: 500;
+	color: var(--muted);
+}
+
+.needs-you-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 6px;
+}
+
+.needs-you-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 16px;
+	padding: 8px 10px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+}
+
+.needs-you-text {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+	flex: 1 1 280px;
+}
+
+.needs-you-name {
+	font-weight: 700;
+	text-align: left;
+	padding: 0;
+}
+
+.needs-you-asks,
+.needs-you-sent {
+	font-size: 12px;
+	color: var(--muted);
+	overflow-wrap: anywhere;
+}
+
+.needs-you-actions {
+	display: inline-flex;
+	gap: 8px;
+}
+
+.needs-you-ask {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 8px;
+	flex: 1 1 100%;
+}
+
+.needs-you-ask label {
+	flex: 1 1 280px;
+}
+
+.needs-you-ask textarea {
+	width: 100%;
+	resize: vertical;
+}

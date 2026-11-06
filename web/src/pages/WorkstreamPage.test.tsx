@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { filterPlans, WorkstreamPage } from './WorkstreamPage';
 import type { WorkstreamBranchLoadResult, ItemSummary, SourceMode } from '../lib/types';
+import { emptyFilters } from '../features/workstream/filtering';
 
 const workspace = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', sources: ['items'], createdAt: new Date().toISOString() };
 const draftItem: ItemSummary = {
@@ -499,17 +500,17 @@ describe('filterPlans', () => {
   const workspace = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', sources: ['items', 'docs'], createdAt: new Date().toISOString() };
 
   it('uses OR within a facet', () => {
-    const result = filterPlans(items, { sources: ['items', 'docs'], scopes: [], statuses: [], branches: [], authors: [] }, '', workspace);
+    const result = filterPlans(items, { sources: ['items', 'docs'], scopes: [], statuses: [], branches: [], authors: [], workedBy: [] }, '', workspace);
     expect(result.map((plan) => plan.id)).toEqual(['p1', 'p2']);
   });
 
   it('filters by scope', () => {
-    const result = filterPlans(items, { sources: [], scopes: ['api'], statuses: [], branches: [], authors: [] }, '', workspace);
+    const result = filterPlans(items, { sources: [], scopes: ['api'], statuses: [], branches: [], authors: [], workedBy: [] }, '', workspace);
     expect(result.map((plan) => plan.id)).toEqual(['p1']);
   });
 
   it('uses AND across facets', () => {
-    const result = filterPlans(items, { sources: ['docs'], scopes: ['docs'], statuses: ['unsorted'], branches: [], authors: ['Giang'] }, '', workspace);
+    const result = filterPlans(items, { sources: ['docs'], scopes: ['docs'], statuses: ['unsorted'], branches: [], authors: ['Giang'], workedBy: [] }, '', workspace);
     expect(result.map((plan) => plan.id)).toEqual(['p2']);
   });
 });
@@ -585,5 +586,17 @@ describe('Jira description formatting', () => {
     expect(within(preview).getByRole('heading', { name: 'Acceptance Criteria' })).toBeInTheDocument();
     expect(within(preview).getAllByRole('listitem')).toHaveLength(2);
     expect(preview.querySelector('code')?.textContent).toBe('ArticleIndex');
+  });
+});
+
+describe('filterPlans by who works on a card', () => {
+  const base = { id: 'p1', workspaceId: 'r1', workspaceName: 'Sample', branch: 'main', scope: 'api', identifier: 'PM-1', title: 'One', status: 'draft' as const, tags: [], metadataSource: 'plan.yaml', itemPath: 'plans/api/PM-1' };
+  const items = [base, { ...base, id: 'p2', identifier: 'PM-2' }];
+  const workedByOf = (item: { id: string }) => (item.id === 'p1' ? 'harness' as const : 'hand' as const);
+
+  it('keeps the cards the harness works on, or the ones by hand', () => {
+    expect(filterPlans(items, { ...emptyFilters, workedBy: ['harness'] }, '', undefined, workedByOf).map((plan) => plan.id)).toEqual(['p1']);
+    expect(filterPlans(items, { ...emptyFilters, workedBy: ['hand'] }, '', undefined, workedByOf).map((plan) => plan.id)).toEqual(['p2']);
+    expect(filterPlans(items, { ...emptyFilters, workedBy: ['harness'] }, '').map((plan) => plan.id)).toEqual([]);
   });
 });

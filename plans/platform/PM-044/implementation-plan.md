@@ -52,8 +52,8 @@ I1 ─> M1 Sources ─> M2 Cards ─> M3 Agents tab ─> M4 Run from a card ─�
 | F1–F6 | Dashboard                                   | Frontend  | B1 contract | Done   |
 | I1    | Documentation                               | Docs      | all         | Done   |
 | M1    | Sources say where they show                 | Fullstack | I1          | Done   |
-| M2    | Harness-aware cards and the Needs you strip | Frontend  | M1          | Next   |
-| M3    | One Agents tab: harness run and sessions    | Frontend  | M2          | —      |
+| M2    | Harness-aware cards and the Needs you strip | Frontend  | M1          | Done   |
+| M3    | One Agents tab: harness run and sessions    | Frontend  | M2          | Next   |
 | M4    | Run with the harness from a card            | Fullstack | M3          | —      |
 | M5    | Queue and Waves as board views              | Frontend  | M2          | —      |
 | M6    | Remove the Harness page                     | Fullstack | M3, M4, M5  | —      |

@@ -10,7 +10,7 @@ import { useNow } from './useNow';
 
 type GateWords = { approve: string; reject: string; askTitle: string; askLabel: string; askPlaceholder: string; answerOnApprove?: boolean; answerLabel?: string; answerPlaceholder?: string; answerSubmit?: string; noteLink?: string };
 
-const gateWords: Record<HarnessApprovalGate, GateWords> = {
+export const gateWords: Record<HarnessApprovalGate, GateWords> = {
 	start: { approve: 'Start', reject: 'Not now', askTitle: 'Why not now?', askLabel: 'Reason', askPlaceholder: 'Say why this task should wait. The Sorter keeps it in line.' },
 	plan: { approve: 'Approve', reject: 'Ask for changes', askTitle: 'What should change?', askLabel: 'What should change?', askPlaceholder: 'Tell the Planner what to change. This is sent back with the plan.' },
 	resume: { approve: 'Retry', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task leaves the queue until its ticket changes.', noteLink: 'Retry with a note', answerLabel: 'A note for the next try', answerPlaceholder: 'Optional. What to do differently this time. The agent reads it with the Checker\'s findings.', answerSubmit: 'Send and retry' },

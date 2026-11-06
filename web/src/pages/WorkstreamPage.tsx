@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
 import { BookmarkPlus, Bot, ChevronDown, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FacetMenu, SelectedFilters } from '../components/FacetMenu';
@@ -42,6 +42,12 @@ import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSetting
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { AgentCluster, AgentPane, AgentsTab, agentFocusKey, useHeldAgentSessions, type AgentFocus } from '../features/workstream/AgentsPanel';
 import { useItemSessions, type ItemAgents } from '../features/workstream/useItemSessions';
+import { useBoardHarness } from '../features/workstream/useBoardHarness';
+import { isSyntheticItem, joinHarness, workedBy, workedByLabels, type CardWork } from '../features/workstream/harnessJoin';
+import { ByHandChip, HarnessCardChips } from '../features/workstream/HarnessCardChips';
+import { NeedsYouStrip } from '../features/workstream/NeedsYouStrip';
+import '../features/harness/harness.css';
+import '../features/workstream/harnessCards.css';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
 type DrawerSideTab = 'info' | 'git' | 'jira' | 'agents';
@@ -125,6 +131,11 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [selectedBranch, setSelectedBranch] = useState('');
   const [branchContext, setBranchContext] = useState<WorkstreamBranchLoadResult | null>(null);
   const { byItem: itemAgents, reload: reloadItemAgents } = useItemSessions(workspace?.id, selectedBranch);
+  const harness = useBoardHarness();
+  const harnessOn = Boolean(harness.state.loaded && harness.state.status?.enabled && harness.state.status.storageSupported);
+  const harnessJoin = useMemo(() => joinHarness(items, harness.state, workspace?.id), [items, harness.state, workspace?.id]);
+  const boardItems = useMemo(() => harnessJoin.synthetic.length ? [...items, ...harnessJoin.synthetic] : items, [items, harnessJoin.synthetic]);
+  const workedByOf = useCallback((item: ItemSummary) => workedBy(harnessJoin.byItemId.get(item.id)), [harnessJoin]);
   const [sourceItemsOpen, setSourceItemsOpen] = useState(false);
   const [sourceItemsLoading, setSourceItemsLoading] = useState(false);
   const [sourceItemsSaving, setSourceItemsSaving] = useState(false);
@@ -309,7 +320,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   }, [workspace?.id]);
 
   const sourceOptions = useMemo(() => sourceFacetOptions(items, workspace), [items, workspace]);
-  const filteredPlans = useMemo(() => filterPlans(items, filters, text, workspace), [items, filters, text, workspace]);
+  const filteredPlans = useMemo(() => filterPlans(boardItems, filters, text, workspace, workedByOf), [boardItems, filters, text, workspace, workedByOf]);
   const services = useMemo(() => unique(items.map((plan) => plan.scope || 'Unknown')), [items]);
   const currentBranch = branchContext?.currentCheckoutBranch || workspaceGitStatus?.branch || workspaceBranchCurrent || workspace?.baselineBranch || 'No branch';
   const branchOptions = useMemo(() => unique([
@@ -323,12 +334,14 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     { key: 'sources', title: 'Source', options: sourceOptions },
     { key: 'scopes', title: 'Service', options: services.map((scope) => ({ value: scope, label: scope })) },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
-    { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) }
+    { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
+    ...(harnessOn ? [{ key: 'workedBy' as const, title: 'Worked by', options: (['harness', 'hand'] as const).map((value) => ({ value, label: workedByLabels[value] })) }] : [])
   ];
   const activeFilterCount = filters.sources.length
     + filters.scopes.length
     + filters.statuses.length
     + filters.authors.length
+    + filters.workedBy.length
     + (text ? 1 : 0);
   const sourceMode = branchContext?.sourceMode ?? 'working_tree';
   const displayedStatuses = useMemo(() => {
@@ -739,6 +752,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         {activeFilterCount > 0 && <span>{activeFilterCount} active filters</span>}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
+      {harnessOn && <NeedsYouStrip state={harness.state} onApprove={harness.approve} onReject={harness.reject} onOpenTask={(task) => {
+        const itemId = Array.from(harnessJoin.byItemId.entries()).find(([, work]) => work.task.id === task.id)?.[0];
+        if (itemId && !isSyntheticItem({ id: itemId })) { setDrawerPlanId(itemId); setDrawerAgent(undefined); }
+      }} />}
       <div className="workstream-board" style={boardStyle} aria-busy={loading}>
         {displayedStatuses.map((column) => (
           <Fragment key={column}>
@@ -776,6 +793,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                     setDrawerAgent(undefined);
                   }}
                   agents={itemAgents.get(plan.id)}
+                  work={harnessJoin.byItemId.get(plan.id)}
+                  harnessOn={harnessOn}
                   onOpenAgent={(focus) => {
                     setDrawerPlanId(plan.id);
                     setDrawerAgent(focus);
@@ -1391,13 +1410,17 @@ function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetSt
   );
 }
 
-const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
+const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, work, harnessOn = false, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
   item: ItemSummary;
   workspace?: WorkspaceConfig;
   pending: boolean;
   active: boolean;
   created: boolean;
   agents?: ItemAgents;
+  /** What the harness holds for this card, when it works on it. */
+  work?: CardWork;
+  /** True once the board knows the harness is on, so a card the harness does not hold can say "By hand". */
+  harnessOn?: boolean;
   onDragStart: (event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
   onPreview: () => void;
@@ -1413,13 +1436,18 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   // the default source-structure card tags every item with its own source name, so
   // wiki items arrived as metadataSource "workspace-settings" and printed it twice.
   const tags = (docs ? plan.tags.filter((tag) => tag !== plan.scope && tag !== plan.identifier) : plan.tags).filter((tag) => tag !== source);
-  const draggable = isItemDraggable(plan) && !pending;
+  const synthetic = isSyntheticItem(plan);
+  const draggable = isItemDraggable(plan) && !pending && !synthetic;
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    onOpen();
+    if (!synthetic) onOpen();
   };
+  const preview = () => { if (!synthetic) onPreview(); };
   const classes = ['plan-card'];
   if (docs) classes.push('docs-plan');
+  if (work) classes.push('harness-card');
+  if (work?.task.needsYou || work?.waiting.length) classes.push('needs-you-card');
+  if (synthetic) classes.push('no-plan');
   if (draggable) classes.push('draggable');
   if (active) classes.push('dragging');
   if (pending) classes.push('move-pending');
@@ -1432,13 +1460,13 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
       aria-busy={pending}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      onClick={onPreview}
+      onClick={preview}
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        onPreview();
+        preview();
       }
       }}
     >
@@ -1446,10 +1474,11 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
         <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
         <span className="card-badges">
           {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
-          {!docs && <AgentCluster agents={agents} title={plan.title} onOpen={onOpenAgent} />}
+          {!docs && !synthetic && <AgentCluster agents={agents} title={plan.title} onOpen={onOpenAgent} />}
         </span>
       </div>
       {showItem && <span className="plan-card-identifier">{plan.identifier}</span>}
+      {work ? <HarnessCardChips work={work} /> : harnessOn && !docs && plan.status !== 'unsorted' && <div className="plan-card-harness"><ByHandChip /></div>}
       {description && <p>{description}</p>}
       <footer>
         <span className="avatar">{(plan.author || plan.owner || '?').slice(0, 1).toUpperCase()}</span>
@@ -1457,7 +1486,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
         <time>{plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : 'No date'}</time>
       </footer>
       {tags.length > 0 && <div className="tags">{tags.slice(0, 3).map((tag: string) => <span key={tag}>{tag}</span>)}</div>}
-      {plan.status !== 'unsorted' && !isDocumentationMetadataSource(plan.metadataSource) && (
+      {plan.status !== 'unsorted' && !synthetic && !isDocumentationMetadataSource(plan.metadataSource) && (
         <StatusMenu value={plan.status} onChange={onMove} ariaLabel="Move item status" />
       )}
     </article>

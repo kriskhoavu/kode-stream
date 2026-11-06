@@ -33,12 +33,14 @@ export function openEventSourceFeed(url: string, handlers: HarnessFeedHandlers):
 	return () => source.close();
 }
 
-export function useHarnessEvents(harness: HarnessController): void {
+export function useHarnessEvents(harness: HarnessController, active = true): void {
 	const { client, dispatch, refresh } = harness;
 	const lastSeq = useRef(harness.state.lastSeq);
 	lastSeq.current = harness.state.lastSeq;
 
 	useEffect(() => {
+		// The board reads the harness beside its items; while the harness is off there is nothing to follow.
+		if (!active) return;
 		if (!client.subscribe) {
 			// No feed at all: poll for good.
 			dispatch({ type: 'connection', connection: 'polling' });
@@ -106,5 +108,5 @@ export function useHarnessEvents(harness: HarnessController): void {
 			clearTimers();
 			close?.();
 		};
-	}, [client, dispatch, refresh]);
+	}, [active, client, dispatch, refresh]);
 }

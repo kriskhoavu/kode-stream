@@ -44,7 +44,7 @@ describe('Workstream drag and drop helpers', () => {
 
   it('lets existing status filters decide visibility after an optimistic move', () => {
     const moved = applyItemStatus([item], item.id, 'review');
-    const draftOnly = { sources: [], scopes: [], statuses: ['draft'], branches: [], authors: [] };
+    const draftOnly = { sources: [], scopes: [], statuses: ['draft'], branches: [], authors: [], workedBy: [] };
     const draftAndReview = { ...draftOnly, statuses: ['draft', 'review'] };
 
     expect(filterPlans(moved, draftOnly, '')).toEqual([]);

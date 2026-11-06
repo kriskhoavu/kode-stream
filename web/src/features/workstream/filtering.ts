@@ -1,7 +1,8 @@
 import type { ItemSummary, WorkspaceConfig } from '../../lib/types';
 import { sourcesShownIn } from '../../lib/sources';
+import type { WorkedBy } from './harnessJoin';
 
-export type FilterKey = 'sources' | 'scopes' | 'statuses' | 'branches' | 'authors';
+export type FilterKey = 'sources' | 'scopes' | 'statuses' | 'branches' | 'authors' | 'workedBy';
 export type Filters = Record<FilterKey, string[]>;
 export type FacetOption = { value: string; label: string };
 
@@ -10,13 +11,16 @@ export const emptyFilters: Filters = {
   scopes: [],
   statuses: [],
   branches: [],
-  authors: []
+  authors: [],
+  workedBy: []
 };
 
-export function filterPlans(items: ItemSummary[], filters: Filters, text: string, workspace?: WorkspaceConfig): ItemSummary[] {
+export function filterPlans(items: ItemSummary[], filters: Filters, text: string, workspace?: WorkspaceConfig, workedByOf?: (item: ItemSummary) => WorkedBy): ItemSummary[] {
   const query = text.trim().toLowerCase();
+  const workedBy = filters.workedBy ?? [];
   return items.filter((plan) => {
     if (filters.sources.length > 0 && !filters.sources.includes(sourceRoot(plan, workspace))) return false;
+    if (workedBy.length > 0 && !workedBy.includes(workedByOf ? workedByOf(plan) : 'hand')) return false;
     const scope = plan.scope || 'Unknown';
     if (filters.scopes.length > 0 && !filters.scopes.includes(scope)) return false;
     if (filters.statuses.length > 0 && !filters.statuses.includes(plan.status)) return false;
