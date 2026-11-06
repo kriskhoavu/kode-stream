@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { ApiError } from '../../shared/api';
 import { newIdempotencyKey } from '../../shared/api/idempotency';
-import type { HarnessApproval, HarnessRoleId, HarnessTask, HarnessRun } from '../../lib/types';
+import type { HarnessApproval, HarnessCreateTaskInput, HarnessRoleId, HarnessTask, HarnessRun } from '../../lib/types';
 import type { HarnessClient } from './harnessClient';
 import { harnessReducer, initialHarnessState, startOfDay } from './harnessState';
 import type { HarnessAction, HarnessState } from './harnessState';
@@ -17,6 +17,8 @@ export interface HarnessController {
 	pin: (task: HarnessTask, pinned: boolean) => Promise<void>;
 	setPriority: (task: HarnessTask, input: { priorityOverride?: number; before?: string }) => Promise<void>;
 	start: (task: HarnessTask) => Promise<void>;
+	/** Puts a card's ticket in the queue and hands the task back; throws when the harness refuses. */
+	createTask: (input: Omit<HarnessCreateTaskInput, 'idempotencyKey'>) => Promise<HarnessTask>;
 	setQuestions: (task: HarnessTask, askQuestions: boolean | null) => Promise<void>;
 	cancelRun: (run: HarnessRun, reason?: string) => Promise<void>;
 	pauseRole: (role: HarnessRoleId) => Promise<void>;
@@ -97,6 +99,16 @@ export function useHarness(client: HarnessClient): HarnessController {
 	const setPriority = useCallback((task: HarnessTask, input: { priorityOverride?: number; before?: string }) => saveTask(() => client.setPriority(task, input)), [client, saveTask]);
 	const start = useCallback((task: HarnessTask) => saveTask(() => client.start(task, newIdempotencyKey())), [client, saveTask]);
 	const setQuestions = useCallback((task: HarnessTask, askQuestions: boolean | null) => saveTask(() => client.setQuestions(task, askQuestions)), [client, saveTask]);
+	const createTask = useCallback(async (input: Omit<HarnessCreateTaskInput, 'idempotencyKey'>) => {
+		if (!client.createTask) throw new Error('The harness cannot take a card here.');
+		// One key per card, so a retry after a dropped reply is a replay, not a second task.
+		const keyName = `create:${input.workspaceId}:${input.key}`;
+		const key = keys.current.get(keyName) ?? newIdempotencyKey('harness');
+		keys.current.set(keyName, key);
+		const task = await client.createTask({ ...input, idempotencyKey: key });
+		dispatch({ type: 'task.saved', task });
+		return task;
+	}, [client]);
 
 	const cancelRun = useCallback(async (run: HarnessRun, reason?: string) => {
 		try {
@@ -119,7 +131,7 @@ export function useHarness(client: HarnessClient): HarnessController {
 	const pauseRole = useCallback((role: HarnessRoleId) => roleChange(() => client.pauseRole(role)), [client, roleChange]);
 	const resumeRole = useCallback((role: HarnessRoleId) => roleChange(() => client.resumeRole(role)), [client, roleChange]);
 
-	return { state, client, dispatch, refresh, loadRun, approve, reject, pin, setPriority, start, setQuestions, cancelRun, pauseRole, resumeRole };
+	return { state, client, dispatch, refresh, loadRun, approve, reject, pin, setPriority, start, createTask, setQuestions, cancelRun, pauseRole, resumeRole };
 }
 
 export function plainError(error: unknown, fallback: string): string {

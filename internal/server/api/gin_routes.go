@@ -233,6 +233,7 @@ func routeManifest(a *API) []routeSpec {
 		{http.MethodGet, "/harness/agent-runs/:id/transcript", "harness", protectedRoute, a.harness.route(a.harness.agentRunTranscript)},
 		{http.MethodGet, "/harness/approvals", "harness", protectedRoute, a.harness.route(a.harness.approvals)},
 		{http.MethodGet, "/harness/events", "harness", protectedRoute, a.harness.route(a.harness.events)},
+		{http.MethodPost, "/harness/tasks", "harness", protectedRoute, a.harness.route(a.harness.createTask)},
 		{http.MethodPost, "/harness/tasks/:id/pin", "harness", protectedRoute, a.harness.route(a.harness.pinTask)},
 		{http.MethodPost, "/harness/tasks/:id/priority", "harness", protectedRoute, a.harness.route(a.harness.setPriority)},
 		{http.MethodPost, "/harness/tasks/:id/dismiss", "harness", protectedRoute, a.harness.route(a.harness.dismissTask)},

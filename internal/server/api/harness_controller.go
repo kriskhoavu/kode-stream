@@ -283,6 +283,36 @@ func (a *harnessController) startTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
 }
 
+type harnessCreateTaskRequest struct {
+	WorkspaceID    string `json:"workspaceId"`
+	Key            string `json:"key"`
+	Title          string `json:"title"`
+	Body           string `json:"body"`
+	URL            string `json:"url"`
+	StartNow       *bool  `json:"startNow"`
+	IdempotencyKey string `json:"idempotencyKey"`
+}
+
+// createTask puts a card's ticket in the queue, started at once unless the
+// request says to queue it.
+func (a *harnessController) createTask(w http.ResponseWriter, r *http.Request) {
+	var request harnessCreateTaskRequest
+	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	if strings.TrimSpace(request.Key) == "" {
+		writeHarnessInvalid(w, "a Jira key is required")
+		return
+	}
+	startNow := request.StartNow == nil || *request.StartNow
+	task, err := a.harness.CreateTask(r.Context(), harness.CreateTaskInput{WorkspaceID: request.WorkspaceID, Key: request.Key, Title: request.Title, Body: request.Body, URL: request.URL, StartNow: startNow, IdempotencyKey: request.IdempotencyKey}, harnessActor(r), domain.ChannelDashboard)
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, harness.DashboardTasks([]domain.Task{task})[0])
+}
+
 type harnessQuestionsRequest struct {
 	AskQuestions     *bool `json:"askQuestions"`
 	ExpectedRevision int64 `json:"expectedRevision"`

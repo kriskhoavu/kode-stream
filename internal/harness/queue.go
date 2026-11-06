@@ -440,3 +440,76 @@ func (s *Service) MoveBefore(ctx context.Context, id, beforeID string, expectedR
 	override = max(-maxPriorityOverride, min(maxPriorityOverride, override))
 	return s.SetPriority(ctx, id, override, expectedRevision, actor)
 }
+
+// CreateTaskInput is what a card hands the harness: the ticket's key, title
+// and body. Nothing in it is trusted further than the Finder trusts a source.
+type CreateTaskInput struct {
+	WorkspaceID    string
+	Key            string
+	Title          string
+	Body           string
+	URL            string
+	StartNow       bool
+	IdempotencyKey string
+}
+
+// CreateTask puts a ticket in the queue from a card rather than from the
+// Finder, ranked at once, and, when asked, starts it the way Start does: as a
+// start gate decided by the person who asked. A ticket already in the queue is
+// taken as it is; one the harness finished or a person dismissed never
+// reopens, as with the Finder.
+func (s *Service) CreateTask(ctx context.Context, input CreateTaskInput, actor domain.Actor, channel domain.Channel) (domain.Task, error) {
+	if err := s.mutable(); err != nil {
+		return domain.Task{}, err
+	}
+	key := strings.TrimSpace(input.Key)
+	if key == "" {
+		return domain.Task{}, domain.Invalid("a Jira key is required")
+	}
+	workspaceID := strings.TrimSpace(input.WorkspaceID)
+	if workspaceID == "" {
+		return domain.Task{}, domain.Invalid("a workspace is required")
+	}
+	if s.workspaces != nil {
+		if _, found, err := s.workspaces.Get(workspaceID); err != nil {
+			return domain.Task{}, err
+		} else if !found {
+			return domain.Task{}, domain.Invalid("workspace %s is not registered", workspaceID)
+		}
+	}
+	title := boundedText(strings.TrimSpace(input.Title), 1024)
+	if title == "" {
+		title = key
+	}
+	existing, found, err := s.repository.FindTaskBySource(ctx, domain.SourceJira, key)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	var task domain.Task
+	switch {
+	case found && domain.TaskTerminal(existing.State):
+		return domain.Task{}, domain.Invalid("%s already ran through the harness and does not reopen", key)
+	case found && existing.WorkspaceID != workspaceID:
+		return domain.Task{}, domain.Invalid("%s is in the queue of another workspace", key)
+	case found:
+		task = existing
+	default:
+		now := s.now()
+		settings := s.settingsNow(ctx)
+		task = domain.Task{
+			ID: domain.NewID("tsk"), WorkspaceID: workspaceID, Source: domain.Source{Kind: domain.SourceJira, Key: boundedText(key, 256), URL: boundedText(strings.TrimSpace(input.URL), 2048), Labels: []string{}},
+			Title: title, Body: boundedText(input.Body, domain.MaxTaskBodyBytes), State: domain.TaskRanked, ScoreReasons: []string{}, DependsOn: []string{},
+			DiscoveredAt: now, UpdatedAt: now,
+		}
+		s.rescore(settings, &task)
+		if err := s.repository.InsertTask(ctx, task); err != nil {
+			return domain.Task{}, err
+		}
+		s.emit(ctx, domain.Event{Kind: domain.EventTaskDiscovered, TaskID: task.ID, Actor: actorOrNil(actor), Payload: payload(map[string]any{"state": task.State, "sourceKey": task.Source.Key, "title": task.Title, "from": "card"})})
+	}
+	if !input.StartNow || task.StartRequested || (task.State != domain.TaskRanked && task.State != domain.TaskDiscovered) {
+		task.Body = ""
+		return task, nil
+	}
+	return s.StartTask(ctx, task.ID, task.Revision, input.IdempotencyKey, actor, channel)
+}

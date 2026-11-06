@@ -1086,6 +1086,9 @@ export interface HarnessTask {
   updatedAt?: string;
 }
 
+/** What a card hands the harness to run it: the ticket's key, title and body. */
+export interface HarnessCreateTaskInput { workspaceId: string; key: string; title: string; body?: string; url?: string; /** Start at once (the default) or only put it in the queue. */ startNow?: boolean; idempotencyKey: string }
+
 export interface HarnessTotals { turns: number; durationMs: number; costUsd: number; blocking: number; advisory: number }
 
 export interface HarnessStage {

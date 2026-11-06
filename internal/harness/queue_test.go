@@ -201,3 +201,42 @@ func TestStartRunsTheScoutAndSorterLoopsUntilStop(t *testing.T) {
 		t.Fatal("still running after Stop")
 	}
 }
+
+func TestCreateTaskFromACardRanksAndStartsIt(t *testing.T) {
+	ctx := context.Background()
+	service, repository := newQueueService(t)
+	actor := domain.Actor{ActorID: "local", DisplayName: "Local user"}
+	if _, err := service.CreateTask(ctx, CreateTaskInput{WorkspaceID: "ws", Title: "No key"}, actor, domain.ChannelDashboard); !IsInvalid(err) {
+		t.Fatalf("no key err = %v", err)
+	}
+	if _, err := service.CreateTask(ctx, CreateTaskInput{WorkspaceID: "other", Key: "PM-7"}, actor, domain.ChannelDashboard); !IsInvalid(err) {
+		t.Fatalf("unknown workspace err = %v", err)
+	}
+	queued, err := service.CreateTask(ctx, CreateTaskInput{WorkspaceID: "ws", Key: " PM-7 ", Title: "Seven", Body: "The ticket's text"}, actor, domain.ChannelDashboard)
+	if err != nil || queued.State != domain.TaskRanked || queued.StartRequested || queued.Source.Key != "PM-7" || queued.Source.Kind != domain.SourceJira || queued.Body != "" {
+		t.Fatalf("queued = %#v err=%v", queued, err)
+	}
+	stored, _, _ := repository.FindTaskBySource(ctx, domain.SourceJira, "PM-7")
+	if stored.Body != "The ticket's text" || stored.Title != "Seven" {
+		t.Fatalf("stored = %#v", stored)
+	}
+	started, err := service.CreateTask(ctx, CreateTaskInput{WorkspaceID: "ws", Key: "PM-7", StartNow: true, IdempotencyKey: "card-7"}, actor, domain.ChannelDashboard)
+	if err != nil || started.ID != queued.ID || !started.StartRequested {
+		t.Fatalf("started = %#v err=%v", started, err)
+	}
+	approvals, _ := service.Approvals(ctx, domain.ApprovalFilter{TaskID: queued.ID, States: []domain.ApprovalState{domain.ApprovalApproved}})
+	if len(approvals) != 1 || approvals[0].Gate != domain.GateStart || approvals[0].DecidedBy == nil || approvals[0].DecidedBy.ActorID != "local" {
+		t.Fatalf("approvals = %#v", approvals)
+	}
+	fresh, err := service.CreateTask(ctx, CreateTaskInput{WorkspaceID: "ws", Key: "PM-8", Title: "Eight", StartNow: true}, actor, domain.ChannelDashboard)
+	if err != nil || !fresh.StartRequested || fresh.State != domain.TaskRanked {
+		t.Fatalf("fresh = %#v err=%v", fresh, err)
+	}
+	dismissed, err := service.DismissTask(ctx, fresh.ID, "not now", fresh.Revision, actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.CreateTask(ctx, CreateTaskInput{WorkspaceID: "ws", Key: "PM-8", StartNow: true}, actor, domain.ChannelDashboard); !IsInvalid(err) {
+		t.Fatalf("dismissed again err = %v (state %s)", err, dismissed.State)
+	}
+}

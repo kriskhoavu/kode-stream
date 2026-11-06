@@ -287,6 +287,17 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 	if dismiss.Code != http.StatusOK || !strings.Contains(dismiss.Body.String(), `"state":"dismissed"`) {
 		t.Fatalf("dismiss = %d %s", dismiss.Code, dismiss.Body.String())
 	}
+	created := serveHarness(handler, http.MethodPost, "/api/harness/tasks", `{"workspaceId":"ws","key":"PM-9","title":"Nine","body":"From a card","startNow":true,"idempotencyKey":"card-9"}`)
+	if created.Code != http.StatusCreated || !strings.Contains(created.Body.String(), `"key":"PM-9"`) || !strings.Contains(created.Body.String(), `"startRequested":true`) || strings.Contains(created.Body.String(), "From a card") {
+		t.Fatalf("created = %d %s", created.Code, created.Body.String())
+	}
+	if noKey := serveHarness(handler, http.MethodPost, "/api/harness/tasks", `{"workspaceId":"ws","title":"No key"}`); noKey.Code != http.StatusBadRequest || !strings.Contains(noKey.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("no key = %d %s", noKey.Code, noKey.Body.String())
+	}
+	queuedOnly := serveHarness(handler, http.MethodPost, "/api/harness/tasks", `{"workspaceId":"ws","key":"PM-10","startNow":false}`)
+	if queuedOnly.Code != http.StatusCreated || strings.Contains(queuedOnly.Body.String(), `"startRequested":true`) {
+		t.Fatalf("queued = %d %s", queuedOnly.Code, queuedOnly.Body.String())
+	}
 	poll := serveHarness(handler, http.MethodPost, "/api/harness/scout/poll", "")
 	if poll.Code != http.StatusOK || !strings.Contains(poll.Body.String(), `"started":true`) {
 		t.Fatalf("poll = %d %s", poll.Code, poll.Body.String())
@@ -295,7 +306,7 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 		t.Fatalf("missing transcript = %d %s", noTranscript.Code, noTranscript.Body.String())
 	}
 	cleared := serveHarness(handler, http.MethodPost, "/api/harness/queue/clear", "")
-	if cleared.Code != http.StatusOK || !strings.Contains(cleared.Body.String(), `"removed":2`) {
+	if cleared.Code != http.StatusOK || !strings.Contains(cleared.Body.String(), `"removed":4`) {
 		t.Fatalf("clear = %d %s", cleared.Code, cleared.Body.String())
 	}
 	missing := serveHarness(handler, http.MethodPost, "/api/harness/tasks/missing/start", `{"expectedRevision":0}`)

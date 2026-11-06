@@ -1,6 +1,7 @@
 import { api } from '../../shared/api';
 import { openEventSourceFeed } from './useHarnessEvents';
 import type {
+	HarnessCreateTaskInput,
 	HarnessAgentRun,
 	HarnessApproval,
 	HarnessCostSummary,
@@ -54,6 +55,8 @@ export interface HarnessClient {
 	setQuestions(task: HarnessTask, askQuestions: boolean | null): Promise<HarnessTask>;
 	/** Asks the harness to start a task now; the next free Planner takes it. */
 	start(task: HarnessTask, idempotencyKey: string): Promise<HarnessTask>;
+	/** Puts a card's ticket in the queue, started at once unless told to queue it. */
+	createTask?(input: HarnessCreateTaskInput): Promise<HarnessTask>;
 	pauseRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
 	resumeRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
 	settings(signal?: AbortSignal): Promise<HarnessSettings>;
@@ -87,6 +90,7 @@ export const apiHarnessClient: HarnessClient = {
 	pin: (task, pinned) => api.pinHarnessTask(task, pinned),
 	setPriority: (task, input) => api.setHarnessPriority(task, input),
 	start: (task, idempotencyKey) => api.startHarnessTask(task, idempotencyKey),
+	createTask: (input) => api.createHarnessTask(input),
 	setQuestions: (task, askQuestions) => api.setHarnessTaskQuestions(task, askQuestions),
 	pauseRole: (role) => api.pauseHarnessRole(role),
 	resumeRole: (role) => api.resumeHarnessRole(role),

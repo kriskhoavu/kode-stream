@@ -49,6 +49,7 @@ import { useBoardHarness } from '../features/workstream/useBoardHarness';
 import { isSyntheticItem, joinHarness, tasksForWorkspace, workedBy, workedByLabels, type CardWork } from '../features/workstream/harnessJoin';
 import { ByHandChip, HarnessCardChips } from '../features/workstream/HarnessCardChips';
 import { NeedsYouStrip } from '../features/workstream/NeedsYouStrip';
+import { RunWithHarnessDialog } from '../features/workstream/RunWithHarnessDialog';
 import { QueueView } from '../features/workstream/QueueView';
 import { useTaskActions } from '../features/workstream/useTaskActions';
 import { WaveBoard } from '../features/harness/WaveBoard';
@@ -161,6 +162,9 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const taskActions = useTaskActions(harness);
   // A task with no card of its own opens the harness's own drawer.
   const [taskDrawer, setTaskDrawer] = useState<{ taskId: string; tab: HarnessRunTabId } | undefined>();
+  // The card being handed to the harness.
+  const [runDialogItemId, setRunDialogItemId] = useState('');
+  const runDialogItem = runDialogItemId ? boardItems.find((item) => item.id === runDialogItemId) : undefined;
   const openTask = useCallback((task: HarnessTask) => {
     const itemId = Array.from(harnessJoin.byItemId.entries()).find(([, work]) => work.task.id === task.id)?.[0];
     if (itemId && !isSyntheticItem({ id: itemId })) {
@@ -800,6 +804,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         </div>
       )}
       {shownView === 'queue' && <QueueView tasks={boardTasks} harness={harness} onOpenTask={openTask} />}
+      {runDialogItem && <RunWithHarnessDialog item={runDialogItem} workspace={workspace} harness={harness} onClose={() => setRunDialogItemId('')} onStarted={() => { setRunDialogItemId(''); void harness.refresh(); }} />}
       {taskDrawer && (
         <RunDrawer state={harness.state} client={harness.client} taskId={taskDrawer.taskId} tab={taskDrawer.tab} wave={[]} onTabChange={(tab) => setTaskDrawer({ ...taskDrawer, tab })} onClose={() => setTaskDrawer(undefined)} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={taskActions.pin} onMove={taskActions.move} onStart={taskActions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />
       )}
@@ -842,6 +847,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                   agents={itemAgents.get(plan.id)}
                   work={harnessJoin.byItemId.get(plan.id)}
                   harnessOn={harnessOn}
+                  onRunWithHarness={harnessOn && !harnessJoin.byItemId.has(plan.id) ? () => setRunDialogItemId(plan.id) : undefined}
                   onOpenAgent={(focus) => {
                     setDrawerPlanId(plan.id);
                     setDrawerAgent(focus);
@@ -873,6 +879,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           onAgentsChanged={reloadItemAgents}
           work={harnessJoin.byItemId.get(drawerPlanId)}
           harness={harness}
+          onRunWithHarness={harnessOn ? () => setRunDialogItemId(drawerPlanId) : undefined}
           onClose={() => { setDrawerPlanId(''); setDrawerAgent(undefined); }}
           onOpenFull={() => onOpenPlan(drawerPlanId)}
           onOpenRun={() => onOpenPlan(drawerPlanId, 'run')}
@@ -1460,7 +1467,7 @@ function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetSt
   );
 }
 
-const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, work, harnessOn = false, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
+const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, work, harnessOn = false, onRunWithHarness, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
   item: ItemSummary;
   workspace?: WorkspaceConfig;
   pending: boolean;
@@ -1471,6 +1478,8 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   work?: CardWork;
   /** True once the board knows the harness is on, so a card the harness does not hold can say "By hand". */
   harnessOn?: boolean;
+  /** Hands the card to the harness; offered on a card it does not hold. */
+  onRunWithHarness?: () => void;
   onDragStart: (event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
   onPreview: () => void;
@@ -1528,7 +1537,12 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
         </span>
       </div>
       {showItem && <span className="plan-card-identifier">{plan.identifier}</span>}
-      {work ? <HarnessCardChips work={work} /> : harnessOn && !docs && plan.status !== 'unsorted' && <div className="plan-card-harness"><ByHandChip /></div>}
+      {work ? <HarnessCardChips work={work} /> : harnessOn && !docs && plan.status !== 'unsorted' && (
+        <div className="plan-card-harness plan-card-harness-chips">
+          <ByHandChip />
+          {onRunWithHarness && <button type="button" className="secondary plan-card-run" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onRunWithHarness(); }}>Run with the harness</button>}
+        </div>
+      )}
       {description && <p>{description}</p>}
       <footer>
         <span className="avatar">{(plan.author || plan.owner || '?').slice(0, 1).toUpperCase()}</span>
@@ -1543,9 +1557,9 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   );
 });
 
-function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus, onAgentFocus, onAgentsChanged, work, harness, onClose, onOpenFull, onOpenRun, onChanged }: { itemId: string; refreshKey: number; workspaceId?: string; agents?: ItemAgents; agentFocus?: AgentFocus; onAgentFocus: (focus: AgentFocus | undefined) => void; onAgentsChanged: () => Promise<unknown> | void; work?: CardWork; harness: HarnessController; onClose: () => void; onOpenFull: () => void; onOpenRun: () => void; onChanged: () => void | Promise<void> }) {
+function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus, onAgentFocus, onAgentsChanged, work, harness, onRunWithHarness, onClose, onOpenFull, onOpenRun, onChanged }: { itemId: string; refreshKey: number; workspaceId?: string; agents?: ItemAgents; agentFocus?: AgentFocus; onAgentFocus: (focus: AgentFocus | undefined) => void; onAgentsChanged: () => Promise<unknown> | void; work?: CardWork; harness: HarnessController; /** Offered while the harness is on and does not hold this card. */ onRunWithHarness?: () => void; onClose: () => void; onOpenFull: () => void; onOpenRun: () => void; onChanged: () => void | Promise<void> }) {
   const [agentsMode, setAgentsMode] = useState<AgentsMode>('run');
-  const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => onAgentFocus({ kind: 'harness', id })} onOpenFull={onOpenRun} onTakeOver={() => { void takeOverByHand(work, harness); setAgentsMode('sessions'); onAgentFocus({ kind: 'launch' }); }} /> : undefined;
+  const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => onAgentFocus({ kind: 'harness', id })} onOpenFull={onOpenRun} onTakeOver={() => void takeOverByHand(work, harness).then(({ agentRunId }) => { if (agentRunId) { onAgentFocus({ kind: 'harness', id: agentRunId }); } else { setAgentsMode('sessions'); onAgentFocus({ kind: 'launch' }); } })} /> : undefined;
   const paneHarness: AgentPaneHarness = { client: harness.client, run: work?.run, detail: work?.run ? harness.state.details[work.run.id] : undefined, reload: () => (work?.run ? harness.loadRun(work.run.id) : Promise.resolve()) };
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
@@ -2031,6 +2045,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
             <p>{plan ? `${plan.scope} / ${plan.branch}` : ''}</p>
           </div>
           <div className="drawer-actions">
+            {onRunWithHarness && !work && <button type="button" className="secondary" onClick={onRunWithHarness}><Bot size={14} /> Run with the harness</button>}
             <button type="button" className="secondary drawer-open-details" onClick={openFullDetails}>Open details</button>
             <button type="button" className="icon-button" aria-label="Close preview" onClick={closeDrawer}><X size={16} /></button>
           </div>

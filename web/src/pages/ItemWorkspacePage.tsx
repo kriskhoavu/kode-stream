@@ -99,7 +99,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const work = useMemo(() => workForItem(plan, harness.state), [plan, harness.state]);
   const [agentsMode, setAgentsMode] = useState<AgentsMode>('run');
   const [runTab, setRunTab] = useState<{ tab: HarnessRunTabId; agentRunId?: string } | undefined>();
-  const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => setAgentFocus({ kind: 'harness', id })} onOpenFull={onViewChange ? () => onViewChange('run') : undefined} onTakeOver={() => { void takeOverByHand(work, harness); setAgentsMode('sessions'); setAgentFocus({ kind: 'launch' }); }} /> : undefined;
+  const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => setAgentFocus({ kind: 'harness', id })} onOpenFull={onViewChange ? () => onViewChange('run') : undefined} onTakeOver={() => void takeOverByHand(work, harness).then(({ agentRunId }) => { if (agentRunId) { setAgentFocus({ kind: 'harness', id: agentRunId }); } else { setAgentsMode('sessions'); setAgentFocus({ kind: 'launch' }); } })} /> : undefined;
   const paneHarness: AgentPaneHarness = { client: harness.client, run: work?.run, detail: work?.run ? harness.state.details[work.run.id] : undefined, reload: () => (work?.run ? harness.loadRun(work.run.id) : Promise.resolve()) };
   const [error, setError] = useState('');
   const [recoveryHint, setRecoveryHint] = useState('');

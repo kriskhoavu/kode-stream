@@ -32,6 +32,8 @@ function stubBoard(options: { enabled?: boolean } = {}) {
 			run('run-3', stuck.id, { currentStage: stage('run-3', 'plan_approval', { state: 'awaiting_approval' }) })
 		] }));
 		if (url === '/api/harness/approvals') return Promise.resolve(response({ approvals: [approval('a-3', stuck.id, { runId: 'run-3', gate: 'plan', summary: 'Three steps, one file.' })] }));
+		if (url === '/api/harness/tasks' && init?.method === 'POST') return Promise.resolve(response(task('PM-2', { workspaceId: 'ws', startRequested: true }), true, 201));
+		if (url === '/api/harness/settings') return Promise.resolve(response({ revision: 1, enabled: true, autoStart: true, requirePrApproval: true, askQuestions: true, slots: {}, paused: {}, sources: [], modelPolicy: {} }));
 		if (url === '/api/harness/approvals/a-3/decide' && init?.method === 'POST') return Promise.resolve(response({ ...approval('a-3', stuck.id, { runId: 'run-3', gate: 'plan' }), state: 'approved', decidedAt: '2026-11-04T10:00:00.000Z', channel: 'dashboard', revision: 2 }));
 		if (url.startsWith('/api/ai/session-records')) return Promise.resolve(response([]));
 		if (url.startsWith('/api/workspaces/ws/claude-transcripts')) return Promise.resolve(response([]));
@@ -47,7 +49,8 @@ function renderBoard() {
 	return render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 }
 
-afterEach(() => { vi.unstubAllGlobals(); });
+// The board remembers its view in the browser's storage; each test starts on the status columns.
+afterEach(() => { vi.unstubAllGlobals(); window.localStorage.clear(); });
 
 describe('WorkstreamPage with the harness', () => {
 	it('shows who works on a card, its stage and progress, and a card for a task no plan holds', async () => {
@@ -136,5 +139,20 @@ describe('WorkstreamPage board views', () => {
 		renderBoard();
 		await screen.findByText('Quiet card');
 		expect(screen.queryByRole('navigation', { name: 'Board view' })).not.toBeInTheDocument();
+	});
+});
+
+describe('WorkstreamPage runs a card with the harness', () => {
+	it('offers Run with the harness on a card by hand and posts the ticket', async () => {
+		const fetchMock = stubBoard();
+		renderBoard();
+		const quietCard = (await screen.findByText('Quiet card')).closest('.plan-card')!;
+		fireEvent.click(within(quietCard as HTMLElement).getByRole('button', { name: 'Run with the harness' }));
+		const dialog = await screen.findByRole('dialog', { name: 'Run PM-2 with the harness' });
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Run with the harness' }));
+		await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url) === '/api/harness/tasks' && init?.method === 'POST')).toBe(true));
+		const body = JSON.parse(String(fetchMock.mock.calls.find(([url, init]) => String(url) === '/api/harness/tasks' && init?.method === 'POST')?.[1]?.body));
+		expect(body).toMatchObject({ workspaceId: 'ws', key: 'PM-2', title: 'Quiet card', startNow: true });
+		expect(typeof body.idempotencyKey).toBe('string');
 	});
 });

@@ -102,6 +102,7 @@ import type {
   HarnessRunDetail,
   HarnessSettings,
   HarnessStatus,
+  HarnessCreateTaskInput,
   HarnessTask,
   HarnessTranscript
 } from '../../lib/types';
@@ -561,6 +562,7 @@ export const api = {
   /** `before` names the task this one should now sit above in its wave; omitted means last. */
   setHarnessPriority: (task: Pick<HarnessTask, 'id' | 'revision'>, input: { priorityOverride?: number; before?: string }) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/priority`, { method: 'POST', body: JSON.stringify({ ...input, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   setHarnessTaskQuestions: (task: Pick<HarnessTask, 'id' | 'revision'>, askQuestions: boolean | null) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/questions`, { method: 'POST', body: JSON.stringify({ askQuestions, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
+  createHarnessTask: (input: HarnessCreateTaskInput) => request<HarnessTask>('/api/harness/tasks', { method: 'POST', body: JSON.stringify(input) }, false).then(normalizeHarnessTask),
   startHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, idempotencyKey: string) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/start`, { method: 'POST', body: JSON.stringify({ idempotencyKey, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   dismissHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, reason?: string) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/dismiss`, { method: 'POST', body: JSON.stringify({ reason, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   clearHarnessQueue: (workspaceId?: string) => request<{ removed: number }>('/api/harness/queue/clear', { method: 'POST', body: JSON.stringify({ workspaceId }) }, false),
