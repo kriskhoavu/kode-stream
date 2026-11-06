@@ -8,12 +8,12 @@ import { HxStatusBadge } from './HxStatusBadge';
 import { agentRoleLabels, formatAgo, formatCost, formatMinutes, gateTitles, plural } from './vocabulary';
 import { useNow } from './useNow';
 
-type GateWords = { approve: string; reject: string; askTitle: string; askLabel: string; askPlaceholder: string; answerOnApprove?: boolean; answerLabel?: string; answerPlaceholder?: string; answerSubmit?: string };
+type GateWords = { approve: string; reject: string; askTitle: string; askLabel: string; askPlaceholder: string; answerOnApprove?: boolean; answerLabel?: string; answerPlaceholder?: string; answerSubmit?: string; noteLink?: string };
 
 const gateWords: Record<HarnessApprovalGate, GateWords> = {
 	start: { approve: 'Start', reject: 'Not now', askTitle: 'Why not now?', askLabel: 'Reason', askPlaceholder: 'Say why this task should wait. The Sorter keeps it in line.' },
 	plan: { approve: 'Approve', reject: 'Ask for changes', askTitle: 'What should change?', askLabel: 'What should change?', askPlaceholder: 'Tell the Planner what to change. This is sent back with the plan.' },
-	resume: { approve: 'Answer and retry', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task leaves the queue until its ticket changes.', answerOnApprove: true },
+	resume: { approve: 'Retry', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task leaves the queue until its ticket changes.', noteLink: 'Retry with a note', answerLabel: 'A note for the next try', answerPlaceholder: 'Optional. What to do differently this time. The agent reads it with the Checker\'s findings.', answerSubmit: 'Send and retry' },
 	draft_pr: { approve: 'Open draft PR', reject: 'Not yet', askTitle: 'Why not yet?', askLabel: 'Reason', askPlaceholder: 'Say what should happen first. The Builder gets this note.' },
 	question: { approve: 'Answer and continue', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task leaves the queue until its ticket changes.', answerOnApprove: true, answerLabel: 'Your answers', answerPlaceholder: 'Answer each question in a line or two. The agent continues from your answers and does not ask again.', answerSubmit: 'Send and continue' }
 };
@@ -111,6 +111,7 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 					{stuck && <HxStatusBadge status="stopped" />}
 					{facts && <span className="hx-muted hx-num">{facts}</span>}
 					{onOpen && <button type="button" className="hx-link" onClick={onOpen}>{stuck ? 'See what the Checker said' : openLabel}</button>}
+					{words.noteLink && <button type="button" className="hx-link" disabled={sending} onClick={() => setDialog('answer')}>{words.noteLink}</button>}
 				</div>
 				{line && <p className={sent?.state === 'failed' ? 'hx-gate-status error' : 'hx-gate-status'} role={sent?.state === 'failed' ? 'alert' : undefined}>{line}</p>}
 			</div>
@@ -125,6 +126,7 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 					placeholder={dialog === 'answer' ? (words.answerPlaceholder ?? 'Your answer is added to the task and the Planner starts a fresh round.') : words.askPlaceholder}
 					submitLabel={dialog === 'answer' ? (words.answerSubmit ?? 'Send and retry') : approval.gate === 'plan' ? 'Send to Planner' : 'Send'}
 					questions={dialog === 'answer' && asking ? questions : undefined}
+					optional={dialog === 'answer' && Boolean(words.noteLink)}
 					onCancel={() => setDialog(undefined)}
 					onSubmit={(reason) => {
 						setDialog(undefined);
@@ -138,13 +140,15 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 }
 
 /** Asks for the reason a decision needs. The reason box comes first; Cmd/Ctrl+Enter sends. */
-export function GateDecisionDialog({ title, label, placeholder, submitLabel, questions, onCancel, onSubmit }: {
+export function GateDecisionDialog({ title, label, placeholder, submitLabel, questions, optional, onCancel, onSubmit }: {
 	title: string;
 	label: string;
 	placeholder: string;
 	submitLabel: string;
 	/** The questions being answered, repeated above the box so nobody has to scroll back. */
 	questions?: string[];
+	/** The box may stay empty; the decision goes without text. */
+	optional?: boolean;
 	onCancel: () => void;
 	onSubmit: (reason: string) => void;
 }) {
@@ -152,7 +156,7 @@ export function GateDecisionDialog({ title, label, placeholder, submitLabel, que
 	const [reason, setReason] = useState('');
 	const [error, setError] = useState('');
 	const submit = () => {
-		if (!reason.trim()) {
+		if (!reason.trim() && !optional) {
 			setError('Write a few words first. The harness sends them with your decision.');
 			return;
 		}

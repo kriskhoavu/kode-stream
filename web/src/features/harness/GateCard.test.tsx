@@ -65,13 +65,18 @@ describe('GateCard', () => {
 		expect(screen.getByRole('list', { name: 'Open questions from the Planner' })).toHaveTextContent('Archived offers too?');
 	});
 
-	it('takes the answer first when a stuck task is retried', () => {
+	it('retries a stuck task in one click, and takes a note only when asked for', () => {
 		const onApprove = vi.fn();
-		render(<GateCard approval={approval('a1', 'task-S', { gate: 'resume', summary: 'The Planner cannot decide that alone.' })} task={task('S')} onApprove={onApprove} onReject={vi.fn()} />);
+		render(<GateCard approval={approval('a1', 'task-S', { gate: 'resume', summary: 'The Planner stopped: not logged in.' })} task={task('S')} onApprove={onApprove} onReject={vi.fn()} />);
 		expect(screen.getByText('Stopped')).toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: 'Answer and retry' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		expect(onApprove).toHaveBeenCalledWith();
+		fireEvent.click(screen.getByRole('button', { name: 'Retry with a note' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Send and retry' }));
+		expect(onApprove).toHaveBeenLastCalledWith('');
+		fireEvent.click(screen.getByRole('button', { name: 'Retry with a note' }));
 		fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep web clients connected' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Send and retry' }));
-		expect(onApprove).toHaveBeenCalledWith('Keep web clients connected');
+		expect(onApprove).toHaveBeenLastCalledWith('Keep web clients connected');
 	});
 });
