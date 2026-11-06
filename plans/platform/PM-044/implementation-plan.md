@@ -13,6 +13,8 @@ P0 Plan ─> B1 Core ─> B2 Scout + sorter ─> B3 Claude Code + plan stage ─
                 └─> F1 Inbox ─> F2 Stepper ─┐
                           └─> F3 Waves ─────┴─> F4 Drawer ─> F6 Polish
                           └─> F5 Settings (after B3) ───────┘
+I1 ─> M1 Sources ─> M2 Cards ─> M3 Agents tab ─> M4 Run from a card ─┐
+                          └─> M5 Queue + Waves ──────────────────────┴─> M6 Remove the Harness page
 ```
 
 ## Terminology Lock
@@ -37,18 +39,24 @@ P0 Plan ─> B1 Core ─> B2 Scout + sorter ─> B3 Claude Code + plan stage ─
 
 ## Phases
 
-| Phase | Name                                      | Track    | Depends on  | Status |
-|-------|-------------------------------------------|----------|-------------|--------|
-| P0    | Plan folder                               | Docs     | —           | Done   |
-| B1    | Core                                      | Backend  | P0          | Done   |
-| B2    | Scout, sorter, queue operations           | Backend  | B1          | Done   |
-| B3    | Claude Code engine, plan stage, plan gate | Backend  | B2          | Done   |
-| B4    | Implement stage                           | Backend  | B3          | Done   |
-| B5    | QA and draft PR                           | Backend  | B4          | Done   |
-| B6    | Bot surface and webhooks                  | Backend  | B3          | Done   |
-| B7    | More engines, policy editing, LLM ranker  | Backend  | B5          | Done   |
-| F1–F6 | Dashboard                                 | Frontend | B1 contract | Done   |
-| I1    | Documentation                             | Docs     | all         | Done   |
+| Phase | Name                                        | Track     | Depends on  | Status |
+|-------|---------------------------------------------|-----------|-------------|--------|
+| P0    | Plan folder                                 | Docs      | —           | Done   |
+| B1    | Core                                        | Backend   | P0          | Done   |
+| B2    | Scout, sorter, queue operations             | Backend   | B1          | Done   |
+| B3    | Claude Code engine, plan stage, plan gate   | Backend   | B2          | Done   |
+| B4    | Implement stage                             | Backend   | B3          | Done   |
+| B5    | QA and draft PR                             | Backend   | B4          | Done   |
+| B6    | Bot surface and webhooks                    | Backend   | B3          | Done   |
+| B7    | More engines, policy editing, LLM ranker    | Backend   | B5          | Done   |
+| F1–F6 | Dashboard                                   | Frontend  | B1 contract | Done   |
+| I1    | Documentation                               | Docs      | all         | Done   |
+| M1    | Sources say where they show                 | Fullstack | I1          | Next   |
+| M2    | Harness-aware cards and the Needs you strip | Frontend  | M1          | —      |
+| M3    | One Agents tab: harness run and sessions    | Frontend  | M2          | —      |
+| M4    | Run with the harness from a card            | Fullstack | M3          | —      |
+| M5    | Queue and Waves as board views              | Frontend  | M2          | —      |
+| M6    | Remove the Harness page                     | Fullstack | M3, M4, M5  | —      |
 
 ### P0 Plan folder
 
@@ -119,6 +127,65 @@ Deliverables: `docs/architecture/README.md` entry, `wiki/platform/harness.md` an
 regenerated `wiki/index.md`, the `AGENTS.md` ownership line, the atlas's harness nodes in the fen workspace.
 Verification: `make verify` in kode-stream; `docs/atlas/build.sh --check` in fen.
 Commit: `PM-044: Document the engineering harness`.
+
+## Merge phases
+
+The merge folds the Harness page into the Workstream board. Its agreement is
+[solution-04-one-board.md](solution/solution-04-one-board.md). Each phase lands alone and keeps `/harness` working
+until M6 removes it.
+
+### M1 Sources say where they show
+
+Deliverables: `shownIn` on a workspace source (Go model, a bare string still parses with the named defaults),
+the Workspaces page's "Shown in" ticks on each source row, the scanner reading only Workstream sources,
+`knowledge.Detector` reading only Knowledge sources, the Source facet listing only Workstream sources.
+Verification: `make verify`; a workspace with `plans` and `wiki` shows no wiki page on the board and the wiki in
+Knowledge, with no setting changed.
+Commit: `PM-044: Let each source say whether it shows in Workstream, Knowledge or both`.
+
+### M2 Harness-aware cards and the Needs you strip
+
+Deliverables: `useHarness` lifted so `WorkstreamPage` reads tasks, runs and approvals beside items; a join by
+`jiraKey` in `features/workstream/harnessJoin.ts` with a synthetic card for a task without an item; the card's
+worker chip, stage chip, progress bar and amber ring; the "Needs you" strip above the board with Approve, Ask for
+changes and Retry; the "Worked by" facet. The Harness page stays.
+Verification: `npm run typecheck && npm test`.
+Commit: `PM-044: Show the harness's work on the Workstream cards`.
+
+### M3 One Agents tab: harness run and sessions
+
+Deliverables: `AgentsTab` gains a "Harness run" mode when the item has a run, holding the chip stepper,
+`WorkerChip`, `FindingsPanel`, `RunLedger` and the actions Pause after this round, Take over by hand, Add a note;
+the Sessions mode is today's tab; `ItemWorkspacePage` gains `?view=run` rendering `RunView` full width with Stop in
+its bar; a ledger step opens the conversation in the item's transcript view.
+Verification: `npm run typecheck && npm test`.
+Commit: `PM-044: Put a harness run beside the hand-driven sessions on the card`.
+
+### M4 Run with the harness from a card
+
+Deliverables: `POST /api/harness/tasks` creating a task from an item's Jira key, title and body, refused without a
+key, decided as a `start` gate at once; the card menu entry and drawer button "Run with the harness" with its dialog
+(branch, model per role, approvals wanted, start now or queue); "Take over by hand" pausing the run and opening its
+session.
+Verification: `go test ./internal/harness/... ./internal/server/api/...`; `npm run typecheck && npm test`.
+Commit: `PM-044: Start a harness run from a card`.
+
+### M5 Queue and Waves as board views
+
+Deliverables: the board's view switcher Status · Waves · Queue; `WaveBoard` rendered over the joined cards; the
+Queue view's ranked rows with "why here", score, Start, Retry, pin and drag, and the side panel explaining the
+selected row's score, what starts next, and the Finder's last look with Look now.
+Verification: `npm run typecheck && npm test`.
+Commit: `PM-044: Show the queue and the waves as views of the board`.
+
+### M6 Remove the Harness page
+
+Deliverables: the Harness section of `SettingsPage` (who does what, sources, how it runs, pause a role, spend
+note) from `HarnessSettings`; the Harness navigation button, count pill, `HarnessPage`, `InboxView`,
+`ApprovalsView` and `/harness/*` removed, with `/harness/runs/:id` redirecting to its item and the rest to `/`;
+wiki, atlas and `AGENTS.md` updated.
+Verification: `make verify` in kode-stream; `docs/atlas/build.sh --check` in fen.
+Commit: `PM-044: Fold the Harness page into the Workstream board`.
 
 ## Out Of Scope
 

@@ -29,16 +29,16 @@ lease that expires is recovered on the next tick.
 
 ## Components
 
-| Layer       | Component                                    | Purpose                                                           |
-|-------------|----------------------------------------------|-------------------------------------------------------------------|
-| Façade      | `internal/harness/harness.go`                | Configuration, construction, start and stop, the service methods. |
-| Domain      | `internal/harness/domain`                    | Entities, state machines, policy, settings, repository interface. |
-| Application | `internal/harness/application/*`             | Ranker, scheduler loops, pipeline stages, brief, feed, outbox.    |
-| Ports       | `internal/harness/ports`                     | Engine, scout, worktree, pull request, notifier.                  |
-| Adapters    | `internal/harness/adapters/*`                | Claude Code, Codex, OpenCode, scouts, git worktree, PRs, webhook. |
-| Storage     | `internal/storage/sql_harness_repository.go` | SQLite and Postgres implementation of `domain.Repository`.        |
-| Transport   | `internal/server/api/harness_*.go`           | Dashboard routes, bot routes, the event stream.                   |
-| Frontend    | `web/src/features/harness`, `HarnessPage`    | Inbox, Pipeline, Queue as waves, run drawer, settings.            |
+| Layer       | Component                                    | Purpose                                                                      |
+|-------------|----------------------------------------------|------------------------------------------------------------------------------|
+| Façade      | `internal/harness/harness.go`                | Configuration, construction, start and stop, the service methods.            |
+| Domain      | `internal/harness/domain`                    | Entities, state machines, policy, settings, repository interface.            |
+| Application | `internal/harness/application/*`             | Ranker, scheduler loops, pipeline stages, brief, feed, outbox.               |
+| Ports       | `internal/harness/ports`                     | Engine, scout, worktree, pull request, notifier.                             |
+| Adapters    | `internal/harness/adapters/*`                | Claude Code, Codex, OpenCode, scouts, git worktree, PRs, webhook.            |
+| Storage     | `internal/storage/sql_harness_repository.go` | SQLite and Postgres implementation of `domain.Repository`.                   |
+| Transport   | `internal/server/api/harness_*.go`           | Dashboard routes, bot routes, the event stream.                              |
+| Frontend    | `web/src/features/harness`, Workstream board | Harness-aware cards, the card's Agents tab, Queue and Waves views, settings. |
 
 ## Boundaries
 
