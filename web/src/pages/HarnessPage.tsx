@@ -1,3 +1,4 @@
+import { CheckSquare, Inbox, ListOrdered, Settings } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HarnessLocation, HarnessRunTab, HarnessView } from '../app/router';
 import type { HarnessTask } from '../lib/types';
@@ -18,11 +19,11 @@ import { RunView } from '../features/harness/RunView';
 import { plural } from '../features/harness/vocabulary';
 import '../features/harness/harness.css';
 
-const sections: { view: HarnessView; label: string }[] = [
-	{ view: 'inbox', label: 'Inbox' },
-	{ view: 'queue', label: 'Queue' },
-	{ view: 'approvals', label: 'Approvals' },
-	{ view: 'settings', label: 'Settings' }
+const sections: { view: HarnessView; label: string; icon: typeof Inbox }[] = [
+	{ view: 'inbox', label: 'Inbox', icon: Inbox },
+	{ view: 'queue', label: 'Queue', icon: ListOrdered },
+	{ view: 'approvals', label: 'Approvals', icon: CheckSquare },
+	{ view: 'settings', label: 'Settings', icon: Settings }
 ];
 
 export function HarnessPage({ location, onLocationChange, onWaitingCountChange, onOpenAgentSpace }: {
@@ -71,12 +72,12 @@ function HarnessScreens({ client, location, onLocationChange, onWaitingCountChan
 
 	return (
 		<section className="hx hx-page">
-			<div className="page-title hx-title">
-				<h1 ref={headingRef} tabIndex={-1}>Harness</h1>
-				<nav className="hx-seg" aria-label="Harness sections">
+			<header className="page-title workstream-title hx-title">
+				<h1 ref={headingRef} tabIndex={-1} className="sr-only">Harness</h1>
+				<nav className="segmented-control workbench-view-switcher hx-sections" aria-label="Harness sections">
 					{sections.map((section) => (
-						<button key={section.view} type="button" className={activeSection === section.view ? 'on' : undefined} aria-current={activeSection === section.view ? 'page' : undefined} onClick={() => onLocationChange({ view: section.view })}>
-							{section.label}
+						<button key={section.view} type="button" className={activeSection === section.view ? 'active' : ''} aria-current={activeSection === section.view ? 'page' : undefined} onClick={() => onLocationChange({ view: section.view })}>
+							<section.icon size={15} aria-hidden="true" /> {section.label}
 							{section.view === 'approvals' && waiting.length > 0 && <span className="hx-seg-count" aria-hidden="true">{waiting.length}</span>}
 						</button>
 					))}
@@ -84,7 +85,7 @@ function HarnessScreens({ client, location, onLocationChange, onWaitingCountChan
 				{client.fixture && <span className="hx-chip hx-demo-chip" title="Showing demo data from the development fixture">Demo data</span>}
 				<span className="hx-title-status hx-muted" role="status" aria-live="polite">{politeText}</span>
 				<ConnectionIndicator connection={state.connection} />
-			</div>
+			</header>
 			{location.view === 'inbox' && state.announcement?.assertive && <span className="sr-only" role="alert" aria-live="assertive" key={state.announcement.id}>{state.announcement.text}</span>}
 
 			<HarnessBody harness={harness} location={location} newestApprovalId={newestApprovalId} onOpenRun={openRun} onLocationChange={onLocationChange} onOpenAgentSpace={onOpenAgentSpace} />
