@@ -293,7 +293,7 @@ function LiveTab({ client, agentRuns, onReload }: { client: HarnessClient; agent
 					: transcript.turns && transcript.turns.length === 0
 						? <p className="hx-muted">{selected.state === 'running' ? 'The conversation has not started yet.' : 'This agent left no conversation the harness can read.'}</p>
 						: <TranscriptTurns className="hx-transcript" turns={transcript.turns} label={`${agentRoleLabels[selected.role]} conversation`} placeholder="Reading the conversation…" names={{ user: 'Harness', assistant: agentRoleLabels[selected.role] }} />}
-			<p className="hx-muted">Text turns only: what the harness asked and what the {agentRoleLabels[selected.role]} answered. The coding tool keeps the full conversation.</p>
+			<p className="hx-muted">What the harness asked, what the {agentRoleLabels[selected.role]} thought, each tool it called, and what it answered. Tool output stays out; the coding tool keeps the full conversation.</p>
 		</div>
 	);
 }

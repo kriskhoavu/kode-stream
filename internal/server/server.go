@@ -108,7 +108,7 @@ func NewServer(port int) (*Server, error) {
 		Engines:    []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath), harnesscodex.New(), harnessopencode.New()},
 		Reranker:   harnessranker.New(),
 		Transcripts: func(path string, limit int) ([]domain.TranscriptTurn, error) {
-			turns, err := ai.ReadClaudeTranscriptTail(path, limit)
+			turns, err := ai.ReadClaudeTranscriptActivity(path, limit)
 			if err != nil {
 				return nil, err
 			}

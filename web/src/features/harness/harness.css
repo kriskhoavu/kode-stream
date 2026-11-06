@@ -1161,7 +1161,6 @@ a.hx-source:hover {
 	color: var(--muted);
 	font-size: 13px;
 	line-height: 1.55;
-	max-width: 72ch;
 }
 
 .hx-findings code {

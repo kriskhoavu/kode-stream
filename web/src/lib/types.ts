@@ -573,7 +573,8 @@ export type SessionChangesReason = 'launch_commit_unknown' | 'launch_commit_miss
 export interface SessionChanges { sessionId: string; launchCommit: string; headCommit: string; headMoved: number; files: SessionFile[]; additions: number; deletions: number; truncated: boolean; availability: SessionChangesAvailability; reason?: SessionChangesReason; }
 /** A Claude Code conversation held in the workspace root, outside kode-stream; metadata only. */
 export interface ClaudeTranscript { sessionId: string; branch?: string; startedAt: string; lastActiveAt: string; messages: number; itemIds: string[]; }
-export interface ClaudeTurn { role: 'user' | 'assistant'; text: string; at?: string; }
+/** `tool` is a call the model made (its name and main argument); `thinking` is its reasoning. Both appear only where the reader asked for the model's work, not just its words. */
+export interface ClaudeTurn { role: 'user' | 'assistant' | 'tool' | 'thinking'; text: string; at?: string; }
 export type SessionScope = 'active' | 'all';
 export interface GlobalSessionRow { record: SafeSessionRecord; workspaceName: string; checkoutBranch: string; planTitle?: string; changesCount?: number; }
 export interface GlobalSessionsResponse { rows: GlobalSessionRow[]; truncated: boolean; }
