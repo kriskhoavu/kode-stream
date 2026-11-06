@@ -92,23 +92,16 @@ describe('router', () => {
     expect(Object.values(routeDescriptors).every((descriptor) => descriptor.title.includes('Kode Stream') && descriptor.mainId === 'app-main')).toBe(true);
   });
 
-  it('parses and builds harness views', () => {
+  it('sends an old harness link to the board, and a run link to its card', () => {
     window.history.pushState(null, '', '/harness');
-    expect(routeFromLocation()).toEqual({ name: 'harness', location: { view: 'inbox' } });
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
     window.history.pushState(null, '', '/harness/queue');
-    expect(routeFromLocation()).toEqual({ name: 'harness', location: { view: 'queue' } });
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
     window.history.pushState(null, '', '/harness/runs/run%201?tab=live');
-    expect(routeFromLocation()).toEqual({ name: 'harness', location: { view: 'run', runId: 'run 1', tab: 'live' } });
-    window.history.pushState(null, '', '/harness/runs/r1?tab=live&agent=agent%202');
-    expect(routeFromLocation()).toEqual({ name: 'harness', location: { view: 'run', runId: 'r1', tab: 'live', agentRunId: 'agent 2' } });
-    window.history.pushState(null, '', '/harness/runs/r1?tab=bogus');
-    expect(routeFromLocation()).toEqual({ name: 'harness', location: { view: 'run', runId: 'r1' } });
+    expect(routeFromLocation()).toEqual({ name: 'harness-run', runId: 'run 1' });
     window.history.pushState(null, '', '/harness/nowhere');
-    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/harness/nowhere' });
-    expect(pathForRoute({ name: 'harness', location: { view: 'approvals' } })).toBe('/harness/approvals');
-    expect(pathForRoute({ name: 'harness', location: { view: 'settings' } })).toBe('/harness/settings');
-    expect(pathForRoute({ name: 'harness', location: { view: 'run', runId: 'run 1', tab: 'changes' } })).toBe('/harness/runs/run%201?tab=changes');
-    expect(pathForRoute({ name: 'harness', location: { view: 'inbox' } })).toBe('/harness');
+    expect(routeFromLocation()).toEqual({ name: 'workstream' });
+    expect(pathForRoute({ name: 'harness-run', runId: 'run 1' })).toBe('/harness/runs/run%201');
   });
 });
 

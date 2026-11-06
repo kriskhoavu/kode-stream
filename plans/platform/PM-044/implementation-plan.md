@@ -56,7 +56,7 @@ I1 ─> M1 Sources ─> M2 Cards ─> M3 Agents tab ─> M4 Run from a card ─�
 | M3    | One Agents tab: harness run and sessions    | Frontend  | M2          | Done   |
 | M4    | Run with the harness from a card            | Fullstack | M3          | Done   |
 | M5    | Queue and Waves as board views              | Frontend  | M2          | Done   |
-| M6    | Remove the Harness page                     | Fullstack | M3, M4, M5  | Next   |
+| M6    | Remove the Harness page                     | Fullstack | M3, M4, M5  | Done   |
 
 ### P0 Plan folder
 

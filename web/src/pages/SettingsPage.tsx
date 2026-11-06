@@ -6,6 +6,8 @@ import { useAISettings } from '../features/ai-settings/useAISettings';
 import type { AICapabilityKind, AILaunchTemplate, AISettings } from '../lib/types';
 import { StorageSettings } from '../features/settings/StorageSettings';
 import { backdropVariants } from '../components/HeaderBackdrop';
+import { HarnessSettingsSection } from '../features/workstream/HarnessSettingsSection';
+import '../features/harness/harness.css';
 import type { BackdropVariant } from '../components/HeaderBackdrop';
 
 /*
@@ -18,7 +20,7 @@ const backdropLabels: Record<BackdropVariant, { name: string; description: strin
   none: { name: 'None', description: 'No backdrop. The topbar keeps its own background and border.' }
 };
 
-export function SettingsPage({ settings, onChange }: { settings: AppSettings; onChange: (settings: AppSettings) => void }) {
+export function SettingsPage({ settings, onChange, showHarness = true }: { settings: AppSettings; onChange: (settings: AppSettings) => void; /** The harness has no page of its own; its settings live here, except on the extension surface. */ showHarness?: boolean }) {
   const visible = new Set(settings.visibleWorkstreamStatuses);
   const ai = useAISettings();
 
@@ -119,6 +121,7 @@ export function SettingsPage({ settings, onChange }: { settings: AppSettings; on
           </>
         )}
       </section>
+      {showHarness && <HarnessSettingsSection />}
     </section>
   );
 }

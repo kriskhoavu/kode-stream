@@ -21,7 +21,7 @@ lastVerified: 2026-11-04
 
 [live] `POST /runs/{id}/decision` and `POST /approvals/{id}/decide` take a decision, a reason, a request id, an idempotency key and the person. The same key returns the recorded approval; another key on a decided approval answers 409 `already_decided`; a stale revision answers 409 `conflict`. Evidence: `internal/harness/approvals.go:42`.
 
-A `question` gate is an agent's own stop: the webhook's `approval` carries its `questions` and the asking `role`, approving with a reason sends that reason back to the agent as the answer, and rejecting cancels the run. The decision is recorded with channel `webex` and the actor `webex:<personId>`, which is how the dashboard shows who approved from Webex. The bot's own commands are `/harness status`, `/harness queue [n]`, `/harness run <id>`, `/harness approve <runId> [reason]` and `/harness reject <runId> <reason>`, each decision behind its draft and confirm card.
+A `question` gate is an agent's own stop: the webhook's `approval` carries its `questions` and the asking `role`, approving with a reason sends that reason back to the agent as the answer, and rejecting cancels the run. The decision is recorded with channel `webex` and the actor `webex:<personId>`, which is how the board shows who approved from Webex. The bot's own commands are `/harness status`, `/harness queue [n]`, `/harness run <id>`, `/harness approve <runId> [reason]` and `/harness reject <runId> <reason>`, each decision behind its draft and confirm card.
 
 ## Webhook
 <!-- chunkId: platform-harness-bot-contract-webhook -->

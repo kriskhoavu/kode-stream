@@ -4,6 +4,8 @@ import { api } from '../shared/api';
 import { defaultAppSettings } from '../features/settings/appSettings';
 import { SettingsPage } from './SettingsPage';
 
+vi.mock('../features/workstream/HarnessSettingsSection', () => ({ HarnessSettingsSection: () => <section aria-label="Harness settings" /> }));
+
 vi.mock('../shared/api', async (importOriginal) => {
   const original = await importOriginal<typeof import('../shared/api')>();
   return { ...original, api: { ...original.api, aiSettings: vi.fn(), aiCapabilities: vi.fn(), saveAISettings: vi.fn() } };

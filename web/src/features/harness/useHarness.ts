@@ -26,7 +26,8 @@ export interface HarnessController {
 }
 
 /**
- * Owned once by HarnessPage; every view reads from it through props. A
+ * Owned once per page that shows the harness, the board, a card and the
+ * settings, with every view reading from it through props. A
  * snapshot is fetched on mount and on every `refresh`; `useHarnessEvents`
  * keeps it current between snapshots, and polls when the feed is down.
  */

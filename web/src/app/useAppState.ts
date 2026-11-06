@@ -75,6 +75,17 @@ export function useAppState() {
     setRoute(next);
   }, []);
 
+  /** Replaces the current entry, for a redirect that should not be in the history. */
+  const replace = useCallback((next: Route) => {
+    history.replaceState(null, '', pathForRoute(next));
+    setRoute(next);
+  }, []);
+
+  useEffect(() => {
+    // An old link to the Harness page lands on the board; the address follows.
+    if (route.name === 'workstream' && window.location.pathname.startsWith('/harness')) history.replaceState(null, '', '/');
+  }, [route.name]);
+
   const refreshAppData = useCallback(async (advanceContent = true) => {
     controller.current?.abort();
     const active = new AbortController();
@@ -149,8 +160,6 @@ export function useAppState() {
       navigate({ name: 'review', location: { workspaceId: repo.id } });
       return;
     }
-    // The harness spans every workspace, so choosing one must not leave it.
-    if (route.name === 'harness') return;
     navigate({ name: 'workstream' });
   };
 
@@ -176,6 +185,7 @@ export function useAppState() {
     dataStatus,
     contentRefreshKey,
     navigate,
+    replace,
     selectWorkspace,
     refreshAppData,
     refreshAppStateOnly,

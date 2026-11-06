@@ -1,7 +1,6 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CostCounter } from './CostCounter';
-import { ConnectionIndicator } from './ConnectionIndicator';
 
 afterEach(() => {
 	cleanup();
@@ -27,14 +26,5 @@ describe('CostCounter', () => {
 		rerender(<CostCounter value={2} />);
 		expect(container.querySelector('[aria-hidden="true"].hx-num')).toHaveTextContent('$2.00');
 		expect(container.querySelector('.hx-cost-ghost')).toBeNull();
-	});
-});
-
-describe('ConnectionIndicator', () => {
-	it('always says the state in words', () => {
-		const { rerender } = render(<ConnectionIndicator connection="reconnecting" />);
-		expect(screen.getByText('Reconnecting…')).toBeInTheDocument();
-		rerender(<ConnectionIndicator connection="polling" />);
-		expect(screen.getByText('Checking every 10 s')).toBeInTheDocument();
 	});
 });

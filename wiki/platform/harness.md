@@ -8,7 +8,7 @@ sourceRef: |
   PM-044 | Overview
   PM-044 | Solution 01 backend
   PM-044 | Solution 03 bot contract
-lastVerified: 2026-11-04
+lastVerified: 2026-11-07
 ---
 
 ## What It Does
@@ -25,7 +25,7 @@ Each role is a coding CLI run headless in the run's own git worktree: the planne
 
 [live] Work starts only when a person presses Start, unless `autoStart` is on, and a plan reaches the builder only after a person approves it; a blocked run resumes only on a person's approval. Evidence: `internal/harness/queue.go:211`, `internal/harness/approvals.go:42`.
 
-A gate can be decided on the dashboard or from Webex through chat-bot; the decision records its channel and who made it, and the same idempotency key always returns the same decision. See [[platform-harness-bot-contract]].
+A gate can be decided on the Workstream board or from Webex through chat-bot; the decision records its channel and who made it, and the same idempotency key always returns the same decision. See [[platform-harness-bot-contract]].
 
 ## What It Will Not Do
 <!-- chunkId: platform-harness-boundaries -->
@@ -40,3 +40,11 @@ A gate can be decided on the dashboard or from Webex through chat-bot; the decis
 [open] Budgets are not enforced. Cost is recorded per agent run and summed per day, run, role and model; the only stop is each CLI's own spending limit per agent run.
 
 Details: [[platform-harness-reference]].
+
+## Where It Shows
+<!-- chunkId: platform-harness-where-it-shows -->
+<!-- keywords: workstream board, card, needs you, worked by, waves, queue, agents tab, settings -->
+
+[live] The harness has no page of its own. A ticket is one card on the Workstream board whether a person or the harness works on it: the board reads the harness beside its items and joins a task to a card by the Jira key, which is the item's identifier. A card the harness holds shows who works on it, its stage and its progress, and rings amber when it waits on a person; what waits on a person sits in the "Needs you" strip above the board; a task the Finder found that no plan holds yet is a dashed card in Unsorted; "Worked by" is a facet. Evidence: `web/src/features/workstream/harnessJoin.ts:54`, `web/src/pages/WorkstreamPage.tsx:152`.
+
+[live] The queue and the waves are views of the board, chosen with Status · Waves · Queue; the card's Agents tab holds the harness run beside the hand-driven sessions, and `?view=run` on the item page shows the run whole, full width. Run with the harness on a card creates its task through `POST /api/harness/tasks`. The harness's settings live under Settings. An old `/harness/runs/{id}` link opens the card that holds the run; every other `/harness` path opens the board. Evidence: `web/src/features/workstream/QueueView.tsx:16`, `web/src/features/workstream/AgentsPanel.tsx:78`, `web/src/app/router.ts:46`.
