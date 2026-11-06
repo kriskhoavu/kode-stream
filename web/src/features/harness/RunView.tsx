@@ -111,7 +111,7 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 				<FindingsPanel agentRuns={detail.agentRuns}>
 					{onOpenTab && <button type="button" className="hx-link" onClick={() => onOpenTab('findings')}>Every finding</button>}
 					{onOpenTab && <button type="button" className="hx-link" onClick={() => onOpenTab('changes')}>Changes so far</button>}
-					{onOpenTab && working && <button type="button" className="hx-link" onClick={() => onOpenTab('live')}>Watch the {agentRoleLabels[working.role]} live</button>}
+					{onOpenTab && detail.agentRuns.length > 0 && <button type="button" className="hx-link" onClick={() => onOpenTab('live')}>{working ? `Watch the ${agentRoleLabels[working.role]} live` : 'Read the conversations'}</button>}
 					{task.source.url && <a className="hx-link" href={task.source.url} target="_blank" rel="noreferrer">{sourceLabels[task.source.kind]} {task.source.key}</a>}
 					{run.prUrl && <a className="hx-link" href={run.prUrl} target="_blank" rel="noreferrer">Draft pull request</a>}
 				</FindingsPanel>

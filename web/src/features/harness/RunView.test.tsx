@@ -40,6 +40,14 @@ describe('RunView', () => {
 		expect(screen.getByText('Round 1 · plan')).toBeInTheDocument();
 	});
 
+	it('offers the conversations of a run that is no longer working', async () => {
+		const state = await stateWith('run-srv-04');
+		const onOpenTab = vi.fn();
+		render(<RunView state={state} runId="run-srv-04" onSelectRun={vi.fn()} onRefresh={vi.fn()} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onOpenTab={onOpenTab} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Read the conversations' }));
+		expect(onOpenTab).toHaveBeenCalledWith('live');
+	});
+
 	it('stops a working run after a confirmation that names the agent it kills', async () => {
 		const state = await stateWith('run-pm-02');
 		const onCancel = vi.fn().mockResolvedValue(undefined);
