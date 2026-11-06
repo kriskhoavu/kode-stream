@@ -51,6 +51,10 @@ describe('RunDrawer', () => {
 		const { client, state } = await setup('task-pm-02', 'run-pm-02');
 		render(<Harnessed state={state} client={client} taskId="task-pm-02" wave={[]} initialTab="live" />);
 		const rounds = await screen.findByRole('tablist', { name: 'Agent rounds' });
+		const names = within(rounds).getAllByRole('tab').map((tab) => tab.textContent ?? '');
+		expect(names.map((name) => name.replace(/\s+/g, ' '))).toEqual(names.map((name) => name.replace(/\s+/g, ' ')).slice().sort((a, b) => Number(a.match(/^\d+/)?.[0]) - Number(b.match(/^\d+/)?.[0])));
+		expect(names[0]).toMatch(/^1/);
+		expect(within(rounds).getByText('Plan')).toBeInTheDocument();
 		const checker = within(rounds).getByRole('tab', { name: /Checker · round 1/ });
 		expect(within(rounds).getByRole('tab', { name: /Builder · round 1/ })).toHaveAttribute('aria-selected', 'true');
 		fireEvent.click(checker);

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, ExternalLink, Pin, PinOff, Play, X } from 'lucide-react';
-import type { ClaudeTurn, HarnessAgentRun, HarnessApproval, HarnessTask, SafeSessionRecord, SessionChanges } from '../../lib/types';
+import type { ClaudeTurn, HarnessAgentRun, HarnessApproval, HarnessStage, HarnessTask, SafeSessionRecord, SessionChanges } from '../../lib/types';
 import type { HarnessRunTab } from '../../app/router';
 import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
 import { TranscriptTurns } from '../ai-session/TranscriptTurns';
@@ -16,7 +16,7 @@ import { PipelineStepper } from './PipelineStepper';
 import { SourceBadge } from './SourceBadge';
 import { pipelineModel, prLabel, runStatus } from './pipeline';
 import { useNow } from './useNow';
-import { agentRoleLabels, formatCost, hxSteps, hxStatuses, modelLabel, plural, sourceLabels, taskStatus } from './vocabulary';
+import { agentRoleLabels, formatCost, hxSteps, hxStatuses, modelLabel, plural, sourceLabels, stageKindLabels, taskStatus } from './vocabulary';
 import type { HxStatus } from './vocabulary';
 
 // The live terminal pulls in xterm; load it only when someone opens the Live tab.
@@ -165,7 +165,7 @@ export function RunDrawer({ state, client, taskId, tab, wave, onTabChange, onClo
 						{tab === 'stages' && (detail ? <PipelineStepper model={pipelineModel(detail, now)} label={`Progress for ${task.source.key}`} orientation="vertical" /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'findings' && (detail ? <FindingsByRound agentRuns={detail.agentRuns} /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'changes' && (runId ? <ChangesTab client={client} runId={runId} agentRun={latestAgentRun(detail?.agentRuns)} /> : <NoRun run={false} />)}
-						{tab === 'live' && (runId ? <LiveTab client={client} agentRuns={detail?.agentRuns ?? (run?.activeAgentRun ? [run.activeAgentRun] : [])} onReload={() => loadRun(runId)} /> : <NoRun run={false} />)}
+						{tab === 'live' && (runId ? <LiveTab client={client} stages={detail?.stages ?? []} agentRuns={detail?.agentRuns ?? (run?.activeAgentRun ? [run.activeAgentRun] : [])} onReload={() => loadRun(runId)} /> : <NoRun run={false} />)}
 						{tab === 'links' && (
 							<ul className="hx-links">
 								{run?.prUrl && <li><a href={run.prUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} aria-hidden="true" />Draft pull request {prLabel(run.prUrl)}</a></li>}
@@ -256,29 +256,47 @@ function ChangesTab({ client, runId, agentRun }: { client: HarnessClient; runId:
 const transcriptEvery = 5_000;
 
 /**
- * What each agent said, one round at a time: the working agent first, then
- * every earlier round of the run. A running agent's transcript is read again
- * every few seconds; its live terminal is shown instead when the backend
- * exposes the run as a session.
+ * What each agent said, in the order it happened: every conversation of the
+ * run as one numbered list, grouped by the stage that ran it, oldest first,
+ * with the working agent chosen by default. A running agent's transcript is
+ * read again every few seconds; its live terminal is shown instead when the
+ * backend exposes the run as a session.
  */
-function LiveTab({ client, agentRuns, onReload }: { client: HarnessClient; agentRuns: HarnessAgentRun[]; onReload: () => Promise<unknown> }) {
-	const rounds = useMemo(() => [...agentRuns].filter((agentRun) => agentRun.state !== 'queued').sort((a, b) => Date.parse(b.startedAt ?? '') - Date.parse(a.startedAt ?? '')), [agentRuns]);
+function LiveTab({ client, stages, agentRuns, onReload }: { client: HarnessClient; stages: HarnessStage[]; agentRuns: HarnessAgentRun[]; onReload: () => Promise<unknown> }) {
+	const steps = useMemo(() => liveSteps(stages, agentRuns), [stages, agentRuns]);
+	const rounds = useMemo(() => steps.flatMap((step) => step.agentRuns), [steps]);
 	const working = rounds.find((agentRun) => agentRun.state === 'running');
 	const [chosen, setChosen] = useState<string | undefined>();
-	const selected = rounds.find((agentRun) => agentRun.id === chosen) ?? working ?? rounds[0];
+	const selected = rounds.find((agentRun) => agentRun.id === chosen) ?? working ?? rounds.at(-1);
 	const session = useAgentSession(client, selected?.id);
 	const transcript = useAgentTranscript(client, selected);
 	if (!selected) return <p className="hx-muted">No agent has worked on this task yet.</p>;
+	let number = 0;
 	return (
 		<div className="hx-live">
 			{rounds.length > 1 && (
-				<div className="hx-live-rounds" role="tablist" aria-label="Agent rounds">
-					{rounds.map((agentRun) => (
-						<button key={agentRun.id} type="button" role="tab" aria-selected={agentRun.id === selected.id} className={agentRun.id === selected.id ? 'on' : undefined} onClick={() => setChosen(agentRun.id)}>
-							<HxStatusBadge status={agentStatus(agentRun)} size="sm" label={`${agentRoleLabels[agentRun.role]} · round ${agentRun.round}${(agentRun.attempt ?? 1) > 1 ? ` · try ${agentRun.attempt}` : ''}`} />
-						</button>
+				<ol className="hx-live-steps" role="tablist" aria-orientation="vertical" aria-label="Agent rounds">
+					{steps.map((step) => (
+						<li key={step.id} className="hx-live-stage">
+							<span className="hx-live-stage-title">{step.title}</span>
+							<ol>
+								{step.agentRuns.map((agentRun) => {
+									number += 1;
+									const on = agentRun.id === selected.id;
+									return (
+										<li key={agentRun.id}>
+											<button type="button" role="tab" aria-selected={on} className={on ? 'on' : undefined} onClick={() => setChosen(agentRun.id)}>
+												<span className="hx-live-step-no hx-num">{number}</span>
+												<HxStatusBadge status={agentStatus(agentRun)} size="sm" label={`${agentRoleLabels[agentRun.role]} · round ${agentRun.round}${(agentRun.attempt ?? 1) > 1 ? ` · try ${agentRun.attempt}` : ''}`} />
+												<span className="hx-live-step-meta hx-num">{agentRun.state === 'running' ? 'working' : `${plural(agentRun.turns, 'turn')} · ${formatCost(agentRun.costUsd)}`}</span>
+											</button>
+										</li>
+									);
+								})}
+							</ol>
+						</li>
 					))}
-				</div>
+				</ol>
 			)}
 			<p><b>{agentRoleLabels[selected.role]}</b> · {modelLabel(selected.model)} · <span className="hx-num">{plural(selected.turns, 'turn')} · {formatCost(selected.costUsd)}</span>{selected.state !== 'running' && <span className="hx-muted"> · {hxStatuses[agentStatus(selected)].label.toLowerCase()}</span>}</p>
 			{selected.state === 'running' && <p className="hx-live-line">{selected.progress ?? 'Starting…'}</p>}
@@ -296,6 +314,34 @@ function LiveTab({ client, agentRuns, onReload }: { client: HarnessClient; agent
 			<p className="hx-muted">What the harness asked, what the {agentRoleLabels[selected.role]} thought, each tool it called, and what it answered. Tool output stays out; the coding tool keeps the full conversation.</p>
 		</div>
 	);
+}
+
+type LiveStep = { id: string; title: string; agentRuns: HarnessAgentRun[] };
+
+/**
+ * The run's conversations grouped by the stage that ran them, in the order the
+ * stages ran and, within a stage, the order the agents started. A stage of a
+ * kind that ran more than once (a retry after a stop) is numbered, so "Plan 2"
+ * is the second Plan stage. An agent whose stage is unknown goes last.
+ */
+export function liveSteps(stages: HarnessStage[], agentRuns: HarnessAgentRun[]): LiveStep[] {
+	const byStart = (a: HarnessAgentRun, b: HarnessAgentRun) => Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? '');
+	const live = agentRuns.filter((agentRun) => agentRun.state !== 'queued').sort(byStart);
+	const ordered = [...stages].sort((a, b) => a.ordinal - b.ordinal || Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? ''));
+	const seen: Partial<Record<HarnessStage['kind'], number>> = {};
+	const steps: LiveStep[] = [];
+	for (const stage of ordered) {
+		const own = live.filter((agentRun) => agentRun.stageId === stage.id);
+		if (own.length === 0) continue;
+		const nth = (seen[stage.kind] ?? 0) + 1;
+		seen[stage.kind] = nth;
+		const repeated = ordered.filter((other) => other.kind === stage.kind).length > 1;
+		steps.push({ id: stage.id, title: repeated ? `${stageKindLabels[stage.kind]} ${nth}` : stageKindLabels[stage.kind], agentRuns: own });
+	}
+	const placed = new Set(steps.flatMap((step) => step.agentRuns.map((agentRun) => agentRun.id)));
+	const rest = live.filter((agentRun) => !placed.has(agentRun.id));
+	if (rest.length > 0) steps.push({ id: 'other', title: 'Other', agentRuns: rest });
+	return steps;
 }
 
 function agentStatus(agentRun: HarnessAgentRun): HxStatus {

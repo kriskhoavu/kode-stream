@@ -1823,27 +1823,88 @@ a.hx-source:hover {
 	margin: 0;
 }
 
-.hx-live-rounds {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
+.hx-live-steps,
+.hx-live-steps ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
 }
 
-.hx-live-rounds button {
-	padding: 2px;
+.hx-live-steps {
+	display: grid;
+	gap: 10px;
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+}
+
+.hx-live-stage {
+	display: grid;
+	gap: 4px;
+}
+
+.hx-live-stage-title {
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.hx-live-steps button {
+	display: grid;
+	grid-template-columns: 22px auto minmax(0, 1fr);
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 3px 6px 3px 2px;
 	border: 1px solid transparent;
 	border-radius: 999px;
 	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
 	cursor: pointer;
 }
 
-.hx-live-rounds button.on {
-	border-color: var(--accent-text);
+.hx-live-steps button:hover {
+	background: var(--panel);
 }
 
-.hx-live-rounds button:focus-visible {
+.hx-live-steps button.on {
+	border-color: var(--accent-text);
+	background: var(--panel);
+}
+
+.hx-live-steps button:focus-visible {
 	outline: 2px solid var(--accent-text);
 	outline-offset: 2px;
+}
+
+.hx-live-step-no {
+	width: 22px;
+	height: 22px;
+	display: inline-grid;
+	place-items: center;
+	border-radius: 50%;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--muted);
+}
+
+.hx-live-steps button.on .hx-live-step-no {
+	border-color: var(--accent-text);
+	color: var(--accent-text);
+}
+
+.hx-live-step-meta {
+	justify-self: end;
+	font-size: 12px;
+	color: var(--muted);
+	white-space: nowrap;
 }
 
 /* The drawer's own padding frames the turns; the list is not a scroll box of its own. */
