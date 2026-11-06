@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import type { HarnessAgentRun, HarnessApproval, HarnessRunDetail, HarnessStage } from '../../lib/types';
 import { HxStatusBadge } from './HxStatusBadge';
 import { LiveTimer } from './LiveTimer';
@@ -12,7 +14,7 @@ const stepWords: Record<HarnessAgentRun['role'], string> = {
 };
 
 type LedgerRow = { id: string; step: string; agentRun?: HarnessAgentRun; stage?: HarnessStage };
-type LedgerGroup = { id: string; title: string; note?: string; rows: LedgerRow[] };
+type LedgerGroup = { id: string; title: string; note?: string; rows: LedgerRow[]; open: boolean };
 
 function decidedNote(approval: HarnessApproval | undefined): string | undefined {
 	if (!approval || approval.state === 'requested') return approval ? 'Waiting on you' : undefined;
@@ -35,31 +37,55 @@ export function ledgerGroups(detail: HarnessRunDetail): LedgerGroup[] {
 			return { id: agentRun.id, step: `Round ${agentRun.round} · ${stepWords[agentRun.role]}${again}${retry}`, agentRun };
 		});
 		if (stage.kind === 'qa' && stage.state !== 'pending') rows.unshift({ id: stage.id, step: `Run ${stage.round} of ${stage.maxRounds} · tests`, stage });
-		if (stage.kind === 'plan') groups.push({ id: stage.id, title: 'Plan', note: decidedNote(approvalOf('plan')), rows });
-		if (stage.kind === 'implement') groups.push({ id: stage.id, title: 'Build', rows });
-		if (stage.kind === 'qa') groups.push({ id: stage.id, title: 'Test', note: decidedNote(approvalOf('draft_pr')), rows });
-		if (stage.kind === 'draft_pr' && stage.state !== 'pending') groups.push({ id: stage.id, title: 'Draft pull request', rows: [{ id: stage.id, step: 'Push and open', stage }] });
+		// A stage that is over folds up; the one still in play, or the one that stopped, stays open.
+		const open = stage.state !== 'passed';
+		if (stage.kind === 'plan') groups.push({ id: stage.id, title: 'Plan', note: decidedNote(approvalOf('plan')), rows, open });
+		if (stage.kind === 'implement') groups.push({ id: stage.id, title: 'Build', rows, open });
+		if (stage.kind === 'qa') groups.push({ id: stage.id, title: 'Test', note: decidedNote(approvalOf('draft_pr')), rows, open });
+		if (stage.kind === 'draft_pr' && stage.state !== 'pending') groups.push({ id: stage.id, title: 'Draft pull request', rows: [{ id: stage.id, step: 'Push and open', stage }], open });
 	}
 	return groups.filter((group) => group.rows.length > 0);
+}
+
+function sumRows(rows: LedgerRow[]) {
+	return rows.reduce((sum, row) => {
+		const source = row.agentRun ?? row.stage;
+		return { turns: sum.turns + (source?.turns ?? 0), durationMs: sum.durationMs + (source?.durationMs ?? 0), costUsd: sum.costUsd + (source?.costUsd ?? 0) };
+	}, { turns: 0, durationMs: 0, costUsd: 0 });
 }
 
 export function RunLedger({ detail }: { detail: HarnessRunDetail }) {
 	const groups = ledgerGroups(detail);
 	const rows = groups.flatMap((group) => group.rows);
-	const total = rows.reduce((sum, row) => {
-		const source = row.agentRun ?? row.stage;
-		return { turns: sum.turns + (source?.turns ?? 0), durationMs: sum.durationMs + (source?.durationMs ?? 0), costUsd: sum.costUsd + (source?.costUsd ?? 0) };
-	}, { turns: 0, durationMs: 0, costUsd: 0 });
+	const total = sumRows(rows);
+	// Which groups the person folded or unfolded by hand; the rest follow the stage's state.
+	const [folded, setFolded] = useState<Record<string, boolean>>({});
+	const isOpen = (group: LedgerGroup) => folded[group.id] ?? group.open;
 	return (
 		<section className="hx-card hx-table-card" aria-label="What each step took">
 			<table className="hx-table hx-ledger">
 				<thead><tr><th scope="col">Step</th><th scope="col">Result</th><th scope="col" className="num">Turns</th><th scope="col" className="num">Time</th><th scope="col" className="num">Cost</th></tr></thead>
 				<tbody>
 					{groups.length === 0 && <tr><td colSpan={5} className="hx-muted">Nothing has run yet.</td></tr>}
-					{groups.map((group) => [
-						<tr className="grp" key={group.id}><th scope="rowgroup" colSpan={group.note ? 3 : 5}>{group.title}</th>{group.note && <td colSpan={2} className="num">{group.note}</td>}</tr>,
-						...group.rows.map((row) => <LedgerRowView key={row.id} row={row} />)
-					])}
+					{groups.map((group) => {
+						const open = isOpen(group);
+						const sum = sumRows(group.rows);
+						return [
+							<tr className="grp" key={group.id}>
+								<th scope="rowgroup">
+									<button type="button" className="hx-ledger-fold" aria-expanded={open} onClick={() => setFolded((prev) => ({ ...prev, [group.id]: !open }))}>
+										<ChevronRight size={14} aria-hidden="true" />{group.title}
+									</button>
+									<span className="hx-ledger-count">{plural(group.rows.length, 'step')}</span>
+								</th>
+								<td className="note">{group.note}</td>
+								<td className="num">{sum.turns}</td>
+								<td className="num">{formatMinutes(sum.durationMs)}</td>
+								<td className="num">{formatCost(sum.costUsd)}</td>
+							</tr>,
+							...(open ? group.rows.map((row) => <LedgerRowView key={row.id} row={row} />) : [])
+						];
+					})}
 					{rows.length > 0 && (
 						<tr className="total"><th scope="row">Total so far</th><td /><td className="num">{total.turns}</td><td className="num">{formatMinutes(total.durationMs)}</td><td className="num">{formatCost(total.costUsd)}</td></tr>
 					)}

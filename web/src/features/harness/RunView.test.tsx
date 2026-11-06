@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RunView } from './RunView';
 import { createFixtureClient } from './fixture';
@@ -25,6 +25,19 @@ describe('RunView', () => {
 		expect(screen.getByRole('heading', { name: 'What the Checker said · plan, round 1' })).toBeInTheDocument();
 		expect(screen.getByText('Must fix · 1 · fixed in round 2')).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Jira PM-02' })).toBeInTheDocument();
+	});
+
+	it('folds a finished stage in the ledger and keeps the one in play open', async () => {
+		const state = await stateWith('run-pm-02');
+		render(<RunView state={state} runId="run-pm-02" onSelectRun={vi.fn()} onRefresh={vi.fn()} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} />);
+		const plan = screen.getByRole('button', { name: 'Plan' });
+		const build = screen.getByRole('button', { name: 'Build' });
+		expect(plan).toHaveAttribute('aria-expanded', 'false');
+		expect(build).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.queryByText('Round 1 · plan')).not.toBeInTheDocument();
+		fireEvent.click(plan);
+		expect(plan).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByText('Round 1 · plan')).toBeInTheDocument();
 	});
 
 	it('puts the waiting gate above the stepper', async () => {

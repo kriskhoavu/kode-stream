@@ -757,7 +757,10 @@ a.hx-source:hover {
 .hx-stepper {
 	display: flex;
 	align-items: center;
-	margin: 0;
+	/* Centred while it fits, scrolling sideways once it does not. */
+	width: fit-content;
+	max-width: 100%;
+	margin: 0 auto;
 	padding: 6px 4px 10px;
 	list-style: none;
 	overflow-x: auto;
@@ -958,7 +961,8 @@ a.hx-source:hover {
 
 .hx-run-split {
 	display: grid;
-	grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+	/* The ledger is numbers; the Checker's words need the room. */
+	grid-template-columns: minmax(360px, 2fr) minmax(0, 3fr);
 	gap: 18px;
 	align-items: start;
 }
@@ -985,6 +989,39 @@ a.hx-source:hover {
 .hx-ledger tr.grp td.num {
 	text-align: right;
 	color: var(--text);
+}
+
+.hx-ledger tr.grp td.note {
+	color: var(--muted);
+	font-weight: 500;
+}
+
+.hx-ledger-fold {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.hx-ledger-fold svg {
+	color: var(--muted);
+	transition: transform 150ms var(--hx-ease);
+}
+
+.hx-ledger-fold[aria-expanded="true"] svg {
+	transform: rotate(90deg);
+}
+
+.hx-ledger tr.grp .hx-ledger-count {
+	margin-left: 6px;
+	color: var(--muted);
+	font-weight: 500;
 }
 
 .hx-ledger tr.total th,
@@ -1026,14 +1063,41 @@ a.hx-source:hover {
 	padding: 0;
 	list-style: none;
 	display: grid;
-	gap: 6px;
+	gap: 10px;
 	font-size: 13px;
 }
 
 .hx-findings li {
-	display: flex;
-	gap: 8px;
-	align-items: flex-start;
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr);
+	gap: 2px 8px;
+	align-items: start;
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+}
+
+.hx-findings li > :first-child {
+	grid-row: 1 / span 3;
+	margin-top: 1px;
+}
+
+.hx-finding-title {
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+.hx-finding-where {
+	font-size: 12px;
+}
+
+.hx-finding-detail {
+	margin: 4px 0 0;
+	color: var(--muted);
+	font-size: 13px;
+	line-height: 1.55;
+	max-width: 72ch;
 }
 
 .hx-findings code {

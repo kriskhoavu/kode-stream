@@ -38,11 +38,9 @@ function FindingItem({ finding }: { finding: HarnessFinding }) {
 	return (
 		<li>
 			{finding.resolved ? <Check aria-label="Fixed" size={16} className="hx-finding-fixed" /> : <span className="hx-muted" aria-hidden="true">·</span>}
-			<span>
-				{finding.title}
-				{finding.path && <> <code>{finding.path}{finding.line ? `:${finding.line}` : ''}</code></>}
-				{finding.detail && <small className="hx-muted"> {finding.detail}</small>}
-			</span>
+			<span className="hx-finding-title">{finding.title}</span>
+			{finding.path && <span className="hx-finding-where"><code>{finding.path}{finding.line ? `:${finding.line}` : ''}</code></span>}
+			{finding.detail && <p className="hx-finding-detail">{finding.detail}</p>}
 		</li>
 	);
 }
