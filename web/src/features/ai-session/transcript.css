@@ -24,22 +24,61 @@
 	background: color-mix(in srgb, var(--blue) 8%, var(--panel));
 }
 
-.agent-turn.role-tool,
-.agent-turn.role-thinking {
-	max-width: 100%;
-	padding: 4px 12px;
-	background: none;
-	border-left: 2px solid var(--line);
-	border-radius: 0;
+/* The tool calls and thinking folded into an answer: one line that opens to the list. */
+.agent-work {
+	margin: 0;
 }
 
-.agent-turn.role-tool p {
+.agent-work > summary {
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--muted);
+	list-style: none;
+}
+
+.agent-work > summary::-webkit-details-marker {
+	display: none;
+}
+
+.agent-work > summary::before {
+	content: '';
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	margin: 0 8px 1px 2px;
+	border-right: 1.5px solid currentColor;
+	border-bottom: 1.5px solid currentColor;
+	transform: rotate(-45deg);
+	transition: transform 150ms ease;
+}
+
+.agent-work[open] > summary::before {
+	transform: rotate(45deg);
+}
+
+.agent-work > ol {
+	list-style: none;
+	margin: 6px 0 4px;
+	padding: 0;
+	display: grid;
+	gap: 6px;
+}
+
+.agent-work-item {
+	display: grid;
+	gap: 2px;
+	padding: 2px 10px;
+	border-left: 2px solid var(--line);
+}
+
+.agent-work-item.role-tool p {
 	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 	font-size: 12px;
 	color: var(--muted);
 }
 
-.agent-turn.role-thinking p {
+.agent-work-item.role-thinking p {
 	font-style: italic;
 	color: var(--muted);
 }
