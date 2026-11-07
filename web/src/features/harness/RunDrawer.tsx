@@ -14,6 +14,7 @@ import { GateCard } from './GateCard';
 import { HxStatusBadge } from './HxStatusBadge';
 import { PipelineStepper } from './PipelineStepper';
 import { SourceBadge } from './SourceBadge';
+import { RunPlanPanel } from './RunPlanPanel';
 import { pipelineModel, prLabel, runStatus } from './pipeline';
 import { useNow } from './useNow';
 import { agentRoleLabels, formatCost, hxSteps, hxStatuses, modelLabel, plural, sourceLabels, stageKindLabels, taskStatus } from './vocabulary';
@@ -24,6 +25,7 @@ const SessionTerminal = lazy(() => import('../ai-session/SessionTerminal').then(
 
 const tabs: { id: HarnessRunTab; label: string }[] = [
 	{ id: 'ticket', label: 'Ticket' },
+	{ id: 'plan', label: 'Plan' },
 	{ id: 'stages', label: 'Stages' },
 	{ id: 'findings', label: 'Findings' },
 	{ id: 'changes', label: 'Changes' },
@@ -164,6 +166,7 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, wave, onTabC
 					</div>
 					<section className="hx-tab-panel" role="tabpanel" id={`hx-panel-${tab}`} aria-labelledby={`hx-tab-${tab}`}>
 						{tab === 'ticket' && <TicketTab task={task} fixture={Boolean(client.fixture)} />}
+						{tab === 'plan' && (run ? <RunPlanPanel client={client} run={run} /> : <NoRun run={false} />)}
 						{tab === 'stages' && (detail ? <PipelineStepper model={pipelineModel(detail, now)} label={`Progress for ${task.source.key}`} orientation="vertical" /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'findings' && (detail ? <FindingsByRound agentRuns={detail.agentRuns} /> : <NoRun run={Boolean(runId)} />)}
 						{tab === 'changes' && (runId ? <ChangesTab client={client} runId={runId} agentRun={latestAgentRun(detail?.agentRuns)} /> : <NoRun run={false} />)}

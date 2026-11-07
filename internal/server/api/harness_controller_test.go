@@ -411,3 +411,19 @@ func TestHarnessMutationsAreHostedExecutionInCloudMode(t *testing.T) {
 		t.Fatal("harness mutations must be refused as hosted execution in Cloud mode")
 	}
 }
+
+func TestHarnessRunPlanRoute(t *testing.T) {
+	service, repository := newHarnessTestService(t, true)
+	handler := New(Dependencies{Harness: service}).Routes()
+	if missing := serveHarness(handler, http.MethodGet, "/api/harness/runs/missing/plan", ""); missing.Code != http.StatusNotFound {
+		t.Fatalf("missing = %d %s", missing.Code, missing.Body.String())
+	}
+	now := time.Now().UTC()
+	if err := repository.InsertRun(context.Background(), domain.Run{ID: "run-1", TaskID: "tsk-1", WorkspaceID: "ws", Branch: "harness/PM-1-abc", State: domain.RunRunning, StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	plan := serveHarness(handler, http.MethodGet, "/api/harness/runs/run-1/plan", "")
+	if plan.Code != http.StatusOK || !strings.Contains(plan.Body.String(), `"branch":"harness/PM-1-abc"`) || !strings.Contains(plan.Body.String(), `"files":[]`) {
+		t.Fatalf("plan = %d %s", plan.Code, plan.Body.String())
+	}
+}

@@ -172,7 +172,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       setDrawerAgent(undefined);
       return;
     }
-    setTaskDrawer({ taskId: task.id, tab: task.runId ? 'stages' : 'ticket' });
+    setTaskDrawer({ taskId: task.id, tab: task.runId ? 'plan' : 'ticket' });
   }, [harnessJoin]);
   const [sourceItemsOpen, setSourceItemsOpen] = useState(false);
   const [sourceItemsLoading, setSourceItemsLoading] = useState(false);
@@ -793,7 +793,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       </div>
       <SelectedFilters facets={facetConfig} filters={filters} onRemove={toggleFilter} />
       <div className="filter-summary">
-        <span>{filteredPlans.length} of {items.length} items</span>
+        <span>{filteredPlans.length} of {boardItems.length} items</span>
         {activeFilterCount > 0 && <span>{activeFilterCount} active filters</span>}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
@@ -848,6 +848,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                   work={harnessJoin.byItemId.get(plan.id)}
                   harnessOn={harnessOn}
                   onRunWithHarness={harnessOn && !harnessJoin.byItemId.has(plan.id) ? () => setRunDialogItemId(plan.id) : undefined}
+                  onOpenTask={isSyntheticItem(plan) && harnessJoin.byItemId.get(plan.id) ? () => openTask(harnessJoin.byItemId.get(plan.id)!.task) : undefined}
                   onOpenAgent={(focus) => {
                     setDrawerPlanId(plan.id);
                     setDrawerAgent(focus);
@@ -1467,7 +1468,7 @@ function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetSt
   );
 }
 
-const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, work, harnessOn = false, onRunWithHarness, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
+const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, work, harnessOn = false, onRunWithHarness, onOpenTask, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
   item: ItemSummary;
   workspace?: WorkspaceConfig;
   pending: boolean;
@@ -1480,6 +1481,8 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   harnessOn?: boolean;
   /** Hands the card to the harness; offered on a card it does not hold. */
   onRunWithHarness?: () => void;
+  /** Opens the harness's task behind a ticket card that no plan holds yet. */
+  onOpenTask?: () => void;
   onDragStart: (event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
   onPreview: () => void;
@@ -1499,14 +1502,15 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   const draggable = isItemDraggable(plan) && !pending && !synthetic;
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    if (!synthetic) onOpen();
+    if (synthetic) onOpenTask?.(); else onOpen();
   };
-  const preview = () => { if (!synthetic) onPreview(); };
+  const preview = () => { if (synthetic) onOpenTask?.(); else onPreview(); };
   const classes = ['plan-card'];
   if (docs) classes.push('docs-plan');
   if (work) classes.push('harness-card');
   if (work?.task.needsYou || work?.waiting.length) classes.push('needs-you-card');
-  if (synthetic) classes.push('no-plan');
+  if (synthetic) classes.push('ticket-card');
+  if (synthetic && !work?.run) classes.push('no-plan');
   if (draggable) classes.push('draggable');
   if (active) classes.push('dragging');
   if (pending) classes.push('move-pending');
@@ -1532,7 +1536,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
       <div className="plan-card-title">
         <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
         <span className="card-badges">
-          {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
+          {synthetic ? <span className="source-badge ticket" title="A ticket the harness holds; no plan on this branch yet">Ticket</span> : source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
           {!docs && !synthetic && <AgentCluster agents={agents} title={plan.title} onOpen={onOpenAgent} />}
         </span>
       </div>
@@ -1559,7 +1563,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
 
 function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus, onAgentFocus, onAgentsChanged, work, harness, onRunWithHarness, onClose, onOpenFull, onOpenRun, onChanged }: { itemId: string; refreshKey: number; workspaceId?: string; agents?: ItemAgents; agentFocus?: AgentFocus; onAgentFocus: (focus: AgentFocus | undefined) => void; onAgentsChanged: () => Promise<unknown> | void; work?: CardWork; harness: HarnessController; /** Offered while the harness is on and does not hold this card. */ onRunWithHarness?: () => void; onClose: () => void; onOpenFull: () => void; onOpenRun: () => void; onChanged: () => void | Promise<void> }) {
   const [agentsMode, setAgentsMode] = useState<AgentsMode>('run');
-  const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => onAgentFocus({ kind: 'harness', id })} onOpenFull={onOpenRun} onTakeOver={() => void takeOverByHand(work, harness).then(({ agentRunId }) => { if (agentRunId) { onAgentFocus({ kind: 'harness', id: agentRunId }); } else { setAgentsMode('sessions'); onAgentFocus({ kind: 'launch' }); } })} /> : undefined;
+  const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => onAgentFocus({ kind: 'harness', id })} onOpenPlan={(id) => onAgentFocus({ kind: 'harness-plan', id })} onOpenFull={onOpenRun} onTakeOver={() => void takeOverByHand(work, harness).then(({ agentRunId }) => { if (agentRunId) { onAgentFocus({ kind: 'harness', id: agentRunId }); } else { setAgentsMode('sessions'); onAgentFocus({ kind: 'launch' }); } })} /> : undefined;
   const paneHarness: AgentPaneHarness = { client: harness.client, run: work?.run, detail: work?.run ? harness.state.details[work.run.id] : undefined, reload: () => (work?.run ? harness.loadRun(work.run.id) : Promise.resolve()) };
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);

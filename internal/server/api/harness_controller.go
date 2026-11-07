@@ -447,6 +447,15 @@ func (a *harnessController) cost(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, harness.DashboardCostOf(summary))
 }
 
+func (a *harnessController) runPlan(w http.ResponseWriter, r *http.Request) {
+	plan, err := a.harness.Plan(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, plan)
+}
+
 func (a *harnessController) runChanges(w http.ResponseWriter, r *http.Request) {
 	changes, err := a.harness.DashboardChanges(r.Context(), r.PathValue("id"))
 	if err != nil {

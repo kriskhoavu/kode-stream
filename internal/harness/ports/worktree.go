@@ -21,6 +21,15 @@ type DiffFile struct {
 	Deletions int    `json:"deletions"`
 }
 
+// RunFile is one file a run wrote, read for a person to look at. Content is
+// empty when Truncated: the file is larger than the reader's limit.
+type RunFile struct {
+	Path      string `json:"path"`
+	Status    string `json:"status"`
+	Content   string `json:"content"`
+	Truncated bool   `json:"truncated,omitempty"`
+}
+
 // Worktrees gives every run a git worktree of its own, outside the
 // workspace, on a harness/* branch. Only the harness commits and pushes.
 type Worktrees interface {
@@ -30,4 +39,9 @@ type Worktrees interface {
 	RestorePaths(ctx context.Context, path, base string, paths []string) error
 	Commit(ctx context.Context, path, message string) (string, error)
 	Push(ctx context.Context, path, branch string) error
+	// ReadRunFiles reads the files under prefix a run changed against base:
+	// from its worktree while it exists, uncommitted work included, else from
+	// its branch, local or as last pushed. It names where it read from,
+	// "worktree" or "branch", or "" when neither is left.
+	ReadRunFiles(ctx context.Context, workspace models.WorkspaceConfig, worktreePath, base, branch, prefix string, limit int64) ([]RunFile, string, error)
 }

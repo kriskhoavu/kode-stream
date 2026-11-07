@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Hand, Maximize2, MessageSquarePlus, PauseCircle } from 'lucide-react';
+import { FileText, Hand, Maximize2, MessageSquarePlus, PauseCircle } from 'lucide-react';
 import type { HarnessApproval, HarnessApprovalGate } from '../../lib/types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { FindingsPanel } from '../harness/FindingsPanel';
@@ -22,11 +22,13 @@ const noteGates: Partial<Record<HarnessApprovalGate, 'approve' | 'reject'>> = { 
  * is working, the Checker's findings, the ledger and the steering actions.
  * The hand-driven sessions are the tab's other mode.
  */
-export function HarnessRunTab({ work, harness, onOpenConversation, onOpenFull, onTakeOver }: {
+export function HarnessRunTab({ work, harness, onOpenConversation, onOpenPlan, onOpenFull, onTakeOver }: {
 	work: CardWork;
 	harness: HarnessController;
 	/** Opens one agent's conversation in the card's main pane. */
 	onOpenConversation: (agentRunId: string) => void;
+	/** Opens the plan the run wrote in the card's main pane, before it is merged. */
+	onOpenPlan?: (runId: string) => void;
 	/** Shows the run whole, full width. */
 	onOpenFull?: () => void;
 	/** Hands the card to a person: the working role pauses and the Sessions mode opens. */
@@ -69,6 +71,7 @@ export function HarnessRunTab({ work, harness, onOpenConversation, onOpenFull, o
 			<div className="harness-run-head">
 				<HxStatusBadge status={status} size="sm" label={where && (status === 'working' || status === 'waiting') ? `${hxStatuses[status].label} · ${where}` : undefined} />
 				{working ? <WorkerChip engine={working.engine} model={working.model} role={agentRoleLabels[working.role]} /> : <WorkerChip role={stage?.kind === 'qa' ? 'Tester' : 'Harness'} />}
+				{onOpenPlan && <button type="button" className="hx-link harness-run-plan" onClick={() => onOpenPlan(run.id)}><FileText size={13} aria-hidden="true" /> Read the plan</button>}
 				{onOpenFull && <button type="button" className="hx-link harness-run-full" onClick={onOpenFull}><Maximize2 size={13} aria-hidden="true" /> Open full width</button>}
 			</div>
 

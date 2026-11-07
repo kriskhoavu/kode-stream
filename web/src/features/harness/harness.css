@@ -2396,3 +2396,59 @@ a.hx-source:hover {
 		transform: none;
 	}
 }
+
+/* The plan a run wrote, before it is merged. */
+.hx-run-plan {
+	display: grid;
+	gap: 10px;
+}
+
+.hx-run-plan-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.hx-run-plan-files {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.hx-run-plan-files button {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 3px 9px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: var(--panel);
+	font-size: 12px;
+}
+
+.hx-run-plan-files button.on {
+	border-color: color-mix(in srgb, var(--button-accent) 55%, var(--line));
+	font-weight: 700;
+}
+
+.hx-run-plan-path {
+	margin: 0 0 6px;
+	font-size: 12px;
+	color: var(--muted);
+}
+
+.hx-run-plan-doc {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.hx-run-plan-text {
+	white-space: pre-wrap;
+	font-size: 12px;
+	margin: 0;
+}

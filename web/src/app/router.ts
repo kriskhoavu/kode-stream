@@ -5,8 +5,8 @@ export interface CanvasLocation { workspaceId?: string; selectedNodeId?: string;
 export interface ReviewLocation { workspaceId?: string; branch?: string; }
 export type ItemView = 'run';
 /** The tabs of a harness run's drawer, on the card's full-width run view. */
-export type HarnessRunTab = 'ticket' | 'stages' | 'findings' | 'changes' | 'live' | 'links';
-export const harnessRunTabs: readonly HarnessRunTab[] = ['ticket', 'stages', 'findings', 'changes', 'live', 'links'];
+export type HarnessRunTab = 'ticket' | 'plan' | 'stages' | 'findings' | 'changes' | 'live' | 'links';
+export const harnessRunTabs: readonly HarnessRunTab[] = ['ticket', 'plan', 'stages', 'findings', 'changes', 'live', 'links'];
 
 export type Route =
   | { name: 'workstream'; focusedItemId?: string; focusedSessionId?: string }

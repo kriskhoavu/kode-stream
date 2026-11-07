@@ -401,3 +401,45 @@ func (s *Service) Changes(ctx context.Context, runID string) (RunChanges, error)
 	changes.Files, changes.DiffStat, changes.Available = files, boundedText(stat, domain.MaxDiffStatBytes), true
 	return changes, nil
 }
+
+// RunPlan is the plan a run wrote, readable before it is merged.
+type RunPlan struct {
+	Branch string          `json:"branch"`
+	From   string          `json:"from"`
+	Files  []ports.RunFile `json:"files"`
+}
+
+// maxPlanFileBytes bounds one plan file a person reads.
+const maxPlanFileBytes = 256 << 10
+
+// Plan reads the files a run wrote under the plan folder: live from its
+// worktree while it has one, else from its branch. A run whose worktree and
+// branch are both gone has no plan to show here; once merged, it is on the
+// board.
+func (s *Service) Plan(ctx context.Context, runID string) (RunPlan, error) {
+	if !s.Supported() {
+		return RunPlan{}, domain.ErrNotFound
+	}
+	run, err := s.repository.GetRun(ctx, runID)
+	if err != nil {
+		return RunPlan{}, err
+	}
+	plan := RunPlan{Branch: run.Branch, Files: []ports.RunFile{}}
+	if s.worktrees == nil || s.workspaces == nil {
+		return plan, nil
+	}
+	workspace, found, err := s.workspaces.Get(run.WorkspaceID)
+	if err != nil || !found {
+		return plan, err
+	}
+	worktree := run.WorktreePath
+	if run.WorktreeRemoved {
+		worktree = ""
+	}
+	files, from, err := s.worktrees.ReadRunFiles(ctx, workspace, worktree, run.BaseCommit, run.Branch, planScope[0], maxPlanFileBytes)
+	if err != nil {
+		return plan, nil
+	}
+	plan.Files, plan.From = files, from
+	return plan, nil
+}

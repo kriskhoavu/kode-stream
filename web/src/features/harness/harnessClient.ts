@@ -2,6 +2,7 @@ import { api } from '../../shared/api';
 import { openEventSourceFeed } from './useHarnessEvents';
 import type {
 	HarnessCreateTaskInput,
+	HarnessRunPlan,
 	HarnessAgentRun,
 	HarnessApproval,
 	HarnessCostSummary,
@@ -44,6 +45,8 @@ export interface HarnessClient {
 	cost(groupBy: HarnessCostSummary['groupBy'], range?: { from?: string; to?: string }, signal?: AbortSignal): Promise<HarnessCostSummary>;
 	run(runId: string, signal?: AbortSignal): Promise<HarnessRunDetail>;
 	runChanges(runId: string, signal?: AbortSignal): Promise<SessionChanges>;
+	/** The plan a run wrote, before it is merged. */
+	runPlan?(runId: string, signal?: AbortSignal): Promise<HarnessRunPlan>;
 	agentRun(agentRunId: string, signal?: AbortSignal): Promise<{ agentRun: HarnessAgentRun; session?: SafeSessionRecord }>;
 	/** The last turns of an agent run's transcript; polled while the agent works. */
 	agentRunTranscript(agentRunId: string, limit?: number, signal?: AbortSignal): Promise<HarnessTranscript>;
@@ -83,6 +86,7 @@ export const apiHarnessClient: HarnessClient = {
 	cost: (groupBy, range, signal) => api.harnessCostSummary(groupBy, range, signal),
 	run: (runId, signal) => api.harnessRun(runId, signal),
 	runChanges: (runId, signal) => api.harnessRunChanges(runId, signal),
+	runPlan: (runId, signal) => api.harnessRunPlan(runId, signal),
 	agentRun: (agentRunId, signal) => api.harnessAgentRun(agentRunId, signal),
 	agentRunTranscript: (agentRunId, limit, signal) => api.harnessAgentRunTranscript(agentRunId, limit, signal),
 	approve: (approval, key, reason) => api.approveHarnessGate(approval, key, reason),

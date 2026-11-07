@@ -6,6 +6,7 @@ import { newIdempotencyKey } from '../../shared/api/idempotency';
 import type { ClaudeTranscript, ClaudeTurn, EmbeddedAISessionResult, HarnessRun, HarnessRunDetail, SafeSessionRecord } from '../../lib/types';
 import type { HarnessClient } from '../harness/harnessClient';
 import { LiveTab } from '../harness/RunDrawer';
+import { RunPlanPanel } from '../harness/RunPlanPanel';
 import { AISessionLaunchControl } from '../ai-session/AISessionLaunchControl';
 import { AgentChip, providerLabel } from '../ai-session/providerDisplay';
 import { SessionTerminal } from '../ai-session/SessionTerminal';
@@ -19,7 +20,7 @@ import { agentRoleLabels } from '../harness/vocabulary';
 import './agents.css';
 
 /** What the card drawer's main pane shows: the document, a session, a transcript, a harness agent's conversation, or the launcher. */
-export type AgentFocus = { kind: 'session'; id: string } | { kind: 'transcript'; id: string } | { kind: 'harness'; id: string } | { kind: 'launch' };
+export type AgentFocus = { kind: 'session'; id: string } | { kind: 'transcript'; id: string } | { kind: 'harness'; id: string } | { kind: 'harness-plan'; id: string } | { kind: 'launch' };
 
 /** The card's Agents tab has two modes once the harness works on the card: its run, and the hand-driven sessions. */
 export type AgentsMode = 'run' | 'sessions';
@@ -181,6 +182,10 @@ export function AgentPane({ focus, heldSessionIds, itemId, workspaceId, agents, 
 		</section>}
 		{focus?.kind === 'transcript' && <TranscriptPane conversation={focus.id} transcript={transcript} itemId={itemId} workspaceId={workspaceId} back={back} onResumed={(result) => { void onReload(); onFocus({ kind: 'session', id: result.session.id }); }} />}
 		{focus?.kind === 'harness' && <HarnessConversationPane agentRunId={focus.id} harness={harness} back={back} />}
+		{focus?.kind === 'harness-plan' && <section className="agent-pane agent-pane-harness hx" aria-label="The harness's plan">
+			<header className="agent-pane-header">{back}<span className="agent-pane-title"><Bot size={14} aria-hidden="true" /><strong>Harness</strong><span>The plan, not merged yet</span></span></header>
+			<div className="agent-pane-body agent-pane-harness-body">{harness?.run ? <RunPlanPanel client={harness.client} run={harness.run} /> : <p className="agents-empty">The harness is not available here.</p>}</div>
+		</section>}
 		{sessionIds.map((id) => {
 			const record = agents?.live.find((candidate) => candidate.id === id) ?? agents?.ended.find((candidate) => candidate.id === id);
 			return <SessionPane key={id} hidden={id !== focusedSession} record={record} itemId={itemId} back={back} onBack={onBack} onRelease={() => onRelease(id)} onReload={onReload} onFocus={onFocus} />;

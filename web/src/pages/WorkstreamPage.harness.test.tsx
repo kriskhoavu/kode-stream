@@ -156,3 +156,17 @@ describe('WorkstreamPage runs a card with the harness', () => {
 		expect(typeof body.idempotencyKey).toBe('string');
 	});
 });
+
+describe('WorkstreamPage ticket cards', () => {
+	it('opens a ticket card on its plan tab, and labels the stop with its status', async () => {
+		stubBoard();
+		renderBoard();
+		const ticket = (await screen.findByText('Found by the Finder')).closest('.plan-card') as HTMLElement;
+		expect(within(ticket).getByText('Ticket')).toBeInTheDocument();
+		expect(within(ticket).getByText('no plan yet')).toBeInTheDocument();
+		expect(screen.getByText(/of 4 items/)).toBeInTheDocument();
+		fireEvent.click(ticket);
+		expect(await screen.findByRole('tab', { name: 'Ticket', selected: true })).toBeInTheDocument();
+		expect(screen.getByRole('tab', { name: 'Plan' })).toBeInTheDocument();
+	});
+});

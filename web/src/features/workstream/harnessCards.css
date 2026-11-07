@@ -280,3 +280,9 @@
 		grid-template-columns: 1fr;
 	}
 }
+
+.source-badge.ticket {
+	color: var(--hx-running);
+	background: color-mix(in srgb, var(--hx-running) var(--hx-mix), var(--panel));
+	border-color: color-mix(in srgb, var(--hx-running) 35%, var(--line));
+}

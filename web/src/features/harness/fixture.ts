@@ -1,5 +1,6 @@
 import type {
 	HarnessAgentRole,
+	HarnessRunPlan,
 	HarnessAgentRun,
 	HarnessApproval,
 	HarnessApprovalGate,
@@ -547,6 +548,16 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 		}),
 		run: (runId) => delay(() => detail(runId)),
 		runChanges: (runId) => delay((): SessionChanges => fixtureChanges(runId)),
+		runPlan: (runId) => delay((): HarnessRunPlan => {
+			const run = store.runs.get(runId);
+			if (!run) throw new Error('This run does not exist in the demo data.');
+			const task = store.tasks.get(run.taskId);
+			const key = task?.source.key ?? 'TASK';
+			return { branch: run.branch, from: run.state === 'running' || run.state === 'blocked' ? 'worktree' : 'branch', files: [
+				{ path: `plans/${key}/README.md`, status: 'added', content: `# ${task?.title ?? key}\n\nWhat the Planner proposes, in three steps.\n\n1. Read the current flow.\n2. Change the smallest part that fixes it.\n3. Add a test that fails before the change.\n` },
+				{ path: `plans/${key}/plan.yaml`, status: 'added', content: `plan:\n  identifier: ${key}\n  status: draft\n` }
+			] };
+		}),
 		agentRun: (agentRunId) => delay(() => {
 			const agentRun = store.agentRuns.get(agentRunId);
 			if (!agentRun) throw new Error('This agent run does not exist in the demo data.');

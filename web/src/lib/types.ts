@@ -1089,6 +1089,11 @@ export interface HarnessTask {
 /** What a card hands the harness to run it: the ticket's key, title and body. */
 export interface HarnessCreateTaskInput { workspaceId: string; key: string; title: string; body?: string; url?: string; /** Start at once (the default) or only put it in the queue. */ startNow?: boolean; idempotencyKey: string }
 
+/** One file a run wrote under the plan folder; `content` is empty when the file is too large to show. */
+export interface HarnessRunFile { path: string; status: 'added' | 'modified' | 'deleted'; content: string; truncated?: boolean }
+/** The plan a run wrote, readable before it is merged: live from the run's own copy, or from its branch. */
+export interface HarnessRunPlan { branch: string; from: 'worktree' | 'branch' | ''; files: HarnessRunFile[] }
+
 export interface HarnessTotals { turns: number; durationMs: number; costUsd: number; blocking: number; advisory: number }
 
 export interface HarnessStage {

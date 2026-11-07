@@ -274,3 +274,46 @@ func (g *GitAdapter) PushBranchContext(ctx context.Context, worktreePath, remote
 	_, err := g.runLong(ctx, worktreePath, worktreeTimeout, "push", "--set-upstream", remote, branch+":"+branch)
 	return err
 }
+
+// RefDiffFilesContext lists the paths under prefix that ref changed against
+// base, read from the repository's objects, so it needs no worktree.
+func (g *GitAdapter) RefDiffFilesContext(ctx context.Context, repoPath, base, ref, prefix string) ([]DiffFile, error) {
+	args := []string{"diff", "--name-status", "-z", "--no-renames", base, ref}
+	if prefix != "" {
+		args = append(args, "--", prefix)
+	}
+	statusOut, err := g.runLong(ctx, repoPath, worktreeTimeout, args...)
+	if err != nil {
+		return nil, err
+	}
+	parts := strings.Split(strings.TrimSuffix(statusOut, "\x00"), "\x00")
+	files := []DiffFile{}
+	for i := 0; i+1 < len(parts); i += 2 {
+		if parts[i+1] != "" {
+			files = append(files, DiffFile{Path: parts[i+1], Status: diffStatus(parts[i])})
+		}
+	}
+	return files, nil
+}
+
+// ShowFileContext returns a file's content at ref. A file larger than limit
+// returns no content and true.
+func (g *GitAdapter) ShowFileContext(ctx context.Context, repoPath, ref, path string, limit int64) ([]byte, bool, error) {
+	clean := filepath.ToSlash(filepath.Clean(path))
+	if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
+		return nil, false, fmt.Errorf("path %q escapes the repository", path)
+	}
+	object := ref + ":" + clean
+	size, err := g.runLong(ctx, repoPath, worktreeTimeout, "cat-file", "-s", object)
+	if err != nil {
+		return nil, false, err
+	}
+	if bytes, convErr := strconv.ParseInt(strings.TrimSpace(size), 10, 64); convErr == nil && bytes > limit {
+		return nil, true, nil
+	}
+	data, err := g.runContextLimited(ctx, repoPath, limit+1, "cat-file", "blob", object)
+	if err != nil {
+		return nil, false, err
+	}
+	return data, false, nil
+}

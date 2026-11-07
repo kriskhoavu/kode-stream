@@ -103,6 +103,7 @@ import type {
   HarnessSettings,
   HarnessStatus,
   HarnessCreateTaskInput,
+  HarnessRunPlan,
   HarnessTask,
   HarnessTranscript
 } from '../../lib/types';
@@ -550,6 +551,7 @@ export const api = {
   harnessQueue: async (signal?: AbortSignal) => (await request<{ tasks?: HarnessTask[] | null }>('/api/harness/queue', { signal }, !signal)).tasks?.map(normalizeHarnessTask) ?? [],
   harnessRuns: async (signal?: AbortSignal) => (await request<{ runs?: HarnessRun[] | null }>('/api/harness/runs', { signal }, !signal)).runs ?? [],
   harnessRun: async (runId: string, signal?: AbortSignal) => normalizeHarnessRunDetail(await request<HarnessRunDetail>(`/api/harness/runs/${encodeURIComponent(runId)}`, { signal }, !signal)),
+  harnessRunPlan: async (runId: string, signal?: AbortSignal) => { const plan = await request<HarnessRunPlan>(`/api/harness/runs/${encodeURIComponent(runId)}/plan`, { signal }, !signal); return { ...plan, files: plan.files ?? [] }; },
   harnessRunChanges: (runId: string, signal?: AbortSignal) => request<SessionChanges>(`/api/harness/runs/${encodeURIComponent(runId)}/changes`, { signal }, !signal),
   harnessAgentRunTranscript: (agentRunId: string, limit = 50, signal?: AbortSignal) => request<HarnessTranscript>(`/api/harness/agent-runs/${encodeURIComponent(agentRunId)}/transcript?limit=${limit}`, { signal }, false),
   harnessAgentRun: (agentRunId: string, signal?: AbortSignal) => request<{ agentRun: HarnessAgentRun; session?: SafeSessionRecord }>(`/api/harness/agent-runs/${encodeURIComponent(agentRunId)}`, { signal }, !signal),

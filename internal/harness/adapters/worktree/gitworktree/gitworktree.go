@@ -4,10 +4,13 @@
 package gitworktree
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"kode-stream/internal/common/models"
 	appgit "kode-stream/internal/git"
@@ -156,4 +159,89 @@ func (a *Adapter) Push(ctx context.Context, path, branch string) error {
 		return err
 	}
 	return a.Git.PushBranchContext(ctx, path, a.Remote, branch)
+}
+
+// maxRunFiles bounds how many files one read returns.
+const maxRunFiles = 40
+
+func (a *Adapter) ReadRunFiles(ctx context.Context, workspace models.WorkspaceConfig, worktreePath, base, branch, prefix string, limit int64) ([]ports.RunFile, string, error) {
+	if worktreePath != "" && a.inside(worktreePath) == nil {
+		if info, err := os.Stat(worktreePath); err == nil && info.IsDir() {
+			files, err := a.Git.DiffFilesContext(ctx, worktreePath, base)
+			if err == nil {
+				return readWorktreeFiles(worktreePath, files, prefix, limit), "worktree", nil
+			}
+		}
+	}
+	if err := checkBranch(branch, ""); err != nil {
+		return []ports.RunFile{}, "", nil
+	}
+	refs := []string{branch}
+	if a.Remote != "" {
+		refs = append(refs, a.Remote+"/"+branch)
+	}
+	for _, ref := range refs {
+		if _, err := a.Git.RevParseContext(ctx, workspace.Path, ref); err != nil {
+			continue
+		}
+		files, err := a.Git.RefDiffFilesContext(ctx, workspace.Path, base, ref, prefix)
+		if err != nil {
+			return nil, "", err
+		}
+		out := []ports.RunFile{}
+		for _, file := range files {
+			if file.Status == "deleted" || len(out) == maxRunFiles {
+				continue
+			}
+			data, truncated, err := a.Git.ShowFileContext(ctx, workspace.Path, ref, file.Path, limit)
+			if err != nil {
+				continue
+			}
+			if text, ok := textOf(data); ok {
+				out = append(out, ports.RunFile{Path: file.Path, Status: file.Status, Content: text, Truncated: truncated})
+			}
+		}
+		return out, "branch", nil
+	}
+	return []ports.RunFile{}, "", nil
+}
+
+// readWorktreeFiles reads the changed files under prefix from a worktree,
+// refusing a symbolic link and any path that leaves the worktree.
+func readWorktreeFiles(root string, files []appgit.DiffFile, prefix string, limit int64) []ports.RunFile {
+	out := []ports.RunFile{}
+	for _, file := range files {
+		if file.Status == "deleted" || !strings.HasPrefix(file.Path, prefix) || len(out) == maxRunFiles {
+			continue
+		}
+		clean := filepath.Clean(filepath.FromSlash(file.Path))
+		if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
+			continue
+		}
+		full := filepath.Join(root, clean)
+		info, err := os.Lstat(full)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		if info.Size() > limit {
+			out = append(out, ports.RunFile{Path: file.Path, Status: file.Status, Truncated: true})
+			continue
+		}
+		data, err := os.ReadFile(full)
+		if err != nil {
+			continue
+		}
+		if text, ok := textOf(data); ok {
+			out = append(out, ports.RunFile{Path: file.Path, Status: file.Status, Content: text})
+		}
+	}
+	return out
+}
+
+// textOf returns data as text, or false for a binary file.
+func textOf(data []byte) (string, bool) {
+	if bytes.IndexByte(data, 0) >= 0 || !utf8.Valid(data) {
+		return "", false
+	}
+	return string(data), true
 }

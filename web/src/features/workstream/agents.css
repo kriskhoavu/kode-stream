@@ -438,8 +438,14 @@
 	gap: 8px;
 }
 
-.harness-run-full {
+.harness-run-plan {
 	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.harness-run-full {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
