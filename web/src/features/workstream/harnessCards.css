@@ -135,12 +135,29 @@
 }
 
 /* The board's Waves and Queue views. */
-.board-view-switcher {
-	flex: 0 0 auto;
-	width: 216px;
+/* The board's views on the left of the title row, the checkout on the right: the
+ * same switcher Agent Space wears, whose rules live in the canvas stylesheet. */
+.workstream-title.with-views {
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
 }
 
-.board-view-switcher button {
+.board-view-switcher.workbench-view-switcher {
+	flex: 0 0 auto;
+	grid-template-columns: repeat(3, auto);
+	width: auto;
+	min-width: 0;
+	padding: 2px;
+}
+
+.board-view-switcher.workbench-view-switcher button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	min-height: 36px;
+	padding: 0 12px;
 	white-space: nowrap;
 }
 

@@ -1,6 +1,6 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
-import { BookmarkPlus, Bot, ChevronDown, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Bot, ChevronDown, Columns3, ListOrdered, Waves as WavesIcon, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FacetMenu, SelectedFilters } from '../components/FacetMenu';
 import { FileMenu } from '../components/FileMenu';
 import { useModalDialog } from '../components/overlay';
@@ -61,7 +61,7 @@ import '../features/workstream/harnessCards.css';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
 type BoardView = 'status' | 'waves' | 'queue';
-const boardViews: { id: BoardView; label: string }[] = [{ id: 'status', label: 'Status' }, { id: 'waves', label: 'Waves' }, { id: 'queue', label: 'Queue' }];
+const boardViews: { id: BoardView; label: string; icon: typeof Columns3 }[] = [{ id: 'status', label: 'Status', icon: Columns3 }, { id: 'waves', label: 'Waves', icon: WavesIcon }, { id: 'queue', label: 'Queue', icon: ListOrdered }];
 const boardViewPreference = 'workstreamBoardView';
 function readBoardView(): BoardView {
   const value = readStringPreference(boardViewPreference);
@@ -726,8 +726,15 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   return (
     <section className="workstream-page">
-      <div className="page-title workstream-title">
+      <div className={harnessOn ? 'page-title workstream-title with-views' : 'page-title workstream-title'}>
         <h1 className="sr-only">Workstream</h1>
+        {harnessOn && (
+          <div className="segmented-control workbench-view-switcher board-view-switcher" role="group" aria-label="Board view">
+            {boardViews.map((view) => (
+              <button key={view.id} type="button" className={shownView === view.id ? 'active' : ''} aria-pressed={shownView === view.id} onClick={() => setBoardView(view.id)}><view.icon size={15} aria-hidden="true" /> {view.label}</button>
+            ))}
+          </div>
+        )}
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
             <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} gitStatus={workspaceGitStatus} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await loadCheckout(true); await onWorkspacesChanged(); }} />
@@ -744,13 +751,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search items..." />
         </label>
         <div className="board-toolbar-actions">
-          {harnessOn && (
-            <nav className="segmented-control segmented-control-compact board-view-switcher" aria-label="Board view">
-              {boardViews.map((view) => (
-                <button key={view.id} type="button" className={shownView === view.id ? 'active' : ''} aria-current={shownView === view.id ? 'page' : undefined} onClick={() => setBoardView(view.id)}>{view.label}</button>
-              ))}
-            </nav>
-          )}
           <button className="secondary" onClick={scan}>
             <RotateCw size={16} /> Refresh
           </button>

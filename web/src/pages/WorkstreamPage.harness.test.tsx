@@ -118,7 +118,7 @@ describe('WorkstreamPage board views', () => {
 		const fetchMock = stubBoard();
 		renderBoard();
 		await screen.findByText('Claude · Opus 5.5');
-		const switcher = screen.getByRole('navigation', { name: 'Board view' });
+		const switcher = screen.getByRole('group', { name: 'Board view' });
 		fireEvent.click(within(switcher).getByRole('button', { name: 'Waves' }));
 		expect(await screen.findByRole('region', { name: /Wave 0/ })).toBeInTheDocument();
 		fireEvent.click(within(switcher).getByRole('button', { name: 'Queue' }));
@@ -138,7 +138,7 @@ describe('WorkstreamPage board views', () => {
 		stubBoard({ enabled: false });
 		renderBoard();
 		await screen.findByText('Quiet card');
-		expect(screen.queryByRole('navigation', { name: 'Board view' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('group', { name: 'Board view' })).not.toBeInTheDocument();
 	});
 });
 
