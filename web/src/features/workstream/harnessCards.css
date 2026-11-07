@@ -136,7 +136,12 @@
 
 /* The board's Waves and Queue views. */
 .board-view-switcher {
-	margin-left: auto;
+	flex: 0 0 auto;
+	width: 216px;
+}
+
+.board-view-switcher button {
+	white-space: nowrap;
 }
 
 .queue-view {
@@ -294,6 +299,14 @@
 }
 
 .queue-toolbar {
-	display: flex;
-	gap: 8px;
+	justify-self: start;
+}
+
+.queue-section-title {
+	margin: 4px 0 0;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--muted);
 }

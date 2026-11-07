@@ -29,16 +29,21 @@ export function QueueView({ tasks, finished = [], harness, onOpenTask }: {
 	const { state } = harness;
 	const actions = useTaskActions(harness);
 	const [selectedId, setSelectedId] = useState<string | undefined>();
-	const [showFinished, setShowFinished] = useState(false);
+	const [shown, setShown] = useState<QueueShown>('active');
 	const ordered = tasks.filter((task) => !isFinishedTask(task)).sort(compareTasks);
 	const selected = ordered.find((task) => task.id === selectedId) ?? ordered[0];
 	return (
 		<div className="queue-view hx">
 			<div className="queue-main">
-			<div className="queue-toolbar">
-				<button type="button" className={showFinished ? 'hx-stat on' : 'hx-stat'} aria-pressed={showFinished} onClick={() => setShowFinished(!showFinished)}>Show finished <span className="hx-num">{finished.length}</span></button>
+			<div className="queue-toolbar hx-seg hx-seg-small" role="group" aria-label="Show">
+				{queueShownOptions.map((option) => (
+					<button key={option.id} type="button" className={shown === option.id ? 'on' : undefined} aria-pressed={shown === option.id} onClick={() => setShown(option.id)}>
+						{option.label} <span className="hx-num">{option.id === 'active' ? ordered.length : option.id === 'finished' ? finished.length : ordered.length + finished.length}</span>
+					</button>
+				))}
 			</div>
-			{showFinished ? <FinishedList tasks={finished} harness={harness} onOpenTask={onOpenTask} /> : <QueueList
+			{shown === 'all' && <h3 className="queue-section-title">Active</h3>}
+			{shown !== 'finished' && <QueueList
 				tasks={ordered}
 				allTasks={state.tasks}
 				onPin={actions.pin}
@@ -52,6 +57,8 @@ export function QueueView({ tasks, finished = [], harness, onOpenTask }: {
 				onMove={actions.move}
 				pendingIds={actions.pendingIds}
 			/>}
+			{shown === 'all' && <h3 className="queue-section-title">Finished</h3>}
+			{shown !== 'active' && <FinishedList tasks={finished} harness={harness} onOpenTask={onOpenTask} />}
 			</div>
 			<QueueSidePanel selected={selected} tasks={ordered} harness={harness} />
 		</div>
@@ -109,6 +116,10 @@ function QueueSidePanel({ selected, tasks, harness }: { selected?: HarnessTask; 
 		</aside>
 	);
 }
+
+/** What the queue lists: the tasks still in play (the default), the finished ones, or both. */
+type QueueShown = 'active' | 'finished' | 'all';
+const queueShownOptions: { id: QueueShown; label: string }[] = [{ id: 'active', label: 'Active' }, { id: 'finished', label: 'Finished' }, { id: 'all', label: 'All' }];
 
 /** The warning a person reads before removing a finished task. */
 export function removeWarning(task: HarnessTask): string {

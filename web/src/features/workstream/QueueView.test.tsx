@@ -62,10 +62,16 @@ describe('QueueView finished tasks', () => {
 	const done = task('PM-9', { state: 'done', runId: 'run-9', updatedAt: new Date(Date.now() - 2 * 3_600_000).toISOString() });
 	const finishedState: HarnessState = { ...state, tasks: { ...state.tasks, [done.id]: done }, runs: { ...state.runs, 'run-9': run('run-9', done.id, { state: 'passed', prUrl: 'https://github.com/example/app/pull/42', finishedAt: new Date(Date.now() - 2 * 3_600_000).toISOString() }) } };
 
-	it('keeps finished tasks out of the ranked rows and lists them under Show finished', () => {
+	it('shows the active tasks by default, then the finished ones, then both', () => {
 		render(<QueueView tasks={Object.values(finishedState.tasks)} finished={[done]} harness={controller(finishedState)} onOpenTask={vi.fn()} />);
+		expect(screen.getByRole('button', { name: 'Active 3' })).toHaveAttribute('aria-pressed', 'true');
 		expect(within(screen.getByRole('list', { name: 'Queue in order' })).queryByText('PM-9')).not.toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: /Show finished/ }));
+		expect(screen.queryByRole('list', { name: 'Finished tasks' })).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'All 4' }));
+		expect(screen.getByRole('list', { name: 'Queue in order' })).toBeInTheDocument();
+		expect(screen.getByRole('list', { name: 'Finished tasks' })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Finished 1' }));
+		expect(screen.queryByRole('list', { name: 'Queue in order' })).not.toBeInTheDocument();
 		const finished = screen.getByRole('list', { name: 'Finished tasks' });
 		expect(within(finished).getByText('PM-9')).toBeInTheDocument();
 		expect(within(finished).getByText(/Finished 2 h ago/)).toBeInTheDocument();
@@ -75,7 +81,7 @@ describe('QueueView finished tasks', () => {
 	it('removes a finished task only after the warning', async () => {
 		const harness = controller(finishedState);
 		render(<QueueView tasks={[]} finished={[done]} harness={harness} onOpenTask={vi.fn()} />);
-		fireEvent.click(screen.getByRole('button', { name: /Show finished/ }));
+		fireEvent.click(screen.getByRole('button', { name: 'Finished 1' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
 		const dialog = screen.getByRole('dialog', { name: 'Remove PM-9?' });
 		expect(dialog).toHaveTextContent('the Finder adds it back as Up next on its next look');

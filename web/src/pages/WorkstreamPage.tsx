@@ -737,13 +737,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
             ))}
           </div>
         )}
-        {harnessOn && (
-          <nav className="segmented-control workbench-view-switcher board-view-switcher" aria-label="Board view">
-            {boardViews.map((view) => (
-              <button key={view.id} type="button" className={shownView === view.id ? 'active' : ''} aria-current={shownView === view.id ? 'page' : undefined} onClick={() => setBoardView(view.id)}>{view.label}</button>
-            ))}
-          </nav>
-        )}
         </div>
       <div className="board-toolbar">
         <label className="filter-input plan-search">
@@ -751,6 +744,13 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search items..." />
         </label>
         <div className="board-toolbar-actions">
+          {harnessOn && (
+            <nav className="segmented-control segmented-control-compact board-view-switcher" aria-label="Board view">
+              {boardViews.map((view) => (
+                <button key={view.id} type="button" className={shownView === view.id ? 'active' : ''} aria-current={shownView === view.id ? 'page' : undefined} onClick={() => setBoardView(view.id)}>{view.label}</button>
+              ))}
+            </nav>
+          )}
           <button className="secondary" onClick={scan}>
             <RotateCw size={16} /> Refresh
           </button>
