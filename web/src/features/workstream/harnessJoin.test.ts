@@ -3,7 +3,7 @@ import type { ItemSummary } from '../../lib/types';
 import { initialHarnessState } from '../harness/harnessState';
 import type { HarnessState } from '../harness/harnessState';
 import { approval, run, stage, status, task } from '../harness/testData';
-import { joinHarness, runProgress, workedBy } from './harnessJoin';
+import { isFinishedTask, joinHarness, runProgress, tasksForWorkspace, workedBy } from './harnessJoin';
 
 const item = (id: string, identifier: string): ItemSummary => ({ id, workspaceId: 'ws', workspaceName: 'Sample', branch: 'main', scope: 'platform', identifier, title: `Item ${identifier}`, status: 'in_progress', tags: [], metadataSource: 'plan.yaml', itemPath: `plans/platform/${identifier}` });
 
@@ -60,5 +60,22 @@ describe('runProgress', () => {
 		expect(runProgress(run('r', 't', { currentStage: stage('r', 'plan', { state: 'running' }) }))).toBeCloseTo(0.5 / 6);
 		expect(runProgress(run('r', 't', { currentStage: stage('r', 'draft_pr', { state: 'passed' }) }))).toBe(1);
 		expect(runProgress(run('r', 't', { state: 'passed' }))).toBe(1);
+	});
+});
+
+describe('finished tasks', () => {
+	it('leave the board unless a plan card holds them, and list apart newest first', () => {
+		const state = loaded({ tasks: {
+			a: task('PM-1', { id: 'a', state: 'done', updatedAt: '2026-11-05T10:00:00.000Z' }),
+			b: task('PM-2', { id: 'b', state: 'cancelled', updatedAt: '2026-11-06T10:00:00.000Z' }),
+			c: task('PM-3', { id: 'c', state: 'stale' }),
+			d: task('PM-4', { id: 'd' })
+		} });
+		const join = joinHarness([item('p1', 'PM-1')], state, 'ws');
+		expect(join.byItemId.get('p1')?.status).toBe('done');
+		expect(join.synthetic.map((card) => card.identifier)).toEqual(['PM-4']);
+		expect(tasksForWorkspace(state, 'ws', { finished: true }).map((entry) => entry.source.key)).toEqual(['PM-2', 'PM-1', 'PM-3']);
+		expect(isFinishedTask(task('X', { finishedOutside: { at: '2026-11-01T00:00:00.000Z' } }))).toBe(true);
+		expect(isFinishedTask(task('X', { state: 'blocked' }))).toBe(false);
 	});
 });

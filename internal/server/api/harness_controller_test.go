@@ -298,6 +298,16 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 	if queuedOnly.Code != http.StatusCreated || strings.Contains(queuedOnly.Body.String(), `"startRequested":true`) {
 		t.Fatalf("queued = %d %s", queuedOnly.Code, queuedOnly.Body.String())
 	}
+	if open := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-2/remove", `{"expectedRevision":1}`); open.Code != http.StatusBadRequest {
+		t.Fatalf("remove open = %d %s", open.Code, open.Body.String())
+	}
+	if missingRemove := serveHarness(handler, http.MethodPost, "/api/harness/tasks/missing/remove", `{"expectedRevision":1}`); missingRemove.Code != http.StatusNotFound {
+		t.Fatalf("remove missing = %d %s", missingRemove.Code, missingRemove.Body.String())
+	}
+	removed := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-1/remove", `{"expectedRevision":5}`)
+	if removed.Code != http.StatusOK || !strings.Contains(removed.Body.String(), `"id":"tsk-1"`) {
+		t.Fatalf("remove = %d %s", removed.Code, removed.Body.String())
+	}
 	poll := serveHarness(handler, http.MethodPost, "/api/harness/scout/poll", "")
 	if poll.Code != http.StatusOK || !strings.Contains(poll.Body.String(), `"started":true`) {
 		t.Fatalf("poll = %d %s", poll.Code, poll.Body.String())
@@ -306,7 +316,7 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 		t.Fatalf("missing transcript = %d %s", noTranscript.Code, noTranscript.Body.String())
 	}
 	cleared := serveHarness(handler, http.MethodPost, "/api/harness/queue/clear", "")
-	if cleared.Code != http.StatusOK || !strings.Contains(cleared.Body.String(), `"removed":4`) {
+	if cleared.Code != http.StatusOK || !strings.Contains(cleared.Body.String(), `"removed":3`) {
 		t.Fatalf("clear = %d %s", cleared.Code, cleared.Body.String())
 	}
 	missing := serveHarness(handler, http.MethodPost, "/api/harness/tasks/missing/start", `{"expectedRevision":0}`)

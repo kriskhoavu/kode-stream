@@ -159,6 +159,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const setBoardView = (view: BoardView) => { setBoardViewState(view); writePreference(boardViewPreference, view); };
   const shownView: BoardView = harnessOn ? boardView : 'status';
   const boardTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id), [harness.state, workspace?.id]);
+  const finishedTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id, { finished: true }), [harness.state, workspace?.id]);
   const taskActions = useTaskActions(harness);
   // A task with no card of its own opens the harness's own drawer.
   const [taskDrawer, setTaskDrawer] = useState<{ taskId: string; tab: HarnessRunTabId } | undefined>();
@@ -803,7 +804,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           <WaveBoard tasks={boardTasks} allTasks={harness.state.tasks} runs={harness.state.runs} pendingIds={taskActions.pendingIds} onOpenTask={openTask} onPin={taskActions.pin} onMove={taskActions.move} onRefresh={() => void harness.refresh()} />
         </div>
       )}
-      {shownView === 'queue' && <QueueView tasks={boardTasks} harness={harness} onOpenTask={openTask} />}
+      {shownView === 'queue' && <QueueView tasks={boardTasks} finished={finishedTasks} harness={harness} onOpenTask={openTask} />}
       {runDialogItem && <RunWithHarnessDialog item={runDialogItem} workspace={workspace} harness={harness} onClose={() => setRunDialogItemId('')} onStarted={() => { setRunDialogItemId(''); void harness.refresh(); }} />}
       {taskDrawer && (
         <RunDrawer state={harness.state} client={harness.client} taskId={taskDrawer.taskId} tab={taskDrawer.tab} wave={[]} onTabChange={(tab) => setTaskDrawer({ ...taskDrawer, tab })} onClose={() => setTaskDrawer(undefined)} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={taskActions.pin} onMove={taskActions.move} onStart={taskActions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />

@@ -237,6 +237,7 @@ func routeManifest(a *API) []routeSpec {
 		{http.MethodPost, "/harness/tasks/:id/pin", "harness", protectedRoute, a.harness.route(a.harness.pinTask)},
 		{http.MethodPost, "/harness/tasks/:id/priority", "harness", protectedRoute, a.harness.route(a.harness.setPriority)},
 		{http.MethodPost, "/harness/tasks/:id/dismiss", "harness", protectedRoute, a.harness.route(a.harness.dismissTask)},
+		{http.MethodPost, "/harness/tasks/:id/remove", "harness", protectedRoute, a.harness.route(a.harness.removeTask)},
 		{http.MethodPost, "/harness/tasks/:id/start", "harness", protectedRoute, a.harness.route(a.harness.startTask)},
 		{http.MethodPost, "/harness/tasks/:id/questions", "harness", protectedRoute, a.harness.route(a.harness.setTaskQuestions)},
 		{http.MethodPost, "/harness/scout/poll", "harness", protectedRoute, a.harness.route(a.harness.pollScouts)},

@@ -265,6 +265,23 @@ func (a *harnessController) dismissTask(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
 }
 
+type harnessRemoveRequest struct {
+	ExpectedRevision int64 `json:"expectedRevision"`
+}
+
+func (a *harnessController) removeTask(w http.ResponseWriter, r *http.Request) {
+	var request harnessRemoveRequest
+	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	task, err := a.harness.RemoveTask(r.Context(), r.PathValue("id"), request.ExpectedRevision, harnessActor(r))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, harness.DashboardTasks([]domain.Task{task})[0])
+}
+
 type harnessStartRequest struct {
 	ExpectedRevision int64  `json:"expectedRevision"`
 	IdempotencyKey   string `json:"idempotencyKey"`

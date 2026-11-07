@@ -240,3 +240,53 @@ func TestCreateTaskFromACardRanksAndStartsIt(t *testing.T) {
 		t.Fatalf("dismissed again err = %v (state %s)", err, dismissed.State)
 	}
 }
+
+func TestRemoveTaskDeletesAFinishedTaskWithItsHistory(t *testing.T) {
+	ctx := context.Background()
+	service, repository := newQueueService(t)
+	actor := domain.Actor{ActorID: "local"}
+	open, err := service.CreateTask(ctx, CreateTaskInput{WorkspaceID: "ws", Key: "PM-1", Title: "Open"}, actor, domain.ChannelDashboard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.RemoveTask(ctx, open.ID, open.Revision, actor); !IsInvalid(err) {
+		t.Fatalf("an open task was removed: %v", err)
+	}
+	now := testNow
+	done := domain.Task{ID: "tsk-done", WorkspaceID: "ws", Source: domain.Source{Kind: domain.SourceJira, Key: "PM-2", Labels: []string{}}, Title: "Done", State: domain.TaskDone, RunID: "run-2", ScoreReasons: []string{}, DependsOn: []string{}, Revision: 4, DiscoveredAt: now, UpdatedAt: now}
+	if err := repository.InsertTask(ctx, done); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.InsertRun(ctx, domain.Run{ID: "run-2", TaskID: done.ID, WorkspaceID: "ws", Branch: "harness/PM-2-abc", State: domain.RunPassed, StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.InsertStage(ctx, domain.Stage{ID: "stg-2", RunID: "run-2", Kind: domain.StagePlan, State: domain.StagePassed}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.InsertApproval(ctx, domain.Approval{ID: "apr-2", TaskID: done.ID, RunID: "run-2", Gate: domain.GatePlan, State: domain.ApprovalApproved, RequestedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	stored, _ := repository.GetTask(ctx, done.ID)
+	if _, err := service.RemoveTask(ctx, done.ID, stored.Revision+1, actor); !IsConflict(err) {
+		t.Fatalf("stale revision err = %v", err)
+	}
+	removed, err := service.RemoveTask(ctx, done.ID, stored.Revision, actor)
+	if err != nil || removed.ID != done.ID {
+		t.Fatalf("removed = %#v err=%v", removed, err)
+	}
+	if _, err := repository.GetTask(ctx, done.ID); err == nil {
+		t.Fatal("the task is still stored")
+	}
+	if _, err := repository.GetRun(ctx, "run-2"); err == nil {
+		t.Fatal("the run is still stored")
+	}
+	if stages, _ := repository.ListStages(ctx, "run-2"); len(stages) != 0 {
+		t.Fatalf("stages = %#v", stages)
+	}
+	if approvals, _ := repository.ListApprovals(ctx, domain.ApprovalFilter{TaskID: done.ID}); len(approvals) != 0 {
+		t.Fatalf("approvals = %#v", approvals)
+	}
+	if _, err := repository.GetTask(ctx, open.ID); err != nil {
+		t.Fatalf("another task went too: %v", err)
+	}
+}

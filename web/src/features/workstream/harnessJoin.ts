@@ -67,6 +67,8 @@ export function joinHarness(items: ItemSummary[], state: HarnessState, workspace
 			if (!byItemId.has(item.id)) byItemId.set(item.id, cardWork(task, state, false));
 			continue;
 		}
+		// A finished task leaves the board; the queue's Finished list keeps it.
+		if (isFinishedTask(task)) continue;
 		const card = syntheticItem(task);
 		synthetic.push(card);
 		byItemId.set(card.id, cardWork(task, state, true));
@@ -136,10 +138,19 @@ export function workForItem(item: Pick<ItemSummary, 'identifier' | 'workspaceId'
 	return task ? cardWork(task, state, false) : undefined;
 }
 
-/** The harness's tasks on one workspace's board, in queue order. */
-export function tasksForWorkspace(state: HarnessState, workspaceId?: string): HarnessTask[] {
+/** Done, stopped, dismissed or closed at its source: nothing more happens to it. */
+export function isFinishedTask(task: HarnessTask): boolean {
+	return task.state === 'done' || task.state === 'cancelled' || task.state === 'dismissed' || task.state === 'stale' || Boolean(task.finishedOutside);
+}
+
+/** The harness's tasks on one workspace's board, in queue order; `finished` picks the finished ones instead, newest first. */
+export function tasksForWorkspace(state: HarnessState, workspaceId?: string, options: { finished?: boolean } = {}): HarnessTask[] {
 	if (!state.loaded) return [];
-	return queueTasks(state.tasks).filter((task) => !workspaceId || task.workspaceId === workspaceId);
+	const mine = (task: HarnessTask) => !workspaceId || task.workspaceId === workspaceId;
+	if (!options.finished) return queueTasks(state.tasks).filter(mine);
+	return queueTasks(state.tasks, { includeFinished: true })
+		.filter((task) => mine(task) && isFinishedTask(task))
+		.sort((a, b) => Date.parse(b.updatedAt ?? '') - Date.parse(a.updatedAt ?? '') || a.source.key.localeCompare(b.source.key));
 }
 
 /** The approval a stuck task retries through: its waiting resume gate. */

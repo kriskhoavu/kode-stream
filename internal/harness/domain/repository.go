@@ -92,6 +92,9 @@ type Repository interface {
 	SaveTask(ctx context.Context, task Task, expect Expect) (Task, error)
 	// DeleteTasks removes every task the filter matches and returns them.
 	DeleteTasks(ctx context.Context, filter TaskFilter) ([]Task, error)
+	// DeleteTaskHistory removes one task with its runs, stages, agent runs
+	// and approvals. Events stay: they are the log of what happened.
+	DeleteTaskHistory(ctx context.Context, taskID string) error
 
 	InsertRun(ctx context.Context, run Run) error
 	GetRun(ctx context.Context, id string) (Run, error)

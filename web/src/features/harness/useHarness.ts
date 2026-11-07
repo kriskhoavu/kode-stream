@@ -19,6 +19,8 @@ export interface HarnessController {
 	start: (task: HarnessTask) => Promise<void>;
 	/** Puts a card's ticket in the queue and hands the task back; throws when the harness refuses. */
 	createTask: (input: Omit<HarnessCreateTaskInput, 'idempotencyKey'>) => Promise<HarnessTask>;
+	/** Deletes a finished task with its runs; throws when the harness refuses. */
+	removeTask: (task: HarnessTask) => Promise<void>;
 	setQuestions: (task: HarnessTask, askQuestions: boolean | null) => Promise<void>;
 	cancelRun: (run: HarnessRun, reason?: string) => Promise<void>;
 	pauseRole: (role: HarnessRoleId) => Promise<void>;
@@ -111,6 +113,12 @@ export function useHarness(client: HarnessClient): HarnessController {
 		return task;
 	}, [client]);
 
+	const removeTask = useCallback(async (task: HarnessTask) => {
+		if (!client.removeTask) throw new Error('The harness cannot remove a task here.');
+		await client.removeTask(task);
+		await refresh();
+	}, [client, refresh]);
+
 	const cancelRun = useCallback(async (run: HarnessRun, reason?: string) => {
 		try {
 			await client.cancelRun(run, reason);
@@ -132,7 +140,7 @@ export function useHarness(client: HarnessClient): HarnessController {
 	const pauseRole = useCallback((role: HarnessRoleId) => roleChange(() => client.pauseRole(role)), [client, roleChange]);
 	const resumeRole = useCallback((role: HarnessRoleId) => roleChange(() => client.resumeRole(role)), [client, roleChange]);
 
-	return { state, client, dispatch, refresh, loadRun, approve, reject, pin, setPriority, start, createTask, setQuestions, cancelRun, pauseRole, resumeRole };
+	return { state, client, dispatch, refresh, loadRun, approve, reject, pin, setPriority, start, createTask, removeTask, setQuestions, cancelRun, pauseRole, resumeRole };
 }
 
 export function plainError(error: unknown, fallback: string): string {

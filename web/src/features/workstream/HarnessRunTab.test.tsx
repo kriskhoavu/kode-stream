@@ -20,7 +20,7 @@ function controller(state: HarnessState, client: HarnessController['client']): H
 	return {
 		state, client, dispatch: vi.fn(), refresh: vi.fn().mockResolvedValue(undefined), loadRun: vi.fn().mockResolvedValue(undefined),
 		approve: vi.fn().mockResolvedValue(undefined), reject: vi.fn().mockResolvedValue(undefined), pin: vi.fn(), setPriority: vi.fn(), start: vi.fn(), setQuestions: vi.fn(),
-		cancelRun: vi.fn(), pauseRole: vi.fn().mockResolvedValue(undefined), resumeRole: vi.fn(), createTask: vi.fn()
+		cancelRun: vi.fn(), pauseRole: vi.fn().mockResolvedValue(undefined), resumeRole: vi.fn(), removeTask: vi.fn().mockResolvedValue(undefined), createTask: vi.fn()
 	};
 }
 

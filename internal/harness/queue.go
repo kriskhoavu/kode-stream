@@ -219,6 +219,58 @@ func (s *Service) DismissTask(ctx context.Context, id, reason string, expectedRe
 	})
 }
 
+// RemoveTask deletes a finished task from the harness with its runs and
+// their history: done, cancelled, dismissed, or closed at its source. A
+// working copy a run still holds is removed; its branch and pull request
+// stay. If the source still lists the issue, the Finder adds it back on its
+// next look, as a new task.
+func (s *Service) RemoveTask(ctx context.Context, id string, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
+	if err := s.mutable(); err != nil {
+		return domain.Task{}, err
+	}
+	task, err := s.repository.GetTask(ctx, id)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if !domain.TaskTerminal(task.State) && task.State != domain.TaskStale {
+		return domain.Task{}, domain.Invalid("only a finished task can be removed; stop or dismiss %s first", task.Source.Key)
+	}
+	if task.Revision != expectedRevision {
+		return domain.Task{}, domain.ErrStateMoved
+	}
+	runs, err := s.repository.ListRuns(ctx, domain.RunFilter{TaskID: task.ID, Limit: 1000})
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if s.workspaces != nil {
+		if workspace, found, err := s.workspaces.Get(task.WorkspaceID); err == nil && found {
+			for _, run := range runs {
+				if !run.WorktreeRemoved && run.WorktreePath != "" {
+					s.removeWorktree(ctx, run, workspace, false)
+				}
+			}
+		}
+	}
+	err = s.atomic(ctx, func(tx domain.Repository, record func(domain.Event) error) error {
+		current, err := tx.GetTask(ctx, id)
+		if err != nil {
+			return err
+		}
+		if current.Revision != expectedRevision {
+			return domain.ErrStateMoved
+		}
+		if err := tx.DeleteTaskHistory(ctx, id); err != nil {
+			return err
+		}
+		return record(domain.Event{Kind: domain.EventTaskRemoved, TaskID: id, Actor: actorOrNil(actor), Payload: payload(map[string]any{"sourceKey": task.Source.Key, "title": boundedText(task.Title, 200), "state": task.State, "runs": len(runs)})})
+	})
+	if err != nil {
+		return domain.Task{}, err
+	}
+	task.Body = ""
+	return task, nil
+}
+
 // ClearQueue deletes every task that no run has touched: discovered, ranked,
 // stale and dismissed ones, in one workspace or all. The Finder adds back
 // whatever its sources still return on the next poll, so this is the way to

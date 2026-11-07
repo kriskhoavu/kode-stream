@@ -60,6 +60,8 @@ export interface HarnessClient {
 	start(task: HarnessTask, idempotencyKey: string): Promise<HarnessTask>;
 	/** Puts a card's ticket in the queue, started at once unless told to queue it. */
 	createTask?(input: HarnessCreateTaskInput): Promise<HarnessTask>;
+	/** Deletes a finished task with its runs; its branch and pull request stay. */
+	removeTask?(task: HarnessTask): Promise<HarnessTask>;
 	pauseRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
 	resumeRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
 	settings(signal?: AbortSignal): Promise<HarnessSettings>;
@@ -95,6 +97,7 @@ export const apiHarnessClient: HarnessClient = {
 	setPriority: (task, input) => api.setHarnessPriority(task, input),
 	start: (task, idempotencyKey) => api.startHarnessTask(task, idempotencyKey),
 	createTask: (input) => api.createHarnessTask(input),
+	removeTask: (task) => api.removeHarnessTask(task),
 	setQuestions: (task, askQuestions) => api.setHarnessTaskQuestions(task, askQuestions),
 	pauseRole: (role) => api.pauseHarnessRole(role),
 	resumeRole: (role) => api.resumeHarnessRole(role),

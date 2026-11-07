@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { QueueView } from './QueueView';
+import { QueueView, removeWarning } from './QueueView';
 import { initialHarnessState } from '../harness/harnessState';
 import type { HarnessState } from '../harness/harnessState';
 import { approval, run, status, task } from '../harness/testData';
@@ -13,7 +13,7 @@ function controller(state: HarnessState, pollScouts?: () => Promise<{ started: b
 	return {
 		state, client: { ...apiHarnessClient, pollScouts }, dispatch: vi.fn(), refresh: vi.fn().mockResolvedValue(undefined), loadRun: vi.fn().mockResolvedValue(undefined),
 		approve: vi.fn().mockResolvedValue(undefined), reject: vi.fn().mockResolvedValue(undefined), pin: vi.fn().mockResolvedValue(undefined), setPriority: vi.fn().mockResolvedValue(undefined), start: vi.fn().mockResolvedValue(undefined), setQuestions: vi.fn(),
-		cancelRun: vi.fn(), pauseRole: vi.fn(), resumeRole: vi.fn(), createTask: vi.fn()
+		cancelRun: vi.fn(), pauseRole: vi.fn(), resumeRole: vi.fn(), removeTask: vi.fn().mockResolvedValue(undefined), createTask: vi.fn()
 	};
 }
 
@@ -55,5 +55,36 @@ describe('QueueView', () => {
 		expect(pollScouts).toHaveBeenCalled();
 		expect(await screen.findByText('The Finder is looking now. New tasks appear here as it finds them.')).toBeInTheDocument();
 		expect(harness.refresh).toHaveBeenCalled();
+	});
+});
+
+describe('QueueView finished tasks', () => {
+	const done = task('PM-9', { state: 'done', runId: 'run-9', updatedAt: new Date(Date.now() - 2 * 3_600_000).toISOString() });
+	const finishedState: HarnessState = { ...state, tasks: { ...state.tasks, [done.id]: done }, runs: { ...state.runs, 'run-9': run('run-9', done.id, { state: 'passed', prUrl: 'https://github.com/example/app/pull/42', finishedAt: new Date(Date.now() - 2 * 3_600_000).toISOString() }) } };
+
+	it('keeps finished tasks out of the ranked rows and lists them under Show finished', () => {
+		render(<QueueView tasks={Object.values(finishedState.tasks)} finished={[done]} harness={controller(finishedState)} onOpenTask={vi.fn()} />);
+		expect(within(screen.getByRole('list', { name: 'Queue in order' })).queryByText('PM-9')).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: /Show finished/ }));
+		const finished = screen.getByRole('list', { name: 'Finished tasks' });
+		expect(within(finished).getByText('PM-9')).toBeInTheDocument();
+		expect(within(finished).getByText(/Finished 2 h ago/)).toBeInTheDocument();
+		expect(within(finished).getByRole('link', { name: /Draft PR/ })).toHaveAttribute('href', 'https://github.com/example/app/pull/42');
+	});
+
+	it('removes a finished task only after the warning', async () => {
+		const harness = controller(finishedState);
+		render(<QueueView tasks={[]} finished={[done]} harness={harness} onOpenTask={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: /Show finished/ }));
+		fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+		const dialog = screen.getByRole('dialog', { name: 'Remove PM-9?' });
+		expect(dialog).toHaveTextContent('the Finder adds it back as Up next on its next look');
+		expect(harness.removeTask).not.toHaveBeenCalled();
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+		await waitFor(() => expect(harness.removeTask).toHaveBeenCalledWith(expect.objectContaining({ id: done.id })));
+	});
+
+	it('words the warning for the task it removes', () => {
+		expect(removeWarning(done)).toContain('PM-9 and its runs, steps and conversations are deleted from Kode Stream. Its branch and pull request stay.');
 	});
 });

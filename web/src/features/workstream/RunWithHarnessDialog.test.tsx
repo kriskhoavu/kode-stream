@@ -27,7 +27,7 @@ function controller(): HarnessController {
 		state: { ...initialHarnessState, loaded: true }, client: { ...apiHarnessClient, settings: vi.fn().mockResolvedValue(settings) }, dispatch: vi.fn(), refresh: vi.fn(), loadRun: vi.fn(),
 		approve: vi.fn(), reject: vi.fn(), pin: vi.fn(), setPriority: vi.fn(), start: vi.fn(), setQuestions: vi.fn().mockResolvedValue(undefined),
 		createTask: vi.fn().mockImplementation(async (input: { key: string; startNow?: boolean }) => task(input.key, { startRequested: input.startNow })),
-		cancelRun: vi.fn(), pauseRole: vi.fn(), resumeRole: vi.fn()
+		cancelRun: vi.fn(), pauseRole: vi.fn(), resumeRole: vi.fn(), removeTask: vi.fn().mockResolvedValue(undefined)
 	};
 }
 

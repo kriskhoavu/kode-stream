@@ -253,6 +253,23 @@ func (r *SQLHarnessRepository) DeleteTasks(ctx context.Context, filter domain.Ta
 	}
 }
 
+func (r *SQLHarnessRepository) DeleteTaskHistory(ctx context.Context, taskID string) error {
+	runs := `SELECT id FROM harness_runs WHERE task_id = ?`
+	statements := []string{
+		`DELETE FROM harness_agent_runs WHERE run_id IN (` + runs + `)`,
+		`DELETE FROM harness_stages WHERE run_id IN (` + runs + `)`,
+		`DELETE FROM harness_approvals WHERE task_id = ?`,
+		`DELETE FROM harness_runs WHERE task_id = ?`,
+		`DELETE FROM harness_tasks WHERE id = ?`,
+	}
+	for _, statement := range statements {
+		if _, err := r.exec(ctx, statement, taskID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // --- runs ---
 
 func (r *SQLHarnessRepository) InsertRun(ctx context.Context, run domain.Run) error {

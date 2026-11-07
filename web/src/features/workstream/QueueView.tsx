@@ -1,6 +1,12 @@
 import { useState } from 'react';
-import { Radar } from 'lucide-react';
+import { ExternalLink, Radar, Trash2 } from 'lucide-react';
 import type { HarnessTask } from '../../lib/types';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { HxStatusBadge } from '../harness/HxStatusBadge';
+import { SourceBadge } from '../harness/SourceBadge';
+import { prLabel } from '../harness/pipeline';
+import { plainError } from '../harness/useHarness';
+import { isFinishedTask } from './harnessJoin';
 import { QueueList } from '../harness/QueueList';
 import { compareTasks, waitsFor } from '../harness/harnessState';
 import type { HarnessController } from '../harness/useHarness';
@@ -13,19 +19,26 @@ import { useTaskActions } from './useTaskActions';
  * chosen row sits where it does, what starts next, and when the Finder last
  * looked.
  */
-export function QueueView({ tasks, harness, onOpenTask }: {
+export function QueueView({ tasks, finished = [], harness, onOpenTask }: {
 	tasks: HarnessTask[];
+	/** Finished tasks, newest first, listed apart under Show finished. */
+	finished?: HarnessTask[];
 	harness: HarnessController;
 	onOpenTask: (task: HarnessTask) => void;
 }) {
 	const { state } = harness;
 	const actions = useTaskActions(harness);
 	const [selectedId, setSelectedId] = useState<string | undefined>();
-	const ordered = [...tasks].sort(compareTasks);
+	const [showFinished, setShowFinished] = useState(false);
+	const ordered = tasks.filter((task) => !isFinishedTask(task)).sort(compareTasks);
 	const selected = ordered.find((task) => task.id === selectedId) ?? ordered[0];
 	return (
 		<div className="queue-view hx">
-			<QueueList
+			<div className="queue-main">
+			<div className="queue-toolbar">
+				<button type="button" className={showFinished ? 'hx-stat on' : 'hx-stat'} aria-pressed={showFinished} onClick={() => setShowFinished(!showFinished)}>Show finished <span className="hx-num">{finished.length}</span></button>
+			</div>
+			{showFinished ? <FinishedList tasks={finished} harness={harness} onOpenTask={onOpenTask} /> : <QueueList
 				tasks={ordered}
 				allTasks={state.tasks}
 				onPin={actions.pin}
@@ -38,7 +51,8 @@ export function QueueView({ tasks, harness, onOpenTask }: {
 				canRetry={actions.canRetry}
 				onMove={actions.move}
 				pendingIds={actions.pendingIds}
-			/>
+			/>}
+			</div>
 			<QueueSidePanel selected={selected} tasks={ordered} harness={harness} />
 		</div>
 	);
@@ -93,5 +107,70 @@ function QueueSidePanel({ selected, tasks, harness }: { selected?: HarnessTask; 
 				{lookNote && <p className="hx-muted" role="status">{lookNote}</p>}
 			</section>
 		</aside>
+	);
+}
+
+/** The warning a person reads before removing a finished task. */
+export function removeWarning(task: HarnessTask): string {
+	const key = task.source.key;
+	return `${key} and its runs, steps and conversations are deleted from Kode Stream. Its branch and pull request stay. If ${key} is still open in Jira and the Finder's search still matches it, the Finder adds it back as Up next on its next look.`;
+}
+
+/** Every task that is done, stopped, dismissed or closed at its source, with Remove. */
+function FinishedList({ tasks, harness, onOpenTask }: { tasks: HarnessTask[]; harness: HarnessController; onOpenTask: (task: HarnessTask) => void }) {
+	const { state } = harness;
+	const now = useNow(60_000);
+	const [confirm, setConfirm] = useState<HarnessTask | undefined>();
+	const [busyId, setBusyId] = useState<string | undefined>();
+	const [error, setError] = useState('');
+	const remove = async (task: HarnessTask) => {
+		setConfirm(undefined);
+		setBusyId(task.id);
+		setError('');
+		try {
+			await harness.removeTask(task);
+		} catch (caught) {
+			setError(plainError(caught, `${task.source.key} could not be removed.`));
+		} finally {
+			setBusyId(undefined);
+		}
+	};
+	if (tasks.length === 0) return <div className="hx-card hx-empty"><span>Nothing has finished yet.</span></div>;
+	return (
+		<>
+			{error && <p className="hx-banner" role="alert">{error}</p>}
+			<ol className="hx-queue-list queue-finished" aria-label="Finished tasks">
+				{tasks.map((task) => {
+					const run = task.runId ? state.runs[task.runId] : undefined;
+					const at = run?.finishedAt ?? task.finishedOutside?.at ?? task.updatedAt;
+					return (
+						<li key={task.id} className="hx-row hx-queue-row" data-task-id={task.id} aria-busy={busyId === task.id || undefined}>
+							<span className="hx-queue-rank" />
+							<span className="hx-row-key"><b>{task.source.key}</b><SourceBadge kind={task.source.kind} url={task.source.url} /></span>
+							<span className="hx-row-title">
+								<button type="button" className="hx-title-button" onClick={() => onOpenTask(task)}>{task.title}</button>
+								<small className="hx-muted">{at ? `Finished ${formatAgo(at, now)}` : 'Finished'}{task.note ? ` · ${task.note}` : ''}</small>
+							</span>
+							<span />
+							<HxStatusBadge status={taskStatus(task)} />
+							<span className="hx-queue-actions">
+								{run?.prUrl && <a className="hx-link" href={run.prUrl} target="_blank" rel="noreferrer"><ExternalLink size={13} aria-hidden="true" /> Draft PR {prLabel(run.prUrl)}</a>}
+								<button type="button" className="secondary hx-small-button" disabled={busyId === task.id} onClick={() => setConfirm(task)}><Trash2 size={13} aria-hidden="true" />{busyId === task.id ? 'Removing…' : 'Remove'}</button>
+							</span>
+						</li>
+					);
+				})}
+			</ol>
+			{confirm && (
+				<ConfirmDialog
+					title={`Remove ${confirm.source.key}?`}
+					message={removeWarning(confirm)}
+					confirmLabel="Remove"
+					danger
+					onCancel={() => setConfirm(undefined)}
+					onConfirm={() => void remove(confirm)}
+				/>
+			)}
+		</>
 	);
 }
