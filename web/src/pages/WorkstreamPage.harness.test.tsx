@@ -162,7 +162,11 @@ describe('WorkstreamPage ticket cards', () => {
 		stubBoard();
 		renderBoard();
 		const ticket = (await screen.findByText('Found by the Finder')).closest('.plan-card') as HTMLElement;
-		expect(within(ticket).getByText('Ticket')).toBeInTheDocument();
+		expect(ticket).toHaveClass('ticket-card');
+		expect(within(ticket).getByText('Jira ticket')).toBeInTheDocument();
+		const plan = (await screen.findByText('Quiet card')).closest('.plan-card') as HTMLElement;
+		expect(plan).toHaveClass('plan-kind-card');
+		expect(within(plan).getByText('Plan')).toBeInTheDocument();
 		expect(within(ticket).getByText('no plan yet')).toBeInTheDocument();
 		expect(screen.getByText(/of 4 items/)).toBeInTheDocument();
 		fireEvent.click(ticket);

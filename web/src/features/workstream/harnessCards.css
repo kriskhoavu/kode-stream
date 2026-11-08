@@ -303,10 +303,60 @@
 	}
 }
 
-.source-badge.ticket {
+/* A card says what it is twice: a type line under the title, and a stripe on its left edge, solid for a plan, hatched for a Jira ticket. */
+.plan-card.plan-kind-card,
+.plan-card.ticket-card {
+	position: relative;
+	padding-left: 15px;
+}
+
+.plan-card.plan-kind-card::before,
+.plan-card.ticket-card::before {
+	content: "";
+	position: absolute;
+	inset: -1px auto -1px -1px;
+	width: 6px;
+	border-radius: 8px 0 0 8px;
+	pointer-events: none;
+}
+
+.plan-card.plan-kind-card::before {
+	background: var(--button-accent);
+}
+
+.plan-card.ticket-card::before {
+	background: repeating-linear-gradient(45deg, var(--hx-running) 0 3px, color-mix(in srgb, var(--hx-running) 18%, var(--panel)) 3px 6px);
+}
+
+.plan-card.ticket-card {
+	background: color-mix(in srgb, var(--hx-running) 4%, var(--panel));
+}
+
+.card-kind {
+	justify-self: start;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 12px;
+	font-weight: 600;
+	min-width: 0;
+}
+
+.card-kind.plan {
+	color: var(--button-accent);
+}
+
+.card-kind.ticket {
 	color: var(--hx-running);
-	background: color-mix(in srgb, var(--hx-running) var(--hx-mix), var(--panel));
-	border-color: color-mix(in srgb, var(--hx-running) 35%, var(--line));
+}
+
+.card-kind-key {
+	color: color-mix(in srgb, var(--text) 82%, var(--muted));
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .queue-main {

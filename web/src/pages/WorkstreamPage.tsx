@@ -1511,6 +1511,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   if (work) classes.push('harness-card');
   if (work?.task.needsYou || work?.waiting.length) classes.push('needs-you-card');
   if (synthetic) classes.push('ticket-card');
+  else if (!docs) classes.push('plan-kind-card');
   if (synthetic && !work?.run) classes.push('no-plan');
   if (draggable) classes.push('draggable');
   if (active) classes.push('dragging');
@@ -1537,11 +1538,17 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
       <div className="plan-card-title">
         <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
         <span className="card-badges">
-          {synthetic ? <span className="source-badge ticket" title="A ticket the harness holds; no plan on this branch yet">Ticket</span> : source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
+          {!synthetic && source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
           {!docs && !synthetic && <AgentCluster agents={agents} title={plan.title} onOpen={onOpenAgent} />}
         </span>
       </div>
-      {showItem && <span className="plan-card-identifier">{plan.identifier}</span>}
+      {docs ? showItem && <span className="plan-card-identifier">{plan.identifier}</span> : (
+        <span className={synthetic ? 'card-kind ticket' : 'card-kind plan'} title={synthetic ? 'A Jira ticket the harness holds. No plan on this branch yet.' : undefined}>
+          {synthetic ? <Ticket size={13} aria-hidden="true" /> : <FileText size={13} aria-hidden="true" />}
+          <span>{synthetic ? 'Jira ticket' : 'Plan'}</span>
+          {(synthetic || showItem) && <><span aria-hidden="true">·</span><span className="card-kind-key">{plan.identifier}</span></>}
+        </span>
+      )}
       {work ? <HarnessCardChips work={work} /> : harnessOn && !docs && plan.status !== 'unsorted' && (
         <div className="plan-card-harness plan-card-harness-chips">
           <ByHandChip />
