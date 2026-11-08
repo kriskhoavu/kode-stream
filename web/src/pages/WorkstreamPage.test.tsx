@@ -253,8 +253,9 @@ describe('WorkstreamPage', () => {
     await screen.findByRole('button', { name: 'Master Data' });
     const card = document.querySelector('.plan-card');
     expect(card).toBeInstanceOf(HTMLElement);
-    expect(within(card as HTMLElement).getAllByText('wiki')).toHaveLength(1);
-    expect(within(card as HTMLElement).getByText('wiki')).toHaveClass('source-badge');
+    // A work item's card names its kind, not its source: the Source filter carries that, and the tag that repeats it is dropped.
+    expect(within(card as HTMLElement).queryByText('wiki')).not.toBeInTheDocument();
+    expect(within(card as HTMLElement).getByText('Plan')).toBeInTheDocument();
     // Tags that say something the card does not already show must survive.
     expect(within(card as HTMLElement).getByText('reference')).toBeInTheDocument();
   });

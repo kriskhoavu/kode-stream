@@ -332,8 +332,16 @@
 	background: color-mix(in srgb, var(--hx-running) 4%, var(--panel));
 }
 
+.card-kind-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	min-width: 0;
+	min-height: 20px;
+}
+
 .card-kind {
-	justify-self: start;
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;

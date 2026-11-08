@@ -1535,20 +1535,21 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
       }
       }}
     >
+      {!docs && (
+        <div className="card-kind-row">
+          <span className={synthetic ? 'card-kind ticket' : 'card-kind plan'} title={synthetic ? 'A Jira ticket the harness holds. No plan on this branch yet.' : undefined}>
+            {synthetic ? <Ticket size={13} aria-hidden="true" /> : <FileText size={13} aria-hidden="true" />}
+            <span>{synthetic ? 'Jira ticket' : 'Plan'}</span>
+            {(synthetic || showItem) && <><span aria-hidden="true">·</span><span className="card-kind-key">{plan.identifier}</span></>}
+          </span>
+          {!synthetic && <AgentCluster agents={agents} title={plan.title} onOpen={onOpenAgent} />}
+        </div>
+      )}
       <div className="plan-card-title">
         <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
-        <span className="card-badges">
-          {!synthetic && source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
-          {!docs && !synthetic && <AgentCluster agents={agents} title={plan.title} onOpen={onOpenAgent} />}
-        </span>
+        {docs && source && <span className="card-badges"><span className="source-badge docs">{source}</span></span>}
       </div>
-      {docs ? showItem && <span className="plan-card-identifier">{plan.identifier}</span> : (
-        <span className={synthetic ? 'card-kind ticket' : 'card-kind plan'} title={synthetic ? 'A Jira ticket the harness holds. No plan on this branch yet.' : undefined}>
-          {synthetic ? <Ticket size={13} aria-hidden="true" /> : <FileText size={13} aria-hidden="true" />}
-          <span>{synthetic ? 'Jira ticket' : 'Plan'}</span>
-          {(synthetic || showItem) && <><span aria-hidden="true">·</span><span className="card-kind-key">{plan.identifier}</span></>}
-        </span>
-      )}
+      {docs && showItem && <span className="plan-card-identifier">{plan.identifier}</span>}
       {work ? <HarnessCardChips work={work} /> : harnessOn && !docs && plan.status !== 'unsorted' && (
         <div className="plan-card-harness plan-card-harness-chips">
           <ByHandChip />
