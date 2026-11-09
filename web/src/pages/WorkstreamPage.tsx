@@ -4,6 +4,7 @@ import { BookmarkPlus, Bot, ChevronDown, Columns3, ListOrdered, Waves as WavesIc
 import { FacetMenu, SelectedFilters } from '../components/FacetMenu';
 import { FileMenu } from '../components/FileMenu';
 import { useModalDialog } from '../components/overlay';
+import { useResizableDrawer } from '../components/useResizableDrawer';
 import { readStringPreference, writePreference } from '../shared/preferences/store';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { StatusMenu } from '../components/StatusMenu';
@@ -1610,8 +1611,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
   const [gitBusy, setGitBusy] = useState('');
   const [gitActivityOpen, setGitActivityOpen] = useState(() => readStoredToggle('workstream.drawer.gitActivityOpen'));
   const [error, setError] = useState('');
-  const [width, setWidth] = useState(1120);
-  const [topOffset, setTopOffset] = useState(() => Math.max(0, 68 - window.scrollY));
+  const { width, style: drawerStyle, startResize } = useResizableDrawer({ initial: 1120 });
   const autoSaveTimerRef = useRef<number | null>(null);
   // The Raw editor grows with the document so the whole file shows, as the
   // preview does, and the drawer scrolls instead of a small box.
@@ -1621,11 +1621,6 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
   const drawerGenerationRef = useRef(0);
   const fileLoadAbortRef = useRef<AbortController | null>(null);
   const autoSaveRefreshAbortRef = useRef<AbortController | null>(null);
-  const resizeCleanupRef = useRef<(() => void) | null>(null);
-  const drawerStyle = {
-    '--drawer-width': `${width}px`,
-    '--drawer-top': `${topOffset}px`,
-  } as CSSProperties & Record<'--drawer-width' | '--drawer-top', string>;
   const compact = width < 700;
   const dirtyFile = file !== null && editorContent !== savedContent;
   const activityPath = plan?.itemPath || '';
@@ -1667,12 +1662,6 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
   useEffect(() => {
     if (agentFocus) setSideTab('agents');
   }, [agentFocusKey(agentFocus)]);
-
-  useEffect(() => {
-    const updateTopOffset = () => setTopOffset(Math.max(0, 68 - window.scrollY));
-    window.addEventListener('scroll', updateTopOffset, { passive: true });
-    return () => window.removeEventListener('scroll', updateTopOffset);
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -2016,33 +2005,6 @@ function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus
       if (isCurrent()) setGitBusy('');
     }
   };
-
-  const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    resizeCleanupRef.current?.();
-    const startX = event.clientX;
-    const startingWidth = width;
-
-    const onPointerMove = (moveEvent: PointerEvent) => {
-      const delta = startX - moveEvent.clientX;
-      setWidth(Math.min(1120, Math.max(460, startingWidth + delta)));
-    };
-
-    const cleanup = () => {
-      document.body.classList.remove('is-resizing-drawer');
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      if (resizeCleanupRef.current === cleanup) resizeCleanupRef.current = null;
-    };
-    function onPointerUp() { cleanup(); }
-
-    document.body.classList.add('is-resizing-drawer');
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp, { once: true });
-    resizeCleanupRef.current = cleanup;
-  };
-
-  useEffect(() => () => resizeCleanupRef.current?.(), []);
 
   return (
     <>

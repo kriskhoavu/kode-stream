@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { ArrowDown, ArrowUp, ChevronRight, ExternalLink, Pin, PinOff, Play, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronRight, ExternalLink, GripVertical, Pin, PinOff, Play, X } from 'lucide-react';
+import { useResizableDrawer } from '../../components/useResizableDrawer';
 import type { ClaudeTurn, HarnessAgentRun, HarnessApproval, HarnessStage, HarnessTask, SafeSessionRecord, SessionChanges } from '../../lib/types';
 import type { HarnessRunTab } from '../../app/router';
 import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
@@ -70,6 +71,7 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, wave, onTabC
 	const headingRef = useRef<HTMLHeadingElement | null>(null);
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 	const now = useNow(30_000);
+	const { style: drawerStyle, startResize } = useResizableDrawer({ initial: 560 });
 	const version = run ? `${run.revision}:${run.state}:${run.currentStageId}:${run.totals.costUsd}` : '';
 
 	useEffect(() => {
@@ -107,8 +109,11 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, wave, onTabC
 
 	return (
 		<>
-			<button className="drawer-scrim" type="button" aria-label="Close details" onClick={onClose} />
-			<aside className="plan-drawer compact hx hx-drawer" aria-labelledby="hx-drawer-title">
+			<button className="drawer-scrim" style={drawerStyle} type="button" aria-label="Close details" onClick={onClose} />
+			<aside className="plan-drawer compact hx hx-drawer" style={drawerStyle} aria-labelledby="hx-drawer-title">
+				<button className="drawer-resize-handle" type="button" aria-label="Resize details panel" onPointerDown={startResize}>
+					<GripVertical size={16} />
+				</button>
 				<header className="plan-drawer-header">
 					<div>
 						<span className="drawer-kicker">{task.source.key} · <SourceBadge kind={task.source.kind} url={task.source.url} /></span>

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import type { HarnessRunTab } from '../../app/router';
@@ -139,5 +139,22 @@ describe('RunDrawer', () => {
 		const { client, state } = await setup('task-pm-02', 'run-pm-02');
 		render(<Harnessed state={state} client={client} taskId="task-pm-02" wave={[]} onStart={vi.fn()} />);
 		expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
+	});
+	it('widens from the grip on its left edge, as the item panel does, within its limits', async () => {
+		const { client, state } = await setup('task-pm-02', 'run-pm-02');
+		render(<Harnessed state={state} client={client} taskId="task-pm-02" wave={[]} />);
+		const drawer = screen.getByRole('complementary');
+		expect(drawer.style.getPropertyValue('--drawer-width')).toBe('560px');
+		const grip = screen.getByRole('button', { name: 'Resize details panel' });
+		// jsdom's PointerEvent drops clientX, so the pointer is a mouse event under the pointer's name.
+		const pointer = (target: EventTarget, type: string, clientX: number) => act(() => { target.dispatchEvent(new MouseEvent(type, { clientX, bubbles: true })); });
+		pointer(grip, 'pointerdown', 800);
+		pointer(window, 'pointermove', 600);
+		expect(drawer.style.getPropertyValue('--drawer-width')).toBe('760px');
+		pointer(window, 'pointermove', 0);
+		expect(drawer.style.getPropertyValue('--drawer-width')).toBe('1120px');
+		pointer(window, 'pointerup', 0);
+		pointer(window, 'pointermove', 900);
+		expect(drawer.style.getPropertyValue('--drawer-width')).toBe('1120px');
 	});
 });

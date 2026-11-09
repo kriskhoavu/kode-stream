@@ -1625,10 +1625,6 @@ a.hx-source:hover {
 
 /* ── Run drawer ─────────────────────────────────────────────────────────── */
 
-.hx-drawer {
-	--drawer-width: 560px;
-}
-
 .hx .plan-drawer-body.hx-drawer-body {
 	display: flex;
 	flex-direction: column;
