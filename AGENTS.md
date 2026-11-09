@@ -12,8 +12,9 @@ making implementation changes.
   coding CLIs (Claude Code, Codex, OpenCode) headless in `harness/*` worktrees from plan to draft pull request, with a
   person approving each gate. Agents never commit; the harness has no model runtime and does not use `agent-plane`.
   Only `internal/server`, `internal/server/api` and `internal/storage` import it. It has no page of its own: a ticket
-  is one card on the Workstream board whether a person or the harness works on it, the queue and the waves are views
-  of the board, and its settings live under Settings. See [the harness page](wiki/platform/harness.md).
+  is one card on the Workstream board whether a person or the harness works on it, the Task Queue is a view of the
+  board beside its status columns, and its settings live under Settings. See
+  [the harness page](wiki/platform/harness.md).
 - Local mode is a single-user server over local repositories. Cloud mode is a hosted control plane with
   Agent-Backed and Agentless Remote Snapshot workspaces. Both modes share one binary and one storage abstraction.
 - Knowledge publication, retrieval, and the release registry belong to `context-cellar`. Tenancy, provider routing,

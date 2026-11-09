@@ -31,11 +31,11 @@ const state: HarnessState = {
 describe('QueueView', () => {
 	it('ranks the rows with their scores, explains the chosen one and says what starts next', () => {
 		render(<QueueView tasks={Object.values(state.tasks)} harness={controller(state)} onOpenTask={vi.fn()} />);
-		const rows = within(screen.getByRole('list', { name: 'Queue in order' })).getAllByRole('listitem');
+		const rows = within(screen.getByRole('list', { name: 'Task Queue in order' })).getAllByRole('listitem');
 		expect(rows.map((row) => row.textContent)).toEqual([expect.stringContaining('PM-2'), expect.stringContaining('PM-1'), expect.stringContaining('PM-3')]);
 		expect(within(rows[1]).getByText('42')).toBeInTheDocument();
 		fireEvent.click(rows[1]);
-		const side = screen.getByRole('complementary', { name: 'About the queue' });
+		const side = screen.getByRole('complementary', { name: 'About the Task Queue' });
 		expect(within(side).getByText('Blocks two other tasks')).toBeInTheDocument();
 		expect(within(side).getByText('Starts when you press Start.')).toBeInTheDocument();
 		expect(within(side).getByText(/Last looked 5 min ago · 2 new tasks/)).toBeInTheDocument();
@@ -45,7 +45,7 @@ describe('QueueView', () => {
 		const pollScouts = vi.fn().mockResolvedValue({ started: true });
 		const harness = controller(state, pollScouts);
 		render(<QueueView tasks={Object.values(state.tasks)} harness={harness} onOpenTask={vi.fn()} />);
-		const rows = within(screen.getByRole('list', { name: 'Queue in order' })).getAllByRole('listitem');
+		const rows = within(screen.getByRole('list', { name: 'Task Queue in order' })).getAllByRole('listitem');
 		fireEvent.click(within(rows[0]).getByRole('button', { name: 'Retry' }));
 		expect(harness.approve).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }));
 		fireEvent.click(within(rows[1]).getByRole('button', { name: 'Start' }));
@@ -65,13 +65,13 @@ describe('QueueView finished tasks', () => {
 	it('shows the active tasks by default, then the finished ones, then both', () => {
 		render(<QueueView tasks={Object.values(finishedState.tasks)} finished={[done]} harness={controller(finishedState)} onOpenTask={vi.fn()} />);
 		expect(screen.getByRole('button', { name: 'Active 3' })).toHaveAttribute('aria-pressed', 'true');
-		expect(within(screen.getByRole('list', { name: 'Queue in order' })).queryByText('PM-9')).not.toBeInTheDocument();
+		expect(within(screen.getByRole('list', { name: 'Task Queue in order' })).queryByText('PM-9')).not.toBeInTheDocument();
 		expect(screen.queryByRole('list', { name: 'Finished tasks' })).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'All 4' }));
-		expect(screen.getByRole('list', { name: 'Queue in order' })).toBeInTheDocument();
+		expect(screen.getByRole('list', { name: 'Task Queue in order' })).toBeInTheDocument();
 		expect(screen.getByRole('list', { name: 'Finished tasks' })).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Finished 1' }));
-		expect(screen.queryByRole('list', { name: 'Queue in order' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('list', { name: 'Task Queue in order' })).not.toBeInTheDocument();
 		const finished = screen.getByRole('list', { name: 'Finished tasks' });
 		expect(within(finished).getByText('PM-9')).toBeInTheDocument();
 		expect(within(finished).getByText(/Finished 2 h ago/)).toBeInTheDocument();

@@ -53,7 +53,7 @@ describe('RunWithHarnessDialog', () => {
 		await screen.findByText((_, element) => element?.tagName === 'LI' && (element.textContent?.startsWith('Planner writes the plan') ?? false));
 		fireEvent.click(screen.getByRole('radio', { name: /Queue it/ }));
 		fireEvent.click(screen.getByRole('checkbox', { name: /may stop and ask me/ }));
-		fireEvent.click(screen.getByRole('button', { name: 'Add to the queue' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Add to the Task Queue' }));
 		await waitFor(() => expect(onStarted).toHaveBeenCalled());
 		expect(harness.createTask).toHaveBeenCalledWith(expect.objectContaining({ startNow: false }));
 		expect(harness.setQuestions).toHaveBeenCalledWith(expect.objectContaining({ source: expect.objectContaining({ key: 'PM-2' }) }), false);

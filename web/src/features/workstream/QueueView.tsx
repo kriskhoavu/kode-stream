@@ -87,7 +87,7 @@ function QueueSidePanel({ selected, tasks, harness }: { selected?: HarnessTask; 
 		}
 	};
 	return (
-		<aside className="queue-side hx-card" aria-label="About the queue">
+		<aside className="queue-side hx-card" aria-label="About the Task Queue">
 			{selected ? (
 				<section className="queue-side-section" aria-labelledby="queue-why">
 					<h3 id="queue-why">Why here</h3>
@@ -117,7 +117,7 @@ function QueueSidePanel({ selected, tasks, harness }: { selected?: HarnessTask; 
 	);
 }
 
-/** What the queue lists: the tasks still in play (the default), the finished ones, or both. */
+/** What the Task Queue lists: the tasks still in play (the default), the finished ones, or both. */
 type QueueShown = 'active' | 'finished' | 'all';
 const queueShownOptions: { id: QueueShown; label: string }[] = [{ id: 'active', label: 'Active' }, { id: 'finished', label: 'Finished' }, { id: 'all', label: 'All' }];
 

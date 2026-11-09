@@ -89,11 +89,11 @@ describe('HarnessSettings', () => {
 		const { client, onSaved } = await setup();
 		const before = (await client.tasks()).filter((task) => task.workspaceId === 'airship' && (task.state === 'ranked' || task.state === 'discovered' || task.state === 'stale' || task.state === 'dismissed')).length;
 		expect(before).toBeGreaterThan(0);
-		fireEvent.click(screen.getAllByRole('button', { name: 'Clear the queue for Airship' })[0]);
+		fireEvent.click(screen.getAllByRole('button', { name: 'Clear the Task Queue for Airship' })[0]);
 		const dialog = await screen.findByRole('dialog');
 		expect(within(dialog).getByText(/Work that is running, waiting on you or done stays/)).toBeInTheDocument();
-		fireEvent.click(within(dialog).getByRole('button', { name: 'Clear the queue' }));
-		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(`Cleared ${before} tasks from the queue`));
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Clear the Task Queue' }));
+		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(`Cleared ${before} tasks from the Task Queue`));
 		expect(onSaved).toHaveBeenCalled();
 		const after = await client.tasks();
 		expect(after.filter((task) => task.workspaceId === 'airship' && task.state === 'ranked')).toHaveLength(0);

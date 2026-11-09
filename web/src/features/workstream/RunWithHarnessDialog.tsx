@@ -23,7 +23,7 @@ export function harnessBranchFor(key: string): string {
  * Hands a card to the harness. The branch and the models are what the harness
  * uses for every task, shown so nobody is surprised; the approvals are the
  * gates it always asks for, plus whether its agents may stop and ask; and the
- * card starts now or waits its turn in the queue.
+ * card starts now or waits its turn in the Task Queue.
  */
 export function RunWithHarnessDialog({ item, workspace, harness, onClose, onStarted }: {
 	item: ItemSummary;
@@ -100,7 +100,7 @@ export function RunWithHarnessDialog({ item, workspace, harness, onClose, onStar
 					{error && <p className="hx-field-error" role="alert">{error}</p>}
 					<footer>
 						<button className="ghost" type="button" onClick={onClose}>Back</button>
-						<button className="primary" type="submit" disabled={busy || !key}>{busy ? 'Handing over…' : startNow ? 'Run with the harness' : 'Add to the queue'}</button>
+						<button className="primary" type="submit" disabled={busy || !key}>{busy ? 'Handing over…' : startNow ? 'Run with the harness' : 'Add to the Task Queue'}</button>
 					</footer>
 				</form>
 			</section>

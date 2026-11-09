@@ -25,8 +25,8 @@ Settings. The mockup this page describes is the eight-screen canvas "Workstream 
 
 | Screen               | Where                                    | Holds                                                                                                                                                    |
 |----------------------|------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Board                | `/` Status view                          | Harness-aware cards (worker chip, stage chip, progress bar, amber ring), the "Needs you" strip, the Worked by facet                                      |
-| Waves, Queue         | `/` view switcher Status · Waves · Queue | Waves as today's wave board over the same cards; Queue as ranked rows with "why here", score, Start, Retry, pin, drag                                    |
+| Board                | `/` Board view                           | Harness-aware cards (worker chip, stage chip, progress bar, amber ring), the "Needs you" strip, the Worked by facet                                      |
+| Task Queue           | `/` view switcher Board · Task Queue     | Ranked rows with "why here", "Waits for", score, Start, Retry, pin, drag                                                                                |
 | Card drawer          | Workstream drawer, Agents tab            | Harness run mode: chip stepper, working agent, findings, ledger, Pause after this round, Take over by hand, Add a note; Sessions mode: today's AgentsTab |
 | Card full width      | `/items/:id?view=run`                    | Today's run page whole: wide stepper, plan preview, Steps · Findings · Changes · Conversations, Stop in the top bar                                      |
 | Run with the harness | card menu and drawer header              | Dialog: branch, model per role, approvals wanted, start now or queue                                                                                     |

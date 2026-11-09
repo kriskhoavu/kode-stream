@@ -11,7 +11,7 @@ import { waitsFor } from './harnessState';
  * The queue in rank order: what the Sorter will hand out next, first. With
  * the optional handlers it also shows each row's score, lets a person start
  * or retry a task, select a row for the side panel, and drag a row above
- * another to move it in the queue.
+ * another to move it in the Task Queue.
  */
 export function QueueList({ tasks, allTasks, onPin, onOpen, onSelect, selectedId, showScore = false, onStart, onRetry, canRetry, onMove, pendingIds }: {
 	tasks: HarnessTask[];
@@ -27,12 +27,12 @@ export function QueueList({ tasks, allTasks, onPin, onOpen, onSelect, selectedId
 	/** Retries a task that is stuck; shown where `canRetry` says so. */
 	onRetry?: (task: HarnessTask) => void;
 	canRetry?: (task: HarnessTask) => boolean;
-	/** Move `task` above `before` in the queue; no `before` means last. */
+	/** Move `task` above `before` in the Task Queue; no `before` means last. */
 	onMove?: (task: HarnessTask, before?: HarnessTask) => void;
 	pendingIds?: Set<string>;
 }) {
 	const [dragId, setDragId] = useState<string | undefined>();
-	if (tasks.length === 0) return <div className="hx-card hx-empty"><span>The queue is empty. The Finder adds tasks from Jira, GitHub and Bitbucket when it next looks.</span></div>;
+	if (tasks.length === 0) return <div className="hx-card hx-empty"><span>The Task Queue is empty. The Finder adds tasks from Jira, GitHub and Bitbucket when it next looks.</span></div>;
 	const dragStart = (event: DragEvent<HTMLElement>, task: HarnessTask) => {
 		event.dataTransfer.effectAllowed = 'move';
 		event.dataTransfer.setData('text/plain', task.id);
@@ -47,7 +47,7 @@ export function QueueList({ tasks, allTasks, onPin, onOpen, onSelect, selectedId
 		onMove(task, before);
 	};
 	return (
-		<ol className="hx-queue-list" aria-label="Queue in order" onDragOver={(event) => { if (dragId && onMove) event.preventDefault(); }} onDrop={(event) => { if ((event.target as HTMLElement).closest('[data-task-id]')) return; drop(event); }}>
+		<ol className="hx-queue-list" aria-label="Task Queue in order" onDragOver={(event) => { if (dragId && onMove) event.preventDefault(); }} onDrop={(event) => { if ((event.target as HTMLElement).closest('[data-task-id]')) return; drop(event); }}>
 			{tasks.map((task, index) => {
 				const waiting = waitsFor(task, allTasks);
 				const status = taskStatus(task, waiting);

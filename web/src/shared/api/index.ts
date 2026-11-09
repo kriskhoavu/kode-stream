@@ -561,7 +561,7 @@ export const api = {
   approveHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason?: string) => decideHarnessGate(approval, 'approve', idempotencyKey, reason),
   rejectHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason: string) => decideHarnessGate(approval, 'reject', idempotencyKey, reason),
   pinHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, pinned: boolean) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/pin`, { method: 'POST', body: JSON.stringify({ pinned, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
-  /** `before` names the task this one should now sit above in its wave; omitted means last. */
+  /** `before` names the task this one should now sit above in the Task Queue; omitted means last. */
   setHarnessPriority: (task: Pick<HarnessTask, 'id' | 'revision'>, input: { priorityOverride?: number; before?: string }) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/priority`, { method: 'POST', body: JSON.stringify({ ...input, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   setHarnessTaskQuestions: (task: Pick<HarnessTask, 'id' | 'revision'>, askQuestions: boolean | null) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/questions`, { method: 'POST', body: JSON.stringify({ askQuestions, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   createHarnessTask: (input: HarnessCreateTaskInput) => request<HarnessTask>('/api/harness/tasks', { method: 'POST', body: JSON.stringify(input) }, false).then(normalizeHarnessTask),

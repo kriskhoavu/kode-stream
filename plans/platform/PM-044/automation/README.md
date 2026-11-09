@@ -2,7 +2,7 @@
 
 ## Applicability
 
-Browser validation is required: the Inbox, the Pipeline stepper, the Queue as waves, the run drawer and the
+Browser validation is required: the Inbox, the Pipeline stepper, the Task Queue, the run drawer and the
 settings are user-visible workflows. The backend phases are covered by Go tests; this page covers the journeys.
 
 ## Runtime Inputs

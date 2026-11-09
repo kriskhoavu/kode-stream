@@ -29,8 +29,8 @@ const policyRows: { role: HarnessAgentRole; name: string; does: string }[] = [
 ];
 
 const pauseConsequence: Record<HarnessRoleId, string> = {
-	scout: 'Paused: no new tasks are found. The queue keeps what it has.',
-	sorter: 'Paused: the queue keeps its current order.',
+	scout: 'Paused: no new tasks are found. The Task Queue keeps what it has.',
+	sorter: 'Paused: the Task Queue keeps its current order.',
 	planner: 'Paused: no new plans start. A plan already being written finishes.',
 	coder: 'Paused: no new code is written. Work already running finishes.',
 	reviewer: 'Paused: plans and code wait for their check.',
@@ -87,10 +87,10 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 		setError('');
 		try {
 			const { removed } = await client.clearQueue(workspaceId);
-			setNotice(removed === 0 ? 'The queue had nothing to clear.' : `Cleared ${plural(removed, 'task')} from the queue. The Finder adds back what it still finds.`);
+			setNotice(removed === 0 ? 'The Task Queue had nothing to clear.' : `Cleared ${plural(removed, 'task')} from the Task Queue. The Finder adds back what it still finds.`);
 			onSaved();
 		} catch (caught) {
-			setError(plainError(caught, 'The queue could not be cleared.'));
+			setError(plainError(caught, 'The Task Queue could not be cleared.'));
 		} finally {
 			setClearing(false);
 		}
@@ -188,7 +188,7 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 			</section>
 
 			<section className="settings-section">
-				<header><div><span className="settings-group-label">Sources</span><h2>Where work comes from</h2><p>The Finder looks at these and adds new tasks to the queue.</p></div></header>
+				<header><div><span className="settings-group-label">Sources</span><h2>Where work comes from</h2><p>The Finder looks at these and adds new tasks to the Task Queue.</p></div></header>
 				<div className="hx-sources">
 					{draft.sources.length === 0 && <p className="hx-muted">No sources yet. Add one below.</p>}
 					{draft.sources.map((source, index) => (
@@ -241,9 +241,9 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 
 			{confirmClear !== undefined && (
 				<ConfirmDialog
-					title={`Clear the queue for ${workspaceNames.get(confirmClear) ?? confirmClear}?`}
-					message="Every task that has not started yet is deleted from the queue, including stale and dismissed ones. Work that is running, waiting on you or done stays. The Finder adds back whatever its search still returns on its next look."
-					confirmLabel="Clear the queue"
+					title={`Clear the Task Queue for ${workspaceNames.get(confirmClear) ?? confirmClear}?`}
+					message="Every task that has not started yet is deleted from the Task Queue, including stale and dismissed ones. Work that is running, waiting on you or done stays. The Finder adds back whatever its search still returns on its next look."
+					confirmLabel="Clear the Task Queue"
 					onCancel={() => setConfirmClear(undefined)}
 					onConfirm={() => void clearQueue(confirmClear)}
 				/>
@@ -305,7 +305,7 @@ function SourceRow({ source, workspaceName, now, askDefault, firstOfWorkspace, o
 				<span><Workflow size={14} aria-hidden="true" /> <b>{sourceLabels[source.kind]}</b> <span className="hx-muted">· {workspaceName ?? source.workspaceId}</span></span>
 				<span className="hx-muted">{checked}</span>
 				<label className="hx-inline-switch"><input type="checkbox" role="switch" checked={source.enabled} onChange={(event) => onChange({ enabled: event.target.checked })} /> Look here</label>
-				<button type="button" className="ghost" disabled={clearing} onClick={onClear} aria-label={`Clear the queue for ${workspaceName ?? source.workspaceId}`}>{clearing ? 'Clearing…' : 'Clear the queue'}</button>
+				<button type="button" className="ghost" disabled={clearing} onClick={onClear} aria-label={`Clear the Task Queue for ${workspaceName ?? source.workspaceId}`}>{clearing ? 'Clearing…' : 'Clear the Task Queue'}</button>
 				<button type="button" className="ghost" onClick={onRemove} aria-label={`Remove ${sourceLabels[source.kind]} for ${workspaceName ?? source.workspaceId}`}>Remove</button>
 			</div>
 			{source.lastError && <p className="hx-banner" role="alert">{source.lastError}</p>}

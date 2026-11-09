@@ -48,7 +48,7 @@ import { AgentPane, AgentsTab, useHeldAgentSessions, type AgentFocus, type Agent
 import { HarnessRunTab } from '../features/workstream/HarnessRunTab';
 import { takeOverByHand } from '../features/workstream/takeOver';
 import { useBoardHarness } from '../features/workstream/useBoardHarness';
-import { workForItem } from '../features/workstream/harnessJoin';
+import { queueOrder, workForItem } from '../features/workstream/harnessJoin';
 import { RunView } from '../features/harness/RunView';
 import { RunDrawer } from '../features/harness/RunDrawer';
 import type { HarnessRunTab as HarnessRunTabId, ItemView } from '../app/router';
@@ -1251,7 +1251,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
           </div>
         </header>
         <RunView state={harness.state} runId={run.id} onSelectRun={() => undefined} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onCancel={harness.cancelRun} onOpenTab={(tab, agentRunId) => setRunTab({ tab, agentRunId })} />
-        {runTab && <RunDrawer state={harness.state} client={harness.client} taskId={work.task.id} tab={runTab.tab} agentRunId={runTab.agentRunId} wave={[]} onTabChange={(tab) => setRunTab({ tab })} onClose={() => setRunTab(undefined)} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={harness.pin} onMove={() => undefined} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />}
+        {runTab && <RunDrawer state={harness.state} client={harness.client} taskId={work.task.id} tab={runTab.tab} agentRunId={runTab.agentRunId} queue={queueOrder(harness.state, work.task.workspaceId)} onTabChange={(tab) => setRunTab({ tab })} onClose={() => setRunTab(undefined)} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={harness.pin} onMove={() => undefined} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />}
       </section>
     );
   }

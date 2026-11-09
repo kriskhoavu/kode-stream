@@ -134,7 +134,7 @@
 	resize: vertical;
 }
 
-/* The board's Waves and Queue views. */
+/* The board's Board and Task Queue views. */
 /* The board's views on the left of the title row, the checkout on the right: the
  * same switcher Agent Space wears, whose rules live in the canvas stylesheet. */
 .workstream-title.with-views {

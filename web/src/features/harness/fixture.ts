@@ -34,7 +34,7 @@ const min = 60_000;
 
 type TaskSeed = [key: string, milestone: string, title: string, deps: string[], extra?: Partial<HarnessTask>];
 
-// Six waves of a small game project; the dependency arrows decide the waves.
+// A small game project in six milestones; each task waits for the tasks it names.
 const seeds: TaskSeed[] = [
 	['PM-01', 'M0', 'Create Jira project and board', [], { state: 'done' }],
 	['PM-02', 'M0', 'Add login form', [], { state: 'running', estimatedMinutes: 90 }],

@@ -1221,408 +1221,6 @@ a.hx-source:hover {
 	}
 }
 
-/* ── Wave board ─────────────────────────────────────────────────────────── */
-
-.hx-board {
-	display: flex;
-	flex-direction: column;
-	gap: 14px;
-	min-width: 0;
-}
-
-.hx-board-filters,
-.hx-board-statuses,
-.hx-hidden-columns {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 8px 10px;
-}
-
-.hx-board-statuses {
-	gap: 4px;
-}
-
-.hx-board-spacer {
-	flex: 1;
-}
-
-.hx-board-count {
-	margin-left: auto;
-	font-size: 13px;
-}
-
-.hx-find {
-	min-width: 220px;
-}
-
-.hx-seg-label {
-	padding: 4px 8px;
-	color: var(--muted);
-	font-size: 12px;
-}
-
-.hx-stat {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	border: 0;
-	border-radius: 6px;
-	background: transparent;
-	color: var(--muted);
-	padding: 4px 8px;
-	font-size: 12px;
-	font-weight: 600;
-}
-
-.hx-stat.on {
-	background: var(--panel-soft);
-	color: var(--text);
-}
-
-.hx-path-swatch {
-	display: inline-block;
-	width: 14px;
-	height: 3px;
-	border-radius: 2px;
-	background: var(--hx-path);
-}
-
-.hx-board-hint {
-	margin: 0;
-	padding: 8px 12px;
-	border: 1px solid color-mix(in srgb, var(--hx-waiting) 45%, var(--line));
-	border-radius: 8px;
-	background: color-mix(in srgb, var(--hx-waiting) var(--hx-mix), var(--panel));
-	font-size: 13px;
-}
-
-.hx-board-scroll {
-	overflow-x: auto;
-	padding: 4px 2px 12px;
-}
-
-.hx-board-inner {
-	position: relative;
-	display: flex;
-	align-items: flex-start;
-	/* Wide enough that a curve between neighbouring waves is visible between the cards. */
-	gap: 40px;
-	width: max-content;
-	min-width: 100%;
-}
-
-.hx-edges {
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
-	overflow: visible;
-	z-index: 0;
-}
-
-.hx-edges path {
-	fill: none;
-	stroke: color-mix(in srgb, var(--muted) 40%, transparent);
-	stroke-width: 1.5;
-}
-
-.hx-edges path.crit {
-	stroke: var(--hx-path);
-	stroke-width: 2.5;
-}
-
-.hx-edges.dim path {
-	opacity: .15;
-}
-
-.hx-edges.dim path.on {
-	opacity: 1;
-	stroke-width: 2.5;
-}
-
-.hx-edges path.live {
-	stroke: var(--hx-running);
-	stroke-dasharray: 6 10;
-}
-
-.hx-wave {
-	position: relative;
-	z-index: 1;
-	width: 260px;
-	flex: none;
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	border-radius: 10px;
-}
-
-.hx-wave.collapsed {
-	width: 140px;
-}
-
-.hx-wave.drop-enabled {
-	outline: 2px dashed color-mix(in srgb, var(--accent-text) 50%, transparent);
-	outline-offset: 4px;
-}
-
-.hx-wave-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 4px;
-	min-height: 34px;
-}
-
-.hx-wave-head h2 {
-	margin: 0;
-	font-size: 14px;
-	font-weight: 700;
-	white-space: nowrap;
-}
-
-.hx-wave-head small {
-	color: var(--muted);
-	font-size: 12px;
-	font-weight: 600;
-}
-
-.hx-wave-actions {
-	display: inline-flex;
-}
-
-.hx-wave-actions .hx-link {
-	padding: 4px 5px;
-	font-size: 12px;
-}
-
-.hx-wave-collapsed {
-	margin: 0;
-	padding: 10px;
-	border: 1px dashed var(--line);
-	border-radius: 8px;
-	font-size: 12px;
-}
-
-.hx-task {
-	position: relative;
-	min-height: 84px;
-	border: 1px solid var(--line);
-	border-radius: 10px;
-	background: var(--panel);
-	box-shadow: var(--hx-card-shadow);
-}
-
-.hx-task.draggable,
-.hx-task[draggable="true"] {
-	cursor: grab;
-}
-
-.hx-task-open {
-	width: 100%;
-	height: 100%;
-	display: grid;
-	gap: 6px;
-	align-content: start;
-	padding: 10px 30px 10px 12px;
-	border: 0;
-	border-radius: inherit;
-	background: transparent;
-	color: var(--text);
-	text-align: left;
-	font: inherit;
-}
-
-.hx-task-open:focus-visible {
-	outline: 2px solid var(--accent-text);
-	outline-offset: 2px;
-}
-
-.hx-task-r1 {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	min-width: 0;
-	color: var(--muted);
-	font-size: 11px;
-	font-weight: 600;
-}
-
-.hx-task-r1 b {
-	color: var(--text);
-	font-size: 12px;
-	font-weight: 700;
-	letter-spacing: .01em;
-	white-space: nowrap;
-}
-
-.hx-task-r1 .hx-source {
-	color: var(--muted);
-}
-
-.hx-task-r1 .hx-source span {
-	display: none;
-}
-
-.hx-task-tracker {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-weight: 500;
-}
-
-.hx-task-tracker::before {
-	content: "·";
-	margin-right: 6px;
-	color: var(--muted);
-}
-
-.hx-task-r3 .hx-badge {
-	flex: none;
-}
-
-.hx-task-title {
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	overflow: hidden;
-	font-size: 13px;
-	font-weight: 600;
-	line-height: 1.35;
-	overflow-wrap: anywhere;
-}
-
-.hx-task-r3 {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	min-width: 0;
-	margin-top: auto;
-	color: var(--muted);
-	font-size: 11px;
-	font-weight: 600;
-	white-space: nowrap;
-}
-
-.hx-task-worker {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.hx-task-meta {
-	flex: none;
-	padding: 1px 6px;
-	border-radius: 999px;
-	background: color-mix(in srgb, var(--muted) 12%, var(--panel));
-	font-weight: 600;
-}
-
-.hx-task-priority {
-	flex: none;
-	color: var(--hx-stopped);
-	font-weight: 700;
-}
-
-.hx-task-avatar {
-	flex: none;
-	margin-left: auto;
-	margin-right: -2px;
-	width: 20px;
-	height: 20px;
-	display: grid;
-	place-items: center;
-	border-radius: 50%;
-	background: color-mix(in srgb, var(--accent-text) 16%, var(--panel));
-	color: var(--accent-text);
-	font-size: 9px;
-	font-weight: 800;
-	letter-spacing: .03em;
-}
-
-.hx-critical-word {
-	flex: none;
-	color: var(--hx-path);
-}
-
-.hx-risk {
-	flex: none;
-	color: var(--hx-stopped);
-}
-
-.hx-task.critical {
-	border-left: 3px solid var(--hx-path);
-}
-
-.hx-task-not_started {
-	opacity: .8;
-}
-
-.hx-task-not_started:hover,
-.hx-task-not_started:focus-within,
-.hx-task.related {
-	opacity: 1;
-}
-
-.hx-task-working {
-	border-color: var(--hx-running);
-}
-
-.hx-task-waiting {
-	border-color: var(--hx-waiting);
-}
-
-.hx-task-stopped,
-.hx-task-failed {
-	border-color: var(--hx-stopped);
-}
-
-.hx-task.related {
-	border-color: color-mix(in srgb, var(--accent-text) 55%, var(--line));
-}
-
-.hx-task.move-pending {
-	opacity: .55;
-}
-
-.hx-task-pin {
-	position: absolute;
-	top: 8px;
-	right: 6px;
-	width: 22px;
-	height: 22px;
-	display: grid;
-	place-items: center;
-	border: 0;
-	border-radius: 6px;
-	background: transparent;
-	color: var(--muted);
-	opacity: 0;
-}
-
-.hx-task:hover .hx-task-pin,
-.hx-task:focus-within .hx-task-pin,
-.hx-task-pin.on,
-.hx-task-pin:focus-visible {
-	opacity: 1;
-}
-
-.hx-task-pin.on {
-	color: var(--accent-text);
-}
-
-.hx-epic {
-	display: grid;
-	gap: 3px;
-	align-content: start;
-	padding: 8px 10px;
-}
-
-.hx-board-legend .hx-path-note {
-	color: var(--hx-path);
-	font-weight: 700;
-}
-
 /* ── Run drawer ─────────────────────────────────────────────────────────── */
 
 .hx .plan-drawer-body.hx-drawer-body {
@@ -2250,8 +1848,7 @@ a.hx-source:hover {
 /* ── Motion ─────────────────────────────────────────────────────────────── */
 /* At most two things move on a screen; tables, findings, counts and words never do. */
 
-.hx-stage-working::after,
-.hx-task-working::after {
+.hx-stage-working::after {
 	content: "";
 	position: absolute;
 	inset: -4px;
@@ -2259,11 +1856,6 @@ a.hx-source:hover {
 	border-radius: 13px;
 	pointer-events: none;
 	animation: hx-pulse 1.8s ease-in-out infinite;
-}
-
-.hx-task-working::after {
-	inset: -3px;
-	border-radius: 12px;
 }
 
 .hx-stage.just-done {
@@ -2286,17 +1878,11 @@ a.hx-source:hover {
 	animation: hx-flow 1.4s linear infinite;
 }
 
-.hx-edges path.live {
-	animation: hx-edge-flow 1.4s linear infinite;
-}
-
-.hx-stage,
-.hx-task {
+.hx-stage {
 	transition: transform .15s ease, border-color .15s ease;
 }
 
-.hx-stage:hover,
-.hx-task:hover {
+.hx-stage:hover {
 	transform: translateY(-1px);
 	border-color: color-mix(in srgb, var(--accent-text) 55%, var(--line));
 }
@@ -2350,8 +1936,7 @@ a.hx-source:hover {
 
 @media (prefers-reduced-motion: reduce) {
 	/* The working ring stays, still. */
-	.hx-stage-working::after,
-	.hx-task-working::after {
+	.hx-stage-working::after {
 		animation: none;
 		opacity: .9;
 	}
@@ -2375,20 +1960,14 @@ a.hx-source:hover {
 		animation: none;
 		background: var(--hx-running);
 	}
-	.hx-edges path.live {
-		animation: none;
-		stroke-dasharray: none;
-	}
 	/* The words "Reconnecting…" carry the state without the blink. */
 	.hx-connection.reconnecting .hx-connection-dot {
 		animation: none;
 	}
-	.hx-stage,
-	.hx-task {
+	.hx-stage {
 		transition: none;
 	}
-	.hx-stage:hover,
-	.hx-task:hover {
+	.hx-stage:hover {
 		transform: none;
 	}
 }

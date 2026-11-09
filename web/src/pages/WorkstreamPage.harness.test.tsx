@@ -113,18 +113,18 @@ describe('WorkstreamPage with the harness', () => {
 describe('WorkstreamPage board views', () => {
 	class FakeResizeObserver { observe() {} disconnect() {} unobserve() {} }
 
-	it('switches the board to the waves and to the queue, with the side panel and the Finder', async () => {
+	it('switches between the Board and the Task Queue, with the side panel and the Finder', async () => {
 		vi.stubGlobal('ResizeObserver', FakeResizeObserver);
 		const fetchMock = stubBoard();
 		renderBoard();
 		await screen.findByText('Claude · Opus 5.5');
 		const switcher = screen.getByRole('group', { name: 'Board view' });
-		fireEvent.click(within(switcher).getByRole('button', { name: 'Waves' }));
-		expect(await screen.findByRole('region', { name: /Wave 0/ })).toBeInTheDocument();
-		fireEvent.click(within(switcher).getByRole('button', { name: 'Queue' }));
-		const queue = await screen.findByRole('list', { name: 'Queue in order' });
+		expect(within(switcher).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Board', 'Task Queue']);
+		expect(within(switcher).getByRole('button', { name: 'Board' })).toHaveAttribute('aria-pressed', 'true');
+		fireEvent.click(within(switcher).getByRole('button', { name: 'Task Queue' }));
+		const queue = await screen.findByRole('list', { name: 'Task Queue in order' });
 		expect(within(queue).getAllByRole('listitem')).toHaveLength(3);
-		const side = screen.getByRole('complementary', { name: 'About the queue' });
+		const side = screen.getByRole('complementary', { name: 'About the Task Queue' });
 		expect(within(side).getByRole('heading', { name: 'Why here' })).toBeInTheDocument();
 		expect(within(side).getByRole('heading', { name: 'What starts next' })).toBeInTheDocument();
 		const foundRow = within(queue).getAllByRole('listitem').find((row) => row.textContent?.includes('Found by the Finder'))!;

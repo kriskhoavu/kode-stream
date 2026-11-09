@@ -1074,7 +1074,7 @@ export interface HarnessTask {
   runId?: string;
   attempts: number;
   revision: number;
-  /** Ids of the tasks this one waits for; drives the wave board. */
+  /** Ids of the tasks this one waits for: the Task Queue says "Waits for" and starts it only after them. */
   dependsOn: string[];
   milestone?: string;
   epic?: string;

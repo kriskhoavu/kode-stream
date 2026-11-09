@@ -38,7 +38,7 @@ lease that expires is recovered on the next tick.
 | Adapters    | `internal/harness/adapters/*`                | Claude Code, Codex, OpenCode, scouts, git worktree, PRs, webhook.            |
 | Storage     | `internal/storage/sql_harness_repository.go` | SQLite and Postgres implementation of `domain.Repository`.                   |
 | Transport   | `internal/server/api/harness_*.go`           | Dashboard routes, bot routes, the event stream.                              |
-| Frontend    | `web/src/features/harness`, Workstream board | Harness-aware cards, the card's Agents tab, Queue and Waves views, settings. |
+| Frontend    | `web/src/features/harness`, Workstream board | Harness-aware cards, the card's Agents tab, the Task Queue view, settings.   |
 
 ## Boundaries
 

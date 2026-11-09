@@ -14,7 +14,7 @@ P0 Plan ─> B1 Core ─> B2 Scout + sorter ─> B3 Claude Code + plan stage ─
                           └─> F3 Waves ─────┴─> F4 Drawer ─> F6 Polish
                           └─> F5 Settings (after B3) ───────┘
 I1 ─> M1 Sources ─> M2 Cards ─> M3 Agents tab ─> M4 Run from a card ─┐
-                          └─> M5 Queue + Waves ──────────────────────┴─> M6 Remove the Harness page
+                          └─> M5 Queue + Waves ──────────────────────┴─> M6 Remove the Harness page ─> M7 Board · Task Queue
 ```
 
 ## Terminology Lock
@@ -57,6 +57,7 @@ I1 ─> M1 Sources ─> M2 Cards ─> M3 Agents tab ─> M4 Run from a card ─�
 | M4    | Run with the harness from a card            | Fullstack | M3          | Done   |
 | M5    | Queue and Waves as board views              | Frontend  | M2          | Done   |
 | M6    | Remove the Harness page                     | Fullstack | M3, M4, M5  | Done   |
+| M7    | Board and Task Queue, without Waves         | Frontend  | M5, M6      | Done   |
 
 ### P0 Plan folder
 
@@ -186,6 +187,15 @@ note) from `HarnessSettings`; the Harness navigation button, count pill, `Harnes
 wiki, atlas and `AGENTS.md` updated.
 Verification: `make verify` in kode-stream; `docs/atlas/build.sh --check` in fen.
 Commit: `PM-044: Fold the Harness page into the Workstream board`.
+
+### M7 Board and Task Queue, without Waves
+
+The Waves view repeated the Task Queue: its only addition was a picture of which task waits for which, and the
+Task Queue already says "Waits for" on each row. Deliverables: the view switcher reads Board · Task Queue;
+`WaveBoard`, `TaskCard`, `DependencyEdges`, `waves.ts`, their tests and their styles removed; the task drawer's Move
+up and Move down step through the Task Queue; wiki, `AGENTS.md` and the atlas updated.
+Verification: `make verify` in kode-stream; `docs/atlas/build.sh --check` in fen.
+Commit: `PM-044: Drop the Waves view and name the board's views Board and Task Queue`.
 
 ## Out Of Scope
 

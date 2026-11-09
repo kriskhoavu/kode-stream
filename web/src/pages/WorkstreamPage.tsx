@@ -1,6 +1,6 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
-import { BookmarkPlus, Bot, ChevronDown, Columns3, ListOrdered, Waves as WavesIcon, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Bot, ChevronDown, Columns3, ListOrdered, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FacetMenu, SelectedFilters } from '../components/FacetMenu';
 import { FileMenu } from '../components/FileMenu';
 import { useModalDialog } from '../components/overlay';
@@ -47,13 +47,12 @@ import { takeOverByHand } from '../features/workstream/takeOver';
 import type { HarnessController } from '../features/harness/useHarness';
 import { useItemSessions, type ItemAgents } from '../features/workstream/useItemSessions';
 import { useBoardHarness } from '../features/workstream/useBoardHarness';
-import { isSyntheticItem, joinHarness, tasksForWorkspace, workedBy, workedByLabels, type CardWork } from '../features/workstream/harnessJoin';
+import { isSyntheticItem, joinHarness, queueOrder, tasksForWorkspace, workedBy, workedByLabels, type CardWork } from '../features/workstream/harnessJoin';
 import { ByHandChip, HarnessCardChips } from '../features/workstream/HarnessCardChips';
 import { NeedsYouStrip } from '../features/workstream/NeedsYouStrip';
 import { RunWithHarnessDialog } from '../features/workstream/RunWithHarnessDialog';
 import { QueueView } from '../features/workstream/QueueView';
 import { useTaskActions } from '../features/workstream/useTaskActions';
-import { WaveBoard } from '../features/harness/WaveBoard';
 import { RunDrawer } from '../features/harness/RunDrawer';
 import type { HarnessRunTab as HarnessRunTabId } from '../app/router';
 import type { HarnessTask } from '../lib/types';
@@ -61,12 +60,12 @@ import '../features/harness/harness.css';
 import '../features/workstream/harnessCards.css';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
-type BoardView = 'status' | 'waves' | 'queue';
-const boardViews: { id: BoardView; label: string; icon: typeof Columns3 }[] = [{ id: 'status', label: 'Status', icon: Columns3 }, { id: 'waves', label: 'Waves', icon: WavesIcon }, { id: 'queue', label: 'Queue', icon: ListOrdered }];
+type BoardView = 'board' | 'queue';
+const boardViews: { id: BoardView; label: string; icon: typeof Columns3 }[] = [{ id: 'board', label: 'Board', icon: Columns3 }, { id: 'queue', label: 'Task Queue', icon: ListOrdered }];
 const boardViewPreference = 'workstreamBoardView';
 function readBoardView(): BoardView {
   const value = readStringPreference(boardViewPreference);
-  return value === 'waves' || value === 'queue' ? value : 'status';
+  return value === 'queue' ? value : 'board';
 }
 type DrawerSideTab = 'info' | 'git' | 'jira' | 'agents';
 type DrawerFileOption = { id: string; path: string; label: string };
@@ -155,10 +154,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const harnessJoin = useMemo(() => joinHarness(items, harness.state, workspace?.id), [items, harness.state, workspace?.id]);
   const boardItems = useMemo(() => harnessJoin.synthetic.length ? [...items, ...harnessJoin.synthetic] : items, [items, harnessJoin.synthetic]);
   const workedByOf = useCallback((item: ItemSummary) => workedBy(harnessJoin.byItemId.get(item.id)), [harnessJoin]);
-  // The board's views: the status columns, the same cards as waves, or the ranked queue.
+  // The board's views: the cards in their status columns, or the harness's tasks in the order it takes them.
   const [boardView, setBoardViewState] = useState<BoardView>(() => readBoardView());
   const setBoardView = (view: BoardView) => { setBoardViewState(view); writePreference(boardViewPreference, view); };
-  const shownView: BoardView = harnessOn ? boardView : 'status';
+  const shownView: BoardView = harnessOn ? boardView : 'board';
   const boardTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id), [harness.state, workspace?.id]);
   const finishedTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id, { finished: true }), [harness.state, workspace?.id]);
   const taskActions = useTaskActions(harness);
@@ -800,17 +799,12 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       {harnessOn && <NeedsYouStrip state={harness.state} onApprove={harness.approve} onReject={harness.reject} onOpenTask={openTask} />}
-      {shownView === 'waves' && (
-        <div className="hx board-waves">
-          <WaveBoard tasks={boardTasks} allTasks={harness.state.tasks} runs={harness.state.runs} pendingIds={taskActions.pendingIds} onOpenTask={openTask} onPin={taskActions.pin} onMove={taskActions.move} onRefresh={() => void harness.refresh()} />
-        </div>
-      )}
       {shownView === 'queue' && <QueueView tasks={boardTasks} finished={finishedTasks} harness={harness} onOpenTask={openTask} />}
       {runDialogItem && <RunWithHarnessDialog item={runDialogItem} workspace={workspace} harness={harness} onClose={() => setRunDialogItemId('')} onStarted={() => { setRunDialogItemId(''); void harness.refresh(); }} />}
       {taskDrawer && (
-        <RunDrawer state={harness.state} client={harness.client} taskId={taskDrawer.taskId} tab={taskDrawer.tab} wave={[]} onTabChange={(tab) => setTaskDrawer({ ...taskDrawer, tab })} onClose={() => setTaskDrawer(undefined)} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={taskActions.pin} onMove={taskActions.move} onStart={taskActions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />
+        <RunDrawer state={harness.state} client={harness.client} taskId={taskDrawer.taskId} tab={taskDrawer.tab} queue={queueOrder(harness.state, workspace?.id)} onTabChange={(tab) => setTaskDrawer({ ...taskDrawer, tab })} onClose={() => setTaskDrawer(undefined)} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={taskActions.pin} onMove={taskActions.move} onStart={taskActions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />
       )}
-      {shownView === 'status' && <div className="workstream-board" style={boardStyle} aria-busy={loading}>
+      {shownView === 'board' && <div className="workstream-board" style={boardStyle} aria-busy={loading}>
         {displayedStatuses.map((column) => (
           <Fragment key={column}>
             <WorkstreamColumn

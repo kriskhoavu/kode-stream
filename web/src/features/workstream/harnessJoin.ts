@@ -1,6 +1,6 @@
 import type { HarnessApproval, HarnessRun, HarnessStageKind, HarnessTask, ItemSummary } from '../../lib/types';
 import type { HarnessState } from '../harness/harnessState';
-import { queueTasks, waitsFor } from '../harness/harnessState';
+import { compareTasks, queueTasks, waitsFor } from '../harness/harnessState';
 import type { HxStatus } from '../harness/vocabulary';
 import { stageKindLabels, taskStatus } from '../harness/vocabulary';
 
@@ -151,6 +151,11 @@ export function tasksForWorkspace(state: HarnessState, workspaceId?: string, opt
 	return queueTasks(state.tasks, { includeFinished: true })
 		.filter((task) => mine(task) && isFinishedTask(task))
 		.sort((a, b) => Date.parse(b.updatedAt ?? '') - Date.parse(a.updatedAt ?? '') || a.source.key.localeCompare(b.source.key));
+}
+
+/** A workspace's unfinished tasks in the order the Task Queue lists them: Move up and Move down step through it. */
+export function queueOrder(state: HarnessState, workspaceId?: string): HarnessTask[] {
+	return tasksForWorkspace(state, workspaceId).filter((task) => !isFinishedTask(task)).sort(compareTasks);
 }
 
 /** The approval a stuck task retries through: its waiting resume gate. */

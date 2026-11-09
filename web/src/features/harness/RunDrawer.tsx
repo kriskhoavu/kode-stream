@@ -39,15 +39,15 @@ const tabs: { id: HarnessRunTab; label: string }[] = [
  * never means leaving it. The waiting gate sits at the top; the tabs hold
  * the stages, the findings, the changed files, the live agent and the links.
  */
-export function RunDrawer({ state, client, taskId, tab, agentRunId, wave, onTabChange, onClose, onOpenPipeline, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onSetQuestions, askDefault = true }: {
+export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTabChange, onClose, onOpenPipeline, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onSetQuestions, askDefault = true }: {
 	state: HarnessState;
 	client: HarnessClient;
 	taskId: string;
 	tab: HarnessRunTab;
 	/** The conversation the Live tab opens on; otherwise the working or latest agent. */
 	agentRunId?: string;
-	/** The task's wave in queue order, for Move up and Move down. */
-	wave: HarnessTask[];
+	/** The workspace's Task Queue in order, for Move up and Move down. */
+	queue: HarnessTask[];
 	onTabChange: (tab: HarnessRunTab) => void;
 	onClose: () => void;
 	onOpenPipeline?: (runId: string) => void;
@@ -96,7 +96,7 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, wave, onTabC
 	const waits = waitsFor(task, state.tasks);
 	const status = run ? runStatus(run) : taskStatus(task, waits);
 	const waiting = Object.values(state.approvals).filter((approval) => approval.taskId === task.id && (approval.state === 'requested' || state.decisions[approval.id]));
-	const position = wave.findIndex((item) => item.id === task.id);
+	const position = queue.findIndex((item) => item.id === task.id);
 
 	const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
 		const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
@@ -155,11 +155,13 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, wave, onTabC
 						</section>
 					)}
 
-					<section className="hx-drawer-queue" aria-label="Place in the queue">
-						<p>{waits.length ? <>Waits for: <b>{waits.join(', ')}</b></> : 'Waits for nothing.'}{position >= 0 && <span className="hx-muted"> · {position + 1} of {wave.length} in its wave</span>}</p>
+					<section className="hx-drawer-queue" aria-label="Place in the Task Queue">
+						<p>{waits.length ? <>Waits for: <b>{waits.join(', ')}</b></> : 'Waits for nothing.'}{position >= 0 && <span className="hx-muted"> · {position + 1} of {queue.length} in the Task Queue</span>}</p>
 						<div className="hx-drawer-queue-actions">
-							<button type="button" className="secondary hx-small-button" disabled={position <= 0} onClick={() => onMove(task, wave[position - 1])}><ArrowUp size={14} aria-hidden="true" />Move up</button>
-							<button type="button" className="secondary hx-small-button" disabled={position < 0 || position >= wave.length - 1} onClick={() => onMove(task, wave[position + 2])}><ArrowDown size={14} aria-hidden="true" />Move down</button>
+							{position >= 0 && <>
+								<button type="button" className="secondary hx-small-button" disabled={position === 0} onClick={() => onMove(task, queue[position - 1])}><ArrowUp size={14} aria-hidden="true" />Move up</button>
+								<button type="button" className="secondary hx-small-button" disabled={position >= queue.length - 1} onClick={() => onMove(task, queue[position + 2])}><ArrowDown size={14} aria-hidden="true" />Move down</button>
+							</>}
 							<button type="button" className="secondary hx-small-button" aria-pressed={task.pinned} onClick={() => onPin(task, !task.pinned)}>{task.pinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}{task.pinned ? 'Unpin' : 'Pin first'}</button>
 						</div>
 					</section>
