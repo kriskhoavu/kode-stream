@@ -5,30 +5,40 @@
 	box-shadow: var(--hx-ring), 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 
-/* A card an agent works on now wears the harness's working ring, pulsing. */
-.plan-card.working-card {
-	position: relative;
+.plan-card.harness-card.no-plan {
+	border-style: dashed;
 }
 
-.plan-card.working-card::after {
+/* A card an agent works on now looks like the working step of its run's pipeline:
+ * a solid border in the working colour and a ring around it that breathes. The
+ * step's ring scales, which on a tall card would swing far; this one grows by the
+ * same few pixels the step's does. */
+.plan-card.harness-card.working-card {
+	position: relative;
+	border-color: var(--hx-running);
+	border-style: solid;
+}
+
+.plan-card.harness-card.working-card::after {
 	content: "";
 	position: absolute;
-	inset: -3px;
+	inset: -4px;
 	border: 2px solid var(--hx-running);
-	border-radius: 11px;
+	border-radius: 12px;
 	pointer-events: none;
-	animation: hx-pulse 1.8s ease-in-out infinite;
+	animation: hx-card-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes hx-card-pulse {
+	0%, 100% { opacity: .9; inset: -4px; border-radius: 12px; }
+	50% { opacity: .25; inset: -7px; border-radius: 15px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.plan-card.working-card::after {
+	.plan-card.harness-card.working-card::after {
 		animation: none;
 		opacity: .9;
 	}
-}
-
-.plan-card.harness-card.no-plan {
-	border-style: dashed;
 }
 
 .plan-card-harness {
