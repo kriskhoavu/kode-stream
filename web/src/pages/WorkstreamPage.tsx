@@ -804,7 +804,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       {shownView === 'queue' && <QueueView tasks={boardTasks} finished={finishedTasks} harness={harness} onOpenTask={openTask} />}
       {runDialogItem && <RunWithHarnessDialog item={runDialogItem} workspace={workspace} harness={harness} onClose={() => setRunDialogItemId('')} onStarted={() => { setRunDialogItemId(''); void harness.refresh(); }} />}
       {taskDrawer && (
-        <RunDrawer state={harness.state} client={harness.client} taskId={taskDrawer.taskId} tab={taskDrawer.tab} queue={queueOrder(harness.state, workspace?.id)} onTabChange={(tab) => setTaskDrawer({ ...taskDrawer, tab })} onClose={() => setTaskDrawer(undefined)} onOpenDetails={onOpenHarnessRun} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={taskActions.pin} onMove={taskActions.move} onStart={taskActions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />
+        <RunDrawer state={harness.state} client={harness.client} taskId={taskDrawer.taskId} tab={taskDrawer.tab} queue={queueOrder(harness.state, workspace?.id)} onTabChange={(tab) => setTaskDrawer({ ...taskDrawer, tab })} onClose={() => setTaskDrawer(undefined)} onOpenDetails={onOpenHarnessRun} onCancel={harness.cancelRun} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={taskActions.pin} onMove={taskActions.move} onStart={taskActions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />
       )}
       {shownView === 'board' && <div className="workstream-board" style={boardStyle} aria-busy={loading}>
         {displayedStatuses.map((column) => (

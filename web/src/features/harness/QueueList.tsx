@@ -1,7 +1,8 @@
 import { GripVertical, Pin, PinOff, Play, RotateCcw } from 'lucide-react';
 import type { DragEvent } from 'react';
 import { useState } from 'react';
-import type { HarnessTask } from '../../lib/types';
+import type { HarnessRun, HarnessTask } from '../../lib/types';
+import { StopRunButton, canStopRun } from './StopRunButton';
 import { HxStatusBadge } from './HxStatusBadge';
 import { SourceBadge } from './SourceBadge';
 import { taskStatus } from './vocabulary';
@@ -13,9 +14,13 @@ import { canStartTask, startPending, waitsFor } from './harnessState';
  * or retry a task, select a row for the side panel, and drag a row above
  * another to move it in the Task Queue.
  */
-export function QueueList({ tasks, allTasks, onPin, onOpen, onSelect, selectedId, showScore = false, onStart, onRetry, canRetry, onMove, pendingIds }: {
+export function QueueList({ tasks, allTasks, runs, onPin, onOpen, onSelect, selectedId, showScore = false, onStart, onRetry, canRetry, onMove, onStop, pendingIds }: {
 	tasks: HarnessTask[];
 	allTasks: Record<string, HarnessTask>;
+	/** The runs by id, so a row whose run is under way can offer Stop. */
+	runs?: Record<string, HarnessRun>;
+	/** Stops a row's run, after a confirmation. */
+	onStop?: (run: HarnessRun) => Promise<void>;
 	onPin: (task: HarnessTask, pinned: boolean) => void;
 	onOpen: (task: HarnessTask) => void;
 	/** Chooses a row for the side panel. */
@@ -56,6 +61,7 @@ export function QueueList({ tasks, allTasks, onPin, onOpen, onSelect, selectedId
 				const startable = onStart && canStartTask(task);
 				const starting = startPending(task);
 				const retryable = onRetry && canRetry?.(task);
+				const run = task.runId ? runs?.[task.runId] : undefined;
 				const classes = ['hx-row', 'hx-queue-row', selected ? 'selected' : '', onMove ? 'draggable' : '', dragId === task.id ? 'dragging' : '', pending ? 'move-pending' : ''].filter(Boolean).join(' ');
 				return (
 					<li
@@ -83,6 +89,7 @@ export function QueueList({ tasks, allTasks, onPin, onOpen, onSelect, selectedId
 						<HxStatusBadge status={status} />
 						<span className="hx-queue-actions">
 							{startable && <button type="button" className="primary hx-small-button" disabled={pending || starting} onClick={(event) => { event.stopPropagation(); onStart(task); }}><Play size={13} aria-hidden="true" />{starting ? 'Starting…' : task.state === 'cancelled' ? 'Start again' : 'Start'}</button>}
+							{onStop && canStopRun(run) && <StopRunButton task={task} run={run} onCancel={onStop} compact />}
 							{retryable && <button type="button" className="secondary hx-small-button" disabled={pending} onClick={(event) => { event.stopPropagation(); onRetry(task); }}><RotateCcw size={13} aria-hidden="true" />Retry</button>}
 							<button type="button" className={task.pinned ? 'hx-icon-toggle on' : 'hx-icon-toggle'} aria-pressed={task.pinned} aria-label={task.pinned ? `Unpin ${task.source.key}` : `Pin ${task.source.key} to the top`} disabled={pending} onClick={(event) => { event.stopPropagation(); onPin(task, !task.pinned); }}>
 								{task.pinned ? <PinOff size={15} aria-hidden="true" /> : <Pin size={15} aria-hidden="true" />}

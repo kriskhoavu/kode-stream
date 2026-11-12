@@ -29,6 +29,22 @@ const state: HarnessState = {
 };
 
 describe('QueueView', () => {
+	it('stops a row whose run is under way, after a confirmation, without selecting the row', async () => {
+		const harness = controller(state);
+		const cancelRun = vi.fn().mockResolvedValue(undefined);
+		harness.cancelRun = cancelRun;
+		render(<QueueView tasks={Object.values(state.tasks)} harness={harness} onOpenTask={vi.fn()} />);
+		const rows = within(screen.getByRole('list', { name: 'Task Queue in order' })).getAllByRole('listitem');
+		expect(within(rows[1]).queryByRole('button', { name: 'Stop PM-1' })).not.toBeInTheDocument();
+		fireEvent.click(rows[1]);
+		fireEvent.click(within(rows[0]).getByRole('button', { name: 'Stop PM-2' }));
+		const dialog = screen.getByRole('dialog', { name: 'Stop PM-2?' });
+		expect(dialog).toHaveTextContent('PM-2 stays in the Task Queue as Stopped');
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Stop this task' }));
+		await waitFor(() => expect(cancelRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'run-2' })));
+		expect(rows[1]).toHaveClass('selected');
+	});
+
 	it('ranks the rows with their scores, explains the chosen one and says what starts next', () => {
 		render(<QueueView tasks={Object.values(state.tasks)} harness={controller(state)} onOpenTask={vi.fn()} />);
 		const rows = within(screen.getByRole('list', { name: 'Task Queue in order' })).getAllByRole('listitem');

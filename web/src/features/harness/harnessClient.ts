@@ -68,7 +68,7 @@ export interface HarnessClient {
 	saveSettings(settings: HarnessSettings): Promise<HarnessSettings>;
 	/** Deletes every task no run has touched, in one workspace or all; the Finder refills the queue on its next look. */
 	clearQueue(workspaceId?: string): Promise<{ removed: number }>;
-	/** Stops a run: the working agent is killed and the task leaves the queue. */
+	/** Stops a run: the working agent is killed and the task stays in the Task Queue as Stopped. */
 	cancelRun(run: HarnessRun, reason?: string): Promise<HarnessRun>;
 	/** The workspaces a source can look in, with the Jira project key when the workspace has a Jira connection. */
 	workspaces?(signal?: AbortSignal): Promise<HarnessWorkspaceOption[]>;

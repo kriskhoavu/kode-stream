@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Square } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { RefreshCw } from 'lucide-react';
 import type { HarnessApproval, HarnessRun } from '../../lib/types';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { StopRunButton, canStopRun } from './StopRunButton';
 import type { HarnessRunTab } from '../../app/router';
 import type { HarnessState } from './harnessState';
 import { GateCard } from './GateCard';
@@ -31,8 +31,6 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 	onOpenTab?: (tab: HarnessRunTab, agentRunId?: string) => void;
 }) {
 	const now = useNow(30_000);
-	const [confirmStop, setConfirmStop] = useState(false);
-	const [stopping, setStopping] = useState(false);
 	const summary = runId ? state.runs[runId] : undefined;
 	const detail = runId ? state.details[runId] : undefined;
 	// Reload the detail whenever the run's summary moves, so polling and events both keep it current.
@@ -75,21 +73,8 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 				<span className="hx-run-head-spacer" />
 				<span className="hx-muted hx-num">So far: {plural(agentRunCount, 'agent run')} · {formatMinutes(run.totals.durationMs)} · <CostCounter value={run.totals.costUsd} /></span>
 				<button type="button" className="secondary hx-small-button" onClick={() => { onRefresh(); void loadRun(run.id); }}><RefreshCw size={14} aria-hidden="true" />Refresh</button>
-				{onCancel && (run.state === 'running' || run.state === 'blocked') && (
-					<button type="button" className="secondary hx-small-button hx-stop-button" disabled={stopping} onClick={() => setConfirmStop(true)}><Square size={14} aria-hidden="true" />{stopping ? 'Stopping…' : 'Stop'}</button>
-				)}
+				{onCancel && canStopRun(run) && <StopRunButton task={task} run={run} working={working} onCancel={onCancel} />}
 			</div>
-
-			{confirmStop && (
-				<ConfirmDialog
-					title={`Stop ${task.source.key}?`}
-					message={working ? `The ${agentRoleLabels[working.role]} is killed mid-step and the run is cancelled. ${task.source.key} leaves the queue until its ticket changes. Nothing is committed to the baseline.` : `The run is cancelled and ${task.source.key} leaves the queue until its ticket changes. Nothing is committed to the baseline.`}
-					confirmLabel="Stop this task"
-					danger
-					onCancel={() => setConfirmStop(false)}
-					onConfirm={() => { setConfirmStop(false); setStopping(true); void onCancel?.(run).finally(() => setStopping(false)); }}
-				/>
-			)}
 
 			{waiting.map((approval) => (
 				<GateCard

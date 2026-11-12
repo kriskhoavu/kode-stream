@@ -46,6 +46,8 @@ export function QueueView({ tasks, finished = [], harness, onOpenTask }: {
 			{shown !== 'finished' && <QueueList
 				tasks={ordered}
 				allTasks={state.tasks}
+				runs={state.runs}
+				onStop={harness.cancelRun}
 				onPin={actions.pin}
 				onOpen={onOpenTask}
 				onSelect={(task) => setSelectedId(task.id)}

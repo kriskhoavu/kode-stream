@@ -135,6 +135,15 @@ describe('RunDrawer', () => {
 		expect(screen.queryByRole('button', { name: 'Open details' })).not.toBeInTheDocument();
 	});
 
+	it('stops a running task from its panel, after a confirmation', async () => {
+		const { client, state } = await setup('task-pm-02', 'run-pm-02');
+		const onCancel = vi.fn().mockResolvedValue(undefined);
+		render(<RunDrawer state={state} client={client} taskId="task-pm-02" tab="stages" queue={[]} onTabChange={vi.fn()} onClose={vi.fn()} onCancel={onCancel} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onPin={vi.fn()} onMove={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+		fireEvent.click(within(screen.getByRole('dialog', { name: 'Stop PM-02?' })).getByRole('button', { name: 'Stop this task' }));
+		await waitFor(() => expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ id: 'run-pm-02' })));
+	});
+
 	it('opens an unstarted task on its ticket, with what the tracker said about it', async () => {
 		const { client, state } = await setup('task-pm-04');
 		render(<Harnessed state={state} client={client} taskId="task-pm-04" queue={[]} initialTab="ticket" />);

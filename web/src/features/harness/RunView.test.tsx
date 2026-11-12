@@ -62,7 +62,7 @@ describe('RunView', () => {
 		const onCancel = vi.fn().mockResolvedValue(undefined);
 		render(<RunView state={state} runId="run-pm-02" onSelectRun={vi.fn()} onRefresh={vi.fn()} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onCancel={onCancel} />);
 		fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
-		expect(screen.getByRole('dialog', { name: 'Stop PM-02?' })).toHaveTextContent(/The Builder is killed mid-step/);
+		expect(screen.getByRole('dialog', { name: 'Stop PM-02?' })).toHaveTextContent(/The Builder is stopped mid-step and the run is cancelled. PM-02 stays in the Task Queue as Stopped/);
 		fireEvent.click(screen.getByRole('button', { name: 'Stop this task' }));
 		expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ id: 'run-pm-02' }));
 	});

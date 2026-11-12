@@ -28,7 +28,7 @@ export function HarnessRunPage({ runId, task, onBack }: { runId: string; task: H
 				</div>
 			</header>
 			<RunView state={harness.state} runId={runId} onSelectRun={() => undefined} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onCancel={harness.cancelRun} onOpenTab={(tab, agentRunId) => setRunTab({ tab, agentRunId })} />
-			{runTab && <RunDrawer state={harness.state} client={harness.client} taskId={task.id} tab={runTab.tab} agentRunId={runTab.agentRunId} queue={queueOrder(harness.state, task.workspaceId)} onTabChange={(tab) => setRunTab({ tab })} onClose={() => setRunTab(undefined)} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={actions.pin} onMove={actions.move} onStart={actions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />}
+			{runTab && <RunDrawer state={harness.state} client={harness.client} taskId={task.id} tab={runTab.tab} agentRunId={runTab.agentRunId} queue={queueOrder(harness.state, task.workspaceId)} onTabChange={(tab) => setRunTab({ tab })} onClose={() => setRunTab(undefined)} onCancel={harness.cancelRun} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={actions.pin} onMove={actions.move} onStart={actions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />}
 		</section>
 	);
 }
