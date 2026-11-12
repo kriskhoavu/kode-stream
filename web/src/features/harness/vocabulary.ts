@@ -64,6 +64,16 @@ export const stageKindLabels: Record<HarnessStageKind, string> = {
 	draft_pr: 'Draft pull request'
 };
 
+/** Where a run ended, after its status: "Stopped while planning". */
+export const stageKindWhere: Record<HarnessStageKind, string> = {
+	plan: 'while planning',
+	plan_approval: 'at your plan approval',
+	implement: 'while building',
+	qa: 'while testing',
+	pr_approval: 'at your pull request approval',
+	draft_pr: 'while opening the draft pull request'
+};
+
 /** The verb shown on a working row: "Planning · round 1 of 3". */
 export const stageKindDoing: Record<HarnessStageKind, string> = {
 	plan: 'Planning',
