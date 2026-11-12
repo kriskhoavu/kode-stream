@@ -123,6 +123,18 @@ describe('RunDrawer', () => {
 		expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-pm-02' }));
 	});
 
+	it('opens a run whole from Open details, and offers it only once there is a run', async () => {
+		const { client, state } = await setup('task-pm-02', 'run-pm-02');
+		const onOpenDetails = vi.fn();
+		render(<RunDrawer state={state} client={client} taskId="task-pm-02" tab="stages" queue={[]} onTabChange={vi.fn()} onClose={vi.fn()} onOpenDetails={onOpenDetails} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onPin={vi.fn()} onMove={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Open details' }));
+		expect(onOpenDetails).toHaveBeenCalledWith('run-pm-02');
+		cleanup();
+		const unstarted = await setup('task-pm-04');
+		render(<RunDrawer state={unstarted.state} client={unstarted.client} taskId="task-pm-04" tab="ticket" queue={[]} onTabChange={vi.fn()} onClose={vi.fn()} onOpenDetails={onOpenDetails} loadRun={vi.fn().mockResolvedValue(undefined)} onApprove={vi.fn()} onReject={vi.fn()} onPin={vi.fn()} onMove={vi.fn()} />);
+		expect(screen.queryByRole('button', { name: 'Open details' })).not.toBeInTheDocument();
+	});
+
 	it('opens an unstarted task on its ticket, with what the tracker said about it', async () => {
 		const { client, state } = await setup('task-pm-04');
 		render(<Harnessed state={state} client={client} taskId="task-pm-04" queue={[]} initialTab="ticket" />);

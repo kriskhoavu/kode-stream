@@ -287,6 +287,7 @@ export function App() {
             focusedItemId={route.focusedItemId}
             focusedSessionId={route.focusedSessionId}
             onOpenPlan={(itemId, view) => navigate({ name: 'item', itemId, view })}
+            onOpenHarnessRun={(runId) => navigate({ name: 'harness-run', runId })}
             onWorkspacesChanged={async () => { await refreshAppData(); }}
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
             onOpenReview={() => navigate({ name: 'review', location: { workspaceId: activeRepo?.id } })}
@@ -305,7 +306,7 @@ export function App() {
           onImported={(itemId) => { void refreshAppData(); navigate({ name: 'item', itemId }); }}
           onCheckoutSwitched={async () => { await refreshAppData(); navigate({ name: 'workstream' }); }}
         /></Suspense>}
-        {route.name === 'harness-run' && <Suspense fallback={<section className="empty-state">Opening the card for this run…</section>}><HarnessRunRedirect runId={route.runId} onResolved={(itemId) => replace({ name: 'item', itemId, view: 'run' })} onMissing={() => replace({ name: 'workstream' })} /></Suspense>}
+        {route.name === 'harness-run' && <Suspense fallback={<section className="empty-state">Opening this run…</section>}><HarnessRunRedirect runId={route.runId} onResolved={(itemId) => replace({ name: 'item', itemId, view: 'run' })} onMissing={() => replace({ name: 'workstream' })} onBack={() => navigate({ name: 'workstream' })} /></Suspense>}
         {route.name === 'not-found' && <section className="empty-state" role="alert"><h1>Page not found</h1><p>This link is not a Kode Stream route.</p><button type="button" className="primary" onClick={() => navigate({ name: 'workstream' })}>Go to Workstream</button></section>}
       </main>
 

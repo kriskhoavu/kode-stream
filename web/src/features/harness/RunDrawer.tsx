@@ -39,7 +39,7 @@ const tabs: { id: HarnessRunTab; label: string }[] = [
  * never means leaving it. The waiting gate sits at the top; the tabs hold
  * the stages, the findings, the changed files, the live agent and the links.
  */
-export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTabChange, onClose, onOpenPipeline, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onSetQuestions, askDefault = true }: {
+export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTabChange, onClose, onOpenDetails, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onSetQuestions, askDefault = true }: {
 	state: HarnessState;
 	client: HarnessClient;
 	taskId: string;
@@ -50,7 +50,8 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTab
 	queue: HarnessTask[];
 	onTabChange: (tab: HarnessRunTab) => void;
 	onClose: () => void;
-	onOpenPipeline?: (runId: string) => void;
+	/** Opens the run whole, full width: its stepper, plan, findings and conversations. */
+	onOpenDetails?: (runId: string) => void;
 	onOpenAgentSpace?: (workspaceId: string, view?: 'sessions') => void;
 	loadRun: (runId: string) => Promise<void>;
 	onApprove: (approval: HarnessApproval, reason?: string) => void;
@@ -121,7 +122,7 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTab
 						<p className="hx-drawer-status"><HxStatusBadge status={status} />{task.epic && <span className="hx-muted">{task.epic}</span>}{task.milestone && <span className="hx-muted">{task.milestone}</span>}</p>
 					</div>
 					<div className="drawer-actions">
-						{run && onOpenPipeline && <button type="button" className="secondary drawer-open-details" onClick={() => onOpenPipeline(run.id)}>Open pipeline</button>}
+						{run && onOpenDetails && <button type="button" className="secondary drawer-open-details" onClick={() => onOpenDetails(run.id)}>Open details</button>}
 						<button type="button" className="icon-button" aria-label="Close details" onClick={onClose}><X size={16} /></button>
 					</div>
 				</header>

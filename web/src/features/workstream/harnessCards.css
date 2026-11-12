@@ -5,6 +5,28 @@
 	box-shadow: var(--hx-ring), 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 
+/* A card an agent works on now wears the harness's working ring, pulsing. */
+.plan-card.working-card {
+	position: relative;
+}
+
+.plan-card.working-card::after {
+	content: "";
+	position: absolute;
+	inset: -3px;
+	border: 2px solid var(--hx-running);
+	border-radius: 11px;
+	pointer-events: none;
+	animation: hx-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.plan-card.working-card::after {
+		animation: none;
+		opacity: .9;
+	}
+}
+
 .plan-card.harness-card.no-plan {
 	border-style: dashed;
 }

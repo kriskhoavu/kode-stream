@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HarnessRunRedirect } from './HarnessRunRedirect';
 import { run, task } from '../harness/testData';
@@ -23,20 +23,26 @@ describe('HarnessRunRedirect', () => {
 		stub(['PM-1', 'pm-7']);
 		const onResolved = vi.fn();
 		const onMissing = vi.fn();
-		render(<HarnessRunRedirect runId="run-7" onResolved={onResolved} onMissing={onMissing} />);
+		render(<HarnessRunRedirect runId="run-7" onResolved={onResolved} onMissing={onMissing} onBack={vi.fn()} />);
 		await waitFor(() => expect(onResolved).toHaveBeenCalledWith('item-pm-7'));
 		expect(onMissing).not.toHaveBeenCalled();
 	});
 
-	it('falls back to the board when no card holds the run, or the run is unknown', async () => {
+	it('shows a Jira ticket\'s run whole when no card holds it, with a way back to the board', async () => {
 		stub(['PM-1']);
 		const onMissing = vi.fn();
-		render(<HarnessRunRedirect runId="run-7" onResolved={vi.fn()} onMissing={onMissing} />);
-		await waitFor(() => expect(onMissing).toHaveBeenCalled());
-		cleanup();
+		const onBack = vi.fn();
+		render(<HarnessRunRedirect runId="run-7" onResolved={vi.fn()} onMissing={onMissing} onBack={onBack} />);
+		expect(await screen.findByRole('region', { name: 'Harness run, full width' })).toHaveTextContent('Jira ticket/PM-7');
+		fireEvent.click(screen.getByRole('button', { name: 'Back to the board' }));
+		expect(onBack).toHaveBeenCalled();
+		expect(onMissing).not.toHaveBeenCalled();
+	});
+
+	it('sends an unknown run to the board', async () => {
 		stub([], false);
-		const onMissingAgain = vi.fn();
-		render(<HarnessRunRedirect runId="run-7" onResolved={vi.fn()} onMissing={onMissingAgain} />);
-		await waitFor(() => expect(onMissingAgain).toHaveBeenCalled());
+		const onMissing = vi.fn();
+		render(<HarnessRunRedirect runId="run-7" onResolved={vi.fn()} onMissing={onMissing} onBack={vi.fn()} />);
+		await waitFor(() => expect(onMissing).toHaveBeenCalled());
 	});
 });

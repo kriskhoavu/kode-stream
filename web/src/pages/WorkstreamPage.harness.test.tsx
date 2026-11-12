@@ -60,6 +60,8 @@ describe('WorkstreamPage with the harness', () => {
 		expect(within(card).getByText('Claude · Opus 5.5')).toBeInTheDocument();
 		expect(within(card).getByText('Build · round 2 of 3')).toBeInTheDocument();
 		expect(within(card).getByRole('progressbar', { name: 'Run progress' })).toHaveAttribute('aria-valuenow', '42');
+		expect(card.closest('.plan-card')).toHaveClass('working-card');
+		expect(screen.getByText('Found by the Finder').closest('.plan-card')).not.toHaveClass('working-card');
 		expect(screen.getByText('Found by the Finder')).toBeInTheDocument();
 		expect(screen.getByText('no plan yet')).toBeInTheDocument();
 		expect(screen.getByText('By hand')).toBeInTheDocument();

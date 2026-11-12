@@ -104,7 +104,7 @@ const emptyNewWorkItemDraft = (): NewWorkItemDraft => ({
 
 export { filterPlans };
 
-export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, focusedSessionId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces, onOpenReview }: {
+export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, focusedSessionId, onOpenPlan, onOpenHarnessRun, onWorkspacesChanged, onOpenWorkspaces, onOpenReview }: {
   workspace?: WorkspaceConfig;
   refreshKey: number;
   visibleStatuses?: ItemStatus[];
@@ -113,6 +113,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   focusedSessionId?: string;
   /** Opens the item page; `run` opens it on the harness run, full width. */
   onOpenPlan: (itemId: string, view?: 'run') => void;
+  /** Opens a harness run whole, full width: a plan card's on its item page, a Jira ticket's on a page of its own. */
+  onOpenHarnessRun?: (runId: string) => void;
   onWorkspacesChanged: () => void | Promise<void>;
   onOpenWorkspaces?: () => void;
   onOpenReview?: () => void;
@@ -802,7 +804,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       {shownView === 'queue' && <QueueView tasks={boardTasks} finished={finishedTasks} harness={harness} onOpenTask={openTask} />}
       {runDialogItem && <RunWithHarnessDialog item={runDialogItem} workspace={workspace} harness={harness} onClose={() => setRunDialogItemId('')} onStarted={() => { setRunDialogItemId(''); void harness.refresh(); }} />}
       {taskDrawer && (
-        <RunDrawer state={harness.state} client={harness.client} taskId={taskDrawer.taskId} tab={taskDrawer.tab} queue={queueOrder(harness.state, workspace?.id)} onTabChange={(tab) => setTaskDrawer({ ...taskDrawer, tab })} onClose={() => setTaskDrawer(undefined)} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={taskActions.pin} onMove={taskActions.move} onStart={taskActions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />
+        <RunDrawer state={harness.state} client={harness.client} taskId={taskDrawer.taskId} tab={taskDrawer.tab} queue={queueOrder(harness.state, workspace?.id)} onTabChange={(tab) => setTaskDrawer({ ...taskDrawer, tab })} onClose={() => setTaskDrawer(undefined)} onOpenDetails={onOpenHarnessRun} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={taskActions.pin} onMove={taskActions.move} onStart={taskActions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />
       )}
       {shownView === 'board' && <div className="workstream-board" style={boardStyle} aria-busy={loading}>
         {displayedStatuses.map((column) => (
@@ -1505,6 +1507,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   if (docs) classes.push('docs-plan');
   if (work) classes.push('harness-card');
   if (work?.task.needsYou || work?.waiting.length) classes.push('needs-you-card');
+  if (work?.status === 'working') classes.push('working-card');
   if (synthetic) classes.push('ticket-card');
   else if (!docs) classes.push('plan-kind-card');
   if (synthetic && !work?.run) classes.push('no-plan');
