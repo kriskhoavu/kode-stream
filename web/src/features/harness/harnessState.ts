@@ -273,6 +273,16 @@ export function queueTasks(tasks: Record<string, HarnessTask>, options: { includ
 		.sort(compareTasks);
 }
 
+/** Whether a person may start the task: one waiting in the queue, or one whose last run was stopped. */
+export function canStartTask(task: Pick<HarnessTask, 'state'>): boolean {
+	return task.state === 'ranked' || task.state === 'discovered' || task.state === 'cancelled';
+}
+
+/** Whether a start was asked for and not yet taken. A stopped task's old request was spent on the run that stopped. */
+export function startPending(task: Pick<HarnessTask, 'state' | 'startRequested'>): boolean {
+	return Boolean(task.startRequested) && task.state !== 'cancelled';
+}
+
 export function compareTasks(a: HarnessTask, b: HarnessTask): number {
 	if (a.needsYou !== b.needsYou) return a.needsYou ? -1 : 1;
 	if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;

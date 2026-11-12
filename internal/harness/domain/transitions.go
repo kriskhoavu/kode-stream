@@ -47,6 +47,9 @@ var taskTransitions = map[TaskState][]TaskState{
 	TaskStale:      {TaskDiscovered, TaskDismissed},
 	TaskRunning:    {TaskDone, TaskBlocked, TaskCancelled},
 	TaskBlocked:    {TaskRunning, TaskCancelled, TaskDismissed},
+	// A stopped run is not finished work: a person may start the task again,
+	// dismiss it, or its source may close it.
+	TaskCancelled: {TaskRanked, TaskDismissed, TaskStale},
 }
 
 var runTransitions = map[RunState][]RunState{
@@ -116,9 +119,16 @@ func CheckApproval(from, to ApprovalState) error {
 	return IllegalTransitionError{Entity: "approval", From: string(from), To: string(to)}
 }
 
-// TaskTerminal reports whether a task state never reopens.
+// TaskTerminal reports whether a task state never reopens. A cancelled task
+// is not terminal: its run was stopped, and the task may start again.
 func TaskTerminal(state TaskState) bool {
-	return state == TaskDone || state == TaskDismissed || state == TaskCancelled
+	return state == TaskDone || state == TaskDismissed
+}
+
+// TaskStartable reports whether a person may start a task: one waiting in the
+// queue, or one whose last run was stopped.
+func TaskStartable(state TaskState) bool {
+	return state == TaskRanked || state == TaskDiscovered || state == TaskCancelled
 }
 
 // TaskActive reports whether a task belongs to a run in flight.

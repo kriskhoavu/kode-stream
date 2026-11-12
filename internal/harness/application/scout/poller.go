@@ -113,7 +113,8 @@ func (p *Poller) apply(ctx context.Context, workspaceID string, kind domain.Sour
 			added++
 		}
 	}
-	open, err := p.repository.ListTasks(ctx, domain.TaskFilter{WorkspaceID: workspaceID, States: []domain.TaskState{domain.TaskDiscovered, domain.TaskRanked}, Limit: 1000})
+	// A stopped task is still open: its issue closing at the source finishes it.
+	open, err := p.repository.ListTasks(ctx, domain.TaskFilter{WorkspaceID: workspaceID, States: []domain.TaskState{domain.TaskDiscovered, domain.TaskRanked, domain.TaskCancelled}, Limit: 1000})
 	if err != nil {
 		return added, err
 	}

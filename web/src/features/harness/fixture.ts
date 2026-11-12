@@ -591,6 +591,8 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 		start: (task) => delay(() => {
 			const current = store.tasks.get(task.id) as HarnessTask;
 			current.startRequested = true;
+			// A stopped task goes back to the queue, as the harness does.
+			if (current.state === 'cancelled' || current.state === 'discovered') { current.state = 'ranked'; current.note = undefined; }
 			current.revision += 1;
 			emit({ type: 'task.updated', task: current } as Omit<HarnessEvent, 'seq' | 'at'>);
 			return clone(current);
@@ -639,6 +641,7 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 			run.state = 'cancelled';
 			run.revision += 1;
 			task.state = 'cancelled';
+			task.startRequested = false;
 			task.revision += 1;
 			for (const agentRun of store.agentRuns.values()) if (agentRun.runId === run.id && agentRun.state === 'running') agentRun.state = 'cancelled';
 			sync(run);

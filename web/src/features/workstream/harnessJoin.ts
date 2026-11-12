@@ -140,7 +140,8 @@ export function workForItem(item: Pick<ItemSummary, 'identifier' | 'workspaceId'
 
 /** Done, stopped, dismissed or closed at its source: nothing more happens to it. */
 export function isFinishedTask(task: HarnessTask): boolean {
-	return task.state === 'done' || task.state === 'cancelled' || task.state === 'dismissed' || task.state === 'stale' || Boolean(task.finishedOutside);
+	// A cancelled task is not finished: its run was stopped, and a person may start it again.
+	return task.state === 'done' || task.state === 'dismissed' || task.state === 'stale' || Boolean(task.finishedOutside);
 }
 
 /** The harness's tasks on one workspace's board, in queue order; `finished` picks the finished ones instead, newest first. */

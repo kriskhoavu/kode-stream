@@ -305,10 +305,10 @@ func (s *Service) Task(ctx context.Context, id string) (domain.Task, error) {
 	return s.repository.GetTask(ctx, id)
 }
 
-// Queue lists the tasks that can still be worked, in the order the
-// dispatcher would take them: pinned first, then by score.
+// Queue lists the tasks that can still be worked, stopped ones included, in
+// the order the dispatcher would take them: pinned first, then by score.
 func (s *Service) Queue(ctx context.Context, workspaceID string, limit int) ([]domain.Task, error) {
-	return s.Tasks(ctx, domain.TaskFilter{WorkspaceID: workspaceID, States: []domain.TaskState{domain.TaskRanked, domain.TaskDiscovered, domain.TaskRunning, domain.TaskBlocked}, Limit: limit})
+	return s.Tasks(ctx, domain.TaskFilter{WorkspaceID: workspaceID, States: []domain.TaskState{domain.TaskRanked, domain.TaskDiscovered, domain.TaskRunning, domain.TaskBlocked, domain.TaskCancelled}, Limit: limit})
 }
 
 // --- runs ---
@@ -534,7 +534,7 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		return status, err
 	}
 	status.Counts.WaitingApprovals = len(waiting)
-	tasks, err := s.repository.ListTasks(ctx, domain.TaskFilter{States: []domain.TaskState{domain.TaskRanked, domain.TaskDiscovered, domain.TaskBlocked}, Limit: 1000})
+	tasks, err := s.repository.ListTasks(ctx, domain.TaskFilter{States: []domain.TaskState{domain.TaskRanked, domain.TaskDiscovered, domain.TaskBlocked, domain.TaskCancelled}, Limit: 1000})
 	if err != nil {
 		return status, err
 	}

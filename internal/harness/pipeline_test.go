@@ -362,6 +362,51 @@ func TestChangesRequestedEveryRoundBlocksTheRunAndResumeStartsAgain(t *testing.T
 	}
 }
 
+func TestACancelledTaskStaysOpenAndStartsAgainWithANewRun(t *testing.T) {
+	ctx := context.Background()
+	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
+		if role == domain.RolePlanReviewer {
+			return map[string]any{"status": "done", "summary": "No.", "verdict": "changes_requested", "findings": []map[string]any{{"severity": "blocking", "title": "Phase 2 has no verification"}}}, ports.Result{Turns: 1, CostUSD: 0.1}
+		}
+		return planReport(role), ports.Result{Turns: 1, CostUSD: 0.1}
+	})
+	fixture.settle(t)
+	first := fixture.run(t)
+	if _, err := fixture.service.CancelRun(ctx, first.ID, "wrong approach", nil, domain.Actor{DisplayName: "Anna"}); err != nil {
+		t.Fatal(err)
+	}
+	task, _ := fixture.repository.GetTask(ctx, fixture.task.ID)
+	if task.State != domain.TaskCancelled || task.StartRequested {
+		t.Fatalf("cancelled task = %s startRequested=%v", task.State, task.StartRequested)
+	}
+	// The dispatcher does not start a stopped task on its own.
+	if err := fixture.service.dispatchCycle(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if task, _ = fixture.repository.GetTask(ctx, fixture.task.ID); task.State != domain.TaskCancelled || task.RunID != first.ID {
+		t.Fatalf("stopped task restarted by itself: %s %s", task.State, task.RunID)
+	}
+	queue, err := fixture.service.Queue(ctx, "ws", 10)
+	if err != nil || len(queue) != 1 || queue[0].ID != task.ID {
+		t.Fatalf("queue = %#v err=%v", queue, err)
+	}
+	started, err := fixture.service.StartTask(ctx, task.ID, task.Revision, "start-again", domain.Actor{DisplayName: "Anna"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if started.State != domain.TaskRanked || !started.StartRequested || started.Note != "" {
+		t.Fatalf("started = %s startRequested=%v note=%q", started.State, started.StartRequested, started.Note)
+	}
+	if err := fixture.service.dispatchCycle(ctx); err != nil {
+		t.Fatal(err)
+	}
+	task, _ = fixture.repository.GetTask(ctx, fixture.task.ID)
+	runs, _ := fixture.repository.ListRuns(ctx, domain.RunFilter{TaskID: task.ID})
+	if task.State != domain.TaskRunning || task.RunID == first.ID || task.Attempts != 2 || len(runs) != 2 {
+		t.Fatalf("restart: state=%s run=%s attempts=%d runs=%d", task.State, task.RunID, task.Attempts, len(runs))
+	}
+}
+
 func TestAMissingReportGetsOneReminderAndBudgetStopsRetryThenBlock(t *testing.T) {
 	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
 		if role == domain.RolePlanner && call == 1 {

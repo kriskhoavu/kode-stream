@@ -5,7 +5,7 @@ import type { HarnessTask } from '../../lib/types';
 import { HxStatusBadge } from './HxStatusBadge';
 import { SourceBadge } from './SourceBadge';
 import { taskStatus } from './vocabulary';
-import { waitsFor } from './harnessState';
+import { canStartTask, startPending, waitsFor } from './harnessState';
 
 /**
  * The queue in rank order: what the Sorter will hand out next, first. With
@@ -53,7 +53,8 @@ export function QueueList({ tasks, allTasks, onPin, onOpen, onSelect, selectedId
 				const status = taskStatus(task, waiting);
 				const pending = pendingIds?.has(task.id) ?? false;
 				const selected = selectedId === task.id;
-				const startable = onStart && (task.state === 'ranked' || task.state === 'discovered');
+				const startable = onStart && canStartTask(task);
+				const starting = startPending(task);
 				const retryable = onRetry && canRetry?.(task);
 				const classes = ['hx-row', 'hx-queue-row', selected ? 'selected' : '', onMove ? 'draggable' : '', dragId === task.id ? 'dragging' : '', pending ? 'move-pending' : ''].filter(Boolean).join(' ');
 				return (
@@ -81,7 +82,7 @@ export function QueueList({ tasks, allTasks, onPin, onOpen, onSelect, selectedId
 						{showScore && <span className="hx-queue-score hx-num" title="The Sorter's score: higher goes first">{Math.round(task.score)}</span>}
 						<HxStatusBadge status={status} />
 						<span className="hx-queue-actions">
-							{startable && <button type="button" className="primary hx-small-button" disabled={pending || Boolean(task.startRequested)} onClick={(event) => { event.stopPropagation(); onStart(task); }}><Play size={13} aria-hidden="true" />{task.startRequested ? 'Starting…' : 'Start'}</button>}
+							{startable && <button type="button" className="primary hx-small-button" disabled={pending || starting} onClick={(event) => { event.stopPropagation(); onStart(task); }}><Play size={13} aria-hidden="true" />{starting ? 'Starting…' : task.state === 'cancelled' ? 'Start again' : 'Start'}</button>}
 							{retryable && <button type="button" className="secondary hx-small-button" disabled={pending} onClick={(event) => { event.stopPropagation(); onRetry(task); }}><RotateCcw size={13} aria-hidden="true" />Retry</button>}
 							<button type="button" className={task.pinned ? 'hx-icon-toggle on' : 'hx-icon-toggle'} aria-pressed={task.pinned} aria-label={task.pinned ? `Unpin ${task.source.key}` : `Pin ${task.source.key} to the top`} disabled={pending} onClick={(event) => { event.stopPropagation(); onPin(task, !task.pinned); }}>
 								{task.pinned ? <PinOff size={15} aria-hidden="true" /> : <Pin size={15} aria-hidden="true" />}

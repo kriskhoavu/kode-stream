@@ -7,13 +7,25 @@ import (
 )
 
 func TestTaskStateMachineRefusesReopeningTerminalStates(t *testing.T) {
-	for _, terminal := range []TaskState{TaskDone, TaskDismissed, TaskCancelled} {
+	for _, terminal := range []TaskState{TaskDone, TaskDismissed} {
 		if err := CheckTask(terminal, TaskRanked); err == nil {
 			t.Fatalf("%s reopened", terminal)
 		}
 		if !TaskTerminal(terminal) {
 			t.Fatalf("%s not terminal", terminal)
 		}
+	}
+	// A stopped run leaves its task open: it may start again, be dismissed, or close at its source.
+	if TaskTerminal(TaskCancelled) || !TaskStartable(TaskCancelled) {
+		t.Fatal("a cancelled task is final")
+	}
+	for _, to := range []TaskState{TaskRanked, TaskDismissed, TaskStale} {
+		if err := CheckTask(TaskCancelled, to); err != nil {
+			t.Fatalf("cancelled -> %s refused: %v", to, err)
+		}
+	}
+	if err := CheckTask(TaskCancelled, TaskDone); err == nil {
+		t.Fatal("a cancelled task finished without a run")
 	}
 	for _, step := range [][2]TaskState{{TaskDiscovered, TaskRanked}, {TaskRanked, TaskRunning}, {TaskRunning, TaskBlocked}, {TaskBlocked, TaskRunning}, {TaskRunning, TaskDone}, {TaskStale, TaskDiscovered}} {
 		if err := CheckTask(step[0], step[1]); err != nil {

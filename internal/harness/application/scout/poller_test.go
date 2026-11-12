@@ -107,3 +107,42 @@ func TestPollerUpsertsRefreshesAndAgesTasks(t *testing.T) {
 		t.Fatal("a failed poll aged tasks")
 	}
 }
+
+func TestPollerKeepsAStoppedTaskOpenUntilItsSourceClosesIt(t *testing.T) {
+	ctx := context.Background()
+	repository, closeStore, err := storage.OpenSQLiteHarness(filepath.Join(t.TempDir(), "h.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeStore()
+	now := time.Date(2026, 11, 4, 9, 0, 0, 0, time.UTC)
+	scout := &fakeScout{candidates: []domain.Candidate{candidate("PM-1", "One")}}
+	poller := NewPoller(repository, workspaces{"ws": {ID: "ws"}}, nil, func() time.Time { return now }, func(_ context.Context, event domain.Event) domain.Event { return event })
+	poller.scouts = append(poller.scouts, scout)
+	settings := domain.DefaultSettings()
+	settings.Workspaces = []domain.WorkspaceSettings{{WorkspaceID: "ws", Jira: &domain.JiraSourceSettings{Enabled: true, JQL: "x"}}}
+	if _, err := poller.Poll(ctx, settings, ""); err != nil {
+		t.Fatal(err)
+	}
+	task, _, _ := repository.FindTaskBySource(ctx, domain.SourceJira, "PM-1")
+	expect := domain.Expect{State: string(task.State), Revision: task.Revision}
+	task.State = domain.TaskCancelled
+	if _, err := repository.SaveTask(ctx, task, expect); err != nil {
+		t.Fatal(err)
+	}
+
+	scout.candidates = []domain.Candidate{candidate("PM-1", "One, renamed")}
+	_, _ = poller.Poll(ctx, settings, "")
+	stopped, _, _ := repository.FindTaskBySource(ctx, domain.SourceJira, "PM-1")
+	if stopped.State != domain.TaskCancelled || stopped.Title != "One, renamed" {
+		t.Fatalf("stopped task = %s %q", stopped.State, stopped.Title)
+	}
+
+	scout.candidates = nil
+	for i := 0; i < StaleAfterMissedPolls; i++ {
+		_, _ = poller.Poll(ctx, settings, "")
+	}
+	if closed, _, _ := repository.FindTaskBySource(ctx, domain.SourceJira, "PM-1"); closed.State != domain.TaskStale {
+		t.Fatalf("a stopped task whose issue closed is %s", closed.State)
+	}
+}

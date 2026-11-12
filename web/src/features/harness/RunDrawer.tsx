@@ -9,7 +9,7 @@ import { TranscriptTurns } from '../ai-session/TranscriptTurns';
 import { JiraItemPanel } from '../jira/JiraItemPanel';
 import type { HarnessClient } from './harnessClient';
 import type { HarnessState } from './harnessState';
-import { waitsFor } from './harnessState';
+import { canStartTask, startPending, waitsFor } from './harnessState';
 import { FindingsList } from './FindingsPanel';
 import { GateCard } from './GateCard';
 import { HxStatusBadge } from './HxStatusBadge';
@@ -132,16 +132,18 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTab
 							onReject={(reason) => onReject(state.approvals[approval.id] ?? approval, reason)} />
 					))}
 
-					{!run && onStart && (task.state === 'ranked' || task.state === 'discovered') && (
+					{onStart && canStartTask(task) && (!run || task.state === 'cancelled') && (
 						<section className="hx-drawer-start" aria-label="Start this task">
-							{task.startRequested
+							{startPending(task)
 								? <p><b>Starting soon.</b> The next free Planner takes it, usually within a minute.</p>
-								: <p>{waits.length ? <>Starting now skips the wait for <b>{waits.join(', ')}</b>. </> : ''}The Planner writes a plan first, and you approve it before any code is written.</p>}
-							<button type="button" className="primary hx-small-button" disabled={Boolean(task.startRequested)} onClick={() => onStart(task)}><Play size={14} aria-hidden="true" />{task.startRequested ? 'Starting…' : 'Start'}</button>
+								: task.state === 'cancelled'
+									? <p><b>Stopped.</b> {task.note ? <>{task.note} </> : ''}Start again begins a new run from a fresh plan. The stopped run stays in its history.</p>
+									: <p>{waits.length ? <>Starting now skips the wait for <b>{waits.join(', ')}</b>. </> : ''}The Planner writes a plan first, and you approve it before any code is written.</p>}
+							<button type="button" className="primary hx-small-button" disabled={startPending(task)} onClick={() => onStart(task)}><Play size={14} aria-hidden="true" />{startPending(task) ? 'Starting…' : task.state === 'cancelled' ? 'Start again' : 'Start'}</button>
 						</section>
 					)}
 
-					{onSetQuestions && !['done', 'dismissed', 'stale', 'cancelled'].includes(task.state) && (
+					{onSetQuestions && !['done', 'dismissed', 'stale'].includes(task.state) && (
 						<section className="hx-drawer-questions" aria-label="Questions">
 							<label className="hx-field hx-field-inline">
 								<span>May an agent stop and ask you?</span>

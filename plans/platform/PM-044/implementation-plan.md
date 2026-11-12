@@ -14,7 +14,7 @@ P0 Plan ─> B1 Core ─> B2 Scout + sorter ─> B3 Claude Code + plan stage ─
                           └─> F3 Waves ─────┴─> F4 Drawer ─> F6 Polish
                           └─> F5 Settings (after B3) ───────┘
 I1 ─> M1 Sources ─> M2 Cards ─> M3 Agents tab ─> M4 Run from a card ─┐
-                          └─> M5 Queue + Waves ──────────────────────┴─> M6 Remove the Harness page ─> M7 Board · Task Queue
+                          └─> M5 Queue + Waves ──────────────────────┴─> M6 Remove the Harness page ─> M7 Board · Task Queue ─> M8 Restart
 ```
 
 ## Terminology Lock
@@ -58,6 +58,7 @@ I1 ─> M1 Sources ─> M2 Cards ─> M3 Agents tab ─> M4 Run from a card ─�
 | M5    | Queue and Waves as board views              | Frontend  | M2          | Done   |
 | M6    | Remove the Harness page                     | Fullstack | M3, M4, M5  | Done   |
 | M7    | Board and Task Queue, without Waves         | Frontend  | M5, M6      | Done   |
+| M8    | A stopped task starts again                 | Fullstack | M7          | Done   |
 
 ### P0 Plan folder
 
@@ -196,6 +197,16 @@ Task Queue already says "Waits for" on each row. Deliverables: the view switcher
 up and Move down step through the Task Queue; wiki, `AGENTS.md` and the atlas updated.
 Verification: `make verify` in kode-stream; `docs/atlas/build.sh --check` in fen.
 Commit: `PM-044: Drop the Waves view and name the board's views Board and Task Queue`.
+
+### M8 A stopped task starts again
+
+A cancelled run means a person stopped the work, not that the work is finished, so a cancelled task is no longer
+terminal. Deliverables: `cancelled → ranked | dismissed | stale`; `StartTask` and Run with the harness accept a
+cancelled task and put it back in the queue; cancelling clears the spent start request so the dispatcher never
+restarts it alone; the Finder refreshes a cancelled task and makes it stale when its issue closes; the board and the
+Task Queue show it as Stopped with Start again; wiki and solution updated.
+Verification: `make verify` in kode-stream.
+Commit: `PM-044: Let a stopped harness task start again instead of counting it finished`.
 
 ## Out Of Scope
 

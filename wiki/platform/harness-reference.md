@@ -36,7 +36,7 @@ The harness runs as one replica. SQLite has one connection, so code inside a tra
 
 [live] An optional model re-ranker may reorder only the unpinned tasks among the rules' top N, and only by a valid permutation of them. Evidence: `internal/harness/application/queue/ranker.go:126`.
 
-[live] A task a source stops listing goes stale after three successful polls; a done, dismissed or cancelled task never reopens. Evidence: `internal/harness/application/scout/poller.go:23`.
+[live] A task a source stops listing goes stale after three successful polls; a done or dismissed task never reopens. A cancelled task, whose run a person stopped, stays open: the Finder still refreshes it and makes it stale when its source stops listing it, and `POST /api/harness/tasks/{id}/start` puts it back in the queue for a new run, beside the runs it already had. Evidence: `internal/harness/application/scout/poller.go:23`, `internal/harness/queue.go:307`.
 
 [live] `POST /api/harness/queue/clear` deletes every task no run has touched, discovered, ranked, stale or dismissed, in one workspace or all, and records `task.removed` for each; the next poll adds back what a source still returns. It is the way to drop what an old search query found instead of waiting for three polls. Evidence: `internal/harness/queue.go:212`.
 
@@ -78,7 +78,7 @@ Codex runs `codex exec --json` with its sandbox standing in for the permission m
 
 [live] The board's routes live under `/api/harness`; reads need the read capability, and every change needs the `harness` capability and, in Cloud mode, the CSRF header. Evidence: `internal/server/api/gin_routes.go:65`.
 
-[live] `POST /api/harness/tasks/{id}/remove` deletes one finished task, done, cancelled, dismissed or stale, with its runs, stages, agent runs and approvals, and records `task.removed`; events stay as the log. It first removes a working copy a run still holds and keeps every branch. Any other task is refused with `invalid_request`. Evidence: `internal/harness/queue.go:227`.
+[live] `POST /api/harness/tasks/{id}/remove` deletes one finished or stopped task, done, cancelled, dismissed or stale, with its runs, stages, agent runs and approvals, and records `task.removed`; events stay as the log. It first removes a working copy a run still holds and keeps every branch. Any other task is refused with `invalid_request`. Evidence: `internal/harness/queue.go:227`.
 
 [live] `GET /api/harness/runs/{id}/plan` returns the files the run changed under `plans/`, at most 40 of 256 KB each and text only: from the run's worktree while it exists, else from its `harness/*` branch or the branch as last pushed, saying which, so the plan is readable before the merge and before the plan is approved and committed. Evidence: `internal/harness/approvals.go:419`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:167`.
 

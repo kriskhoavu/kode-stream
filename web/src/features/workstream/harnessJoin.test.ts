@@ -67,15 +67,19 @@ describe('finished tasks', () => {
 	it('leave the board unless a plan card holds them, and list apart newest first', () => {
 		const state = loaded({ tasks: {
 			a: task('PM-1', { id: 'a', state: 'done', updatedAt: '2026-11-05T10:00:00.000Z' }),
-			b: task('PM-2', { id: 'b', state: 'cancelled', updatedAt: '2026-11-06T10:00:00.000Z' }),
+			b: task('PM-2', { id: 'b', state: 'dismissed', updatedAt: '2026-11-06T10:00:00.000Z' }),
+			e: task('PM-5', { id: 'e', state: 'cancelled' }),
 			c: task('PM-3', { id: 'c', state: 'stale' }),
 			d: task('PM-4', { id: 'd' })
 		} });
 		const join = joinHarness([item('p1', 'PM-1')], state, 'ws');
 		expect(join.byItemId.get('p1')?.status).toBe('done');
-		expect(join.synthetic.map((card) => card.identifier)).toEqual(['PM-4']);
+		// A stopped task is not finished: it stays a card, and a person may start it again.
+		expect(join.synthetic.map((card) => card.identifier).sort()).toEqual(['PM-4', 'PM-5']);
+		expect(join.byItemId.get('harness:e')?.status).toBe('stopped');
 		expect(tasksForWorkspace(state, 'ws', { finished: true }).map((entry) => entry.source.key)).toEqual(['PM-2', 'PM-1', 'PM-3']);
 		expect(isFinishedTask(task('X', { finishedOutside: { at: '2026-11-01T00:00:00.000Z' } }))).toBe(true);
 		expect(isFinishedTask(task('X', { state: 'blocked' }))).toBe(false);
+		expect(isFinishedTask(task('X', { state: 'cancelled' }))).toBe(false);
 	});
 });

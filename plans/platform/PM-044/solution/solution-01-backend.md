@@ -64,8 +64,9 @@ cost sums are relational. This is a recorded deviation from "selectable options,
 ## State Machines
 
 - Task: `discovered → ranked → running → done`; `discovered|ranked → dismissed|stale`; `running → blocked → running`
-  (a resume approval); `running → cancelled`. `done`, `dismissed` and `cancelled` never reopen. A `stale` task that
-  reappears returns to `discovered`.
+  (a resume approval); `running|blocked → cancelled`. `done` and `dismissed` never reopen. A `cancelled` task's run
+  was stopped, not finished: `cancelled → ranked` when a person starts it again, and `cancelled → dismissed|stale`.
+  A `stale` task that reappears returns to `discovered`.
 - Stage: `pending → running → passed | awaiting_approval | retry_wait | failed | cancelled`;
   `awaiting_approval → passed | failed`; `retry_wait → pending` while `attempt + 1 ≤ maxAttempts (3)`.
   The next stage is created `pending` in the same transaction that marks the previous one `passed`.

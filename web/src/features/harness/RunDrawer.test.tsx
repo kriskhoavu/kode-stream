@@ -112,6 +112,17 @@ describe('RunDrawer', () => {
 		expect(screen.getByText('Starting soon.')).toBeInTheDocument();
 	});
 
+	it('offers Start again on a stopped task, whose spent start request no longer counts', async () => {
+		const base = await setup('task-pm-02', 'run-pm-02');
+		const state = harnessReducer(base.state, { type: 'task.saved', task: { ...base.state.tasks['task-pm-02'], state: 'cancelled', startRequested: true, note: 'Stopped by Anna: wrong approach.' } });
+		const onStart = vi.fn();
+		render(<Harnessed state={state} client={base.client} taskId="task-pm-02" queue={[]} onStart={onStart} />);
+		const region = screen.getByRole('region', { name: 'Start this task' });
+		expect(region).toHaveTextContent('Stopped. Stopped by Anna: wrong approach. Start again begins a new run');
+		fireEvent.click(within(region).getByRole('button', { name: 'Start again' }));
+		expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-pm-02' }));
+	});
+
 	it('opens an unstarted task on its ticket, with what the tracker said about it', async () => {
 		const { client, state } = await setup('task-pm-04');
 		render(<Harnessed state={state} client={client} taskId="task-pm-04" queue={[]} initialTab="ticket" />);

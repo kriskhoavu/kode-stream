@@ -232,8 +232,8 @@ func (s *Service) RemoveTask(ctx context.Context, id string, expectedRevision in
 	if err != nil {
 		return domain.Task{}, err
 	}
-	if !domain.TaskTerminal(task.State) && task.State != domain.TaskStale {
-		return domain.Task{}, domain.Invalid("only a finished task can be removed; stop or dismiss %s first", task.Source.Key)
+	if !domain.TaskTerminal(task.State) && task.State != domain.TaskStale && task.State != domain.TaskCancelled {
+		return domain.Task{}, domain.Invalid("only a finished or stopped task can be removed; stop or dismiss %s first", task.Source.Key)
 	}
 	if task.Revision != expectedRevision {
 		return domain.Task{}, domain.ErrStateMoved
@@ -337,17 +337,20 @@ func (s *Service) StartTask(ctx context.Context, id string, expectedRevision int
 		if task.Revision != expectedRevision {
 			return domain.ErrStateMoved
 		}
-		if task.State != domain.TaskRanked && task.State != domain.TaskDiscovered {
+		if !domain.TaskStartable(task.State) {
 			return domain.IllegalTransitionError{Entity: "task", From: string(task.State), To: "started"}
 		}
-		if task.StartRequested {
+		if task.StartRequested && task.State != domain.TaskCancelled {
 			saved = task
 			return nil
 		}
 		expect := domain.Expect{State: string(task.State), Revision: task.Revision}
 		task.StartRequested = true
-		if task.State == domain.TaskDiscovered {
+		// A stopped task goes back to the queue; its next run starts fresh,
+		// beside the runs it already had.
+		if task.State == domain.TaskDiscovered || task.State == domain.TaskCancelled {
 			task.State = domain.TaskRanked
+			task.Note = ""
 			s.rescore(settings, &task)
 		}
 		now := s.now()
@@ -559,7 +562,7 @@ func (s *Service) CreateTask(ctx context.Context, input CreateTaskInput, actor d
 		}
 		s.emit(ctx, domain.Event{Kind: domain.EventTaskDiscovered, TaskID: task.ID, Actor: actorOrNil(actor), Payload: payload(map[string]any{"state": task.State, "sourceKey": task.Source.Key, "title": task.Title, "from": "card"})})
 	}
-	if !input.StartNow || task.StartRequested || (task.State != domain.TaskRanked && task.State != domain.TaskDiscovered) {
+	if !input.StartNow || (task.StartRequested && task.State != domain.TaskCancelled) || !domain.TaskStartable(task.State) {
 		task.Body = ""
 		return task, nil
 	}
