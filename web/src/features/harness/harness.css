@@ -1986,29 +1986,115 @@ a.hx-source:hover {
 	gap: 8px;
 }
 
+.hx-run-plan-index {
+	display: grid;
+	gap: 4px;
+}
+
+.hx-run-plan-folder {
+	margin: 0;
+	font-size: 12px;
+	color: var(--muted);
+}
+
 .hx-run-plan-files {
 	list-style: none;
 	margin: 0;
 	padding: 0;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
+	display: grid;
+	gap: 1px;
 }
 
 .hx-run-plan-files button {
-	display: inline-flex;
+	width: 100%;
+	display: flex;
 	align-items: center;
-	gap: 5px;
-	padding: 3px 9px;
-	border: 1px solid var(--line);
-	border-radius: 999px;
-	background: var(--panel);
-	font-size: 12px;
+	gap: 10px;
+	padding: 5px 8px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text);
+	font-size: 13px;
+	text-align: left;
+}
+
+.hx-run-plan-files button:hover {
+	background: var(--panel-soft);
 }
 
 .hx-run-plan-files button.on {
-	border-color: color-mix(in srgb, var(--button-accent) 55%, var(--line));
+	background: color-mix(in srgb, var(--button-accent) 12%, var(--panel));
+	font-weight: 600;
+}
+
+.hx-run-plan-step {
+	width: 16px;
+	flex: none;
+	color: var(--muted);
+	font-size: 12px;
+	text-align: right;
+}
+
+.hx-run-plan-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hx-run-plan-sub {
+	color: var(--muted);
+	font-weight: 400;
+}
+
+.hx-run-plan-status {
+	margin-left: auto;
+	flex: none;
+	font-family: var(--mono, ui-monospace, monospace);
+	font-size: 12px;
 	font-weight: 700;
+}
+
+.hx-run-plan-status.added {
+	color: var(--hx-done);
+}
+
+.hx-run-plan-status.modified {
+	color: var(--hx-waiting);
+}
+
+.hx-run-plan-pager {
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+	align-items: center;
+	gap: 8px;
+	padding-top: 10px;
+	border-top: 1px solid var(--line);
+}
+
+.hx-run-plan-pager > :last-child {
+	justify-self: end;
+}
+
+.hx-run-plan-pager button > span {
+	display: grid;
+	text-align: left;
+	line-height: 1.25;
+}
+
+.hx-run-plan-pager > :last-child > span {
+	text-align: right;
+}
+
+.hx-run-plan-pager-name {
+	font-size: 11px;
+	font-weight: 400;
+	color: var(--muted);
+	max-width: 180px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .hx-run-plan-path {
@@ -2019,6 +2105,7 @@ a.hx-source:hover {
 
 .hx-run-plan-doc {
 	min-width: 0;
+	scroll-margin-top: 12px;
 	overflow-wrap: anywhere;
 }
 
