@@ -859,7 +859,7 @@ body.is-resizing-panel .knowledge-browser {
 
 .knowledge-graph-panel {
   position: absolute;
-  top: var(--sheet-gap);
+  top: 0;
   right: 0;
   bottom: 0;
   width: min(760px, 54vw, calc(100% - 48px));
@@ -869,8 +869,8 @@ body.is-resizing-panel .knowledge-browser {
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-width: 1px 0 0 1px;
-  border-radius: var(--sheet-radius) 0 0 0;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
   background: var(--panel);
   box-shadow: var(--sheet-shadow);
 }
