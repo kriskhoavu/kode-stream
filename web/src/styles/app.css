@@ -3638,16 +3638,25 @@ select:disabled {
   cursor: default;
 }
 
+/* The panel floats as an inset sheet: a gap below the header and from the
+ * window's right and bottom edges, rounded corners and a layered shadow, so
+ * the header pattern runs around it instead of being cut by a hard edge. */
 .plan-drawer {
+  --drawer-gap: 12px;
   position: fixed;
-  top: var(--drawer-top, 68px);
-  right: 0;
-  bottom: 0;
+  top: calc(var(--drawer-top, 68px) + var(--drawer-gap) - 4px);
+  right: var(--drawer-gap);
+  bottom: var(--drawer-gap);
   z-index: 46;
-  width: min(var(--drawer-width, 1120px), calc(100vw - 24px));
+  width: min(var(--drawer-width, 1120px), calc(100vw - 24px - var(--drawer-gap)));
   background: var(--panel);
-  border-left: 1px solid var(--line);
-  box-shadow: -18px 0 42px rgba(17, 24, 39, .1);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px rgba(17, 24, 39, .06),
+    0 8px 24px rgba(17, 24, 39, .08),
+    0 24px 64px rgba(17, 24, 39, .12);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   animation: drawer-slide-in .18s ease-out;
@@ -3664,12 +3673,19 @@ select:disabled {
   }
 }
 
+:root[data-theme="dark"] .plan-drawer {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, .3),
+    0 8px 24px rgba(0, 0, 0, .3),
+    0 24px 64px rgba(0, 0, 0, .4);
+}
+
 .drawer-resize-handle {
   position: absolute;
-  left: -8px;
+  left: 0;
   top: 72px;
   bottom: 16px;
-  width: 16px;
+  width: 12px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -8254,7 +8270,7 @@ body.is-resizing-panel {
   }
 
   .plan-drawer {
-    top: 58px;
+    top: calc(58px + var(--drawer-gap) - 4px);
   }
 
   .drawer-scrim {
@@ -8427,8 +8443,11 @@ body.is-resizing-panel {
   }
 
   .plan-drawer {
+    --drawer-gap: 0px;
     top: 58px;
     width: 100vw;
+    border-width: 1px 0 0;
+    border-radius: 0;
   }
 
   .drawer-scrim {
