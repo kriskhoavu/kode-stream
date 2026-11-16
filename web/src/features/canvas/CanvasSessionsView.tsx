@@ -7,7 +7,8 @@ export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch,
 	workspaceId: string;
 	workspaceName?: string;
 	checkoutBranch?: string;
-	projection: CanvasProjection;
+	/** The canvas, once it has loaded: it names each session's plan. Sessions show without it. */
+	projection?: CanvasProjection;
 	onOpenOnBoard: (sessionId: string) => void;
 	onOpenOnCard?: (itemId: string, sessionId: string) => void;
 	/** Opens a harness run's live conversation. Without it the harness section is not shown. */
@@ -32,8 +33,8 @@ export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch,
 		record,
 		workspaceName: workspaceName ?? 'Workspace',
 		checkoutBranch: checkoutBranch ?? '',
-		planTitle: record.planRef ? projection.nodes.find((node) => node.plan?.itemId === record.planRef?.itemId)?.plan?.title : undefined
-	})), [checkoutBranch, projection.nodes, records, workspaceName]);
+		planTitle: record.planRef ? projection?.nodes.find((node) => node.plan?.itemId === record.planRef?.itemId)?.plan?.title : undefined
+	})), [checkoutBranch, projection?.nodes, records, workspaceName]);
 	const stop = async (row: GlobalSessionRow) => {
 		await api.cancelEmbeddedAISession(row.record.id);
 		setReloadToken((token) => token + 1);
