@@ -22,13 +22,14 @@ describe('router', () => {
     expect(pathForRoute({ name: 'workspaces' })).toBe('/workspaces');
     expect(pathForRoute({ name: 'settings' })).toBe('/settings');
     expect(pathForRoute({ name: 'item', itemId: 'PM-003 Architecture' })).toBe('/items/PM-003%20Architecture');
-	expect(pathForRoute({ name: 'knowledge', location: { workspaceId: 'workspace one', root: 'master-data/article', slug: 'article overview', view: 'read' } }))
-		.toBe('/knowledge?workspaceId=workspace+one&root=master-data%2Farticle&slug=article+overview&view=read');
+	expect(pathForRoute({ name: 'knowledge', location: { workspaceId: 'workspace one', slug: 'article overview', view: 'read' } }))
+		.toBe('/knowledge?workspaceId=workspace+one&slug=article+overview&view=read');
   });
 
 	it('parses and builds Knowledge selections', () => {
 		window.history.pushState(null, '', '/knowledge?workspaceId=ws&root=docs%2Fwiki&slug=overview&view=read');
-		expect(routeFromLocation()).toEqual({ name: 'knowledge', location: { workspaceId: 'ws', root: 'docs/wiki', slug: 'overview', view: 'read' } });
+		// An old link naming the wiki's folder still opens the page; Knowledge shows the workspace's one Wiki.
+		expect(routeFromLocation()).toEqual({ name: 'knowledge', location: { workspaceId: 'ws', slug: 'overview', view: 'read' } });
 		expect(knowledgeLocationFromSearch('?view=invalid&slug=page')).toEqual({ slug: 'page' });
 		expect(knowledgePath()).toBe('/knowledge');
 	});

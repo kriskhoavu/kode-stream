@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { CheckCircle2, X } from 'lucide-react';
+import { CheckCircle2, FileText, Share2, X } from 'lucide-react';
+import { ViewSwitcher } from '../components/ViewSwitcher';
 import type { KnowledgeLocation } from '../app/router';
 import { KnowledgeActions } from '../features/knowledge/KnowledgeActions';
 import { KnowledgeBrowser } from '../features/knowledge/KnowledgeBrowser';
@@ -20,16 +21,14 @@ export function KnowledgePage({ workspaces, activeWorkspace, location, onLocatio
 	if (!workspaces.length) return <section className="empty-state"><h1>Knowledge</h1><p>Add a workspace to discover structured Markdown Wikis.</p></section>;
 	return <section className="knowledge-page">
 		<header className="knowledge-header">
-			<div className="knowledge-heading-row"><h1 className="sr-only">Knowledge</h1>{controller.workspace && <BranchCheckoutPicker workspaceId={controller.workspace.id} currentCheckoutBranch={branches?.current ?? controller.workspace.baselineBranch} branches={branches?.branches ?? []} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={controller.reload} />}</div>
+			<div className="page-title workstream-title with-views"><h1 className="sr-only">Knowledge</h1><ViewSwitcher label="Knowledge view" options={[{ id: 'pages', label: 'Pages', icon: FileText }, { id: 'graph', label: 'Graph', icon: Share2, disabled: !controller.pages.length }]} value={location?.view === 'graph' ? 'graph' : 'pages'} onChange={(view) => controller.updateLocation(view === 'graph' ? { view: 'graph' } : { view: controller.page ? 'read' : 'browse' })} />{controller.workspace && <BranchCheckoutPicker workspaceId={controller.workspace.id} currentCheckoutBranch={branches?.current ?? controller.workspace.baselineBranch} branches={branches?.branches ?? []} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={controller.reload} />}</div>
 			<div className="knowledge-toolbar">
-			<label className="knowledge-field"><select aria-label="Knowledge Wiki" value={controller.wiki?.root ?? ''} disabled={!controller.wikis.length} onChange={(event) => controller.updateLocation({ root: event.target.value, slug: undefined, view: 'browse' })}>{controller.wikis.map((wiki) => <option key={wiki.root} value={wiki.root}>{wiki.displayName}</option>)}</select></label>
-			<div className="knowledge-views" aria-label="Knowledge view"><button type="button" className={location?.view !== 'graph' ? 'active' : ''} onClick={() => controller.updateLocation({ view: controller.page ? 'read' : 'browse' })}>Pages</button><button type="button" className={location?.view === 'graph' ? 'active' : ''} disabled={!controller.pages.length} onClick={() => controller.updateLocation({ view: 'graph' })}>Graph</button></div>
 			{controller.workspace && <KnowledgeActions workspaceId={controller.workspace.id} settings={controller.workspace.knowledge} root={controller.wiki?.root} busy={controller.actionBusy} onRun={controller.runAction} />}
 			</div>
 		</header>
 		<KnowledgeActionNotification result={controller.actionResult} />
 		{(controller.loading || controller.error || controller.notice) && <div aria-live="polite" className={controller.error ? 'knowledge-status error' : 'knowledge-status'}>{controller.loading ? 'Loading Knowledge…' : controller.error || controller.notice}</div>}
-		{!controller.loading && !controller.error && !controller.wikis.length && <div className="empty-state"><h2>No structured Wikis detected</h2><p>A source qualifies when it contains <code>index.md</code> and valid pages with <code>slug</code> and <code>title</code> front matter.</p></div>}
+		{!controller.loading && !controller.error && !controller.wiki && <div className="empty-state"><h2>No structured Wikis detected</h2><p>A source qualifies when it contains <code>index.md</code> and valid pages with <code>slug</code> and <code>title</code> front matter.</p></div>}
 		{controller.wiki && location?.view !== 'graph' && <KnowledgeBrowser rootName={controller.wiki.root.split('/').filter(Boolean).pop() || controller.wiki.displayName} pages={controller.pages} selectedSlug={controller.page?.slug} warnings={controller.warnings} onSelect={(slug) => controller.updateLocation({ slug, view: 'read' })} sidePanel={controller.detail && location?.view === 'read' && controller.workspace && controller.detail.path.startsWith('e2e-testing/') ? <KnowledgeE2ESidePanel workspaceId={controller.workspace.id} root={controller.wiki.root} detail={controller.detail} /> : undefined}>
 			{controller.detailLoading ? <div className="knowledge-welcome">Loading page…</div> : controller.detail && location?.view === 'read' ? <KnowledgeReader detail={controller.detail} onNavigate={(slug) => controller.updateLocation({ slug, view: 'read' })} /> : undefined}
 		</KnowledgeBrowser>}

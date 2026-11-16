@@ -21,7 +21,7 @@ describe('useKnowledgeController', () => {
 		const { result } = renderHook(() => useKnowledgeController(workspaces, undefined, onLocationChange));
 		await waitFor(() => expect(result.current.loading).toBe(false));
 		expect(api.knowledgePages).toHaveBeenCalledWith('one', 'docs', expect.any(AbortSignal));
-		expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'one', root: 'docs', view: 'browse' });
+		expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'one', view: 'browse' });
 	});
 
 	it('ignores a stale Wiki response after the workspace changes', async () => {
@@ -32,13 +32,13 @@ describe('useKnowledgeController', () => {
 		rerender({ workspaceId: 'two' });
 		await waitFor(() => expect(api.knowledgePages).toHaveBeenCalledWith('two', 'wiki', expect.any(AbortSignal)));
 		await act(async () => resolveFirst([wiki('one', 'docs')]));
-		expect(result.current.wikis.map((item) => item.root)).toEqual(['wiki']);
+		expect(result.current.wiki?.root).toBe('wiki');
 	});
 
 	it('invalidates data after a successful action', async () => {
 		vi.mocked(api.knowledgeWikis).mockResolvedValue([wiki('one', 'docs')]);
 		vi.mocked(api.rescanKnowledge).mockResolvedValue({ ok: true, operation: 'rescan', wikis: [], warnings: [], logTruncated: false, completedAt: '' });
-		const { result } = renderHook(() => useKnowledgeController(workspaces, { workspaceId: 'one', root: 'docs', view: 'browse' }, vi.fn()));
+		const { result } = renderHook(() => useKnowledgeController(workspaces, { workspaceId: 'one', view: 'browse' }, vi.fn()));
 		await waitFor(() => expect(result.current.loading).toBe(false));
 		await act(async () => { await result.current.runAction('rescan'); });
 		expect(api.knowledgeWikis).toHaveBeenCalledTimes(2);
@@ -49,7 +49,7 @@ describe('useKnowledgeController', () => {
 		vi.mocked(api.knowledgeWikis).mockResolvedValue([wiki('one', 'docs')]);
 		vi.mocked(api.knowledgePages).mockResolvedValue({ pages: [{ slug: 'guide', title: 'Guide', path: 'guide.md', domain: 'root', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }], warnings: [] });
 		vi.mocked(api.knowledgePage).mockResolvedValue({ slug: 'guide', title: 'Guide', path: 'guide.md', domain: 'root', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [], warnings: [], content: { id: 'guide', path: 'guide.md', content: '', language: 'markdown', hash: '', kind: 'markdown', sizeBytes: 0, editable: false } });
-		const { rerender } = renderHook(({ slug, view }) => useKnowledgeController(workspaces, { workspaceId: 'one', root: 'docs', slug, view }, vi.fn()), { initialProps: { slug: undefined as string | undefined, view: 'browse' as 'browse' | 'read' } });
+		const { rerender } = renderHook(({ slug, view }) => useKnowledgeController(workspaces, { workspaceId: 'one', slug, view }, vi.fn()), { initialProps: { slug: undefined as string | undefined, view: 'browse' as 'browse' | 'read' } });
 		await waitFor(() => expect(api.knowledgePages).toHaveBeenCalledTimes(1));
 		rerender({ slug: 'guide', view: 'read' });
 		await act(async () => { await Promise.resolve(); });

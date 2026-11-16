@@ -12,73 +12,16 @@
   gap: 16px;
 }
 
-.knowledge-heading-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-  min-width: 0;
-}
-
 .knowledge-toolbar {
   display: grid;
-  grid-template-columns: minmax(160px, 220px) auto minmax(0, 1fr);
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
   box-shadow: var(--shadow-soft);
-}
-
-.knowledge-field {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.knowledge-field select {
-  width: 100%;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.knowledge-views {
-  display: inline-flex;
-  gap: 3px;
-  min-height: 38px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-soft);
-}
-
-.knowledge-views button {
-  min-height: 30px;
-  padding: 0 11px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  font-weight: 650;
-}
-
-.knowledge-views button:hover:not(:disabled) {
-  color: var(--text);
-}
-
-.knowledge-views button.active {
-  background: var(--panel);
-  color: var(--button-accent);
-  box-shadow: 0 2px 7px rgba(17, 24, 39, 0.1);
 }
 
 .knowledge-actions {
@@ -985,10 +928,6 @@ body.is-resizing-panel .knowledge-browser {
 }
 
 @media (max-width: 1100px) {
-  .knowledge-toolbar {
-    grid-template-columns: minmax(160px, 1fr) auto minmax(0, 1fr);
-  }
-
   .knowledge-graph-filters {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
@@ -1038,17 +977,8 @@ body.is-resizing-panel .knowledge-browser {
     justify-content: space-between;
   }
 
-  .knowledge-toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .knowledge-views,
   .knowledge-actions {
     width: 100%;
-  }
-
-  .knowledge-views button {
-    flex: 1;
   }
 
   .knowledge-browser,

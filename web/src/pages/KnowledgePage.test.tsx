@@ -32,12 +32,15 @@ describe('KnowledgePage layout', () => {
 	});
 
 	it('uses application controls, removes empty status space, and collapses large warning lists', async () => {
-		const { container } = render(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'browse' }} onLocationChange={vi.fn()} />);
+		const { container } = render(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', slug: 'overview', view: 'browse' }} onLocationChange={vi.fn()} />);
 
 		await waitFor(() => expect(screen.getByRole('button', { name: /Offer Overview/ })).toBeInTheDocument());
 		expect(screen.getByRole('button', { name: 'Sync' })).toHaveClass('secondary');
 		expect(screen.getByRole('button', { name: 'Pull' })).toHaveClass('secondary');
 		expect(screen.getByRole('button', { name: 'Pages' })).toHaveClass('active');
+		// Knowledge shows the workspace's one Wiki: no picker, and the view switch sits in the title row.
+		expect(screen.queryByRole('combobox', { name: 'Knowledge Wiki' })).not.toBeInTheDocument();
+		expect(screen.getByRole('group', { name: 'Knowledge view' }).closest('.page-title')).not.toBeNull();
 		expect(container.querySelector('.knowledge-status')).not.toBeInTheDocument();
 		const warningDetails = screen.getByText('Index diagnostics (26)').closest('details');
 		expect(warningDetails).not.toHaveAttribute('open');
@@ -50,20 +53,20 @@ describe('KnowledgePage layout', () => {
 		const activeWorkspace = { ...workspace, id: 'discovery-sap', name: 'Discovery SAP' };
 		vi.mocked(api.knowledgeWikis).mockResolvedValue([{ workspaceId: activeWorkspace.id, root: 'wiki', displayName: 'Wiki', pages: [], warnings: [], indexedAt: '' }]);
 		const onLocationChange = vi.fn();
-		render(<KnowledgePage workspaces={[workspace, activeWorkspace]} activeWorkspace={activeWorkspace} location={{ workspaceId: workspace.id, root: 'docs', view: 'browse' }} onLocationChange={onLocationChange} />);
+		render(<KnowledgePage workspaces={[workspace, activeWorkspace]} activeWorkspace={activeWorkspace} location={{ workspaceId: workspace.id, view: 'browse' }} onLocationChange={onLocationChange} />);
 
 		await waitFor(() => expect(api.knowledgeWikis).toHaveBeenCalledWith(activeWorkspace.id, expect.any(AbortSignal)));
-		expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: activeWorkspace.id, root: 'wiki', view: 'browse' });
+		expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: activeWorkspace.id, view: 'browse' });
 	});
 
 	it('opens full page content with one click and keeps the index visible', async () => {
 		const onLocationChange = vi.fn();
-		const first = render(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', view: 'browse' }} onLocationChange={onLocationChange} />);
+		const first = render(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', view: 'browse' }} onLocationChange={onLocationChange} />);
 		const row = await screen.findByRole('button', { name: /Offer Overview/ });
 		fireEvent.click(row);
-		expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'read' });
+		expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: 'discovery', slug: 'overview', view: 'read' });
 
-		first.rerender(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', root: 'docs', slug: 'overview', view: 'read' }} onLocationChange={onLocationChange} />);
+		first.rerender(<KnowledgePage workspaces={[workspace]} location={{ workspaceId: 'discovery', slug: 'overview', view: 'read' }} onLocationChange={onLocationChange} />);
 		await waitFor(() => expect(api.knowledgePage).toHaveBeenCalledWith('discovery', 'docs', 'overview', expect.any(AbortSignal)));
 		expect(await screen.findByText('Full document content.', {}, { timeout: 5_000 })).toBeInTheDocument();
 		expect(screen.getByRole('navigation', { name: 'Knowledge pages' })).toBeInTheDocument();

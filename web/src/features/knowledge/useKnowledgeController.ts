@@ -29,7 +29,7 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 	const workspace = workspaces.find((candidate) => candidate.id === location?.workspaceId) ?? workspaces[0];
 	const workspaceRef = useRef(workspace);
 	workspaceRef.current = workspace;
-	const wiki = wikis.find((candidate) => candidate.root === location?.root) ?? wikis[0];
+	const wiki = theWiki(wikis);
 	const page = pages.find((candidate) => candidate.slug === location?.slug);
 
 	const updateLocation = useCallback((patch: Partial<KnowledgeLocation>) => {
@@ -49,13 +49,13 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 			const loadedWikis = await api.knowledgeWikis(selectedWorkspace.id, abort.signal);
 			if (version !== requestVersion.current) return;
 			setWikis(loadedWikis);
-			const selectedWiki = loadedWikis.find((candidate) => candidate.root === currentLocation?.root) ?? loadedWikis[0];
-			if (!selectedWiki) { setPages([]); setWarnings([]); setLoading(false); if (currentLocation?.workspaceId !== selectedWorkspace.id || currentLocation?.root) onLocationChangeRef.current({ workspaceId: selectedWorkspace.id, view: 'browse' }); return; }
+			const selectedWiki = theWiki(loadedWikis);
+			if (!selectedWiki) { setPages([]); setWarnings([]); setLoading(false); if (currentLocation?.workspaceId !== selectedWorkspace.id) onLocationChangeRef.current({ workspaceId: selectedWorkspace.id, view: 'browse' }); return; }
 			const response = await api.knowledgePages(selectedWorkspace.id, selectedWiki.root, abort.signal);
 			if (version !== requestVersion.current) return;
 			setPages(response.pages); setWarnings(response.warnings);
 			const selectedPage = response.pages.find((candidate) => candidate.slug === currentLocation?.slug);
-			const next: KnowledgeLocation = { workspaceId: selectedWorkspace.id, root: selectedWiki.root, view: currentLocation?.view ?? 'browse' };
+			const next: KnowledgeLocation = { workspaceId: selectedWorkspace.id, view: currentLocation?.view ?? 'browse' };
 			if (selectedPage) next.slug = selectedPage.slug;
 			else if (currentLocation?.slug) setNotice('The selected page is no longer available.');
 			if (!sameLocation(currentLocation, next)) onLocationChangeRef.current(next);
@@ -63,7 +63,7 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 			if (abort.signal.aborted) return;
 			if (version === requestVersion.current) { setError(requestError instanceof Error ? requestError.message : 'Knowledge could not be loaded.'); setPages([]); setWarnings([]); }
 		} finally { if (version === requestVersion.current) setLoading(false); }
-	}, [workspace?.id, location?.workspaceId, location?.root]);
+	}, [workspace?.id, location?.workspaceId]);
 
 	useEffect(() => { void load(); return () => { requestVersion.current++; loadAbort.current?.abort(); }; }, [load]);
 
@@ -80,7 +80,7 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 			if (abort.signal.aborted) return;
 			if (version !== detailVersion.current) return;
 			setDetail(null); setNotice('The selected page could not be loaded. It may have been removed.');
-			if (locationRef.current?.view === 'read') onLocationChangeRef.current({ workspaceId: workspace.id, root: wiki.root, view: 'browse' });
+			if (locationRef.current?.view === 'read') onLocationChangeRef.current({ workspaceId: workspace.id, view: 'browse' });
 		}).finally(() => { if (version === detailVersion.current) setDetailLoading(false); });
 		return () => { detailVersion.current++; abort.abort(); };
 	}, [workspace, wiki, location?.slug, location?.view]);
@@ -113,9 +113,14 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 		finally { setActionBusy(false); }
 	}, [load, wiki, workspace]);
 
-	return useMemo(() => ({ workspace, wiki, page, detail, detailLoading, graph, graphLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, reload: load, runAction }), [workspace, wiki, page, detail, detailLoading, graph, graphLoading, wikis, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, load, runAction]);
+	return useMemo(() => ({ workspace, wiki, page, detail, detailLoading, graph, graphLoading, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, reload: load, runAction }), [workspace, wiki, page, detail, detailLoading, graph, graphLoading, pages, warnings, loading, error, notice, actionBusy, actionResult, updateLocation, load, runAction]);
 }
 
 function sameLocation(left: KnowledgeLocation | undefined, right: KnowledgeLocation): boolean {
-	return left?.workspaceId === right.workspaceId && left?.root === right.root && left?.slug === right.slug && left?.view === right.view;
+	return left?.workspaceId === right.workspaceId && left?.slug === right.slug && left?.view === right.view;
+}
+
+/** Knowledge shows a workspace's Wiki: the one at `wiki/` when the workspace has it, else the one it found. */
+function theWiki(wikis: KnowledgeWiki[]): KnowledgeWiki | undefined {
+	return wikis.find((candidate) => candidate.root === 'wiki') ?? wikis[0];
 }
