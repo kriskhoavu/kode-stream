@@ -64,8 +64,6 @@
 .canvas-board-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .canvas-board-toolbar .plan-search { min-height: 40px; box-shadow: var(--shadow-soft); }
 .canvas-board-toolbar > button { flex: 0 0 auto; }
-.workbench-view-switcher { flex: 0 0 auto; width: auto; min-width: 220px; padding: 2px; }
-.workbench-view-switcher button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0 12px; white-space: nowrap; }
 .canvas-board-actions { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 10px; margin-left: auto; }
 .canvas-board-actions.with-selection { flex-basis: 100%; }
 .canvas-board-actions > button { flex: 0 0 auto; }
@@ -190,10 +188,9 @@ body.is-resizing-panel .canvas-workbench-resize-handle { opacity: 1; }
 .canvas-session-terminal > p, .canvas-session-terminal-error { margin: 0; padding: 18px; color: var(--muted); font-size: 12px; }
 .canvas-session-terminal-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--danger); }
 .canvas-sessions-view { flex-direction: column; }
-.canvas-sessions-toolbar { display: flex; align-items: center; justify-content: flex-start; padding: 10px 12px; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); background: var(--panel); }
 .canvas-sessions-view .session-browser { flex: 1 1 auto; min-height: 0; margin: 12px; }
 @media (max-width: 1020px) { .canvas-search { flex-basis: 220px; min-width: 0; } }
-@media (max-width: 800px) { .canvas-toolbar { min-height: 0; overflow-y: auto; } .canvas-search { min-width: 0; } .canvas-board-toolbar > button, .workbench-view-switcher { flex: 1 1 auto; } .canvas-facet-row { align-items: stretch; flex-direction: column; } .canvas-facet-row .facet-bar { display: grid; grid-template-columns: 1fr; } .canvas-facet-row .facet-menu, .canvas-facet-row .facet-trigger, .canvas-focus-toggle { width: 100%; } .canvas-board { inset-block-start: 316px; } }
+@media (max-width: 800px) { .canvas-toolbar { min-height: 0; overflow-y: auto; } .canvas-search { min-width: 0; } .canvas-board-toolbar > button { flex: 1 1 auto; } .canvas-facet-row { align-items: stretch; flex-direction: column; } .canvas-facet-row .facet-bar { display: grid; grid-template-columns: 1fr; } .canvas-facet-row .facet-menu, .canvas-facet-row .facet-trigger, .canvas-focus-toggle { width: 100%; } .canvas-board { inset-block-start: 316px; } }
 @media (max-width: 900px) { .canvas-workbench.open { position: absolute; z-index: 8; inset: 0 0 0 auto; width: min(var(--canvas-workbench-width, 410px), 94vw); max-width: 94vw; box-shadow: -16px 0 36px rgb(0 0 0 / .18); } }
 @media (prefers-reduced-motion: reduce) { .canvas-semantic-node, .canvas-workbench { transition: none; } }
 

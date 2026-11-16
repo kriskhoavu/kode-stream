@@ -393,18 +393,12 @@ function focusLayoutProjection(): CanvasProjection {
 	};
 }
 
-describe('CanvasBoard sessions entry point', () => {
-	it('presents Canvas and Sessions as Workbench views and opens the Sessions view', () => {
-		const onOpenSessions = vi.fn();
-		renderBoard(baseProjection(), { onOpenSessions });
-		expect(screen.getByRole('button', { name: 'Canvas' })).toHaveAttribute('aria-pressed', 'true');
-		const switcher = screen.getByRole('group', { name: 'Workbench view' });
-		expect(switcher.compareDocumentPosition(screen.getByLabelText('Search Canvas nodes')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+describe('CanvasBoard toolbar', () => {
+	it('leaves the view switch to the page and puts Node type before Focus', () => {
+		renderBoard(baseProjection());
+		expect(screen.queryByRole('group', { name: 'Agent Space view' })).not.toBeInTheDocument();
 		const nodeType = screen.getByRole('button', { name: 'Node type' });
 		expect(nodeType.compareDocumentPosition(screen.getByRole('button', { name: 'Focus' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-		const button = screen.getByRole('button', { name: 'Sessions (1)' });
-		fireEvent.click(button);
-		expect(onOpenSessions).toHaveBeenCalledTimes(1);
 	});
 });
 

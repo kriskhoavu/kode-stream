@@ -1,12 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { CanvasProjection, WorkspaceConfig } from '../lib/types';
 import { CanvasPage } from './CanvasPage';
 
 const canvasState = vi.hoisted(() => ({ projection: undefined as CanvasProjection | undefined, removeStalePlans: vi.fn(), resetPositions: vi.fn(), moveNode: vi.fn() }));
 vi.mock('../features/canvas/useCanvasState', () => ({ useCanvasState: () => ({ projection: canvasState.projection, loading: false, error: '', conflicts: [], dirtyCount: 0, saveStatus: 'saved', hasUnsavedChanges: false, moveNode: canvasState.moveNode, setNodeCollapsed: vi.fn(), saveViewport: vi.fn(), reloadPosition: vi.fn(), reapplyPosition: vi.fn(), placeSession: vi.fn(), removeNode: vi.fn(), removeStalePlans: canvasState.removeStalePlans, resetPositions: canvasState.resetPositions, reload: vi.fn(), refresh: vi.fn() }) }));
-vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, onSelect, onOpenSessions, onReset }: { projection: CanvasProjection; onSelect: (id?: string) => void; onOpenSessions: () => void; onReset: () => void }) => <><button type="button" onClick={onOpenSessions}>Sessions view</button><button type="button" onClick={onReset}>Reset board</button>{projection.nodes.map((node) => <button key={node.id} data-canvas-node-id={node.id} aria-label={node.session ? `Session: ${node.session.record.provider}` : 'Plan: PM-037 Canvas main'} type="button" onClick={() => onSelect(node.id)}>{node.session ? 'Session node' : 'Plan node'}</button>)}</> }));
-vi.mock('../features/canvas/CanvasSessionsView', () => ({ CanvasSessionsView: ({ onViewChange, onOpenOnBoard }: { onViewChange: (view: 'canvas') => void; onOpenOnBoard: (sessionId: string) => void }) => <section aria-label="Sessions view"><button type="button" onClick={() => onViewChange('canvas')}>Canvas view</button><button type="button" onClick={() => onOpenOnBoard('session-1')}>Open session on Canvas</button></section> }));
+vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, onSelect, onReset }: { projection: CanvasProjection; onSelect: (id?: string) => void; onReset: () => void }) => <><button type="button" onClick={onReset}>Reset board</button>{projection.nodes.map((node) => <button key={node.id} data-canvas-node-id={node.id} aria-label={node.session ? `Session: ${node.session.record.provider}` : 'Plan: PM-037 Canvas main'} type="button" onClick={() => onSelect(node.id)}>{node.session ? 'Session node' : 'Plan node'}</button>)}</> }));
+vi.mock('../features/canvas/CanvasSessionsView', () => ({ CanvasSessionsView: ({ onOpenOnBoard }: { onOpenOnBoard: (sessionId: string) => void }) => <section aria-label="Sessions view"><button type="button" onClick={() => onOpenOnBoard('session-1')}>Open session on Canvas</button></section> }));
 vi.mock('../features/canvas/CanvasWorkbench', () => ({ CanvasWorkbench: ({ selectedNode, onClose }: { selectedNode?: unknown; onClose: () => void }) => selectedNode ? <aside aria-label="Canvas Workbench"><button type="button" onClick={onClose}>Close Workbench</button></aside> : null }));
 
 describe('CanvasPage', () => {
@@ -84,10 +84,14 @@ describe('CanvasPage', () => {
 		const onLocationChange = vi.fn();
 		const view = render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={onLocationChange} />);
 		expect(screen.getByLabelText('Sessions view')).toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button', { name: 'Canvas view' }));
+		// The switcher sits in the title row, Sessions first, as on every page with views.
+		const switcher = screen.getByRole('group', { name: 'Agent Space view' });
+		expect(switcher.closest('.page-title')).not.toBeNull();
+		expect(within(switcher).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Sessions (1)', 'Canvas']);
+		fireEvent.click(within(switcher).getByRole('button', { name: 'Canvas' }));
 		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: workspace.id, view: 'canvas' }));
 		view.rerender(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={onLocationChange} />);
-		fireEvent.click(screen.getByRole('button', { name: 'Sessions view' }));
+		fireEvent.click(within(screen.getByRole('group', { name: 'Agent Space view' })).getByRole('button', { name: /Sessions/ }));
 		await waitFor(() => expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: workspace.id, view: undefined }));
 	});
 

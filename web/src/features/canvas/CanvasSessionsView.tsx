@@ -2,14 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../shared/api';
 import type { CanvasProjection, GlobalSessionRow, HarnessRun, HarnessTask, SafeSessionRecord } from '../../lib/types';
 import { SessionBrowser } from '../sessions/SessionBrowser';
-import { WorkbenchViewSwitcher } from './WorkbenchViewSwitcher';
 
-export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch, projection, onViewChange, onOpenOnBoard, onOpenOnCard, onOpenHarnessRun, onReload }: {
+export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch, projection, onOpenOnBoard, onOpenOnCard, onOpenHarnessRun, onReload }: {
 	workspaceId: string;
 	workspaceName?: string;
 	checkoutBranch?: string;
 	projection: CanvasProjection;
-	onViewChange: (view: 'canvas' | 'sessions') => void;
 	onOpenOnBoard: (sessionId: string) => void;
 	onOpenOnCard?: (itemId: string, sessionId: string) => void;
 	/** Opens a harness run's live conversation. Without it the harness section is not shown. */
@@ -36,7 +34,6 @@ export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch,
 		checkoutBranch: checkoutBranch ?? '',
 		planTitle: record.planRef ? projection.nodes.find((node) => node.plan?.itemId === record.planRef?.itemId)?.plan?.title : undefined
 	})), [checkoutBranch, projection.nodes, records, workspaceName]);
-	const liveSessionCount = rows.filter((row) => row.record.live && (row.record.state === 'starting' || row.record.state === 'running')).length;
 	const stop = async (row: GlobalSessionRow) => {
 		await api.cancelEmbeddedAISession(row.record.id);
 		setReloadToken((token) => token + 1);
@@ -49,9 +46,6 @@ export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch,
 	};
 
 	return <div className="canvas-work-area canvas-sessions-view">
-		<div className="canvas-sessions-toolbar">
-			<WorkbenchViewSwitcher view="sessions" sessionCount={liveSessionCount} onChange={onViewChange} />
-		</div>
 		{onOpenHarnessRun && <HarnessRunsSection workspaceId={workspaceId} reloadToken={reloadToken} onOpen={onOpenHarnessRun} />}
 		{error && <div className="canvas-state error" role="alert">{error}<button type="button" onClick={() => setReloadToken((token) => token + 1)}>Retry</button></div>}
 		{!error && !records && <div className="canvas-state" role="status">Loading sessions…</div>}

@@ -6,7 +6,6 @@ import { Bot, Box, ChevronDown, Expand, Eye, EyeOff, GitBranch, LayoutGrid, Maxi
 import type { CanvasNode as DomainNode, CanvasPosition, CanvasProjection, CanvasSection, CanvasSize, CanvasViewport, GitStatus } from '../../lib/types';
 import { SessionTerminal } from '../ai-session/SessionTerminal';
 import { readPreference, writePreference } from '../../shared/preferences/store';
-import { WorkbenchViewSwitcher } from './WorkbenchViewSwitcher';
 import '@xyflow/react/dist/style.css';
 
 interface CanvasNodeData extends Record<string, unknown> {
@@ -23,7 +22,6 @@ interface CanvasNodeData extends Record<string, unknown> {
 	focusOn?: boolean;
 	section?: CanvasSection;
 	onRemoveSection?: (id: string) => void;
-	onOpenSessions?: () => void;
 	onMoveSection?: (id: string, position: CanvasPosition, delta: CanvasPosition) => void;
 }
 
@@ -53,13 +51,12 @@ type CanvasFlowNode = XYNode<CanvasNodeData>;
 
 const nodeTypes = { workspace: memo(WorkspaceCanvasNode), plan: memo(PlanCanvasNode), session: memo(SessionCanvasNode), section: memo(CanvasSectionNode) };
 
-export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onOpenSessions, onMoveNode, onResizeNode = () => {}, onSetCollapsed, onArrange, serviceGridColumns = 1, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onPinSession, onOpenAISession, aiSessionDisabled = true }: {
+export function CanvasBoard({ projection, sections = [], conflicts, selectedId, onSelect, onMoveNode, onResizeNode = () => {}, onSetCollapsed, onArrange, serviceGridColumns = 1, onSaveViewport, onReload, onReloadPosition, onReapplyPosition, onReset, onRemove, onCreateSection, onMoveSection, onRemoveSection, onPinSession, onOpenAISession, aiSessionDisabled = true }: {
 	projection: CanvasProjection;
 	sections?: CanvasSection[];
 	conflicts: string[];
 	selectedId?: string;
 	onSelect: (id?: string) => void;
-	onOpenSessions?: () => void;
 	onMoveNode: (id: string, position: CanvasPosition) => void;
 	onResizeNode?: (id: string, size: CanvasSize) => void;
 	onSetCollapsed: (id: string, collapsed: boolean) => void;
@@ -92,7 +89,6 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	const layoutCapability = projection.nodes.find((node) => node.workspace)?.workspace?.actions['layout.move'];
 	const layoutAvailable = layoutCapability?.state === 'available';
 	const canvasNodes = useMemo(() => projection.nodes.filter((node) => node.kind !== 'workspace'), [projection.nodes]);
-	const liveSessionCount = useMemo(() => projection.nodes.filter((node) => node.session?.record.live && (node.session.record.state === 'starting' || node.session.record.state === 'running')).length, [projection.nodes]);
 	const focusActiveSet = useMemo(() => {
 		const sessionIds = new Set<string>();
 		const planIds = new Set<string>();
@@ -254,7 +250,6 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	return <ReactFlowProvider><div className="canvas-board-shell" ref={canvasShellRef}>
 		<div className="canvas-toolbar" aria-label="Canvas tools">
 			<div className="canvas-board-toolbar">
-				{onOpenSessions && <WorkbenchViewSwitcher view="canvas" sessionCount={liveSessionCount} onChange={(view) => { if (view === 'sessions') onOpenSessions(); }} />}
 				<CanvasSearch query={searchQuery} onQueryChange={setSearchQuery} />
 				<button className="primary" type="button" disabled={aiSessionDisabled} onClick={onOpenAISession}><Bot size={15} /> AI session</button>
 				{(onCreateSection || selected) && <div className={`canvas-board-actions${selected ? ' with-selection' : ''}`} role="group" aria-label="Canvas actions">

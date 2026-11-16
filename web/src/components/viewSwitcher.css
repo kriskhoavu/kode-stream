@@ -1,0 +1,40 @@
+/* A page's view switcher: the segmented control at Workstream's size. */
+.segmented-control.view-switcher {
+	display: inline-grid;
+	grid-auto-flow: column;
+	grid-template-columns: none;
+	grid-auto-columns: auto;
+	flex: 0 0 auto;
+	width: auto;
+	min-width: 0;
+	padding: 2px;
+}
+
+.segmented-control.view-switcher button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	min-height: 36px;
+	padding: 0 12px;
+	white-space: nowrap;
+}
+
+.segmented-control.view-switcher button:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+/* The compact form beside a toolbar's buttons, at their height. */
+.segmented-control.view-switcher.icon-only button {
+	width: 34px;
+	min-height: 32px;
+	padding: 0;
+}
+
+/* A page's title row: its view switcher on the left, the checkout on the right. */
+.page-title.with-views {
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+}

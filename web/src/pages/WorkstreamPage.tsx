@@ -49,6 +49,7 @@ import { useItemSessions, type ItemAgents } from '../features/workstream/useItem
 import { useBoardHarness } from '../features/workstream/useBoardHarness';
 import { isSyntheticItem, joinHarness, queueOrder, taskCards, tasksForWorkspace, workedBy, workedByLabels, type CardWork } from '../features/workstream/harnessJoin';
 import { PlanListView } from '../features/workstream/PlanListView';
+import { ViewSwitcher, type ViewSwitcherOption } from '../components/ViewSwitcher';
 import { ByHandChip, HarnessCardChips } from '../features/workstream/HarnessCardChips';
 import { NeedsYouStrip } from '../features/workstream/NeedsYouStrip';
 import { RunWithHarnessDialog } from '../features/workstream/RunWithHarnessDialog';
@@ -65,8 +66,8 @@ type DrawerTab = 'preview' | 'raw' | 'diff';
 type BoardKind = 'tasks' | 'plans';
 /** How it shows them: cards in status columns, or rows. */
 type BoardLayout = 'board' | 'list';
-const boardKinds: { id: BoardKind; label: string; icon: typeof Columns3 }[] = [{ id: 'tasks', label: 'Tasks', icon: Ticket }, { id: 'plans', label: 'Plans', icon: FileText }];
-const boardLayouts: { id: BoardLayout; label: string; icon: typeof Columns3 }[] = [{ id: 'board', label: 'Board', icon: Columns3 }, { id: 'list', label: 'List', icon: ListOrdered }];
+const boardKinds: ViewSwitcherOption<BoardKind>[] = [{ id: 'tasks', label: 'Tasks', icon: Ticket }, { id: 'plans', label: 'Plans', icon: FileText }];
+const boardLayouts: ViewSwitcherOption<BoardLayout>[] = [{ id: 'board', label: 'Board', icon: Columns3 }, { id: 'list', label: 'List', icon: ListOrdered }];
 const boardKindPreference = 'workstreamBoardKind';
 const layoutPreferences: Record<BoardKind, string> = { tasks: 'workstreamTaskLayout', plans: 'workstreamPlanLayout' };
 /** The Tasks board's first column: a task nobody has started. */
@@ -755,15 +756,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     <section className="workstream-page">
       <div className="page-title workstream-title with-views">
         <h1 className="sr-only">Workstream</h1>
-        <div className="board-switchers">
-          {harnessOn && (
-            <div className="segmented-control workbench-view-switcher board-view-switcher" role="group" aria-label="Show on the board">
-              {boardKinds.map((kind) => (
-                <button key={kind.id} type="button" className={shownKind === kind.id ? 'active' : ''} aria-pressed={shownKind === kind.id} onClick={() => setBoardKind(kind.id)}><kind.icon size={15} aria-hidden="true" /> {kind.label}</button>
-              ))}
-            </div>
-          )}
-        </div>
+        {harnessOn ? <ViewSwitcher label="Show on the board" options={boardKinds} value={shownKind} onChange={setBoardKind} /> : <span />}
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
             <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} gitStatus={workspaceGitStatus} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await loadCheckout(true); await onWorkspacesChanged(); }} />
@@ -806,11 +799,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         ))}
       </div>
       <div className="saved-filter-bar">
-        <div className="segmented-control workbench-view-switcher board-view-switcher board-layout-switcher" role="group" aria-label="Board view">
-          {boardLayouts.map((layout) => (
-            <button key={layout.id} type="button" className={shownLayout === layout.id ? 'active' : ''} aria-pressed={shownLayout === layout.id} aria-label={layout.label} title={layout.label} onClick={() => setLayout(layout.id)}><layout.icon size={16} aria-hidden="true" /></button>
-          ))}
-        </div>
+        <ViewSwitcher label="Board view" options={boardLayouts} value={shownLayout} onChange={setLayout} iconOnly />
         <button className="secondary" type="button" onClick={() => setSaveFilterOpen((open) => !open)}><BookmarkPlus size={15} /> Save view</button>
         {saveFilterOpen && (
           <div className="save-filter-form">

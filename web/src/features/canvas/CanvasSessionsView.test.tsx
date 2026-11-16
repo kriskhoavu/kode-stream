@@ -21,12 +21,8 @@ describe('CanvasSessionsView', () => {
 		vi.mocked(api.deleteSession).mockResolvedValue(undefined);
 	});
 
-	it('shows Sessions as the active Workbench view and groups sessions by plan', async () => {
-		const onViewChange = vi.fn();
-		render(<CanvasSessionsView workspaceId="workspace-1" workspaceName="Workspace" checkoutBranch="main" projection={projection()} onViewChange={onViewChange} onOpenOnBoard={vi.fn()} onReload={vi.fn()} />);
-		expect(screen.getByRole('button', { name: 'Sessions' })).toHaveAttribute('aria-pressed', 'true');
-		fireEvent.click(screen.getByRole('button', { name: 'Canvas' }));
-		expect(onViewChange).toHaveBeenCalledWith('canvas');
+	it('groups sessions by plan', async () => {
+		render(<CanvasSessionsView workspaceId="workspace-1" workspaceName="Workspace" checkoutBranch="main" projection={projection()} onOpenOnBoard={vi.fn()} onReload={vi.fn()} />);
 		expect(await screen.findByText('Session focus')).toBeInTheDocument();
 		expect(screen.getByTestId('session-browser')).toHaveAttribute('data-grouping', 'plan');
 	});
@@ -42,7 +38,7 @@ describe('CanvasSessionsView', () => {
 			{ id: 'task-a', source: { key: 'DI-1' }, title: 'Done one' },
 			{ id: 'task-b', source: { key: 'DI-2' }, title: 'Live one' }
 		] as never);
-		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onViewChange={vi.fn()} onOpenOnBoard={vi.fn()} onOpenHarnessRun={onOpenHarnessRun} onReload={vi.fn()} />);
+		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onOpenOnBoard={vi.fn()} onOpenHarnessRun={onOpenHarnessRun} onReload={vi.fn()} />);
 		const section = await screen.findByRole('region', { name: 'Harness · 1 working' });
 		const items = section.querySelectorAll('li');
 		expect(items[0]).toHaveTextContent('Working');
@@ -56,7 +52,7 @@ describe('CanvasSessionsView', () => {
 	it('returns a listed session to its node on the Canvas and can stop it', async () => {
 		const onOpenOnBoard = vi.fn();
 		const onReload = vi.fn();
-		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onViewChange={vi.fn()} onOpenOnBoard={onOpenOnBoard} onReload={onReload} />);
+		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onOpenOnBoard={onOpenOnBoard} onReload={onReload} />);
 		fireEvent.click(await screen.findByRole('button', { name: 'Open session-1' }));
 		expect(onOpenOnBoard).toHaveBeenCalledWith('session-1');
 		fireEvent.click(screen.getByRole('button', { name: 'Stop session-1' }));
@@ -69,7 +65,7 @@ describe('CanvasSessionsView', () => {
 			id: 'session-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'card_context', requestedBranch: 'main', state: 'cancelled', startedAt: '', lastKnownAt: '', live: false
 		}]);
 		const onReload = vi.fn();
-		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onViewChange={vi.fn()} onOpenOnBoard={vi.fn()} onReload={onReload} />);
+		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onOpenOnBoard={vi.fn()} onReload={onReload} />);
 		fireEvent.click(await screen.findByRole('button', { name: 'Remove session-1' }));
 		await waitFor(() => expect(api.deleteSession).toHaveBeenCalledWith('session-1'));
 		await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove session-1' })).not.toBeInTheDocument());
