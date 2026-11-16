@@ -11,9 +11,9 @@ making implementation changes.
 - It also owns the engineering harness in `internal/harness/`: scouts fill a ranked queue, and an orchestrator runs
   coding CLIs (Claude Code, Codex, OpenCode) headless in `harness/*` worktrees from plan to draft pull request, with a
   person approving each gate. Agents never commit; the harness has no model runtime and does not use `agent-plane`.
-  Only `internal/server`, `internal/server/api` and `internal/storage` import it. It has no page of its own: a ticket
-  is one card on the Workstream board whether a person or the harness works on it, the Task Queue is a view of the
-  board beside its status columns, and its settings live under Settings. See
+  Only `internal/server`, `internal/server/api` and `internal/storage` import it. It has no page of its own: the Workstream
+  board shows either Tasks, the harness's tickets in the columns their runs have reached, or Plans, the branch's plans
+  moved by hand, each as a Board or a List (the Tasks list is the Task Queue), and its settings live under Settings. See
   [the harness page](wiki/platform/harness.md).
 - Local mode is a single-user server over local repositories. Cloud mode is a hosted control plane with
   Agent-Backed and Agentless Remote Snapshot workspaces. Both modes share one binary and one storage abstraction.

@@ -3,7 +3,7 @@ import type { ItemSummary } from '../../lib/types';
 import { initialHarnessState } from '../harness/harnessState';
 import type { HarnessState } from '../harness/harnessState';
 import { approval, run, stage, status, task } from '../harness/testData';
-import { isFinishedTask, joinHarness, runProgress, tasksForWorkspace, workedBy } from './harnessJoin';
+import { isFinishedTask, joinHarness, runProgress, taskCards, taskColumn, tasksForWorkspace, workedBy } from './harnessJoin';
 
 const item = (id: string, identifier: string): ItemSummary => ({ id, workspaceId: 'ws', workspaceName: 'Sample', branch: 'main', scope: 'platform', identifier, title: `Item ${identifier}`, status: 'in_progress', tags: [], metadataSource: 'plan.yaml', itemPath: `plans/platform/${identifier}` });
 
@@ -81,5 +81,49 @@ describe('finished tasks', () => {
 		expect(isFinishedTask(task('X', { finishedOutside: { at: '2026-11-01T00:00:00.000Z' } }))).toBe(true);
 		expect(isFinishedTask(task('X', { state: 'blocked' }))).toBe(false);
 		expect(isFinishedTask(task('X', { state: 'cancelled' }))).toBe(false);
+	});
+});
+
+describe('taskColumn', () => {
+	it('moves a task with its run: started is Draft, an approved plan is In Progress, the pull request is Review', () => {
+		expect(taskColumn(task('PM-1'))).toBe('unsorted');
+		expect(taskColumn(task('PM-1', { state: 'running' }))).toBe('draft');
+		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't'))).toBe('draft');
+		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'plan', { state: 'running' }) }))).toBe('draft');
+		expect(taskColumn(task('PM-1', { state: 'running', needsYou: true }), run('r', 't', { currentStage: stage('r', 'plan_approval', { state: 'awaiting_approval' }) }))).toBe('draft');
+		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'implement', { state: 'running' }) }))).toBe('in_progress');
+		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'qa', { state: 'running' }) }))).toBe('in_progress');
+		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'pr_approval', { state: 'awaiting_approval' }) }))).toBe('review');
+		expect(taskColumn(task('PM-1', { state: 'done' }), run('r', 't', { state: 'passed' }))).toBe('done');
+		expect(taskColumn(task('PM-1', { finishedOutside: { at: '2026-11-01T00:00:00.000Z' } }))).toBe('done');
+	});
+
+	it('keeps a stopped task in the column its run reached', () => {
+		expect(taskColumn(task('PM-1', { state: 'cancelled' }), run('r', 't', { state: 'cancelled', currentStage: stage('r', 'implement', { state: 'cancelled' }) }))).toBe('in_progress');
+		expect(taskColumn(task('PM-1', { state: 'cancelled' }))).toBe('unsorted');
+	});
+});
+
+describe('taskCards', () => {
+	it('gives every task one card, on the item that holds it or a card of its own, and never one to move by hand', () => {
+		const state = loaded({
+			tasks: {
+				a: task('PM-1', { id: 'a', state: 'running', runId: 'run-1' }),
+				b: task('PM-2', { id: 'b' }),
+				c: task('PM-3', { id: 'c', state: 'done' }),
+				d: task('PM-4', { id: 'd', state: 'dismissed' }),
+				e: task('PM-5', { id: 'e', workspaceId: 'other' })
+			},
+			runs: { 'run-1': run('run-1', 'a', { currentStage: stage('run-1', 'implement', { state: 'running' }) }) }
+		});
+		const cards = taskCards([item('p1', 'PM-1'), item('p9', 'PM-9')], state, 'ws');
+		expect(cards.map((card) => [card.item.id, card.item.status, card.item.editable])).toEqual(expect.arrayContaining([
+			['p1', 'in_progress', false],
+			['harness:b', 'unsorted', false],
+			['harness:c', 'done', false]
+		]));
+		expect(cards).toHaveLength(3);
+		expect(cards.find((card) => card.item.id === 'p1')?.work.synthetic).toBe(false);
+		expect(taskCards([], initialHarnessState, 'ws')).toEqual([]);
 	});
 });

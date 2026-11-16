@@ -49,6 +49,15 @@ function renderBoard() {
 	return render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 }
 
+/** Tasks is the board's first view; the plans on the branch sit behind the other toggle. */
+async function showPlans() {
+	fireEvent.click(await screen.findByRole('button', { name: 'Plans' }));
+}
+
+function column(status: string): HTMLElement {
+	return document.querySelector(`.workstream-column[data-status="${status}"]`) as HTMLElement;
+}
+
 // The board remembers its view in the browser's storage; each test starts on the status columns.
 afterEach(() => { vi.unstubAllGlobals(); window.localStorage.clear(); });
 
@@ -64,8 +73,32 @@ describe('WorkstreamPage with the harness', () => {
 		expect(screen.getByText('Found by the Finder').closest('.plan-card')).not.toHaveClass('working-card');
 		expect(screen.getByText('Found by the Finder')).toBeInTheDocument();
 		expect(screen.getByText('no plan yet')).toBeInTheDocument();
-		expect(screen.getByText('By hand')).toBeInTheDocument();
 		expect(screen.getByText('Needs a decision').closest('.plan-card')).toHaveClass('needs-you-card');
+		// The Tasks board holds tasks only: the plan nobody handed to the harness is not on it.
+		expect(screen.queryByText('Quiet card')).not.toBeInTheDocument();
+		expect(screen.queryByText('By hand')).not.toBeInTheDocument();
+		await showPlans();
+		expect(await screen.findByText('By hand')).toBeInTheDocument();
+		expect(screen.queryByText('Found by the Finder')).not.toBeInTheDocument();
+	});
+
+	it('puts each task in the column its run has reached, and offers no way to move it by hand', async () => {
+		stubBoard();
+		renderBoard();
+		await screen.findByText('Found by the Finder');
+		expect(within(column('unsorted')).getByRole('heading', { name: 'To do' })).toBeInTheDocument();
+		expect(within(column('unsorted')).getByText('Found by the Finder')).toBeInTheDocument();
+		// Started, its plan waiting for approval: Draft. Its plan approved and being built: In Progress.
+		expect(within(column('draft')).getByText('Needs a decision')).toBeInTheDocument();
+		expect(within(column('in_progress')).getByText('Built by the harness')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Move item status' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: '+ New item' })).not.toBeInTheDocument();
+		expect(screen.queryByTitle('Configure source items')).not.toBeInTheDocument();
+		expect(document.querySelector('.plan-card.draggable')).toBeNull();
+		await showPlans();
+		// On the Plans board a plan keeps the status a person gave it.
+		expect(within(column('in_progress')).getByText('Needs a decision')).toBeInTheDocument();
+		expect(screen.getAllByRole('button', { name: 'Move item status' }).length).toBeGreaterThan(0);
 	});
 
 	it('lists what needs you above the board and approves from there', async () => {
@@ -96,6 +129,8 @@ describe('WorkstreamPage with the harness', () => {
 		stubBoard();
 		renderBoard();
 		await screen.findByText('Claude · Opus 5.5');
+		expect(screen.queryByRole('button', { name: /Worked by/ })).not.toBeInTheDocument();
+		await showPlans();
 		fireEvent.click(screen.getByRole('button', { name: /Worked by/ }));
 		fireEvent.click(screen.getByRole('checkbox', { name: 'By hand' }));
 		await waitFor(() => expect(screen.queryByText('Built by the harness')).not.toBeInTheDocument());
@@ -115,15 +150,43 @@ describe('WorkstreamPage with the harness', () => {
 describe('WorkstreamPage board views', () => {
 	class FakeResizeObserver { observe() {} disconnect() {} unobserve() {} }
 
-	it('switches between the Board and the Task Queue, with the side panel and the Finder', async () => {
+	it('shows Tasks first, beside Plans, each as a Board or a List', async () => {
+		stubBoard();
+		renderBoard();
+		await screen.findByText('Claude · Opus 5.5');
+		const kinds = screen.getByRole('group', { name: 'Show on the board' });
+		expect(within(kinds).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Tasks', 'Plans']);
+		expect(within(kinds).getByRole('button', { name: 'Tasks' })).toHaveAttribute('aria-pressed', 'true');
+		const layouts = screen.getByRole('group', { name: 'Board view' });
+		expect(within(layouts).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Board', 'List']);
+		expect(within(layouts).getByRole('button', { name: 'Board' })).toHaveAttribute('aria-pressed', 'true');
+	});
+
+	it('lists the plans in rows by status, and moves one from its row', async () => {
+		const fetchMock = stubBoard();
+		renderBoard();
+		await showPlans();
+		fireEvent.click(within(screen.getByRole('group', { name: 'Board view' })).getByRole('button', { name: 'List' }));
+		const group = await screen.findByRole('rowgroup', { name: 'In Progress' });
+		expect(within(group).getAllByRole('row').map((row) => row.getAttribute('data-item-id')).filter(Boolean).sort()).toEqual(['p1', 'p2', 'p3']);
+		expect(document.querySelector('.workstream-board')).toBeNull();
+		const quietRow = within(group).getAllByRole('row').find((row) => row.textContent?.includes('Quiet card'))!;
+		expect(within(quietRow).getByText('By hand')).toBeInTheDocument();
+		fireEvent.click(within(quietRow).getByRole('button', { name: 'Move Quiet card' }));
+		fireEvent.click(screen.getByRole('menuitemradio', { name: 'Review' }));
+		await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url).includes('/api/items/p2') && init?.method && init.method !== 'GET')).toBe(true));
+		// Each toggle keeps its own view: Tasks is still a board.
+		fireEvent.click(screen.getByRole('button', { name: 'Tasks' }));
+		expect(await screen.findByText('Found by the Finder')).toBeInTheDocument();
+		expect(within(screen.getByRole('group', { name: 'Board view' })).getByRole('button', { name: 'Board' })).toHaveAttribute('aria-pressed', 'true');
+	});
+
+	it('lists the tasks as the Task Queue, with the side panel and the Finder', async () => {
 		vi.stubGlobal('ResizeObserver', FakeResizeObserver);
 		const fetchMock = stubBoard();
 		renderBoard();
 		await screen.findByText('Claude · Opus 5.5');
-		const switcher = screen.getByRole('group', { name: 'Board view' });
-		expect(within(switcher).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Board', 'Task Queue']);
-		expect(within(switcher).getByRole('button', { name: 'Board' })).toHaveAttribute('aria-pressed', 'true');
-		fireEvent.click(within(switcher).getByRole('button', { name: 'Task Queue' }));
+		fireEvent.click(within(screen.getByRole('group', { name: 'Board view' })).getByRole('button', { name: 'List' }));
 		const queue = await screen.findByRole('list', { name: 'Task Queue in order' });
 		expect(within(queue).getAllByRole('listitem')).toHaveLength(3);
 		const side = screen.getByRole('complementary', { name: 'About the Task Queue' });
@@ -136,11 +199,12 @@ describe('WorkstreamPage board views', () => {
 		await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url) === '/api/harness/scout/poll' && init?.method === 'POST')).toBe(true));
 	});
 
-	it('hides the view switcher while the harness is off', async () => {
+	it('shows only the plans while the harness is off, still as a Board or a List', async () => {
 		stubBoard({ enabled: false });
 		renderBoard();
 		await screen.findByText('Quiet card');
-		expect(screen.queryByRole('group', { name: 'Board view' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('group', { name: 'Show on the board' })).not.toBeInTheDocument();
+		expect(screen.getByRole('group', { name: 'Board view' })).toBeInTheDocument();
 	});
 });
 
@@ -148,6 +212,7 @@ describe('WorkstreamPage runs a card with the harness', () => {
 	it('offers Run with the harness on a card by hand and posts the ticket', async () => {
 		const fetchMock = stubBoard();
 		renderBoard();
+		await showPlans();
 		const quietCard = (await screen.findByText('Quiet card')).closest('.plan-card')!;
 		fireEvent.click(within(quietCard as HTMLElement).getByRole('button', { name: 'Run with the harness' }));
 		const dialog = await screen.findByRole('dialog', { name: 'Run PM-2 with the harness' });
@@ -166,11 +231,12 @@ describe('WorkstreamPage ticket cards', () => {
 		const ticket = (await screen.findByText('Found by the Finder')).closest('.plan-card') as HTMLElement;
 		expect(ticket).toHaveClass('ticket-card');
 		expect(within(ticket).getByText('Jira ticket')).toBeInTheDocument();
-		const plan = (await screen.findByText('Quiet card')).closest('.plan-card') as HTMLElement;
-		expect(plan).toHaveClass('plan-kind-card');
-		expect(within(plan).getByText('Plan')).toBeInTheDocument();
+		// A task a plan holds keeps the plan card's look on the Tasks board.
+		const held = screen.getByText('Built by the harness').closest('.plan-card') as HTMLElement;
+		expect(held).toHaveClass('plan-kind-card');
+		expect(within(held).getByText('Plan')).toBeInTheDocument();
 		expect(within(ticket).getByText('no plan yet')).toBeInTheDocument();
-		expect(screen.getByText(/of 4 items/)).toBeInTheDocument();
+		expect(screen.getByText(/of 3 tasks/)).toBeInTheDocument();
 		fireEvent.click(ticket);
 		expect(await screen.findByRole('tab', { name: 'Ticket', selected: true })).toBeInTheDocument();
 		expect(screen.getByRole('tab', { name: 'Plan' })).toBeInTheDocument();

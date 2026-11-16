@@ -47,7 +47,8 @@ import { takeOverByHand } from '../features/workstream/takeOver';
 import type { HarnessController } from '../features/harness/useHarness';
 import { useItemSessions, type ItemAgents } from '../features/workstream/useItemSessions';
 import { useBoardHarness } from '../features/workstream/useBoardHarness';
-import { isSyntheticItem, joinHarness, queueOrder, tasksForWorkspace, workedBy, workedByLabels, type CardWork } from '../features/workstream/harnessJoin';
+import { isSyntheticItem, joinHarness, queueOrder, taskCards, tasksForWorkspace, workedBy, workedByLabels, type CardWork } from '../features/workstream/harnessJoin';
+import { PlanListView } from '../features/workstream/PlanListView';
 import { ByHandChip, HarnessCardChips } from '../features/workstream/HarnessCardChips';
 import { NeedsYouStrip } from '../features/workstream/NeedsYouStrip';
 import { RunWithHarnessDialog } from '../features/workstream/RunWithHarnessDialog';
@@ -60,12 +61,24 @@ import '../features/harness/harness.css';
 import '../features/workstream/harnessCards.css';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
-type BoardView = 'board' | 'queue';
-const boardViews: { id: BoardView; label: string; icon: typeof Columns3 }[] = [{ id: 'board', label: 'Board', icon: Columns3 }, { id: 'queue', label: 'Task Queue', icon: ListOrdered }];
-const boardViewPreference = 'workstreamBoardView';
-function readBoardView(): BoardView {
-  const value = readStringPreference(boardViewPreference);
-  return value === 'queue' ? value : 'board';
+/** What the board shows: the harness's tasks, whose columns follow their runs, or the plans on the branch, moved by hand. */
+type BoardKind = 'tasks' | 'plans';
+/** How it shows them: cards in status columns, or rows. */
+type BoardLayout = 'board' | 'list';
+const boardKinds: { id: BoardKind; label: string; icon: typeof Columns3 }[] = [{ id: 'tasks', label: 'Tasks', icon: Ticket }, { id: 'plans', label: 'Plans', icon: FileText }];
+const boardLayouts: { id: BoardLayout; label: string; icon: typeof Columns3 }[] = [{ id: 'board', label: 'Board', icon: Columns3 }, { id: 'list', label: 'List', icon: ListOrdered }];
+const boardKindPreference = 'workstreamBoardKind';
+const layoutPreferences: Record<BoardKind, string> = { tasks: 'workstreamTaskLayout', plans: 'workstreamPlanLayout' };
+/** The Tasks board's first column: a task nobody has started. */
+const taskColumnLabels: Partial<Record<ItemStatus, string>> = { unsorted: 'To do' };
+function readBoardKind(): BoardKind {
+  return readStringPreference(boardKindPreference) === 'plans' ? 'plans' : 'tasks';
+}
+function readBoardLayout(kind: BoardKind): BoardLayout {
+  const value = readStringPreference(layoutPreferences[kind]);
+  if (value === 'board' || value === 'list') return value;
+  // The Task Queue view the board had before is the Tasks list.
+  return kind === 'tasks' && readStringPreference('workstreamBoardView') === 'queue' ? 'list' : 'board';
 }
 type DrawerSideTab = 'info' | 'git' | 'jira' | 'agents';
 type DrawerFileOption = { id: string; path: string; label: string };
@@ -154,12 +167,20 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const harness = useBoardHarness();
   const harnessOn = Boolean(harness.state.loaded && harness.state.status?.enabled && harness.state.status.storageSupported);
   const harnessJoin = useMemo(() => joinHarness(items, harness.state, workspace?.id), [items, harness.state, workspace?.id]);
-  const boardItems = useMemo(() => harnessJoin.synthetic.length ? [...items, ...harnessJoin.synthetic] : items, [items, harnessJoin.synthetic]);
+  // Tasks and plans never share the board: Tasks shows what the harness holds, Plans what the branch holds.
+  // Without the harness there are no tasks, so the board shows plans.
+  const [boardKind, setBoardKindState] = useState<BoardKind>(() => readBoardKind());
+  const setBoardKind = (kind: BoardKind) => { setBoardKindState(kind); writePreference(boardKindPreference, kind); };
+  const shownKind: BoardKind = harnessOn ? boardKind : 'plans';
+  const [layouts, setLayouts] = useState<Record<BoardKind, BoardLayout>>(() => ({ tasks: readBoardLayout('tasks'), plans: readBoardLayout('plans') }));
+  const setLayout = (layout: BoardLayout) => { setLayouts((current) => ({ ...current, [shownKind]: layout })); writePreference(layoutPreferences[shownKind], layout); };
+  const shownLayout = layouts[shownKind];
+  const tasksShown = shownKind === 'tasks';
+  const boardTaskCards = useMemo(() => taskCards(items, harness.state, workspace?.id), [items, harness.state, workspace?.id]);
+  const taskWorkById = useMemo(() => new Map(boardTaskCards.map((card) => [card.item.id, card.work])), [boardTaskCards]);
+  const boardItems = useMemo(() => tasksShown ? boardTaskCards.map((card) => card.item) : items, [tasksShown, boardTaskCards, items]);
+  const workOf = useCallback((id: string) => (tasksShown ? taskWorkById.get(id) : undefined) ?? harnessJoin.byItemId.get(id), [tasksShown, taskWorkById, harnessJoin]);
   const workedByOf = useCallback((item: ItemSummary) => workedBy(harnessJoin.byItemId.get(item.id)), [harnessJoin]);
-  // The board's views: the cards in their status columns, or the harness's tasks in the order it takes them.
-  const [boardView, setBoardViewState] = useState<BoardView>(() => readBoardView());
-  const setBoardView = (view: BoardView) => { setBoardViewState(view); writePreference(boardViewPreference, view); };
-  const shownView: BoardView = harnessOn ? boardView : 'board';
   const boardTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id), [harness.state, workspace?.id]);
   const finishedTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id, { finished: true }), [harness.state, workspace?.id]);
   const taskActions = useTaskActions(harness);
@@ -361,7 +382,9 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   }, [workspace?.id]);
 
   const sourceOptions = useMemo(() => sourceFacetOptions(items, workspace), [items, workspace]);
-  const filteredPlans = useMemo(() => filterPlans(boardItems, filters, text, workspace, workedByOf), [boardItems, filters, text, workspace, workedByOf]);
+  const filteredPlans = useMemo(() => filterPlans(boardItems, tasksShown ? { ...filters, workedBy: [] } : filters, text, workspace, workedByOf), [boardItems, tasksShown, filters, text, workspace, workedByOf]);
+  // The Tasks list is the Task Queue, narrowed by the same search and filters as the board.
+  const shownTaskIds = useMemo(() => new Set(filteredPlans.map((item) => taskWorkById.get(item.id)?.task.id).filter(Boolean)), [filteredPlans, taskWorkById]);
   const services = useMemo(() => unique(items.map((plan) => plan.scope || 'Unknown')), [items]);
   const currentBranch = branchContext?.currentCheckoutBranch || workspaceGitStatus?.branch || workspaceBranchCurrent || workspace?.baselineBranch || 'No branch';
   const branchOptions = useMemo(() => unique([
@@ -376,7 +399,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     { key: 'scopes', title: 'Service', options: services.map((scope) => ({ value: scope, label: scope })) },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
     { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
-    ...(harnessOn ? [{ key: 'workedBy' as const, title: 'Worked by', options: (['harness', 'hand'] as const).map((value) => ({ value, label: workedByLabels[value] })) }] : [])
+    ...(harnessOn && !tasksShown ? [{ key: 'workedBy' as const, title: 'Worked by', options: (['harness', 'hand'] as const).map((value) => ({ value, label: workedByLabels[value] })) }] : [])
   ];
   const activeFilterCount = filters.sources.length
     + filters.scopes.length
@@ -392,9 +415,9 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   }, [visibleStatuses]);
   const boardStyle = useMemo(() => ({
     gridTemplateColumns: displayedStatuses
-      .flatMap((status) => status === 'unsorted' ? ['minmax(200px, 1fr)', '44px'] : ['minmax(200px, 1fr)'])
+      .flatMap((status) => status === 'unsorted' && !tasksShown ? ['minmax(200px, 1fr)', '44px'] : ['minmax(200px, 1fr)'])
       .join(' ')
-  }) as CSSProperties, [displayedStatuses]);
+  }) as CSSProperties, [displayedStatuses, tasksShown]);
   const grouped = useMemo(() => {
     const map = new Map<ItemStatus, ItemSummary[]>();
     displayedStatuses.forEach((item) => map.set(item, []));
@@ -587,6 +610,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         ? current.map((candidate) => (candidate.id === result.item.id ? { ...candidate, ...result.item } : candidate))
         : [result.item, ...current]);
       setCreatedItemId(result.item.id);
+      // A new work item is a plan: show the board that holds it.
+      if (tasksShown) setBoardKind('plans');
       setNewPlanOpen(false);
       setNewPlanDraft(emptyNewWorkItemDraft());
       setJiraLookup(null);
@@ -728,15 +753,22 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   return (
     <section className="workstream-page">
-      <div className={harnessOn ? 'page-title workstream-title with-views' : 'page-title workstream-title'}>
+      <div className="page-title workstream-title with-views">
         <h1 className="sr-only">Workstream</h1>
-        {harnessOn && (
+        <div className="board-switchers">
+          {harnessOn && (
+            <div className="segmented-control workbench-view-switcher board-view-switcher" role="group" aria-label="Show on the board">
+              {boardKinds.map((kind) => (
+                <button key={kind.id} type="button" className={shownKind === kind.id ? 'active' : ''} aria-pressed={shownKind === kind.id} onClick={() => setBoardKind(kind.id)}><kind.icon size={15} aria-hidden="true" /> {kind.label}</button>
+              ))}
+            </div>
+          )}
           <div className="segmented-control workbench-view-switcher board-view-switcher" role="group" aria-label="Board view">
-            {boardViews.map((view) => (
-              <button key={view.id} type="button" className={shownView === view.id ? 'active' : ''} aria-pressed={shownView === view.id} onClick={() => setBoardView(view.id)}><view.icon size={15} aria-hidden="true" /> {view.label}</button>
+            {boardLayouts.map((layout) => (
+              <button key={layout.id} type="button" className={shownLayout === layout.id ? 'active' : ''} aria-pressed={shownLayout === layout.id} onClick={() => setLayout(layout.id)}><layout.icon size={15} aria-hidden="true" /> {layout.label}</button>
             ))}
           </div>
-        )}
+        </div>
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
             <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} gitStatus={workspaceGitStatus} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await loadCheckout(true); await onWorkspacesChanged(); }} />
@@ -796,29 +828,42 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
       </div>
       <SelectedFilters facets={facetConfig} filters={filters} onRemove={toggleFilter} />
       <div className="filter-summary">
-        <span>{filteredPlans.length} of {boardItems.length} items</span>
+        <span>{filteredPlans.length} of {boardItems.length} {tasksShown ? 'tasks' : 'items'}</span>
         {activeFilterCount > 0 && <span>{activeFilterCount} active filters</span>}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       {harnessOn && <NeedsYouStrip state={harness.state} onApprove={harness.approve} onReject={harness.reject} onOpenTask={openTask} />}
-      {shownView === 'queue' && <QueueView tasks={boardTasks} finished={finishedTasks} harness={harness} onOpenTask={openTask} />}
+      {tasksShown && shownLayout === 'list' && <QueueView tasks={boardTasks.filter((task) => shownTaskIds.has(task.id))} finished={finishedTasks.filter((task) => shownTaskIds.has(task.id))} harness={harness} onOpenTask={openTask} />}
+      {!tasksShown && shownLayout === 'list' && (
+        <PlanListView
+          items={filteredPlans}
+          workspace={workspace}
+          loading={loading}
+          pendingIds={pendingItemIds}
+          workOf={workOf}
+          onPreview={(item) => { setDrawerPlanId(item.id); setDrawerAgent(undefined); }}
+          onOpen={(item) => onOpenPlan(item.id)}
+          onMove={(item, status) => void moveItem(item.id, status)}
+        />
+      )}
       {runDialogItem && <RunWithHarnessDialog item={runDialogItem} workspace={workspace} harness={harness} onClose={() => setRunDialogItemId('')} onStarted={() => { setRunDialogItemId(''); void harness.refresh(); }} />}
       {taskDrawer && (
         <RunDrawer state={harness.state} client={harness.client} taskId={taskDrawer.taskId} tab={taskDrawer.tab} queue={queueOrder(harness.state, workspace?.id)} onTabChange={(tab) => setTaskDrawer({ ...taskDrawer, tab })} onClose={() => setTaskDrawer(undefined)} onOpenDetails={onOpenHarnessRun} onCancel={harness.cancelRun} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={taskActions.pin} onMove={taskActions.move} onStart={taskActions.start} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />
       )}
-      {shownView === 'board' && <div className="workstream-board" style={boardStyle} aria-busy={loading}>
+      {shownLayout === 'board' && <div className={tasksShown ? 'workstream-board task-board' : 'workstream-board'} style={boardStyle} aria-busy={loading}>
         {displayedStatuses.map((column) => (
           <Fragment key={column}>
             <WorkstreamColumn
               status={column}
               itemCount={grouped.get(column)?.length ?? 0}
               loading={loading}
-              dragActive={Boolean(activeItem)}
+              label={tasksShown ? taskColumnLabels[column] : undefined}
+              dragActive={!tasksShown && Boolean(activeItem)}
               dragTargetStatus={dragTargetStatus}
               onDragOver={handleColumnDragOver}
               onDragLeave={handleColumnDragLeave}
               onDrop={handleColumnDrop}
-              onCreate={column === 'unsorted' ? undefined : () => {
+              onCreate={column === 'unsorted' || tasksShown ? undefined : () => {
                 setNewPlanDraft((draft) => ({ ...draft, status: column, source: sourcesShownIn(workspace, 'workstream')[0] ?? '' }));
                 setNewPlanOpen(true);
               }}
@@ -843,10 +888,11 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                     setDrawerAgent(undefined);
                   }}
                   agents={itemAgents.get(plan.id)}
-                  work={harnessJoin.byItemId.get(plan.id)}
+                  work={workOf(plan.id)}
                   harnessOn={harnessOn}
-                  onRunWithHarness={harnessOn && !harnessJoin.byItemId.has(plan.id) ? () => setRunDialogItemId(plan.id) : undefined}
-                  onOpenTask={isSyntheticItem(plan) && harnessJoin.byItemId.get(plan.id) ? () => openTask(harnessJoin.byItemId.get(plan.id)!.task) : undefined}
+                  autoStatus={tasksShown}
+                  onRunWithHarness={harnessOn && !tasksShown && !harnessJoin.byItemId.has(plan.id) ? () => setRunDialogItemId(plan.id) : undefined}
+                  onOpenTask={isSyntheticItem(plan) && workOf(plan.id) ? () => openTask(workOf(plan.id)!.task) : undefined}
                   onOpenAgent={(focus) => {
                     setDrawerPlanId(plan.id);
                     setDrawerAgent(focus);
@@ -856,7 +902,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                 />
               ))}
             </WorkstreamColumn>
-            {column === 'unsorted' && (
+            {column === 'unsorted' && !tasksShown && (
               <button className="workstream-separator" type="button" onClick={() => void openSourceItemsDialog()} title="Configure source items">
                 <span className="separator-arrow">▶</span>
                 <span className="separator-count">{grouped.get('unsorted')?.length ?? 0}</span>
@@ -1426,8 +1472,10 @@ function renderTemplateWithCaptures(template: string, captures: Record<string, s
   return Object.entries(captures).reduce((result, [name, value]) => result.replaceAll(`{${name}}`, value), template).trim();
 }
 
-function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
+function WorkstreamColumn({ status, label, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
   status: ItemStatus;
+  /** The column's name where it is not the status's own. */
+  label?: string;
   itemCount: number;
   loading: boolean;
   dragActive: boolean;
@@ -1438,7 +1486,7 @@ function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetSt
   onCreate?: () => void;
   children: React.ReactNode;
 }) {
-  const droppable = isDropStatus(status);
+  const droppable = dragActive && isDropStatus(status);
   const classes = ['workstream-column', status];
   if (dragActive && droppable) classes.push('drop-enabled');
   if (dragTargetStatus === status && droppable) classes.push('drop-target');
@@ -1452,7 +1500,7 @@ function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetSt
       onDrop={(event) => onDrop(event, status)}
     >
       <header>
-        <h2>{statusLabels[status]}</h2>
+        <h2>{label ?? statusLabels[status]}</h2>
         <span>{itemCount}</span>
         <Filter size={14} />
       </header>
@@ -1466,7 +1514,7 @@ function WorkstreamColumn({ status, itemCount, loading, dragActive, dragTargetSt
   );
 }
 
-const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, work, harnessOn = false, onRunWithHarness, onOpenTask, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
+const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, work, harnessOn = false, autoStatus = false, onRunWithHarness, onOpenTask, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
   item: ItemSummary;
   workspace?: WorkspaceConfig;
   pending: boolean;
@@ -1477,6 +1525,8 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   work?: CardWork;
   /** True once the board knows the harness is on, so a card the harness does not hold can say "By hand". */
   harnessOn?: boolean;
+  /** True on the Tasks board, where a card's column follows its run and a person never moves it. */
+  autoStatus?: boolean;
   /** Hands the card to the harness; offered on a card it does not hold. */
   onRunWithHarness?: () => void;
   /** Opens the harness's task behind a ticket card that no plan holds yet. */
@@ -1497,7 +1547,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   // wiki items arrived as metadataSource "workspace-settings" and printed it twice.
   const tags = (docs ? plan.tags.filter((tag) => tag !== plan.scope && tag !== plan.identifier) : plan.tags).filter((tag) => tag !== source);
   const synthetic = isSyntheticItem(plan);
-  const draggable = isItemDraggable(plan) && !pending && !synthetic;
+  const draggable = isItemDraggable(plan) && !pending && !synthetic && !autoStatus;
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     if (synthetic) onOpenTask?.(); else onOpen();
@@ -1561,7 +1611,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
         <time>{plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : 'No date'}</time>
       </footer>
       {tags.length > 0 && <div className="tags">{tags.slice(0, 3).map((tag: string) => <span key={tag}>{tag}</span>)}</div>}
-      {plan.status !== 'unsorted' && !synthetic && !isDocumentationMetadataSource(plan.metadataSource) && (
+      {plan.status !== 'unsorted' && !synthetic && !autoStatus && !isDocumentationMetadataSource(plan.metadataSource) && (
         <StatusMenu value={plan.status} onChange={onMove} ariaLabel="Move item status" />
       )}
     </article>

@@ -1,4 +1,4 @@
-import type { HarnessApproval, HarnessRun, HarnessStageKind, HarnessTask, ItemSummary } from '../../lib/types';
+import type { HarnessApproval, HarnessRun, HarnessStageKind, HarnessTask, ItemStatus, ItemSummary } from '../../lib/types';
 import type { HarnessState } from '../harness/harnessState';
 import { compareTasks, queueTasks, waitsFor } from '../harness/harnessState';
 import type { HxStatus } from '../harness/vocabulary';
@@ -163,4 +163,51 @@ export function queueOrder(state: HarnessState, workspaceId?: string): HarnessTa
 export function retryApproval(task: HarnessTask, state: HarnessState): HarnessApproval | undefined {
 	if (task.state !== 'blocked') return undefined;
 	return Object.values(state.approvals).find((approval) => approval.taskId === task.id && approval.state === 'requested' && approval.gate === 'resume');
+}
+
+/** One card of the Tasks board: the item that holds the task, or a card made from the task, in the column its run has reached. */
+export interface TaskCard {
+	item: ItemSummary;
+	work: CardWork;
+}
+
+/**
+ * The column a task stands in, set by the harness and never by a person: not
+ * started, planning until the plan is approved, building and testing, the pull
+ * request, then done.
+ */
+export function taskColumn(task: HarnessTask, run?: HarnessRun): ItemStatus {
+	if (task.finishedOutside || task.state === 'done' || run?.state === 'passed') return 'done';
+	if (!run) return task.state === 'running' ? 'draft' : 'unsorted';
+	switch (run.currentStage?.kind) {
+		case 'implement':
+		case 'qa': return 'in_progress';
+		case 'pr_approval':
+		case 'draft_pr': return 'review';
+		default: return 'draft';
+	}
+}
+
+/** The Tasks board: every task of the workspace that was not skipped, finished ones in Done, each in the column its run has reached. */
+export function taskCards(items: ItemSummary[], state: HarnessState, workspaceId?: string): TaskCard[] {
+	if (!state.loaded) return [];
+	const itemsByKey = new Map<string, ItemSummary>();
+	for (const item of items) {
+		const key = itemJoinKey(item);
+		if (key && !itemsByKey.has(key)) itemsByKey.set(key, item);
+	}
+	const taken = new Set<string>();
+	const cards: TaskCard[] = [];
+	for (const task of queueTasks(state.tasks, { includeFinished: true })) {
+		if (workspaceId && task.workspaceId !== workspaceId) continue;
+		if (task.state === 'dismissed' || task.state === 'stale') continue;
+		const holder = itemsByKey.get(taskJoinKey(task));
+		const item = holder && !taken.has(holder.id) ? holder : undefined;
+		if (item) taken.add(item.id);
+		const work = cardWork(task, state, !item);
+		const status = taskColumn(task, work.run);
+		// A task's card moves only with its run, so it is never dragged or moved by hand.
+		cards.push({ item: { ...(item ?? syntheticItem(task)), status, editable: false }, work });
+	}
+	return cards;
 }

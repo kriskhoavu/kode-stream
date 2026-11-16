@@ -166,13 +166,21 @@
 	resize: vertical;
 }
 
-/* The board's Board and Task Queue views. */
+/* The board's Tasks and Plans, each as a Board or a List. */
 /* The board's views on the left of the title row, the checkout on the right: the
  * same switcher Agent Space wears, whose rules live in the canvas stylesheet. */
 .workstream-title.with-views {
 	justify-content: space-between;
 	gap: 12px;
 	flex-wrap: wrap;
+}
+
+/* The two switchers on the left of the title row: what the board shows, and how. */
+.board-switchers {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
 }
 
 .board-view-switcher.workbench-view-switcher {

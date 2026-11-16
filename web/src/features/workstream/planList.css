@@ -1,0 +1,117 @@
+/* The Plans list: one row per plan, grouped by status in board order. */
+.plan-list {
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--panel);
+	overflow-x: auto;
+}
+
+.plan-list-empty {
+	padding: 28px 16px;
+	color: var(--muted);
+	text-align: center;
+}
+
+.plan-list table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.plan-list thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 10px 12px;
+	background: var(--panel);
+	border-bottom: 1px solid var(--line);
+	color: var(--muted);
+	font-size: 11.5px;
+	font-weight: 600;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.plan-list-group th {
+	padding: 14px 12px 6px;
+	background: var(--panel-soft);
+	border-bottom: 1px solid var(--line);
+	font-size: 12px;
+	font-weight: 600;
+	text-align: left;
+}
+
+.plan-list-group th span {
+	margin-left: 6px;
+	color: var(--muted);
+	font-weight: 500;
+}
+
+.plan-list-row {
+	cursor: pointer;
+}
+
+.plan-list-row td {
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--line);
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.plan-list-row:hover td {
+	background: var(--panel-soft);
+}
+
+.plan-list-row[aria-busy="true"] {
+	opacity: 0.6;
+}
+
+.plan-list-row td.plan-list-title {
+	min-width: 240px;
+	max-width: 560px;
+	white-space: normal;
+}
+
+.plan-list-title-inner {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.plan-list-title svg {
+	flex: 0 0 auto;
+	color: var(--muted);
+}
+
+.plan-list-link {
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--text);
+	font: inherit;
+	font-weight: 600;
+	text-align: left;
+	cursor: pointer;
+}
+
+.plan-list-link:hover {
+	color: var(--accent-text);
+	text-decoration: underline;
+}
+
+.plan-list-key,
+.plan-list-muted,
+.plan-list-status {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.plan-list-key {
+	flex: 0 0 auto;
+}
+
+.plan-list .status-move-control {
+	width: 132px;
+}
+
