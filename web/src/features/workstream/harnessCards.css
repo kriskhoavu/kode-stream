@@ -175,7 +175,7 @@
 	flex-wrap: wrap;
 }
 
-/* The two switchers on the left of the title row: what the board shows, and how. */
+/* The Tasks · Plans switcher on the left of the title row. */
 .board-switchers {
 	display: flex;
 	align-items: center;
@@ -424,4 +424,11 @@
 	text-transform: uppercase;
 	letter-spacing: .04em;
 	color: var(--muted);
+}
+
+/* Board or List, as icons, beside Save view: the same switcher as Tasks · Plans, sized to the buttons around it. */
+.board-view-switcher.board-layout-switcher button {
+	width: 34px;
+	min-height: 32px;
+	padding: 0;
 }

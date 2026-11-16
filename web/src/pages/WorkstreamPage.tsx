@@ -763,11 +763,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
               ))}
             </div>
           )}
-          <div className="segmented-control workbench-view-switcher board-view-switcher" role="group" aria-label="Board view">
-            {boardLayouts.map((layout) => (
-              <button key={layout.id} type="button" className={shownLayout === layout.id ? 'active' : ''} aria-pressed={shownLayout === layout.id} onClick={() => setLayout(layout.id)}><layout.icon size={15} aria-hidden="true" /> {layout.label}</button>
-            ))}
-          </div>
         </div>
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
@@ -811,6 +806,11 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         ))}
       </div>
       <div className="saved-filter-bar">
+        <div className="segmented-control workbench-view-switcher board-view-switcher board-layout-switcher" role="group" aria-label="Board view">
+          {boardLayouts.map((layout) => (
+            <button key={layout.id} type="button" className={shownLayout === layout.id ? 'active' : ''} aria-pressed={shownLayout === layout.id} aria-label={layout.label} title={layout.label} onClick={() => setLayout(layout.id)}><layout.icon size={16} aria-hidden="true" /></button>
+          ))}
+        </div>
         <button className="secondary" type="button" onClick={() => setSaveFilterOpen((open) => !open)}><BookmarkPlus size={15} /> Save view</button>
         {saveFilterOpen && (
           <div className="save-filter-form">

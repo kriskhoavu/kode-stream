@@ -158,7 +158,10 @@ describe('WorkstreamPage board views', () => {
 		expect(within(kinds).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Tasks', 'Plans']);
 		expect(within(kinds).getByRole('button', { name: 'Tasks' })).toHaveAttribute('aria-pressed', 'true');
 		const layouts = screen.getByRole('group', { name: 'Board view' });
-		expect(within(layouts).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Board', 'List']);
+		expect(within(layouts).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Board', 'List']);
+		expect(within(layouts).getByRole('button', { name: 'List' })).toHaveTextContent('');
+		// The view switcher sits beside Save view, not in the title row.
+		expect(layouts.closest('.saved-filter-bar')).not.toBeNull();
 		expect(within(layouts).getByRole('button', { name: 'Board' })).toHaveAttribute('aria-pressed', 'true');
 	});
 
