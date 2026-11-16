@@ -14,14 +14,14 @@ describe('CanvasPage', () => {
 		const brokenStorage = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => { throw new Error('blocked'); } };
 		vi.stubGlobal('localStorage', brokenStorage);
 		canvasState.projection = projection();
-		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={vi.fn()} />);
 		expect(await screen.findByLabelText('Workspace Canvas')).toBeInTheDocument();
 		vi.unstubAllGlobals();
 	});
 
 	it('returns keyboard focus to the selected node after closing the Workbench', async () => {
 		canvasState.projection = projection();
-		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={vi.fn()} />);
 		const node = screen.getByRole('button', { name: 'Plan: PM-037 Canvas main' });
 		fireEvent.click(node);
 		fireEvent.click(screen.getByRole('button', { name: 'Close Workbench' }));
@@ -30,7 +30,7 @@ describe('CanvasPage', () => {
 
 	it('closes the Workbench on Escape, but not while typing in a field', async () => {
 		canvasState.projection = projection();
-		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: 'Plan: PM-037 Canvas main' }));
 		expect(screen.getByLabelText('Canvas Workbench')).toBeInTheDocument();
 		const input = document.createElement('input');
@@ -44,7 +44,7 @@ describe('CanvasPage', () => {
 
 	it('shows checkout context and exposes a polite save-status region', async () => {
 		canvasState.projection = projection();
-		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={vi.fn()} />);
 		await waitFor(() => expect(screen.getByLabelText('Checkout: main')).toBeInTheDocument());
 		expect(screen.queryByTestId('canvas-ready')).not.toBeInTheDocument();
 		expect(screen.getByRole('status')).toHaveTextContent('Saved');
@@ -56,7 +56,7 @@ describe('CanvasPage', () => {
 		const stale = { ...projection().nodes[0], state: 'stale' as const, plan: undefined };
 		canvasState.projection = { ...projection(), nodes: [stale] };
 		canvasState.removeStalePlans.mockResolvedValueOnce({ ...projection(), nodes: [] });
-		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: 'Reset board' }));
 		expect(screen.getByRole('dialog')).toHaveTextContent('Remove 1 stale plan placement');
 		fireEvent.click(screen.getByRole('button', { name: 'Reset layout' }));
@@ -67,27 +67,27 @@ describe('CanvasPage', () => {
 
 	it('shows upstream drift on the Git icon inside the checkout picker', async () => {
 		canvasState.projection = upstreamProjection();
-		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={vi.fn()} />);
 		expect(await screen.findByRole('img', { name: 'Git not in sync with origin/main: 4 behind' })).toHaveClass('is-not-synced');
 		expect(screen.queryByText('origin/main')).not.toBeInTheDocument();
 	});
 
 	it('opens the Workbench for a selected terminal session, alongside the terminal kept in the Canvas node', async () => {
 		canvasState.projection = sessionProjection();
-		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={vi.fn()} />);
+		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: 'Session: codex' }));
 		await waitFor(() => expect(screen.getByLabelText('Canvas Workbench')).toBeInTheDocument());
 	});
 
-	it('switches Sessions into the main Workbench area and returns to Canvas through the route', async () => {
+	it('opens on Sessions, switches to Canvas and back through the route', async () => {
 		canvasState.projection = sessionProjection();
 		const onLocationChange = vi.fn();
 		const view = render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={onLocationChange} />);
-		fireEvent.click(screen.getByRole('button', { name: 'Sessions view' }));
-		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: workspace.id, view: 'sessions' }));
-		view.rerender(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'sessions' }} onLocationChange={onLocationChange} />);
 		expect(screen.getByLabelText('Sessions view')).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Canvas view' }));
+		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: workspace.id, view: 'canvas' }));
+		view.rerender(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={onLocationChange} />);
+		fireEvent.click(screen.getByRole('button', { name: 'Sessions view' }));
 		await waitFor(() => expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: workspace.id, view: undefined }));
 	});
 
@@ -98,7 +98,7 @@ describe('CanvasPage', () => {
 		canvasState.projection = sessionProjection();
 		const onLocationChange = vi.fn();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, selectedNodeId: 'session:session-1' }} onLocationChange={onLocationChange} />);
-		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: workspace.id, selectedNodeId: undefined }));
+		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: workspace.id, view: 'canvas', selectedNodeId: undefined }));
 	});
 });
 

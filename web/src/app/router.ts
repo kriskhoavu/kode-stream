@@ -92,7 +92,9 @@ export function canvasLocationFromSearch(search: string): CanvasLocation | undef
 	const query = new URLSearchParams(search);
 	const workspaceId = query.get('workspaceId')?.trim() || undefined;
 	const selectedNodeId = query.get('selectedNodeId')?.trim() || undefined;
-	const view = query.get('view') === 'sessions' ? 'sessions' : undefined;
+	// Sessions is Agent Space's first view; a link to a node on the canvas opens the canvas.
+	const asked = query.get('view');
+	const view: WorkbenchView | undefined = asked === 'canvas' || asked === 'sessions' ? asked : selectedNodeId ? 'canvas' : undefined;
 	return workspaceId || selectedNodeId || view ? { workspaceId, selectedNodeId, view } : undefined;
 }
 
@@ -100,7 +102,7 @@ export function canvasPath(location?: CanvasLocation): string {
 	const query = new URLSearchParams();
 	if (location?.workspaceId) query.set('workspaceId', location.workspaceId);
 	if (location?.selectedNodeId) query.set('selectedNodeId', location.selectedNodeId);
-	if (location?.view === 'sessions') query.set('view', 'sessions');
+	if (location?.view === 'canvas') query.set('view', 'canvas');
 	return query.size ? `/canvas?${query.toString()}` : '/canvas';
 }
 

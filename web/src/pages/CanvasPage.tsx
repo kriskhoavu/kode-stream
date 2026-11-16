@@ -62,13 +62,14 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		if (!target || !canvas.projection || consumedSelectionRef.current === target) return;
 		consumedSelectionRef.current = target;
 		if (canvas.projection.nodes.some((node) => node.id === target)) setSelectedId(target);
-		onLocationChange({ ...location, selectedNodeId: undefined });
+		onLocationChange({ ...location, view: location?.view ?? 'canvas', selectedNodeId: undefined });
 	}, [canvas.projection, location, onLocationChange]);
 
 	const title = useMemo(() => canvas.projection?.nodes.find((node) => node.kind === 'workspace')?.workspace?.name ?? workspace?.name ?? 'Canvas', [canvas.projection, workspace?.name]);
 	const selectedNode = canvas.projection?.nodes.find((node) => node.id === selectedId);
 	const workspaceNode = canvas.projection?.nodes.find((node) => node.kind === 'workspace');
-	const view = location?.view ?? 'canvas';
+	// Sessions is the first view; a node handed off through the route is shown on the canvas.
+	const view = location?.view ?? (location?.selectedNodeId ? 'canvas' : 'sessions');
 	const terminalLaunch = selectedNode?.plan?.actions['terminal.launch'] ?? workspaceNode?.workspace?.actions['terminal.launch'];
 	const canOpenAISession = terminalLaunch?.state === 'available';
 	const workbenchNode = selectedNode;
@@ -76,12 +77,12 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	const changeView = useCallback((nextView: 'canvas' | 'sessions') => {
 		setAISessionDialogOpen(false);
 		setSelectedId(undefined);
-		onLocationChange({ workspaceId, view: nextView === 'sessions' ? 'sessions' : undefined });
+		onLocationChange({ workspaceId, view: nextView === 'canvas' ? 'canvas' : undefined });
 	}, [onLocationChange, workspaceId]);
 	const openSession = (sessionId: string) => {
 		canvas.setNodeCollapsed(`session:${sessionId}`, false);
 		setSelectedId(`session:${sessionId}`);
-		onLocationChange({ workspaceId });
+		onLocationChange({ workspaceId, view: 'canvas' });
 	};
 	const arrangeGroupedSections = useCallback((grouping: 'status' | 'service' | 'service_status' | 'service_grid') => {
 		if (!canvas.projection) return;

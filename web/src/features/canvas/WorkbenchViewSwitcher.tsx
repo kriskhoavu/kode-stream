@@ -7,7 +7,7 @@ export function WorkbenchViewSwitcher({ view, sessionCount = 0, onChange }: {
 	onChange: (view: WorkbenchView) => void;
 }) {
 	return <div className="segmented-control workbench-view-switcher" role="group" aria-label="Workbench view">
-		<button type="button" className={view === 'canvas' ? 'active' : ''} aria-pressed={view === 'canvas'} onClick={() => onChange('canvas')}><Workflow size={15} /> Canvas</button>
 		<button type="button" className={view === 'sessions' ? 'active' : ''} aria-pressed={view === 'sessions'} onClick={() => onChange('sessions')}><ListChecks size={15} /> Sessions{sessionCount ? ` (${sessionCount})` : ''}</button>
+		<button type="button" className={view === 'canvas' ? 'active' : ''} aria-pressed={view === 'canvas'} onClick={() => onChange('canvas')}><Workflow size={15} /> Canvas</button>
 	</div>;
 }

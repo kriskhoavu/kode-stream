@@ -41,16 +41,22 @@ describe('router', () => {
 		expect(canvasPath()).toBe('/canvas');
 	});
 
-	it('parses and builds the Sessions Workbench view', () => {
+	it('opens Agent Space on Sessions, and names the Canvas view in the address', () => {
+		window.history.pushState(null, '', '/canvas?workspaceId=ws+one');
+		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', view: undefined } });
+		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', view: 'sessions' } })).toBe('/canvas?workspaceId=ws+one');
+		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&view=canvas');
+		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', view: 'canvas' } });
+		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', view: 'canvas' } })).toBe('/canvas?workspaceId=ws+one&view=canvas');
+		// An old link to the Sessions view still opens it.
 		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&view=sessions');
 		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', view: 'sessions' } });
-		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', view: 'sessions' } })).toBe('/canvas?workspaceId=ws+one&view=sessions');
 	});
 
 	it('parses and builds a selected Canvas node for a session handoff', () => {
 		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&selectedNodeId=session%3Aembedded-1');
-		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', selectedNodeId: 'session:embedded-1' } });
-		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', selectedNodeId: 'session:embedded-1' } })).toBe('/canvas?workspaceId=ws+one&selectedNodeId=session%3Aembedded-1');
+		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', selectedNodeId: 'session:embedded-1', view: 'canvas' } });
+		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', selectedNodeId: 'session:embedded-1', view: 'canvas' } })).toBe('/canvas?workspaceId=ws+one&selectedNodeId=session%3Aembedded-1&view=canvas');
 	});
 
 	it('redirects the legacy Sessions route into the Workbench Sessions view', () => {
