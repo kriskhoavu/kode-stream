@@ -111,9 +111,9 @@
   max-width: min(440px, calc(100vw - 40px));
   padding: 10px 10px 10px 14px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: var(--sheet-shadow);
 }
 
 .knowledge-notification.success { border-color: color-mix(in srgb, var(--green) 42%, var(--line)); }
@@ -859,22 +859,19 @@ body.is-resizing-panel .knowledge-browser {
 
 .knowledge-graph-panel {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(760px, 54vw, calc(100% - 48px));
+  top: var(--sheet-gap);
+  right: var(--sheet-gap);
+  bottom: var(--sheet-gap);
+  width: min(760px, 54vw, calc(100% - 48px - var(--sheet-gap)));
   z-index: 8;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-top: 0;
-  border-right: 0;
-  border-bottom: 0;
-  border-radius: 0;
+  border-radius: var(--sheet-radius);
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: var(--sheet-shadow);
 }
 
 .knowledge-graph-panel-header {

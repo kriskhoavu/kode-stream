@@ -165,7 +165,7 @@ export function EmbeddedTerminalDock({ workspaces }: { workspaces: WorkspaceConf
 
 function shellStyle(mode: DockMode, layout: FloatingLayout, sidePanelWidth: number) {
 	if (mode === 'floating') return { left: `${layout.x}px`, top: `${layout.y}px`, width: `${layout.width}px`, height: `${layout.height}px` };
-	if (mode === 'side_panel') return { right: '0', top: '0', width: `${sidePanelWidth}px`, height: '100dvh' };
+	if (mode === 'side_panel') return { width: `${sidePanelWidth}px` };
 	return { inset: '0', width: '100vw', height: '100dvh' };
 }
 

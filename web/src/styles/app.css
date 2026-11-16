@@ -33,6 +33,14 @@
   --shadow: 0 16px 36px rgba(17, 24, 39, 0.08);
   --shadow-soft: 0 8px 22px rgba(17, 24, 39, 0.06);
   --shadow-lg: 0 24px 60px rgba(17, 24, 39, 0.14);
+  /* A floating panel is an inset sheet: a gap from the edges it sits
+   * against, rounded corners and a layered shadow. */
+  --sheet-gap: 12px;
+  --sheet-radius: 16px;
+  --sheet-shadow:
+    0 1px 2px rgba(17, 24, 39, .06),
+    0 8px 24px rgba(17, 24, 39, .08),
+    0 24px 64px rgba(17, 24, 39, .12);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -327,6 +335,10 @@
   --shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
   --shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.38);
   --shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.58);
+  --sheet-shadow:
+    0 1px 2px rgba(0, 0, 0, .3),
+    0 8px 24px rgba(0, 0, 0, .3),
+    0 24px 64px rgba(0, 0, 0, .4);
 }
 
 * {
@@ -1079,25 +1091,20 @@ button:disabled {
 	grid-template-rows: auto minmax(0, 1fr);
 	position: fixed;
 	border: 1px solid var(--line);
-	border-radius: 10px;
+	border-radius: var(--sheet-radius);
 	background: var(--panel);
-	box-shadow: var(--shadow-lg);
+	box-shadow: var(--sheet-shadow);
 	overflow: hidden;
 	pointer-events: auto;
 }
 
 .embedded-terminal-shell-side_panel {
-	right: 0;
-	top: 0;
-	height: 100dvh;
-	border-right: 0;
-	border-top: 0;
-	border-bottom: 0;
-	border-radius: 0;
-	box-shadow: -16px 0 36px rgba(15, 23, 42, 0.22);
+	right: var(--sheet-gap);
+	top: var(--sheet-gap);
+	height: calc(100dvh - 2 * var(--sheet-gap));
 }
 
-.embedded-terminal-shell-maximized { border: 0; border-radius: 0; }
+.embedded-terminal-shell-maximized { border: 0; border-radius: 0; box-shadow: none; }
 
 .embedded-terminal-minimized {
 	position: fixed;
@@ -2784,10 +2791,10 @@ select:disabled {
   gap: 10px;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--sheet-radius);
   padding: 14px;
   background: var(--panel);
-  box-shadow: 0 24px 70px rgb(0 0 0 / 35%);
+  box-shadow: var(--sheet-shadow);
 }
 
 .e2e-evidence-preview > header {
@@ -3638,11 +3645,10 @@ select:disabled {
   cursor: default;
 }
 
-/* The panel floats as an inset sheet: a gap below the header and from the
- * window's right and bottom edges, rounded corners and a layered shadow, so
- * the header pattern runs around it instead of being cut by a hard edge. */
+/* An inset sheet below the header, so the header pattern runs around it
+ * instead of being cut by a hard edge. */
 .plan-drawer {
-  --drawer-gap: 12px;
+  --drawer-gap: var(--sheet-gap);
   position: fixed;
   top: calc(var(--drawer-top, 68px) + var(--drawer-gap) - 4px);
   right: var(--drawer-gap);
@@ -3651,12 +3657,9 @@ select:disabled {
   width: min(var(--drawer-width, 1120px), calc(100vw - 24px - var(--drawer-gap)));
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--sheet-radius);
   overflow: hidden;
-  box-shadow:
-    0 1px 2px rgba(17, 24, 39, .06),
-    0 8px 24px rgba(17, 24, 39, .08),
-    0 24px 64px rgba(17, 24, 39, .12);
+  box-shadow: var(--sheet-shadow);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   animation: drawer-slide-in .18s ease-out;
@@ -3671,13 +3674,6 @@ select:disabled {
     transform: translateX(0);
     opacity: 1;
   }
-}
-
-:root[data-theme="dark"] .plan-drawer {
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, .3),
-    0 8px 24px rgba(0, 0, 0, .3),
-    0 24px 64px rgba(0, 0, 0, .4);
 }
 
 .drawer-resize-handle {
@@ -5720,9 +5716,9 @@ body.is-resizing-drawer {
   max-height: min(520px, calc(100vh - 76px));
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--sheet-radius);
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: var(--sheet-shadow);
   padding: 12px;
   display: grid;
   gap: 10px;
