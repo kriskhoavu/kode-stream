@@ -33,8 +33,8 @@
   --shadow: 0 16px 36px rgba(17, 24, 39, 0.08);
   --shadow-soft: 0 8px 22px rgba(17, 24, 39, 0.06);
   --shadow-lg: 0 24px 60px rgba(17, 24, 39, 0.14);
-  /* A floating panel is an inset sheet: a gap from the edges it sits
-   * against, rounded corners and a layered shadow. */
+  /* A floating panel is a sheet: rounded where it floats, flush where it
+   * docks to an edge, with a layered shadow. */
   --sheet-gap: 12px;
   --sheet-radius: 16px;
   --sheet-shadow:
@@ -1099,9 +1099,11 @@ button:disabled {
 }
 
 .embedded-terminal-shell-side_panel {
-	right: var(--sheet-gap);
+	right: 0;
 	top: var(--sheet-gap);
-	height: calc(100dvh - 2 * var(--sheet-gap));
+	height: calc(100dvh - var(--sheet-gap));
+	border-width: 1px 0 0 1px;
+	border-radius: var(--sheet-radius) 0 0 0;
 }
 
 .embedded-terminal-shell-maximized { border: 0; border-radius: 0; box-shadow: none; }
@@ -3645,19 +3647,21 @@ select:disabled {
   cursor: default;
 }
 
-/* An inset sheet below the header, so the header pattern runs around it
- * instead of being cut by a hard edge. */
+/* A sheet docked to the window's right and bottom edges, with a gap below
+ * the header and a rounded top-left corner, so the header pattern runs
+ * around it instead of being cut by a hard edge. */
 .plan-drawer {
   --drawer-gap: var(--sheet-gap);
   position: fixed;
   top: calc(var(--drawer-top, 68px) + var(--drawer-gap) - 4px);
-  right: var(--drawer-gap);
-  bottom: var(--drawer-gap);
+  right: 0;
+  bottom: 0;
   z-index: 46;
-  width: min(var(--drawer-width, 1120px), calc(100vw - 24px - var(--drawer-gap)));
+  width: min(var(--drawer-width, 1120px), calc(100vw - 24px));
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--sheet-radius);
+  border-width: 1px 0 0 1px;
+  border-radius: var(--sheet-radius) 0 0 0;
   overflow: hidden;
   box-shadow: var(--sheet-shadow);
   display: grid;
