@@ -18,7 +18,7 @@ import (
 )
 
 // protectedPaths are never an agent's to change, whatever the scope says.
-var protectedPaths = []string{".git/", ".harness/", ".claude/", ".github/workflows/"}
+var protectedPaths = []string{".git/", ".harness/", ".claude/", ".kode-stream/", ".github/workflows/"}
 
 // planScope is where the planner may write.
 var planScope = []string{"plans/"}

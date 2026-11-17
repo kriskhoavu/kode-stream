@@ -1,5 +1,5 @@
 // Package procedure reads a repository's own procedure for the harness's
-// roles: `.claude/harness.yaml` maps a role to the skill, and optionally the
+// roles: `.kode-stream/harness.yaml` maps a role to the skill, and optionally the
 // track of that skill, which the role follows in that repository. A role the
 // file does not map keeps the harness's built-in instructions.
 package procedure
@@ -18,7 +18,7 @@ import (
 )
 
 // Path is where a repository keeps the file, relative to its root.
-const Path = ".claude/harness.yaml"
+const Path = ".kode-stream/harness.yaml"
 
 const maxFileBytes = 16 << 10
 

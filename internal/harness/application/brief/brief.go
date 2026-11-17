@@ -48,7 +48,7 @@ type Input struct {
 	GateCommands []string
 	LogTail      string
 	Reminder     bool
-	// Procedure is the skill the repository's `.claude/harness.yaml` maps
+	// Procedure is the skill the repository's `.kode-stream/harness.yaml` maps
 	// this role to; empty keeps the built-in instructions alone.
 	Procedure Procedure
 }

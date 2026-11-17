@@ -12,7 +12,7 @@ import (
 func write(t *testing.T, text string) string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, ".kode-stream"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, Path), []byte(text), 0o644); err != nil {

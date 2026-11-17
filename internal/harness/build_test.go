@@ -136,7 +136,7 @@ func TestAFailingGateSendsTheBuilderBackWithTheLogAndBlocksAfterThreeRounds(t *t
 }
 
 func TestScopeKeepsProtectedPathsOutEvenWithoutAScope(t *testing.T) {
-	cases := map[string]bool{"internal/a.go": true, ".git/config": false, ".harness/report.json": false, ".claude/settings.json": false, ".github/workflows/ci.yml": false, ".github/CODEOWNERS": true}
+	cases := map[string]bool{"internal/a.go": true, ".git/config": false, ".harness/report.json": false, ".claude/settings.json": false, ".kode-stream/harness.yaml": false, ".github/workflows/ci.yml": false, ".github/CODEOWNERS": true}
 	for path, want := range cases {
 		if got := inScope(path, nil); got != want {
 			t.Fatalf("inScope(%s, nil) = %v", path, got)
@@ -153,7 +153,7 @@ func TestABriefFollowsTheSkillTheRepositoryMapsItsRoleTo(t *testing.T) {
 		briefs[role] = invocation.Brief
 		return happyScript(role, call, invocation)
 	})
-	writeIn(t, fixture.workspace.Path, ".claude/harness.yaml", "version: 1\nroles:\n  planner: { skill: feature-planning, track: Plan }\n")
+	writeIn(t, fixture.workspace.Path, ".kode-stream/harness.yaml", "version: 1\nroles:\n  planner: { skill: feature-planning, track: Plan }\n")
 	runGit(t, fixture.workspace.Path, "add", ".")
 	runGit(t, fixture.workspace.Path, "commit", "-q", "-m", "procedure")
 	fixture.settle(t)

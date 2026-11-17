@@ -14,7 +14,7 @@ making implementation changes.
   Only `internal/server`, `internal/server/api` and `internal/storage` import it. It has no page of its own: the Workstream
   board shows either Tasks, the harness's tickets in the columns their runs have reached, or Plans, the branch's plans
   moved by hand, each as a Board or a List (the Tasks list is the Task Queue), and its settings live under Settings. A
-  repository's `.claude/harness.yaml` maps a role to the skill and track it follows there; an unmapped role keeps the
+  repository's `.kode-stream/harness.yaml` maps a role to the skill and track it follows there; an unmapped role keeps the
   built-in instructions. See
   [the harness page](wiki/platform/harness.md).
 - Local mode is a single-user server over local repositories. Cloud mode is a hosted control plane with
