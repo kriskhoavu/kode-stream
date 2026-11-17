@@ -146,3 +146,23 @@ func TestScopeKeepsProtectedPathsOutEvenWithoutAScope(t *testing.T) {
 		t.Fatal("prefix scope is wrong")
 	}
 }
+
+func TestABriefFollowsTheSkillTheRepositoryMapsItsRoleTo(t *testing.T) {
+	briefs := map[domain.Role]string{}
+	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
+		briefs[role] = invocation.Brief
+		return happyScript(role, call, invocation)
+	})
+	writeIn(t, fixture.workspace.Path, ".claude/harness.yaml", "version: 1\nroles:\n  planner: { skill: feature-planning, track: Plan }\n")
+	runGit(t, fixture.workspace.Path, "add", ".")
+	runGit(t, fixture.workspace.Path, "commit", "-q", "-m", "procedure")
+	fixture.settle(t)
+	for _, want := range []string{"Follow the `feature-planning` skill, its Plan track.", "`.claude/skills/feature-planning/SKILL.md`", "put the question in `open`"} {
+		if !strings.Contains(briefs[domain.RolePlanner], want) {
+			t.Fatalf("planner brief lacks %q:\n%s", want, briefs[domain.RolePlanner])
+		}
+	}
+	if reviewer, ran := briefs[domain.RolePlanReviewer]; !ran || strings.Contains(reviewer, "own procedure") {
+		t.Fatalf("an unmapped role must keep the built-in instructions:\n%s", reviewer)
+	}
+}

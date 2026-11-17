@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"kode-stream/internal/harness/adapters/engine/process"
 	"kode-stream/internal/harness/application/brief"
+	"kode-stream/internal/harness/application/procedure"
 	"kode-stream/internal/harness/domain"
 )
 
@@ -237,6 +239,11 @@ func (s *Service) decorateBrief(ctx context.Context, input brief.Input, run doma
 	settings := s.settingsNow(ctx)
 	if producer(agentRun.Role) {
 		input.Scope = scopeFor(agentRun.Role, settings, run.WorkspaceID)
+	}
+	if steps, err := procedure.Load(run.WorktreePath); err != nil {
+		log.Printf("harness: run %s keeps the built-in instructions: %v", run.ID, err)
+	} else if step, mapped := steps[agentRun.Role]; mapped {
+		input.Procedure = brief.Procedure{Skill: step.Skill, Track: step.Track}
 	}
 	if agentRun.Role == domain.RoleCoder && stage.Round > 1 {
 		previous, err := s.repository.ListAgentRuns(ctx, domain.AgentRunFilter{StageID: stage.ID, States: []domain.AgentRunState{domain.AgentSucceeded}})

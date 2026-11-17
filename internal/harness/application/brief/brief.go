@@ -48,6 +48,16 @@ type Input struct {
 	GateCommands []string
 	LogTail      string
 	Reminder     bool
+	// Procedure is the skill the repository's `.claude/harness.yaml` maps
+	// this role to; empty keeps the built-in instructions alone.
+	Procedure Procedure
+}
+
+// Procedure names the repository's own skill, and the track of it, that a
+// role follows.
+type Procedure struct {
+	Skill string
+	Track string
 }
 
 // Data wraps untrusted text in task-data delimiters. A closing tag inside the
@@ -67,6 +77,7 @@ func Compose(input Input) string {
 
 	section("1. Goal")
 	b.WriteString(goal(input))
+	b.WriteString(procedure(input.Procedure))
 
 	section("2. Context")
 	fmt.Fprintf(&b, "You work in a git worktree of %s on branch `%s`, cut from `%s`", nonEmpty(input.WorkspaceName, "the workspace"), input.Branch, nonEmpty(input.Baseline, "the baseline"))
@@ -193,6 +204,22 @@ func goal(input Input) string {
 		return "The verification commands failed after the build. Find the cause and fix it with the smallest change that makes them pass.\n"
 	}
 	return ""
+}
+
+// procedure tells the agent to follow the repository's own skill for this
+// step, under the brief's constraints and deliverable.
+func procedure(step Procedure) string {
+	if step.Skill == "" {
+		return ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "\nThis repository has its own procedure for this step. Follow the `%s` skill", step.Skill)
+	if step.Track != "" {
+		fmt.Fprintf(&b, ", its %s track", step.Track)
+	}
+	fmt.Fprintf(&b, ". If you cannot load the skill, read `.claude/skills/%s/SKILL.md` and follow it.\n", step.Skill)
+	b.WriteString("Where the skill and this brief disagree, sections 3 to 6 of this brief win: keep to the scope, do not commit, and write the report. Where the skill says to ask the user, put the question in `open` instead.\n")
+	return b.String()
 }
 
 func scope(input Input) string {
