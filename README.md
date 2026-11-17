@@ -305,15 +305,15 @@ Kode Stream reads configured source directories such as `plans`, `wiki`, or `spe
 
 Common workspace files:
 
-- `.kode-stream/<source>/workspace-settings.yaml`: optional mapping rules for a source with a non-standard layout,
-  keyed by the source's path so that each source of a repository has its own. A source without one reads
-  `workspace-settings.yaml` inside the source. The settings page saves to the file it read, and creates the first one
-  under `.kode-stream/`. `pathPattern` is relative to the source.
+- `.kode-stream/workspace-settings.yaml`: optional mapping rules for sources with a non-standard layout. A rule
+  belongs to the source its `fields.source` names, by the source's path or its last part, so one file serves every
+  source of a repository. A source that no rule names reads `workspace-settings.yaml` inside the source. The settings
+  page saves to the file it read and replaces only that source's rules. `pathPattern` is relative to the source.
 - `.kode-stream/harness.yaml`: optional; maps each harness role to the repository's own skill and track.
 - `plan.yaml`: item metadata such as `status`, `owner`, `tags`, and optional title overrides.
 - `README.md`: primary item document and default title source.
 
-Example `.kode-stream/wiki/workspace-settings.yaml`:
+Example `.kode-stream/workspace-settings.yaml`:
 
 ```yaml
 version: 1
@@ -330,7 +330,7 @@ cards:
 ## Safety Model
 
 - Server access is local by default.
-- Writes are limited to configured workspace sources and their settings files under `.kode-stream/`.
+- Writes are limited to configured workspace sources and `.kode-stream/workspace-settings.yaml`.
 - Markdown saves use expected content hashes to prevent stale overwrites.
 - File access rejects path traversal and symlink escapes.
 - Git commits stage only user-selected paths inside configured sources.

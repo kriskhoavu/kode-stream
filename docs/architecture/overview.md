@@ -240,7 +240,8 @@ keys are not stored in SQL.
 The scanner turns configured repository sources into item cards and knowledge entries. It evaluates each source in this
 order:
 
-1. Source mappings from `.kode-stream/<source>/workspace-settings.yaml`, else `workspace-settings.yaml` inside the source.
+1. Source mappings: the rules in `.kode-stream/workspace-settings.yaml` whose `fields.source` names the source, else
+   `workspace-settings.yaml` inside the source.
 2. Structured item folders.
 3. Freestyle Markdown docs.
 

@@ -689,7 +689,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   const resetSourceItemsSettings = async () => {
     if (!sourceItemsEditor) return;
-    const confirmed = window.confirm(`Reset Source Items for ${sourceItemsEditor.directory}? This removes the source's settings file and scans the source again.`);
+    const confirmed = window.confirm(`Reset Source Items for ${sourceItemsEditor.directory}? This removes the source's rules and scans the source again.`);
     if (!confirmed) return;
     setSourceItemsSaving(true);
     setSourceItemsError('');
@@ -957,7 +957,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                 {!sourceItemsEditor.exists && sourceItemsEditor.mode !== 'structured' && (
                   <div className="metadata-callout">
                     <strong>No settings file yet</strong>
-                    <span>Saving creates <code>.kode-stream/{sourceItemsEditor.directory}/workspace-settings.yaml</code>.</span>
+                    <span>Saving adds this source's rules to <code>.kode-stream/workspace-settings.yaml</code>.</span>
                   </div>
                 )}
                 {sourceItemsEditor.warnings.length > 0 && (

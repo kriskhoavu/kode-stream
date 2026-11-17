@@ -621,7 +621,7 @@ const busy = pendingOperations.length > 0;
 
   const resetSourceSettings = async () => {
     if (!settingsEditor) return;
-    const confirmed = window.confirm(`Reset Source Items for ${settingsEditor.directory}? This removes the source's settings file and scans the source again.`);
+    const confirmed = window.confirm(`Reset Source Items for ${settingsEditor.directory}? This removes the source's rules and scans the source again.`);
     if (!confirmed) return;
     setBusy(true);
     setNotice(null);
@@ -959,7 +959,7 @@ const busy = pendingOperations.length > 0;
             {!settingsEditor.exists && settingsEditor.mode !== 'structured' && (
               <div className="metadata-callout">
                 <strong>No settings file yet</strong>
-                <span>Saving creates <code>.kode-stream/{settingsEditor.directory}/workspace-settings.yaml</code>.</span>
+                <span>Saving adds this source's rules to <code>.kode-stream/workspace-settings.yaml</code>.</span>
               </div>
             )}
             {settingsEditor.warnings.length > 0 && (

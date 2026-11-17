@@ -18,34 +18,83 @@ import (
 const SourceStructureSettingsFile = "workspace-settings.yaml"
 
 // RepositorySettingsDir holds Kode Stream's own files at the workspace root.
-// A source's settings live at RepositorySettingsDir/<source>/
-// workspace-settings.yaml, keyed by the source's path so that two sources of
-// one repository never share a file; a source that has no file there falls
-// back to workspace-settings.yaml inside the source itself.
+// Its workspace-settings.yaml holds the card rules of every source of the
+// repository; a rule belongs to the source its fields.source names, by the
+// source's path or its last part. A source that no rule there names reads
+// workspace-settings.yaml inside the source itself.
 const RepositorySettingsDir = ".kode-stream"
 
-// sourceSettingsPaths are the places a source's settings may live, relative
-// to the workspace root, in the order they are read.
-func sourceSettingsPaths(source string) []string {
-	source = filepath.ToSlash(filepath.Clean(source))
-	return []string{
-		filepath.ToSlash(filepath.Join(RepositorySettingsDir, source, SourceStructureSettingsFile)),
-		filepath.ToSlash(filepath.Join(source, SourceStructureSettingsFile)),
-	}
+// RepositorySettingsPath is the repository's settings file, relative to the
+// workspace root.
+const RepositorySettingsPath = RepositorySettingsDir + "/" + SourceStructureSettingsFile
+
+func sourceSettingsFile(source string) string {
+	return filepath.ToSlash(filepath.Join(filepath.Clean(source), SourceStructureSettingsFile))
 }
 
-// SourceSettingsPath is the settings file of source in the workspace at
-// workspaceRoot: the file it was read from, else, for a source with none, the
-// one under RepositorySettingsDir that saving creates. The second result says
-// whether the file exists.
-func SourceSettingsPath(workspaceRoot, source string) (string, bool) {
-	paths := sourceSettingsPaths(source)
-	for _, candidate := range paths {
-		if _, err := os.Lstat(filepath.Join(workspaceRoot, filepath.FromSlash(candidate))); err == nil {
-			return filepath.Join(workspaceRoot, filepath.FromSlash(candidate)), true
+// cardNamesSource says whether a rule of the repository's file belongs to
+// source.
+func cardNamesSource(card models.SourceStructureCard, source string) bool {
+	name := strings.TrimSpace(card.Fields.Source)
+	source = filepath.ToSlash(filepath.Clean(source))
+	return name != "" && (name == source || name == filepath.Base(source))
+}
+
+func decodeSourceStructureSettings(data []byte) (models.SourceStructureSettings, error) {
+	var settings models.SourceStructureSettings
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true)
+	err := decoder.Decode(&settings)
+	return settings, err
+}
+
+// splitCards parts the rules of the repository's file into those of source
+// and the others.
+func splitCards(settings models.SourceStructureSettings, source string) (own, others []models.SourceStructureCard) {
+	for _, card := range settings.Cards {
+		if cardNamesSource(card, source) {
+			own = append(own, card)
+		} else {
+			others = append(others, card)
 		}
 	}
-	return filepath.Join(workspaceRoot, filepath.FromSlash(paths[0])), false
+	return own, others
+}
+
+// readRepositorySettings reads the repository's file from the workspace at
+// workspaceRoot. A missing file is empty settings.
+func readRepositorySettings(workspaceRoot string) (models.SourceStructureSettings, bool, error) {
+	data, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(RepositorySettingsPath)))
+	if errors.Is(err, os.ErrNotExist) {
+		return models.SourceStructureSettings{Version: 1}, false, nil
+	}
+	if err != nil {
+		return models.SourceStructureSettings{}, false, err
+	}
+	settings, err := decodeSourceStructureSettings(data)
+	if err != nil {
+		return models.SourceStructureSettings{}, true, fmt.Errorf("%s: %w", RepositorySettingsPath, err)
+	}
+	return settings, true, nil
+}
+
+// SourceSettingsPath is the file that holds the settings of source in the
+// workspace at workspaceRoot: the repository's file when a rule there names
+// the source, else the file inside the source when it exists, else the
+// repository's file, which saving creates or extends. The second result says
+// whether the source has settings in that file.
+func SourceSettingsPath(workspaceRoot, source string) (string, bool) {
+	repository := filepath.Join(workspaceRoot, filepath.FromSlash(RepositorySettingsPath))
+	if settings, _, err := readRepositorySettings(workspaceRoot); err == nil {
+		if own, _ := splitCards(settings, source); len(own) > 0 {
+			return repository, true
+		}
+	}
+	inSource := filepath.Join(workspaceRoot, filepath.FromSlash(sourceSettingsFile(source)))
+	if _, err := os.Lstat(inSource); err == nil {
+		return inSource, true
+	}
+	return repository, false
 }
 
 var settingVariablePattern = regexp.MustCompile(`^\{([A-Za-z][A-Za-z0-9_]*)\}$`)
@@ -95,29 +144,31 @@ func ReadSourceStructureSettings(workspaceRoot, source string) (models.SourceStr
 // ReadSourceStructureSettingsFromReader reads the settings of root, a source
 // path relative to the reader, which is rooted at the workspace.
 func ReadSourceStructureSettingsFromReader(reader SourceReader, root string) (models.SourceStructureSettings, bool, []models.ScanWarning) {
-	var data []byte
-	var path string
-	err := os.ErrNotExist
-	for _, candidate := range sourceSettingsPaths(root) {
-		path = candidate
-		if data, err = reader.ReadFile(candidate); !os.IsNotExist(err) {
-			break
+	if data, err := reader.ReadFile(RepositorySettingsPath); err == nil {
+		settings, decodeErr := decodeSourceStructureSettings(data)
+		if decodeErr != nil {
+			return DefaultSourceStructureSettings(root), true, []models.ScanWarning{{ItemPath: RepositorySettingsPath, Message: "invalid workspace settings: " + decodeErr.Error()}}
 		}
+		if own, _ := splitCards(settings, root); len(own) > 0 {
+			settings.Cards = own
+			return settings, true, ValidateSourceStructureSettings(settings)
+		}
+	} else if !os.IsNotExist(err) {
+		return DefaultSourceStructureSettings(root), false, []models.ScanWarning{{ItemPath: RepositorySettingsPath, Message: err.Error()}}
 	}
+	path := sourceSettingsFile(root)
+	data, err := reader.ReadFile(path)
 	if os.IsNotExist(err) {
 		return DefaultSourceStructureSettings(root), false, nil
 	}
 	if err != nil {
-		return DefaultSourceStructureSettings(root), false, []models.ScanWarning{{ItemPath: filepath.ToSlash(path), Message: err.Error()}}
+		return DefaultSourceStructureSettings(root), false, []models.ScanWarning{{ItemPath: path, Message: err.Error()}}
 	}
-	var settings models.SourceStructureSettings
-	decoder := yaml.NewDecoder(bytes.NewReader(data))
-	decoder.KnownFields(true)
-	if err := decoder.Decode(&settings); err != nil {
+	settings, err := decodeSourceStructureSettings(data)
+	if err != nil {
 		return DefaultSourceStructureSettings(root), true, []models.ScanWarning{{ItemPath: path, Message: "invalid workspace settings: " + err.Error()}}
 	}
-	warnings := ValidateSourceStructureSettings(settings)
-	return settings, true, warnings
+	return settings, true, ValidateSourceStructureSettings(settings)
 }
 
 func SourceSettingsMode(root string) string {
@@ -138,12 +189,34 @@ func SourceSettingsModeFromReader(reader SourceReader, root string) string {
 	return "empty"
 }
 
-// WriteSourceStructureSettings writes the settings to target, the path
-// SourceSettingsPath gave.
-func WriteSourceStructureSettings(target string, settings models.SourceStructureSettings) error {
+// WriteSourceStructureSettings saves the settings of source in the workspace
+// at workspaceRoot to the file SourceSettingsPath names. In the repository's
+// file it replaces the source's rules and keeps every other source's, and
+// each saved rule must name the source in fields.source.
+func WriteSourceStructureSettings(workspaceRoot, source string, settings models.SourceStructureSettings) error {
 	if warnings := ValidateSourceStructureSettings(settings); len(warnings) > 0 {
 		return errors.New(warnings[0].Message)
 	}
+	target, _ := SourceSettingsPath(workspaceRoot, source)
+	if target != filepath.Join(workspaceRoot, filepath.FromSlash(RepositorySettingsPath)) {
+		return marshalSettings(target, settings)
+	}
+	for i, card := range settings.Cards {
+		if !cardNamesSource(card, source) {
+			return fmt.Errorf("card rule %d fields.source must be %s, so %s knows the rule is this source's", i+1, filepath.Base(source), RepositorySettingsPath)
+		}
+	}
+	repository, _, err := readRepositorySettings(workspaceRoot)
+	if err != nil {
+		return err
+	}
+	_, others := splitCards(repository, source)
+	repository.Version = settings.Version
+	repository.Cards = append(others, settings.Cards...)
+	return marshalSettings(target, repository)
+}
+
+func marshalSettings(target string, settings models.SourceStructureSettings) error {
 	data, err := yaml.Marshal(settings)
 	if err != nil {
 		return err
@@ -248,12 +321,33 @@ func ReadSourceStructureSettingsFile(path string) ([]byte, os.FileMode, bool, er
 
 func RestoreSourceStructureSettings(path string, data []byte, existed bool) error {
 	if !existed {
-		return RemoveSourceStructureSettings(path)
+		return removeSettingsFile(path)
 	}
 	return atomicWriteSettings(path, data)
 }
 
-func RemoveSourceStructureSettings(path string) error {
+// RemoveSourceStructureSettings removes the settings of source: its rules
+// from the repository's file, deleting the file when no other source's rule
+// is left, or else the file inside the source.
+func RemoveSourceStructureSettings(workspaceRoot, source string) error {
+	target, exists := SourceSettingsPath(workspaceRoot, source)
+	if !exists {
+		return nil
+	}
+	if target == filepath.Join(workspaceRoot, filepath.FromSlash(RepositorySettingsPath)) {
+		repository, _, err := readRepositorySettings(workspaceRoot)
+		if err != nil {
+			return err
+		}
+		if _, others := splitCards(repository, source); len(others) > 0 {
+			repository.Cards = others
+			return marshalSettings(target, repository)
+		}
+	}
+	return removeSettingsFile(target)
+}
+
+func removeSettingsFile(path string) error {
 	err := os.Remove(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err

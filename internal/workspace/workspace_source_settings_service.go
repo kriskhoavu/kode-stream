@@ -58,7 +58,7 @@ func (s *SourceSettingsService) SaveSourceStructure(id, directory string, settin
 	if err != nil {
 		return SourceStructureSaveResult{}, err
 	}
-	if err := scanner.WriteSourceStructureSettings(settingsPath, settings); err != nil {
+	if err := scanner.WriteSourceStructureSettings(workspaceRoot, cleanDirectory, settings); err != nil {
 		return SourceStructureSaveResult{}, err
 	}
 	workspace, ok, err := s.registry.Get(id)
@@ -102,7 +102,7 @@ func (s *SourceSettingsService) ResetSourceStructure(id, directory string) (Sour
 	if err != nil {
 		return SourceStructureSaveResult{}, err
 	}
-	if err := scanner.RemoveSourceStructureSettings(settingsPath); err != nil {
+	if err := scanner.RemoveSourceStructureSettings(workspaceRoot, cleanDirectory); err != nil {
 		return SourceStructureSaveResult{}, err
 	}
 	workspace, ok, err := s.registry.Get(id)
