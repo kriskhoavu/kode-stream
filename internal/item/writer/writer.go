@@ -346,8 +346,7 @@ func isEmptyDir(path string, info os.FileInfo) (bool, error) {
 var createItemPatternVariable = regexp.MustCompile(`\{([A-Za-z][A-Za-z0-9_]*)\}`)
 
 func (w *Writer) createItemRoot(workspace models.WorkspaceConfig, source string, input models.NewItemInput) (string, error) {
-	sourceRoot := filepath.Join(workspace.Path, filepath.FromSlash(source))
-	settings, hasSettings, warnings := scanner.ReadSourceStructureSettings(sourceRoot)
+	settings, hasSettings, warnings := scanner.ReadSourceStructureSettings(workspace.Path, source)
 	if hasSettings && len(warnings) == 0 && len(settings.Cards) > 0 {
 		rel, err := renderCreateItemPathPattern(settings.Cards[0].PathPattern, source, input)
 		if err != nil {

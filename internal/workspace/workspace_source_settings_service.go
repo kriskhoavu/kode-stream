@@ -16,11 +16,11 @@ func (s *Service) SourceStructure(id, directory string) (models.SourceSettingsRe
 }
 
 func (s *SourceSettingsService) SourceStructure(id, directory string) (models.SourceSettingsResult, error) {
-	root, cleanDirectory, err := s.sourceRoot(id, directory)
+	root, cleanDirectory, workspaceRoot, err := s.sourceRoot(id, directory)
 	if err != nil {
 		return models.SourceSettingsResult{}, err
 	}
-	settings, exists, warnings := scanner.ReadSourceStructureSettings(root)
+	settings, exists, warnings := scanner.ReadSourceStructureSettings(workspaceRoot, cleanDirectory)
 	mode := scanner.SourceSettingsMode(root)
 	if !exists && mode == "structured" {
 		settings = scanner.BuiltInStructuredSettings()
@@ -46,18 +46,19 @@ func (s *Service) SaveSourceStructure(id, directory string, settings models.Sour
 }
 
 func (s *SourceSettingsService) SaveSourceStructure(id, directory string, settings models.SourceStructureSettings) (SourceStructureSaveResult, error) {
-	root, cleanDirectory, err := s.sourceRoot(id, directory)
+	root, cleanDirectory, workspaceRoot, err := s.sourceRoot(id, directory)
 	if err != nil {
 		return SourceStructureSaveResult{}, err
 	}
+	settingsPath, _ := scanner.SourceSettingsPath(workspaceRoot, cleanDirectory)
 	if warnings := scanner.ValidateSourceStructureSettings(settings); len(warnings) > 0 {
 		return SourceStructureSaveResult{}, fmt.Errorf("%s", warnings[0].Message)
 	}
-	previous, _, existed, err := scanner.ReadSourceStructureSettingsFile(root)
+	previous, _, existed, err := scanner.ReadSourceStructureSettingsFile(settingsPath)
 	if err != nil {
 		return SourceStructureSaveResult{}, err
 	}
-	if err := scanner.WriteSourceStructureSettings(root, settings); err != nil {
+	if err := scanner.WriteSourceStructureSettings(settingsPath, settings); err != nil {
 		return SourceStructureSaveResult{}, err
 	}
 	workspace, ok, err := s.registry.Get(id)
@@ -69,7 +70,7 @@ func (s *SourceSettingsService) SaveSourceStructure(id, directory string, settin
 	}
 	scanResult, err := s.writer.RefreshWorkspace(workspace)
 	if err != nil {
-		if restoreErr := scanner.RestoreSourceStructureSettings(root, previous, existed); restoreErr != nil {
+		if restoreErr := scanner.RestoreSourceStructureSettings(settingsPath, previous, existed); restoreErr != nil {
 			return SourceStructureSaveResult{}, fmt.Errorf("refresh failed: %v; settings rollback failed: %w", err, restoreErr)
 		}
 		return SourceStructureSaveResult{}, fmt.Errorf("refresh failed; settings were restored: %w", err)
@@ -92,15 +93,16 @@ func (s *Service) ResetSourceStructure(id, directory string) (SourceStructureSav
 }
 
 func (s *SourceSettingsService) ResetSourceStructure(id, directory string) (SourceStructureSaveResult, error) {
-	root, cleanDirectory, err := s.sourceRoot(id, directory)
+	_, cleanDirectory, workspaceRoot, err := s.sourceRoot(id, directory)
 	if err != nil {
 		return SourceStructureSaveResult{}, err
 	}
-	previous, _, existed, err := scanner.ReadSourceStructureSettingsFile(root)
+	settingsPath, _ := scanner.SourceSettingsPath(workspaceRoot, cleanDirectory)
+	previous, _, existed, err := scanner.ReadSourceStructureSettingsFile(settingsPath)
 	if err != nil {
 		return SourceStructureSaveResult{}, err
 	}
-	if err := scanner.RemoveSourceStructureSettings(root); err != nil {
+	if err := scanner.RemoveSourceStructureSettings(settingsPath); err != nil {
 		return SourceStructureSaveResult{}, err
 	}
 	workspace, ok, err := s.registry.Get(id)
@@ -112,7 +114,7 @@ func (s *SourceSettingsService) ResetSourceStructure(id, directory string) (Sour
 	}
 	scanResult, err := s.writer.RefreshWorkspace(workspace)
 	if err != nil {
-		if restoreErr := scanner.RestoreSourceStructureSettings(root, previous, existed); restoreErr != nil {
+		if restoreErr := scanner.RestoreSourceStructureSettings(settingsPath, previous, existed); restoreErr != nil {
 			return SourceStructureSaveResult{}, fmt.Errorf("refresh failed: %v; settings rollback failed: %w", err, restoreErr)
 		}
 		return SourceStructureSaveResult{}, fmt.Errorf("refresh failed; settings were restored: %w", err)
@@ -135,17 +137,19 @@ func sourceStructurePreview(root, cleanDirectory string, settings models.SourceS
 	return scanner.PreviewSourceStructureCard(scanner.NewFilesystemSourceReader(filepath.Dir(root)), cleanDirectory, settings.Cards[0])
 }
 
-func (s *SourceSettingsService) sourceRoot(id, directory string) (string, string, error) {
+// sourceRoot resolves a registered source: its real path, its clean path
+// relative to the workspace, and the workspace's real root.
+func (s *SourceSettingsService) sourceRoot(id, directory string) (string, string, string, error) {
 	workspace, ok, err := s.registry.Get(id)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if !ok {
-		return "", "", apperrors.ErrWorkspaceNotFound
+		return "", "", "", apperrors.ErrWorkspaceNotFound
 	}
 	cleanDirectory := filepath.ToSlash(filepath.Clean(strings.TrimSpace(directory)))
 	if cleanDirectory == "." || cleanDirectory == "" || filepath.IsAbs(cleanDirectory) || strings.HasPrefix(cleanDirectory, "../") || cleanDirectory == ".." {
-		return "", "", fmt.Errorf("source directory is invalid")
+		return "", "", "", fmt.Errorf("source directory is invalid")
 	}
 	allowed := false
 	for _, source := range workspace.SourcePaths() {
@@ -155,16 +159,20 @@ func (s *SourceSettingsService) sourceRoot(id, directory string) (string, string
 		}
 	}
 	if !allowed {
-		return "", "", fmt.Errorf("source directory is not registered")
+		return "", "", "", fmt.Errorf("source directory is not registered")
 	}
 	resolved, err := sourceguard.ResolveAll(workspace.Path, workspace.SourcePaths())
 	if err != nil {
-		return "", "", fmt.Errorf("configured source boundary is unsafe: %w", err)
+		return "", "", "", fmt.Errorf("configured source boundary is unsafe: %w", err)
 	}
 	for _, source := range resolved {
 		if source.Relative == cleanDirectory {
-			return source.RealPath, cleanDirectory, nil
+			workspaceRoot, err := filepath.EvalSymlinks(workspace.Path)
+			if err != nil {
+				return "", "", "", err
+			}
+			return source.RealPath, cleanDirectory, workspaceRoot, nil
 		}
 	}
-	return "", "", fmt.Errorf("source directory is not registered")
+	return "", "", "", fmt.Errorf("source directory is not registered")
 }

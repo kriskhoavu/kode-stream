@@ -222,6 +222,64 @@ cards:
 	}
 }
 
+func TestRepositorySettingsKeyedBySourceWinOverTheSourcesOwnFile(t *testing.T) {
+	root := t.TempDir()
+	rule := func(status string) string {
+		return "version: 1\ncards:\n  - pathPattern: \"{item}\"\n    fields:\n      source: notes\n      item: \"{item}\"\n      title: readme_heading\n      status: " + status + "\n"
+	}
+	writeTestFile(t, root, ".kode-stream/notes/workspace-settings.yaml", rule("in_progress"))
+	writeTestFile(t, root, "notes/workspace-settings.yaml", rule("done"))
+	writeTestFile(t, root, "notes/offers/README.md", "# Offers\n")
+	writeTestFile(t, root, "docs/api/feature/DI-101/README.md", "# API Search\n")
+
+	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: models.SourceList("notes", "docs"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := map[string]models.ItemDetail{}
+	for _, item := range data.Items {
+		items[item.Identifier] = item
+	}
+	if offers := items["offers"]; offers.Status != models.StatusInProgress || offers.MetadataSource != "workspace-settings" {
+		t.Fatalf("the notes must use .kode-stream/notes/workspace-settings.yaml: %+v (%v)", offers.ItemSummary, data.Warnings)
+	}
+	if docs, found := items["docs"]; !found || docs.MetadataSource == "workspace-settings" {
+		t.Fatalf("the docs source must not take the notes source's settings: %v", data.Items)
+	}
+
+	path, exists := SourceSettingsPath(root, "notes")
+	if !exists || path != filepath.Join(root, ".kode-stream", "notes", "workspace-settings.yaml") {
+		t.Fatalf("settings path = %q, exists = %v", path, exists)
+	}
+	created, exists := SourceSettingsPath(root, "docs")
+	if exists || created != filepath.Join(root, ".kode-stream", "docs", "workspace-settings.yaml") {
+		t.Fatalf("a source without settings saves to %q, exists = %v", created, exists)
+	}
+	settings, _, _ := ReadSourceStructureSettings(root, "notes")
+	if err := WriteSourceStructureSettings(created, settings); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(created); err != nil {
+		t.Fatalf("saving did not create the file: %v", err)
+	}
+}
+
+func TestSavingSettingsRefusesALinkedSettingsFolder(t *testing.T) {
+	root, outside := t.TempDir(), t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, ".kode-stream")); err != nil {
+		t.Fatal(err)
+	}
+	target, _ := SourceSettingsPath(root, "wiki")
+	if err := WriteSourceStructureSettings(target, BuiltInStructuredSettings()); err == nil {
+		t.Fatal("a write through a linked .kode-stream folder must be refused")
+	}
+	if entries, _ := os.ReadDir(outside); len(entries) != 0 {
+		t.Fatalf("the write left the workspace: %v", entries)
+	}
+}
+
 func TestSourceStructureSettingsSupportNestedItemIdentifierTemplate(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "docs/workspace-settings.yaml", `version: 1
@@ -342,7 +400,11 @@ func TestRemoveSourceStructureSettingsDeletesCurrentFile(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "docs/workspace-settings.yaml", "version: 1\ncards: []\n")
 
-	if err := RemoveSourceStructureSettings(filepath.Join(root, "docs")); err != nil {
+	path, exists := SourceSettingsPath(root, "docs")
+	if !exists || path != filepath.Join(root, "docs", "workspace-settings.yaml") {
+		t.Fatalf("settings path = %q, exists = %v", path, exists)
+	}
+	if err := RemoveSourceStructureSettings(path); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "docs", "workspace-settings.yaml")); !os.IsNotExist(err) {

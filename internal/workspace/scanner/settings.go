@@ -17,6 +17,37 @@ import (
 
 const SourceStructureSettingsFile = "workspace-settings.yaml"
 
+// RepositorySettingsDir holds Kode Stream's own files at the workspace root.
+// A source's settings live at RepositorySettingsDir/<source>/
+// workspace-settings.yaml, keyed by the source's path so that two sources of
+// one repository never share a file; a source that has no file there falls
+// back to workspace-settings.yaml inside the source itself.
+const RepositorySettingsDir = ".kode-stream"
+
+// sourceSettingsPaths are the places a source's settings may live, relative
+// to the workspace root, in the order they are read.
+func sourceSettingsPaths(source string) []string {
+	source = filepath.ToSlash(filepath.Clean(source))
+	return []string{
+		filepath.ToSlash(filepath.Join(RepositorySettingsDir, source, SourceStructureSettingsFile)),
+		filepath.ToSlash(filepath.Join(source, SourceStructureSettingsFile)),
+	}
+}
+
+// SourceSettingsPath is the settings file of source in the workspace at
+// workspaceRoot: the file it was read from, else, for a source with none, the
+// one under RepositorySettingsDir that saving creates. The second result says
+// whether the file exists.
+func SourceSettingsPath(workspaceRoot, source string) (string, bool) {
+	paths := sourceSettingsPaths(source)
+	for _, candidate := range paths {
+		if _, err := os.Lstat(filepath.Join(workspaceRoot, filepath.FromSlash(candidate))); err == nil {
+			return filepath.Join(workspaceRoot, filepath.FromSlash(candidate)), true
+		}
+	}
+	return filepath.Join(workspaceRoot, filepath.FromSlash(paths[0])), false
+}
+
 var settingVariablePattern = regexp.MustCompile(`^\{([A-Za-z][A-Za-z0-9_]*)\}$`)
 
 func DefaultSourceStructureSettings(sourceRoot ...string) models.SourceStructureSettings {
@@ -55,13 +86,24 @@ func BuiltInStructuredSettings() models.SourceStructureSettings {
 	}
 }
 
-func ReadSourceStructureSettings(root string) (models.SourceStructureSettings, bool, []models.ScanWarning) {
-	return ReadSourceStructureSettingsFromReader(NewFilesystemSourceReader(filepath.Dir(root)), filepath.Base(root))
+// ReadSourceStructureSettings reads the settings of source, a path relative
+// to the workspace at workspaceRoot.
+func ReadSourceStructureSettings(workspaceRoot, source string) (models.SourceStructureSettings, bool, []models.ScanWarning) {
+	return ReadSourceStructureSettingsFromReader(NewFilesystemSourceReader(workspaceRoot), source)
 }
 
+// ReadSourceStructureSettingsFromReader reads the settings of root, a source
+// path relative to the reader, which is rooted at the workspace.
 func ReadSourceStructureSettingsFromReader(reader SourceReader, root string) (models.SourceStructureSettings, bool, []models.ScanWarning) {
-	path := filepath.ToSlash(filepath.Join(root, SourceStructureSettingsFile))
-	data, err := reader.ReadFile(path)
+	var data []byte
+	var path string
+	err := os.ErrNotExist
+	for _, candidate := range sourceSettingsPaths(root) {
+		path = candidate
+		if data, err = reader.ReadFile(candidate); !os.IsNotExist(err) {
+			break
+		}
+	}
 	if os.IsNotExist(err) {
 		return DefaultSourceStructureSettings(root), false, nil
 	}
@@ -72,7 +114,7 @@ func ReadSourceStructureSettingsFromReader(reader SourceReader, root string) (mo
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&settings); err != nil {
-		return DefaultSourceStructureSettings(root), true, []models.ScanWarning{{ItemPath: SourceStructureSettingsFile, Message: "invalid workspace settings: " + err.Error()}}
+		return DefaultSourceStructureSettings(root), true, []models.ScanWarning{{ItemPath: path, Message: "invalid workspace settings: " + err.Error()}}
 	}
 	warnings := ValidateSourceStructureSettings(settings)
 	return settings, true, warnings
@@ -96,7 +138,9 @@ func SourceSettingsModeFromReader(reader SourceReader, root string) string {
 	return "empty"
 }
 
-func WriteSourceStructureSettings(root string, settings models.SourceStructureSettings) error {
+// WriteSourceStructureSettings writes the settings to target, the path
+// SourceSettingsPath gave.
+func WriteSourceStructureSettings(target string, settings models.SourceStructureSettings) error {
 	if warnings := ValidateSourceStructureSettings(settings); len(warnings) > 0 {
 		return errors.New(warnings[0].Message)
 	}
@@ -104,10 +148,42 @@ func WriteSourceStructureSettings(root string, settings models.SourceStructureSe
 	if err != nil {
 		return err
 	}
-	return atomicWriteSettings(filepath.Join(root, SourceStructureSettingsFile), data)
+	return atomicWriteSettings(target, data)
+}
+
+// ensureSettingsDirectory creates the folders that hold target, refusing a
+// symbolic link on the way so a write cannot leave the workspace.
+func ensureSettingsDirectory(target string) error {
+	directory := filepath.Dir(target)
+	var missing []string
+	for current := directory; ; current = filepath.Dir(current) {
+		info, err := os.Lstat(current)
+		if err == nil {
+			if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return errors.New("workspace settings folder must be a regular folder")
+			}
+			break
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		missing = append(missing, current)
+		if filepath.Base(current) == RepositorySettingsDir || filepath.Dir(current) == current {
+			break
+		}
+	}
+	for i := len(missing) - 1; i >= 0; i-- {
+		if err := os.Mkdir(missing[i], 0o755); err != nil && !errors.Is(err, os.ErrExist) {
+			return err
+		}
+	}
+	return nil
 }
 
 func atomicWriteSettings(target string, data []byte) error {
+	if err := ensureSettingsDirectory(target); err != nil {
+		return err
+	}
 	info, err := os.Lstat(target)
 	mode := os.FileMode(0o644)
 	if err == nil {
@@ -153,8 +229,9 @@ func atomicWriteSettings(target string, data []byte) error {
 	return directory.Close()
 }
 
-func ReadSourceStructureSettingsFile(root string) ([]byte, os.FileMode, bool, error) {
-	path := filepath.Join(root, SourceStructureSettingsFile)
+// ReadSourceStructureSettingsFile reads the file at path as it is, to restore
+// it if a save fails.
+func ReadSourceStructureSettingsFile(path string) ([]byte, os.FileMode, bool, error) {
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, 0, false, nil
@@ -169,15 +246,15 @@ func ReadSourceStructureSettingsFile(root string) ([]byte, os.FileMode, bool, er
 	return data, info.Mode().Perm(), true, err
 }
 
-func RestoreSourceStructureSettings(root string, data []byte, existed bool) error {
+func RestoreSourceStructureSettings(path string, data []byte, existed bool) error {
 	if !existed {
-		return RemoveSourceStructureSettings(root)
+		return RemoveSourceStructureSettings(path)
 	}
-	return atomicWriteSettings(filepath.Join(root, SourceStructureSettingsFile), data)
+	return atomicWriteSettings(path, data)
 }
 
-func RemoveSourceStructureSettings(root string) error {
-	err := os.Remove(filepath.Join(root, SourceStructureSettingsFile))
+func RemoveSourceStructureSettings(path string) error {
+	err := os.Remove(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
