@@ -202,17 +202,3 @@ func TestJanitorRemovesExpiredWorktreesOnly(t *testing.T) {
 		t.Fatal("the janitor deleted an unpushed branch")
 	}
 }
-
-func TestAPullRequestNamesThePlanFolderOnItsOwnLine(t *testing.T) {
-	for planPath, want := range map[string]string{
-		"plans/platform/PM-7":                          "plans/platform/PM-7",
-		"plans/customer/APP-661/":                       "plans/customer/APP-661",
-		"`plans/customer/APP-661`":                      "plans/customer/APP-661",
-		"plans/customer/APP-661/implementation-plan.md": "plans/customer/APP-661",
-		"docs/plans/export.md":                         "docs/plans",
-	} {
-		if got := planFolder(planPath); got != want {
-			t.Fatalf("planFolder(%q) = %q, want %q", planPath, got, want)
-		}
-	}
-}

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"path"
 	"strings"
 	"time"
 
@@ -207,27 +206,8 @@ func (s *Service) pullRequestBody(ctx context.Context, run domain.Run) string {
 	if task, err := s.repository.GetTask(ctx, run.TaskID); err == nil && task.Source.URL != "" {
 		fmt.Fprintf(&body, "Issue: %s\n", task.Source.URL)
 	}
-	if run.PlanPath != "" {
-		fmt.Fprintf(&body, "Plan: %s\n", planFolder(run.PlanPath))
-	}
 	fmt.Fprintf(&body, "Agent turns: %d · Cost: $%.2f\n\nA person reviews and merges this pull request; the harness never merges.\n", run.Totals.Turns, roundCents(run.Totals.CostUSD))
 	return body.String()
-}
-
-// planFolder is the plan's folder as a pull request names it, on its own
-// `Plan:` line that a pipeline reads: no backticks, no trailing slash, and the
-// folder rather than a file in it. A plan under plans/ is the first three
-// parts of its path, plans/<area>/<key>.
-func planFolder(planPath string) string {
-	clean := path.Clean(strings.Trim(strings.TrimSpace(planPath), "`"))
-	parts := strings.Split(clean, "/")
-	if len(parts) >= 3 && parts[0] == "plans" {
-		return strings.Join(parts[:3], "/")
-	}
-	if path.Ext(clean) != "" {
-		return path.Dir(clean)
-	}
-	return clean
 }
 
 func (s *Service) finishDraftPR(ctx context.Context, settings domain.Settings, stage domain.Stage, run domain.Run, workspace models.WorkspaceConfig, url string, openErr error) error {
