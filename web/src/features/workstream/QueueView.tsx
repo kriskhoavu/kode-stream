@@ -94,18 +94,21 @@ function QueueSidePanel({ selected, tasks, harness }: { selected?: HarnessTask; 
 				<section className="queue-side-section" aria-labelledby="queue-why">
 					<h3 id="queue-why">Why here</h3>
 					<p className="queue-side-task"><b>{selected.source.key}</b> · {selected.title}</p>
-					<p className="hx-muted">Score <span className="hx-num">{Math.round(selected.score)}</span>{selected.pinned ? ' · pinned first' : ''}{selected.priorityOverride ? ` · moved by hand (${selected.priorityOverride > 0 ? '+' : ''}${selected.priorityOverride})` : ''}</p>
+					<p className="queue-side-score"><span>Score</span><b className="hx-num">{Math.round(selected.score)}</b>{selected.pinned && <span className="queue-side-flag">Pinned first</span>}{selected.priorityOverride ? <span className="queue-side-flag">{`Moved by hand ${selected.priorityOverride > 0 ? '+' : ''}${selected.priorityOverride}`}</span> : null}</p>
 					{selected.scoreReasons.length > 0
-						? <ul className="queue-side-reasons">{selected.scoreReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+						? <ul className="queue-side-reasons" aria-label="What makes the score">{selected.scoreReasons.map((reason) => {
+							const [, label, points] = /^(.*?)\s*([+-]\d+)?$/.exec(reason) ?? [reason, reason, undefined];
+							return <li key={reason}><span>{label}</span>{points && <span className="hx-num">{points}</span>}</li>;
+						})}</ul>
 						: <p className="hx-muted">The Sorter gave no reasons for this score.</p>}
 					{waitsFor(selected, state.tasks).length > 0 && <p className="hx-muted">Waits for {waitsFor(selected, state.tasks).join(', ')}.</p>}
 				</section>
-			) : <p className="hx-muted">Choose a row to see why it sits where it does.</p>}
+			) : <section className="queue-side-section"><p className="hx-muted">Choose a row to see why it sits where it does.</p></section>}
 
 			<section className="queue-side-section" aria-labelledby="queue-next">
 				<h3 id="queue-next">What starts next</h3>
 				{next
-					? <p><b>{next.source.key}</b> · {next.title}<br /><span className="hx-muted">{state.status?.autoStart ? 'Starts when a Planner is free.' : 'Starts when you press Start.'}</span></p>
+					? <><p className="queue-side-task"><b>{next.source.key}</b> · {next.title}</p><p className="hx-muted">{state.status?.autoStart ? 'Starts when a Planner is free.' : 'Starts when you press Start.'}</p></>
 					: <p className="hx-muted">Nothing is ready to start. {tasks.some((task) => hxStatuses[taskStatus(task, waitsFor(task, state.tasks))].tone === 'idle') ? 'The next tasks wait for others to finish.' : ''}</p>}
 			</section>
 
