@@ -576,7 +576,7 @@ export type SessionFileStatus = 'A' | 'M' | 'D' | 'R' | 'C' | '?';
 export interface SessionFile { path: string; status: SessionFileStatus; oldPath?: string; }
 export type SessionChangesAvailability = 'available' | 'unavailable' | 'unsupported';
 export type SessionChangesReason = 'launch_commit_unknown' | 'launch_commit_missing' | 'workspace_missing' | 'content_provider_unsupported';
-export interface SessionChanges { sessionId: string; launchCommit: string; headCommit: string; headMoved: number; files: SessionFile[]; additions: number; deletions: number; truncated: boolean; availability: SessionChangesAvailability; reason?: SessionChangesReason; }
+export interface SessionChanges { sessionId: string; launchCommit: string; headCommit: string; headMoved: number; files: SessionFile[]; additions: number; deletions: number; truncated: boolean; availability: SessionChangesAvailability; reason?: SessionChangesReason; /** A harness run's changes: where they were read, its own copy or its branch. */ from?: 'worktree' | 'branch'; branch?: string; }
 /** A Claude Code conversation held in the workspace root, outside kode-stream; metadata only. */
 export interface ClaudeTranscript { sessionId: string; branch?: string; startedAt: string; lastActiveAt: string; messages: number; itemIds: string[]; }
 /** `tool` is a call the model made (its name and main argument); `thinking` is its reasoning. Both appear only where the reader asked for the model's work, not just its words. */
@@ -1092,6 +1092,8 @@ export interface HarnessCreateTaskInput { workspaceId: string; key: string; titl
 /** One file a run wrote under the plan folder; `content` is empty when the file is too large to show. */
 export interface HarnessRunFile { path: string; status: 'added' | 'modified' | 'deleted'; content: string; truncated?: boolean }
 /** The plan a run wrote, readable before it is merged: live from the run's own copy, or from its branch. */
+/** The diff of one path a run changed, read from its own copy or its branch. */
+export interface HarnessRunFileDiff { path: string; diff: string; truncated: boolean; from: 'worktree' | 'branch' | '' }
 export interface HarnessRunPlan { branch: string; from: 'worktree' | 'branch' | ''; files: HarnessRunFile[] }
 
 export interface HarnessTotals { turns: number; durationMs: number; costUsd: number; blocking: number; advisory: number }
@@ -1163,6 +1165,8 @@ export interface HarnessRun {
   currentStageId?: string;
   totals: HarnessTotals;
   prUrl?: string;
+  /** The name the branch is pushed under. */
+  remoteBranch?: string;
   startedAt: string;
   finishedAt?: string;
   revision: number;

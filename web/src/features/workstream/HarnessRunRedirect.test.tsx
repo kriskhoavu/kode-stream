@@ -33,7 +33,7 @@ describe('HarnessRunRedirect', () => {
 		const onMissing = vi.fn();
 		const onBack = vi.fn();
 		render(<HarnessRunRedirect runId="run-7" onResolved={vi.fn()} onMissing={onMissing} onBack={onBack} />);
-		expect(await screen.findByRole('region', { name: 'Harness run, full width' })).toHaveTextContent('Jira ticket/PM-7');
+		expect(await screen.findByRole('region', { name: 'Harness run, full width' })).toHaveTextContent('Jira ticket');
 		fireEvent.click(screen.getByRole('button', { name: 'Back to the board' }));
 		expect(onBack).toHaveBeenCalled();
 		expect(onMissing).not.toHaveBeenCalled();

@@ -11,7 +11,7 @@ import { LiveTimer } from './LiveTimer';
  * steps (roving tabindex), Enter or a click opens a two-sentence explainer.
  * `orientation="vertical"` is the drawer's compact form.
  */
-export function PipelineStepper({ model, label, orientation = 'horizontal' }: { model: PipelineModel; label: string; orientation?: 'horizontal' | 'vertical' }) {
+export function PipelineStepper({ model, label, orientation = 'horizontal', onSelect }: { model: PipelineModel; label: string; orientation?: 'horizontal' | 'vertical'; /** Also called when a step is clicked, so a page can show what that step made. */ onSelect?: (card: StepCard) => void }) {
 	const cards = model.groups.flatMap((group) => group.cards);
 	const initial = Math.max(0, cards.findIndex((card) => card.current));
 	const [focusIndex, setFocusIndex] = useState(initial);
@@ -67,7 +67,7 @@ export function PipelineStepper({ model, label, orientation = 'horizontal' }: { 
 											refCallback={(element) => { refs.current[position] = element; }}
 											tabIndex={position === focusIndex ? 0 : -1}
 											open={open === card.id}
-											onToggle={() => { setFocusIndex(position); setOpen((current) => current === card.id ? undefined : card.id); }}
+											onToggle={() => { setFocusIndex(position); setOpen((current) => current === card.id ? undefined : card.id); onSelect?.(card); }}
 											onKeyDown={(event) => move(event, position)}
 										/>
 									);

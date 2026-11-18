@@ -2,7 +2,7 @@ import { api } from '../../shared/api';
 import { openEventSourceFeed } from './useHarnessEvents';
 import type {
 	HarnessCreateTaskInput,
-	HarnessRunPlan,
+	HarnessRunFileDiff, HarnessRunPlan,
 	HarnessAgentRun,
 	HarnessApproval,
 	HarnessCostSummary,
@@ -48,6 +48,8 @@ export interface HarnessClient {
 	runChanges(runId: string, signal?: AbortSignal): Promise<SessionChanges>;
 	/** The plan a run wrote, before it is merged. */
 	runPlan?(runId: string, signal?: AbortSignal): Promise<HarnessRunPlan>;
+	/** The diff of one path the run changed. */
+	runFileDiff?(runId: string, path: string, signal?: AbortSignal): Promise<HarnessRunFileDiff>;
 	agentRun(agentRunId: string, signal?: AbortSignal): Promise<{ agentRun: HarnessAgentRun; session?: SafeSessionRecord }>;
 	/** The last turns of an agent run's transcript; polled while the agent works. */
 	agentRunTranscript(agentRunId: string, limit?: number, signal?: AbortSignal): Promise<HarnessTranscript>;
@@ -91,6 +93,7 @@ export const apiHarnessClient: HarnessClient = {
 	run: (runId, signal) => api.harnessRun(runId, signal),
 	runChanges: (runId, signal) => api.harnessRunChanges(runId, signal),
 	runPlan: (runId, signal) => api.harnessRunPlan(runId, signal),
+	runFileDiff: (runId, path, signal) => api.harnessRunFileDiff(runId, path, signal),
 	agentRun: (agentRunId, signal) => api.harnessAgentRun(agentRunId, signal),
 	agentRunTranscript: (agentRunId, limit, signal) => api.harnessAgentRunTranscript(agentRunId, limit, signal),
 	approve: (approval, key, reason) => api.approveHarnessGate(approval, key, reason),

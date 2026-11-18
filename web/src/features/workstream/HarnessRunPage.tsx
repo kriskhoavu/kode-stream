@@ -5,6 +5,8 @@ import type { HarnessTask } from '../../lib/types';
 import { ResetTaskButton, canResetTask } from '../harness/ResetTaskButton';
 import { RunDrawer } from '../harness/RunDrawer';
 import { RunView } from '../harness/RunView';
+import { RunPagePath, RunWorkbench } from '../harness/RunWorkbench';
+import { sourceLabels } from '../harness/vocabulary';
 import { queueOrder } from './harnessJoin';
 import { useBoardHarness } from './useBoardHarness';
 import { useTaskActions } from './useTaskActions';
@@ -26,10 +28,12 @@ export function HarnessRunPage({ runId, task, onBack }: { runId: string; task: H
 				</div>
 				<div className="workspace-header-title">
 					<h1>{task.title}</h1>
-					<div className="workspace-item-path" aria-label="Item location"><span className="workspace-item-path-segment">Jira ticket</span><span className="workspace-item-path-separator">/</span><span className="workspace-item-path-segment">{task.source.key}</span></div>
+					<RunPagePath run={harness.state.runs[runId]} lead={task.source.url
+						? <a className="workspace-item-path-segment hx-link" href={task.source.url} target="_blank" rel="noreferrer" title={task.source.key}>{sourceLabels[task.source.kind]} ticket ↗</a>
+						: <span className="workspace-item-path-segment">{sourceLabels[task.source.kind]} ticket {task.source.key}</span>} />
 				</div>
 			</header>
-			<RunView state={harness.state} runId={runId} onSelectRun={() => undefined} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onCancel={harness.cancelRun} onOpenTab={(tab, agentRunId) => setRunTab({ tab, agentRunId })} />
+			<RunView state={harness.state} runId={runId} onSelectRun={() => undefined} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onCancel={harness.cancelRun} onOpenTab={(tab, agentRunId) => setRunTab({ tab, agentRunId })} workbench={(detail, request) => <RunWorkbench client={harness.client} detail={detail} request={request} />} />
 			{runTab && <RunDrawer state={harness.state} client={harness.client} taskId={task.id} tab={runTab.tab} agentRunId={runTab.agentRunId} queue={queueOrder(harness.state, task.workspaceId)} onTabChange={(tab) => setRunTab({ tab })} onClose={() => setRunTab(undefined)} onCancel={harness.cancelRun} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={actions.pin} onMove={actions.move} onStart={actions.start} onReset={(reset) => harness.resetTask(reset).then(onBack)} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />}
 		</section>
 	);

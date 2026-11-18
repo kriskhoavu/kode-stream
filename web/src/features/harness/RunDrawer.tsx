@@ -206,7 +206,7 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTab
 }
 
 /** The ticket as its tracker shows it: the Jira panel the Workstream page uses, read by key in the task's workspace. */
-function TicketTab({ task, fixture }: { task: HarnessTask; fixture: boolean }) {
+export function TicketTab({ task, fixture }: { task: HarnessTask; fixture: boolean }) {
 	if (task.source.kind === 'jira' && !fixture) return <div className="hx-ticket"><JiraItemPanel workspaceId={task.workspaceId} issueKey={task.source.key} /></div>;
 	return (
 		<div className="hx-ticket hx-ticket-summary">
@@ -351,7 +351,7 @@ export function LiveTab({ client, focus, stages, agentRuns, onReload }: { client
 	);
 }
 
-type LiveStep = { id: string; title: string; agentRuns: HarnessAgentRun[] };
+export type LiveStep = { id: string; title: string; agentRuns: HarnessAgentRun[] };
 
 /**
  * The run's conversations grouped by the stage that ran them, in the order the
@@ -379,7 +379,7 @@ export function liveSteps(stages: HarnessStage[], agentRuns: HarnessAgentRun[]):
 	return steps;
 }
 
-function agentStatus(agentRun: HarnessAgentRun): HxStatus {
+export function agentStatus(agentRun: HarnessAgentRun): HxStatus {
 	switch (agentRun.state) {
 		case 'running': return 'working';
 		case 'succeeded': return 'done';
@@ -390,7 +390,7 @@ function agentStatus(agentRun: HarnessAgentRun): HxStatus {
 }
 
 /** The transcript of one agent run, read once when it is finished and every few seconds while it runs. */
-function useAgentTranscript(client: HarnessClient, agentRun?: HarnessAgentRun): { turns?: ClaudeTurn[]; error: string } {
+export function useAgentTranscript(client: HarnessClient, agentRun?: HarnessAgentRun): { turns?: ClaudeTurn[]; error: string } {
 	const [turns, setTurns] = useState<ClaudeTurn[] | undefined>();
 	const [error, setError] = useState('');
 	const id = agentRun?.id;

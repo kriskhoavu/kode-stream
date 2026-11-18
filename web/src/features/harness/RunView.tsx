@@ -1,6 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
-import type { HarnessApproval, HarnessRun } from '../../lib/types';
+import type { HarnessApproval, HarnessRun, HarnessRunDetail } from '../../lib/types';
+import type { WorkbenchRequest } from './RunWorkbench';
 import { StopRunButton, canStopRun } from './StopRunButton';
 import type { HarnessRunTab } from '../../app/router';
 import type { HarnessState } from './harnessState';
@@ -17,7 +19,7 @@ import { useNow } from './useNow';
 import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, plural, sourceLabels, stageKindLabels } from './vocabulary';
 
 /** The pipeline for one run: where it stands, what waits on a person, and what each step took. */
-export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onApprove, onReject, onCancel, onOpenTab }: {
+export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onApprove, onReject, onCancel, onOpenTab, workbench }: {
 	state: HarnessState;
 	runId?: string;
 	onSelectRun: (runId: string) => void;
@@ -29,7 +31,10 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 	onCancel?: (run: HarnessRun) => Promise<void>;
 	/** Opens the run's drawer on a tab: changed files, the live agent, every finding. */
 	onOpenTab?: (tab: HarnessRunTab, agentRunId?: string) => void;
+	/** Shown below the pipeline instead of the ledger and findings: the run page's workbench, told which step was clicked. */
+	workbench?: (detail: HarnessRunDetail, request?: WorkbenchRequest) => ReactNode;
 }) {
+	const [request, setRequest] = useState<WorkbenchRequest | undefined>();
 	const now = useNow(30_000);
 	const summary = runId ? state.runs[runId] : undefined;
 	const detail = runId ? state.details[runId] : undefined;
@@ -88,10 +93,10 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 			))}
 
 			<section className="hx-card hx-stepper-card">
-				<PipelineStepper model={model} label={`Progress for ${task.source.key}`} />
+				<PipelineStepper model={model} label={`Progress for ${task.source.key}`} onSelect={workbench ? (card) => setRequest((current) => ({ card, n: (current?.n ?? 0) + 1 })) : undefined} />
 			</section>
 
-			<div className="hx-run-split">
+			{workbench ? workbench(detail, request) : <div className="hx-run-split">
 				<RunLedger detail={detail} onOpenAgentRun={onOpenTab ? (agentRunId) => onOpenTab('live', agentRunId) : undefined} />
 				<FindingsPanel agentRuns={detail.agentRuns}>
 					{onOpenTab && <button type="button" className="hx-link" onClick={() => onOpenTab('findings')}>Every finding</button>}
@@ -100,7 +105,7 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 					{task.source.url && <a className="hx-link" href={task.source.url} target="_blank" rel="noreferrer">{sourceLabels[task.source.kind]} {task.source.key}</a>}
 					{run.prUrl && <a className="hx-link" href={run.prUrl} target="_blank" rel="noreferrer">Draft pull request</a>}
 				</FindingsPanel>
-			</div>
+			</div>}
 		</div>
 	);
 }
