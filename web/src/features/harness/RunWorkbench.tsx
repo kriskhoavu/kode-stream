@@ -103,7 +103,7 @@ export function RunWorkbench({ client, detail, request }: { client: HarnessClien
 				<p className="hx-workbench-count">{modeCount(mode, planFiles.length, codeFiles, steps)}</p>
 				<div className="explorer-tree" role="tree" aria-label={modeLabels[mode]}>
 					{mode === 'plan' && <PlanTree plan={plan} files={planFiles} active={active} onOpen={show} />}
-					{mode === 'changes' && <ChangesTree changes={changes} files={codeFiles} active={active} onOpen={show} />}
+					{mode === 'changes' && <ChangesTree changes={changes} files={codeFiles} branch={run.prUrl && run.remoteBranch ? run.remoteBranch : run.branch} active={active} onOpen={show} />}
 					{mode === 'agents' && <AgentsList steps={steps} active={active} onOpen={show} />}
 				</div>
 			</aside>
@@ -281,7 +281,7 @@ function PlanTree({ plan, files, active, onOpen }: { plan: Loaded<HarnessRunPlan
 	);
 }
 
-function ChangesTree({ changes, files, active, onOpen }: { changes: Loaded<SessionChanges>; files: SessionFile[]; active?: WorkbenchKey; onOpen: (key: WorkbenchKey) => void }) {
+function ChangesTree({ changes, files, branch, active, onOpen }: { changes: Loaded<SessionChanges>; files: SessionFile[]; branch: string; active?: WorkbenchKey; onOpen: (key: WorkbenchKey) => void }) {
 	if (changes.error) return <p className="hx-banner" role="alert">{changes.error}</p>;
 	if (!changes.value) return <p className="hx-workbench-empty" aria-busy="true">Reading the changes…</p>;
 	if (changes.value.availability !== 'available') return <p className="hx-workbench-empty">This run's copy and branch are gone, so its changes cannot be read here.</p>;
@@ -289,7 +289,7 @@ function ChangesTree({ changes, files, active, onOpen }: { changes: Loaded<Sessi
 	const counted = files as (SessionFile & { additions?: number; deletions?: number })[];
 	return (
 		<>
-			<p className="hx-workbench-folder">{changes.value.from === 'branch' ? `From ${changes.value.branch ?? 'the branch'}` : 'Live from the harness\'s own copy'}</p>
+			<p className="hx-workbench-folder">{changes.value.from === 'branch' ? `From ${branch}` : 'Live from the harness\'s own copy'}</p>
 			<Tree dir={buildTree(files.map((file) => file.path))} depth={0} prefix="file:" active={active} row={(path, depth) => {
 				const file = counted.find((candidate) => candidate.path === path);
 				return <FileRow path={path} depth={depth} selected={active === `file:${path}`} additions={file?.additions ?? 0} deletions={file?.deletions ?? 0} onOpen={() => onOpen(`file:${path}`)} />;
