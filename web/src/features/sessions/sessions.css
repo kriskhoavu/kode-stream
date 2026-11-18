@@ -29,6 +29,9 @@
 /* The kind filter is the harness's segmented control, as on a task's details: it spans the list. */
 .session-browser .session-browser-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
 .session-browser .session-browser-kinds button { justify-content: center; min-width: 0; }
+/* Its chosen kind reads as a task's details mark a chosen tab: in the tab-selection colour, on a light accent wash. */
+.session-browser .session-browser-kinds button.on { background: color-mix(in srgb, var(--button-accent) 12%, var(--panel)); color: var(--accent-text); }
+.session-browser .session-browser-kinds button:not(.on):hover { color: var(--text); }
 
 /* Grid children size to their content by default; a long ticket title must shrink to the column instead. */
 .session-browser .session-browser-group,
