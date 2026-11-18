@@ -42,32 +42,9 @@
 .session-browser .session-browser-live-toggle.active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .session-browser .session-browser-filter { min-height: 32px; }
 
-.session-browser .session-browser-kinds {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 2px;
-	width: 100%;
-	padding: 3px;
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	background: var(--panel);
-}
-
-.session-browser .session-browser-kinds button {
-	min-width: 0;
-	min-height: 26px;
-	padding: 0 6px;
-	border: 0;
-	border-radius: 6px;
-	background: transparent;
-	box-shadow: none;
-	color: var(--muted);
-	font-size: 12px;
-	font-weight: 600;
-}
-
-.session-browser .session-browser-kinds button:hover { color: var(--text); }
-.session-browser .session-browser-kinds button.active { background: color-mix(in srgb, var(--text) 8%, var(--panel)); color: var(--text); box-shadow: none; }
+/* The kind filter is the harness's segmented control, as on a task's details: it spans the list. */
+.session-browser .session-browser-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.session-browser .session-browser-kinds button { justify-content: center; min-width: 0; }
 
 /* Grid children size to their content by default; a long ticket title must shrink to the column instead. */
 .session-browser .session-browser-group,
@@ -174,36 +151,8 @@
 
 /* ── Detail: tabs ──────────────────────────────────────────────────────── */
 
-.session-browser .session-browser-detail-tabs {
-	display: flex;
-	flex: none;
-	gap: 22px;
-	min-height: 0;
-	margin: 0;
-	padding: 0 20px;
-	border: 0;
-	border-bottom: 1px solid var(--line);
-	border-radius: 0;
-	background: transparent;
-}
-
-.session-browser .session-browser-detail-tabs button {
-	position: relative;
-	min-height: 0;
-	padding: 10px 0 9px;
-	border: 0;
-	border-radius: 0;
-	background: transparent;
-	box-shadow: none;
-	color: var(--muted);
-	font-size: 13px;
-	font-weight: 600;
-}
-
-.session-browser .session-browser-detail-tabs button::before { content: none; }
-.session-browser .session-browser-detail-tabs button:hover { color: var(--text); }
-.session-browser .session-browser-detail-tabs button.active { color: var(--text); }
-.session-browser .session-browser-detail-tabs button.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--text); }
+/* The harness's tab bar, as on a task's details; its first label lines up with the pane's 20px edge. */
+.session-browser .session-browser-detail-tabs { flex: none; margin: 0; padding: 0 8px; }
 
 /* ── Harness detail: the run's steps, compact ──────────────────────────── */
 

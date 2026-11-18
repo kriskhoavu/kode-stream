@@ -9,6 +9,7 @@ import { HarnessSessionCard, SessionCard, SessionKindTag, harnessRunGlyph, sessi
 import { formatDuration, formatSessionDate, isSessionLive, SessionConfirmDialog } from './sessionDisplay';
 import { useSessionBrowserSelection } from './useSessionBrowserSelection';
 import { agentRoleLabels } from '../harness/vocabulary';
+import '../harness/harness.css';
 import './sessions.css';
 
 export type SessionBrowserGrouping = 'plan' | 'workspace-plan';
@@ -133,8 +134,8 @@ export function SessionBrowser({ rows, harness, renderHarnessDetail, grouping, p
 				<input type="search" className="session-browser-filter" aria-label="Filter sessions" placeholder={mixed ? 'Filter by title, ticket or agent' : 'Filter by title or provider'} value={query} onChange={(event) => setQuery(event.target.value)} />
 				<button type="button" className={liveOnly ? 'session-browser-live-toggle active' : 'session-browser-live-toggle'} aria-pressed={liveOnly} onClick={() => setLiveOnly((value) => !value)}>Live only</button>
 			</div>
-			{mixed && <div className="segmented-control segmented-control-compact session-browser-kinds" role="tablist" aria-label="Session kind">
-				{(['all', 'interactive', 'harness'] as KindFilter[]).map((candidate) => <button key={candidate} type="button" role="tab" aria-selected={kind === candidate} className={kind === candidate ? 'active' : ''} title={kindHints[candidate]} onClick={() => setKind(candidate)}>{kindLabels[candidate]}</button>)}
+			{mixed && <div className="hx-seg hx-seg-small session-browser-kinds" role="tablist" aria-label="Session kind">
+				{(['all', 'interactive', 'harness'] as KindFilter[]).map((candidate) => <button key={candidate} type="button" role="tab" aria-selected={kind === candidate} className={kind === candidate ? 'on' : ''} title={kindHints[candidate]} onClick={() => setKind(candidate)}>{kindLabels[candidate]}</button>)}
 			</div>}
 			{sessions.length === 0 && <p className="session-browser-empty">{emptyMessage}</p>}
 			{sessions.length > 0 && visibleRows.length === 0 && <p className="session-browser-empty">No sessions match the current filter.</p>}
@@ -213,9 +214,9 @@ function SessionDetail({ row, tagged, onStop, onReload, onOpenOnBoard, onOpenOnC
 				{live && <button type="button" className="danger-confirm" onClick={() => setConfirming(true)}>{`Stop ${title} session`}</button>}
 			</div>
 		</header>
-		<div className="session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
-			<button type="button" role="tab" className={tab === 'terminal' ? 'active' : ''} aria-selected={tab === 'terminal'} onClick={() => setTab('terminal')}>Terminal</button>
-			<button type="button" role="tab" className={tab === 'changes' ? 'active' : ''} aria-selected={tab === 'changes'} onClick={() => setTab('changes')}>Changes</button>
+		<div className="hx-tabs session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
+			<button type="button" role="tab" className={tab === 'terminal' ? 'on' : ''} aria-selected={tab === 'terminal'} onClick={() => setTab('terminal')}>Terminal</button>
+			<button type="button" role="tab" className={tab === 'changes' ? 'on' : ''} aria-selected={tab === 'changes'} onClick={() => setTab('changes')}>Changes</button>
 		</div>
 		{tab === 'terminal' && <SessionBrowserTerminal record={row.record} visible onReload={onReload} />}
 		{tab === 'changes' && <SessionChangesPanel session={row.record} />}

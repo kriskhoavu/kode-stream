@@ -131,9 +131,9 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 			</div>}
 		</div>
 		{agent && <>
-			<div className="session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
-				<button type="button" role="tab" className={tab === 'conversation' ? 'active' : ''} aria-selected={tab === 'conversation'} onClick={() => setTab('conversation')}>Conversation</button>
-				<button type="button" role="tab" className={tab === 'changes' ? 'active' : ''} aria-selected={tab === 'changes'} onClick={() => setTab('changes')}>Changes</button>
+			<div className="hx-tabs session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
+				<button type="button" role="tab" className={tab === 'conversation' ? 'on' : ''} aria-selected={tab === 'conversation'} onClick={() => setTab('conversation')}>Conversation</button>
+				<button type="button" role="tab" className={tab === 'changes' ? 'on' : ''} aria-selected={tab === 'changes'} onClick={() => setTab('changes')}>Changes</button>
 			</div>
 			{tab === 'conversation' && <div className="session-harness-conversation">
 				{transcript.error
