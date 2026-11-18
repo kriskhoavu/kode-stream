@@ -1,0 +1,55 @@
+/*
+ * The Session Browser's two kinds of session. An interactive session wears a
+ * blue tag, a harness session the accent; a group that holds a harness task
+ * names its run's state beside its title.
+ */
+.session-kind-tag {
+	display: inline-block;
+	margin-right: 7px;
+	padding: 0 7px;
+	border-radius: 999px;
+	font-size: 10.5px;
+	font-weight: 700;
+	line-height: 18px;
+	letter-spacing: 0;
+	text-transform: none;
+	vertical-align: 1px;
+}
+
+.session-kind-tag.interactive { background: color-mix(in srgb, var(--blue) 13%, transparent); color: var(--blue); }
+.session-kind-tag.harness { background: color-mix(in srgb, var(--accent-text) 14%, transparent); color: var(--accent-text); }
+
+.session-browser-kinds { width: 100%; }
+.session-browser-kinds button { min-width: 0; padding: 0 6px; }
+
+.session-browser-group-title { display: flex; align-items: flex-start; gap: 8px; }
+.session-browser-group-title > span:first-child { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.session-browser-run-state {
+	flex: none;
+	padding: 0 7px;
+	border-radius: 999px;
+	font-size: 10.5px;
+	line-height: 18px;
+	letter-spacing: 0;
+	text-transform: none;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	color: var(--muted);
+}
+
+.session-browser-run-state.state-running { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 35%, var(--line)); }
+.session-browser-run-state.state-blocked { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 40%, var(--line)); }
+.session-browser-run-state.state-passed { color: var(--green); border-color: color-mix(in srgb, var(--green) 35%, var(--line)); }
+
+.session-harness-note {
+	margin: 0 0 10px;
+	padding: 8px 12px;
+	border-radius: 8px;
+	background: var(--panel-soft);
+	color: var(--muted);
+	font-size: 12.5px;
+	line-height: 1.45;
+}
+
+.session-harness-conversation { flex: 1; min-height: 0; overflow: auto; padding: 4px 2px; }

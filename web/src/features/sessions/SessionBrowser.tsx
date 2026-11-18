@@ -1,52 +1,67 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { GlobalSessionRow } from '../../lib/types';
+import { byLiveThenNewest, harnessSession, interactiveSession, sessionGroup, sessionIsLive } from './agentSessions';
+import type { AgentSession, HarnessSessionRow, SessionKind } from './agentSessions';
 import { SessionBrowserTerminal } from './SessionBrowserTerminal';
 import { SessionChangesPanel } from './SessionChangesPanel';
-import { SessionCard, sessionTitle } from './SessionCard';
+import { HarnessSessionCard, SessionCard, SessionKindTag, harnessTitle, sessionTitle } from './SessionCard';
 import { formatDuration, formatSessionDate, isSessionLive, SessionConfirmDialog } from './sessionDisplay';
 import { useSessionBrowserSelection } from './useSessionBrowserSelection';
+import './sessions.css';
 
 export type SessionBrowserGrouping = 'plan' | 'workspace-plan';
 
-type Group = { key: string; title: string; rows: GlobalSessionRow[] };
+type Group = { key: string; title: string; rows: AgentSession[]; run?: HarnessSessionRow['run'] };
+type KindFilter = 'all' | SessionKind;
 
-function groupLabel(row: GlobalSessionRow): string {
-	return row.planTitle || row.record.intent || row.record.provider;
-}
+const runWords: Record<HarnessSessionRow['run']['state'], string> = { running: 'Working', blocked: 'Waiting on you', passed: 'Done', failed: 'Stopped', cancelled: 'Stopped' };
 
-function byLiveThenNewest(a: GlobalSessionRow, b: GlobalSessionRow): number {
-	const liveDiff = Number(isSessionLive(b.record)) - Number(isSessionLive(a.record));
-	if (liveDiff !== 0) return liveDiff;
-	return Date.parse(b.record.startedAt) - Date.parse(a.record.startedAt);
-}
-
-function buildGroups(rows: GlobalSessionRow[], grouping: SessionBrowserGrouping): Group[] {
+function buildGroups(rows: AgentSession[], grouping: SessionBrowserGrouping): Group[] {
 	const buckets = new Map<string, Group>();
 	for (const row of rows) {
-		const key = grouping === 'workspace-plan' ? `${row.workspaceName} ${groupLabel(row)}` : groupLabel(row);
-		const title = grouping === 'workspace-plan' ? `${row.workspaceName} · ${groupLabel(row)}` : groupLabel(row);
+		const own = sessionGroup(row);
+		const prefix = grouping === 'workspace-plan' && row.kind === 'interactive' ? row.row.workspaceName : '';
+		const key = prefix ? `${prefix} ${own.key}` : own.key;
+		const title = prefix ? `${prefix} · ${own.title}` : own.title;
 		const existing = buckets.get(key);
-		if (existing) existing.rows.push(row);
-		else buckets.set(key, { key, title, rows: [row] });
+		const run = row.kind === 'harness' ? row.harness.run : undefined;
+		if (existing) {
+			existing.rows.push(row);
+			if (run && (!existing.run || Date.parse(run.startedAt) > Date.parse(existing.run.startedAt))) existing.run = run;
+			// A harness task names the group by its key and title, which reads better than a plan title alone.
+			if (row.kind === 'harness') existing.title = title;
+		} else buckets.set(key, { key, title, rows: [row], run });
 	}
 	const groups = [...buckets.values()];
 	for (const group of groups) group.rows.sort(byLiveThenNewest);
 	groups.sort((a, b) => {
-		const liveDiff = Number(b.rows.some((row) => isSessionLive(row.record))) - Number(a.rows.some((row) => isSessionLive(row.record)));
+		const liveDiff = Number(b.rows.some(sessionIsLive)) - Number(a.rows.some(sessionIsLive));
 		if (liveDiff !== 0) return liveDiff;
 		return a.title.localeCompare(b.title);
 	});
 	return groups;
 }
 
+function searchText(session: AgentSession): string {
+	if (session.kind === 'interactive') return `${sessionTitle(session.row)} ${session.row.record.intent ?? ''} ${session.row.record.provider} ${session.row.planKey ?? ''}`;
+	const { task, agentRun, step } = session.harness;
+	return `${harnessTitle(session.harness)} ${step} ${task?.source.key ?? ''} ${task?.title ?? ''} ${agentRun.engine} ${agentRun.model} harness`;
+}
+
 /**
  * The session browser: a filterable, grouped card list on the left and the
- * selected session's live terminal (or its Changes) on the right. Shared by
- * the Workbench Sessions view (grouped by plan). The grouping option remains
+ * selected session on the right. It lists two kinds of session side by side
+ * (see `agentSessions.ts`): an interactive session shows its live terminal,
+ * a harness session its conversation, and both their Changes. Shared by the
+ * Workbench Sessions view (grouped by plan). The grouping option remains
  * reusable for callers that aggregate more than one workspace.
  */
-export function SessionBrowser({ rows, grouping, persistKey, onStop, onRemove, onReload, onOpenOnBoard, onOpenOnCard, emptyMessage = 'No sessions yet. Start one from a plan on the Workbench.' }: {
+export function SessionBrowser({ rows, harness, renderHarnessDetail, grouping, persistKey, onStop, onRemove, onReload, onOpenOnBoard, onOpenOnCard, emptyMessage = 'No sessions yet. Start one from a plan on the Workbench.' }: {
 	rows: GlobalSessionRow[];
+	/** The harness's agents, listed beside the interactive sessions. Without it the list has one kind and no kind filter. */
+	harness?: HarnessSessionRow[];
+	renderHarnessDetail?: (row: HarnessSessionRow) => ReactNode;
 	grouping: SessionBrowserGrouping;
 	persistKey: string;
 	onStop: (row: GlobalSessionRow) => Promise<unknown>;
@@ -58,7 +73,10 @@ export function SessionBrowser({ rows, grouping, persistKey, onStop, onRemove, o
 	emptyMessage?: string;
 }) {
 	const [query, setQuery] = useState('');
-	const [liveOnly, setLiveOnly] = useState(() => rows.some((row) => isSessionLive(row.record)));
+	const [kind, setKind] = useState<KindFilter>('all');
+	const sessions = useMemo<AgentSession[]>(() => [...rows.map(interactiveSession), ...(harness ?? []).map(harnessSession)], [rows, harness]);
+	const [liveOnly, setLiveOnly] = useState(() => sessions.some(sessionIsLive));
+	const mixed = harness !== undefined;
 	const [removeTarget, setRemoveTarget] = useState<GlobalSessionRow>();
 	const [removing, setRemoving] = useState(false);
 	const [removeError, setRemoveError] = useState('');
@@ -66,34 +84,35 @@ export function SessionBrowser({ rows, grouping, persistKey, onStop, onRemove, o
 
 	const filteredRows = useMemo(() => {
 		const normalizedQuery = query.trim().toLowerCase();
-		return rows.filter((row) => {
-			if (liveOnly && !isSessionLive(row.record)) return false;
+		return sessions.filter((session) => {
+			if (kind !== 'all' && session.kind !== kind) return false;
+			if (liveOnly && !sessionIsLive(session)) return false;
 			if (!normalizedQuery) return true;
-			const haystack = `${sessionTitle(row)} ${row.record.intent ?? ''} ${row.record.provider}`.toLowerCase();
-			return haystack.includes(normalizedQuery);
+			return searchText(session).toLowerCase().includes(normalizedQuery);
 		});
-	}, [rows, liveOnly, query]);
+	}, [sessions, kind, liveOnly, query]);
 
 	const groups = useMemo(() => buildGroups(filteredRows, grouping), [filteredRows, grouping]);
 	const visibleRows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
-	const { selectedId, select } = useSessionBrowserSelection(persistKey, rows, visibleRows, liveOnly, setLiveOnly);
-	const selectedRow = rows.find((row) => row.record.id === selectedId);
-	const rovingId = selectedId && visibleRows.some((row) => row.record.id === selectedId) ? selectedId : visibleRows[0]?.record.id;
+	const { selectedId, select } = useSessionBrowserSelection(persistKey, sessions, visibleRows, liveOnly, setLiveOnly);
+	const selected = sessions.find((session) => session.id === selectedId);
+	const rovingId = selectedId && visibleRows.some((row) => row.id === selectedId) ? selectedId : visibleRows[0]?.id;
 
 	const moveSelection = (currentId: string, delta: 1 | -1) => {
 		if (visibleRows.length === 0) return;
-		const index = visibleRows.findIndex((row) => row.record.id === currentId);
+		const index = visibleRows.findIndex((row) => row.id === currentId);
 		const nextIndex = index === -1 ? 0 : (index + delta + visibleRows.length) % visibleRows.length;
 		const next = visibleRows[nextIndex];
-		select(next.record.id);
-		cardRefs.current.get(next.record.id)?.focus();
+		select(next.id);
+		cardRefs.current.get(next.id)?.focus();
 	};
 
-	const onCardKeyDown = (row: GlobalSessionRow) => (event: React.KeyboardEvent<HTMLButtonElement>) => {
-		if (event.key === 'ArrowDown' || event.key === 'ArrowRight') { event.preventDefault(); moveSelection(row.record.id, 1); }
-		else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(row.record.id, -1); }
-		else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(row.record.id); }
+	const onCardKeyDown = (id: string) => (event: React.KeyboardEvent<HTMLButtonElement>) => {
+		if (event.key === 'ArrowDown' || event.key === 'ArrowRight') { event.preventDefault(); moveSelection(id, 1); }
+		else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(id, -1); }
+		else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(id); }
 	};
+	const cardRef = (id: string) => (element: HTMLButtonElement | null) => { if (element) cardRefs.current.set(id, element); else cardRefs.current.delete(id); };
 	const remove = async () => {
 		if (!removeTarget || !onRemove) return;
 		setRemoving(true);
@@ -111,26 +130,40 @@ export function SessionBrowser({ rows, grouping, persistKey, onStop, onRemove, o
 	return <div className="session-browser">
 		<div className="session-browser-list">
 			<div className="session-browser-toolbar">
-				<input type="search" className="session-browser-filter" aria-label="Filter sessions" placeholder="Filter by title or provider" value={query} onChange={(event) => setQuery(event.target.value)} />
+				<input type="search" className="session-browser-filter" aria-label="Filter sessions" placeholder={mixed ? 'Filter by title, ticket or agent' : 'Filter by title or provider'} value={query} onChange={(event) => setQuery(event.target.value)} />
 				<button type="button" className={liveOnly ? 'session-browser-live-toggle active' : 'session-browser-live-toggle'} aria-pressed={liveOnly} onClick={() => setLiveOnly((value) => !value)}>Live only</button>
 			</div>
-			{rows.length === 0 && <p className="session-browser-empty">{emptyMessage}</p>}
-			{rows.length > 0 && visibleRows.length === 0 && <p className="session-browser-empty">No sessions match the current filter.</p>}
+			{mixed && <div className="segmented-control segmented-control-compact session-browser-kinds" role="tablist" aria-label="Session kind">
+				{(['all', 'interactive', 'harness'] as KindFilter[]).map((candidate) => <button key={candidate} type="button" role="tab" aria-selected={kind === candidate} className={kind === candidate ? 'active' : ''} title={kindHints[candidate]} onClick={() => setKind(candidate)}>{kindLabels[candidate]}</button>)}
+			</div>}
+			{sessions.length === 0 && <p className="session-browser-empty">{emptyMessage}</p>}
+			{sessions.length > 0 && visibleRows.length === 0 && <p className="session-browser-empty">No sessions match the current filter.</p>}
 			{groups.map((group) => <section key={group.key} className="session-browser-group">
-				<h3 className="session-browser-group-title">{group.title}</h3>
+				<h3 className="session-browser-group-title"><span>{group.title}</span>{group.run && <span className={`session-browser-run-state state-${group.run.state}`}>{runWords[group.run.state]}</span>}</h3>
 				<ul className="session-browser-cards">
-					{group.rows.map((row) => <SessionCard key={row.record.id} row={row} selected={row.record.id === selectedId} tabIndex={row.record.id === rovingId ? 0 : -1} cardRef={(element) => { if (element) cardRefs.current.set(row.record.id, element); else cardRefs.current.delete(row.record.id); }} onSelect={() => select(row.record.id)} onRemove={onRemove ? () => { setRemoveError(''); setRemoveTarget(row); } : undefined} onKeyDown={onCardKeyDown(row)} />)}
+					{group.rows.map((session) => session.kind === 'interactive'
+						? <SessionCard key={session.id} row={session.row} tagged={mixed} selected={session.id === selectedId} tabIndex={session.id === rovingId ? 0 : -1} cardRef={cardRef(session.id)} onSelect={() => select(session.id)} onRemove={onRemove ? () => { setRemoveError(''); setRemoveTarget(session.row); } : undefined} onKeyDown={onCardKeyDown(session.id)} />
+						: <HarnessSessionCard key={session.id} row={session.harness} selected={session.id === selectedId} tabIndex={session.id === rovingId ? 0 : -1} cardRef={cardRef(session.id)} onSelect={() => select(session.id)} onKeyDown={onCardKeyDown(session.id)} />)}
 				</ul>
 			</section>)}
 		</div>
 		<div className="session-browser-detail">
-			{selectedRow ? <SessionDetail row={selectedRow} onStop={onStop} onReload={onReload} onOpenOnBoard={onOpenOnBoard} onOpenOnCard={onOpenOnCard} /> : <p className="session-browser-detail-empty">Select a session to see its terminal.</p>}
+			{selected?.kind === 'interactive' && <SessionDetail row={selected.row} tagged={mixed} onStop={onStop} onReload={onReload} onOpenOnBoard={onOpenOnBoard} onOpenOnCard={onOpenOnCard} />}
+			{selected?.kind === 'harness' && renderHarnessDetail?.(selected.harness)}
+			{!selected && <p className="session-browser-detail-empty">{mixed ? 'Select a session to see its terminal or its conversation.' : 'Select a session to see its terminal.'}</p>}
 		</div>
 		{removeTarget && <SessionConfirmDialog title="Remove session?" message={`Remove ${sessionTitle(removeTarget)} from session history? This removes its saved terminal metadata; workspace files and Git changes are untouched.`} confirmLabel="Remove session" busyLabel="Removing…" busy={removing} error={removeError} onCancel={() => { setRemoveTarget(undefined); setRemoveError(''); }} onConfirm={() => void remove()} />}
 	</div>;
 }
 
-function SessionDetail({ row, onStop, onReload, onOpenOnBoard, onOpenOnCard }: { row: GlobalSessionRow; onStop: (row: GlobalSessionRow) => Promise<unknown>; onReload: () => Promise<unknown> | void; onOpenOnBoard?: (row: GlobalSessionRow) => void; onOpenOnCard?: (row: GlobalSessionRow) => void }) {
+const kindLabels: Record<KindFilter, string> = { all: 'All', interactive: 'Interactive', harness: 'Harness' };
+const kindHints: Record<KindFilter, string> = {
+	all: 'Every agent session of this workspace',
+	interactive: 'Agents a person started in a terminal and types into',
+	harness: 'Agents the harness ran for a task, headless, in a worktree of their own'
+};
+
+function SessionDetail({ row, tagged, onStop, onReload, onOpenOnBoard, onOpenOnCard }: { row: GlobalSessionRow; tagged?: boolean; onStop: (row: GlobalSessionRow) => Promise<unknown>; onReload: () => Promise<unknown> | void; onOpenOnBoard?: (row: GlobalSessionRow) => void; onOpenOnCard?: (row: GlobalSessionRow) => void }) {
 	const [tab, setTab] = useState<'terminal' | 'changes'>('terminal');
 	const [confirming, setConfirming] = useState(false);
 	const [stopping, setStopping] = useState(false);
@@ -165,7 +198,7 @@ function SessionDetail({ row, onStop, onReload, onOpenOnBoard, onOpenOnCard }: {
 	return <div className="session-browser-detail-content">
 		<header className="session-browser-detail-header">
 			<div>
-				<h3>{title}</h3>
+				<h3>{tagged && <SessionKindTag kind="interactive" />}{title}</h3>
 				<dl>
 					<dt>Plan</dt><dd>{row.planTitle || '—'}</dd>
 					<dt>Branch</dt><dd>{row.record.requestedBranch}</dd>

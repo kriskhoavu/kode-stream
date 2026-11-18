@@ -4,12 +4,16 @@ import type { SessionChanges } from '../../lib/types';
 
 const POLL_INTERVAL_MS = 5000;
 
+/** Reads the changes of whatever `id` names: an interactive session by default, or a harness run. */
+export type ChangesLoader = (id: string, signal: AbortSignal) => Promise<SessionChanges>;
+const sessionChanges: ChangesLoader = (id, signal) => api.sessionChanges(id, signal);
+
 /**
  * Loads a session's changes and, while the session is live, refreshes every
  * 5s. A request token guards against a stale response landing after the
  * session or liveness changes, and the poll is cancelled on unmount.
  */
-export function useSessionChanges(sessionId: string | undefined, live: boolean) {
+export function useSessionChanges(sessionId: string | undefined, live: boolean, loader: ChangesLoader = sessionChanges) {
 	const [changes, setChanges] = useState<SessionChanges>();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
@@ -30,7 +34,7 @@ export function useSessionChanges(sessionId: string | undefined, live: boolean) 
 			if (inFlight) return;
 			inFlight = true;
 			setLoading(true);
-			api.sessionChanges(sessionId, controller.signal).then((result) => {
+			loader(sessionId, controller.signal).then((result) => {
 				if (cancelled || tokenRef.current !== token) return;
 				setChanges(result);
 				setError('');
@@ -47,6 +51,7 @@ export function useSessionChanges(sessionId: string | undefined, live: boolean) 
 		if (!live) return () => { cancelled = true; controller.abort(); };
 		const timer = window.setInterval(load, POLL_INTERVAL_MS);
 		return () => { cancelled = true; controller.abort(); window.clearInterval(timer); };
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [sessionId, live]);
 
 	return { changes, loading, error };

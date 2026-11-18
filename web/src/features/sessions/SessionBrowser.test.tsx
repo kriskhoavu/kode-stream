@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GlobalSessionRow, SafeSessionRecord } from '../../lib/types';
+import type { GlobalSessionRow, HarnessAgentRun, HarnessRun, HarnessTask, SafeSessionRecord } from '../../lib/types';
+import type { HarnessSessionRow } from './agentSessions';
 import { writePreference } from '../../shared/preferences/store';
 import { SessionBrowser } from './SessionBrowser';
 
@@ -217,5 +218,42 @@ describe('SessionBrowser', () => {
 		unmount();
 		render(<SessionBrowser rows={rows} grouping="plan" persistKey="test-remember" onStop={vi.fn()} onReload={vi.fn()} />);
 		expect(screen.getByRole('button', { name: 'Plan A, Running' })).toHaveAttribute('aria-current', 'true');
+	});
+
+	describe('with harness sessions', () => {
+		const run = { id: 'run-1', taskId: 'task-1', workspaceId: 'workspace-1', branch: 'harness/DI-7-1', state: 'running', startedAt: new Date(Date.now() - 3_600_000).toISOString(), revision: 1, totals: { costUsd: 0, durationMs: 0, turns: 0 } } as unknown as HarnessRun;
+		const task = { id: 'task-1', source: { kind: 'jira', key: 'DI-7', labels: [] }, title: 'Fix the price' } as unknown as HarnessTask;
+		const agent = (id: string, round: number, state: HarnessAgentRun['state']): HarnessSessionRow => ({ run, task, step: 'Plan', agentRun: { id, runId: 'run-1', stageId: 's', role: 'planner', round, engine: 'claudecode', model: 'opus', state, startedAt: new Date(Date.now() - (10 - round) * 60_000).toISOString(), turns: 3, durationMs: 60_000, costUsd: 0.1, blocking: 0, advisory: 0 } });
+		const harness = [agent('agent-1', 1, 'succeeded'), agent('agent-2', 2, 'running')];
+
+		it('lists both kinds under the ticket they share, each with its tag', () => {
+			const rows = [row({ id: 'i-1', state: 'exited', live: false, exitCode: 0 }, { planTitle: 'Fix the price', planKey: 'DI-7' })];
+			render(<SessionBrowser rows={rows} harness={harness} renderHarnessDetail={(selected) => <div data-testid="harness-detail">{selected.agentRun.id}</div>} grouping="plan" persistKey="test-mixed" onStop={vi.fn()} onReload={vi.fn()} />);
+			const groups = [...document.querySelectorAll('.session-browser-group')];
+			expect(groups).toHaveLength(1);
+			expect(groups[0].querySelector('.session-browser-group-title')).toHaveTextContent('DI-7 · Fix the priceWorking');
+			expect(screen.getByRole('button', { name: 'Planner · round 2, harness, Working' })).toBeInTheDocument();
+			// Live only starts on, because an agent works; the finished ones show once it is off.
+			fireEvent.click(screen.getByRole('button', { name: 'Live only' }));
+			expect(screen.getByRole('button', { name: 'Planner · round 1, harness, Done' })).toBeInTheDocument();
+			expect(within(groups[0] as HTMLElement).getByText('Interactive')).toBeInTheDocument();
+		});
+
+		it('filters by kind and opens a harness session in its own detail, not a terminal', () => {
+			const rows = [row({ id: 'i-1', state: 'running', live: true }, { planTitle: 'Other plan' })];
+			render(<SessionBrowser rows={rows} harness={harness} renderHarnessDetail={(selected) => <div data-testid="harness-detail">{selected.agentRun.id}</div>} grouping="plan" persistKey="test-kinds" onStop={vi.fn()} onReload={vi.fn()} />);
+			fireEvent.click(screen.getByRole('tab', { name: 'Harness' }));
+			expect(screen.queryByRole('button', { name: /Other plan/ })).not.toBeInTheDocument();
+			fireEvent.click(screen.getByRole('button', { name: 'Planner · round 2, harness, Working' }));
+			expect(screen.getByTestId('harness-detail')).toHaveTextContent('agent-2');
+			expect(screen.queryByTestId('mock-terminal')).not.toBeInTheDocument();
+			fireEvent.click(screen.getByRole('tab', { name: 'Interactive' }));
+			expect(screen.queryByRole('button', { name: /Planner/ })).not.toBeInTheDocument();
+		});
+
+		it('shows no kind filter when the harness is off', () => {
+			render(<SessionBrowser rows={[row()]} grouping="plan" persistKey="test-plain" onStop={vi.fn()} onReload={vi.fn()} />);
+			expect(screen.queryByRole('tablist', { name: 'Session kind' })).not.toBeInTheDocument();
+		});
 	});
 });

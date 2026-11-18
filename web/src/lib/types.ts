@@ -582,7 +582,7 @@ export interface ClaudeTranscript { sessionId: string; branch?: string; startedA
 /** `tool` is a call the model made (its name and main argument); `thinking` is its reasoning. Both appear only where the reader asked for the model's work, not just its words. */
 export interface ClaudeTurn { role: 'user' | 'assistant' | 'tool' | 'thinking'; text: string; at?: string; }
 export type SessionScope = 'active' | 'all';
-export interface GlobalSessionRow { record: SafeSessionRecord; workspaceName: string; checkoutBranch: string; planTitle?: string; changesCount?: number; }
+export interface GlobalSessionRow { record: SafeSessionRecord; workspaceName: string; checkoutBranch: string; planTitle?: string; /** The plan's key (its identifier), which joins it to a harness task on the same ticket. */ planKey?: string; changesCount?: number; }
 export interface GlobalSessionsResponse { rows: GlobalSessionRow[]; truncated: boolean; }
 export interface CanvasWorkspaceNode { id: string; name?: string; branch?: string; commit?: string; git?: GitStatus; providerAxes: WorkspaceProviderAxes; actions: Partial<Record<WorkspaceAction, ActionCapability>>; verification?: VerificationJob; }
 export interface CanvasPlanNode { itemId: string; identifier?: string; title?: string; service?: string; status: ItemStatus; branch?: string; commit?: string; editable: boolean; actions: Partial<Record<WorkspaceAction, ActionCapability>>; }

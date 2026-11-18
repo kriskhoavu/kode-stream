@@ -3,6 +3,31 @@ import { api } from '../../shared/api';
 import type { SafeSessionRecord, SessionChanges, SessionFile, SessionFileStatus } from '../../lib/types';
 import { isSessionLive } from './sessionDisplay';
 import { useSessionChanges } from './useSessionChanges';
+import type { ChangesLoader } from './useSessionChanges';
+
+/**
+ * Where a Changes tab reads from. An interactive session reads its checkout
+ * since launch; a harness agent reads its run, from the run's own worktree
+ * while it lives and its branch after.
+ */
+export interface ChangesSource {
+	id: string;
+	live: boolean;
+	loadChanges: ChangesLoader;
+	loadDiff: (id: string, path: string, signal: AbortSignal) => Promise<{ diff: string; truncated: boolean }>;
+	/** The line under the totals, saying what the changes are measured against. */
+	note: string;
+}
+
+export function sessionChangesSource(session: SafeSessionRecord): ChangesSource {
+	return {
+		id: session.id,
+		live: isSessionLive(session),
+		loadChanges: (id, signal) => api.sessionChanges(id, signal),
+		loadDiff: (id, path, signal) => api.sessionFileDiff(id, path, signal),
+		note: 'Changes since launch include work by any session in this checkout.'
+	};
+}
 
 const STATUS_ORDER: SessionFileStatus[] = ['A', 'M', 'D', 'R', 'C', '?'];
 const STATUS_LABEL: Record<SessionFileStatus, string> = { A: 'Added', M: 'Modified', D: 'Deleted', R: 'Renamed', C: 'Copied', '?': 'Untracked' };
@@ -12,7 +37,8 @@ function pluralize(count: number, word: string): string {
 }
 
 function headerLine(changes: SessionChanges): string {
-	return `+${changes.additions ?? 0} −${changes.deletions ?? 0} · ${pluralize((changes.files ?? []).length, 'file')} · HEAD moved ${pluralize(changes.headMoved ?? 0, 'commit')}`;
+	const where = changes.from ? (changes.branch ? ` · on ${changes.branch}` : '') : ` · HEAD moved ${pluralize(changes.headMoved ?? 0, 'commit')}`;
+	return `+${changes.additions ?? 0} −${changes.deletions ?? 0} · ${pluralize((changes.files ?? []).length, 'file')}${where}`;
 }
 
 function availabilityMessage(changes: SessionChanges): string {
@@ -48,9 +74,9 @@ function groupFiles(files: SessionFile[]) {
  * when changes cannot be computed, a truncation note, and a file list
  * grouped by status whose selection loads a unified diff.
  */
-export function SessionChangesPanel({ session }: { session: SafeSessionRecord }) {
-	const live = isSessionLive(session);
-	const { changes, loading, error } = useSessionChanges(session.id, live);
+export function SessionChangesPanel({ session, source: given }: { session?: SafeSessionRecord; source?: ChangesSource }) {
+	const source = given ?? sessionChangesSource(session!);
+	const { changes, loading, error } = useSessionChanges(source.id, source.live, source.loadChanges);
 	const [selectedPath, setSelectedPath] = useState<string>();
 	const [diff, setDiff] = useState<{ path: string; diff: string; truncated: boolean }>();
 	const [diffLoading, setDiffLoading] = useState(false);
@@ -64,7 +90,7 @@ export function SessionChangesPanel({ session }: { session: SafeSessionRecord })
 		setSelectedPath(undefined);
 		setDiff(undefined);
 		setDiffError('');
-	}, [session.id]);
+	}, [source.id]);
 	useEffect(() => () => diffAbortRef.current?.abort(), []);
 
 	const openFile = (path: string) => {
@@ -76,9 +102,9 @@ export function SessionChangesPanel({ session }: { session: SafeSessionRecord })
 		const controller = new AbortController();
 		diffAbortRef.current = controller;
 		const token = ++diffTokenRef.current;
-		api.sessionFileDiff(session.id, path, controller.signal).then((result) => {
+		source.loadDiff(source.id, path, controller.signal).then((result) => {
 			if (controller.signal.aborted || diffTokenRef.current !== token) return;
-			setDiff(result);
+			setDiff({ path, diff: result.diff, truncated: result.truncated });
 		}).catch((caught) => {
 			if (controller.signal.aborted || diffTokenRef.current !== token) return;
 			setDiffError(caught instanceof Error ? caught.message : 'The diff could not be loaded.');
@@ -106,7 +132,7 @@ export function SessionChangesPanel({ session }: { session: SafeSessionRecord })
 	return <div className="session-changes-panel">
 		{error && <p className="error" role="alert">{error}</p>}
 		<p className="session-changes-header">{headerLine(changes)}</p>
-		<p className="session-changes-note">Changes since launch include work by any session in this checkout.</p>
+		<p className="session-changes-note">{source.note}</p>
 		{changes.truncated && <p className="session-changes-truncated">Only the first files are shown; more files changed than are listed here.</p>}
 		<div className="session-changes-body">
 			<ul className="session-changes-file-list" aria-label="Changed files">

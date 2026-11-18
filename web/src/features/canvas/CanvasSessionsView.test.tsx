@@ -1,15 +1,20 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CanvasProjection, GlobalSessionRow } from '../../lib/types';
+import type { HarnessSessionRow } from '../sessions/agentSessions';
 import { api } from '../../shared/api';
 import { CanvasSessionsView } from './CanvasSessionsView';
 
-vi.mock('../../shared/api', () => ({ api: { aiSessionRecords: vi.fn(), cancelEmbeddedAISession: vi.fn(), deleteSession: vi.fn(), harnessRuns: vi.fn(), harnessTasks: vi.fn() } }));
+vi.mock('../../shared/api', () => ({ api: { aiSessionRecords: vi.fn(), cancelEmbeddedAISession: vi.fn(), deleteSession: vi.fn() } }));
 vi.mock('../sessions/SessionBrowser', () => ({
-	SessionBrowser: ({ rows, grouping, onOpenOnBoard, onStop, onRemove }: { rows: GlobalSessionRow[]; grouping: string; onOpenOnBoard: (row: GlobalSessionRow) => void; onStop: (row: GlobalSessionRow) => void; onRemove: (row: GlobalSessionRow) => void }) => <div data-testid="session-browser" data-grouping={grouping}>
+	SessionBrowser: ({ rows, harness, grouping, onOpenOnBoard, onStop, onRemove }: { rows: GlobalSessionRow[]; harness?: HarnessSessionRow[]; grouping: string; onOpenOnBoard: (row: GlobalSessionRow) => void; onStop: (row: GlobalSessionRow) => void; onRemove: (row: GlobalSessionRow) => void }) => <div data-testid="session-browser" data-grouping={grouping} data-harness={harness === undefined ? 'off' : 'on'}>
 		{rows.map((row) => <div key={row.record.id}><span>{row.planTitle}</span><button type="button" onClick={() => onOpenOnBoard(row)}>Open {row.record.id}</button><button type="button" onClick={() => onStop(row)}>Stop {row.record.id}</button><button type="button" onClick={() => onRemove(row)}>Remove {row.record.id}</button></div>)}
+		{harness?.map((row) => <p key={row.agentRun.id} data-testid="harness-row">{`${row.task?.source.key} ${row.step} ${row.agentRun.role} ${row.agentRun.round}`}</p>)}
 	</div>
 }));
+const harnessState = vi.hoisted(() => ({ current: { status: { enabled: false, storageSupported: true }, runs: {}, details: {}, tasks: {} } as Record<string, unknown> }));
+const loadRun = vi.hoisted(() => vi.fn());
+vi.mock('../workstream/useBoardHarness', () => ({ useBoardHarness: () => ({ state: harnessState.current, loadRun, cancelRun: vi.fn(), client: {} }) }));
 
 describe('CanvasSessionsView', () => {
 	beforeEach(() => {
@@ -27,26 +32,29 @@ describe('CanvasSessionsView', () => {
 		expect(screen.getByTestId('session-browser')).toHaveAttribute('data-grouping', 'plan');
 	});
 
-	it('lists the harness runs of this workspace, working first, and opens one live', async () => {
-		const onOpenHarnessRun = vi.fn();
-		vi.mocked(api.harnessRuns).mockResolvedValue([
-			{ id: 'run-done', taskId: 'task-a', workspaceId: 'workspace-1', state: 'passed', startedAt: '2026-01-02T00:00:00Z' },
-			{ id: 'run-live', taskId: 'task-b', workspaceId: 'workspace-1', state: 'running', startedAt: '2026-01-01T00:00:00Z' },
-			{ id: 'run-other', taskId: 'task-c', workspaceId: 'workspace-2', state: 'running', startedAt: '2026-01-01T00:00:00Z' }
-		] as never);
-		vi.mocked(api.harnessTasks).mockResolvedValue([
-			{ id: 'task-a', source: { key: 'DI-1' }, title: 'Done one' },
-			{ id: 'task-b', source: { key: 'DI-2' }, title: 'Live one' }
-		] as never);
-		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onOpenOnBoard={vi.fn()} onOpenHarnessRun={onOpenHarnessRun} onReload={vi.fn()} />);
-		const section = await screen.findByRole('region', { name: 'Harness · 1 working' });
-		const items = section.querySelectorAll('li');
-		expect(items[0]).toHaveTextContent('Working');
-		expect(items[0]).toHaveTextContent('DI-2 · Live one');
-		expect(items[1]).toHaveTextContent('DI-1 · Done one');
-		expect(section).not.toHaveTextContent('run-other');
-		fireEvent.click(screen.getByRole('button', { name: 'Watch' }));
-		expect(onOpenHarnessRun).toHaveBeenCalledWith('run-live');
+	it('lists the harness agents of this workspace as harness sessions beside the interactive ones', async () => {
+		const run = (id: string, workspaceId: string, taskId: string) => ({ id, taskId, workspaceId, state: 'passed', startedAt: '2026-01-01T00:00:00Z', revision: 2, branch: `harness/${id}` });
+		const stage = { id: 'stage-plan', kind: 'plan', ordinal: 1, state: 'passed' };
+		const agentRun = (id: string, runId: string, round: number) => ({ id, runId, stageId: 'stage-plan', role: 'planner', round, state: 'succeeded', startedAt: `2026-01-01T00:0${round}:00Z` });
+		harnessState.current = {
+			status: { enabled: true, storageSupported: true },
+			runs: { 'run-a': run('run-a', 'workspace-1', 'task-a'), 'run-b': run('run-b', 'workspace-2', 'task-b'), 'run-c': run('run-c', 'workspace-1', 'task-c') },
+			details: { 'run-a': { run: run('run-a', 'workspace-1', 'task-a'), stages: [stage], agentRuns: [agentRun('agent-1', 'run-a', 1), agentRun('agent-2', 'run-a', 2)] } },
+			tasks: { 'task-a': { id: 'task-a', source: { key: 'DI-1' }, title: 'Plan one' } }
+		};
+		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onOpenOnBoard={vi.fn()} onOpenHarnessRun={vi.fn()} onReload={vi.fn()} />);
+		expect(await screen.findByTestId('session-browser')).toHaveAttribute('data-harness', 'on');
+		expect(screen.getAllByTestId('harness-row').map((row) => row.textContent)).toEqual(['DI-1 Plan planner 1', 'DI-1 Plan planner 2']);
+		// The other workspace's run is not read; this workspace's run without a detail is.
+		expect(loadRun).toHaveBeenCalledWith('run-c');
+		expect(loadRun).not.toHaveBeenCalledWith('run-b');
+		expect(loadRun).not.toHaveBeenCalledWith('run-a');
+		harnessState.current = { status: { enabled: false, storageSupported: true }, runs: {}, details: {}, tasks: {} };
+	});
+
+	it('lists interactive sessions alone while the harness is off', async () => {
+		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onOpenOnBoard={vi.fn()} onOpenHarnessRun={vi.fn()} onReload={vi.fn()} />);
+		expect(await screen.findByTestId('session-browser')).toHaveAttribute('data-harness', 'off');
 	});
 
 	it('returns a listed session to its node on the Canvas and can stop it', async () => {
