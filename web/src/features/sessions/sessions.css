@@ -14,16 +14,15 @@
 
 .session-browser .session-browser-list { gap: 14px; padding: 14px; }
 
-.session-browser .session-browser-live-toggle { min-height: 32px; }
+/* Live only keeps one shape on and off, so turning it on moves nothing: only its dot and colours change. */
+.session-browser .session-browser-live-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
+.session-browser .session-browser-live-toggle::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: color-mix(in srgb, var(--muted) 45%, transparent); }
 .session-browser .session-browser-live-toggle.active {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
 	background: var(--panel);
 	border-color: color-mix(in srgb, var(--text) 30%, var(--line));
 	color: var(--text);
 }
-.session-browser .session-browser-live-toggle.active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.session-browser .session-browser-live-toggle.active::before { background: var(--green); }
 .session-browser .session-browser-filter { min-height: 32px; }
 
 /* The kind filter is the harness's segmented control, as on a task's details: it spans the list. */

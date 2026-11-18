@@ -206,6 +206,12 @@ describe('SessionBrowser', () => {
 		expect(screen.getByRole('button', { name: 'Live only' })).toHaveAttribute('aria-pressed', 'false');
 		expect(screen.getByRole('button', { name: 'Finished plan, Exited' })).toHaveAttribute('aria-current', 'true');
 		expect(screen.getByRole('button', { name: 'Finished plan, Exited' })).toHaveAttribute('tabIndex', '0');
+
+		// Turning Live only on afterwards is the person's choice: it stays on, and the live session is selected.
+		fireEvent.click(screen.getByRole('button', { name: 'Live only' }));
+		expect(screen.getByRole('button', { name: 'Live only' })).toHaveAttribute('aria-pressed', 'true');
+		expect(screen.queryByRole('button', { name: 'Finished plan, Exited' })).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Live plan, Running' })).toHaveAttribute('aria-current', 'true');
 	});
 
 	it('remembers the selected session per persistKey across remounts', () => {
