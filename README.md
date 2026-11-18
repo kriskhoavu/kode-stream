@@ -19,8 +19,8 @@ clearer local Git operations.
 - Launches external or embedded terminal sessions with supported local AI CLIs.
 - Runs verification harness jobs and tracks their status and artifacts.
 - Provides a branch-scoped Canvas for arranging workspace, plan, and durable terminal-session nodes.
-- Lists every AI session across registered workspaces on a dedicated Sessions page, with each session's changes since
-  it launched.
+- Lists a workspace's agent sessions in Agent Space, in one list of two kinds: interactive sessions a person drives in
+  a terminal, and harness sessions the harness runs headless for a task, each with its changes.
 - Indexes LLM Wiki content and graph relationships for structured knowledge workflows.
 - Stores app registry, cache, audit log, filters, recents, and AI settings outside managed repositories.
 
@@ -101,13 +101,20 @@ details.
 
 ## Sessions
 
-Choose **Sessions** from the left nav to see every AI session across every registered workspace, not only the one
-open in Canvas. A **Focus** toggle on the Canvas toolbar temporarily shows only plans with an active session, their
-session nodes, and the edges between them. The focused subset receives an automatic layout without changing saved node
-positions or the saved viewport. Each session has a **Changes** view: the files the checkout has changed since it launched,
-committed history plus working tree, with a per-file diff. Changes are computed from Git on request and are never
-stored; a session carries no transcript.
+Choose **Agent Space**, then **Sessions**, to see every agent session of a workspace in one list, grouped by ticket or
+plan. A session comes in two kinds. An **interactive session** is a coding agent you started in a terminal on the
+checkout: it shows its live terminal, and you type into it and stop it. A **harness session** is one agent the
+harness ran for a task, headless, in a worktree of its own: it shows its conversation, and you steer it through the
+run's questions and approvals on its run page. A tag on each card names its kind, and **All · Interactive · Harness**
+narrows the list. Both kinds have a **Changes** view with a per-file diff: an interactive session's checkout since it
+launched, a harness session's run, from its worktree or its branch. Changes are computed from Git on request and are
+never stored.
 
+A **Focus** toggle on the Canvas toolbar temporarily shows only plans with an active session, their session nodes, and
+the edges between them. The focused subset receives an automatic layout without changing saved node positions or the
+saved viewport.
+
+See [Interactive And Harness Sessions](wiki/domains/workspace/concepts/agent-sessions.md) for the difference in full.
 See [Session Focus](wiki/domains/workspace/concepts/session-focus.md) and its
 [reference](wiki/domains/workspace/reference/session-focus-reference.md) for availability and cross-workspace
 authorization rules.

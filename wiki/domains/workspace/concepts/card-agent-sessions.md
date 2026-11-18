@@ -49,7 +49,7 @@ An embedded Claude session is named after its conversation, so kode-stream's own
 
 [live] A session started or resumed from a card is an ordinary embedded session with a plan reference. The Sessions list shows it while live and after it ends. The Canvas draws it beside its placed plan only while it is live, unless it is pinned, moved, or resized. Evidence: `internal/canvas/service.go:650`, `web/src/features/canvas/CanvasBoard.tsx:262`.
 
-The Sessions list opens a session on its card with **Open on card**, through `/workstream?itemId=&agent=`. Evidence: `web/src/features/sessions/SessionBrowser.tsx:179`, `web/src/app/router.ts:125`.
+Agent Space's Sessions view opens an interactive session on its card with **Open on card**, through `/workstream?itemId=&agent=`. The harness's agents are harness sessions, not interactive ones: once the harness works on a card, its Agents tab shows the run beside the card's interactive sessions, and a harness agent opens there as its conversation. See [[workspace-agent-sessions]]. Evidence: `web/src/features/sessions/SessionBrowser.tsx:212`, `web/src/app/router.ts:151`, `web/src/features/workstream/AgentsPanel.tsx:25`.
 
 ## Not supported
 <!-- chunkId: workspace-card-agent-sessions-not-supported -->
@@ -59,4 +59,4 @@ The Sessions list opens a session on its card with **Open on card**, through `/w
 
 ## Related pages
 
-See [[workspace-card-agent-sessions-reference]], [[workspace-session-focus]], [[workspace-terminal-canvas]], and [[workspace-ai-session-launch]].
+See [[workspace-card-agent-sessions-reference]], [[workspace-agent-sessions]], [[workspace-session-focus]], [[workspace-terminal-canvas]], and [[workspace-ai-session-launch]].

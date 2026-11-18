@@ -3,7 +3,7 @@ slug: workspace-session-focus-reference
 title: Session Focus Reference
 pageType: REFERENCE
 topics: sessions, api, changes, authorization, polling
-summary: Reference for global and Workbench session listing, change availability, file diffs, and access controls.
+summary: Reference for Agent Space's session listing, change availability, file diffs, and access controls.
 sourceRef: |
   PM-042 (plan retired) | Session APIs and Git computation
   PM-042 (plan retired) | Client state
@@ -41,9 +41,7 @@ An unavailable or unsupported diff returns conflict with its reason. Empty paths
 <!-- chunkId: workspace-session-focus-reference-client-refresh -->
 <!-- keywords: global route, checkout filter, plan grouping, projection refresh -->
 
-[live] The top-level Sessions route remains in primary navigation and renders records grouped by workspace and plan. Evidence: `web/src/App.tsx:127`, `web/src/App.tsx:299`, `web/src/features/sessions/SessionsPage.tsx:44`.
-
-[live] The workspace-node Sessions tab loads records for the current workspace and checkout and groups them by plan. Stopping a session reloads the list and Canvas projection; **Open on board** selects the existing Canvas node. Evidence: `web/src/features/canvas/CanvasWorkbench.tsx:193`, `web/src/features/canvas/CanvasWorkbench.tsx:300`, `web/src/features/canvas/CanvasWorkbench.tsx:319`, `web/src/pages/CanvasPage.tsx:75`.
+[live] Agent Space's Sessions view is the one session list; `/sessions` opens it. It loads the records of the current workspace and checkout, groups them by plan, and lists the harness's agents beside them as harness sessions (see [[workspace-agent-sessions-reference]]). Stopping an interactive session reloads the list and Canvas projection; **Open on board** selects the existing Canvas node. Evidence: `web/src/app/router.ts:64`, `web/src/pages/CanvasPage.tsx:173`, `web/src/features/canvas/CanvasSessionsView.tsx:23`.
 
 ## Not supported
 <!-- chunkId: workspace-session-focus-reference-not-supported -->
@@ -55,10 +53,8 @@ An unavailable or unsupported diff returns conflict with its reason. Empty paths
 <!-- chunkId: workspace-session-focus-reference-known-conflicts -->
 <!-- keywords: historical validation, two workspace, native keyboard -->
 
-[open] Have both the two-workspace global journey and checkout-scoped Workbench tab, with deterministic real edits and native terminal keyboard interaction, been rerun? The retired result used one throwaway workspace and did not complete that coverage.
-
-[live] The global Sessions client and checkout-scoped Workbench tab coexist. Treating either one as the replacement for the other contradicts the committed navigation and Canvas implementation. Evidence: `web/src/App.tsx:127`, `web/src/features/canvas/CanvasWorkbench.tsx:190`, `web/src/features/canvas/CanvasWorkbench.tsx:193`.
+[open] Has the Sessions view, with deterministic real edits and native terminal keyboard interaction, been rerun? The retired result used one throwaway workspace and did not complete that coverage.
 
 ## Related pages
 
-See [[workspace-session-focus]], [[workspace-terminal-canvas-reference]], and [[e2e-testing-workspace-terminal-canvas]].
+See [[workspace-session-focus]], [[workspace-agent-sessions-reference]], [[workspace-terminal-canvas-reference]], and [[e2e-testing-workspace-terminal-canvas]].

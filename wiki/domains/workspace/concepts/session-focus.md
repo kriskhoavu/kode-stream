@@ -3,7 +3,7 @@ slug: workspace-session-focus
 title: Session Focus
 pageType: CONCEPT
 topics: workspace, canvas, sessions, focus, changes
-summary: Session Focus connects active Canvas work, checkout changes, and global or checkout-scoped session browsing.
+summary: Session Focus connects active Canvas work, checkout changes, and Agent Space's session list.
 sourceRef: |
   PM-042 (plan retired) | Session Focus
   PM-042 (plan retired) | User experience
@@ -24,9 +24,9 @@ Focus does not overwrite saved positions or the saved viewport. Dragging is disa
 
 ## Session Surfaces
 <!-- chunkId: workspace-session-focus-shared-session-browser -->
-<!-- keywords: global inventory, plan grouping, active filter, terminal changes -->
+<!-- keywords: sessions view, plan grouping, active filter, terminal changes, harness sessions -->
 
-[live] The top-level Sessions page groups authorized records by workspace and plan. A workspace node's Workbench also has a checkout-scoped Sessions tab grouped by plan. Both provide Terminal and Changes detail, live-only filtering, explicit cancellation, and an action that opens the existing session node on Canvas. Evidence: [[workspace-session-focus-reference]].
+[live] Agent Space's Sessions view lists the workspace's sessions for the current checkout, grouped by plan, with live-only filtering, explicit cancellation, and an action that opens the existing session node on Canvas. It lists two kinds: an interactive session shows its terminal and Changes, a harness session its conversation and its run's Changes. See [[workspace-agent-sessions]] for the difference. Evidence: [[workspace-session-focus-reference]].
 
 When a selected live session stops, the live-only filter relaxes so the user's current context remains visible.
 
@@ -49,8 +49,6 @@ This is checkout history, not attribution. Work by another session or person in 
 <!-- keywords: documentation drift, dim rule, hidden nodes -->
 
 [legacy] The original PM-042 narrative proposed dimming inactive Canvas nodes. The delivered component filters them out and lays out only the active subset, and the domain guide now describes that delivered behavior. Evidence: `web/src/features/canvas/CanvasBoard.tsx:128`, `web/src/features/canvas/CanvasBoard.tsx:135`, `docs/domain/terminal/session-focus.md:61`.
-
-[live] The top-level Sessions page and workspace-node Sessions tab both ship. The checkout-scoped tab supplements the global page rather than replacing it. Evidence: [[workspace-session-focus-reference]].
 
 ## Related pages
 

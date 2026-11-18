@@ -30,3 +30,20 @@ leaves the durable record and placement available.
 Canvas supports Local checkout plus Local process execution. Cloud Agent execution is a future execution-provider
 adapter. Agentless Remote Snapshot support is a separate content-provider capability and is not a restricted Canvas
 mode or a delivered terminal surface.
+
+## Interactive And Harness Sessions
+
+A session is one agent conversation, and Kode Stream has two kinds of it. An **interactive session** is the kind this
+page describes: a person starts a coding agent in an embedded terminal on the workspace's checkout, types into it and
+stops it, and Kode Stream keeps only its safe record. A **harness session** is one agent the harness runs for a task —
+a Planner, Checker or Builder round — headless, in the run's own worktree. It has no terminal and no session record:
+its conversation comes from the engine's event stream, a person steers it through the run's questions and approvals,
+and its changes are its run's, read from the worktree while the run lives and from its branch after.
+
+Agent Space's Sessions view lists both kinds in one list. It groups them by the ticket or plan they share, tags each
+card **Interactive** or **Harness**, and narrows the list with **All · Interactive · Harness** and **Live only**.
+Picking an interactive session shows its terminal; picking a harness session shows its conversation, with **Open run
+page** and, while the run works, **Stop**, which stops the whole run. Interactive sessions follow the checked-out
+branch; harness sessions are listed for the workspace's newest runs whatever is checked out. The full comparison is
+[Interactive And Harness Sessions](../../../wiki/domains/workspace/concepts/agent-sessions.md).
+
