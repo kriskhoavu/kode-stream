@@ -300,3 +300,51 @@ func TestRemoveTaskDeletesAFinishedTaskWithItsHistory(t *testing.T) {
 		t.Fatalf("another task went too: %v", err)
 	}
 }
+
+func TestResetTaskDropsItsRunsAndKeepsItsPlaceInTheQueue(t *testing.T) {
+	ctx := context.Background()
+	service, repository := newQueueService(t)
+	actor := domain.Actor{ActorID: "local"}
+	now := testNow
+	ask := false
+	stopped := domain.Task{ID: "tsk-reset", WorkspaceID: "ws", Source: domain.Source{Kind: domain.SourceJira, Key: "PM-3", Labels: []string{}}, Title: "Three", Body: "Do three.", State: domain.TaskCancelled, Note: "Cancelled by Anna", RunID: "run-3", Attempts: 2, Pinned: true, PriorityOverride: 5, AskQuestions: &ask, ScoreReasons: []string{}, DependsOn: []string{}, Revision: 7, DiscoveredAt: now, UpdatedAt: now}
+	if err := repository.InsertTask(ctx, stopped); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.InsertRun(ctx, domain.Run{ID: "run-3", TaskID: stopped.ID, WorkspaceID: "ws", Branch: "harness/PM-3-abc", State: domain.RunCancelled, StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.InsertStage(ctx, domain.Stage{ID: "stg-3", RunID: "run-3", Kind: domain.StagePlan, State: domain.StagePassed}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ResetTask(ctx, stopped.ID, stopped.Revision+1, actor); !IsConflict(err) {
+		t.Fatalf("stale revision err = %v", err)
+	}
+	reset, err := service.ResetTask(ctx, stopped.ID, stopped.Revision, actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reset.ID != stopped.ID || reset.State != domain.TaskRanked || reset.RunID != "" || reset.Attempts != 0 || reset.Note != "" || reset.StartRequested || reset.Revision <= stopped.Revision {
+		t.Fatalf("reset = %#v", reset)
+	}
+	stored, err := repository.GetTask(ctx, stopped.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stored.Pinned || stored.PriorityOverride != 5 || stored.AskQuestions == nil || *stored.AskQuestions || stored.Body != "Do three." {
+		t.Fatalf("what a person chose was lost: %#v", stored)
+	}
+	if _, err := repository.GetRun(ctx, "run-3"); err == nil {
+		t.Fatal("the run is still stored")
+	}
+	if stages, _ := repository.ListStages(ctx, "run-3"); len(stages) != 0 {
+		t.Fatalf("stages = %#v", stages)
+	}
+	dismissed, err := service.DismissTask(ctx, stored.ID, "not now", stored.Revision, actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ResetTask(ctx, dismissed.ID, dismissed.Revision, actor); !IsInvalid(err) {
+		t.Fatalf("a dismissed task was reset: %v", err)
+	}
+}

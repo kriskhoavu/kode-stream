@@ -13,7 +13,7 @@ function controller(state: HarnessState, pollScouts?: () => Promise<{ started: b
 	return {
 		state, client: { ...apiHarnessClient, pollScouts }, dispatch: vi.fn(), refresh: vi.fn().mockResolvedValue(undefined), loadRun: vi.fn().mockResolvedValue(undefined),
 		approve: vi.fn().mockResolvedValue(undefined), reject: vi.fn().mockResolvedValue(undefined), pin: vi.fn().mockResolvedValue(undefined), setPriority: vi.fn().mockResolvedValue(undefined), start: vi.fn().mockResolvedValue(undefined), setQuestions: vi.fn(),
-		cancelRun: vi.fn(), pauseRole: vi.fn(), resumeRole: vi.fn(), removeTask: vi.fn().mockResolvedValue(undefined), createTask: vi.fn()
+		cancelRun: vi.fn(), pauseRole: vi.fn(), resumeRole: vi.fn(), removeTask: vi.fn().mockResolvedValue(undefined), resetTask: vi.fn().mockResolvedValue(undefined), createTask: vi.fn()
 	};
 }
 

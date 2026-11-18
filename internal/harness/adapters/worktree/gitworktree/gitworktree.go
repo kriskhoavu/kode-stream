@@ -110,7 +110,10 @@ func (a *Adapter) Remove(ctx context.Context, workspace models.WorkspaceConfig, 
 	}
 	if err := a.Git.WorktreeRemoveContext(ctx, workspace.Path, path, true); err != nil {
 		_ = a.Git.WorktreePruneContext(ctx, workspace.Path)
-		return err
+		// A working copy the janitor already removed still leaves its branch to delete.
+		if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+			return err
+		}
 	}
 	if branch != "" && strings.HasPrefix(branch, BranchPrefix) {
 		_ = a.Git.DeleteBranchContext(ctx, workspace.Path, branch)

@@ -62,6 +62,7 @@ export interface HarnessClient {
 	createTask?(input: HarnessCreateTaskInput): Promise<HarnessTask>;
 	/** Deletes a finished task with its runs; its branch and pull request stay. */
 	removeTask?(task: HarnessTask): Promise<HarnessTask>;
+	resetTask?(task: HarnessTask): Promise<HarnessTask>;
 	pauseRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
 	resumeRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
 	settings(signal?: AbortSignal): Promise<HarnessSettings>;
@@ -98,6 +99,7 @@ export const apiHarnessClient: HarnessClient = {
 	start: (task, idempotencyKey) => api.startHarnessTask(task, idempotencyKey),
 	createTask: (input) => api.createHarnessTask(input),
 	removeTask: (task) => api.removeHarnessTask(task),
+	resetTask: (task) => api.resetHarnessTask(task),
 	setQuestions: (task, askQuestions) => api.setHarnessTaskQuestions(task, askQuestions),
 	pauseRole: (role) => api.pauseHarnessRole(role),
 	resumeRole: (role) => api.resumeHarnessRole(role),

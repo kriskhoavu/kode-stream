@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight, ExternalLink, GripVertical, Pin, PinOff, Play, X } from 'lucide-react';
 import { useResizableDrawer } from '../../components/useResizableDrawer';
 import { StopRunButton, canStopRun } from './StopRunButton';
+import { ResetTaskButton, canResetTask } from './ResetTaskButton';
 import type { ClaudeTurn, HarnessAgentRun, HarnessApproval, HarnessRun, HarnessStage, HarnessTask, SafeSessionRecord, SessionChanges } from '../../lib/types';
 import type { HarnessRunTab } from '../../app/router';
 import { SessionChangesPanel } from '../sessions/SessionChangesPanel';
@@ -40,7 +41,7 @@ const tabs: { id: HarnessRunTab; label: string }[] = [
  * never means leaving it. The waiting gate sits at the top; the tabs hold
  * the stages, the findings, the changed files, the live agent and the links.
  */
-export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTabChange, onClose, onOpenDetails, onCancel, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onSetQuestions, askDefault = true }: {
+export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTabChange, onClose, onOpenDetails, onCancel, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onReset, onSetQuestions, askDefault = true }: {
 	state: HarnessState;
 	client: HarnessClient;
 	taskId: string;
@@ -63,6 +64,8 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTab
 	onMove: (task: HarnessTask, before?: HarnessTask) => void;
 	/** Starts a task that is up next; absent when nothing can be started here. */
 	onStart?: (task: HarnessTask) => void;
+	/** Throws away the task's runs and working copies; offered once the task has a run. */
+	onReset?: (task: HarnessTask) => Promise<void>;
 	/** Sets this task's own answer to "may an agent stop and ask"; null follows the workspace and the settings. */
 	onSetQuestions?: (task: HarnessTask, askQuestions: boolean | null) => void;
 	/** What the settings say when the task does not. */
@@ -126,6 +129,7 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTab
 					</div>
 					<div className="drawer-actions">
 						{onCancel && canStopRun(run) && <StopRunButton task={task} run={run} onCancel={onCancel} />}
+						{onReset && canResetTask(task) && <ResetTaskButton task={task} onReset={onReset} />}
 						{run && onOpenDetails && <button type="button" className="secondary drawer-open-details" onClick={() => onOpenDetails(run.id)}>Open details</button>}
 						<button type="button" className="icon-button" aria-label="Close details" onClick={onClose}><X size={16} /></button>
 					</div>

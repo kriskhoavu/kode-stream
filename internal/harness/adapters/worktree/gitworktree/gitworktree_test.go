@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kode-stream/internal/common/models"
@@ -139,5 +140,32 @@ func TestReadRunFilesReadsTheWorktreeThenTheBranch(t *testing.T) {
 	}
 	if none, from, _ := adapter.ReadRunFiles(ctx, workspace, "", worktree.BaseCommit, "main", "plans/", 1024); from != "" || len(none) != 0 {
 		t.Fatalf("a non-harness branch was read: %#v", none)
+	}
+}
+
+func TestRemoveDeletesTheBranchOfAWorktreeAlreadyGone(t *testing.T) {
+	ctx := context.Background()
+	repo := t.TempDir()
+	git(t, repo, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(repo, "a.md"), []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-q", "-m", "base")
+	adapter := New(filepath.Join(t.TempDir(), "worktrees"), appgit.New())
+	workspace := models.WorkspaceConfig{ID: "ws", Path: repo, BaselineBranch: "main"}
+	worktree, err := adapter.Create(ctx, workspace, "run-1", "harness/PM-1-abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := adapter.Remove(ctx, workspace, worktree.Path, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := adapter.Remove(ctx, workspace, worktree.Path, worktree.Branch); err != nil {
+		t.Fatalf("the second remove failed: %v", err)
+	}
+	out, err := exec.Command("git", "-C", repo, "branch", "--list", worktree.Branch).Output()
+	if err != nil || strings.TrimSpace(string(out)) != "" {
+		t.Fatalf("branch still listed: %q err=%v", out, err)
 	}
 }

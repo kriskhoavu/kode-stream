@@ -8,7 +8,7 @@ import type { HarnessController } from '../harness/useHarness';
 import { apiHarnessClient } from '../harness/harnessClient';
 
 function controller(state: HarnessState): HarnessController {
-	return { state, client: apiHarnessClient, dispatch: vi.fn(), refresh: vi.fn(), loadRun: vi.fn(), approve: vi.fn(), reject: vi.fn(), pin: vi.fn(), setPriority: vi.fn(), start: vi.fn(), createTask: vi.fn(), setQuestions: vi.fn(), cancelRun: vi.fn(), pauseRole: vi.fn().mockResolvedValue(undefined), resumeRole: vi.fn(), removeTask: vi.fn().mockResolvedValue(undefined) };
+	return { state, client: apiHarnessClient, dispatch: vi.fn(), refresh: vi.fn(), loadRun: vi.fn(), approve: vi.fn(), reject: vi.fn(), pin: vi.fn(), setPriority: vi.fn(), start: vi.fn(), createTask: vi.fn(), setQuestions: vi.fn(), cancelRun: vi.fn(), pauseRole: vi.fn().mockResolvedValue(undefined), resumeRole: vi.fn(), removeTask: vi.fn().mockResolvedValue(undefined), resetTask: vi.fn().mockResolvedValue(undefined) };
 }
 
 describe('takeOverByHand', () => {

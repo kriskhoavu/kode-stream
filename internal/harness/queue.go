@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"time"
 
 	"kode-stream/internal/harness/application/queue"
 	"kode-stream/internal/harness/domain"
@@ -269,6 +270,96 @@ func (s *Service) RemoveTask(ctx context.Context, id string, expectedRevision in
 	}
 	task.Body = ""
 	return task, nil
+}
+
+// ResetTask puts a task back as the Finder left it, so its work begins again
+// from nothing. A run in flight is stopped first. Every run's working copy and
+// local harness branch are deleted, and so are its runs, stages, agent runs
+// and approvals. The task keeps its place in the queue, its pin and its
+// questions setting, and waits for Start. A pushed branch and a pull request
+// stay at the remote; events stay as the log of what happened.
+func (s *Service) ResetTask(ctx context.Context, id string, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
+	if err := s.mutable(); err != nil {
+		return domain.Task{}, err
+	}
+	task, err := s.repository.GetTask(ctx, id)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if task.Revision != expectedRevision {
+		return domain.Task{}, domain.ErrStateMoved
+	}
+	if task.State == domain.TaskDismissed || task.State == domain.TaskStale {
+		return domain.Task{}, domain.Invalid("%s is not in the queue; only a task in the queue can be reset", task.Source.Key)
+	}
+	if task.RunID != "" {
+		run, err := s.repository.GetRun(ctx, task.RunID)
+		if err != nil && !errors.Is(err, domain.ErrNotFound) {
+			return domain.Task{}, err
+		}
+		if err == nil && !domain.RunTerminal(run.State) {
+			if _, err := s.CancelRun(ctx, run.ID, "reset", nil, actor); err != nil {
+				return domain.Task{}, err
+			}
+		}
+	}
+	runs, err := s.repository.ListRuns(ctx, domain.RunFilter{TaskID: task.ID, Limit: 1000})
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if s.workspaces != nil {
+		if workspace, found, err := s.workspaces.Get(task.WorkspaceID); err == nil && found {
+			for _, run := range runs {
+				if run.WorktreePath != "" {
+					s.removeWorktree(ctx, run, workspace, true)
+				}
+			}
+		}
+	}
+	settings := s.settingsNow(ctx)
+	var fresh domain.Task
+	err = s.atomic(ctx, func(tx domain.Repository, record func(domain.Event) error) error {
+		current, err := tx.GetTask(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := tx.DeleteTaskHistory(ctx, id); err != nil {
+			return err
+		}
+		fresh = resetTask(current, s.now())
+		s.rescore(settings, &fresh)
+		if err := tx.InsertTask(ctx, fresh); err != nil {
+			return err
+		}
+		return record(domain.Event{Kind: domain.EventTaskUpdated, TaskID: id, Actor: actorOrNil(actor), Payload: payload(map[string]any{"state": fresh.State, "reset": true, "runs": len(runs)})})
+	})
+	if err != nil {
+		return domain.Task{}, err
+	}
+	fresh.Body = ""
+	return fresh, nil
+}
+
+// resetTask is the task as it was found, with what a person chose for it:
+// its pin, its priority and its questions setting.
+func resetTask(task domain.Task, now time.Time) domain.Task {
+	return domain.Task{
+		ID:               task.ID,
+		WorkspaceID:      task.WorkspaceID,
+		Source:           task.Source,
+		Title:            task.Title,
+		Body:             task.Body,
+		State:            domain.TaskRanked,
+		PriorityOverride: task.PriorityOverride,
+		Pinned:           task.Pinned,
+		AskQuestions:     task.AskQuestions,
+		DependsOn:        task.DependsOn,
+		DependsOnKeys:    task.DependsOnKeys,
+		EstimatedMinutes: task.EstimatedMinutes,
+		Revision:         task.Revision + 1,
+		DiscoveredAt:     task.DiscoveredAt,
+		UpdatedAt:        now,
+	}
 }
 
 // ClearQueue deletes every task that no run has touched: discovered, ranked,

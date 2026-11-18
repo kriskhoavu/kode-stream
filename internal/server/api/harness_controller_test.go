@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -300,6 +301,13 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 	}
 	if open := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-2/remove", `{"expectedRevision":1}`); open.Code != http.StatusBadRequest {
 		t.Fatalf("remove open = %d %s", open.Code, open.Body.String())
+	}
+	if missingReset := serveHarness(handler, http.MethodPost, "/api/harness/tasks/missing/reset", `{"expectedRevision":1}`); missingReset.Code != http.StatusNotFound {
+		t.Fatalf("reset missing = %d %s", missingReset.Code, missingReset.Body.String())
+	}
+	queued, _ := repository.GetTask(ctx, "tsk-2")
+	if reset := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-2/reset", `{"expectedRevision":`+strconv.FormatInt(queued.Revision, 10)+`}`); reset.Code != http.StatusOK || !strings.Contains(reset.Body.String(), `"id":"tsk-2"`) || !strings.Contains(reset.Body.String(), `"state":"ranked"`) {
+		t.Fatalf("reset = %d %s", reset.Code, reset.Body.String())
 	}
 	if missingRemove := serveHarness(handler, http.MethodPost, "/api/harness/tasks/missing/remove", `{"expectedRevision":1}`); missingRemove.Code != http.StatusNotFound {
 		t.Fatalf("remove missing = %d %s", missingRemove.Code, missingRemove.Body.String())
