@@ -269,9 +269,9 @@ func (g *GitAdapter) CommitAllContext(ctx context.Context, worktreePath, message
 	return g.RevParseContext(ctx, worktreePath, "HEAD")
 }
 
-// PushBranchContext pushes branch to remote and sets its upstream.
-func (g *GitAdapter) PushBranchContext(ctx context.Context, worktreePath, remote, branch string) error {
-	_, err := g.runLong(ctx, worktreePath, worktreeTimeout, "push", "--set-upstream", remote, branch+":"+branch)
+// PushBranchContext pushes the local branch to remote as remoteBranch and sets its upstream.
+func (g *GitAdapter) PushBranchContext(ctx context.Context, worktreePath, remote, branch, remoteBranch string) error {
+	_, err := g.runLong(ctx, worktreePath, worktreeTimeout, "push", "--set-upstream", remote, branch+":"+remoteBranch)
 	return err
 }
 

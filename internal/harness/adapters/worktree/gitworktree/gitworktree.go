@@ -17,8 +17,17 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// BranchPrefix is the only branch namespace the harness writes to.
+// BranchPrefix is the only local branch namespace the harness writes to.
 const BranchPrefix = "harness/"
+
+// RemoteBranchPrefix replaces BranchPrefix when a branch is pushed. Hosting
+// hooks commonly accept only feature/<KEY>-<number>-..., which a harness
+// branch, named <KEY>-<number>-<run>, then matches.
+const RemoteBranchPrefix = "feature/"
+
+func (a *Adapter) RemoteBranch(branch string) string {
+	return RemoteBranchPrefix + strings.TrimPrefix(branch, BranchPrefix)
+}
 
 type Adapter struct {
 	Root   string
@@ -161,7 +170,7 @@ func (a *Adapter) Push(ctx context.Context, path, branch string) error {
 	if err := checkBranch(branch, ""); err != nil {
 		return err
 	}
-	return a.Git.PushBranchContext(ctx, path, a.Remote, branch)
+	return a.Git.PushBranchContext(ctx, path, a.Remote, branch, a.RemoteBranch(branch))
 }
 
 // maxRunFiles bounds how many files one read returns.
@@ -181,7 +190,7 @@ func (a *Adapter) ReadRunFiles(ctx context.Context, workspace models.WorkspaceCo
 	}
 	refs := []string{branch}
 	if a.Remote != "" {
-		refs = append(refs, a.Remote+"/"+branch)
+		refs = append(refs, a.Remote+"/"+a.RemoteBranch(branch))
 	}
 	for _, ref := range refs {
 		if _, err := a.Git.RevParseContext(ctx, workspace.Path, ref); err != nil {

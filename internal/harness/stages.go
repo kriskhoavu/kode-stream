@@ -182,16 +182,17 @@ func (s *Service) openPullRequest(ctx context.Context, settings domain.Settings,
 	if s.worktrees == nil {
 		return "", errors.New("worktrees are unavailable")
 	}
+	remote := s.worktrees.RemoteBranch(run.Branch)
 	if err := s.worktrees.Push(ctx, run.WorktreePath, run.Branch); err != nil {
-		s.record(ctx, run, "harness.push", models.AuditStatusFailed, "Push of "+run.Branch+" failed", err)
-		return "", fmt.Errorf("push %s: %w", run.Branch, err)
+		s.record(ctx, run, "harness.push", models.AuditStatusFailed, "Push of "+run.Branch+" as "+remote+" failed", err)
+		return "", fmt.Errorf("push %s as %s: %w", run.Branch, remote, err)
 	}
-	s.record(ctx, run, "harness.push", models.AuditStatusSuccess, "Pushed "+run.Branch, nil)
+	s.record(ctx, run, "harness.push", models.AuditStatusSuccess, "Pushed "+run.Branch+" as "+remote, nil)
 	baseline := workspace.BaselineBranch
 	if baseline == "" {
 		baseline = "main"
 	}
-	url, err := adapter.CreateDraft(ctx, ports.PullRequest{Workspace: workspace, Settings: workspaceSettings, WorktreePath: run.WorktreePath, Branch: run.Branch, Base: baseline, Title: strings.SplitN(commitMessage(run, ""), "\n", 2)[0], Body: s.pullRequestBody(ctx, run)})
+	url, err := adapter.CreateDraft(ctx, ports.PullRequest{Workspace: workspace, Settings: workspaceSettings, WorktreePath: run.WorktreePath, Branch: remote, Base: baseline, Title: strings.SplitN(commitMessage(run, ""), "\n", 2)[0], Body: s.pullRequestBody(ctx, run)})
 	if err != nil {
 		s.record(ctx, run, "harness.pull_request", models.AuditStatusFailed, "Draft pull request failed", err)
 		return "", err

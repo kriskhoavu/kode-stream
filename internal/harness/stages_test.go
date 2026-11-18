@@ -110,7 +110,8 @@ func TestARunGoesFromBuildThroughTestsToADraftPullRequest(t *testing.T) {
 	if qa.State != domain.StagePassed || qa.Round != 1 || qa.LastGate == nil || !qa.LastGate.Passed || len(qa.AgentRuns) != 1 || qa.AgentRuns[0].Role != domain.RoleQAFixer {
 		t.Fatalf("qa = %#v", qa.Stage)
 	}
-	if draft.State != domain.StagePassed || draft.Attempt != 2 || len(pulls.requests) != 2 || pulls.requests[0].Base != "main" || !strings.HasPrefix(pulls.requests[0].Title, "PM-7: ") {
+	remote := "feature/" + strings.TrimPrefix(view.Branch, "harness/")
+	if draft.State != domain.StagePassed || draft.Attempt != 2 || len(pulls.requests) != 2 || pulls.requests[0].Base != "main" || pulls.requests[0].Branch != remote || !strings.HasPrefix(pulls.requests[0].Title, "PM-7: ") {
 		t.Fatalf("draft = %#v requests=%d", draft.Stage, len(pulls.requests))
 	}
 	task, _ := fixture.repository.GetTask(ctx, fixture.task.ID)
@@ -120,7 +121,7 @@ func TestARunGoesFromBuildThroughTestsToADraftPullRequest(t *testing.T) {
 	if _, err := os.Stat(view.WorktreePath); !os.IsNotExist(err) {
 		t.Fatal("the worktree was kept after the pull request")
 	}
-	pushed := gitOutput(t, origin, "log", "--format=%s", view.Branch)
+	pushed := gitOutput(t, origin, "log", "--format=%s", remote)
 	// The planner wrote no files here, so there is no plan commit.
 	if !strings.HasPrefix(pushed, "PM-7: Fix the tests of Add export\nPM-7: Add export\nbase\n") {
 		t.Fatalf("pushed branch log = %q", pushed)

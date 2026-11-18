@@ -50,7 +50,7 @@ The harness runs as one replica. SQLite has one connection, so code inside a tra
 
 [live] After each builder and tester run the harness reverts paths outside the scope, then runs the verification commands itself; a failing gate sends the builder back with the end of the log. Evidence: `internal/harness/build.go:56`, `internal/harness/build.go:89`.
 
-[live] QA runs the verification and the runtime's smoke check twice; both must pass, with at most two tester rounds. The draft PR stage pushes the branch and opens a draft pull request on GitHub or Bitbucket, retrying a minute apart. Evidence: `internal/harness/stages.go:82`, `internal/harness/stages.go:170`.
+[live] QA runs the verification and the runtime's smoke check twice; both must pass, with at most two tester rounds. The draft PR stage pushes the local `harness/<key>-<run>` branch as `feature/<key>-<run>`, the name branch hooks such as `feature/[A-Z0-9]+-\d+-.+` accept, and opens a draft pull request from it on GitHub or Bitbucket, retrying a minute apart. Evidence: `internal/harness/stages.go:82`, `internal/harness/stages.go:170`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:22`.
 
 [live] A passed run's worktree is removed at once; a cancelled or failed run keeps its worktree for `retentionDays` and its branch after that. Evidence: `internal/harness/stages.go:283`.
 
@@ -80,7 +80,7 @@ Codex runs `codex exec --json` with its sandbox standing in for the permission m
 
 [live] `POST /api/harness/tasks/{id}/remove` deletes one finished or stopped task, done, cancelled, dismissed or stale, with its runs, stages, agent runs and approvals, and records `task.removed`; events stay as the log. It first removes a working copy a run still holds and keeps every branch. Any other task is refused with `invalid_request`. Evidence: `internal/harness/queue.go:227`.
 
-[live] `GET /api/harness/runs/{id}/plan` returns the files the run changed under `plans/`, at most 40 of 256 KB each and text only: from the run's worktree while it exists, else from its `harness/*` branch or the branch as last pushed, saying which, so the plan is readable before the merge and before the plan is approved and committed. Evidence: `internal/harness/approvals.go:419`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:167`.
+[live] `GET /api/harness/runs/{id}/plan` returns the files the run changed under `plans/`, at most 40 of 256 KB each and text only: from the run's worktree while it exists, else from its `harness/*` branch or its `feature/*` branch as last pushed, saying which, so the plan is readable before the merge and before the plan is approved and committed. Evidence: `internal/harness/approvals.go:419`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:167`.
 
 [live] `GET /api/harness/events` replays stored events after `Last-Event-ID`, then streams live ones with a keepalive every 15 seconds; a subscriber that falls behind gets `reset` and refetches. Evidence: `internal/server/api/harness_sse.go:27`.
 

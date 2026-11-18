@@ -38,7 +38,10 @@ type Worktrees interface {
 	Diff(ctx context.Context, path, base string) ([]DiffFile, string, error)
 	RestorePaths(ctx context.Context, path, base string, paths []string) error
 	Commit(ctx context.Context, path, message string) (string, error)
+	// Push pushes the local harness/* branch under RemoteBranch's name.
 	Push(ctx context.Context, path, branch string) error
+	// RemoteBranch is the name a local harness/* branch has at the remote.
+	RemoteBranch(branch string) string
 	// ReadRunFiles reads the files under prefix a run changed against base:
 	// from its worktree while it exists, uncommitted work included, else from
 	// its branch, local or as last pushed. It names where it read from,

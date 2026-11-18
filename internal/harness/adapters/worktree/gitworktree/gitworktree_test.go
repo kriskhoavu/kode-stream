@@ -169,3 +169,44 @@ func TestRemoveDeletesTheBranchOfAWorktreeAlreadyGone(t *testing.T) {
 		t.Fatalf("branch still listed: %q err=%v", out, err)
 	}
 }
+
+func TestPushNamesTheBranchAFeatureBranchAtTheRemote(t *testing.T) {
+	ctx := context.Background()
+	remote := t.TempDir()
+	git(t, remote, "init", "-q", "--bare", "-b", "main")
+	repo := t.TempDir()
+	git(t, repo, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(repo, "a.md"), []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-q", "-m", "base")
+	git(t, repo, "remote", "add", "origin", remote)
+	git(t, repo, "push", "-q", "origin", "main")
+	adapter := New(filepath.Join(t.TempDir(), "worktrees"), appgit.New())
+	workspace := models.WorkspaceConfig{ID: "ws", Path: repo, BaselineBranch: "main"}
+	worktree, err := adapter.Create(ctx, workspace, "run-1", "harness/APP-664-4b00e6")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worktree.Path, "b.md"), []byte("b\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Commit(ctx, worktree.Path, "APP-664: Add b"); err != nil {
+		t.Fatal(err)
+	}
+	if err := adapter.Push(ctx, worktree.Path, worktree.Branch); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command("git", "-C", remote, "branch", "--list").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if branches := strings.Fields(strings.ReplaceAll(string(out), "*", "")); strings.Join(branches, ",") != "feature/APP-664-4b00e6,main" {
+		t.Fatalf("remote branches = %v", branches)
+	}
+	files, from, err := adapter.ReadRunFiles(ctx, workspace, "", worktree.BaseCommit, worktree.Branch, "", 1024)
+	if err != nil || from != "branch" || len(files) != 1 {
+		t.Fatalf("files = %#v from=%q err=%v", files, from, err)
+	}
+}
