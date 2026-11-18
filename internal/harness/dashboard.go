@@ -106,10 +106,15 @@ type DashboardRun struct {
 	domain.Run
 	CurrentStage   *domain.Stage      `json:"currentStage,omitempty"`
 	ActiveAgentRun *DashboardAgentRun `json:"activeAgentRun,omitempty"`
+	// RemoteBranch is the name the branch is pushed under.
+	RemoteBranch string `json:"remoteBranch,omitempty"`
 }
 
 func (s *Service) dashboardRun(ctx context.Context, run domain.Run) DashboardRun {
 	view := DashboardRun{Run: run}
+	if s.worktrees != nil && run.Branch != "" {
+		view.RemoteBranch = s.worktrees.RemoteBranch(run.Branch)
+	}
 	if run.CurrentStageID != "" {
 		if stage, err := s.repository.GetStage(ctx, run.CurrentStageID); err == nil {
 			view.CurrentStage = &stage
@@ -679,6 +684,8 @@ type DashboardChanges struct {
 	Availability string                 `json:"availability"`
 	Reason       string                 `json:"reason,omitempty"`
 	Branch       string                 `json:"branch"`
+	// From says where the files were read: "worktree" or "branch".
+	From string `json:"from,omitempty"`
 }
 
 type DashboardChangedFile struct {
@@ -693,7 +700,7 @@ func (s *Service) DashboardChanges(ctx context.Context, runID string) (Dashboard
 	if err != nil {
 		return DashboardChanges{}, err
 	}
-	view := DashboardChanges{SessionID: runID, LaunchCommit: changes.BaseCommit, Files: []DashboardChangedFile{}, Availability: "available", Branch: changes.Branch}
+	view := DashboardChanges{SessionID: runID, LaunchCommit: changes.BaseCommit, Files: []DashboardChangedFile{}, Availability: "available", Branch: changes.Branch, From: changes.From}
 	if !changes.Available {
 		view.Availability, view.Reason = "unavailable", "workspace_missing"
 	}

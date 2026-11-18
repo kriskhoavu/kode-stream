@@ -249,6 +249,7 @@ func routeManifest(a *API) []routeSpec {
 		{http.MethodGet, "/harness/cost", "harness", protectedRoute, a.harness.route(a.harness.cost)},
 		{http.MethodGet, "/harness/runs/:id/changes", "harness", protectedRoute, a.harness.route(a.harness.runChanges)},
 		{http.MethodGet, "/harness/runs/:id/plan", "harness", protectedRoute, a.harness.route(a.harness.runPlan)},
+		{http.MethodGet, "/harness/runs/:id/diff", "harness", protectedRoute, a.harness.route(a.harness.runFileDiff)},
 		{http.MethodPost, "/harness/runs/:id/cancel", "harness", protectedRoute, a.harness.route(a.harness.cancelRun)},
 	}
 }

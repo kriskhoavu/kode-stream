@@ -302,6 +302,12 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 	if open := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-2/remove", `{"expectedRevision":1}`); open.Code != http.StatusBadRequest {
 		t.Fatalf("remove open = %d %s", open.Code, open.Body.String())
 	}
+	if noPath := serveHarness(handler, http.MethodGet, "/api/harness/runs/run-1/diff", ""); noPath.Code != http.StatusBadRequest {
+		t.Fatalf("diff without a path = %d %s", noPath.Code, noPath.Body.String())
+	}
+	if missingRun := serveHarness(handler, http.MethodGet, "/api/harness/runs/missing/diff?path=a.md", ""); missingRun.Code != http.StatusNotFound {
+		t.Fatalf("diff of a missing run = %d %s", missingRun.Code, missingRun.Body.String())
+	}
 	if missingReset := serveHarness(handler, http.MethodPost, "/api/harness/tasks/missing/reset", `{"expectedRevision":1}`); missingReset.Code != http.StatusNotFound {
 		t.Fatalf("reset missing = %d %s", missingReset.Code, missingReset.Body.String())
 	}

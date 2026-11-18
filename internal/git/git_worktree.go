@@ -192,16 +192,7 @@ func (g *GitAdapter) DiffFilesContext(ctx context.Context, worktreePath, base st
 	if err != nil {
 		return nil, err
 	}
-	counts := map[string][2]int{}
-	for _, record := range strings.Split(numstatOut, "\x00") {
-		fields := strings.SplitN(record, "\t", 3)
-		if len(fields) != 3 {
-			continue
-		}
-		additions, _ := strconv.Atoi(fields[0])
-		deletions, _ := strconv.Atoi(fields[1])
-		counts[fields[2]] = [2]int{additions, deletions}
-	}
+	counts := numstatCounts(numstatOut)
 	parts := strings.Split(strings.TrimSuffix(statusOut, "\x00"), "\x00")
 	files := []DiffFile{}
 	for i := 0; i+1 < len(parts); i += 2 {
@@ -286,14 +277,60 @@ func (g *GitAdapter) RefDiffFilesContext(ctx context.Context, repoPath, base, re
 	if err != nil {
 		return nil, err
 	}
+	numstatArgs := append([]string{"diff", "--numstat", "-z", "--no-renames", base, ref}, prefixArgs(prefix)...)
+	numstatOut, err := g.runLong(ctx, repoPath, worktreeTimeout, numstatArgs...)
+	if err != nil {
+		return nil, err
+	}
+	counts := numstatCounts(numstatOut)
 	parts := strings.Split(strings.TrimSuffix(statusOut, "\x00"), "\x00")
 	files := []DiffFile{}
 	for i := 0; i+1 < len(parts); i += 2 {
 		if parts[i+1] != "" {
-			files = append(files, DiffFile{Path: parts[i+1], Status: diffStatus(parts[i])})
+			count := counts[parts[i+1]]
+			files = append(files, DiffFile{Path: parts[i+1], Status: diffStatus(parts[i]), Additions: count[0], Deletions: count[1]})
 		}
 	}
 	return files, nil
+}
+
+func prefixArgs(prefix string) []string {
+	if prefix == "" {
+		return nil
+	}
+	return []string{"--", prefix}
+}
+
+func numstatCounts(out string) map[string][2]int {
+	counts := map[string][2]int{}
+	for _, record := range strings.Split(out, "\x00") {
+		fields := strings.SplitN(record, "\t", 3)
+		if len(fields) != 3 {
+			continue
+		}
+		additions, _ := strconv.Atoi(fields[0])
+		deletions, _ := strconv.Atoi(fields[1])
+		counts[fields[2]] = [2]int{additions, deletions}
+	}
+	return counts
+}
+
+// RefFileDiffContext returns the diff of one path between base and ref, read
+// from the repository's objects, bounded by maxBytes with a truncated flag.
+func (g *GitAdapter) RefFileDiffContext(ctx context.Context, repoPath, base, ref, relPath string, maxBytes int64) (string, bool, error) {
+	clean, err := cleanGitTreePath(relPath)
+	if err != nil {
+		return "", false, err
+	}
+	if clean == "" || strings.HasPrefix(clean, ":") || strings.HasPrefix(clean, "-") {
+		return "", false, fmt.Errorf("invalid diff path %q", relPath)
+	}
+	for _, rev := range []string{base, ref} {
+		if rev == "" || strings.HasPrefix(rev, "-") {
+			return "", false, fmt.Errorf("invalid revision %q", rev)
+		}
+	}
+	return g.boundedDiff(ctx, repoPath, maxBytes, "diff", "--no-ext-diff", "--no-renames", base, ref, "--", clean)
 }
 
 // ShowFileContext returns a file's content at ref. A file larger than limit

@@ -309,7 +309,15 @@ func (g *GitAdapter) DiffFileSince(ctx context.Context, workspacePath, commit, r
 	if clean == "" || strings.HasPrefix(clean, ":") || strings.HasPrefix(clean, "-") {
 		return "", false, fmt.Errorf("invalid diff path %q", relPath)
 	}
-	args := []string{"diff", "--no-ext-diff", "-M", sha, "--", clean}
+	return g.boundedDiff(ctx, workspacePath, maxBytes, "diff", "--no-ext-diff", "-M", sha, "--", clean)
+}
+
+// boundedDiff runs a git diff and returns at most maxBytes of it, with a
+// truncated flag, instead of failing on a large diff.
+func (g *GitAdapter) boundedDiff(ctx context.Context, workspacePath string, maxBytes int64, args ...string) (string, bool, error) {
+	if maxBytes <= 0 {
+		return "", false, ErrBlobLimit
+	}
 	// Cap the command just above the caller's bound: a diff at or under
 	// maxBytes always comes back whole, and one that overflows is reported
 	// as ErrOutputLimit rather than silently discarded.

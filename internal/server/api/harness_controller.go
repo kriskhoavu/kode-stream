@@ -486,6 +486,20 @@ func (a *harnessController) runPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, plan)
 }
 
+func (a *harnessController) runFileDiff(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "path is required"})
+		return
+	}
+	diff, err := a.harness.FileDiff(r.Context(), r.PathValue("id"), path)
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, diff)
+}
+
 func (a *harnessController) runChanges(w http.ResponseWriter, r *http.Request) {
 	changes, err := a.harness.DashboardChanges(r.Context(), r.PathValue("id"))
 	if err != nil {

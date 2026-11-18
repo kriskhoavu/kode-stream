@@ -80,6 +80,8 @@ Codex runs `codex exec --json` with its sandbox standing in for the permission m
 
 [live] `POST /api/harness/tasks/{id}/remove` deletes one finished or stopped task, done, cancelled, dismissed or stale, with its runs, stages, agent runs and approvals, and records `task.removed`; events stay as the log. It first removes a working copy a run still holds and keeps every branch. Any other task is refused with `invalid_request`. Evidence: `internal/harness/queue.go:227`.
 
+[live] `GET /api/harness/runs/{id}/changes` lists the files a run changed with lines added and removed, and `GET /api/harness/runs/{id}/diff?path=` returns one changed file's diff, at most 512 KB; both read the run's worktree while it exists, else its `harness/*` branch or its `feature/*` branch as last pushed, and say which, so a finished run still shows its changes. A path the run did not change is 404. Evidence: `internal/harness/approvals.go:446`, `internal/harness/approvals.go:425`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:237`.
+
 [live] `GET /api/harness/runs/{id}/plan` returns the files the run changed under `plans/`, at most 40 of 256 KB each and text only: from the run's worktree while it exists, else from its `harness/*` branch or its `feature/*` branch as last pushed, saying which, so the plan is readable before the merge and before the plan is approved and committed. Evidence: `internal/harness/approvals.go:419`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:167`.
 
 [live] `GET /api/harness/events` replays stored events after `Last-Event-ID`, then streams live ones with a keepalive every 15 seconds; a subscriber that falls behind gets `reset` and refetches. Evidence: `internal/server/api/harness_sse.go:27`.

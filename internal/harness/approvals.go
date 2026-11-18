@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"kode-stream/internal/common/models"
 	"kode-stream/internal/harness/domain"
 	"kode-stream/internal/harness/ports"
 )
@@ -380,26 +381,82 @@ type RunChanges struct {
 	Files      []ports.DiffFile `json:"files"`
 	DiffStat   string           `json:"diffStat"`
 	Available  bool             `json:"available"`
+	// From says where the files were read: "worktree", "branch", or "".
+	From string `json:"from"`
+}
+
+// RunFileDiff is the diff of one path a run changed.
+type RunFileDiff struct {
+	Path      string `json:"path"`
+	Diff      string `json:"diff"`
+	Truncated bool   `json:"truncated"`
+	From      string `json:"from"`
+}
+
+// maxRunDiffBytes bounds one file's diff a person reads.
+const maxRunDiffBytes = 512 << 10
+
+// runSource is where a run's files are read: its workspace and its worktree
+// while it has one.
+func (s *Service) runSource(ctx context.Context, runID string) (domain.Run, models.WorkspaceConfig, string, bool, error) {
+	if !s.Supported() {
+		return domain.Run{}, models.WorkspaceConfig{}, "", false, domain.ErrNotFound
+	}
+	run, err := s.repository.GetRun(ctx, runID)
+	if err != nil {
+		return domain.Run{}, models.WorkspaceConfig{}, "", false, err
+	}
+	if s.worktrees == nil || s.workspaces == nil {
+		return run, models.WorkspaceConfig{}, "", false, nil
+	}
+	workspace, found, err := s.workspaces.Get(run.WorkspaceID)
+	if err != nil || !found {
+		return run, workspace, "", false, err
+	}
+	worktree := run.WorktreePath
+	if run.WorktreeRemoved {
+		worktree = ""
+	}
+	return run, workspace, worktree, true, nil
+}
+
+// FileDiff returns the diff of one path the run changed: live from its
+// worktree, else from its branch.
+func (s *Service) FileDiff(ctx context.Context, runID, path string) (RunFileDiff, error) {
+	run, workspace, worktree, ok, err := s.runSource(ctx, runID)
+	if err != nil {
+		return RunFileDiff{}, err
+	}
+	out := RunFileDiff{Path: path}
+	if !ok {
+		return out, nil
+	}
+	diff, truncated, from, err := s.worktrees.FileDiff(ctx, workspace, worktree, run.BaseCommit, run.Branch, path, maxRunDiffBytes)
+	if errors.Is(err, ports.ErrNotChanged) {
+		return out, domain.ErrNotFound
+	}
+	if err != nil {
+		return out, err
+	}
+	out.Diff, out.Truncated, out.From = diff, truncated, from
+	return out, nil
 }
 
 // Changes lists what a run changed in its worktree against its base.
 func (s *Service) Changes(ctx context.Context, runID string) (RunChanges, error) {
-	if !s.Supported() {
-		return RunChanges{}, domain.ErrNotFound
-	}
-	run, err := s.repository.GetRun(ctx, runID)
+	run, workspace, worktree, ok, err := s.runSource(ctx, runID)
 	if err != nil {
 		return RunChanges{}, err
 	}
 	changes := RunChanges{Branch: run.Branch, BaseCommit: run.BaseCommit, Files: []ports.DiffFile{}}
-	if s.worktrees == nil || run.WorktreeRemoved || run.WorktreePath == "" {
+	if !ok {
 		return changes, nil
 	}
-	files, stat, err := s.worktrees.Diff(ctx, run.WorktreePath, run.BaseCommit)
-	if err != nil {
+	files, from, err := s.worktrees.ChangedFiles(ctx, workspace, worktree, run.BaseCommit, run.Branch)
+	if err != nil || from == "" {
 		return changes, nil
 	}
-	changes.Files, changes.DiffStat, changes.Available = files, boundedText(stat, domain.MaxDiffStatBytes), true
+	changes.Files, changes.From, changes.Available = files, from, true
 	return changes, nil
 }
 
@@ -418,24 +475,13 @@ const maxPlanFileBytes = 256 << 10
 // branch are both gone has no plan to show here; once merged, it is on the
 // board.
 func (s *Service) Plan(ctx context.Context, runID string) (RunPlan, error) {
-	if !s.Supported() {
-		return RunPlan{}, domain.ErrNotFound
-	}
-	run, err := s.repository.GetRun(ctx, runID)
+	run, workspace, worktree, ok, err := s.runSource(ctx, runID)
 	if err != nil {
 		return RunPlan{}, err
 	}
 	plan := RunPlan{Branch: run.Branch, Files: []ports.RunFile{}}
-	if s.worktrees == nil || s.workspaces == nil {
+	if !ok {
 		return plan, nil
-	}
-	workspace, found, err := s.workspaces.Get(run.WorkspaceID)
-	if err != nil || !found {
-		return plan, err
-	}
-	worktree := run.WorktreePath
-	if run.WorktreeRemoved {
-		worktree = ""
 	}
 	files, from, err := s.worktrees.ReadRunFiles(ctx, workspace, worktree, run.BaseCommit, run.Branch, planScope[0], maxPlanFileBytes)
 	if err != nil {

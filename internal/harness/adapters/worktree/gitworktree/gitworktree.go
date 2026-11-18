@@ -177,45 +177,104 @@ func (a *Adapter) Push(ctx context.Context, path, branch string) error {
 const maxRunFiles = 40
 
 func (a *Adapter) ReadRunFiles(ctx context.Context, workspace models.WorkspaceConfig, worktreePath, base, branch, prefix string, limit int64) ([]ports.RunFile, string, error) {
-	if worktreePath != "" && a.inside(worktreePath) == nil {
-		if info, err := os.Stat(worktreePath); err == nil && info.IsDir() {
-			files, err := a.Git.DiffFilesContext(ctx, worktreePath, base)
-			if err == nil {
-				return readWorktreeFiles(worktreePath, files, prefix, limit), "worktree", nil
-			}
+	if a.liveWorktree(worktreePath) {
+		files, err := a.Git.DiffFilesContext(ctx, worktreePath, base)
+		if err == nil {
+			return readWorktreeFiles(worktreePath, files, prefix, limit), "worktree", nil
 		}
 	}
-	if err := checkBranch(branch, ""); err != nil {
+	ref, ok := a.branchRef(ctx, workspace, branch)
+	if !ok {
 		return []ports.RunFile{}, "", nil
+	}
+	files, err := a.Git.RefDiffFilesContext(ctx, workspace.Path, base, ref, prefix)
+	if err != nil {
+		return nil, "", err
+	}
+	out := []ports.RunFile{}
+	for _, file := range files {
+		if file.Status == "deleted" || len(out) == maxRunFiles {
+			continue
+		}
+		data, truncated, err := a.Git.ShowFileContext(ctx, workspace.Path, ref, file.Path, limit)
+		if err != nil {
+			continue
+		}
+		if text, ok := textOf(data); ok {
+			out = append(out, ports.RunFile{Path: file.Path, Status: file.Status, Content: text, Truncated: truncated})
+		}
+	}
+	return out, "branch", nil
+}
+
+// liveWorktree reports whether a run's worktree is still on disk.
+func (a *Adapter) liveWorktree(worktreePath string) bool {
+	if worktreePath == "" || a.inside(worktreePath) != nil {
+		return false
+	}
+	info, err := os.Stat(worktreePath)
+	return err == nil && info.IsDir()
+}
+
+// branchRef is the run branch as the workspace holds it: the local harness/*
+// branch, else the branch as last pushed.
+func (a *Adapter) branchRef(ctx context.Context, workspace models.WorkspaceConfig, branch string) (string, bool) {
+	if checkBranch(branch, "") != nil {
+		return "", false
 	}
 	refs := []string{branch}
 	if a.Remote != "" {
 		refs = append(refs, a.Remote+"/"+a.RemoteBranch(branch))
 	}
 	for _, ref := range refs {
-		if _, err := a.Git.RevParseContext(ctx, workspace.Path, ref); err != nil {
-			continue
+		if _, err := a.Git.RevParseContext(ctx, workspace.Path, ref); err == nil {
+			return ref, true
 		}
-		files, err := a.Git.RefDiffFilesContext(ctx, workspace.Path, base, ref, prefix)
-		if err != nil {
-			return nil, "", err
-		}
-		out := []ports.RunFile{}
-		for _, file := range files {
-			if file.Status == "deleted" || len(out) == maxRunFiles {
-				continue
-			}
-			data, truncated, err := a.Git.ShowFileContext(ctx, workspace.Path, ref, file.Path, limit)
-			if err != nil {
-				continue
-			}
-			if text, ok := textOf(data); ok {
-				out = append(out, ports.RunFile{Path: file.Path, Status: file.Status, Content: text, Truncated: truncated})
-			}
-		}
-		return out, "branch", nil
 	}
-	return []ports.RunFile{}, "", nil
+	return "", false
+}
+
+func (a *Adapter) ChangedFiles(ctx context.Context, workspace models.WorkspaceConfig, worktreePath, base, branch string) ([]ports.DiffFile, string, error) {
+	var files []appgit.DiffFile
+	var err error
+	from := "worktree"
+	if a.liveWorktree(worktreePath) {
+		files, err = a.Git.DiffFilesContext(ctx, worktreePath, base)
+	} else if ref, ok := a.branchRef(ctx, workspace, branch); ok {
+		from = "branch"
+		files, err = a.Git.RefDiffFilesContext(ctx, workspace.Path, base, ref, "")
+	} else {
+		return []ports.DiffFile{}, "", nil
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	out := make([]ports.DiffFile, 0, len(files))
+	for _, file := range files {
+		out = append(out, ports.DiffFile{Path: file.Path, Status: file.Status, Additions: file.Additions, Deletions: file.Deletions})
+	}
+	return out, from, nil
+}
+
+func (a *Adapter) FileDiff(ctx context.Context, workspace models.WorkspaceConfig, worktreePath, base, branch, path string, limit int64) (string, bool, string, error) {
+	files, from, err := a.ChangedFiles(ctx, workspace, worktreePath, base, branch)
+	if err != nil || from == "" {
+		return "", false, from, err
+	}
+	changed := false
+	for _, file := range files {
+		changed = changed || file.Path == path
+	}
+	if !changed {
+		return "", false, from, ports.ErrNotChanged
+	}
+	if from == "worktree" {
+		diff, truncated, err := a.Git.DiffFileSince(ctx, worktreePath, base, path, limit)
+		return diff, truncated, from, err
+	}
+	ref, _ := a.branchRef(ctx, workspace, branch)
+	diff, truncated, err := a.Git.RefFileDiffContext(ctx, workspace.Path, base, ref, path, limit)
+	return diff, truncated, from, err
 }
 
 // readWorktreeFiles reads the changed files under prefix from a worktree,

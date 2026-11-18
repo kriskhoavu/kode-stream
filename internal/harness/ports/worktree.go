@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"errors"
 
 	"kode-stream/internal/common/models"
 )
@@ -47,4 +48,14 @@ type Worktrees interface {
 	// its branch, local or as last pushed. It names where it read from,
 	// "worktree" or "branch", or "" when neither is left.
 	ReadRunFiles(ctx context.Context, workspace models.WorkspaceConfig, worktreePath, base, branch, prefix string, limit int64) ([]RunFile, string, error)
+	// ChangedFiles lists what a run changed against base, from its worktree
+	// while it exists, else from its branch, saying which: "worktree",
+	// "branch", or "" when neither is left.
+	ChangedFiles(ctx context.Context, workspace models.WorkspaceConfig, worktreePath, base, branch string) ([]DiffFile, string, error)
+	// FileDiff returns the diff of one changed path, read the same way and
+	// bounded by limit. A path the run did not change is ErrNotChanged.
+	FileDiff(ctx context.Context, workspace models.WorkspaceConfig, worktreePath, base, branch, path string, limit int64) (string, bool, string, error)
 }
+
+// ErrNotChanged is a diff asked for a path the run did not change.
+var ErrNotChanged = errors.New("the run did not change this path")

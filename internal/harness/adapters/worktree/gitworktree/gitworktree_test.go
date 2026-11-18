@@ -2,6 +2,7 @@ package gitworktree
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"kode-stream/internal/common/models"
 	appgit "kode-stream/internal/git"
+	"kode-stream/internal/harness/ports"
 )
 
 func git(t *testing.T, dir string, args ...string) {
@@ -208,5 +210,52 @@ func TestPushNamesTheBranchAFeatureBranchAtTheRemote(t *testing.T) {
 	files, from, err := adapter.ReadRunFiles(ctx, workspace, "", worktree.BaseCommit, worktree.Branch, "", 1024)
 	if err != nil || from != "branch" || len(files) != 1 {
 		t.Fatalf("files = %#v from=%q err=%v", files, from, err)
+	}
+}
+
+func TestChangedFilesAndFileDiffReadTheBranchOnceTheWorktreeIsGone(t *testing.T) {
+	ctx := context.Background()
+	repo := t.TempDir()
+	git(t, repo, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(repo, "a.md"), []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-q", "-m", "base")
+	adapter := New(filepath.Join(t.TempDir(), "worktrees"), appgit.New())
+	adapter.Remote = ""
+	workspace := models.WorkspaceConfig{ID: "ws", Path: repo, BaselineBranch: "main"}
+	worktree, err := adapter.Create(ctx, workspace, "run-1", "harness/PM-1-abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worktree.Path, "a.md"), []byte("a\nb\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worktree.Path, "new.md"), []byte("n\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, from, err := adapter.ChangedFiles(ctx, workspace, worktree.Path, worktree.BaseCommit, worktree.Branch)
+	if err != nil || from != "worktree" || len(files) != 2 {
+		t.Fatalf("live files = %#v from=%q err=%v", files, from, err)
+	}
+	diff, _, from, err := adapter.FileDiff(ctx, workspace, worktree.Path, worktree.BaseCommit, worktree.Branch, "new.md", 1<<20)
+	if err != nil || from != "worktree" || !strings.Contains(diff, "+n") {
+		t.Fatalf("live diff = %q from=%q err=%v", diff, from, err)
+	}
+	if _, err := adapter.Commit(ctx, worktree.Path, "PM-1: Change a"); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repo, "worktree", "remove", "--force", worktree.Path)
+	files, from, err = adapter.ChangedFiles(ctx, workspace, worktree.Path, worktree.BaseCommit, worktree.Branch)
+	if err != nil || from != "branch" || len(files) != 2 || files[0].Path != "a.md" || files[0].Additions != 1 {
+		t.Fatalf("branch files = %#v from=%q err=%v", files, from, err)
+	}
+	diff, _, from, err = adapter.FileDiff(ctx, workspace, worktree.Path, worktree.BaseCommit, worktree.Branch, "a.md", 1<<20)
+	if err != nil || from != "branch" || !strings.Contains(diff, "+b") {
+		t.Fatalf("branch diff = %q from=%q err=%v", diff, from, err)
+	}
+	if _, _, _, err := adapter.FileDiff(ctx, workspace, worktree.Path, worktree.BaseCommit, worktree.Branch, "../etc/passwd", 1<<20); !errors.Is(err, ports.ErrNotChanged) {
+		t.Fatalf("an unchanged path err = %v", err)
 	}
 }
