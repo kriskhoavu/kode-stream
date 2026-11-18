@@ -46,7 +46,7 @@ Use these words. "Live agent session" means an interactive session that is still
 <!-- chunkId: workspace-agent-sessions-agent-space -->
 <!-- keywords: agent space, sessions view, kind filter, group, live only, conversation tab -->
 
-[live] Agent Space's Sessions view lists both kinds in one list, grouped by the ticket or plan they belong to. An interactive session on a plan and the harness card for the ticket with the same key share one group, which names the run's state beside its title. Each card carries an **Interactive** or **Harness** tag; **All · Interactive · Harness** narrows the list to one kind, and **Live only** keeps the running ones of either kind. Evidence: `web/src/features/sessions/SessionBrowser.tsx:60`, `web/src/features/sessions/agentSessions.ts:55`.
+[live] Agent Space's Sessions view lists both kinds in one list, grouped by the ticket or plan they belong to. An interactive session on a plan and the harness card for the ticket with the same key share one group. Each card carries an **Interactive** or **Harness** chip and its state as the status badge a task's details use; **All · Interactive · Harness** narrows the list to one kind, and **Live only** keeps the running ones of either kind. Evidence: `web/src/features/sessions/SessionBrowser.tsx:60`, `web/src/features/sessions/agentSessions.ts:55`.
 
 A ticket's harness sessions share **one card**, however many rounds they took, so a ticket the Planner and Checker went back and forth on does not fill the list. The card names the run's state, the agent in play and the run's rounds. Evidence: `web/src/features/sessions/SessionCard.tsx:126`.
 

@@ -26,7 +26,7 @@ A harness row is one ticket: the runs of its task among those 12, newest first, 
 <!-- chunkId: workspace-agent-sessions-reference-grouping -->
 <!-- keywords: plan key, ticket key, group title, run state, kind filter, live only, search -->
 
-[live] Rows are grouped by key. A harness row's key is its ticket's key (`APP-664`); an interactive row's key is its plan's identifier when the Canvas knows the plan, else its plan title, intent or provider. Rows that share a key share a group, titled `key · title`, with the newest run's state beside it: Working, Waiting on you, Done, Failed or Stopped. Evidence: `web/src/features/sessions/agentSessions.ts:55`.
+[live] Rows are grouped by key. A harness row's key is its ticket's key (`APP-664`); an interactive row's key is its plan's identifier when the Canvas knows the plan, else its plan title, intent or provider. Rows that share a key share a group, titled `key · title`. Each card states where it stands with the harness's status badge, the one a task's details use: Working, Waiting on you, Done, Failed or Stopped for a harness card. Evidence: `web/src/features/sessions/agentSessions.ts:55`.
 
 Groups with a live row come first, then by title; inside a group, live rows first, then newest. **All · Interactive · Harness** filters by kind, **Live only** keeps an interactive session that is starting or running and a harness session whose agent is working, and the text filter matches titles, ticket keys, branches, providers, agent roles, engines and models. The selection is remembered per workspace. Evidence: `web/src/features/sessions/SessionBrowser.tsx:60`, `web/src/features/sessions/useSessionBrowserSelection.ts:16`.
 
