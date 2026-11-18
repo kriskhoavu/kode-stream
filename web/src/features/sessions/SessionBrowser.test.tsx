@@ -232,7 +232,7 @@ describe('SessionBrowser', () => {
 			render(<SessionBrowser rows={rows} harness={harness} renderHarnessDetail={(selected) => <div data-testid="harness-detail">{selected.key}</div>} grouping="plan" persistKey="test-mixed" onStop={vi.fn()} onReload={vi.fn()} />);
 			const groups = [...document.querySelectorAll('.session-browser-group')];
 			expect(groups).toHaveLength(1);
-			expect(groups[0].querySelector('.session-browser-group-title')).toHaveTextContent('DI-7 · Fix the priceWorking');
+			expect(groups[0].querySelector('.session-browser-group-title')).toHaveTextContent('DI-7 · Fix the price');
 			// Two started rounds and a queued one make one card, naming the agent at work.
 			const card = screen.getByRole('button', { name: 'DI-7 harness run, Working' });
 			expect(card).toHaveTextContent('Planner · round 2');

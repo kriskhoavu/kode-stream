@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { GlobalSessionRow, HarnessRun } from '../../lib/types';
-import { byLiveThenNewest, harnessRun, harnessSession, interactiveSession, sessionGroup, sessionIsLive } from './agentSessions';
+import type { GlobalSessionRow } from '../../lib/types';
+import { byLiveThenNewest, harnessSession, interactiveSession, sessionGroup, sessionIsLive } from './agentSessions';
 import type { AgentSession, HarnessSessionRow, SessionKind } from './agentSessions';
 import { SessionBrowserTerminal } from './SessionBrowserTerminal';
 import { SessionChangesPanel } from './SessionChangesPanel';
-import { HarnessSessionCard, SessionCard, SessionKindTag, harnessRunGlyph, sessionTitle } from './SessionCard';
+import { HarnessSessionCard, SessionCard, SessionKindTag, sessionTitle } from './SessionCard';
 import { formatDuration, formatSessionDate, isSessionLive, SessionConfirmDialog } from './sessionDisplay';
 import { useSessionBrowserSelection } from './useSessionBrowserSelection';
 import { agentRoleLabels } from '../harness/vocabulary';
@@ -14,7 +14,7 @@ import './sessions.css';
 
 export type SessionBrowserGrouping = 'plan' | 'workspace-plan';
 
-type Group = { key: string; title: string; rows: AgentSession[]; run?: HarnessRun };
+type Group = { key: string; title: string; rows: AgentSession[] };
 type KindFilter = 'all' | SessionKind;
 
 function buildGroups(rows: AgentSession[], grouping: SessionBrowserGrouping): Group[] {
@@ -25,13 +25,11 @@ function buildGroups(rows: AgentSession[], grouping: SessionBrowserGrouping): Gr
 		const key = prefix ? `${prefix} ${own.key}` : own.key;
 		const title = prefix ? `${prefix} · ${own.title}` : own.title;
 		const existing = buckets.get(key);
-		const run = row.kind === 'harness' ? harnessRun(row.harness) : undefined;
 		if (existing) {
 			existing.rows.push(row);
-			if (run && (!existing.run || Date.parse(run.startedAt) > Date.parse(existing.run.startedAt))) existing.run = run;
 			// A harness task names the group by its key and title, which reads better than a plan title alone.
 			if (row.kind === 'harness') existing.title = title;
-		} else buckets.set(key, { key, title, rows: [row], run });
+		} else buckets.set(key, { key, title, rows: [row] });
 	}
 	const groups = [...buckets.values()];
 	for (const group of groups) group.rows.sort(byLiveThenNewest);
@@ -140,7 +138,7 @@ export function SessionBrowser({ rows, harness, renderHarnessDetail, grouping, p
 			{sessions.length === 0 && <p className="session-browser-empty">{emptyMessage}</p>}
 			{sessions.length > 0 && visibleRows.length === 0 && <p className="session-browser-empty">No sessions match the current filter.</p>}
 			{groups.map((group) => <section key={group.key} className="session-browser-group">
-				<h3 className="session-browser-group-title" title={group.title}><span>{group.title}</span>{group.run && <span className={`session-browser-run-state tone-${harnessRunGlyph(group.run).tone}`}>{harnessRunGlyph(group.run).label}</span>}</h3>
+				<h3 className="session-browser-group-title" title={group.title}><span>{group.title}</span></h3>
 				<ul className="session-browser-cards">
 					{group.rows.map((session) => session.kind === 'interactive'
 						? <SessionCard key={session.id} row={session.row} tagged={mixed} selected={session.id === selectedId} tabIndex={session.id === rovingId ? 0 : -1} cardRef={cardRef(session.id)} onSelect={() => select(session.id)} onRemove={onRemove ? () => { setRemoveError(''); setRemoveTarget(session.row); } : undefined} onKeyDown={onCardKeyDown(session.id)} />

@@ -3,11 +3,12 @@ import type { HarnessAgentRole, HarnessAgentRun, HarnessRun } from '../../lib/ty
 import { api } from '../../shared/api';
 import { TranscriptTurns } from '../ai-session/TranscriptTurns';
 import type { HarnessClient } from '../harness/harnessClient';
+import { HxStatusBadge } from '../harness/HxStatusBadge';
 import { PipelineStepper } from '../harness/PipelineStepper';
 import { pipelineModel } from '../harness/pipeline';
 import { useAgentTranscript } from '../harness/RunDrawer';
 import { StopRunButton, canStopRun } from '../harness/StopRunButton';
-import { agentRoleLabels, formatCost, formatMinutes, hxSteps, plural } from '../harness/vocabulary';
+import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, hxSteps, plural } from '../harness/vocabulary';
 import type { HxStep } from '../harness/vocabulary';
 import '../harness/harness.css';
 import { readableTurns } from './agentSessions';
@@ -85,7 +86,7 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 						? <select className="session-harness-run-picker" aria-label="Run" value={run.id} onChange={(event) => { setRunId(event.target.value); setPick(undefined); }}>
 							{row.runs.map((candidate) => <option key={candidate.run.id} value={candidate.run.id}>{`Run ${runOrder.indexOf(candidate) + 1} · ${formatSessionDate(candidate.run.startedAt)} · ${harnessRunGlyph(candidate.run).label}`}</option>)}
 						</select>
-						: harnessRunGlyph(run).label}</dd></div>
+						: <HxStatusBadge status={harnessRunGlyph(run).status} label={harnessRunGlyph(run).label} size="sm" />}</dd></div>
 					<div><dt>Branch</dt><dd><code>{branch}</code></dd></div>
 					<div><dt>Started</dt><dd>{formatSessionDate(run.startedAt)}</dd></div>
 					<div><dt>Work</dt><dd>{[plural(agents.length, 'round'), formatMinutes(sum('durationMs')), formatCost(sum('costUsd'))].join(' · ')}</dd></div>
@@ -114,7 +115,7 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 			{agent
 				? <p className="session-harness-agent">
 					<strong>{`${agentRoleLabels[agent.role]} · round ${agent.round}`}</strong>
-					<span className={`session-harness-agent-state tone-${harnessGlyph(agent).tone}`}>{harnessGlyph(agent).label}</span>
+					<HxStatusBadge status={harnessGlyph(agent).status} label={harnessGlyph(agent).label} size="sm" className="session-harness-agent-state" />
 					<span>{harnessAgentLabel(agent)}</span>
 					<span>{[plural(agent.turns, 'turn'), formatMinutes(agent.durationMs), formatCost(agent.costUsd)].join(' · ')}</span>
 				</p>
@@ -125,7 +126,7 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 					const glyph = harnessGlyph(agentRun);
 					const on = agentRun.id === agent?.id;
 					return <button key={agentRun.id} type="button" className={on ? 'session-harness-round active' : 'session-harness-round'} aria-pressed={on} title={`${agentRoleLabels[agentRun.role]} · round ${agentRun.round} · ${glyph.label}`} onClick={() => { setPick({ step: roleSteps[agentRun.role], agentRunId: agentRun.id }); setTab('conversation'); }}>
-						<span className={`session-card-glyph glyph-${glyph.kind} tone-${glyph.tone}`} aria-hidden="true" />{index + 1}
+						<i className={`hx-swatch hx-tone-${hxStatuses[glyph.status].tone}`} aria-hidden="true" />{index + 1}
 					</button>;
 				})}
 			</div>}
