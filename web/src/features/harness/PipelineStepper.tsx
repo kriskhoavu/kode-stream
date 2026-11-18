@@ -8,15 +8,16 @@ import { LiveTimer } from './LiveTimer';
 
 /**
  * The run as a row of plain steps. One tab stop: arrow keys move between
- * steps (roving tabindex), Enter or a click opens a two-sentence explainer.
+ * steps (roving tabindex). Hovering a step names what it does; where the page
+ * passes `onSelect`, a click or Enter opens what that step made.
  * `orientation="vertical"` is the drawer's compact form.
  */
 export function PipelineStepper({ model, label, orientation = 'horizontal', onSelect }: { model: PipelineModel; label: string; orientation?: 'horizontal' | 'vertical'; /** Also called when a step is clicked, so a page can show what that step made. */ onSelect?: (card: StepCard) => void }) {
 	const cards = model.groups.flatMap((group) => group.cards);
 	const initial = Math.max(0, cards.findIndex((card) => card.current));
 	const [focusIndex, setFocusIndex] = useState(initial);
-	const [open, setOpen] = useState<string | undefined>();
-	const refs = useRef<(HTMLButtonElement | null)[]>([]);
+	const [selected, setSelected] = useState<string | undefined>();
+const refs = useRef<(HTMLButtonElement | null)[]>([]);
 	const currentId = model.current?.id;
 
 	useEffect(() => {
@@ -26,14 +27,7 @@ export function PipelineStepper({ model, label, orientation = 'horizontal', onSe
 		if (index >= 0) setFocusIndex(index);
 	}, [currentId]);
 
-	useEffect(() => {
-		if (!open) return;
-		const close = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') setOpen(undefined); };
-		window.addEventListener('keydown', close);
-		return () => window.removeEventListener('keydown', close);
-	}, [open]);
-
-	const move = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+const move = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
 		const keys: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 		let next = index;
 		if (event.key in keys) next = Math.min(cards.length - 1, Math.max(0, index + keys[event.key]));
@@ -66,8 +60,8 @@ export function PipelineStepper({ model, label, orientation = 'horizontal', onSe
 											card={card}
 											refCallback={(element) => { refs.current[position] = element; }}
 											tabIndex={position === focusIndex ? 0 : -1}
-											open={open === card.id}
-											onToggle={() => { setFocusIndex(position); setOpen((current) => current === card.id ? undefined : card.id); onSelect?.(card); }}
+											selected={Boolean(onSelect) && selected === card.id}
+onSelect={onSelect ? () => { setFocusIndex(position); setSelected(card.id); onSelect(card); } : undefined}
 											onKeyDown={(event) => move(event, position)}
 										/>
 									);
@@ -77,23 +71,22 @@ export function PipelineStepper({ model, label, orientation = 'horizontal', onSe
 					);
 				})}
 			</ol>
-			{orientation === 'horizontal' && <StepperLegend />}
+			{orientation === 'horizontal' && <StepperLegend hint={onSelect ? 'Click a step to open what it made.' : undefined} />}
 		</div>
 	);
 }
 
-function StageCard({ card, refCallback, tabIndex, open, onToggle, onKeyDown }: {
+function StageCard({ card, refCallback, tabIndex, selected, onSelect, onKeyDown }: {
 	card: StepCard;
 	refCallback: (element: HTMLButtonElement | null) => void;
 	tabIndex: number;
-	open: boolean;
-	onToggle: () => void;
+	selected: boolean;
+	onSelect?: () => void;
 	onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
 	const meta = hxStatuses[card.status];
 	const Icon = meta.icon;
-	const explainId = `hx-explain-${card.id}`;
-	// Draw the check and glow only when a step finishes while someone watches, not on every page load.
+// Draw the check and glow only when a step finishes while someone watches, not on every page load.
 	const [justDone, setJustDone] = useState(false);
 	const previous = useRef(card.status);
 	useEffect(() => {
@@ -105,12 +98,12 @@ function StageCard({ card, refCallback, tabIndex, open, onToggle, onKeyDown }: {
 			<button
 				ref={refCallback}
 				type="button"
-				className={`hx-stage hx-tone-${meta.tone} hx-stage-${card.status}${justDone ? ' just-done' : ''}`}
+				className={`hx-stage hx-tone-${meta.tone} hx-stage-${card.status}${justDone ? ' just-done' : ''}${selected ? ' selected' : ''}${onSelect ? '' : ' static'}`}
+title={stepHint(card)}
 				tabIndex={tabIndex}
 				aria-current={card.current ? 'step' : undefined}
-				aria-expanded={open}
-				aria-controls={open ? explainId : undefined}
-				onClick={onToggle}
+				aria-pressed={onSelect ? selected : undefined}
+onClick={onSelect}
 				onKeyDown={onKeyDown}
 				onAnimationEnd={(event) => { if (event.animationName === 'hx-glow') setJustDone(false); }}
 			>
@@ -121,20 +114,13 @@ function StageCard({ card, refCallback, tabIndex, open, onToggle, onKeyDown }: {
 					{card.meta.map((fact) => <span key={fact}>{fact}</span>)}
 				</span>
 			</button>
-			{open && <StageExplainer id={explainId} card={card} />}
-		</div>
+</div>
 	);
 }
 
-/** Two plain sentences: what the step does, and where it stands. */
-export function StageExplainer({ id, card }: { id: string; card: StepCard }) {
-	return (
-		<div className="hx-explain" id={id} role="note">
-			<b>{card.label}</b>
-			<span>{hxSteps[card.step].explain}</span>
-			<span> {statusSentence(card.status)}</span>
-		</div>
-	);
+/** Two plain sentences, shown on hover: what the step does, and where it stands. */
+export function stepHint(card: StepCard): string {
+	return `${hxSteps[card.step].explain} ${statusSentence(card.status)}`;
 }
 
 function statusSentence(status: HxStatus): string {
@@ -151,14 +137,14 @@ function statusSentence(status: HxStatus): string {
 	}
 }
 
-export function StepperLegend() {
+export function StepperLegend({ hint }: { hint?: string }) {
 	const items: HxStatus[] = ['done', 'working', 'waiting', 'stopped', 'not_started', 'manual'];
 	return (
 		<div className="hx-legend" aria-label="Legend">
 			{items.map((status) => (
 				<span key={status}><i className={`hx-swatch hx-tone-${hxStatuses[status].tone} ${status === 'not_started' || status === 'manual' ? 'outline' : ''}`} aria-hidden="true" />{hxStatuses[status].label}</span>
 			))}
-			<span className="hx-legend-hint">Click a step to see what it does.</span>
+			{hint && <span className="hx-legend-hint">{hint}</span>}
 		</div>
 	);
 }

@@ -918,27 +918,6 @@ a.hx-source:hover {
 	background: repeating-linear-gradient(90deg, var(--hx-running) 0 6px, transparent 6px 16px);
 }
 
-.hx-explain {
-	position: absolute;
-	z-index: 5;
-	top: 100%;
-	left: 0;
-	width: 300px;
-	margin-top: 8px;
-	padding: 12px 14px;
-	border: 1px solid var(--line);
-	border-radius: 10px;
-	background: var(--panel);
-	box-shadow: var(--shadow-soft);
-	font-size: 13px;
-	color: var(--text);
-}
-
-.hx-explain b {
-	display: block;
-	margin-bottom: 4px;
-}
-
 .hx-legend {
 	display: flex;
 	flex-wrap: wrap;
@@ -1882,10 +1861,16 @@ a.hx-source:hover {
 	transition: transform .15s ease, border-color .15s ease;
 }
 
-.hx-stage:hover {
+.hx-stage:not(.static):hover {
 	transform: translateY(-1px);
 	border-color: color-mix(in srgb, var(--accent-text) 55%, var(--line));
 }
+
+/* A step that opens nothing stays still under the pointer. */
+.hx-stage.static { cursor: default; }
+
+/* The step whose work the page below shows. */
+.hx-stage.selected { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-text) 70%, transparent); }
 
 /* A task that is starting or working turns its badge's loader, so the change shows at once. */
 .hx-badge.hx-status-starting svg,

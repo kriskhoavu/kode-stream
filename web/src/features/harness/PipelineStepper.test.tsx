@@ -27,12 +27,22 @@ describe('PipelineStepper', () => {
 		expect(screen.getAllByRole('button')[0]).toHaveTextContent(/^DoneStart/);
 	});
 
-	it('explains a step in two plain sentences and closes on Escape', async () => {
+	it('names what a step does on hover and opens nothing over the pipeline', async () => {
 		const model = pipelineModel(await createFixtureClient({ tickMs: 0, arrivalMs: 0 }).run('run-pm-02'));
 		render(<PipelineStepper model={model} label="Progress" />);
-		fireEvent.click(screen.getByRole('button', { name: /Code check/ }));
-		expect(screen.getByRole('note')).toHaveTextContent('The Checker reads the change and lists must-fix items. The Builder fixes them, up to 3 rounds. It has not started yet.');
-		fireEvent.keyDown(window, { key: 'Escape' });
+		const step = screen.getByRole('button', { name: /Code check/ });
+		expect(step).toHaveAttribute('title', 'The Checker reads the change and lists must-fix items. The Builder fixes them, up to 3 rounds. It has not started yet.');
+		fireEvent.click(step);
 		expect(screen.queryByRole('note')).not.toBeInTheDocument();
+	});
+
+	it('marks the step clicked when the page opens what it made', async () => {
+		const model = pipelineModel(await createFixtureClient({ tickMs: 0, arrivalMs: 0 }).run('run-pm-02'));
+		const opened: string[] = [];
+		render(<PipelineStepper model={model} label="Progress" onSelect={(card) => opened.push(card.step)} />);
+		fireEvent.click(screen.getByRole('button', { name: /Plan check/ }));
+		expect(opened).toEqual(['plan_check']);
+		expect(screen.getByRole('button', { name: /Plan check/ })).toHaveAttribute('aria-pressed', 'true');
+		expect(screen.getByText('Click a step to open what it made.')).toBeInTheDocument();
 	});
 });
