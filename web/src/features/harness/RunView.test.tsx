@@ -22,8 +22,10 @@ describe('RunView', () => {
 		expect(screen.getByText(/So far: 5 agent runs/)).toBeInTheDocument();
 		expect(screen.getByRole('list', { name: 'Progress for PM-02' })).toBeInTheDocument();
 		expect(screen.getByRole('row', { name: /Total so far/ })).toBeInTheDocument();
-		expect(screen.getByRole('heading', { name: 'What the Checker said · plan, round 1' })).toBeInTheDocument();
-		expect(screen.getByText('Must fix · 1 · fixed in round 2')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'What the Checker said · plan, round 2' })).toBeInTheDocument();
+		expect(screen.getByText('Round 1 asked for 1 must-fix item. Round 2 found them fixed.')).toBeInTheDocument();
+		expect(screen.getByText('Suggestions · 4')).toBeInTheDocument();
+		expect(screen.queryByText(/Must fix/)).not.toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Jira PM-02' })).toBeInTheDocument();
 	});
 

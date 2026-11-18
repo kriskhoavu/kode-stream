@@ -34,7 +34,7 @@ describe('HarnessRunTab', () => {
 		expect(harness.loadRun).toHaveBeenCalledWith('run-pm-02');
 		expect(screen.getByText('Working · Build · round 1 of 3')).toBeInTheDocument();
 		expect(screen.getByRole('list', { name: 'Progress for PM-02' })).toBeInTheDocument();
-		expect(screen.getByRole('heading', { name: 'What the Checker said · plan, round 1' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'What the Checker said · plan, round 2' })).toBeInTheDocument();
 		const ledger = screen.getByRole('region', { name: 'What each step took' });
 		fireEvent.click(within(ledger).getAllByRole('button', { name: /^Round \d/ })[0]);
 		expect(onOpenConversation).toHaveBeenCalledWith(expect.any(String));
