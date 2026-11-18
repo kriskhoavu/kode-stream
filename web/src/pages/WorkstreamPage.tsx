@@ -44,7 +44,7 @@ import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { AgentCluster, AgentPane, AgentsTab, agentFocusKey, useHeldAgentSessions, type AgentFocus, type AgentPaneHarness, type AgentsMode } from '../features/workstream/AgentsPanel';
 import { HarnessRunTab } from '../features/workstream/HarnessRunTab';
 import { takeOverByHand } from '../features/workstream/takeOver';
-import type { HarnessController } from '../features/harness/useHarness';
+import { plainError, type HarnessController } from '../features/harness/useHarness';
 import { useItemSessions, type ItemAgents } from '../features/workstream/useItemSessions';
 import { useBoardHarness } from '../features/workstream/useBoardHarness';
 import { isSyntheticItem, joinHarness, queueOrder, taskCards, tasksForWorkspace, workedBy, workedByLabels, type CardWork } from '../features/workstream/harnessJoin';
@@ -447,12 +447,17 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 		const workspaceID = workspace.id;
 		const generation = workspaceGenerationRef.current;
 		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
-    setScanState('Refreshing');
+    // On the Tasks board, Refresh also asks the workspace's sources (Jira) at once, rather than at the next poll.
+    const pollScouts = tasksShown && harnessOn ? harness.client.pollScouts : undefined;
+    setScanState(pollScouts ? 'Checking Jira' : 'Refreshing');
     try {
-      const result = await api.loadWorkstreamCheckout(workspace.id, { force: true }, controller.signal);
+      const [result, polled] = await Promise.all([
+        api.loadWorkstreamCheckout(workspace.id, { force: true }, controller.signal),
+        pollScouts ? pollScouts(workspaceID).then(async (answer) => { await harness.refresh(); return sourcesChecked(answer.sources ?? []); }, (caught: unknown) => { const message = plainError(caught, 'the check failed'); return message.includes('has no harness sources') ? '' : `Jira: ${message}`; }) : Promise.resolve('')
+      ]);
 			if (controller.signal.aborted || !active()) return;
       notifyReliabilityChanged();
-      setScanState(`${result.itemCount} items indexed`);
+      setScanState(polled || `${result.itemCount} items indexed`);
       setBranchContext(result);
       setSelectedBranch(result.branch);
       setPlans(result.items);
@@ -2298,4 +2303,13 @@ function readStoredToggle(key: string): boolean {
 
 function sameJSON(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/** What a Refresh on the Tasks board says the sources returned. */
+export function sourcesChecked(sources: { found: number; added: number; lastError?: string }[]): string {
+  const failed = sources.find((source) => source.lastError);
+  if (failed) return `Jira: ${failed.lastError}`;
+  const found = sources.reduce((sum, source) => sum + source.found, 0);
+  const added = sources.reduce((sum, source) => sum + source.added, 0);
+  return `Jira checked: ${found} found, ${added} new`;
 }

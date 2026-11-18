@@ -33,6 +33,7 @@ function stubBoard(options: { enabled?: boolean } = {}) {
 		] }));
 		if (url === '/api/harness/approvals') return Promise.resolve(response({ approvals: [approval('a-3', stuck.id, { runId: 'run-3', gate: 'plan', summary: 'Three steps, one file.' })] }));
 		if (url === '/api/harness/tasks' && init?.method === 'POST') return Promise.resolve(response(task('PM-2', { workspaceId: 'ws', startRequested: true }), true, 201));
+		if (url === '/api/harness/scout/poll' && init?.method === 'POST') return Promise.resolve(response({ started: true, sources: [{ workspaceId: 'ws', kind: 'jira', found: 4, added: 1 }] }));
 		if (url === '/api/harness/settings') return Promise.resolve(response({ revision: 1, enabled: true, autoStart: true, requirePrApproval: true, askQuestions: true, slots: {}, paused: {}, sources: [], modelPolicy: {} }));
 		if (url === '/api/harness/approvals/a-3/decide' && init?.method === 'POST') return Promise.resolve(response({ ...approval('a-3', stuck.id, { runId: 'run-3', gate: 'plan' }), state: 'approved', decidedAt: '2026-11-04T10:00:00.000Z', channel: 'dashboard', revision: 2 }));
 		if (url.startsWith('/api/ai/session-records')) return Promise.resolve(response([]));
@@ -243,5 +244,20 @@ describe('WorkstreamPage ticket cards', () => {
 		fireEvent.click(ticket);
 		expect(await screen.findByRole('tab', { name: 'Ticket', selected: true })).toBeInTheDocument();
 		expect(screen.getByRole('tab', { name: 'Plan' })).toBeInTheDocument();
+	});
+
+	it('asks Jira at once when Refresh is pressed on Tasks, and not on Plans', async () => {
+		const fetchMock = stubBoard();
+		renderBoard();
+		await screen.findByText('Found by the Finder');
+		const polls = () => fetchMock.mock.calls.filter(([url]) => String(url) === '/api/harness/scout/poll');
+		fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		expect(await screen.findByText('Jira checked: 4 found, 1 new')).toBeInTheDocument();
+		expect(polls()).toHaveLength(1);
+		expect(JSON.parse(String(polls()[0][1]?.body))).toEqual({ workspaceId: 'ws' });
+		await showPlans();
+		fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		expect(await screen.findByText('3 items indexed')).toBeInTheDocument();
+		expect(polls()).toHaveLength(1);
 	});
 });

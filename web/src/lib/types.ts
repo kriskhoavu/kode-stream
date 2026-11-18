@@ -1240,6 +1240,16 @@ export interface HarnessStatus {
   engines: HarnessEngineStatus[];
 }
 
+/** What one source returned when the Finder asked it. */
+export interface HarnessSourcePoll {
+  workspaceId: string;
+  kind: string;
+  lastPolledAt?: string;
+  found: number;
+  added: number;
+  lastError?: string;
+}
+
 export interface HarnessCostGroup { key: string; costUsd: number; agentRuns: number; turns: number; durationMs: number }
 export interface HarnessCostSummary {
   groupBy: 'day' | 'run' | 'role' | 'model';

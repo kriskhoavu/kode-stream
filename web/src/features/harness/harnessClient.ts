@@ -12,6 +12,7 @@ import type {
 	HarnessRun,
 	HarnessRunDetail,
 	HarnessSettings,
+	HarnessSourcePoll,
 	HarnessStatus,
 	HarnessTask, HarnessTranscript,
 	SafeSessionRecord,
@@ -74,7 +75,7 @@ export interface HarnessClient {
 	/** The workspaces a source can look in, with the Jira project key when the workspace has a Jira connection. */
 	workspaces?(signal?: AbortSignal): Promise<HarnessWorkspaceOption[]>;
 	/** Asks the Finder to look at its sources now rather than on its timer. */
-	pollScouts?(): Promise<{ started: boolean }>;
+	pollScouts?(workspaceId?: string): Promise<{ started: boolean; sources?: HarnessSourcePoll[] }>;
 	/** Opens the live event feed after `afterSeq`; returns a function that closes it. */
 	subscribe?(afterSeq: number, handlers: HarnessFeedHandlers): () => void;
 	/** True for the in-memory fixture, so the page can say so. */
@@ -108,7 +109,7 @@ export const apiHarnessClient: HarnessClient = {
 	clearQueue: (workspaceId) => api.clearHarnessQueue(workspaceId),
 	cancelRun: (run, reason) => api.cancelHarnessRun(run.id, run.revision, reason),
 	workspaces: async (signal) => (await api.workspaces(signal)).map((workspace) => ({ id: workspace.id, name: workspace.name, jiraProjectKey: workspace.jira?.projectKey || undefined })),
-	pollScouts: () => api.pollHarnessScouts(),
+	pollScouts: (workspaceId) => api.pollHarnessScouts(workspaceId),
 	subscribe: (afterSeq, handlers) => typeof EventSource === 'undefined'
 		? (handlers.onError(), () => undefined)
 		: openEventSourceFeed(api.harnessEventsURL(afterSeq || undefined), handlers)
