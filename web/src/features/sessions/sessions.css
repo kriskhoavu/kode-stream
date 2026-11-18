@@ -207,16 +207,16 @@
 
 /* ── Harness detail: the run's steps, compact ──────────────────────────── */
 
-.session-harness-steps { padding: 14px 20px 12px; border-bottom: 1px solid var(--line); }
+.session-harness-steps { padding: 16px 20px 14px; border-bottom: 1px solid var(--line); }
 .session-harness-steps .hx-stepper-wrap { gap: 0; }
 
 /* Groups share the width and one height; a group's cards sit at its middle, the connectors at theirs. */
 .session-harness-steps .hx-stepper { align-items: stretch; width: 100%; max-width: 100%; margin: 0; padding: 0 0 2px; }
-.session-harness-steps .hx-step-group { flex: 1 1 0; justify-content: center; min-width: 108px; gap: 4px; padding: 22px 5px 5px; border-radius: 8px; background: transparent; }
-.session-harness-steps .hx-step-group-label { top: 6px; left: 8px; right: 8px; overflow: hidden; font-size: 10px; letter-spacing: .03em; text-overflow: ellipsis; }
-.session-harness-steps .hx-conn { align-self: center; width: 10px; }
+.session-harness-steps .hx-step-group { flex: 1 1 0; justify-content: center; min-width: 124px; gap: 8px; padding: 30px 10px 10px; border-radius: 10px; background: transparent; }
+.session-harness-steps .hx-step-group-label { top: 10px; left: 11px; right: 8px; overflow: hidden; font-size: 10px; letter-spacing: .01em; text-overflow: ellipsis; }
+.session-harness-steps .hx-conn { align-self: center; width: 18px; }
 
-.session-harness-steps .hx-stage { width: 100%; min-height: 0; gap: 1px; padding: 6px 8px; border-color: var(--line); border-radius: 7px; background: var(--panel); box-shadow: none; }
+.session-harness-steps .hx-stage { width: 100%; min-height: 0; gap: 3px; padding: 9px 10px 10px; border-color: var(--line); border-radius: 8px; background: var(--panel); box-shadow: none; }
 .session-harness-steps .hx-stage-working { border-color: color-mix(in srgb, var(--hx-running) 55%, var(--line)); }
 .session-harness-steps .hx-stage-waiting { border-color: color-mix(in srgb, var(--hx-waiting) 55%, var(--line)); box-shadow: none; }
 .session-harness-steps .hx-stage:not(.static):hover { transform: none; border-color: color-mix(in srgb, var(--text) 30%, var(--line)); }
@@ -224,12 +224,13 @@
 
 .session-harness-steps .hx-stage-status { gap: 4px; color: color-mix(in srgb, var(--hx-tone) 72%, var(--muted)); font-size: 10.5px; font-weight: 600; }
 .session-harness-steps .hx-stage-status svg { width: 11px; height: 11px; }
-.session-harness-steps .hx-stage-name { overflow: hidden; font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+/* A name too long for a narrow step wraps rather than losing its end. */
+.session-harness-steps .hx-stage-name { font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
 .session-harness-steps .hx-stage-not_started .hx-stage-name,
 .session-harness-steps .hx-stage-skipped .hx-stage-name { color: var(--muted); }
-.session-harness-steps .hx-stage-meta { gap: 0 6px; font-size: 11px; }
+.session-harness-steps .hx-stage-meta { gap: 2px 8px; font-size: 11.5px; line-height: 1.35; }
 
-.session-harness-hint { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; }
+.session-harness-hint { margin: 12px 0 0; color: var(--muted); font-size: 11.5px; }
 
 /* ── Harness detail: the chosen agent and its step's rounds ────────────── */
 
