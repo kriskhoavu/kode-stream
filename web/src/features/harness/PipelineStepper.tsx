@@ -12,11 +12,22 @@ import { LiveTimer } from './LiveTimer';
  * passes `onSelect`, a click or Enter opens what that step made.
  * `orientation="vertical"` is the drawer's compact form.
  */
-export function PipelineStepper({ model, label, orientation = 'horizontal', onSelect }: { model: PipelineModel; label: string; orientation?: 'horizontal' | 'vertical'; /** Also called when a step is clicked, so a page can show what that step made. */ onSelect?: (card: StepCard) => void }) {
+export function PipelineStepper({ model, label, orientation = 'horizontal', onSelect, selectedId, hint = 'Click a step to open what it made.' }: {
+	model: PipelineModel;
+	label: string;
+	orientation?: 'horizontal' | 'vertical';
+	/** Also called when a step is clicked, so a page can show what that step made. */
+	onSelect?: (card: StepCard) => void;
+	/** The step shown as selected, where the page decides it; else the last one clicked. */
+	selectedId?: string;
+	/** The legend's line on what a click does. */
+	hint?: string;
+}) {
 	const cards = model.groups.flatMap((group) => group.cards);
 	const initial = Math.max(0, cards.findIndex((card) => card.current));
 	const [focusIndex, setFocusIndex] = useState(initial);
-	const [selected, setSelected] = useState<string | undefined>();
+	const [clicked, setSelected] = useState<string | undefined>();
+	const selected = selectedId ?? clicked;
 const refs = useRef<(HTMLButtonElement | null)[]>([]);
 	const currentId = model.current?.id;
 
@@ -71,7 +82,7 @@ onSelect={onSelect ? () => { setFocusIndex(position); setSelected(card.id); onSe
 					);
 				})}
 			</ol>
-			{orientation === 'horizontal' && <StepperLegend hint={onSelect ? 'Click a step to open what it made.' : undefined} />}
+			{orientation === 'horizontal' && <StepperLegend hint={onSelect ? hint : undefined} />}
 		</div>
 	);
 }

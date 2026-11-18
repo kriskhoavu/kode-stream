@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../shared/api';
-import type { CanvasProjection, GlobalSessionRow, SafeSessionRecord } from '../../lib/types';
-import { liveSteps } from '../harness/RunDrawer';
+import type { CanvasProjection, GlobalSessionRow, HarnessRunDetail, SafeSessionRecord } from '../../lib/types';
 import { useBoardHarness } from '../workstream/useBoardHarness';
 import type { HarnessSessionRow } from '../sessions/agentSessions';
 import { HarnessSessionDetail } from '../sessions/HarnessSessionDetail';
@@ -61,8 +60,9 @@ export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch,
 
 /**
  * The harness's agents in this workspace, as harness sessions: one row per
- * agent of the newest runs, live from the harness's event feed. Undefined
- * while the harness is off, so the list then holds interactive sessions only.
+ * ticket, holding the ticket's newest runs and their agents, live from the
+ * harness's event feed. Undefined while the harness is off, so the list then
+ * holds interactive sessions only.
  */
 function useHarnessSessions(workspaceId: string, wanted: boolean): { rows?: HarnessSessionRow[]; controller: ReturnType<typeof useBoardHarness> } {
 	const controller = useBoardHarness();
@@ -86,12 +86,19 @@ function useHarnessSessions(workspaceId: string, wanted: boolean): { rows?: Harn
 
 	const rows = useMemo(() => {
 		if (!on) return undefined;
-		return runs.flatMap((run) => {
+		const tickets = new Map<string, HarnessSessionRow>();
+		for (const run of runs) {
 			const detail = state.details[run.id];
-			if (!detail) return [];
+			if (!detail) continue;
 			const task = state.tasks[run.taskId] ?? detail.task;
-			return liveSteps(detail.stages, detail.agentRuns).flatMap((step) => step.agentRuns.map((agentRun) => ({ agentRun, run, task, step: step.title })));
-		});
+			const key = task?.source.key ?? run.id;
+			const current: HarnessRunDetail = { ...detail, run };
+			const ticket = tickets.get(key);
+			if (ticket) ticket.runs.push(current);
+			else tickets.set(key, { key, task, runs: [current] });
+		}
+		// `runs` is already working first, then newest; a ticket's runs keep that order.
+		return [...tickets.values()];
 	}, [on, runs, state.details, state.tasks]);
 	return { rows, controller };
 }

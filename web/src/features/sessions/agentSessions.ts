@@ -1,4 +1,4 @@
-import type { GlobalSessionRow, HarnessAgentRun, HarnessRun, HarnessTask } from '../../lib/types';
+import type { GlobalSessionRow, HarnessRun, HarnessRunDetail, HarnessTask } from '../../lib/types';
 import { isSessionLive } from './sessionDisplay';
 
 /**
@@ -11,15 +11,24 @@ import { isSessionLive } from './sessionDisplay';
  *   Planner, Checker or Builder round), headless, in the run's own worktree.
  *   Nobody types into it: a person steers it through the run's questions and
  *   approvals, and reads its conversation.
+ *
+ * The list shows one harness row per ticket, never one per round: its detail
+ * walks the run's steps and rounds, so a ticket's many agents stay one card.
  */
 export type SessionKind = 'interactive' | 'harness';
 
+/** One ticket's harness sessions: every agent of its runs, newest run first. */
 export interface HarnessSessionRow {
-	agentRun: HarnessAgentRun;
-	run: HarnessRun;
+	/** The ticket's key (`APP-664`), or its run's id while the task is unknown. */
+	key: string;
 	task?: HarnessTask;
-	/** The run's step this agent worked in, as the run page names it ("Plan", "Build 2"). */
-	step: string;
+	/** The ticket's runs with their agents, newest first; never empty. */
+	runs: HarnessRunDetail[];
+}
+
+/** The run a ticket's card speaks for: its newest. */
+export function harnessRun(row: HarnessSessionRow): HarnessRun {
+	return row.runs[0].run;
 }
 
 export type AgentSession =
@@ -31,22 +40,22 @@ export function interactiveSession(row: GlobalSessionRow): AgentSession {
 }
 
 export function harnessSession(harness: HarnessSessionRow): AgentSession {
-	return { kind: 'harness', id: `harness:${harness.agentRun.id}`, harness };
+	return { kind: 'harness', id: `harness:${harness.key}`, harness };
 }
 
 export function sessionIsLive(session: AgentSession): boolean {
-	return session.kind === 'interactive' ? isSessionLive(session.row.record) : session.harness.agentRun.state === 'running';
+	return session.kind === 'interactive' ? isSessionLive(session.row.record) : harnessRun(session.harness).state === 'running';
 }
 
 export function sessionStartedAt(session: AgentSession): string {
-	return session.kind === 'interactive' ? session.row.record.startedAt : session.harness.agentRun.startedAt ?? session.harness.run.startedAt;
+	return session.kind === 'interactive' ? session.row.record.startedAt : harnessRun(session.harness).startedAt;
 }
 
 /** The ticket or plan a session belongs to: its key, when it has one, joins a harness task to an interactive session on the same plan. */
 export function sessionGroup(session: AgentSession): { key: string; title: string } {
 	if (session.kind === 'harness') {
-		const { task, run } = session.harness;
-		if (!task) return { key: `run:${run.id}`, title: run.branch };
+		const { task } = session.harness;
+		if (!task) return { key: `run:${session.harness.key}`, title: harnessRun(session.harness).branch };
 		return { key: `key:${task.source.key}`, title: `${task.source.key} · ${task.title}` };
 	}
 	const { row } = session;

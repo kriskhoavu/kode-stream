@@ -1,5 +1,6 @@
-import type { GlobalSessionRow, HarnessAgentRun, SafeSessionRecord } from '../../lib/types';
-import { agentRoleLabels, engineLabel, modelLabel } from '../harness/vocabulary';
+import type { GlobalSessionRow, HarnessAgentRun, HarnessRun, HarnessRunDetail, SafeSessionRecord } from '../../lib/types';
+import { agentRoleLabels, engineLabel, formatCost, modelLabel, plural } from '../harness/vocabulary';
+import { harnessRun } from './agentSessions';
 import type { HarnessSessionRow, SessionKind } from './agentSessions';
 import { Trash2 } from 'lucide-react';
 import { formatAge, isSessionLive } from './sessionDisplay';
@@ -82,14 +83,46 @@ export function harnessGlyph(agentRun: HarnessAgentRun): SessionGlyph {
 	}
 }
 
-export function harnessTitle(row: HarnessSessionRow): string {
-	return `${agentRoleLabels[row.agentRun.role]} · round ${row.agentRun.round}`;
+/** An agent's name in a run: its role and round, "Builder · round 2". */
+export function harnessAgentTitle(agentRun: HarnessAgentRun): string {
+	return `${agentRoleLabels[agentRun.role]} · round ${agentRun.round}`;
 }
 
 export function harnessAgentLabel(agentRun: HarnessAgentRun): string {
 	return [engineLabel(agentRun.engine), modelLabel(agentRun.model)].filter(Boolean).join(' · ');
 }
 
+/** A run's agents that have started, in the order they started. */
+export function startedAgents(detail: HarnessRunDetail): HarnessAgentRun[] {
+	return detail.agentRuns
+		.filter((agentRun) => agentRun.state !== 'queued')
+		.sort((a, b) => Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? ''));
+}
+
+/** The agent a run's card and detail open on: the one working, else the last to start. */
+export function focusAgent(detail: HarnessRunDetail): HarnessAgentRun | undefined {
+	const started = startedAgents(detail);
+	return started.find((agentRun) => agentRun.state === 'running') ?? started.at(-1);
+}
+
+/** Glyph and label for a whole run: spinner while an agent works, else where it stands. */
+export function harnessRunGlyph(run: HarnessRun): SessionGlyph {
+	switch (run.state) {
+		case 'running': return run.currentStage?.state === 'awaiting_approval'
+			? { kind: 'dot', tone: 'live', label: 'Waiting on you' }
+			: { kind: 'spinner', tone: 'live', label: 'Working' };
+		case 'blocked': return { kind: 'dot', tone: 'live', label: 'Waiting on you' };
+		case 'passed': return { kind: 'dot', tone: 'success', label: 'Done' };
+		case 'failed': return { kind: 'dot', tone: 'danger', label: 'Failed' };
+		default: return { kind: 'dot', tone: 'neutral', label: 'Stopped' };
+	}
+}
+
+/**
+ * One card per ticket: the harness's agents for it, however many rounds they
+ * took. It names the agent in play and the run's totals; the detail walks the
+ * rounds.
+ */
 export function HarnessSessionCard({ row, selected, tabIndex, cardRef, onSelect, onKeyDown }: {
 	row: HarnessSessionRow;
 	selected: boolean;
@@ -98,18 +131,24 @@ export function HarnessSessionCard({ row, selected, tabIndex, cardRef, onSelect,
 	onSelect: () => void;
 	onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
 }) {
-	const glyph = harnessGlyph(row.agentRun);
-	const title = harnessTitle(row);
+	const detail = row.runs[0];
+	const run = harnessRun(row);
+	const glyph = harnessRunGlyph(run);
+	const agent = focusAgent(detail);
+	const rounds = startedAgents(detail).length;
+	const cost = detail.agentRuns.reduce((total, agentRun) => total + agentRun.costUsd, 0);
+	const title = row.runs.length > 1 ? `Harness run · ${plural(row.runs.length, 'run')}` : 'Harness run';
 	return <li className="session-card-item">
-		<button type="button" ref={cardRef} className={selected ? 'session-card selected' : 'session-card'} tabIndex={tabIndex} aria-current={selected ? 'true' : undefined} aria-label={`${title}, harness, ${glyph.label}`} onClick={onSelect} onKeyDown={onKeyDown}>
+		<button type="button" ref={cardRef} className={selected ? 'session-card selected' : 'session-card'} tabIndex={tabIndex} aria-current={selected ? 'true' : undefined} aria-label={`${row.task ? `${row.key} ` : ''}harness run, ${glyph.label}`} onClick={onSelect} onKeyDown={onKeyDown}>
 			<span className={`session-card-glyph glyph-${glyph.kind} tone-${glyph.tone}`} aria-hidden="true" />
 			<span className="session-card-body">
 				<span className="session-card-title"><SessionKindTag kind="harness" />{title}</span>
 				<span className="session-card-meta">
 					<span className="session-card-state">{glyph.label}</span>
-					<span>{row.step}</span>
-					<span>{harnessAgentLabel(row.agentRun)}</span>
-					<span>{formatAge(row.agentRun.startedAt ?? row.run.startedAt)}</span>
+					{agent && <span>{harnessAgentTitle(agent)}</span>}
+					<span>{plural(rounds, 'round')}</span>
+					<span>{formatCost(cost)}</span>
+					<span>{formatAge(run.startedAt)}</span>
 				</span>
 			</span>
 		</button>
