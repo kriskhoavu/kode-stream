@@ -34,7 +34,7 @@ Groups with a live row come first, then by title; inside a group, live rows firs
 <!-- chunkId: workspace-agent-sessions-reference-cards -->
 <!-- keywords: kind tag, glyph, harness glyph, changes asked, approved -->
 
-[live] Every card wears its kind's tag while both kinds share the list. An interactive card shows its state (Starting, Running, Exited, Failed, Cancelled, Interrupted), provider and age, and offers Remove once it has ended. A harness card stands for a whole ticket. It is titled **Harness run**, or **Harness run · N runs** after a Reset, and shows the newest run's state, the agent in play (`Builder · round 2`), the run's rounds and cost, and its age. It offers no Remove. Evidence: `web/src/features/sessions/SessionCard.tsx:126`.
+[live] Every card wears its kind's tag while both kinds share the list. An interactive card shows its state (Starting, Running, Exited, Failed, Cancelled, Interrupted), provider and age, and offers Remove once it has ended. A harness card stands for a whole ticket. It is titled **Harness run**, or **Harness run · N runs** after a Reset, and shows the newest run's state, the agent in play (`Builder · round 2`), the run's rounds, and its age, on two lines that never wrap. It offers no Remove. Evidence: `web/src/features/sessions/SessionCard.tsx:126`.
 
 ## Detail
 <!-- chunkId: workspace-agent-sessions-reference-detail -->
@@ -50,7 +50,7 @@ Groups with a live row come first, then by title; inside a group, live rows firs
 | Actions    | **Open on board**, **Open on card**, **Stop** (`DELETE /api/ai/sessions/{id}`) | **Open run page** (`/harness/runs/{id}`), **Stop** while the run works, which cancels the whole run          |
 | Header     | Plan, branch, launch commit, started, duration                               | Ticket, run, branch, started, rounds · time · cost; under the stepper, the chosen agent's role, round, state, engine and model, turns, time and cost |
 
-The harness detail opens on the agent at work, else the last to start, and follows the run until a person picks a step or a round. Each agent belongs to one step: Planner to Plan, plan Checker to Plan check, Builder to Build, code Checker to Code check, fixer to Fix. A step without an agent (Start, approvals, Test, hand-off) shows a line pointing to the run page. The stepper's legend says that questions and approvals happen there. Evidence: `web/src/features/sessions/HarnessSessionDetail.tsx:20`.
+The harness detail opens on the agent at work, else the last to start, and follows the run until a person picks a step or a round. Each agent belongs to one step: Planner to Plan, plan Checker to Plan check, Builder to Build, code Checker to Code check, fixer to Fix. A step without an agent (Start, approvals, Test, hand-off) shows a line pointing to the run page. A line under the stepper says that questions and approvals happen there. In the conversation, the brief the harness gave the agent is folded to one line that opens it, and a tool call names a file inside the run's worktree from the worktree's root (`./plans/…`). Evidence: `web/src/features/sessions/HarnessSessionDetail.tsx:20`.
 
 ## Not supported
 <!-- chunkId: workspace-agent-sessions-reference-not-supported -->
