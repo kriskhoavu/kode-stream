@@ -41,9 +41,10 @@ its conversation comes from the engine's event stream, a person steers it throug
 and its changes are its run's, read from the worktree while the run lives and from its branch after.
 
 Agent Space's Sessions view lists both kinds in one list. It groups them by the ticket or plan they share, tags each
-card **Interactive** or **Harness**, and narrows the list with **All · Interactive · Harness** and **Live only**.
-Picking an interactive session shows its terminal; picking a harness session shows its conversation, with **Open run
-page** and, while the run works, **Stop**, which stops the whole run. Interactive sessions follow the checked-out
+card **Interactive** or **Harness**, and narrows the list with **All · Interactive · Harness** and **Live only**. A
+ticket's harness sessions share one card, however many rounds they took. Picking an interactive session shows its
+terminal. Picking a harness card shows the run's stepper: a step, then one of its rounds, opens that agent's
+conversation, with **Open run page** and, while the run works, **Stop**, which stops the whole run. Interactive sessions follow the checked-out
 branch; harness sessions are listed for the workspace's newest runs whatever is checked out. The full comparison is
 [Interactive And Harness Sessions](../../../wiki/domains/workspace/concepts/agent-sessions.md).
 

@@ -28,7 +28,7 @@ lastVerified: 2026-11-18
 
 The two kinds are separate in storage: a harness agent is never a session record, and an interactive session is never part of a run. They meet only in the views that list them.
 
-Use these words. "Live agent session" means an interactive session that is still running; "task harness" or "harness agent session" means a harness session; a **harness run** is the pipeline for one task and holds several harness sessions, one per agent round.
+Use these words. "Live agent session" means an interactive session that is still running; "task harness" or "harness agent session" means a harness session; a **harness run** is the pipeline for one task and holds several harness sessions, one per agent round. Agent Space shows a ticket's harness sessions as one card.
 
 ## Interactive Sessions
 <!-- chunkId: workspace-agent-sessions-interactive -->
@@ -46,11 +46,13 @@ Use these words. "Live agent session" means an interactive session that is still
 <!-- chunkId: workspace-agent-sessions-agent-space -->
 <!-- keywords: agent space, sessions view, kind filter, group, live only, conversation tab -->
 
-[live] Agent Space's Sessions view lists both kinds in one list, grouped by the ticket or plan they belong to. An interactive session on a plan and the harness's agents for the ticket with the same key share one group, which names the run's state beside its title. Each card carries an **Interactive** or **Harness** tag; **All · Interactive · Harness** narrows the list to one kind, and **Live only** keeps the running ones of either kind. Evidence: `web/src/features/sessions/SessionBrowser.tsx:60`, `web/src/features/sessions/agentSessions.ts:46`.
+[live] Agent Space's Sessions view lists both kinds in one list, grouped by the ticket or plan they belong to. An interactive session on a plan and the harness card for the ticket with the same key share one group, which names the run's state beside its title. Each card carries an **Interactive** or **Harness** tag; **All · Interactive · Harness** narrows the list to one kind, and **Live only** keeps the running ones of either kind. Evidence: `web/src/features/sessions/SessionBrowser.tsx:60`, `web/src/features/sessions/agentSessions.ts:55`.
 
-Picking an interactive session shows its terminal and its Changes. Picking a harness session shows its conversation and its run's Changes, with **Open run page** and, while the run works, **Stop**, which stops the whole run. Evidence: `web/src/features/sessions/HarnessSessionDetail.tsx:22`.
+A ticket's harness sessions share **one card**, however many rounds they took, so a ticket the Planner and Checker went back and forth on does not fill the list. The card names the agent in play and the run's rounds and cost. Evidence: `web/src/features/sessions/SessionCard.tsx:126`.
 
-Interactive sessions follow the checkout: the view lists those launched on the branch that is checked out. Harness sessions do not, because each works on a branch of its own: the view lists the agents of the workspace's newest runs whatever is checked out, and names each one's branch. Evidence: `web/src/features/canvas/CanvasSessionsView.tsx:67`.
+Picking an interactive session shows its terminal and its Changes. Picking a harness card shows the run's stepper, the one the run page shows, made compact. It opens on the agent at work, else the last one that ran. Clicking a step opens that step's last round; where a step ran more than once, round chips under the stepper pick an earlier one. The chosen agent's conversation and the run's Changes show below, with **Open run page** and, while the run works, **Stop**, which stops the whole run. A step no agent works in, such as an approval or the tests, says so and points to the run page. A ticket with more than one run, after a Reset, offers a run picker. Evidence: `web/src/features/sessions/HarnessSessionDetail.tsx:32`.
+
+Interactive sessions follow the checkout: the view lists those launched on the branch that is checked out. Harness sessions do not, because each works on a branch of its own: the view lists the tickets of the workspace's newest runs whatever is checked out, and names each run's branch. Evidence: `web/src/features/canvas/CanvasSessionsView.tsx:67`.
 
 ## Not supported
 <!-- chunkId: workspace-agent-sessions-not-supported -->

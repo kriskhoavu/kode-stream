@@ -105,8 +105,9 @@ Choose **Agent Space**, then **Sessions**, to see every agent session of a works
 plan. A session comes in two kinds. An **interactive session** is a coding agent you started in a terminal on the
 checkout: it shows its live terminal, and you type into it and stop it. A **harness session** is one agent the
 harness ran for a task, headless, in a worktree of its own: it shows its conversation, and you steer it through the
-run's questions and approvals on its run page. A tag on each card names its kind, and **All · Interactive · Harness**
-narrows the list. Both kinds have a **Changes** view with a per-file diff: an interactive session's checkout since it
+run's questions and approvals on its run page. A ticket's harness sessions share one card, however many rounds they
+took: its detail shows the run's steps, and you click a step, then one of its rounds, to read that agent's
+conversation. A tag on each card names its kind, and **All · Interactive · Harness** narrows the list. Both kinds have a **Changes** view with a per-file diff: an interactive session's checkout since it
 launched, a harness session's run, from its worktree or its branch. Changes are computed from Git on request and are
 never stored.
 
