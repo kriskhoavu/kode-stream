@@ -1887,6 +1887,14 @@ a.hx-source:hover {
 	border-color: color-mix(in srgb, var(--accent-text) 55%, var(--line));
 }
 
+/* A task that is starting or working turns its badge's loader, so the change shows at once. */
+.hx-badge.hx-status-starting svg,
+.hx-badge.hx-status-working svg { animation: hx-spin 1.2s linear infinite; }
+
+@keyframes hx-spin {
+	to { transform: rotate(360deg); }
+}
+
 @keyframes hx-pulse {
 	0%, 100% { opacity: .9; transform: scale(1); }
 	50% { opacity: .25; transform: scale(1.04); }
@@ -1936,6 +1944,8 @@ a.hx-source:hover {
 
 @media (prefers-reduced-motion: reduce) {
 	/* The working ring stays, still. */
+	.hx-badge.hx-status-starting svg,
+	.hx-badge.hx-status-working svg { animation: none; }
 	.hx-stage-working::after {
 		animation: none;
 		opacity: .9;

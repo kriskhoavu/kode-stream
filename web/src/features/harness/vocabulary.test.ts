@@ -11,13 +11,14 @@ describe('harness vocabulary', () => {
 	});
 
 	it('gives every status a word and an icon', () => {
-		expect(Object.values(hxStatuses).map((status) => status.label)).toEqual(['Not started', 'Up next', 'Working', 'Waiting on you', 'Done', 'Needs a fix', "Didn't pass", 'Stopped', 'Skipped', 'Done by hand']);
+		expect(Object.values(hxStatuses).map((status) => status.label)).toEqual(['Not started', 'Up next', 'Starting', 'Working', 'Waiting on you', 'Done', 'Needs a fix', "Didn't pass", 'Stopped', 'Skipped', 'Done by hand']);
 		expect(Object.values(hxStatuses).every((status) => Boolean(status.icon))).toBe(true);
 	});
 
 	it('derives task and stage statuses', () => {
 		expect(taskStatus(task('A'))).toBe('up_next');
 		expect(taskStatus(task('A'), ['B'])).toBe('not_started');
+		expect(taskStatus(task('A', { startRequested: true }))).toBe('starting');
 		expect(taskStatus(task('A', { needsYou: true, state: 'running' }))).toBe('waiting');
 		expect(taskStatus(task('A', { state: 'done', finishedOutside: { by: 'Anna' } }))).toBe('manual');
 		expect(taskStatus(task('A', { state: 'stale' }))).toBe('skipped');

@@ -88,6 +88,8 @@ describe('taskColumn', () => {
 	it('moves a task with its run: started is Draft, an approved plan is In Progress, the pull request is Review', () => {
 		expect(taskColumn(task('PM-1'))).toBe('unsorted');
 		expect(taskColumn(task('PM-1', { state: 'running' }))).toBe('draft');
+		// Start moves a task to Draft at once, before a Planner takes it.
+		expect(taskColumn(task('PM-1', { startRequested: true }))).toBe('draft');
 		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't'))).toBe('draft');
 		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'plan', { state: 'running' }) }))).toBe('draft');
 		expect(taskColumn(task('PM-1', { state: 'running', needsYou: true }), run('r', 't', { currentStage: stage('r', 'plan_approval', { state: 'awaiting_approval' }) }))).toBe('draft');

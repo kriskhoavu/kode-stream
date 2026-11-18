@@ -19,7 +19,7 @@ import type {
  * reaches them except through this module (raw ids go in tooltips only).
  */
 
-export type HxStatus = 'not_started' | 'up_next' | 'working' | 'waiting' | 'done' | 'needs_fix' | 'failed' | 'stopped' | 'skipped' | 'manual';
+export type HxStatus = 'not_started' | 'up_next' | 'starting' | 'working' | 'waiting' | 'done' | 'needs_fix' | 'failed' | 'stopped' | 'skipped' | 'manual';
 
 /** Colour family of a status; each maps to one --hx-* token. */
 export type HxTone = 'idle' | 'running' | 'waiting' | 'done' | 'stopped' | 'manual';
@@ -29,6 +29,7 @@ export const hxStatusOrder: readonly HxStatus[] = ['waiting', 'working', 'needs_
 export const hxStatuses: Record<HxStatus, { label: string; tone: HxTone; icon: LucideIcon }> = {
 	not_started: { label: 'Not started', tone: 'idle', icon: CircleDashed },
 	up_next: { label: 'Up next', tone: 'done', icon: CircleDot },
+	starting: { label: 'Starting', tone: 'running', icon: LoaderCircle },
 	working: { label: 'Working', tone: 'running', icon: LoaderCircle },
 	waiting: { label: 'Waiting on you', tone: 'waiting', icon: Hand },
 	done: { label: 'Done', tone: 'done', icon: Check },
@@ -183,7 +184,8 @@ export function taskStatus(task: HarnessTask, waitsFor: readonly string[] = []):
 		case 'done': return 'done';
 		case 'dismissed':
 		case 'stale': return 'skipped';
-		case 'ranked': return waitsFor.length ? 'not_started' : 'up_next';
+		// Started by a person, not yet taken by a Planner.
+		case 'ranked': return task.startRequested ? 'starting' : waitsFor.length ? 'not_started' : 'up_next';
 		default: return 'not_started';
 	}
 }

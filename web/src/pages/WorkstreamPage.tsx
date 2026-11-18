@@ -1551,7 +1551,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   if (docs) classes.push('docs-plan');
   if (work) classes.push('harness-card');
   if (work?.task.needsYou || work?.waiting.length) classes.push('needs-you-card');
-  if (work?.status === 'working') classes.push('working-card');
+  if (work?.status === 'working' || work?.status === 'starting') classes.push('working-card');
   if (synthetic) classes.push('ticket-card');
   else if (!docs) classes.push('plan-kind-card');
   if (synthetic && !work?.run) classes.push('no-plan');

@@ -178,7 +178,8 @@ export interface TaskCard {
  */
 export function taskColumn(task: HarnessTask, run?: HarnessRun): ItemStatus {
 	if (task.finishedOutside || task.state === 'done' || run?.state === 'passed') return 'done';
-	if (!run) return task.state === 'running' ? 'draft' : 'unsorted';
+	// A task a person started is planning from that moment, before a Planner takes it.
+	if (!run) return task.state === 'running' || (task.state === 'ranked' && task.startRequested) ? 'draft' : 'unsorted';
 	switch (run.currentStage?.kind) {
 		case 'implement':
 		case 'qa': return 'in_progress';
