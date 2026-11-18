@@ -33,7 +33,7 @@ describe('RunWorkbench', () => {
 	it('reads a whole section of conversations at once', async () => {
 		await setup('run-pm-02');
 		fireEvent.click(within(screen.getByRole('tablist', { name: 'Run view' })).getByRole('tab', { name: 'Agents' }));
-		fireEvent.click(await screen.findByRole('button', { name: /^Plan.*read all/ }));
+		fireEvent.click(await screen.findByRole('button', { name: /^Plan.*Read all/ }));
 		expect(screen.getAllByRole('region', { name: /Planner, round 1/ }).length).toBeGreaterThan(0);
 		expect(screen.getByRole('button', { name: 'Close Plan · all' })).toBeInTheDocument();
 	});

@@ -24,13 +24,15 @@ export function HarnessRunPage({ runId, task, onBack }: { runId: string; task: H
 			<header className="workspace-header">
 				<div className="workspace-header-main">
 					<button className="ghost" type="button" onClick={onBack}><ArrowLeft size={16} /> Back to the board</button>
-					{canResetTask(task) && <ResetTaskButton task={task} onReset={(reset) => harness.resetTask(reset).then(onBack)} />}
-				</div>
+</div>
 				<div className="workspace-header-title">
 					<h1>{task.title}</h1>
 					<RunPagePath run={harness.state.runs[runId]} lead={task.source.url
 						? <a className="workspace-item-path-segment hx-link" href={task.source.url} target="_blank" rel="noreferrer" title={task.source.key}>{sourceLabels[task.source.kind]} ticket ↗</a>
 						: <span className="workspace-item-path-segment">{sourceLabels[task.source.kind]} ticket {task.source.key}</span>} />
+				</div>
+				<div className="workspace-header-actions">
+					{canResetTask(task) && <ResetTaskButton task={task} onReset={(reset) => harness.resetTask(reset).then(onBack)} />}
 				</div>
 			</header>
 			<RunView state={harness.state} runId={runId} onSelectRun={() => undefined} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onCancel={harness.cancelRun} onOpenTab={(tab, agentRunId) => setRunTab({ tab, agentRunId })} workbench={(detail, request) => <RunWorkbench client={harness.client} detail={detail} request={request} />} />

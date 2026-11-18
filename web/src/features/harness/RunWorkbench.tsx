@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronDown, ChevronRight, ClipboardList, Code2, Eye, FileText, Folder, GitCompare, Info, ListChecks, MessagesSquare, Ticket, X } from 'lucide-react';
 import type { HarnessAgentRun, HarnessRunDetail, HarnessRunFile, HarnessRunFileDiff, HarnessRunPlan, SessionChanges, SessionFile } from '../../lib/types';
@@ -8,12 +8,12 @@ import { TranscriptTurns } from '../ai-session/TranscriptTurns';
 import type { HarnessClient } from './harnessClient';
 import type { StepCard } from './pipeline';
 import { prLabel } from './pipeline';
-import { RunLedger } from './RunLedger';
 import { TicketTab, agentStatus, liveSteps, useAgentTranscript } from './RunDrawer';
 import type { LiveStep } from './RunDrawer';
 import { commonFolder, orderPlanFiles, planSourceLine } from './RunPlanPanel';
 import { plainError } from './useHarness';
-import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, plural } from './vocabulary';
+import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, plural, stageKindLabels, stageStatus } from './vocabulary';
+import '../content-viewer/content-viewer.css';
 import '../workstream-explorer/workstream-explorer.css';
 
 type Mode = 'plan' | 'changes' | 'agents';
@@ -26,6 +26,7 @@ export interface WorkbenchRequest { card: StepCard; n: number }
 
 const planPrefix = 'plans/';
 const statusLetter: Record<string, string> = { added: 'A', modified: 'M', deleted: 'D', A: 'A', M: 'M', D: 'D' };
+const statusClass: Record<string, string> = { A: 'added', M: 'modified', D: 'deleted' };
 
 /**
  * A harness run read like a plan: what the run wrote (Plan), what it changed
@@ -87,7 +88,7 @@ export function RunWorkbench({ client, detail, request }: { client: HarnessClien
 		if (codeFile) show(`file:${codeFile.path}`);
 	};
 
-	const gridStyle = { '--explorer-left-width': '320px', '--explorer-right-width': '320px' } as CSSProperties;
+	const gridStyle = { '--explorer-left-width': 'clamp(240px, 21vw, 300px)', '--explorer-right-width': 'clamp(260px, 21vw, 300px)' } as CSSProperties;
 	return (
 		<div className="explorer-grid hx-workbench" style={gridStyle}>
 			<aside className="explorer-tree-panel" aria-label="What the run made">
@@ -100,10 +101,13 @@ export function RunWorkbench({ client, detail, request }: { client: HarnessClien
 						</div>
 					</div>
 				</div>
-				<p className="hx-workbench-count">{modeCount(mode, planFiles.length, codeFiles, steps)}</p>
+				<div className="hx-workbench-meta">
+					<span className="hx-workbench-meta-label" title={modeLabel(mode, plan.value, changes.value, run)}>{modeLabel(mode, plan.value, changes.value, run)}</span>
+					<span className="hx-workbench-meta-count">{modeCount(mode, planFiles.length, codeFiles, steps)}</span>
+				</div>
 				<div className="explorer-tree" role="tree" aria-label={modeLabels[mode]}>
 					{mode === 'plan' && <PlanTree plan={plan} files={planFiles} active={active} onOpen={show} />}
-					{mode === 'changes' && <ChangesTree changes={changes} files={codeFiles} branch={run.prUrl && run.remoteBranch ? run.remoteBranch : run.branch} active={active} onOpen={show} />}
+					{mode === 'changes' &&<ChangesTree changes={changes} files={codeFiles} active={active} onOpen={show} />}
 					{mode === 'agents' && <AgentsList steps={steps} active={active} onOpen={show} />}
 				</div>
 			</aside>
@@ -119,9 +123,9 @@ export function RunWorkbench({ client, detail, request }: { client: HarnessClien
 					})}
 				</div>
 				{side === 'info' && <TaskInfo detail={detail} planCount={planFiles.length} codeFiles={codeFiles} from={changes.value?.from ?? plan.value?.from} />}
-				{side === 'jira' && <><TicketTab task={task} fixture={false} /><Answers detail={detail} /></>}
+				{side === 'jira' && <><div className="hx-workbench-block"><TicketTab task={task} fixture={false} /></div><Answers detail={detail} /></>}
 				{side === 'checker' && <CheckerList agentRuns={detail.agentRuns} onOpen={openFinding} onOpenRun={(id) => show(`agent:${id}`)} />}
-				{side === 'steps' && <div className="hx-workbench-steps"><RunLedger detail={detail} onOpenAgentRun={(id) => show(`agent:${id}`)} /></div>}
+				{side === 'steps' && <StepList detail={detail} onOpen={show} />}
 			</aside>
 		</div>
 	);
@@ -140,6 +144,14 @@ function modeCount(mode: Mode, planCount: number, codeFiles: SessionFile[], step
 	return <><span className="hx-add">+{additions}</span> <span className="hx-del">−{deletions}</span> · {plural(codeFiles.length, 'file')}</>;
 }
 
+/** What the left panel's list holds: the plan's folder, the branch the changes were read from, or the run's conversations. */
+function modeLabel(mode: Mode, plan: HarnessRunPlan | undefined, changes: SessionChanges | undefined, run: HarnessRunDetail['run']): string {
+	if (mode === 'plan') return plan?.files.length ? commonFolder(plan.files.map((file) => file.path)).replace(/^plans\//, '').replace(/\/$/, '') : 'Plan';
+	if (mode === 'agents') return 'By step';
+	if (changes?.from === 'branch') return run.prUrl && run.remoteBranch ? run.remoteBranch : run.branch;
+	return changes?.from === 'worktree' ? 'Live, not committed' : 'Code';
+}
+
 /**
  * The line under a run page's title: where the task came from, as a link,
  * then the run's branch and its pull request once there is one.
@@ -148,8 +160,8 @@ export function RunPagePath({ lead, run }: { lead: ReactNode; run?: HarnessRunDe
 	return (
 		<div className="workspace-item-path" aria-label="Item location">
 			{lead}
-			{run && <><span className="workspace-item-path-separator">/</span><span className="workspace-item-path-segment" title={run.branch}>{run.prUrl && run.remoteBranch ? run.remoteBranch : run.branch}</span></>}
-			{run?.prUrl && <><span className="workspace-item-path-separator">/</span><a className="workspace-item-path-segment hx-link" href={run.prUrl} target="_blank" rel="noreferrer">Pull request {prLabel(run.prUrl)} ↗</a></>}
+			{run && <span className="hx-path-part"><span className="workspace-item-path-separator">/</span><span className="workspace-item-path-segment" title={run.branch}>{run.prUrl && run.remoteBranch ? run.remoteBranch : run.branch}</span></span>}
+{run?.prUrl && <span className="hx-path-part"><span className="workspace-item-path-separator">/</span><a className="workspace-item-path-segment hx-link" href={run.prUrl} target="_blank" rel="noreferrer">Pull request {prLabel(run.prUrl)} ↗</a></span>}
 		</div>
 	);
 }
@@ -254,11 +266,20 @@ function FileRow({ path, depth, selected, additions, deletions, status, onOpen }
 			<button className="explorer-row-main" type="button" title={path} onClick={onOpen}>
 				<FileText size={15} aria-hidden="true" />
 				<span className="explorer-row-label file">{path.split('/').pop()}</span>
-				<span className="hx-workbench-delta">
-					{additions !== undefined ? <><span className="hx-add">+{additions}</span>{deletions ? <> <span className="hx-del">−{deletions}</span></> : null}</> : status && statusLetter[status] ? <span className={`hx-run-plan-status ${status}`}>{statusLetter[status]}</span> : null}
-				</span>
+				{additions !== undefined ? <Delta additions={additions} deletions={deletions ?? 0} /> : <span className="hx-workbench-delta">{status && statusLetter[status] ? <span className={`hx-workbench-letter ${statusClass[statusLetter[status]]}`} title={statusClass[statusLetter[status]]}>{statusLetter[status]}</span> : null}</span>}
 			</button>
 		</div>
+	);
+}
+
+/** Lines added and removed; a zero side is left out. */
+function Delta({ additions, deletions }: { additions: number; deletions: number }) {
+	return (
+		<span className="hx-workbench-delta">
+			{additions > 0 && <span className="hx-add">+{additions}</span>}
+			{additions > 0 && deletions > 0 && ' '}
+			{deletions > 0 && <span className="hx-del">−{deletions}</span>}
+		</span>
 	);
 }
 
@@ -271,17 +292,14 @@ function PlanTree({ plan, files, active, onOpen }: { plan: Loaded<HarnessRunPlan
 	const tree = buildTree(files.map((file) => file.path), folder);
 	const sortTree = (dir: TreeDir): TreeDir => ({ ...dir, dirs: dir.dirs.map(sortTree), files: [...dir.files].sort((a, b) => (ordered.get(a) ?? 0) - (ordered.get(b) ?? 0)) });
 	return (
-		<>
-			<p className="hx-workbench-folder" title={folder}>{folder.replace(/^plans\//, '').replace(/\/$/, '')}</p>
-			<Tree dir={sortTree(tree)} depth={0} prefix="plan:" active={active} row={(path, depth) => {
-				const file = files.find((candidate) => candidate.path === path);
-				return <FileRow path={path} depth={depth} selected={active === `plan:${path}`} status={file?.status} onOpen={() => onOpen(`plan:${path}`)} />;
-			}} />
-		</>
+		<Tree dir={sortTree(tree)} depth={0} prefix="plan:" active={active} row={(path, depth) => {
+			const file = files.find((candidate) => candidate.path === path);
+			return <FileRow path={path} depth={depth} selected={active === `plan:${path}`} status={file?.status} onOpen={() => onOpen(`plan:${path}`)} />;
+		}} />
 	);
 }
 
-function ChangesTree({ changes, files, branch, active, onOpen }: { changes: Loaded<SessionChanges>; files: SessionFile[]; branch: string; active?: WorkbenchKey; onOpen: (key: WorkbenchKey) => void }) {
+function ChangesTree({ changes, files, active, onOpen }: { changes: Loaded<SessionChanges>; files: SessionFile[]; active?: WorkbenchKey; onOpen: (key: WorkbenchKey) => void }) {
 	if (changes.error) return <p className="hx-banner" role="alert">{changes.error}</p>;
 	if (!changes.value) return <p className="hx-workbench-empty" aria-busy="true">Reading the changes…</p>;
 	if (changes.value.availability !== 'available') return <p className="hx-workbench-empty">This run's copy and branch are gone, so its changes cannot be read here.</p>;
@@ -289,11 +307,22 @@ function ChangesTree({ changes, files, branch, active, onOpen }: { changes: Load
 	const counted = files as (SessionFile & { additions?: number; deletions?: number })[];
 	return (
 		<>
-			<p className="hx-workbench-folder">{changes.value.from === 'branch' ? `From ${branch}` : 'Live from the harness\'s own copy'}</p>
-			<Tree dir={buildTree(files.map((file) => file.path))} depth={0} prefix="file:" active={active} row={(path, depth) => {
-				const file = counted.find((candidate) => candidate.path === path);
-				return <FileRow path={path} depth={depth} selected={active === `file:${path}`} additions={file?.additions ?? 0} deletions={file?.deletions ?? 0} onOpen={() => onOpen(`file:${path}`)} />;
-			}} />
+			{[...counted].sort((a, b) => a.path.localeCompare(b.path)).map((file) => {
+				const key: WorkbenchKey = `file:${file.path}`;
+				const slash = file.path.lastIndexOf('/');
+				return (
+					<div key={file.path} className={active === key ? 'explorer-tree-row hx-workbench-change selected' : 'explorer-tree-row hx-workbench-change'} role="treeitem" aria-selected={active === key}>
+						<button className="explorer-row-main" type="button" title={file.path} onClick={() => onOpen(key)}>
+							<FileText size={15} aria-hidden="true" />
+							<span className="hx-workbench-change-name">
+								<span className="explorer-row-label file">{file.path.slice(slash + 1)}</span>
+								{slash > 0 && <small dir="rtl"><bdi>{file.path.slice(0, slash)}</bdi></small>}
+							</span>
+							<Delta additions={file.additions ?? 0} deletions={file.deletions ?? 0} />
+						</button>
+					</div>
+				);
+			})}
 		</>
 	);
 }
@@ -302,13 +331,13 @@ function AgentsList({ steps, active, onOpen }: { steps: LiveStep[]; active?: Wor
 	if (steps.length === 0) return <p className="hx-workbench-empty">No agent has worked on this task yet.</p>;
 	return (
 		<>
-			<button type="button" className={active === 'stage:*' ? 'hx-workbench-all on' : 'hx-workbench-all'} onClick={() => onOpen('stage:*')}>
-				<span>All steps</span><small>Read every conversation in order</small>
+			<button type="button" className={active === 'stage:*' ? 'hx-workbench-all on' : 'hx-workbench-all'} onClick={() => onOpen('stage:*')} title="Read every conversation in order">
+				<MessagesSquare size={15} aria-hidden="true" /><span>All steps</span><small>Read in order</small>
 			</button>
 			{steps.map((step) => (
 				<div key={step.id} role="group" aria-label={step.title}>
 					<button type="button" className={active === `stage:${step.id}` ? 'hx-workbench-group on' : 'hx-workbench-group'} onClick={() => onOpen(`stage:${step.id}`)} title={`Read all of ${step.title}`}>
-						<span>{step.title}</span><span className="hx-workbench-group-all">{step.agentRuns.length} · read all</span>
+						<span>{step.title}</span><span className="hx-workbench-group-all">Read all {step.agentRuns.length}</span>
 					</button>
 					{step.agentRuns.map((agentRun) => {
 						const key: WorkbenchKey = `agent:${agentRun.id}`;
@@ -316,8 +345,8 @@ function AgentsList({ steps, active, onOpen }: { steps: LiveStep[]; active?: Wor
 							<div key={agentRun.id} className={active === key ? 'explorer-tree-row selected' : 'explorer-tree-row'} role="treeitem" aria-selected={active === key} style={{ '--explorer-depth': 0 } as CSSProperties}>
 								<button className="explorer-row-toggle" type="button" tabIndex={-1} disabled />
 								<button className="explorer-row-main" type="button" onClick={() => onOpen(key)}>
-									<span className={`hx-workbench-dot hx-tone-${hxStatuses[agentDot(agentRun)].tone}`} aria-hidden="true" />
-									<span className="explorer-row-label file"><b>{agentRoleLabels[agentRun.role]}</b> · {agentTitle(agentRun)}</span>
+									<span className={`hx-workbench-dot hx-tone-${hxStatuses[agentDot(agentRun)].tone}`} title={hxStatuses[agentDot(agentRun)].label} />
+									<span className="explorer-row-label file hx-workbench-agent"><b>{agentRoleLabels[agentRun.role]}</b> <span>· {agentTitle(agentRun)}</span></span>
 								</button>
 							</div>
 						);
@@ -366,7 +395,7 @@ function Reader({ client, detail, keyed, open, steps, planFiles, codeFiles, plan
 	return (
 		<>
 			<div className="explorer-breadcrumbs">
-				{path ? path.split('/').map((part, index) => <span key={index}>{index ? ' / ' : ''}{part}</span>) : <span>{keyed ? keyTitle(keyed, detail, steps) : task(detail)}</span>}
+				{path ? crumbs(path).map((part, index) => <Fragment key={index}>{index > 0 && <span className="hx-workbench-crumb-sep" aria-hidden="true">/</span>}<span title={part === '…' ? path : undefined}>{part}</span></Fragment>) : <span>{keyed ? keyTitle(keyed, detail, steps) : task(detail)}</span>}
 			</div>
 			<div className="editor-file-strip">
 				<div className="tab-list file-tab-list" aria-label="Open items">
@@ -381,19 +410,19 @@ function Reader({ client, detail, keyed, open, steps, planFiles, codeFiles, plan
 			{path && (
 				<div className="tabs explorer-editor-tabs">
 					<div className="editor-toolbar-actions">
-						<div className="editor-view-switch" role="tablist" aria-label="File view mode">
+						{modes.length > 1 ? <div className="editor-view-switch" role="tablist" aria-label="File view mode">
 							{modes.map((mode) => {
 								const Icon = mode === 'preview' ? Eye : mode === 'source' ? Code2 : GitCompare;
 								return <button key={mode} type="button" role="tab" aria-selected={current === mode} className={current === mode ? 'active' : ''} onClick={() => onView(mode)}><Icon size={14} aria-hidden="true" /> {mode[0].toUpperCase() + mode.slice(1)}</button>;
 							})}
-						</div>
-						<span className="autosave-state idle">{codeFile ? <><span className="hx-add">+{codeFile.additions ?? 0}</span> <span className="hx-del">−{codeFile.deletions ?? 0}</span> · </> : null}{from === 'branch' ? `from ${run.remoteBranch || run.branch}` : from === 'worktree' ? 'live, not committed yet' : ''}</span>
+						</div> : <span className="hx-workbench-viewname"><GitCompare size={14} aria-hidden="true" /> Diff{codeFile && <Delta additions={codeFile.additions ?? 0} deletions={codeFile.deletions ?? 0} />}</span>}
+						<span className="autosave-state idle">{from === 'branch' ? `from ${run.remoteBranch || run.branch}` : from === 'worktree' ? 'live, not committed yet' : ''}</span>
 					</div>
 				</div>
 			)}
 			<section className="content-viewer hx-workbench-reader" data-file-kind={current === 'preview' ? 'markdown' : 'text'}>
 				{!keyed && <p className="hx-workbench-empty">Pick a plan file, a changed file or a conversation on the left.</p>}
-				{planFile && current === 'preview' && (planFile.truncated ? <p className="hx-workbench-empty">This file is too large to show here.</p> : /\.md$/i.test(planFile.path) ? <article className="content-viewer-markdown"><MarkdownPreview content={planFile.content} /></article> : <pre className="hx-workbench-source">{planFile.content}</pre>)}
+				{planFile && current === 'preview' && (planFile.truncated ? <p className="hx-workbench-empty">This file is too large to show here.</p> : /\.md$/i.test(planFile.path) ?<MarkdownPreview content={planFile.content} /> : <pre className="hx-workbench-source">{planFile.content}</pre>)}
 				{planFile && current === 'source' && <pre className="hx-workbench-source">{planFile.content}</pre>}
 				{path && current === 'diff' && <DiffView diff={diff} />}
 				{keyed?.startsWith('agent:') && <Conversation client={client} agentRun={detail.agentRuns.find((agentRun) => agentRun.id === keyed.slice(6))} />}
@@ -402,6 +431,12 @@ function Reader({ client, detail, keyed, open, steps, planFiles, codeFiles, plan
 			</section>
 		</>
 	);
+}
+
+/** A path's first folder and its last three parts; the folders between fold into one "…". */
+function crumbs(path: string): string[] {
+	const parts = path.split('/');
+	return parts.length <= 5 ? parts : [parts[0], '…', ...parts.slice(-3)];
 }
 
 function task(detail: HarnessRunDetail): string {
@@ -418,7 +453,7 @@ function DiffView({ diff }: { diff: Loaded<HarnessRunFileDiff> }) {
 			{files.map((file) => (
 				<article className="diff-file" key={file.path}>
 					<div className="diff-lines">
-						{file.lines.map((line, index) => (
+						{file.lines.filter((line) => line.type !== 'meta' || line.text.startsWith('@@')).map((line, index) => (
 							<div className={`diff-line ${line.type}`} key={index}>
 								<span className="line-number">{line.oldLine ?? ''}</span>
 								<span className="line-number">{line.newLine ?? ''}</span>
@@ -480,7 +515,7 @@ function TaskInfo({ detail, planCount, codeFiles, from }: { detail: HarnessRunDe
 	return (
 		<dl>
 			<dt>Item</dt><dd>{task.source.key}</dd>
-			<dt>Status</dt><dd><span className={`hx-badge hx-tone-${hxStatuses[runTone(run.state)].tone}`}>{hxStatuses[runTone(run.state)].label}</span></dd>
+			<dt>Status</dt><dd><span className={`hx-badge hx-badge-sm hx-tone-${hxStatuses[runTone(run.state)].tone}`}>{hxStatuses[runTone(run.state)].label}</span></dd>
 			<dt>Branch</dt><dd title={run.branch}>{run.remoteBranch && run.prUrl ? run.remoteBranch : run.branch}</dd>
 			{run.prUrl && <><dt>Pull request</dt><dd><a className="hx-link" href={run.prUrl} target="_blank" rel="noreferrer">{prLabel(run.prUrl)} ↗</a></dd></>}
 			<dt>Plan</dt><dd>{plural(planCount, 'file')}</dd>
@@ -509,7 +544,7 @@ function Answers({ detail }: { detail: HarnessRunDetail }) {
 	const answered = detail.approvals.filter((approval) => approval.gate === 'question' && approval.context?.questions?.length);
 	if (answered.length === 0) return null;
 	return (
-		<div className="hx-workbench-answers">
+		<div className="hx-workbench-block">
 			<h3 className="hx-workbench-subhead">Questions you answered</h3>
 			{answered.map((approval) => (
 				<div key={approval.id} className="hx-workbench-qa">
@@ -527,17 +562,17 @@ function CheckerList({ agentRuns, onOpen, onOpenRun }: { agentRuns: HarnessAgent
 		.sort((a, b) => Date.parse(b.startedAt ?? '') - Date.parse(a.startedAt ?? ''));
 	if (reviews.length === 0) return <p className="hx-workbench-empty">The Checker has not reviewed anything in this run yet.</p>;
 	return (
-		<div className="hx-workbench-checker">
+		<div>
 			{reviews.map((review) => (
-				<section key={review.id}>
-					<button type="button" className="hx-workbench-subhead" onClick={() => onOpenRun(review.id)}>
+				<section key={review.id} className="hx-workbench-block">
+					<button type="button" className="hx-workbench-subhead" onClick={() => onOpenRun(review.id)} title="Open the Checker's conversation">
 						{review.role === 'plan_reviewer' ? 'Plan check' : 'Code check'} · round {review.round}
-						<span className={review.verdict === 'approve' ? 'hx-workbench-verdict ok' : 'hx-workbench-verdict'}>{review.verdict === 'approve' ? 'approved' : 'changes asked'}</span>
+						<span className={`hx-badge hx-badge-sm ${review.verdict === 'approve' ? 'hx-tone-done' : 'hx-tone-waiting'}`}>{review.verdict === 'approve' ? 'Approved' : 'Changes asked'}</span>
 					</button>
 					{(review.findings ?? []).length === 0 && <p className="hx-workbench-empty">Nothing to fix and no suggestions.</p>}
 					{(review.findings ?? []).map((finding, index) => (
 						<button key={index} type="button" className="hx-workbench-finding" disabled={!finding.path} onClick={() => finding.path && onOpen(finding.path)}>
-							<span className={finding.resolved ? 'hx-workbench-verdict ok' : finding.severity === 'blocking' ? 'hx-workbench-verdict bad' : 'hx-workbench-verdict'}>{finding.resolved ? 'Fixed' : finding.severity === 'blocking' ? 'Must fix' : 'Suggestion'}</span>
+							<span className={`hx-badge hx-badge-sm ${finding.resolved ? 'hx-tone-done' : finding.severity === 'blocking' ? 'hx-tone-stopped' : 'hx-tone-idle'}`}>{finding.resolved ? 'Fixed' : finding.severity === 'blocking' ? 'Must fix' : 'Suggestion'}</span>
 							<span className="hx-workbench-finding-title">{finding.title}</span>
 							{finding.path && <code>{finding.path.split('/').pop()}{finding.line ? `:${finding.line}` : ''}</code>}
 						</button>
@@ -545,5 +580,30 @@ function CheckerList({ agentRuns, onOpen, onOpenRun }: { agentRuns: HarnessAgent
 				</section>
 			))}
 		</div>
+	);
+}
+
+
+/** Each stage of the run in order, with its status, rounds, time and cost; a stage with conversations opens them. */
+function StepList({ detail, onOpen }: { detail: HarnessRunDetail; onOpen: (key: WorkbenchKey) => void }) {
+	const stages = [...detail.stages].sort((a, b) => a.ordinal - b.ordinal || Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? ''));
+	if (stages.length === 0) return <p className="hx-workbench-empty">No step has started yet.</p>;
+	const counts: Partial<Record<string, number>> = {};
+	const repeated = (kind: string) => stages.filter((stage) => stage.kind === kind).length > 1;
+	return (
+		<>
+			<ul className="hx-workbench-steps">
+				{stages.map((stage) => {
+					counts[stage.kind] = (counts[stage.kind] ?? 0) + 1;
+					const title = repeated(stage.kind) ? `${stageKindLabels[stage.kind]} ${counts[stage.kind]}` : stageKindLabels[stage.kind];
+					const status = hxStatuses[stageStatus(stage.state)];
+					const talks = detail.agentRuns.some((agentRun) => agentRun.stageId === stage.id);
+					const meta = [stage.maxRounds > 1 && stage.round > 0 ? `round ${stage.round} of ${stage.maxRounds}` : '', stage.durationMs ? formatMinutes(stage.durationMs) : '', stage.costUsd ? formatCost(stage.costUsd) : ''].filter(Boolean).join(' · ');
+					const body = <><b>{title}</b><span className={`hx-badge hx-badge-sm hx-tone-${status.tone}`}>{status.label}</span>{meta && <small>{meta}</small>}</>;
+					return <li key={stage.id}>{talks ? <button type="button" className="hx-workbench-step" onClick={() => onOpen(`stage:${stage.id}`)} title={`Read ${title}'s conversations`}>{body}</button> : <div className="hx-workbench-step">{body}</div>}</li>;
+				})}
+			</ul>
+			<p className="hx-workbench-step-total">Total<span>{plural(detail.agentRuns.length, 'agent run')} · {formatMinutes(detail.run.totals.durationMs)} · {formatCost(detail.run.totals.costUsd)}</span></p>
+		</>
 	);
 }

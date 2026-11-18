@@ -2125,58 +2125,405 @@ a.hx-source:hover {
 	margin: 0;
 }
 
-/* The run page's workbench: the item page's three panels, holding what a run made. */
-.hx-workbench { margin-top: 14px; height: calc(100vh - 150px); min-height: 560px; }
-.hx-workbench .explorer-tree { overflow: auto; }
-.hx-workbench-count { margin: 0; padding: 4px 12px 8px; font-size: 12px; color: var(--muted, #6b7280); text-align: center; }
-.hx-workbench-folder { margin: 8px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2, #9aa0ad); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hx-workbench-empty { padding: 16px 18px; color: var(--muted, #6b7280); font-size: 13px; margin: 0; }
-.hx-workbench-delta { margin-left: auto; padding-left: 6px; font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.hx-add { color: #15803d; }
-.hx-del { color: #b91c1c; }
-.hx-workbench .explorer-row-main .hx-workbench-dot { flex: 0 0 8px; width: 8px; min-width: 8px; max-width: 8px; height: 8px; border-radius: 50%; margin: 0 4px; background: var(--hx-tone, currentColor); }
-.hx-workbench-dot { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--hx-tone, currentColor); }
-.hx-workbench-dot.hx-tone-done { background: #15803d; }
-.hx-workbench-dot.hx-tone-running { background: #2563eb; }
-.hx-workbench-dot.hx-tone-waiting { background: #ca8a04; }
-.hx-workbench-dot.hx-tone-stopped, .hx-workbench-dot.hx-tone-failed { background: #b91c1c; }
-.hx-workbench-dot.hx-tone-idle { background: #cbd5e1; }
-.hx-workbench-all { display: flex; flex-direction: column; align-items: flex-start; width: calc(100% - 16px); margin: 6px 8px 2px; padding: 7px 10px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; background: var(--surface, #fff); cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; text-align: left; }
-.hx-workbench-all small { font-weight: 400; color: var(--muted, #6b7280); font-size: 11.5px; }
-.hx-workbench-all:hover, .hx-workbench-all.on { border-color: #e9b796; background: #fff8f3; }
-.hx-workbench-group { display: flex; width: 100%; justify-content: space-between; align-items: center; background: none; border: 0; cursor: pointer; text-align: left; font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2, #9aa0ad); padding: 10px 12px 4px; }
-.hx-workbench-group:hover, .hx-workbench-group.on { color: var(--accent-text, #b4501d); }
-.hx-workbench-group-all { font-weight: 500; letter-spacing: 0; text-transform: none; font-size: 11.5px; opacity: 0; }
-.hx-workbench-group:hover .hx-workbench-group-all, .hx-workbench-group.on .hx-workbench-group-all, .hx-workbench-group:focus-visible .hx-workbench-group-all { opacity: 1; }
+/*
+ * The run page's workbench: the item page's three panels, holding what a run
+ * made. Spacing follows the item page: panels pad 12px, rows sit on the
+ * tree's 6px gutter, the reader pads 24px. Colours are the shell's tokens, so
+ * dark mode follows.
+ */
+.explorer-grid.hx-workbench {
+	flex: none;
+	height: calc(100vh - 96px);
+	min-height: 620px;
+	margin-top: 0;
+}
+
+/* Left panel */
+.hx-workbench-meta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 34px;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--line);
+	font-size: 12px;
+	color: var(--muted);
+}
+
+.hx-workbench-meta-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text);
+	font-weight: 600;
+}
+
+.hx-workbench-meta-count {
+	flex: none;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.hx-workbench .explorer-row-main > .hx-workbench-delta {
+	flex: none;
+	min-width: 22px;
+	margin-left: auto;
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	white-space: nowrap;
+}
+
+.hx-workbench-letter {
+	display: inline-grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 4px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--muted);
+	background: var(--panel-soft);
+}
+
+.hx-workbench-letter.added { color: var(--hx-done); background: color-mix(in srgb, var(--hx-done) var(--hx-mix), transparent); }
+.hx-workbench-letter.modified { color: var(--hx-waiting); background: color-mix(in srgb, var(--hx-waiting) var(--hx-mix), transparent); }
+.hx-workbench-letter.deleted { color: var(--hx-stopped); background: color-mix(in srgb, var(--hx-stopped) var(--hx-mix), transparent); }
+
+.hx-workbench .hx-add { color: var(--hx-done); }
+.hx-workbench .hx-del { color: var(--hx-stopped); }
+
+.hx-workbench-empty {
+	margin: 0;
+	padding: 16px 14px;
+	color: var(--muted);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.hx-workbench .explorer-tree > .hx-banner { margin: 8px; }
+
+/* A dot takes the file icon's 15px slot, so agent rows line up with file rows. */
+.hx-workbench-dot,
+.hx-workbench .explorer-row-main > .hx-workbench-dot {
+	flex: 0 0 15px;
+	display: grid;
+	place-items: center;
+	width: 15px;
+	height: 15px;
+}
+
+.hx-workbench-dot::before {
+	content: '';
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--hx-tone, var(--hx-idle));
+}
+
+.hx-workbench-all {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	width: 100%;
+	min-height: 38px;
+	padding: 2px 8px 2px 26px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 650;
+	text-align: left;
+	cursor: pointer;
+}
+
+.hx-workbench-all small {
+	margin-left: auto;
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 400;
+}
+
+.hx-workbench-all:hover { background: var(--panel-soft); }
+
+.hx-workbench-all.on,
+.hx-workbench-group.on {
+	background: rgba(148, 163, 184, 0.14);
+	box-shadow: inset 3px 0 var(--selection-accent);
+}
+
+.hx-workbench-group {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-height: 32px;
+	margin-top: 8px;
+	padding: 0 8px 0 10px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .05em;
+	text-transform: uppercase;
+	text-align: left;
+	cursor: pointer;
+}
+
+.hx-workbench-group:hover { background: var(--panel-soft); color: var(--text); }
+
+.hx-workbench-group-all {
+	margin-left: auto;
+	font-size: 12px;
+	font-weight: 400;
+	letter-spacing: 0;
+	text-transform: none;
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-workbench-agent b { font-weight: 600; }
+.hx-workbench-agent span { color: var(--muted); }
+
+/* Middle panel */
+.hx-workbench .explorer-breadcrumbs > span:first-child { flex: none; }
+.hx-workbench .explorer-breadcrumbs > span:last-child { color: var(--text); }
+.hx-workbench .explorer-breadcrumbs .hx-workbench-crumb-sep { flex: none; padding: 0 4px; color: var(--muted); font-weight: 400; }
+
+.hx-workbench .editor-file-strip:empty { display: none; }
+
 .hx-workbench-reader { overflow: auto; }
-.hx-workbench-source { margin: 0; padding: 18px 22px; font: 12.5px/1.6 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); white-space: pre-wrap; }
-.hx-workbench-diff { padding: 12px 14px; }
-.hx-workbench-thread { padding: 12px 18px; }
-.hx-workbench-thread-meta { margin: 0 0 8px; font-size: 12px; color: var(--muted, #6b7280); }
-.hx-workbench-section { padding: 6px 18px 18px; }
-.hx-workbench-section-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2, #9aa0ad); margin: 18px 0 8px; }
-.hx-workbench-section-thread { border-left: 2px solid var(--border, #eceef3); padding-left: 12px; margin: 0 0 16px; }
-.hx-workbench-section-thread .hx-workbench-thread { padding: 0; }
-.hx-workbench-section-head { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: 0; padding: 4px 0 8px; font: inherit; font-size: 13.5px; cursor: pointer; text-align: left; color: inherit; }
-.hx-workbench-section-meta { color: var(--muted-2, #9aa0ad); font-size: 12px; margin-left: 6px; }
-.hx-workbench-section-open { margin-left: auto; color: var(--accent-text, #b4501d); font-size: 12px; font-weight: 600; opacity: 0; }
-.hx-workbench-section-head:hover .hx-workbench-section-open, .hx-workbench-section-head:focus-visible .hx-workbench-section-open { opacity: 1; }
-.hx-workbench .side-panel dl { margin: 8px 12px; }
-.hx-workbench-steps { padding: 4px 8px; overflow: auto; }
-.hx-workbench-steps .hx-card { border: 0; box-shadow: none; }
-.hx-workbench-steps .hx-table { font-size: 12px; }
-.hx-workbench-subhead { display: flex; align-items: center; gap: 8px; width: 100%; margin: 12px 0 6px; padding: 0 12px; background: none; border: 0; font: inherit; font-size: 12px; font-weight: 700; color: var(--text, #111827); text-align: left; cursor: pointer; }
-.hx-workbench-verdict { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; background: #eef0f5; color: #4b5563; }
-.hx-workbench-verdict.ok { background: #e8f6ec; color: #15803d; }
-.hx-workbench-verdict.bad { background: #fdecec; color: #b91c1c; }
-.hx-workbench-finding { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: calc(100% - 24px); margin: 0 12px 8px; padding: 8px 10px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; background: var(--surface, #fff); font: inherit; font-size: 13px; text-align: left; cursor: pointer; color: inherit; }
-.hx-workbench-finding:disabled { cursor: default; }
-.hx-workbench-finding:not(:disabled):hover { border-color: #e9b796; }
+
+.hx-workbench-reader > .content-viewer-markdown { flex: none; overflow: visible; }
+
+.hx-workbench-source {
+	margin: 0;
+	padding: 24px;
+	font: 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	color: var(--text);
+}
+
+.hx-workbench-diff.diff-review { flex: none; overflow: visible; }
+
+.hx-workbench-thread { padding: 20px 24px; }
+
+.hx-workbench-thread-meta {
+	margin: 0 0 12px;
+	font-size: 12px;
+	color: var(--muted);
+}
+
+.hx-workbench-section { padding: 8px 24px 24px; }
+
+.hx-workbench-section-title {
+	margin: 20px 0 10px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--line);
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.hx-workbench-section-thread {
+	margin: 0 0 14px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	overflow: hidden;
+}
+
+.hx-workbench-section-thread .hx-workbench-thread { padding: 12px 14px; }
+.hx-workbench-section-thread .hx-workbench-thread-meta { display: none; }
+
+.hx-workbench-section-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-height: 40px;
+	padding: 0 12px;
+	border: 0;
+	border-bottom: 1px solid var(--line);
+	background: var(--panel-soft);
+	color: var(--text);
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.hx-workbench-section-meta { color: var(--muted); font-size: 12px; }
+
+.hx-workbench-section-open {
+	margin-left: auto;
+	color: var(--accent-text);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-workbench-section-head:hover { background: color-mix(in srgb, var(--panel-soft) 60%, var(--line)); }
+
+/* Right panel: the side panel pads 14px; nothing inside adds a side margin. */
+
+.hx-workbench .side-panel dl { grid-template-columns: 88px minmax(0, 1fr); gap: 10px 12px; margin: 4px 0 0; font-size: 13px; }
+
+.hx-workbench-subhead {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	margin: 0 0 8px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--text);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 700;
+	text-align: left;
+}
+
+button.hx-workbench-subhead { cursor: pointer; }
+button.hx-workbench-subhead:hover { color: var(--accent-text); }
+
+.hx-workbench-subhead > .hx-badge { margin-left: auto; }
+
+.hx-workbench-block + .hx-workbench-block {
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid var(--line);
+}
+
+.hx-workbench-finding {
+	display: grid;
+	gap: 4px;
+	width: 100%;
+	margin: 0 0 8px;
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--text);
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.4;
+	text-align: left;
+}
+
+.hx-workbench-finding:not(:disabled) { cursor: pointer; }
+.hx-workbench-finding:not(:disabled):hover { border-color: color-mix(in srgb, var(--accent-text) 45%, var(--line)); }
+.hx-workbench-finding:disabled { color: var(--text); opacity: 1; }
+.hx-workbench-finding > .hx-badge { justify-self: start; }
 .hx-workbench-finding-title { font-weight: 600; }
-.hx-workbench-finding code { font-size: 11.5px; color: var(--muted, #6b7280); word-break: break-all; }
-.hx-workbench-answers { padding: 0 0 12px; }
-.hx-workbench-qa { margin: 0 12px 10px; font-size: 13px; }
+.hx-workbench-finding code { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+
+.hx-workbench .side-panel .hx-workbench-empty { padding: 0; }
+
+.hx-workbench-qa { display: grid; gap: 6px; margin: 0 0 12px; font-size: 13px; line-height: 1.45; }
 .hx-workbench-qa p { margin: 4px 0 0; }
-.hx-workbench-qa .q { background: var(--surface-muted, #f7f8fb); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
-.hx-workbench-qa .a { background: #fff8f3; border: 1px solid #f0c9ad; border-radius: 8px; padding: 8px 10px; }
-@media (max-width: 1100px) { .hx-workbench { height: auto; } }
+.hx-workbench-qa .q,
+.hx-workbench-qa .a { padding: 10px 12px; border-radius: 8px; }
+.hx-workbench-qa .q { background: var(--panel-soft); }
+.hx-workbench-qa .a { border: 1px solid color-mix(in srgb, var(--accent-text) 30%, var(--line)); background: color-mix(in srgb, var(--accent-text) 6%, var(--panel)); }
+
+.hx-workbench-steps { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+
+.hx-workbench-step {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 2px 8px;
+	width: 100%;
+	padding: 8px 8px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+}
+
+button.hx-workbench-step { cursor: pointer; }
+button.hx-workbench-step:hover { background: var(--panel-soft); }
+.hx-workbench-step b { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-workbench-step small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.hx-workbench-step-total { display: flex; justify-content: space-between; margin-top: 8px; padding: 10px 8px 0; border-top: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+.hx-workbench-step-total span { color: var(--muted); font-weight: 400; }
+
+@media (max-width: 1180px) {
+	.explorer-grid.hx-workbench { height: auto; grid-template-rows: calc(100vh - 96px) auto; }
+	.hx-workbench .explorer-inspector { max-height: none; overflow: visible; }
+}
+
+@media (max-width: 760px) {
+	.explorer-grid.hx-workbench { height: auto; min-height: 0; }
+	.hx-workbench .explorer-tree-panel { max-height: 360px; }
+	.hx-workbench .workspace-file-editor { height: 70vh; min-height: 420px; }
+	.hx-workbench-thread, .hx-workbench-source { padding: 16px; }
+	.hx-workbench-section { padding: 4px 16px 16px; }
+}
+
+/* Changes: a flat list, the file's name over its folder, so a deep path never hides the name. */
+.hx-workbench .explorer-tree-row.hx-workbench-change { min-height: 48px; padding-left: 10px; }
+.hx-workbench .explorer-tree-row.hx-workbench-change + .hx-workbench-change { margin-top: 2px; }
+.hx-workbench .hx-workbench-change .explorer-row-main { min-height: 48px; gap: 9px; padding: 6px 8px 6px 0; }
+.hx-workbench .hx-workbench-change .explorer-row-main > svg { flex: none; color: var(--muted); }
+.hx-workbench .explorer-row-main > .hx-workbench-change-name { display: grid; flex: 1; min-width: 0; line-height: 1.3; }
+.hx-workbench-change-name small {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: left;
+	color: var(--muted);
+	font-size: 11.5px;
+}
+
+.hx-workbench-viewname {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.hx-workbench-viewname .hx-workbench-delta { margin-left: 4px; font-weight: 500; }
+
+/* The Jira tab: the ticket fits the panel; a wide code block scrolls inside itself. */
+.hx-workbench .jira-item-panel { grid-template-columns: minmax(0, 1fr); }
+.hx-workbench .jira-item-panel h3 { overflow-wrap: anywhere; }
+.hx-workbench .side-panel .content-viewer-markdown { padding: 0; overflow: visible; font-size: 13px; line-height: 1.5; }
+.hx-workbench .side-panel .content-viewer-markdown ul,
+.hx-workbench .side-panel .content-viewer-markdown ol { padding-left: 18px; }
+.hx-workbench .side-panel .content-viewer-markdown pre { max-width: 100%; overflow: auto; }
+
+/* The run page's header: Back on the left, actions on the right, and the title
+ * takes the room between them, so a long title wraps instead of overlapping. */
+.item-run-page .workspace-header {
+	grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
+}
+
+.item-run-page .workspace-header-actions { justify-content: flex-end; }
+.item-run-page .workspace-header-title h1 { text-wrap: balance; overflow-wrap: anywhere; }
+.item-run-page .workspace-item-path { flex-wrap: wrap; justify-content: center; }
+
+@media (max-width: 1180px) {
+	.item-run-page .workspace-header { grid-template-columns: minmax(0, 1fr) auto; }
+	.item-run-page .workspace-header-title { grid-column: 1 / -1; grid-row: 2; }
+}
+.workspace-header-title .hx-path-part { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.workspace-header-title .hx-path-part > * { display: inline-flex; }
+
+/* The Plan / Changes / Agents switch fills its panel at every width. */
+.hx-workbench .explorer-panel-header.embedded { grid-template-columns: minmax(0, 1fr); }
+.hx-workbench .explorer-panel-title .segmented-control-compact { width: 100%; }
+.hx-workbench .segmented-control-compact button { min-width: 0; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }

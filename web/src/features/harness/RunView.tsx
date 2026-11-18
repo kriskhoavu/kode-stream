@@ -72,7 +72,7 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 		<div className="hx-run">
 			<div className="hx-run-head">
 				<span className="hx-eyebrow">Pipeline</span>
-				<RunPicker runs={runs.length ? runs : [run]} tasks={state.tasks} value={run.id} onChange={onSelectRun} />
+				{!workbench && <RunPicker runs={runs.length ? runs : [run]} tasks={state.tasks} value={run.id} onChange={onSelectRun} />}
 				<HxStatusBadge status={status} label={where && (status === 'working' || status === 'waiting') ? `${hxStatuses[status].label} · ${where}` : undefined} />
 				{working && <WorkerChip engine={working.engine} model={working.model} role={agentRoleLabels[working.role]} />}
 				<span className="hx-run-head-spacer" />
