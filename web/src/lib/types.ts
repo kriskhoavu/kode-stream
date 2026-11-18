@@ -1299,9 +1299,9 @@ export interface HarnessSettings {
 export type HarnessEvent =
   | { seq: number; at: string; type: 'task.discovered' | 'task.updated' | 'task.ranked' | 'task.pinned'; task: HarnessTask }
   | { seq: number; at: string; type: 'task.removed'; taskId: string }
-  | { seq: number; at: string; type: 'run.started' | 'run.blocked' | 'run.finished'; run: HarnessRun }
+  | { seq: number; at: string; type: 'run.started' | 'run.blocked' | 'run.finished'; run: HarnessRun; /** The run's task as it stands after the change. */ task?: HarnessTask }
   | { seq: number; at: string; type: 'stage.started' | 'stage.round' | 'stage.finished'; stage: HarnessStage }
   | { seq: number; at: string; type: 'agent.started' | 'agent.progress' | 'agent.finished'; agentRun: HarnessAgentRun }
-  | { seq: number; at: string; type: 'approval.requested' | 'approval.decided'; approval: HarnessApproval }
+  | { seq: number; at: string; type: 'approval.requested' | 'approval.decided'; approval: HarnessApproval; /** The gate's task as it stands after the change. */ task?: HarnessTask }
   | { seq: number; at: string; type: 'role.paused' | 'role.resumed'; role: HarnessRoleHealth }
   | { seq: number; at: string; type: 'notification.failed'; message: string };

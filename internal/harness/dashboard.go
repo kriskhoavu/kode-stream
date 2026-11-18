@@ -651,6 +651,16 @@ func (s *Service) DashboardEvent(ctx context.Context, event domain.Event) (map[s
 	default:
 		return nil, false
 	}
+	// A run or a gate changes its task too (its state, its run, whether it
+	// needs a person), and no task event follows, so the task travels along.
+	switch event.Kind {
+	case domain.EventRunStarted, domain.EventRunBlocked, domain.EventRunFinished, domain.EventApprovalRequested, domain.EventApprovalDecided:
+		if event.TaskID != "" {
+			if task, err := s.repository.GetTask(ctx, event.TaskID); err == nil {
+				out["task"] = dashboardTask(task)
+			}
+		}
+	}
 	return out, true
 }
 

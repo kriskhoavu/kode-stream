@@ -62,6 +62,11 @@ func TestDashboardViewsCarryWhatTheScreensRead(t *testing.T) {
 			t.Fatalf("no event carried a %s; saw %v", key, shown)
 		}
 	}
+	// A run event carries its task, whose state and run change with it.
+	started, ok := fixture.service.DashboardEvent(ctx, domain.Event{Kind: domain.EventRunStarted, TaskID: runs[0].TaskID, RunID: runs[0].ID})
+	if carried, _ := started["task"].(DashboardTask); !ok || carried.ID != runs[0].TaskID {
+		t.Fatalf("run.started = %#v", started)
+	}
 	progress, ok := fixture.service.DashboardEvent(ctx, domain.Event{Kind: domain.EventAgentProgress, AgentRunID: reviewer.ID, Payload: []byte(`{"progress":"reading","turns":99}`)})
 	if agentRun, _ := progress["agentRun"].(DashboardAgentRun); !ok || agentRun.Progress != "reading" || agentRun.Turns != 99 {
 		t.Fatalf("progress = %#v", progress)

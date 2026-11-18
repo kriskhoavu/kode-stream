@@ -116,6 +116,10 @@ export function harnessReducer(state: HarnessState, action: HarnessAction): Harn
 function applyEvent(state: HarnessState, event: HarnessEvent): HarnessState {
 	if (event.seq <= state.lastSeq) return state;
 	let next: HarnessState = { ...state, lastSeq: event.seq };
+	// A run or gate event carries its task, whose state, run and needs-you change with it.
+	if ('task' in event && event.task && event.type !== 'task.discovered' && event.type !== 'task.updated' && event.type !== 'task.ranked' && event.type !== 'task.pinned') {
+		next.tasks = { ...next.tasks, [event.task.id]: event.task };
+	}
 	switch (event.type) {
 		case 'task.discovered':
 		case 'task.updated':

@@ -32,6 +32,15 @@ describe('harness reducer', () => {
 		expect(fresh.lastSeq).toBe(11);
 	});
 
+	it('takes the task a run or gate event carries, so a started task leaves Up next', () => {
+		const state = loaded();
+		const started = harnessReducer(state, { type: 'event', event: { seq: 11, at: '', type: 'run.started', run: run('run-9', 'task-C'), task: task('C', { pinned: true, state: 'running', runId: 'run-9', startRequested: true }) } });
+		expect(started.tasks['task-C']).toMatchObject({ state: 'running', runId: 'run-9' });
+		expect(started.runs['run-9']).toBeDefined();
+		const asked = harnessReducer(started, { type: 'event', event: { seq: 12, at: '', type: 'approval.requested', approval: approval('ap-9', 'task-C', { runId: 'run-9', gate: 'question' }), task: task('C', { state: 'running', runId: 'run-9', needsYou: true }) } });
+		expect(asked.tasks['task-C'].needsYou).toBe(true);
+	});
+
 	it('drops a task the harness removed, and ignores one it never held', () => {
 		const state = loaded();
 		const removed = harnessReducer(state, { type: 'event', event: { seq: 11, at: '', type: 'task.removed', taskId: 'task-A' } });
