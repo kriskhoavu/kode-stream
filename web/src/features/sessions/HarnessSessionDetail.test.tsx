@@ -52,3 +52,19 @@ describe('HarnessSessionDetail', () => {
 		expect(screen.queryByRole('tab', { name: 'Conversation' })).not.toBeInTheDocument();
 	});
 });
+
+describe('readableTurns', () => {
+	it('drops the run worktree folder from tool lines, spaces in its path included', async () => {
+		const { readableTurns } = await import('./agentSessions');
+		const turns = readableTurns([
+			{ role: 'tool', text: 'Read · /Users/me/Library/Application Support/kode-stream/harness/worktrees/workspace-ff9/run-425/plans/api/plan.md' },
+			{ role: 'tool', text: 'Grep · /Users/me/Library/Application Support/kode-stream/harness/worktrees/workspace-ff9/run-425' },
+			{ role: 'assistant', text: 'See /Users/me/Library/Application Support/kode-stream/harness/worktrees/workspace-ff9/run-425/a.md' }
+		]);
+		expect(turns?.map((turn) => turn.text)).toEqual([
+			'Read · ./plans/api/plan.md',
+			'Grep · ./',
+			'See /Users/me/Library/Application Support/kode-stream/harness/worktrees/workspace-ff9/run-425/a.md'
+		]);
+	});
+});

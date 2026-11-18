@@ -96,3 +96,29 @@
 	font-size: 13px;
 	line-height: 1.5;
 }
+
+/* A long user turn folded to one line, such as the brief the harness gives an agent. */
+.agent-brief > summary {
+	cursor: pointer;
+	color: var(--muted);
+	font-size: 12.5px;
+	font-weight: 600;
+	list-style: none;
+}
+
+.agent-brief > summary::-webkit-details-marker { display: none; }
+
+.agent-brief > summary::before {
+	content: '';
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	margin: 0 8px 1px 2px;
+	border-right: 1.5px solid currentColor;
+	border-bottom: 1.5px solid currentColor;
+	transform: rotate(-45deg);
+	transition: transform 150ms ease;
+}
+
+.agent-brief[open] > summary::before { transform: rotate(45deg); }
+.agent-brief > p { max-height: 420px; margin-top: 8px; overflow: auto; }

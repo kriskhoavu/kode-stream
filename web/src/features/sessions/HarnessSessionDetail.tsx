@@ -10,6 +10,7 @@ import { StopRunButton, canStopRun } from '../harness/StopRunButton';
 import { agentRoleLabels, formatCost, formatMinutes, hxSteps, plural } from '../harness/vocabulary';
 import type { HxStep } from '../harness/vocabulary';
 import '../harness/harness.css';
+import { readableTurns } from './agentSessions';
 import type { HarnessSessionRow } from './agentSessions';
 import { SessionKindTag, focusAgent, harnessAgentLabel, harnessGlyph, harnessRunGlyph, startedAgents } from './SessionCard';
 import { SessionChangesPanel } from './SessionChangesPanel';
@@ -50,9 +51,19 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 	const step = pick?.step ?? (agent ? roleSteps[agent.role] : undefined);
 	const rounds = step ? agents.filter((agentRun) => roleSteps[agentRun.role] === step) : [];
 	const transcript = useAgentTranscript(client, agent);
-	const steps = useRef<HTMLDivElement>(null);
+	const readable = useMemo(() => readableTurns(transcript.turns), [transcript.turns]);
+	const steps = useRef<HTMLElement>(null);
 	// Keep the chosen step in sight where the stepper scrolls sideways.
-	useEffect(() => { steps.current?.querySelector<HTMLElement>('.hx-stage.selected')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' }); }, [step, run.id]);
+	useEffect(() => {
+		// Scroll the stepper alone: scrolling the step into view would move the panes around it too.
+		const list = steps.current?.querySelector<HTMLElement>('.hx-stepper');
+		const chosen = list?.querySelector<HTMLElement>('.hx-stage.selected');
+		if (!list || !chosen) return;
+		const box = list.getBoundingClientRect();
+		const card = chosen.getBoundingClientRect();
+		if (card.left < box.left) list.scrollLeft -= box.left - card.left + 8;
+		else if (card.right > box.right) list.scrollLeft += card.right - box.right + 8;
+	}, [step, run.id]);
 
 	const branch = run.prUrl && run.remoteBranch ? run.remoteBranch : run.branch;
 	const changes = useMemo<ChangesSource>(() => ({
@@ -67,18 +78,17 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 
 	return <div className="session-browser-detail-content session-harness-detail">
 		<header className="session-browser-detail-header">
-			<div>
-				<h3><SessionKindTag kind="harness" />{task ? `${task.source.key} · ${task.title}` : 'Harness run'}</h3>
+			<div className="session-browser-detail-heading">
+				<h3><SessionKindTag kind="harness" /><span>{task ? `${task.source.key} · ${task.title}` : 'Harness run'}</span></h3>
 				<dl>
-					<dt>Run</dt>
-					<dd>{row.runs.length > 1
+					<div><dt>Run</dt><dd>{row.runs.length > 1
 						? <select className="session-harness-run-picker" aria-label="Run" value={run.id} onChange={(event) => { setRunId(event.target.value); setPick(undefined); }}>
 							{row.runs.map((candidate) => <option key={candidate.run.id} value={candidate.run.id}>{`Run ${runOrder.indexOf(candidate) + 1} · ${formatSessionDate(candidate.run.startedAt)} · ${harnessRunGlyph(candidate.run).label}`}</option>)}
 						</select>
-						: harnessRunGlyph(run).label}</dd>
-					<dt>Branch</dt><dd>{branch}</dd>
-					<dt>Started</dt><dd>{formatSessionDate(run.startedAt)}</dd>
-					<dt>Work</dt><dd>{[plural(agents.length, 'round'), formatMinutes(sum('durationMs')), formatCost(sum('costUsd'))].join(' · ')}</dd>
+						: harnessRunGlyph(run).label}</dd></div>
+					<div><dt>Branch</dt><dd><code>{branch}</code></dd></div>
+					<div><dt>Started</dt><dd>{formatSessionDate(run.startedAt)}</dd></div>
+					<div><dt>Work</dt><dd>{[plural(agents.length, 'round'), formatMinutes(sum('durationMs')), formatCost(sum('costUsd'))].join(' · ')}</dd></div>
 				</dl>
 			</div>
 			<div className="session-browser-detail-actions">
@@ -86,46 +96,49 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 				{onStopRun && task && canStopRun(run) && <StopRunButton task={task} run={run} onCancel={onStopRun} />}
 			</div>
 		</header>
-		<div className="session-harness-steps" ref={steps}>
+		<section className="session-harness-steps" ref={steps} aria-label="Steps">
 			<PipelineStepper
 				model={model}
 				label={`Steps of ${task?.source.key ?? 'this run'}`}
 				selectedId={step}
-				hint="Click a step to read its agent's conversation. Questions and approvals are on the run page."
+				legend={false}
 				onSelect={(card) => {
 					const own = agents.filter((agentRun) => roleSteps[agentRun.role] === card.step);
 					setPick({ step: card.step, agentRunId: own.at(-1)?.id });
 					setTab('conversation');
 				}}
 			/>
+			<p className="session-harness-hint">Click a step to read its agent&apos;s conversation. Questions and approvals are on the run page.</p>
+		</section>
+		<div className="session-harness-agent-bar">
+			{agent
+				? <p className="session-harness-agent">
+					<strong>{`${agentRoleLabels[agent.role]} · round ${agent.round}`}</strong>
+					<span className={`session-harness-agent-state tone-${harnessGlyph(agent).tone}`}>{harnessGlyph(agent).label}</span>
+					<span>{harnessAgentLabel(agent)}</span>
+					<span>{[plural(agent.turns, 'turn'), formatMinutes(agent.durationMs), formatCost(agent.costUsd)].join(' · ')}</span>
+				</p>
+				: <p className="session-harness-agent muted">{step ? `${hxSteps[step].label} has no agent conversation in this run. Its record is on the run page.` : 'No agent has started in this run yet.'}</p>}
+			{rounds.length > 1 && <div className="session-harness-rounds" role="group" aria-label={`Rounds of ${step ? hxSteps[step].label : 'this step'}`}>
+				<span className="session-harness-rounds-label">Rounds</span>
+				{rounds.map((agentRun, index) => {
+					const glyph = harnessGlyph(agentRun);
+					const on = agentRun.id === agent?.id;
+					return <button key={agentRun.id} type="button" className={on ? 'session-harness-round active' : 'session-harness-round'} aria-pressed={on} title={`${agentRoleLabels[agentRun.role]} · round ${agentRun.round} · ${glyph.label}`} onClick={() => { setPick({ step: roleSteps[agentRun.role], agentRunId: agentRun.id }); setTab('conversation'); }}>
+						<span className={`session-card-glyph glyph-${glyph.kind} tone-${glyph.tone}`} aria-hidden="true" />{index + 1}
+					</button>;
+				})}
+			</div>}
 		</div>
-		{rounds.length > 1 && <div className="session-harness-rounds" role="group" aria-label={`Rounds of ${step ? hxSteps[step].label : 'this step'}`}>
-			<span className="session-harness-rounds-label">Rounds</span>
-			{rounds.map((agentRun, index) => {
-				const glyph = harnessGlyph(agentRun);
-				const on = agentRun.id === agent?.id;
-				return <button key={agentRun.id} type="button" className={on ? 'session-harness-round active' : 'session-harness-round'} aria-pressed={on} title={`${agentRoleLabels[agentRun.role]} · round ${agentRun.round} · ${glyph.label}`} onClick={() => { setPick({ step: roleSteps[agentRun.role], agentRunId: agentRun.id }); setTab('conversation'); }}>
-					<span className={`session-card-glyph glyph-${glyph.kind} tone-${glyph.tone}`} aria-hidden="true" />{index + 1}
-				</button>;
-			})}
-		</div>}
-		{agent
-			? <p className="session-harness-agent">
-				<strong>{`${agentRoleLabels[agent.role]} · round ${agent.round}`}</strong>
-				<span>{harnessGlyph(agent).label}</span>
-				<span>{harnessAgentLabel(agent)}</span>
-				<span>{[plural(agent.turns, 'turn'), formatMinutes(agent.durationMs), formatCost(agent.costUsd)].join(' · ')}</span>
-			</p>
-			: <p className="session-harness-note">{step ? `${hxSteps[step].label} has no agent conversation in this run. Its record is on the run page.` : 'No agent has started in this run yet.'}</p>}
 		{agent && <>
-			<div className="side-panel-tabs session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
+			<div className="session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
 				<button type="button" role="tab" className={tab === 'conversation' ? 'active' : ''} aria-selected={tab === 'conversation'} onClick={() => setTab('conversation')}>Conversation</button>
 				<button type="button" role="tab" className={tab === 'changes' ? 'active' : ''} aria-selected={tab === 'changes'} onClick={() => setTab('changes')}>Changes</button>
 			</div>
 			{tab === 'conversation' && <div className="session-harness-conversation">
 				{transcript.error
 					? <p className="error" role="alert">{transcript.error}</p>
-					: <TranscriptTurns className="hx-transcript" turns={transcript.turns} label={`${agentRoleLabels[agent.role]} conversation`} placeholder="Reading the conversation…" names={{ user: 'Harness', assistant: agentRoleLabels[agent.role] }} />}
+					: <TranscriptTurns className="hx-transcript session-transcript" turns={readable} label={`${agentRoleLabels[agent.role]} conversation`} placeholder="Reading the conversation…" names={{ user: 'Harness', assistant: agentRoleLabels[agent.role] }} foldUser="The brief the harness gave it" />}
 			</div>}
 			{tab === 'changes' && <SessionChangesPanel source={changes} />}
 		</>}

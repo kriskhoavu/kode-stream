@@ -12,7 +12,7 @@ import { LiveTimer } from './LiveTimer';
  * passes `onSelect`, a click or Enter opens what that step made.
  * `orientation="vertical"` is the drawer's compact form.
  */
-export function PipelineStepper({ model, label, orientation = 'horizontal', onSelect, selectedId, hint = 'Click a step to open what it made.' }: {
+export function PipelineStepper({ model, label, orientation = 'horizontal', onSelect, selectedId, hint = 'Click a step to open what it made.', legend = true }: {
 	model: PipelineModel;
 	label: string;
 	orientation?: 'horizontal' | 'vertical';
@@ -22,6 +22,8 @@ export function PipelineStepper({ model, label, orientation = 'horizontal', onSe
 	selectedId?: string;
 	/** The legend's line on what a click does. */
 	hint?: string;
+	/** Shows the colour legend under the steps; a page that says each step's state in words may leave it out. */
+	legend?: boolean;
 }) {
 	const cards = model.groups.flatMap((group) => group.cards);
 	const initial = Math.max(0, cards.findIndex((card) => card.current));
@@ -82,7 +84,7 @@ onSelect={onSelect ? () => { setFocusIndex(position); setSelected(card.id); onSe
 					);
 				})}
 			</ol>
-			{orientation === 'horizontal' && <StepperLegend hint={onSelect ? hint : undefined} />}
+			{orientation === 'horizontal' && legend && <StepperLegend hint={onSelect ? hint : undefined} />}
 		</div>
 	);
 }

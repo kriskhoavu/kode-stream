@@ -10,13 +10,17 @@ import './transcript.css';
  * work the model has not answered yet stays open, so a running agent can be
  * followed.
  */
-export function TranscriptTurns({ turns, label, placeholder, names = { user: 'You', assistant: 'Claude' }, className }: {
+function plural(count: number, one: string): string { return `${count} ${count === 1 ? one : `${one}s`}`; }
+
+export function TranscriptTurns({ turns, label, placeholder, names = { user: 'You', assistant: 'Claude' }, className, foldUser }: {
 	turns?: ClaudeTurn[];
 	label: string;
 	/** Shown while `turns` is undefined. */
 	placeholder?: ReactNode;
 	names?: { user: string; assistant: string };
 	className?: string;
+	/** Folds the user's turns to one line that opens them, for a long brief the reader rarely needs. */
+	foldUser?: string;
 }) {
 	const blocks = turns ? transcriptBlocks(turns) : undefined;
 	return (
@@ -40,7 +44,9 @@ export function TranscriptTurns({ turns, label, placeholder, names = { user: 'Yo
 								</ol>
 							</details>
 						)}
-						{block.turn && <p>{block.turn.text}</p>}
+						{block.turn && (role === 'user' && foldUser
+							? <details className="agent-brief"><summary>{`${foldUser} · ${plural(block.turn.text.split('\n').length, 'line')}`}</summary><p>{block.turn.text}</p></details>
+							: <p>{block.turn.text}</p>)}
 					</li>
 				);
 			})}

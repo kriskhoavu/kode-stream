@@ -139,7 +139,7 @@ export function SessionBrowser({ rows, harness, renderHarnessDetail, grouping, p
 			{sessions.length === 0 && <p className="session-browser-empty">{emptyMessage}</p>}
 			{sessions.length > 0 && visibleRows.length === 0 && <p className="session-browser-empty">No sessions match the current filter.</p>}
 			{groups.map((group) => <section key={group.key} className="session-browser-group">
-				<h3 className="session-browser-group-title"><span>{group.title}</span>{group.run && <span className={`session-browser-run-state state-${group.run.state}`}>{harnessRunGlyph(group.run).label}</span>}</h3>
+				<h3 className="session-browser-group-title" title={group.title}><span>{group.title}</span>{group.run && <span className={`session-browser-run-state tone-${harnessRunGlyph(group.run).tone}`}>{harnessRunGlyph(group.run).label}</span>}</h3>
 				<ul className="session-browser-cards">
 					{group.rows.map((session) => session.kind === 'interactive'
 						? <SessionCard key={session.id} row={session.row} tagged={mixed} selected={session.id === selectedId} tabIndex={session.id === rovingId ? 0 : -1} cardRef={cardRef(session.id)} onSelect={() => select(session.id)} onRemove={onRemove ? () => { setRemoveError(''); setRemoveTarget(session.row); } : undefined} onKeyDown={onCardKeyDown(session.id)} />
@@ -197,14 +197,14 @@ function SessionDetail({ row, tagged, onStop, onReload, onOpenOnBoard, onOpenOnC
 
 	return <div className="session-browser-detail-content">
 		<header className="session-browser-detail-header">
-			<div>
-				<h3>{tagged && <SessionKindTag kind="interactive" />}{title}</h3>
+			<div className="session-browser-detail-heading">
+				<h3>{tagged && <SessionKindTag kind="interactive" />}<span>{title}</span></h3>
 				<dl>
-					<dt>Plan</dt><dd>{row.planTitle || '—'}</dd>
-					<dt>Branch</dt><dd>{row.record.requestedBranch}</dd>
-					<dt>Launch commit</dt><dd><code>{shortSHA(row.record.observedCommit)}</code></dd>
-					<dt>Started</dt><dd>{formatSessionDate(row.record.startedAt)}</dd>
-					<dt>Duration</dt><dd>{formatDuration(row.record)}</dd>
+					<div><dt>Plan</dt><dd>{row.planTitle || '—'}</dd></div>
+					<div><dt>Branch</dt><dd><code>{row.record.requestedBranch}</code></dd></div>
+					<div><dt>Launch commit</dt><dd><code>{shortSHA(row.record.observedCommit)}</code></dd></div>
+					<div><dt>Started</dt><dd>{formatSessionDate(row.record.startedAt)}</dd></div>
+					<div><dt>Duration</dt><dd>{formatDuration(row.record)}</dd></div>
 				</dl>
 			</div>
 			<div className="session-browser-detail-actions">
@@ -213,9 +213,9 @@ function SessionDetail({ row, tagged, onStop, onReload, onOpenOnBoard, onOpenOnC
 				{live && <button type="button" className="danger-confirm" onClick={() => setConfirming(true)}>{`Stop ${title} session`}</button>}
 			</div>
 		</header>
-		<div className="side-panel-tabs session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
-			<button type="button" className={tab === 'terminal' ? 'active' : ''} aria-selected={tab === 'terminal'} onClick={() => setTab('terminal')}>Terminal</button>
-			<button type="button" className={tab === 'changes' ? 'active' : ''} aria-selected={tab === 'changes'} onClick={() => setTab('changes')}>Changes</button>
+		<div className="session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
+			<button type="button" role="tab" className={tab === 'terminal' ? 'active' : ''} aria-selected={tab === 'terminal'} onClick={() => setTab('terminal')}>Terminal</button>
+			<button type="button" role="tab" className={tab === 'changes' ? 'active' : ''} aria-selected={tab === 'changes'} onClick={() => setTab('changes')}>Changes</button>
 		</div>
 		{tab === 'terminal' && <SessionBrowserTerminal record={row.record} visible onReload={onReload} />}
 		{tab === 'changes' && <SessionChangesPanel session={row.record} />}

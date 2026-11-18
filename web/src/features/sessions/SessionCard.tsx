@@ -1,5 +1,5 @@
 import type { GlobalSessionRow, HarnessAgentRun, HarnessRun, HarnessRunDetail, SafeSessionRecord } from '../../lib/types';
-import { agentRoleLabels, engineLabel, formatCost, modelLabel, plural } from '../harness/vocabulary';
+import { agentRoleLabels, engineLabel, modelLabel, plural } from '../harness/vocabulary';
 import { harnessRun } from './agentSessions';
 import type { HarnessSessionRow, SessionKind } from './agentSessions';
 import { Trash2 } from 'lucide-react';
@@ -50,11 +50,13 @@ export function SessionCard({ row, selected, tabIndex, cardRef, onSelect, onRemo
 		>
 			<span className={`session-card-glyph glyph-${glyph.kind} tone-${glyph.tone}`} aria-hidden="true" />
 			<span className="session-card-body">
-				<span className="session-card-title">{tagged && <SessionKindTag kind="interactive" />}{title}</span>
+				<span className="session-card-head">
+					<span className="session-card-title">{tagged && <SessionKindTag kind="interactive" />}<span>{title}</span></span>
+					<span className="session-card-age">{formatAge(row.record.startedAt)}</span>
+				</span>
 				<span className="session-card-meta">
 					<span className="session-card-state">{glyph.label}</span>
 					<span>{providerLabel(row.record.provider)}</span>
-					<span>{formatAge(row.record.startedAt)}</span>
 					{finished && typeof row.record.exitCode === 'number' && <span>{`Exit ${row.record.exitCode}`}</span>}
 				</span>
 			</span>
@@ -136,19 +138,19 @@ export function HarnessSessionCard({ row, selected, tabIndex, cardRef, onSelect,
 	const glyph = harnessRunGlyph(run);
 	const agent = focusAgent(detail);
 	const rounds = startedAgents(detail).length;
-	const cost = detail.agentRuns.reduce((total, agentRun) => total + agentRun.costUsd, 0);
 	const title = row.runs.length > 1 ? `Harness run · ${plural(row.runs.length, 'run')}` : 'Harness run';
 	return <li className="session-card-item">
 		<button type="button" ref={cardRef} className={selected ? 'session-card selected' : 'session-card'} tabIndex={tabIndex} aria-current={selected ? 'true' : undefined} aria-label={`${row.task ? `${row.key} ` : ''}harness run, ${glyph.label}`} onClick={onSelect} onKeyDown={onKeyDown}>
 			<span className={`session-card-glyph glyph-${glyph.kind} tone-${glyph.tone}`} aria-hidden="true" />
 			<span className="session-card-body">
-				<span className="session-card-title"><SessionKindTag kind="harness" />{title}</span>
+				<span className="session-card-head">
+					<span className="session-card-title"><SessionKindTag kind="harness" /><span>{title}</span></span>
+					<span className="session-card-age">{formatAge(run.startedAt)}</span>
+				</span>
 				<span className="session-card-meta">
 					<span className="session-card-state">{glyph.label}</span>
 					{agent && <span>{harnessAgentTitle(agent)}</span>}
 					<span>{plural(rounds, 'round')}</span>
-					<span>{formatCost(cost)}</span>
-					<span>{formatAge(run.startedAt)}</span>
 				</span>
 			</span>
 		</button>

@@ -126,7 +126,7 @@ describe('SessionBrowser', () => {
 		const rows = [row({ id: 'a' }, { planTitle: 'Plan A' })];
 		render(<SessionBrowser rows={rows} grouping="plan" persistKey="test-changes" onStop={vi.fn()} onReload={vi.fn()} />);
 		expect(screen.getByRole('tablist', { name: 'Session detail tabs' })).toHaveClass('session-browser-detail-tabs');
-		fireEvent.click(screen.getByRole('button', { name: 'Changes' }));
+		fireEvent.click(screen.getByRole('tab', { name: 'Changes' }));
 		expect(screen.getByTestId('mock-changes')).toHaveAttribute('data-session', 'a');
 	});
 

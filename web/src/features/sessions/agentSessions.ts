@@ -1,4 +1,4 @@
-import type { GlobalSessionRow, HarnessRun, HarnessRunDetail, HarnessTask } from '../../lib/types';
+import type { ClaudeTurn, GlobalSessionRow, HarnessRun, HarnessRunDetail, HarnessTask } from '../../lib/types';
 import { isSessionLive } from './sessionDisplay';
 
 /**
@@ -68,4 +68,15 @@ export function byLiveThenNewest(a: AgentSession, b: AgentSession): number {
 	const liveDiff = Number(sessionIsLive(b)) - Number(sessionIsLive(a));
 	if (liveDiff !== 0) return liveDiff;
 	return Date.parse(sessionStartedAt(b)) - Date.parse(sessionStartedAt(a));
+}
+
+/**
+ * A path inside a run's worktree, as an agent's tool call names it: from a
+ * filesystem root, through folders whose names may hold spaces ("Application
+ * Support"), to the run's own folder, which adds nothing a reader needs.
+ */
+const worktreePath = /\/(?:Users|home|private|var|tmp)\/[^\n]*?\/harness\/worktrees\/[^/\s]+\/[^/\s]+(?:\/|(?=\s|$))/g;
+
+export function readableTurns(turns: ClaudeTurn[] | undefined): ClaudeTurn[] | undefined {
+	return turns?.map((turn) => (turn.role === 'tool' ? { ...turn, text: turn.text.replace(worktreePath, './') } : turn));
 }

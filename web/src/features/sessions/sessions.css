@@ -1,107 +1,295 @@
 /*
- * The Session Browser's two kinds of session. An interactive session wears a
- * blue tag, a harness session the accent; a group that holds a harness task
- * names its run's state beside its title.
+ * Agent Space's Sessions view. The shared session-browser rules in app.css
+ * lay it out; these settle its look. Colour is kept for state (a dot, a
+ * word), never for chrome: tags, filters, tabs and selection are neutral, and
+ * a selected row wears the app's selection bar. Every pane's content sits
+ * 20px in from its edges.
  */
+
+/* ── Kind tags ─────────────────────────────────────────────────────────── */
+
 .session-kind-tag {
-	display: inline-block;
-	margin-right: 7px;
-	padding: 0 7px;
-	border-radius: 999px;
+	display: inline-flex;
+	align-items: center;
+	flex: none;
+	height: 18px;
+	margin-right: 8px;
+	padding: 0 6px;
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	background: transparent;
+	color: var(--muted);
 	font-size: 10.5px;
-	font-weight: 700;
-	line-height: 18px;
-	letter-spacing: 0;
-	text-transform: none;
-	vertical-align: 1px;
+	font-weight: 600;
+	line-height: 1;
 }
 
-.session-kind-tag.interactive { background: color-mix(in srgb, var(--blue) 13%, transparent); color: var(--blue); }
-.session-kind-tag.harness { background: color-mix(in srgb, var(--accent-text) 14%, transparent); color: var(--accent-text); }
+.session-kind-tag.harness { color: var(--text); border-color: color-mix(in srgb, var(--text) 24%, var(--line)); }
 
-.session-browser-kinds { width: 100%; }
-.session-browser-kinds button { min-width: 0; padding: 0 6px; }
+/* ── List ──────────────────────────────────────────────────────────────── */
 
-.session-browser-group-title { display: flex; align-items: flex-start; gap: 8px; }
-.session-browser-group-title > span:first-child { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.session-browser .session-browser-list { gap: 14px; padding: 14px; }
+
+.session-browser .session-browser-live-toggle { min-height: 32px; }
+.session-browser .session-browser-live-toggle.active {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: var(--panel);
+	border-color: color-mix(in srgb, var(--text) 30%, var(--line));
+	color: var(--text);
+}
+.session-browser .session-browser-live-toggle.active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.session-browser .session-browser-filter { min-height: 32px; }
+
+.session-browser .session-browser-kinds {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 2px;
+	width: 100%;
+	padding: 3px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+}
+
+.session-browser .session-browser-kinds button {
+	min-width: 0;
+	min-height: 26px;
+	padding: 0 6px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.session-browser .session-browser-kinds button:hover { color: var(--text); }
+.session-browser .session-browser-kinds button.active { background: color-mix(in srgb, var(--text) 8%, var(--panel)); color: var(--text); box-shadow: none; }
+
+/* Grid children size to their content by default; a long ticket title must shrink to the column instead. */
+.session-browser .session-browser-group,
+.session-browser .session-browser-cards { grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 6px; }
+
+.session-browser .session-browser-group-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 18px;
+	margin: 0 2px;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+.session-browser .session-browser-group-title > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .session-browser-run-state {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
 	flex: none;
+	height: 18px;
 	padding: 0 7px;
+	border: 1px solid var(--line);
 	border-radius: 999px;
-	font-size: 10.5px;
-	line-height: 18px;
-	letter-spacing: 0;
-	text-transform: none;
 	background: var(--panel);
-	border: 1px solid var(--line);
 	color: var(--muted);
+	font-size: 10.5px;
+	font-weight: 600;
 }
 
-.session-browser-run-state.state-running { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 35%, var(--line)); }
-.session-browser-run-state.state-blocked { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 40%, var(--line)); }
-.session-browser-run-state.state-passed { color: var(--green); border-color: color-mix(in srgb, var(--green) 35%, var(--line)); }
+.session-browser-run-state::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.session-browser-run-state.tone-live::before { background: var(--blue); }
+.session-browser-run-state.tone-success::before { background: var(--green); }
+.session-browser-run-state.tone-danger::before { background: var(--danger); }
 
-.session-harness-note {
-	margin: 0 0 10px;
-	padding: 8px 12px;
+.session-browser .session-card {
+	align-items: flex-start;
+	gap: 10px;
+	padding: 9px 12px;
+	border-color: var(--line);
 	border-radius: 8px;
-	background: var(--panel-soft);
-	color: var(--muted);
-	font-size: 12.5px;
-	line-height: 1.45;
-}
-
-.session-harness-conversation { flex: 1; min-height: 0; overflow: auto; padding: 4px 2px; }
-
-/* A ticket's harness detail: the run's stepper, the chosen step's rounds, then the agent. */
-.session-harness-steps { margin: 0 0 8px; }
-
-/* The run page's stepper, compact enough for the detail pane; it scrolls sideways only when the pane is narrow. */
-.session-harness-steps .hx-stepper-wrap { gap: 6px; }
-.session-harness-steps .hx-stepper { width: auto; margin: 0; padding: 2px 2px 6px; }
-.session-harness-steps .hx-step-group { gap: 4px; padding: 20px 5px 5px; border-radius: 10px; }
-.session-harness-steps .hx-step-group-label { top: 5px; left: 8px; font-size: 10px; }
-.session-harness-steps .hx-stage { width: 106px; min-height: 0; gap: 1px; padding: 5px 8px; border-radius: 8px; box-shadow: none; }
-.session-harness-steps .hx-stage-status { font-size: 10.5px; gap: 4px; }
-.session-harness-steps .hx-stage-status svg { width: 11px; height: 11px; }
-.session-harness-steps .hx-stage-name { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.session-harness-steps .hx-stage-meta { font-size: 11px; gap: 0 6px; }
-.session-harness-steps .hx-conn { width: 10px; }
-.session-harness-steps .hx-legend { gap: 4px 12px; font-size: 11px; }
-
-.session-browser-detail-header .session-harness-run-picker {
-	max-width: 100%;
-	height: 24px;
-	min-height: 0;
-	padding: 0 6px;
-	font-size: 12.5px;
-	border: 1px solid var(--line);
-	border-radius: 6px;
-	background: var(--panel-soft);
+	background: var(--panel);
 	color: var(--text);
 }
 
-.session-harness-rounds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; }
-.session-harness-rounds-label { color: var(--muted); font-size: 12px; margin-right: 2px; }
+.session-browser .session-card-item:has(.session-card-remove) .session-card { padding-right: 40px; }
+.session-browser .session-card:hover { border-color: color-mix(in srgb, var(--text) 22%, var(--line)); }
+
+.session-browser .session-card.selected,
+.session-browser .session-card[aria-current="true"] {
+	border-color: color-mix(in srgb, var(--text) 26%, var(--line));
+	background: color-mix(in srgb, var(--text) 5%, var(--panel));
+	box-shadow: inset 3px 0 0 var(--selection-accent);
+}
+
+.session-browser .session-card-glyph { width: 8px; height: 8px; margin-top: 5px; }
+.session-browser .session-card-glyph.glyph-spinner { width: 8px; height: 8px; border-width: 1.5px; }
+.session-browser .session-card-body { flex: 1; gap: 3px; }
+
+.session-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.session-browser .session-card-title { display: flex; align-items: center; flex: 1; min-width: 0; font-size: 13px; font-weight: 600; line-height: 18px; }
+.session-browser .session-card-title > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-card-age { flex: none; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* One line: what it is doing, then the facts, cut short rather than wrapped. */
+.session-browser .session-card-meta { display: block; overflow: hidden; font-size: 11.5px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.session-browser .session-card-meta > span + span::before { content: '·'; margin: 0 6px; color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.session-browser .session-card-state { font-weight: 600; color: var(--text); }
+
+/* ── Detail: header ────────────────────────────────────────────────────── */
+
+.session-browser .session-browser-detail-header { align-items: flex-start; gap: 16px; padding: 16px 20px 14px; }
+.session-browser-detail-heading { display: grid; gap: 10px; flex: 1; min-width: 0; }
+
+.session-browser .session-browser-detail-header h3 { display: flex; align-items: center; min-width: 0; margin: 0; font-size: 15px; line-height: 1.3; }
+.session-browser .session-browser-detail-header h3 > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.session-browser .session-browser-detail-header dl { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 0; }
+.session-browser .session-browser-detail-header dl > div { display: grid; gap: 2px; min-width: 0; }
+.session-browser .session-browser-detail-header dt { color: var(--muted); font-size: 11px; }
+.session-browser .session-browser-detail-header dd { margin: 0; color: var(--text); font-size: 12.5px; line-height: 20px; }
+.session-browser .session-browser-detail-header dd code { padding: 0; background: none; font-size: 12px; }
+
+.session-browser .session-browser-detail-actions { flex-direction: row; align-items: center; gap: 8px; }
+.session-browser .session-browser-detail-actions button { min-height: 30px; padding: 0 12px; border-radius: 7px; font-size: 12.5px; white-space: nowrap; }
+
+.session-browser-detail-header .session-harness-run-picker {
+	height: 20px;
+	min-height: 0;
+	max-width: 100%;
+	padding: 0 4px;
+	border: 1px solid var(--line);
+	border-radius: 5px;
+	background: var(--panel);
+	color: var(--text);
+	font: inherit;
+	font-size: 12px;
+}
+
+/* ── Detail: tabs ──────────────────────────────────────────────────────── */
+
+.session-browser .session-browser-detail-tabs {
+	display: flex;
+	flex: none;
+	gap: 22px;
+	min-height: 0;
+	margin: 0;
+	padding: 0 20px;
+	border: 0;
+	border-bottom: 1px solid var(--line);
+	border-radius: 0;
+	background: transparent;
+}
+
+.session-browser .session-browser-detail-tabs button {
+	position: relative;
+	min-height: 0;
+	padding: 10px 0 9px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.session-browser .session-browser-detail-tabs button::before { content: none; }
+.session-browser .session-browser-detail-tabs button:hover { color: var(--text); }
+.session-browser .session-browser-detail-tabs button.active { color: var(--text); }
+.session-browser .session-browser-detail-tabs button.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--text); }
+
+/* ── Harness detail: the run's steps, compact ──────────────────────────── */
+
+.session-harness-steps { padding: 14px 20px 12px; border-bottom: 1px solid var(--line); }
+.session-harness-steps .hx-stepper-wrap { gap: 0; }
+
+/* Groups share the width and one height; a group's cards sit at its middle, the connectors at theirs. */
+.session-harness-steps .hx-stepper { align-items: stretch; width: 100%; max-width: 100%; margin: 0; padding: 0 0 2px; }
+.session-harness-steps .hx-step-group { flex: 1 1 0; justify-content: center; min-width: 108px; gap: 4px; padding: 22px 5px 5px; border-radius: 8px; background: transparent; }
+.session-harness-steps .hx-step-group-label { top: 6px; left: 8px; right: 8px; overflow: hidden; font-size: 10px; letter-spacing: .03em; text-overflow: ellipsis; }
+.session-harness-steps .hx-conn { align-self: center; width: 10px; }
+
+.session-harness-steps .hx-stage { width: 100%; min-height: 0; gap: 1px; padding: 6px 8px; border-color: var(--line); border-radius: 7px; background: var(--panel); box-shadow: none; }
+.session-harness-steps .hx-stage-working { border-color: color-mix(in srgb, var(--hx-running) 55%, var(--line)); }
+.session-harness-steps .hx-stage-waiting { border-color: color-mix(in srgb, var(--hx-waiting) 55%, var(--line)); box-shadow: none; }
+.session-harness-steps .hx-stage:not(.static):hover { transform: none; border-color: color-mix(in srgb, var(--text) 30%, var(--line)); }
+.session-harness-steps .hx-stage.selected { border-color: color-mix(in srgb, var(--text) 32%, var(--line)); background: color-mix(in srgb, var(--text) 6%, var(--panel)); box-shadow: inset 3px 0 0 var(--selection-accent); }
+
+.session-harness-steps .hx-stage-status { gap: 4px; color: color-mix(in srgb, var(--hx-tone) 72%, var(--muted)); font-size: 10.5px; font-weight: 600; }
+.session-harness-steps .hx-stage-status svg { width: 11px; height: 11px; }
+.session-harness-steps .hx-stage-name { overflow: hidden; font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.session-harness-steps .hx-stage-not_started .hx-stage-name,
+.session-harness-steps .hx-stage-skipped .hx-stage-name { color: var(--muted); }
+.session-harness-steps .hx-stage-meta { gap: 0 6px; font-size: 11px; }
+
+.session-harness-hint { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; }
+
+/* ── Harness detail: the chosen agent and its step's rounds ────────────── */
+
+.session-harness-agent-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 16px;
+	min-height: 46px;
+	padding: 8px 20px;
+	border-bottom: 1px solid var(--line);
+}
+
+.session-harness-agent { display: flex; flex-wrap: wrap; align-items: baseline; margin: 0; color: var(--muted); font-size: 12.5px; }
+.session-harness-agent strong { margin-right: 10px; color: var(--text); font-size: 13px; }
+.session-harness-agent > span + span::before { content: '·'; margin: 0 7px; color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.session-harness-agent-state { font-weight: 600; }
+.session-harness-agent-state.tone-success { color: color-mix(in srgb, var(--green) 75%, var(--muted)); }
+.session-harness-agent-state.tone-danger { color: color-mix(in srgb, var(--danger) 75%, var(--muted)); }
+.session-harness-agent-state.tone-live { color: color-mix(in srgb, var(--blue) 75%, var(--muted)); }
+
+.session-harness-rounds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.session-harness-rounds-label { margin-right: 2px; color: var(--muted); font-size: 12px; }
 
 .session-harness-round {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	min-height: 24px;
-	padding: 0 10px;
+	height: 24px;
+	min-width: 38px;
+	padding: 0 9px;
 	border: 1px solid var(--line);
 	border-radius: 999px;
 	background: var(--panel);
-	color: var(--text);
+	color: var(--muted);
 	font-size: 12px;
+	font-weight: 600;
 	font-variant-numeric: tabular-nums;
 }
 
-.session-harness-round:hover { background: var(--panel-soft); }
-.session-harness-round.active { border-color: var(--selection-accent); color: var(--accent-text); font-weight: 600; box-shadow: 0 0 0 1px var(--selection-accent); }
-.session-harness-round .session-card-glyph { margin: 0; }
+.session-harness-round:hover { color: var(--text); border-color: color-mix(in srgb, var(--text) 26%, var(--line)); }
+.session-harness-round.active { border-color: color-mix(in srgb, var(--text) 36%, var(--line)); background: color-mix(in srgb, var(--text) 8%, var(--panel)); color: var(--text); }
+.session-harness-round .session-card-glyph { width: 7px; height: 7px; margin: 0; }
+.session-harness-round .session-card-glyph.glyph-spinner { width: 7px; height: 7px; border-width: 1.5px; }
 
-.session-harness-agent { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 0 6px; font-size: 12.5px; color: var(--muted); }
-.session-harness-agent strong { color: var(--text); font-size: 13px; }
+/* ── Harness detail: the conversation ──────────────────────────────────── */
+
+.session-harness-conversation { flex: 1; min-height: 0; padding: 16px 20px 24px; }
+
+.session-transcript.agent-transcript { gap: 10px; padding: 0; }
+.session-transcript .agent-turn { justify-self: stretch; max-width: 100%; gap: 6px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.session-transcript .agent-turn.role-user { background: var(--panel-soft); }
+.session-transcript .agent-turn-role { font-size: 11px; font-weight: 600; }
+
+/* A tool call is one line: what it is, then what it did. */
+.session-transcript .agent-work-item { display: flex; align-items: baseline; gap: 10px; padding: 2px 0 2px 12px; }
+.session-transcript .agent-work-item .agent-turn-role { flex: none; min-width: 32px; font-weight: 500; }
+.session-transcript .agent-work-item p { min-width: 0; }
+
+/* ── Interactive detail ────────────────────────────────────────────────── */
+
+.session-browser .session-browser-terminal { padding: 0; }
