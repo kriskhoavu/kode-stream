@@ -60,7 +60,7 @@ init() {
 		echo "The sandbox already exists at $dir. Use 'next' to reset it." >&2
 		exit 1
 	fi
-	mkdir -p "$repo/greet" "$tasks"
+	mkdir -p "$repo/greet" "$repo/plans" "$tasks"
 	git init --quiet --bare --initial-branch=main "$remote"
 	git -C "$repo" init --quiet --initial-branch=main
 	cat >"$repo/go.mod" <<'EOF'
@@ -103,6 +103,11 @@ EOF
 
 A tiny Go module for trying the Kode Stream harness. Code lives in `greet/`,
 plans in `plans/`. Run `go test ./...` before you finish.
+EOF
+	cat >"$repo/plans/README.md" <<'EOF'
+# Plans
+
+The harness writes each task's plan here, under its key.
 EOF
 	git -C "$repo" add -A
 	git -C "$repo" -c user.name=Sandbox -c user.email=sandbox@localhost commit --quiet -m "Start the sandbox"
