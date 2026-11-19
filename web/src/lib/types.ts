@@ -489,6 +489,13 @@ export interface AISettings {
   defaultTerminal: string;
   providers: Record<string, AILaunchTemplate>;
   terminals: Record<string, AILaunchTemplate>;
+  /** Each workspace's own default provider, over `defaultProvider`. */
+  workspaceProviders?: Record<string, string>;
+}
+
+/** The provider a session in a workspace starts with. */
+export function providerFor(settings: Pick<AISettings, 'defaultProvider' | 'workspaceProviders'>, workspaceId?: string): string {
+  return (workspaceId && settings.workspaceProviders?.[workspaceId]) || settings.defaultProvider;
 }
 
 export interface AIPlanPreset {
@@ -1282,10 +1289,6 @@ export interface HarnessSourceSettings {
   enabled: boolean;
   /** Jira search query, GitHub `owner/repo`, Bitbucket `workspace/repo`, or a local task folder. */
   query: string;
-  /** The workspace's own answer to "may an agent stop and ask"; absent follows the settings. */
-  askQuestions?: boolean | null;
-  /** The workspace's test commands, carried on each of its sources; absent keeps the stored ones. */
-  verificationCommands?: string[];
   labels?: string[];
   tokenEnvVar?: string;
   lastCheckedAt?: string;
@@ -1305,6 +1308,65 @@ export interface HarnessSettings {
   paused: Partial<Record<HarnessRoleId, boolean>>;
   sources: HarnessSourceSettings[];
   modelPolicy: Record<HarnessAgentRole, HarnessRolePolicy>;
+  /** Each workspace's own choices over these settings. */
+  workspaces: HarnessWorkspaceSettings[];
+}
+
+/** A role's CLI and model in one workspace; an empty field follows the defaults. Tool permissions stay the defaults' alone. */
+export interface HarnessRoleModel {
+  engine?: HarnessEngineId;
+  model?: string;
+  highDifficultyModel?: string;
+  maxTurns?: number;
+}
+
+/** The skill of the repository, and the track of it, a role follows in one workspace. */
+export interface HarnessProcedureStep {
+  skill: string;
+  track?: string;
+}
+
+/** One workspace's overrides. An absent or empty field follows the defaults. */
+export interface HarnessWorkspaceSettings {
+  workspaceId: string;
+  enabled?: boolean | null;
+  autoStart?: boolean | null;
+  requireReview?: boolean | null;
+  askQuestions?: boolean | null;
+  verificationCommands: string[];
+  scope: string[];
+  models: Partial<Record<HarnessAgentRole, HarnessRoleModel>>;
+  procedure: Partial<Record<HarnessAgentRole, HarnessProcedureStep>>;
+}
+
+/** The parts of `.kode-stream/settings.yaml` a person exports or imports one at a time. */
+export type SettingsFilePart = 'provider' | 'pipeline' | 'tests' | 'scope' | 'models' | 'procedure' | 'sources';
+
+export interface SettingsFileContent {
+  version: number;
+  ai?: { provider: string };
+  harness?: {
+    enabled?: boolean;
+    autoStart?: boolean;
+    review?: boolean;
+    askQuestions?: boolean;
+    tests?: string[];
+    scope?: string[];
+    models?: Partial<Record<HarnessAgentRole, { engine?: string; model?: string; hardModel?: string; maxTurns?: number }>>;
+    procedure?: Partial<Record<HarnessAgentRole, HarnessProcedureStep>>;
+    sources?: { kind: HarnessSourceKind; enabled: boolean; query: string; labels?: string[]; tokenEnvVar?: string }[];
+  };
+}
+
+/** A workspace's shared settings file: whether its checkout has one, what it holds, and what an export would write now. */
+export interface SettingsFileView {
+  path: string;
+  exists: boolean;
+  error?: string;
+  file?: SettingsFileContent;
+  has: SettingsFilePart[];
+  current: SettingsFileContent;
+  parts: SettingsFilePart[];
 }
 
 export type HarnessEvent =

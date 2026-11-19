@@ -11,7 +11,7 @@ afterEach(cleanup);
 
 const settings: HarnessSettings = {
 	revision: 1, enabled: true, autoStart: true, requireReview: true, askQuestions: true,
-	slots: { scout: 1, sorter: 1, planner: 1, coder: 1, reviewer: 1, qa: 1 }, paused: {}, sources: [],
+	slots: { scout: 1, sorter: 1, planner: 1, coder: 1, reviewer: 1, qa: 1 }, paused: {}, sources: [], workspaces: [],
 	modelPolicy: {
 		planner: { engine: 'claudecode', model: 'claude-opus-5-5', maxTurns: 20 },
 		plan_reviewer: { engine: 'claudecode', model: 'claude-sonnet-5-5', maxTurns: 10 },

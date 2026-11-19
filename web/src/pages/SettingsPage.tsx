@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react';
 import { RefreshCw, Save, Settings as SettingsIcon } from 'lucide-react';
-import { statusLabels, statusOrder } from '../shared/api';
+import { api, statusLabels, statusOrder } from '../shared/api';
 import type { ItemStatus } from '../lib/types';
 import type { AppSettings } from '../features/settings/appSettings';
 import { useAISettings } from '../features/ai-settings/useAISettings';
-import type { AICapabilityKind, AILaunchTemplate, AISettings } from '../lib/types';
+import type { AICapabilityKind, AILaunchTemplate, AISettings, WorkspaceConfig } from '../lib/types';
+import { SettingsFilePanel } from '../features/settings/SettingsFilePanel';
 import { StorageSettings } from '../features/settings/StorageSettings';
 import { backdropVariants } from '../components/HeaderBackdrop';
 import { HarnessSettingsSection } from '../features/workstream/HarnessSettingsSection';
@@ -23,6 +25,16 @@ const backdropLabels: Record<BackdropVariant, { name: string; description: strin
 export function SettingsPage({ settings, onChange, showHarness = true }: { settings: AppSettings; onChange: (settings: AppSettings) => void; /** The harness has no page of its own; its settings live here, except on the extension surface. */ showHarness?: boolean }) {
   const visible = new Set(settings.visibleWorkstreamStatuses);
   const ai = useAISettings();
+  const [workspaces, setWorkspaces] = useState<WorkspaceConfig[]>([]);
+  /** '' is the defaults every workspace starts from; a workspace id is that workspace's own choices. */
+  const [scope, setScope] = useState('');
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    api.workspaces(controller.signal).then(setWorkspaces).catch(() => setWorkspaces([]));
+    return () => controller.abort();
+  }, []);
+  const workspace = workspaces.find((candidate) => candidate.id === scope);
 
   const toggleStatus = (status: ItemStatus) => {
     const next = visible.has(status)
@@ -35,8 +47,58 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
     <section className="settings-page">
       <header className="settings-title">
         <h1><SettingsIcon size={22} /> Settings</h1>
-        <p>Configure how Kode Stream presents workspace and board metadata.</p>
+        <p>{workspace ? `${workspace.name}'s own choices. A value it does not set follows the defaults.` : 'The defaults every workspace starts from, and how Kode Stream looks on this machine.'}</p>
+        {workspaces.length > 0 && (
+          <label className="settings-scope">
+            <span>Settings for</span>
+            <select aria-label="Settings for" value={scope} onChange={(event) => setScope(event.target.value)}>
+              <option value="">Defaults, for every workspace</option>
+              {workspaces.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+            </select>
+          </label>
+        )}
       </header>
+
+      {workspace && (
+        <>
+          <section className="settings-section ai-settings-section">
+            <header>
+              <div>
+                <span className="settings-group-label">Local AI tools</span>
+                <h2>Provider in this workspace</h2>
+                <p>The tool a new session in {workspace.name} starts with. Executables and terminals stay the same on this machine for every workspace.</p>
+              </div>
+            </header>
+            {ai.settings && (
+              <>
+                <label className="settings-toggle-row">
+                  <span><strong>Default provider here</strong><small>Blank follows the defaults.</small></span>
+                  <select aria-label="Default provider here" value={ai.settings.workspaceProviders?.[workspace.id] ?? ''} onChange={(event) => {
+                    const next = { ...(ai.settings?.workspaceProviders ?? {}) };
+                    if (event.target.value) next[workspace.id] = event.target.value;
+                    else delete next[workspace.id];
+                    ai.setSettings({ ...(ai.settings as AISettings), workspaceProviders: next });
+                  }}>
+                    <option value="">Default ({ai.settings.defaultProvider || 'none'})</option>
+                    {Object.entries(ai.settings.providers).filter(([, template]) => template.enabled).map(([id]) => <option key={id} value={id}>{id}</option>)}
+                  </select>
+                </label>
+                <div className="settings-actions">
+                  {ai.saved && <span role="status">AI settings saved.</span>}
+                  {ai.error && <p className="settings-error" role="alert">{ai.error}</p>}
+                  <button className="primary" type="button" onClick={() => void ai.save()} disabled={ai.saving}>
+                    <Save size={15} /> {ai.saving ? 'Saving...' : 'Save provider'}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+          {showHarness && <HarnessSettingsSection key={`${workspace.id}:${reload}`} workspaceId={workspace.id} />}
+          {showHarness && <SettingsFilePanel workspaceId={workspace.id} workspaceName={workspace.name} onImported={() => { setReload((value) => value + 1); void ai.refresh(); }} />}
+        </>
+      )}
+
+      {!workspace && <>
 
       <section className="settings-section">
         <header>
@@ -122,6 +184,7 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
         )}
       </section>
       {showHarness && <HarnessSettingsSection />}
+      </>}
     </section>
   );
 }

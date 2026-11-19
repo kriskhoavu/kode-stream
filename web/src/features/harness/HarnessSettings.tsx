@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { Workflow } from 'lucide-react';
-import type { HarnessAgentRole, HarnessEngineId, HarnessRoleHealth, HarnessRoleId, HarnessRolePolicy, HarnessSettings as Settings, HarnessSourceKind, HarnessSourceSettings, HarnessStatus } from '../../lib/types';
+import type { HarnessAgentRole, HarnessEngineId, HarnessRoleHealth, HarnessRoleId, HarnessRoleModel, HarnessRolePolicy, HarnessSettings as Settings, HarnessSourceKind, HarnessSourceSettings, HarnessStatus, HarnessWorkspaceSettings } from '../../lib/types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import type { HarnessClient, HarnessWorkspaceOption } from './harnessClient';
 import { plainError } from './useHarness';
@@ -38,10 +38,22 @@ const pauseConsequence: Record<HarnessRoleId, string> = {
 	qa: 'Paused: finished work waits before its tests run.'
 };
 
-/** Who does what, where work comes from, and which roles are paused. Plain words; the advanced search query stays folded away. */
-export function HarnessSettings({ client, status, onPause, onResume, onSaved }: {
+/** A workspace with no choices of its own yet: it follows the defaults everywhere. */
+export function emptyWorkspaceSettings(workspaceId: string): HarnessWorkspaceSettings {
+	return { workspaceId, verificationCommands: [], scope: [], models: {}, procedure: {} };
+}
+
+/**
+ * The harness's settings. Without a workspace they are the defaults every
+ * workspace starts from: what runs on its own, who does what and which roles
+ * are paused. With one, they are that workspace's own choices over the
+ * defaults, and the sources its Finder looks at.
+ */
+export function HarnessSettings({ client, status, workspaceId, onPause, onResume, onSaved }: {
 	client: HarnessClient;
 	status?: HarnessStatus;
+	/** Shows this workspace's own choices; absent shows the defaults. */
+	workspaceId?: string;
 	onPause: (role: HarnessRoleId) => Promise<void>;
 	onResume: (role: HarnessRoleId) => Promise<void>;
 	onSaved: () => void;
@@ -99,8 +111,29 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 	const engines = status?.engines ?? [];
 	const roles = new Map((status?.roles ?? []).map((role) => [role.role, role]));
 	const workspaceNames = new Map(workspaces.map((workspace) => [workspace.id, workspace.name]));
-	const addTarget = workspaces.find((workspace) => workspace.id === addWorkspace);
-	const addWorkspaceId = addTarget?.id ?? addWorkspace.trim();
+	const addTarget = workspaces.find((workspace) => workspace.id === (workspaceId ?? addWorkspace));
+	const addWorkspaceId = workspaceId ?? addTarget?.id ?? addWorkspace.trim();
+	const own = draft.workspaces.find((workspace) => workspace.workspaceId === workspaceId) ?? emptyWorkspaceSettings(workspaceId ?? '');
+	const updateOwn = (patch: Partial<HarnessWorkspaceSettings>) => {
+		const next = { ...own, ...patch };
+		update({ workspaces: draft.workspaces.some((workspace) => workspace.workspaceId === own.workspaceId) ? draft.workspaces.map((workspace) => workspace.workspaceId === own.workspaceId ? next : workspace) : [...draft.workspaces, next] });
+	};
+	const updateModel = (role: HarnessAgentRole, patch: Partial<HarnessRoleModel>) => {
+		const next: HarnessRoleModel = { ...own.models[role], ...patch };
+		const models = { ...own.models };
+		if (Object.values(next).some((value) => value !== undefined && value !== '' && value !== 0)) models[role] = next;
+		else delete models[role];
+		updateOwn({ models });
+	};
+	const updateSkill = (role: HarnessAgentRole, patch: Partial<{ skill: string; track: string }>) => {
+		const current = own.procedure[role] ?? { skill: '' };
+		const next = { ...current, ...patch };
+		const procedure = { ...own.procedure };
+		if (next.skill || next.track) procedure[role] = { skill: next.skill, ...(next.track ? { track: next.track } : {}) };
+		else delete procedure[role];
+		updateOwn({ procedure });
+	};
+	const shownSources = draft.sources.map((source, index) => ({ source, index })).filter(({ source }) => !workspaceId || source.workspaceId === workspaceId);
 	const duplicateSource = draft.sources.some((source) => source.workspaceId === addWorkspaceId && source.kind === addKind);
 	const addSource = () => {
 		if (!addWorkspaceId || duplicateSource) return;
@@ -137,6 +170,7 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 
 	return (
 		<div className="settings-page hx-settings">
+			{!workspaceId && <>
 			<section className="settings-section">
 				<header><div><span className="settings-group-label">Harness</span><h2>The harness</h2><p>What runs on its own, and what waits for a person.</p></div></header>
 				<div className="settings-toggle-list">
@@ -145,6 +179,7 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 					<Toggle label="Review before hand-off" hint="When on, a person tries each change in a session of their own once its tests pass, then hands it off or sends it back to Build or Plan. When off, the draft pull request opens at once." checked={draft.requireReview} onChange={(requireReview) => update({ requireReview })} />
 					<Toggle label="Let an agent stop and ask you" hint="When on, an agent that cannot decide alone stops its round and waits for your answer. When off, it goes on with its best guess and its questions show on the plan approval. A workspace or a task can say otherwise." checked={draft.askQuestions} onChange={(askQuestions) => update({ askQuestions })} />
 				</div>
+				<p className="hx-muted">Every workspace starts from these. Pick a workspace at the top of Settings to give it its own models, tests, sources and role skills.</p>
 			</section>
 
 			<section className="settings-section hx-settings-policy">
@@ -187,21 +222,81 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 					</ul>
 				)}
 			</section>
+			</>}
+
+			{workspaceId && <>
+			<section className="settings-section">
+				<header><div><span className="settings-group-label">Harness</span><h2>The harness in this workspace</h2><p>Each choice follows the defaults until you set it here.</p></div></header>
+				<div className="settings-toggle-list">
+					<Override label="Run the harness here" hint="Off: the Finder skips this workspace and none of its tasks start." value={own.enabled} fallback={draft.enabled} onChange={(enabled) => updateOwn({ enabled })} />
+					<Override label="Start tasks on their own" hint="Off: a person approves each task before the Planner starts." value={own.autoStart} fallback={draft.autoStart} onChange={(autoStart) => updateOwn({ autoStart })} />
+					<Override label="Review before hand-off" hint="On: a person tries each change once its tests pass, then hands it off or sends it back." value={own.requireReview} fallback={draft.requireReview} onChange={(requireReview) => updateOwn({ requireReview })} />
+					<Override label="Let an agent stop and ask you" hint="Off: an agent goes on with its best guess and its questions show on the plan approval." value={own.askQuestions} fallback={draft.askQuestions} onChange={(askQuestions) => updateOwn({ askQuestions })} />
+				</div>
+				<div className="hx-advanced-fields">
+					<label className="hx-field"><span>Test command</span><input aria-label="Test command" placeholder="None: Test passes without running anything" value={own.verificationCommands.join(' && ')} onChange={(event) => updateOwn({ verificationCommands: event.target.value.trim() ? [event.target.value] : [] })} /></label>
+					<label className="hx-field"><span>Paths the Builder may change (comma separated, empty for any)</span><input aria-label="Scope" placeholder="Any path that is not protected" value={own.scope.join(', ')} onChange={(event) => updateOwn({ scope: event.target.value.split(',').map((path) => path.trim()).filter(Boolean) })} /></label>
+				</div>
+			</section>
+
+			<section className="settings-section hx-settings-policy">
+				<header><div><span className="settings-group-label">Models</span><h2>Who does what here</h2><p>A blank field follows the defaults, shown greyed. Tool permissions are the defaults' alone.</p></div></header>
+				<div className="hx-table-card">
+					<table className="hx-table">
+						<thead><tr><th scope="col">Role</th><th scope="col">Tool</th><th scope="col">Model</th><th scope="col">Most turns</th></tr></thead>
+						<tbody>
+							{policyRows.map((row) => {
+								const fallback = draft.modelPolicy[row.role];
+								const model = own.models[row.role] ?? {};
+								return (
+									<tr key={row.role}>
+										<th scope="row"><b>{row.name}</b><br /><small className="hx-muted">{row.does}</small></th>
+										<td><select className="hx-select" aria-label={`${row.name} tool for “${row.does}” here`} value={model.engine ?? ''} onChange={(event) => updateModel(row.role, { engine: (event.target.value || undefined) as HarnessEngineId | undefined })}>
+											<option value="">Default ({engineLabel(fallback.engine)})</option>
+											{(engines.length ? engines.map((engine) => engine.id) : [fallback.engine]).map((id) => <option key={id} value={id}>{engineLabel(id)}</option>)}
+										</select></td>
+										<td>
+											<div className={row.role === 'coder' ? 'hx-model-pair' : undefined}>
+												<label className="hx-model-input"><span className={row.role === 'coder' ? undefined : 'sr-only'}>{row.role === 'coder' ? 'Easy' : `${row.name} model for “${row.does}” here`}</span><input aria-label={row.role === 'coder' ? 'Easy model here' : undefined} placeholder={fallback.model} value={model.model ?? ''} onChange={(event) => updateModel(row.role, { model: event.target.value.trim() || undefined })} /></label>
+												{row.role === 'coder' && <label className="hx-model-input"><span>Hard</span><input aria-label="Hard model here" placeholder={fallback.hardModel ?? fallback.model} value={model.highDifficultyModel ?? ''} onChange={(event) => updateModel(row.role, { highDifficultyModel: event.target.value.trim() || undefined })} /></label>}
+											</div>
+										</td>
+										<td><input className="hx-number" type="number" min={1} max={500} aria-label={`Most turns for “${row.does}” here`} placeholder={String(fallback.maxTurns)} value={model.maxTurns ?? ''} onChange={(event) => updateModel(row.role, { maxTurns: Number(event.target.value) > 0 ? Number(event.target.value) : undefined })} /></td>
+									</tr>
+								);
+							})}
+						</tbody>
+					</table>
+				</div>
+			</section>
 
 			<section className="settings-section">
-				<header><div><span className="settings-group-label">Sources</span><h2>Where work comes from</h2><p>The Finder looks at these and adds new tasks to the Task Queue.</p></div></header>
+				<header><div><span className="settings-group-label">Role skills</span><h2>The repository's own procedure</h2><p>A role given a skill follows that skill of the repository, and the track of it when one is named. A role without one keeps the harness's own instructions.</p></div></header>
+				<div className="hx-table-card">
+					<table className="hx-table">
+						<thead><tr><th scope="col">Role</th><th scope="col">Skill</th><th scope="col">Track</th></tr></thead>
+						<tbody>
+							{policyRows.map((row) => (
+								<tr key={row.role}>
+									<th scope="row"><b>{row.name}</b><br /><small className="hx-muted">{row.does}</small></th>
+									<td><input aria-label={`Skill for “${row.does}”`} placeholder="Built-in instructions" value={own.procedure[row.role]?.skill ?? ''} onChange={(event) => updateSkill(row.role, { skill: event.target.value.trim() })} /></td>
+									<td><input aria-label={`Track for “${row.does}”`} placeholder="Whole skill" value={own.procedure[row.role]?.track ?? ''} onChange={(event) => updateSkill(row.role, { track: event.target.value })} /></td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			</section>
+
+			<section className="settings-section">
+				<header><div><span className="settings-group-label">Sources</span><h2>Where work comes from</h2><p>The Finder looks at these and adds new tasks to this workspace's Task Queue.</p></div></header>
 				<div className="hx-sources">
-					{draft.sources.length === 0 && <p className="hx-muted">No sources yet. Add one below.</p>}
-					{draft.sources.map((source, index) => (
-						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} workspaceName={workspaceNames.get(source.workspaceId)} now={now} askDefault={draft.askQuestions} firstOfWorkspace={draft.sources.findIndex((other) => other.workspaceId === source.workspaceId) === index} onChange={(patch) => updateSource(index, patch)} onWorkspaceQuestions={(askQuestions) => update({ sources: draft.sources.map((other) => other.workspaceId === source.workspaceId ? { ...other, askQuestions } : other) })} onWorkspaceTests={(verificationCommands) => update({ sources: draft.sources.map((other) => other.workspaceId === source.workspaceId ? { ...other, verificationCommands } : other) })} onRemove={() => removeSource(index)} onClear={() => setConfirmClear(source.workspaceId)} clearing={clearing} />
+					{shownSources.length === 0 && <p className="hx-muted">No sources yet. Add one below.</p>}
+					{shownSources.map(({ source, index }) => (
+						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} workspaceName={workspaceNames.get(source.workspaceId)} now={now} onChange={(patch) => updateSource(index, patch)} onRemove={() => removeSource(index)} onClear={() => setConfirmClear(source.workspaceId)} clearing={clearing} />
 					))}
 				</div>
 				<form className="hx-add-source" aria-label="Add a source" onSubmit={(event) => { event.preventDefault(); addSource(); }}>
-					<label className="hx-field"><span>Workspace</span>
-						{workspaces.length > 0
-							? <select value={addWorkspace} onChange={(event) => setAddWorkspace(event.target.value)}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select>
-							: <input value={addWorkspace} placeholder="Workspace id" onChange={(event) => setAddWorkspace(event.target.value)} />}
-					</label>
 					<label className="hx-field"><span>Look in</span>
 						<select value={addKind} onChange={(event) => setAddKind(event.target.value as HarnessSourceKind)}>{addableKinds.map((kind) => <option key={kind} value={kind}>{sourceLabels[kind]}</option>)}</select>
 					</label>
@@ -210,8 +305,9 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 					{!duplicateSource && addKind === 'jira' && addTarget && !addTarget.jiraProjectKey && <span className="hx-muted">This workspace has no Jira connection yet. Set one in the workspace settings, or type a search under Advanced after adding.</span>}
 				</form>
 			</section>
+			</>}
 
-			<section className="settings-section">
+			{!workspaceId && <section className="settings-section">
 				<header><div><span className="settings-group-label">Roles</span><h2>Pause a role</h2><p>A paused role starts nothing new. Pausing takes effect at once.</p></div></header>
 				<div className="settings-toggle-list">
 					{roleOrder.map((role) => {
@@ -231,7 +327,7 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 						);
 					})}
 				</div>
-			</section>
+			</section>}
 
 			<div className="settings-actions hx-settings-actions">
 				<button type="button" className="primary" disabled={!dirty || saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</button>
@@ -260,6 +356,20 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 				/>
 			)}
 		</div>
+	);
+}
+
+/** A workspace's own on or off, or the default's. */
+function Override({ label, hint, value, fallback, onChange }: { label: string; hint: string; value?: boolean | null; fallback: boolean; onChange: (value: boolean | undefined) => void }) {
+	return (
+		<label className="settings-toggle-row">
+			<span><strong>{label}</strong><small>{hint}</small></span>
+			<select className="hx-select" aria-label={label} value={value === undefined || value === null ? 'default' : value ? 'on' : 'off'} onChange={(event) => onChange(event.target.value === 'default' ? undefined : event.target.value === 'on')}>
+				<option value="default">Default ({fallback ? 'on' : 'off'})</option>
+				<option value="on">On</option>
+				<option value="off">Off</option>
+			</select>
+		</label>
 	);
 }
 
@@ -297,7 +407,7 @@ function ModelInput({ label, value, hideLabel = false, onChange }: { label: stri
 	);
 }
 
-function SourceRow({ source, workspaceName, now, askDefault, firstOfWorkspace, onChange, onWorkspaceQuestions, onWorkspaceTests, onRemove, onClear, clearing }: { source: HarnessSourceSettings; workspaceName?: string; now: number; askDefault: boolean; firstOfWorkspace: boolean; onChange: (patch: Partial<HarnessSourceSettings>) => void; onWorkspaceQuestions: (askQuestions: boolean | null) => void; onWorkspaceTests: (commands: string[]) => void; onRemove: () => void; onClear: () => void; clearing: boolean }) {
+function SourceRow({ source, workspaceName, now, onChange, onRemove, onClear, clearing }: { source: HarnessSourceSettings; workspaceName?: string; now: number; onChange: (patch: Partial<HarnessSourceSettings>) => void; onRemove: () => void; onClear: () => void; clearing: boolean }) {
 	const checked = source.lastCheckedAt ? `Looked ${formatAgo(source.lastCheckedAt, now)}${source.lastFound !== undefined ? ` · ${source.lastFound} new` : ''}` : 'Not looked yet';
 	const queryLabel = source.kind === 'jira' ? 'Jira search (JQL)' : source.kind === 'github' ? 'Repository (owner/name)' : source.kind === 'local' ? 'Task folder (inside the workspace, or a full path)' : 'Repository (workspace/name)';
 	const workspaceLabel = workspaceName ?? source.workspaceId;
@@ -311,22 +421,6 @@ function SourceRow({ source, workspaceName, now, askDefault, firstOfWorkspace, o
 				<button type="button" className="ghost" onClick={onRemove} aria-label={`Remove ${sourceLabels[source.kind]} for ${workspaceName ?? source.workspaceId}`}>Remove</button>
 			</div>
 			{source.lastError && <p className="hx-banner" role="alert">{source.lastError}</p>}
-			{firstOfWorkspace && (
-				<label className="hx-field hx-field-inline">
-					<span>May an agent stop and ask you here?</span>
-					<select aria-label={`May an agent stop and ask in ${workspaceName ?? source.workspaceId}`} value={source.askQuestions === undefined || source.askQuestions === null ? 'default' : source.askQuestions ? 'yes' : 'no'} onChange={(event) => onWorkspaceQuestions(event.target.value === 'default' ? null : event.target.value === 'yes')}>
-						<option value="default">Same as everywhere ({askDefault ? 'yes' : 'no'})</option>
-						<option value="yes">Yes, stop and ask</option>
-						<option value="no">No, go on with a best guess</option>
-					</select>
-				</label>
-			)}
-			{firstOfWorkspace && (
-				<label className="hx-field hx-field-inline">
-					<span>Test command</span>
-					<input aria-label={`Test command for ${workspaceLabel}`} placeholder="None: Test passes without running anything" value={(source.verificationCommands ?? []).join(' && ')} onChange={(event) => onWorkspaceTests(event.target.value.trim() ? [event.target.value] : [])} />
-				</label>
-			)}
 			{source.kind === 'local' && <p className="hx-muted">One Markdown file per task: its name is the key, its first heading the title. Hand-off pushes the branch and opens no pull request.</p>}
 			<details className="hx-advanced" open={source.query === '' ? true : undefined}>
 				<summary>Advanced</summary>

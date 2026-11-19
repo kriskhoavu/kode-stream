@@ -185,7 +185,10 @@ export function createFixtureStore(now = Date.now()): Store {
 				coder: { engine: 'claudecode', model: SONNET, hardModel: OPUS, maxTurns: 120 },
 				code_reviewer: { engine: 'claudecode', model: OPUS, maxTurns: 40 },
 				qa_fixer: { engine: 'claudecode', model: SONNET, maxTurns: 60 }
-			}
+			},
+			workspaces: [
+				{ workspaceId: 'airship', verificationCommands: ['npm test'], scope: [], models: { code_reviewer: { model: SONNET } }, procedure: { planner: { skill: 'feature-planning', track: 'Plan' } } }
+			]
 		}
 	};
 

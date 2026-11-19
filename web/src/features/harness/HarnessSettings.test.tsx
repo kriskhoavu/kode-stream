@@ -5,14 +5,14 @@ import { createFixtureClient } from './fixture';
 
 afterEach(cleanup);
 
-async function setup() {
+async function setup(workspaceId?: string) {
 	const client = createFixtureClient({ tickMs: 0, arrivalMs: 0 });
 	const status = await client.status();
 	const onPause = vi.fn().mockResolvedValue(undefined);
 	const onResume = vi.fn().mockResolvedValue(undefined);
 	const onSaved = vi.fn();
-	render(<HarnessSettings client={client} status={status} onPause={onPause} onResume={onResume} onSaved={onSaved} />);
-	await screen.findByRole('heading', { name: 'Who does what' });
+	render(<HarnessSettings client={client} status={status} workspaceId={workspaceId} onPause={onPause} onResume={onResume} onSaved={onSaved} />);
+	await screen.findByRole('heading', { name: workspaceId ? 'Who does what here' : 'Who does what' });
 	return { client, onPause, onResume, onSaved };
 }
 
@@ -30,7 +30,7 @@ describe('HarnessSettings', () => {
 	});
 
 	it('keeps the source query folded under Advanced', async () => {
-		await setup();
+		await setup('airship');
 		const advanced = screen.getAllByText('Advanced')[0].closest('details') as HTMLDetailsElement;
 		expect(advanced.open).toBe(false);
 		expect(screen.getByText('Looked 12 min ago · 3 new')).toBeInTheDocument();
@@ -62,9 +62,8 @@ describe('HarnessSettings', () => {
 	});
 
 	it('adds a Jira source for a workspace with its project as the first query, and saves it', async () => {
-		const { client } = await setup();
+		const { client } = await setup('airship-docs');
 		const form = await screen.findByRole('form', { name: 'Add a source' });
-		fireEvent.change(within(form).getByRole('combobox', { name: 'Workspace' }), { target: { value: 'airship-docs' } });
 		fireEvent.change(within(form).getByRole('combobox', { name: 'Look in' }), { target: { value: 'jira' } });
 		fireEvent.click(within(form).getByRole('button', { name: 'Add source' }));
 		expect(screen.getByRole('status')).toHaveTextContent('Added. Save to let the Finder look there.');
@@ -77,16 +76,15 @@ describe('HarnessSettings', () => {
 	});
 
 	it('refuses a second source of the same kind for one workspace, and offers Jira, GitHub and a local folder', async () => {
-		await setup();
+		await setup('airship');
 		const form = await screen.findByRole('form', { name: 'Add a source' });
-		expect(within(form).getAllByRole('option').map((option) => option.textContent)).toEqual(['Airship', 'Airship client', 'Airship docs', 'Jira', 'GitHub', 'Local folder']);
-		fireEvent.change(within(form).getByRole('combobox', { name: 'Workspace' }), { target: { value: 'airship' } });
+		expect(within(form).getAllByRole('option').map((option) => option.textContent)).toEqual(['Jira', 'GitHub', 'Local folder']);
 		expect(within(form).getByRole('button', { name: 'Add source' })).toBeDisabled();
 		expect(form).toHaveTextContent('Jira is already set for this workspace.');
 	});
 
 	it('clears a workspace queue after a confirmation and says how many tasks went', async () => {
-		const { client, onSaved } = await setup();
+		const { client, onSaved } = await setup('airship');
 		const before = (await client.tasks()).filter((task) => task.workspaceId === 'airship' && (task.state === 'ranked' || task.state === 'discovered' || task.state === 'stale' || task.state === 'dismissed')).length;
 		expect(before).toBeGreaterThan(0);
 		fireEvent.click(screen.getAllByRole('button', { name: 'Clear the Task Queue for Airship' })[0]);
@@ -100,32 +98,35 @@ describe('HarnessSettings', () => {
 		expect(after.some((task) => task.workspaceId === 'airship' && task.state === 'running')).toBe(true);
 	});
 
-	it('turns stop-and-ask off everywhere and back on for one workspace', async () => {
-		const { client } = await setup();
-		const everywhere = screen.getByRole('switch', { name: /Let an agent stop and ask you/ });
-		expect(everywhere).toBeChecked();
-		fireEvent.click(everywhere);
-		const airship = screen.getByRole('combobox', { name: 'May an agent stop and ask in Airship' });
-		expect(airship).toHaveDisplayValue('Same as everywhere (no)');
-		fireEvent.change(airship, { target: { value: 'yes' } });
-		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved'));
-		const saved = await client.settings();
-		expect(saved.askQuestions).toBe(false);
-		expect(saved.sources.filter((source) => source.workspaceId === 'airship').every((source) => source.askQuestions === true)).toBe(true);
+	it('shows only the defaults, with no sources, when no workspace is picked', async () => {
+		await setup();
+		expect(screen.queryByRole('heading', { name: 'Where work comes from' })).not.toBeInTheDocument();
+		expect(screen.getByRole('switch', { name: /Let an agent stop and ask you/ })).toBeChecked();
 	});
 
-	it('sets one test command for every source of a workspace', async () => {
-		const { client } = await setup();
-		fireEvent.change(screen.getByRole('textbox', { name: 'Test command for Airship' }), { target: { value: 'go test ./...' } });
+	it('gives a workspace its own choices over the defaults, each blank one following them', async () => {
+		const { client } = await setup('airship');
+		const ask = screen.getByRole('combobox', { name: 'Let an agent stop and ask you' });
+		expect(ask).toHaveDisplayValue('Default (on)');
+		fireEvent.change(ask, { target: { value: 'off' } });
+		expect(screen.getByRole('textbox', { name: 'Test command' })).toHaveValue('npm test');
+		fireEvent.change(screen.getByRole('textbox', { name: 'Test command' }), { target: { value: 'go test ./...' } });
+		const easy = screen.getByRole('textbox', { name: 'Easy model here' });
+		expect(easy).toHaveValue('');
+		expect(easy).toHaveAttribute('placeholder', 'claude-sonnet-5-5');
+		fireEvent.change(easy, { target: { value: 'haiku' } });
+		expect(screen.getByRole('textbox', { name: 'Skill for “Writes the plan”' })).toHaveValue('feature-planning');
+		fireEvent.change(screen.getByRole('textbox', { name: 'Skill for “Writes the code”' }), { target: { value: 'feature-planning' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved'));
 		const saved = await client.settings();
-		expect(saved.sources.filter((source) => source.workspaceId === 'airship').every((source) => source.verificationCommands?.[0] === 'go test ./...')).toBe(true);
+		const own = saved.workspaces.find((workspace) => workspace.workspaceId === 'airship');
+		expect(saved.askQuestions).toBe(true);
+		expect(own).toMatchObject({ askQuestions: false, verificationCommands: ['go test ./...'], models: { coder: { model: 'haiku' } }, procedure: { coder: { skill: 'feature-planning' } } });
 	});
 
 	it('removes a source and names workspaces by their name', async () => {
-		await setup();
+		await setup('airship-client');
 		expect(screen.getByText('· Airship client')).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Remove Bitbucket for Airship client' }));
 		expect(screen.queryByText('· Airship client')).not.toBeInTheDocument();

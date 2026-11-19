@@ -101,6 +101,8 @@ import type {
   HarnessRun,
   HarnessRunDetail,
   HarnessSettings,
+  SettingsFilePart,
+  SettingsFileView,
   HarnessStatus,
   HarnessCreateTaskInput,
   HarnessRunFileDiff, HarnessRunPlan,
@@ -584,8 +586,11 @@ export const api = {
     if (range.to) query.set('to', range.to);
     return request<HarnessCostSummary>(`/api/harness/cost?${query.toString()}`, { signal }, !signal).then((summary) => ({ ...summary, groups: summary.groups ?? [] }));
   },
-  harnessSettings: (signal?: AbortSignal) => request<HarnessSettings>('/api/harness/settings', { signal }, !signal),
-  saveHarnessSettings: (settings: HarnessSettings) => request<HarnessSettings>('/api/harness/settings', { method: 'PUT', body: JSON.stringify({ ...settings, expectedRevision: settings.revision }) }, false),
+  harnessSettings: async (signal?: AbortSignal) => normalizeHarnessSettings(await request<HarnessSettings>('/api/harness/settings', { signal }, !signal)),
+  saveHarnessSettings: async (settings: HarnessSettings) => normalizeHarnessSettings(await request<HarnessSettings>('/api/harness/settings', { method: 'PUT', body: JSON.stringify({ ...settings, expectedRevision: settings.revision }) }, false)),
+  settingsFile: (workspaceId: string, signal?: AbortSignal) => request<SettingsFileView>(`/api/workspaces/${encodeURIComponent(workspaceId)}/settings-file`, { signal }, !signal),
+  exportSettingsFile: (workspaceId: string, parts: SettingsFilePart[]) => request<{ path: string; has: SettingsFilePart[] }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/settings-file/export`, { method: 'POST', body: JSON.stringify({ parts }) }, false),
+  importSettingsFile: (workspaceId: string, parts: SettingsFilePart[]) => request<{ imported: SettingsFilePart[] }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/settings-file/import`, { method: 'POST', body: JSON.stringify({ parts }) }, false),
   harnessEventsURL: (lastEventId?: number) => apiURL(lastEventId ? `/api/harness/events?after=${lastEventId}` : '/api/harness/events')
 };
 
@@ -679,12 +684,21 @@ function normalizeSystemConfigPaths(input: SystemConfigPaths): SystemConfigPaths
   };
 }
 
+function normalizeHarnessSettings(input: HarnessSettings): HarnessSettings {
+  return {
+    ...input,
+    sources: input.sources ?? [],
+    workspaces: (input.workspaces ?? []).map((workspace) => ({ ...workspace, verificationCommands: workspace.verificationCommands ?? [], scope: workspace.scope ?? [], models: workspace.models ?? {}, procedure: workspace.procedure ?? {} }))
+  };
+}
+
 function normalizeAISettings(input: AISettings): AISettings {
   return {
     defaultProvider: input.defaultProvider ?? '',
     defaultTerminal: input.defaultTerminal ?? '',
     providers: normalizeAILaunchTemplates(input.providers),
-    terminals: normalizeAILaunchTemplates(input.terminals)
+    terminals: normalizeAILaunchTemplates(input.terminals),
+    workspaceProviders: input.workspaceProviders ?? {}
   };
 }
 

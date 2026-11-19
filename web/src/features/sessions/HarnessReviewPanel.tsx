@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { HarnessApproval, HarnessRunDetail, HarnessTask, SafeSessionRecord } from '../../lib/types';
+import { providerFor } from '../../lib/types';
 import { api } from '../../shared/api';
 import { newIdempotencyKey } from '../../shared/api/idempotency';
 import { GateCard } from '../harness/GateCard';
@@ -63,7 +64,7 @@ export function HarnessReviewPanel({ detail, task, changes, decide }: {
 		setError('');
 		try {
 			const settings = await api.aiSettings();
-			const result = await api.startHarnessReviewSession(run.id, { provider: settings.defaultProvider, idempotencyKey: newIdempotencyKey('review'), columns: 100, rows: 30 });
+			const result = await api.startHarnessReviewSession(run.id, { provider: providerFor(settings, run.workspaceId), idempotencyKey: newIdempotencyKey('review'), columns: 100, rows: 30 });
 			if (result.record) setSessions((current) => [result.record as SafeSessionRecord, ...current.filter((record) => record.id !== result.record?.id)]);
 			else await load();
 			setTab('session');

@@ -16,6 +16,6 @@ describe('HarnessSettingsSection', () => {
 		}));
 		render(<HarnessSettingsSection />);
 		expect(await screen.findByRole('heading', { name: 'The harness' })).toBeInTheDocument();
-		expect(await screen.findByRole('heading', { name: 'Where work comes from' })).toBeInTheDocument();
+		expect(await screen.findByRole('heading', { name: 'Pause a role' })).toBeInTheDocument();
 	});
 });

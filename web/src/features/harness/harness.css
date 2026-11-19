@@ -2556,3 +2556,18 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 .hx-workbench .explorer-panel-header.embedded { grid-template-columns: minmax(0, 1fr); }
 .hx-workbench .explorer-panel-title .segmented-control-compact { width: 100%; }
 .hx-workbench .segmented-control-compact button { min-width: 0; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Settings: one workspace's own choices, and the file that shares them ── */
+
+.settings-scope { display: inline-flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.settings-scope select { min-width: 240px; min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font: inherit; }
+
+.settings-file-state { margin: 0 0 14px; padding: 0 4px; color: var(--muted); font-size: 13px; }
+.settings-file-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.settings-file-parts { display: grid; gap: 8px; align-content: start; min-width: 0; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; }
+.settings-file-parts legend { padding: 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.settings-file-parts > button { justify-self: start; display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; }
+.settings-file-part { display: flex; align-items: flex-start; gap: 10px; min-width: 0; font-size: 13px; }
+.settings-file-part input { margin-top: 3px; }
+.settings-file-part > span { display: grid; gap: 2px; min-width: 0; }
+.settings-file-part small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }

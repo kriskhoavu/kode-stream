@@ -15,6 +15,7 @@ import type {
 	EmbeddedAISessionResult,
 	E2ERunbook
 } from '../../lib/types';
+import { providerFor } from '../../lib/types';
 import { appendJiraDescriptionPrompt, removeJiraDescriptionPrompt } from './jiraPrompt';
 import { useModalDialog } from '../../components/overlay';
 import { toolLabel as label } from './providerDisplay';
@@ -58,7 +59,7 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 		const controller = new AbortController();
 		Promise.all([api.aiSettings(controller.signal), api.aiCapabilities(controller.signal), api.aiPresets(controller.signal), itemId ? api.aiSessionEligibility(itemId, controller.signal) : Promise.resolve({ editable: true, cardContextAvailable: true, missing: [] })]).then(([nextSettings, nextCapabilities, nextPresets, nextEligibility]) => {
 			if (!active) return;
-			const nextProvider = preference?.provider ?? nextSettings.defaultProvider;
+			const nextProvider = preference?.provider ?? providerFor(nextSettings, workspaceTarget?.workspaceId ?? embeddedLaunchGuards?.expectedWorkspaceId);
 			const nextPresetId = preference?.presetId ?? nextPresets[0]?.id ?? '';
 			const presetPrompt = nextPresets.find((preset) => preset.id === nextPresetId)?.prompt ?? '';
 			const nextPromptDraft = e2eMode ? `Execute the E2E runbook at ${workspaceTarget!.contextPath}. Use the e2e-testing skill, request missing runtime inputs, and record the result at ${e2eRunbook!.resultPath}.` : preference?.promptDraft ?? preference?.customPrompt ?? presetPrompt;

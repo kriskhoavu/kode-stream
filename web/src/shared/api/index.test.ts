@@ -153,7 +153,8 @@ describe('shared api facade', () => {
       defaultProvider: 'codex',
       defaultTerminal: '',
       providers: { codex: { enabled: true, executable: 'codex', args: [] } },
-      terminals: {}
+      terminals: {},
+      workspaceProviders: {}
     });
   });
 
