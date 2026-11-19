@@ -2323,7 +2323,8 @@ a.hx-source:hover {
 
 .hx-workbench .editor-file-strip:empty { display: none; }
 
-.hx-workbench-reader { overflow: auto; }
+/* The shared viewer clips its content; the reader scrolls it instead, so a long conversation reads to its end. */
+.hx-workbench .content-viewer.hx-workbench-reader { overflow: auto; }
 
 .hx-workbench-reader > .content-viewer-markdown { flex: none; overflow: visible; }
 
@@ -2339,6 +2340,10 @@ a.hx-source:hover {
 .hx-workbench-diff.diff-review { flex: none; overflow: visible; }
 
 .hx-workbench-thread { padding: 20px 24px; }
+
+/* A conversation reads as a page, not a chat: every turn spans the reader, the harness's brief included. */
+.hx-workbench-thread .agent-turn,
+.hx-workbench-section-thread .agent-turn { justify-self: stretch; }
 
 .hx-workbench-thread-meta {
 	margin: 0 0 12px;
