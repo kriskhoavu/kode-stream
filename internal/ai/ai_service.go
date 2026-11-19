@@ -170,6 +170,14 @@ func mergeDefaults(saved Settings, goos string) Settings {
 	if saved.DefaultTerminal != "" {
 		defaults.DefaultTerminal = saved.DefaultTerminal
 	}
+	for workspaceID, provider := range saved.WorkspaceProviders {
+		if provider = strings.TrimSpace(provider); provider != "" {
+			if defaults.WorkspaceProviders == nil {
+				defaults.WorkspaceProviders = map[string]string{}
+			}
+			defaults.WorkspaceProviders[workspaceID] = provider
+		}
+	}
 	return defaults
 }
 

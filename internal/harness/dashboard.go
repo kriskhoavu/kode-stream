@@ -381,21 +381,29 @@ func DashboardCostOf(summary domain.CostSummary) DashboardCost {
 // --- settings ---
 
 type DashboardSource struct {
-	WorkspaceID string `json:"workspaceId"`
-	Kind        string `json:"kind"`
-	Enabled     bool   `json:"enabled"`
-	// AskQuestions is the workspace's own answer to "may an agent stop and
-	// ask", carried on each of its sources; nil follows the settings.
-	AskQuestions *bool `json:"askQuestions,omitempty"`
-	// VerificationCommands are the workspace's test commands, carried on each
-	// of its sources like AskQuestions; nil keeps the stored ones.
-	VerificationCommands []string   `json:"verificationCommands,omitempty"`
-	Query                string     `json:"query"`
-	Labels               []string   `json:"labels,omitempty"`
-	TokenEnvVar          string     `json:"tokenEnvVar,omitempty"`
-	LastCheckedAt        *time.Time `json:"lastCheckedAt,omitempty"`
-	LastFound            int        `json:"lastFound,omitempty"`
-	LastError            string     `json:"lastError,omitempty"`
+	WorkspaceID   string     `json:"workspaceId"`
+	Kind          string     `json:"kind"`
+	Enabled       bool       `json:"enabled"`
+	Query         string     `json:"query"`
+	Labels        []string   `json:"labels,omitempty"`
+	TokenEnvVar   string     `json:"tokenEnvVar,omitempty"`
+	LastCheckedAt *time.Time `json:"lastCheckedAt,omitempty"`
+	LastFound     int        `json:"lastFound,omitempty"`
+	LastError     string     `json:"lastError,omitempty"`
+}
+
+// DashboardWorkspace is one workspace's overrides. A nil or empty field
+// follows the settings.
+type DashboardWorkspace struct {
+	WorkspaceID          string                               `json:"workspaceId"`
+	Enabled              *bool                                `json:"enabled,omitempty"`
+	AutoStart            *bool                                `json:"autoStart,omitempty"`
+	RequireReview        *bool                                `json:"requireReview,omitempty"`
+	AskQuestions         *bool                                `json:"askQuestions,omitempty"`
+	VerificationCommands []string                             `json:"verificationCommands"`
+	Scope                []string                             `json:"scope"`
+	Models               map[domain.Role]domain.RoleModel     `json:"models"`
+	Procedure            map[domain.Role]domain.ProcedureStep `json:"procedure"`
 }
 
 type DashboardRolePolicy struct {
@@ -406,14 +414,17 @@ type DashboardRolePolicy struct {
 }
 
 type DashboardSettings struct {
-	Revision         int64                               `json:"revision"`
-	Enabled          bool                                `json:"enabled"`
-	AutoStart        bool                                `json:"autoStart"`
-	RequireReview    bool                                `json:"requireReview"`
-	AskQuestions     bool                                `json:"askQuestions"`
-	Slots            map[string]int                      `json:"slots"`
-	Paused           map[string]bool                     `json:"paused"`
-	Sources          []DashboardSource                   `json:"sources"`
+	Revision      int64             `json:"revision"`
+	Enabled       bool              `json:"enabled"`
+	AutoStart     bool              `json:"autoStart"`
+	RequireReview bool              `json:"requireReview"`
+	AskQuestions  bool              `json:"askQuestions"`
+	Slots         map[string]int    `json:"slots"`
+	Paused        map[string]bool   `json:"paused"`
+	Sources       []DashboardSource `json:"sources"`
+	// Workspaces holds each workspace's own choices over these settings. A
+	// save that omits it keeps the stored ones.
+	Workspaces       []DashboardWorkspace                `json:"workspaces"`
 	ModelPolicy      map[domain.Role]DashboardRolePolicy `json:"modelPolicy"`
 	ExpectedRevision *int64                              `json:"expectedRevision,omitempty"`
 }
@@ -425,7 +436,7 @@ func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, err
 	}
 	view := DashboardSettings{Revision: settings.Revision, Enabled: settings.Enabled, AutoStart: settings.AutoStart, RequireReview: settings.RequireReview, AskQuestions: settings.QuestionGate(domain.Task{}),
 		Slots:  map[string]int{"scout": 1, "sorter": 1, "planner": settings.Slots.Planner, "reviewer": settings.Slots.Reviewer, "coder": settings.Slots.Coder, "qa": settings.Slots.QAFixer},
-		Paused: map[string]bool{}, Sources: []DashboardSource{}, ModelPolicy: map[domain.Role]DashboardRolePolicy{}}
+		Paused: map[string]bool{}, Sources: []DashboardSource{}, Workspaces: []DashboardWorkspace{}, ModelPolicy: map[domain.Role]DashboardRolePolicy{}}
 	for key, paused := range settings.Paused {
 		if paused {
 			view.Paused[DashboardRoleOf(key)] = true
@@ -443,22 +454,21 @@ func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, err
 	}
 	for _, workspace := range settings.Workspaces {
 		if jira := workspace.Jira; jira != nil {
-			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceJira), Enabled: jira.Enabled, Query: jira.JQL, AskQuestions: workspace.AskQuestions})
+			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceJira), Enabled: jira.Enabled, Query: jira.JQL})
 		}
 		if github := workspace.GitHub; github != nil {
-			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceGitHub), Enabled: github.Enabled, Query: github.Repo, Labels: github.Labels, TokenEnvVar: github.TokenEnvVar, AskQuestions: workspace.AskQuestions})
+			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceGitHub), Enabled: github.Enabled, Query: github.Repo, Labels: github.Labels, TokenEnvVar: github.TokenEnvVar})
 		}
 		if bitbucket := workspace.Bitbucket; bitbucket != nil {
-			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceBitbucket), Enabled: bitbucket.Enabled, Query: bitbucket.Workspace + "/" + bitbucket.Repo, TokenEnvVar: bitbucket.TokenEnvVar, AskQuestions: workspace.AskQuestions})
+			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceBitbucket), Enabled: bitbucket.Enabled, Query: bitbucket.Workspace + "/" + bitbucket.Repo, TokenEnvVar: bitbucket.TokenEnvVar})
 		}
 		if local := workspace.Local; local != nil {
-			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceLocal), Enabled: local.Enabled, Query: local.Dir, AskQuestions: workspace.AskQuestions})
+			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceLocal), Enabled: local.Enabled, Query: local.Dir})
 		}
 	}
-	for i := range view.Sources {
-		if workspace, ok := settings.Workspace(view.Sources[i].WorkspaceID); ok && len(workspace.VerificationCommands) > 0 {
-			view.Sources[i].VerificationCommands = workspace.VerificationCommands
-		}
+	for _, workspace := range settings.Workspaces {
+		view.Workspaces = append(view.Workspaces, DashboardWorkspace{WorkspaceID: workspace.WorkspaceID, Enabled: workspace.Enabled, AutoStart: workspace.AutoStart, RequireReview: workspace.RequireReview, AskQuestions: workspace.AskQuestions,
+			VerificationCommands: nonNil(workspace.VerificationCommands), Scope: nonNil(workspace.Scope), Models: orEmpty(workspace.Models), Procedure: orEmpty(workspace.Procedure)})
 	}
 	for _, role := range domain.Roles {
 		policy := settings.ModelPolicy.Roles[role]
@@ -506,6 +516,9 @@ func (s *Service) SaveDashboardSettings(ctx context.Context, view DashboardSetti
 			return DashboardSettings{}, err
 		}
 	}
+	if view.Workspaces != nil {
+		applyWorkspaces(&settings, view.Workspaces)
+	}
 	for role, policy := range view.ModelPolicy {
 		current, ok := settings.ModelPolicy.Roles[role]
 		if !ok {
@@ -552,19 +565,6 @@ func applySources(settings *domain.Settings, sources []DashboardSource) error {
 	for i := range settings.Workspaces {
 		workspace := &settings.Workspaces[i]
 		kinds := listed[workspace.WorkspaceID]
-		workspace.AskQuestions = nil
-		for _, source := range kinds {
-			if source.AskQuestions != nil {
-				workspace.AskQuestions = source.AskQuestions
-				break
-			}
-		}
-		for _, source := range kinds {
-			if source.VerificationCommands != nil {
-				workspace.VerificationCommands = cleanCommands(source.VerificationCommands)
-				break
-			}
-		}
 		workspace.Jira, workspace.GitHub, workspace.Local = nil, nil, nil
 		previousBitbucket := workspace.Bitbucket
 		workspace.Bitbucket = nil
@@ -590,6 +590,45 @@ func applySources(settings *domain.Settings, sources []DashboardSource) error {
 		}
 	}
 	return nil
+}
+
+// applyWorkspaces sets each listed workspace's overrides; a workspace it
+// does not list keeps its own.
+func applyWorkspaces(settings *domain.Settings, workspaces []DashboardWorkspace) {
+	for _, view := range workspaces {
+		if strings.TrimSpace(view.WorkspaceID) == "" {
+			continue
+		}
+		index := -1
+		for i := range settings.Workspaces {
+			if settings.Workspaces[i].WorkspaceID == view.WorkspaceID {
+				index = i
+			}
+		}
+		if index < 0 {
+			settings.Workspaces = append(settings.Workspaces, domain.WorkspaceSettings{WorkspaceID: view.WorkspaceID})
+			index = len(settings.Workspaces) - 1
+		}
+		workspace := &settings.Workspaces[index]
+		workspace.Enabled, workspace.AutoStart, workspace.RequireReview, workspace.AskQuestions = view.Enabled, view.AutoStart, view.RequireReview, view.AskQuestions
+		workspace.VerificationCommands = cleanCommands(view.VerificationCommands)
+		workspace.Scope = cleanCommands(view.Scope)
+		workspace.Models, workspace.Procedure = view.Models, view.Procedure
+	}
+}
+
+func nonNil[T any](values []T) []T {
+	if values == nil {
+		return []T{}
+	}
+	return values
+}
+
+func orEmpty[K comparable, V any](values map[K]V) map[K]V {
+	if values == nil {
+		return map[K]V{}
+	}
+	return values
 }
 
 // cleanCommands drops blank test commands and trims the rest.

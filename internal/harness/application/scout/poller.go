@@ -57,6 +57,9 @@ func (p *Poller) Poll(ctx context.Context, settings domain.Settings, workspaceID
 		if workspaceID != "" && workspaceSettings.WorkspaceID != workspaceID {
 			continue
 		}
+		if workspaceSettings.Enabled != nil && !*workspaceSettings.Enabled {
+			continue
+		}
 		workspace, found, err := p.workspaces.Get(workspaceSettings.WorkspaceID)
 		if err != nil {
 			errs = append(errs, err)

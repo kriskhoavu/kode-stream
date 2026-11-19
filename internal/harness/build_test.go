@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -147,15 +148,14 @@ func TestScopeKeepsProtectedPathsOutEvenWithoutAScope(t *testing.T) {
 	}
 }
 
-func TestABriefFollowsTheSkillTheRepositoryMapsItsRoleTo(t *testing.T) {
+func TestABriefFollowsTheSkillTheWorkspaceMapsItsRoleTo(t *testing.T) {
 	briefs := map[domain.Role]string{}
 	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
 		briefs[role] = invocation.Brief
 		return happyScript(role, call, invocation)
+	}, func(settings *domain.Settings) {
+		settings.Workspaces[0].Procedure = map[domain.Role]domain.ProcedureStep{domain.RolePlanner: {Skill: "feature-planning", Track: "Plan"}}
 	})
-	writeIn(t, fixture.workspace.Path, ".kode-stream/harness.yaml", "version: 1\nroles:\n  planner: { skill: feature-planning, track: Plan }\n")
-	runGit(t, fixture.workspace.Path, "add", ".")
-	runGit(t, fixture.workspace.Path, "commit", "-q", "-m", "procedure")
 	fixture.settle(t)
 	for _, want := range []string{"Follow the `feature-planning` skill, its Plan track.", "`.claude/skills/feature-planning/SKILL.md`", "put the question in `open`"} {
 		if !strings.Contains(briefs[domain.RolePlanner], want) {
@@ -164,5 +164,49 @@ func TestABriefFollowsTheSkillTheRepositoryMapsItsRoleTo(t *testing.T) {
 	}
 	if reviewer, ran := briefs[domain.RolePlanReviewer]; !ran || strings.Contains(reviewer, "own procedure") {
 		t.Fatalf("an unmapped role must keep the built-in instructions:\n%s", reviewer)
+	}
+}
+
+func TestAWorkspaceRunsWithItsOwnModelsAndReview(t *testing.T) {
+	engines := map[domain.Role]string{}
+	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
+		engines[role] = invocation.Model + "/" + strconv.Itoa(invocation.MaxTurns)
+		return happyScript(role, call, invocation)
+	}, func(settings *domain.Settings) {
+		review := true
+		settings.Workspaces[0].RequireReview = &review
+		settings.Workspaces[0].Models = map[domain.Role]domain.RoleModel{domain.RoleCoder: {Model: "haiku", HighDifficultyModel: "haiku", MaxTurns: 7}}
+	})
+	withOrigin(t, fixture)
+	fixture.service.pulls = []ports.PullRequests{&fakePulls{}}
+	fixture.settle(t)
+	approvePlan(t, fixture)
+	fixture.settle(t)
+	if engines[domain.RoleCoder] != "haiku/7" || strings.HasPrefix(engines[domain.RolePlanner], "haiku") {
+		t.Fatalf("models = %#v", engines)
+	}
+	if approval := fixture.waiting(t); approval.Gate != domain.GateReview {
+		t.Fatalf("the workspace turns Review on, waiting = %s", approval.Gate)
+	}
+}
+
+func TestSettingsForLaysAWorkspaceOverTheDefaults(t *testing.T) {
+	settings := domain.DefaultSettings()
+	settings.Enabled, settings.AutoStart = true, false
+	off, on := false, true
+	settings.Workspaces = []domain.WorkspaceSettings{{WorkspaceID: "a", Enabled: &off, AutoStart: &on}, {WorkspaceID: "b"}}
+	normalized, err := settings.Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := normalized.For("a"); a.Enabled || !a.AutoStart {
+		t.Fatalf("a = enabled %v autoStart %v", a.Enabled, a.AutoStart)
+	}
+	if b := normalized.For("b"); !b.Enabled || b.AutoStart {
+		t.Fatalf("b = enabled %v autoStart %v", b.Enabled, b.AutoStart)
+	}
+	settings.Workspaces[1].Procedure = map[domain.Role]domain.ProcedureStep{domain.RolePlanner: {Skill: "Bad Skill"}}
+	if _, err := settings.Normalize(); err == nil {
+		t.Fatal("a bad skill name must be refused")
 	}
 }

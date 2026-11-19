@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -100,6 +101,93 @@ type WorkspaceSettings struct {
 	GitHub    *GitHubSourceSettings    `json:"github,omitempty"`
 	Bitbucket *BitbucketSourceSettings `json:"bitbucket,omitempty"`
 	Local     *LocalSourceSettings     `json:"local,omitempty"`
+	// The overrides below lay this workspace's own choices over the
+	// settings'; nil or empty follows the settings.
+	Enabled       *bool                  `json:"enabled,omitempty"`
+	AutoStart     *bool                  `json:"autoStart,omitempty"`
+	RequireReview *bool                  `json:"requireReview,omitempty"`
+	Models        map[Role]RoleModel     `json:"models,omitempty"`
+	Procedure     map[Role]ProcedureStep `json:"procedure,omitempty"`
+	// ProcedureMoved records that the repository's harness.yaml, if it had
+	// one, was moved into Procedure, so it is never read again.
+	ProcedureMoved bool `json:"procedureMoved,omitempty"`
+}
+
+// RoleModel is a workspace's choice of CLI and model for one role. An empty
+// field follows the settings. It holds no tool permissions: those stay the
+// settings' alone.
+type RoleModel struct {
+	Engine              string `json:"engine,omitempty"`
+	Model               string `json:"model,omitempty"`
+	HighDifficultyModel string `json:"highDifficultyModel,omitempty"`
+	MaxTurns            int    `json:"maxTurns,omitempty"`
+}
+
+// ProcedureStep is the repository's own skill, and the track of it, that a
+// role follows in a workspace.
+type ProcedureStep struct {
+	Skill string `json:"skill" yaml:"skill"`
+	Track string `json:"track,omitempty" yaml:"track,omitempty"`
+}
+
+var (
+	skillName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+	trackName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$`)
+)
+
+// ValidateProcedure checks a role's skill and track.
+func ValidateProcedure(role Role, step ProcedureStep) error {
+	if !validRole(role) {
+		return Invalid("unknown role %q in procedure", role)
+	}
+	if !skillName.MatchString(step.Skill) {
+		return Invalid("procedure.%s.skill %q must be lower-case letters, digits, - or _", role, step.Skill)
+	}
+	if step.Track != "" && !trackName.MatchString(step.Track) {
+		return Invalid("procedure.%s.track %q must be letters, digits, spaces, - or _", role, step.Track)
+	}
+	return nil
+}
+
+// For is the settings one workspace runs with: the settings, with that
+// workspace's own choices laid over them.
+func (s Settings) For(workspaceID string) Settings {
+	workspace, ok := s.Workspace(workspaceID)
+	if !ok {
+		return s
+	}
+	out := s
+	if workspace.Enabled != nil {
+		out.Enabled = s.Enabled && *workspace.Enabled
+	}
+	if workspace.AutoStart != nil {
+		out.AutoStart = *workspace.AutoStart
+	}
+	if workspace.RequireReview != nil {
+		out.RequireReview = *workspace.RequireReview
+	}
+	if len(workspace.Models) > 0 {
+		roles := make(map[Role]RolePolicy, len(s.ModelPolicy.Roles))
+		for role, policy := range s.ModelPolicy.Roles {
+			if model, ok := workspace.Models[role]; ok {
+				if model.Engine != "" {
+					policy.Engine = model.Engine
+				}
+				if model.Model != "" {
+					policy.Model = model.Model
+				}
+				if model.HighDifficultyModel != "" {
+					policy.HighDifficultyModel = model.HighDifficultyModel
+				}
+				if model.MaxTurns > 0 {
+					policy.MaxTurns = min(model.MaxTurns, max(s.ModelPolicy.Max.MaxTurns, 1))
+				}
+			}
+			roles[role] = policy
+		}
+		out.ModelPolicy.Roles = roles
+	}
+	return out
 }
 
 type LLMRankerSettings struct {
@@ -342,6 +430,22 @@ func (s Settings) Normalize() (Settings, error) {
 		}
 		if workspace.Local != nil && workspace.Local.Enabled && strings.TrimSpace(workspace.Local.Dir) == "" {
 			return s, Invalid("workspace %s local.dir is required when the local source is enabled", workspace.WorkspaceID)
+		}
+		for role, model := range workspace.Models {
+			if !validRole(role) {
+				return s, Invalid("workspace %s names an unknown role %q in models", workspace.WorkspaceID, role)
+			}
+			if model.MaxTurns < 0 || model.MaxTurns > DefaultPolicyMaxTurn {
+				return s, Invalid("workspace %s models.%s.maxTurns must be between 1 and %d", workspace.WorkspaceID, role, DefaultPolicyMaxTurn)
+			}
+			if model == (RoleModel{}) {
+				delete(workspace.Models, role)
+			}
+		}
+		for role, step := range workspace.Procedure {
+			if err := ValidateProcedure(role, step); err != nil {
+				return s, Invalid("workspace %s: %v", workspace.WorkspaceID, err)
+			}
 		}
 	}
 	policy, err := s.ModelPolicy.Normalize()

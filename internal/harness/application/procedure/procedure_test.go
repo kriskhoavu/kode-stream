@@ -32,7 +32,7 @@ roles:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if steps[domain.RolePlanner] != (Step{Skill: "feature-planning", Track: "Plan"}) || steps[domain.RoleCodeReviewer] != (Step{Skill: "code-review"}) {
+	if steps[domain.RolePlanner] != (domain.ProcedureStep{Skill: "feature-planning", Track: "Plan"}) || steps[domain.RoleCodeReviewer] != (domain.ProcedureStep{Skill: "code-review"}) {
 		t.Fatalf("steps = %#v", steps)
 	}
 	if _, mapped := steps[domain.RoleQAFixer]; mapped {

@@ -12,6 +12,7 @@ import (
 	appaisession "kode-stream/internal/ai"
 	"kode-stream/internal/harness"
 	"kode-stream/internal/harness/domain"
+	"kode-stream/internal/workspace/registry"
 )
 
 const maxHarnessBodyBytes int64 = 256 << 10
@@ -20,8 +21,11 @@ const maxHarnessBodyBytes int64 = 256 << 10
 // to calls on the harness service and errors back to HTTP, nothing else.
 type harnessController struct {
 	harness *harness.Service
-	// ai starts a person's session at a run's Review stage.
+	// ai starts a person's session at a run's Review stage, and holds the
+	// workspace's default provider a settings file exports and imports.
 	ai *aiController
+	// workspaces finds the checkout a workspace's settings file lives in.
+	workspaces registry.Repository
 }
 
 func (a *harnessController) route(handler http.HandlerFunc) gin.HandlerFunc {

@@ -98,10 +98,11 @@ func (s *Service) dispatchCycle(ctx context.Context) error {
 	var errs []error
 	for offset := range workspaces {
 		workspace := workspaces[(start+offset)%len(workspaces)]
-		if running[workspace.WorkspaceID] >= workspace.MaxConcurrentRuns {
+		own := settings.For(workspace.WorkspaceID)
+		if !own.Enabled || running[workspace.WorkspaceID] >= workspace.MaxConcurrentRuns {
 			continue
 		}
-		task, found, err := s.nextStartable(ctx, settings, workspace.WorkspaceID)
+		task, found, err := s.nextStartable(ctx, own, workspace.WorkspaceID)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -225,6 +226,7 @@ func (s *Service) noteTask(ctx context.Context, task domain.Task, note string) {
 }
 
 func (s *Service) newAgentRun(run domain.Run, stage domain.Stage, role domain.Role, settings domain.Settings, reminder bool) domain.AgentRun {
+	settings = settings.For(run.WorkspaceID)
 	policy := settings.ModelPolicy.Roles[role]
 	return domain.AgentRun{ID: domain.NewID("agr"), RunID: run.ID, StageID: stage.ID, Role: role, Engine: policy.Engine, Model: settings.ModelPolicy.ModelFor(role, run.Difficulty), State: domain.AgentQueued, Round: stage.Round, Attempt: 1, Reminder: reminder, WorktreePath: run.WorktreePath, QueuedAt: s.now()}
 }
@@ -299,7 +301,7 @@ func (s *Service) execute(agentRun domain.AgentRun, settings domain.Settings, po
 		fail("cannot prepare the worktree: " + err.Error())
 		return
 	}
-	policy := settings.ModelPolicy.Roles[agentRun.Role]
+	policy := settings.For(run.WorkspaceID).ModelPolicy.Roles[agentRun.Role]
 	lease := time.Duration(settings.Intervals.LeaseSeconds) * time.Second
 	invocation := ports.Invocation{
 		Role: agentRun.Role, Brief: brief.Compose(s.briefInput(ctx, run, stage, task, agentRun, settings)), WorktreePath: run.WorktreePath,

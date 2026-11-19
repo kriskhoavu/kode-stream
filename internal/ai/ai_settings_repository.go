@@ -42,6 +42,17 @@ type Settings struct {
 	DefaultTerminal string                    `json:"defaultTerminal" yaml:"defaultTerminal"`
 	Providers       map[string]LaunchTemplate `json:"providers" yaml:"providers"`
 	Terminals       map[string]LaunchTemplate `json:"terminals" yaml:"terminals"`
+	// WorkspaceProviders is each workspace's own default provider, laid over
+	// DefaultProvider. Executables and arguments stay machine-wide.
+	WorkspaceProviders map[string]string `json:"workspaceProviders,omitempty" yaml:"workspaceProviders,omitempty"`
+}
+
+// ProviderFor is the provider a session in workspaceID starts with.
+func (s Settings) ProviderFor(workspaceID string) string {
+	if provider := s.WorkspaceProviders[workspaceID]; provider != "" {
+		return provider
+	}
+	return s.DefaultProvider
 }
 
 type SettingsStore interface {
@@ -110,6 +121,11 @@ func Validate(settings Settings) error {
 		template, ok := settings.Providers[settings.DefaultProvider]
 		if !ok || !template.Enabled {
 			return errors.New("default AI provider must reference an enabled provider")
+		}
+	}
+	for workspaceID, provider := range settings.WorkspaceProviders {
+		if template, ok := settings.Providers[provider]; !ok || !template.Enabled {
+			return fmt.Errorf("the default AI provider of workspace %s must reference an enabled provider", workspaceID)
 		}
 	}
 	if settings.DefaultTerminal != "" {

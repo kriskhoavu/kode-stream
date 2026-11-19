@@ -256,7 +256,7 @@ func (st *step) lastReport(role domain.Role) *domain.Report {
 // after the last.
 func (st *step) pass() {
 	st.close()
-	next := domain.NextStage(st.stage.Kind, st.settings.RequireReview)
+	next := domain.NextStage(st.stage.Kind, st.settings.For(st.run.WorkspaceID).RequireReview)
 	if st.stage.Kind == domain.StageQA && st.stage.Reviewed {
 		next = domain.StageDraftPR
 	}

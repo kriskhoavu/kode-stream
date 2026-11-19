@@ -117,31 +117,39 @@ func TestDashboardSettingsRoundTripKeepsWhatTheScreenDoesNotShow(t *testing.T) {
 	}
 }
 
-func TestDashboardSettingsCarryALocalSourceAndTheWorkspaceTests(t *testing.T) {
+func TestDashboardSettingsCarryEachWorkspacesOwnChoices(t *testing.T) {
 	ctx := context.Background()
 	service, _ := newQueueService(t)
 	view, err := service.DashboardSettings(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	view.Sources = append(view.Sources, DashboardSource{WorkspaceID: "ws", Kind: "local", Enabled: true, Query: "/tmp/sandbox/tasks", VerificationCommands: []string{" go test ./... ", ""}})
+	off := false
+	view.Sources = append(view.Sources, DashboardSource{WorkspaceID: "ws", Kind: "local", Enabled: true, Query: "/tmp/sandbox/tasks"})
+	view.Workspaces = []DashboardWorkspace{{WorkspaceID: "ws", RequireReview: &off, VerificationCommands: []string{" go test ./... ", ""}, Scope: []string{"greet/"},
+		Models:    map[domain.Role]domain.RoleModel{domain.RoleCoder: {Model: "haiku"}},
+		Procedure: map[domain.Role]domain.ProcedureStep{domain.RolePlanner: {Skill: "feature-planning"}}}}
 	saved, err := service.SaveDashboardSettings(ctx, view, domain.Actor{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	local := saved.Sources[len(saved.Sources)-1]
-	if local.Kind != "local" || local.Query != "/tmp/sandbox/tasks" || len(local.VerificationCommands) != 1 || local.VerificationCommands[0] != "go test ./..." {
+	if local := saved.Sources[len(saved.Sources)-1]; local.Kind != "local" || local.Query != "/tmp/sandbox/tasks" {
 		t.Fatalf("local source = %#v", local)
 	}
-	// A save that does not name the tests keeps them.
-	for i := range saved.Sources {
-		saved.Sources[i].VerificationCommands = nil
+	if len(saved.Workspaces) != 1 {
+		t.Fatalf("workspaces = %#v", saved.Workspaces)
 	}
+	own := saved.Workspaces[0]
+	if own.RequireReview == nil || *own.RequireReview || len(own.VerificationCommands) != 1 || own.VerificationCommands[0] != "go test ./..." || own.Models[domain.RoleCoder].Model != "haiku" || own.Procedure[domain.RolePlanner].Skill != "feature-planning" {
+		t.Fatalf("workspace = %#v", own)
+	}
+	// A save that does not list the workspaces keeps them.
+	saved.Workspaces = nil
 	if _, err := service.SaveDashboardSettings(ctx, saved, domain.Actor{}); err != nil {
 		t.Fatal(err)
 	}
 	after, _ := service.Settings(ctx)
-	if workspace, _ := after.Workspace("ws"); workspace.Local == nil || !workspace.Local.Enabled || len(workspace.VerificationCommands) != 1 {
+	if workspace, _ := after.Workspace("ws"); workspace.Local == nil || len(workspace.VerificationCommands) != 1 || after.For("ws").RequireReview {
 		t.Fatalf("stored = %#v", workspace)
 	}
 }
