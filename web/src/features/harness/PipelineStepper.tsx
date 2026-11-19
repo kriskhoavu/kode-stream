@@ -10,7 +10,9 @@ import { LiveTimer } from './LiveTimer';
  * The run as a row of plain steps. One tab stop: arrow keys move between
  * steps (roving tabindex). Hovering a step names what it does; where the page
  * passes `onSelect`, a click or Enter opens what that step made.
- * `orientation="vertical"` is the drawer's compact form.
+ * `orientation="vertical"` is the drawer's compact form. Laid out sideways,
+ * Start is a small circle, as a flow chart opens, to leave the room to the
+ * steps that do the work.
  */
 export function PipelineStepper({ model, label, orientation = 'horizontal', onSelect, selectedId, hint = 'Click a step to open what it made.', legend = true }: {
 	model: PipelineModel;
@@ -59,11 +61,12 @@ const move = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
 				{model.groups.map((group, groupIndex) => {
 					const into = groupIndex === model.activeGroup;
 					const previousDone = groupIndex > 0 && groupStatus(model.groups[groupIndex - 1]) === 'done';
+					const dot = orientation === 'horizontal' && group.id === 'start' && group.cards.length === 1;
 					return (
 						<Fragment key={group.id}>
 							{groupIndex > 0 && <li className={['hx-conn', into ? 'flow' : previousDone && groupStatus(group) !== 'idle' ? 'done' : ''].filter(Boolean).join(' ')} aria-hidden="true" />}
-							<li className="hx-step-group" role="group" aria-label={group.label}>
-								<span className="hx-step-group-label" aria-hidden="true">{group.label}</span>
+							<li className={dot ? 'hx-step-start' : 'hx-step-group'} role="group" aria-label={group.label}>
+								{!dot && <span className="hx-step-group-label" aria-hidden="true">{group.label}</span>}
 								{group.cards.map((card) => {
 									index += 1;
 									const position = index;
@@ -71,6 +74,7 @@ const move = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
 										<StageCard
 											key={card.id}
 											card={card}
+											dot={dot}
 											refCallback={(element) => { refs.current[position] = element; }}
 											tabIndex={position === focusIndex ? 0 : -1}
 											selected={Boolean(onSelect) && selected === card.id}
@@ -89,8 +93,10 @@ onSelect={onSelect ? () => { setFocusIndex(position); setSelected(card.id); onSe
 	);
 }
 
-function StageCard({ card, refCallback, tabIndex, selected, onSelect, onKeyDown }: {
+function StageCard({ card, dot = false, refCallback, tabIndex, selected, onSelect, onKeyDown }: {
 	card: StepCard;
+	/** Drawn as a small circle holding only its status icon; its words move to the hover text and the name. */
+	dot?: boolean;
 	refCallback: (element: HTMLButtonElement | null) => void;
 	tabIndex: number;
 	selected: boolean;
@@ -111,8 +117,9 @@ function StageCard({ card, refCallback, tabIndex, selected, onSelect, onKeyDown 
 			<button
 				ref={refCallback}
 				type="button"
-				className={`hx-stage hx-tone-${meta.tone} hx-stage-${card.status}${justDone ? ' just-done' : ''}${selected ? ' selected' : ''}${onSelect ? '' : ' static'}`}
-title={stepHint(card)}
+				className={`hx-stage hx-tone-${meta.tone} hx-stage-${card.status}${dot ? ' hx-stage-dot' : ''}${justDone ? ' just-done' : ''}${selected ? ' selected' : ''}${onSelect ? '' : ' static'}`}
+				title={dot ? `${[card.label, meta.label, ...card.meta].join(' · ')}. ${stepHint(card)}` : stepHint(card)}
+				aria-label={dot ? [card.label, meta.label, ...card.meta].join(', ') : undefined}
 				tabIndex={tabIndex}
 				aria-current={card.current ? 'step' : undefined}
 				aria-pressed={onSelect ? selected : undefined}
@@ -120,12 +127,16 @@ onClick={onSelect}
 				onKeyDown={onKeyDown}
 				onAnimationEnd={(event) => { if (event.animationName === 'hx-glow') setJustDone(false); }}
 			>
-				<span className="hx-stage-status"><Icon aria-hidden="true" strokeWidth={2.5} key={card.status} className={justDone ? 'hx-check-draw' : undefined} />{meta.label}</span>
-				<span className="hx-stage-name">{card.label}</span>
-				<span className="hx-stage-meta">
-					{card.since && <LiveTimer since={card.since} label="for" />}
-					{card.meta.map((fact) => <span key={fact}>{fact}</span>)}
-				</span>
+				{dot
+					? <Icon aria-hidden="true" strokeWidth={2.5} key={card.status} className={justDone ? 'hx-check-draw' : undefined} />
+					: <>
+						<span className="hx-stage-status"><Icon aria-hidden="true" strokeWidth={2.5} key={card.status} className={justDone ? 'hx-check-draw' : undefined} />{meta.label}</span>
+						<span className="hx-stage-name">{card.label}</span>
+						<span className="hx-stage-meta">
+							{card.since && <LiveTimer since={card.since} label="for" />}
+							{card.meta.map((fact) => <span key={fact}>{fact}</span>)}
+						</span>
+					</>}
 			</button>
 </div>
 	);

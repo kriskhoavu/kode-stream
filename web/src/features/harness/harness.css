@@ -950,6 +950,45 @@ a.hx-source:hover {
 	border: 1px dashed var(--hx-tone);
 }
 
+/* Start, laid out sideways, is a small circle holding its status icon. */
+.hx-step-start {
+	flex: none;
+	display: flex;
+	align-items: center;
+}
+
+.hx-stepper .hx-stage.hx-stage-dot {
+	width: 30px;
+	height: 30px;
+	min-height: 0;
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border: 2px solid var(--hx-tone);
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--hx-tone) 12%, var(--panel));
+	box-shadow: none;
+	color: var(--hx-tone);
+}
+
+.hx-stepper .hx-stage.hx-stage-dot svg {
+	width: 14px;
+	height: 14px;
+}
+
+.hx-stepper .hx-stage.hx-stage-dot.hx-stage-not_started {
+	border-style: dashed;
+	background: var(--panel);
+}
+
+.hx-stepper .hx-stage.hx-stage-dot.hx-stage-waiting {
+	box-shadow: var(--hx-ring);
+}
+
+.hx-step-start + .hx-conn {
+	width: 18px;
+}
+
 /* The vertical stepper lives in the drawer: one column, connectors become a rail. */
 .hx-stepper.vertical {
 	flex-direction: column;

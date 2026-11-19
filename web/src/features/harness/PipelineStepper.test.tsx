@@ -24,6 +24,14 @@ describe('PipelineStepper', () => {
 		expect(next).toHaveAttribute('tabindex', '0');
 		fireEvent.keyDown(next, { key: 'Home' });
 		expect(screen.getAllByRole('button')[0]).toHaveFocus();
+		// Start is a small circle: its words are its name, not its text.
+		expect(screen.getAllByRole('button')[0]).toHaveAccessibleName(/^Start, Done/);
+		expect(screen.getAllByRole('button')[0]).toHaveClass('hx-stage-dot');
+	});
+
+	it('keeps Start a full step in the drawer', async () => {
+		const model = pipelineModel(await createFixtureClient({ tickMs: 0, arrivalMs: 0 }).run('run-pm-02'));
+		render(<PipelineStepper model={model} label="Progress" orientation="vertical" />);
 		expect(screen.getAllByRole('button')[0]).toHaveTextContent(/^DoneStart/);
 	});
 
