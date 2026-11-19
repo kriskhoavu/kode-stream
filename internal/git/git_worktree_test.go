@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,5 +120,35 @@ func TestRefDiffAndShowFileReadABranchWithoutItsWorktree(t *testing.T) {
 	}
 	if _, _, err := adapter.ShowFileContext(ctx, root, "harness/PM-1-abc", "../secret", 1024); err == nil {
 		t.Fatal("a path outside the repository was read")
+	}
+}
+
+func TestDiffFilesReadsOneWorktreeFromManyCallersAtOnce(t *testing.T) {
+	ctx := context.Background()
+	root := newGitRepo(t)
+	writeGitFile(t, root, "edit.md", "base\n")
+	gitCommit(t, root, "base")
+	adapter := New()
+	base, _ := adapter.RevParseContext(ctx, root, "HEAD")
+	worktree := filepath.Join(t.TempDir(), "run")
+	if err := adapter.WorktreeAddContext(ctx, root, worktree, "harness/PM-2-abc", base); err != nil {
+		t.Fatal(err)
+	}
+	writeGitFile(t, worktree, "edit.md", "changed\n")
+	writeGitFile(t, worktree, "new.md", "new\n")
+	errs := make(chan error, 8)
+	for range 8 {
+		go func() {
+			files, err := adapter.DiffFilesContext(ctx, worktree, base)
+			if err == nil && len(files) != 2 {
+				err = fmt.Errorf("files = %#v", files)
+			}
+			errs <- err
+		}()
+	}
+	for range 8 {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -152,9 +153,31 @@ func (g *GitAdapter) ExcludeContext(ctx context.Context, repoPath, pattern strin
 
 // intendToAdd records untracked files as intent-to-add, so a diff against
 // the base lists files an agent created.
+// indexLocks holds one lock per worktree: `git add` takes the worktree's
+// index lock and fails at once when another git holds it, so two readers of
+// the same run's changes take turns.
+var indexLocks sync.Map
+
+// indexLockRetries is how often intendToAdd tries again while a git outside
+// this process, such as an agent's or a person's, holds the index lock.
+const indexLockRetries = 10
+
 func (g *GitAdapter) intendToAdd(ctx context.Context, worktreePath string) error {
-	_, err := g.runLong(ctx, worktreePath, worktreeTimeout, "add", "--intent-to-add", "--all")
-	return err
+	lock, _ := indexLocks.LoadOrStore(filepath.Clean(worktreePath), &sync.Mutex{})
+	mutex := lock.(*sync.Mutex)
+	mutex.Lock()
+	defer mutex.Unlock()
+	for attempt := 0; ; attempt++ {
+		_, err := g.runLong(ctx, worktreePath, worktreeTimeout, "add", "--intent-to-add", "--all")
+		if err == nil || attempt >= indexLockRetries || !strings.Contains(err.Error(), "index.lock") {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 }
 
 // DiffStatContext summarises every change in the worktree against base,
