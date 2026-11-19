@@ -13,9 +13,10 @@ making implementation changes.
   person approving each gate. Agents never commit; the harness has no model runtime and does not use `agent-plane`.
   Only `internal/server`, `internal/server/api` and `internal/storage` import it. It has no page of its own: the Workstream
   board shows either Tasks, the harness's tickets in the columns their runs have reached, or Plans, the branch's plans
-  moved by hand, each as a Board or a List (the Tasks list is the Task Queue), and its settings live under Settings. A
-  repository's `.kode-stream/harness.yaml` maps a role to the skill and track it follows there; an unmapped role keeps the
-  built-in instructions. See
+  moved by hand, each as a Board or a List (the Tasks list is the Task Queue), and its settings live under Settings:
+  defaults for every workspace, and each workspace's own choices over them, role skills included; an unmapped role keeps
+  the built-in instructions. `.kode-stream/settings.yaml` shares chosen parts through a repository, on export and import
+  only. See
   [the harness page](wiki/platform/harness.md).
 - Local mode is a single-user server over local repositories. Cloud mode is a hosted control plane with
   Agent-Backed and Agentless Remote Snapshot workspaces. Both modes share one binary and one storage abstraction.

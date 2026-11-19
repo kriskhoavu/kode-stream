@@ -23,6 +23,7 @@ lastVerified: never
 - [[workspace-automation-verification]] and [[workspace-automation-verification-reference]] cover browser automation selection and execution.
 - [[workspace-e2e-quality]] and [[workspace-e2e-quality-reference]] cover agent-run browser journeys, results, and evidence.
 - [[workspace-appearance]] and [[workspace-appearance-reference]] cover the shared route backdrop and accessibility boundary.
+- [[workspace-settings]] covers the defaults every workspace starts from, a workspace's own choices over them, and the settings file a team shares them through.
 - [[workspace-lifecycle]] and [[workspace-lifecycle-reference]] cover registration, import, source structure, guarded changes, and reliability.
 - [[workspace-workstream-explorer]] and [[workspace-workstream-explorer-reference]] cover the primary planning surface, embedded repository context, search, and preview.
 - [[workspace-jira-workstream]] and [[workspace-jira-workstream-reference]] cover read-only Jira context and Jira-first local intake.

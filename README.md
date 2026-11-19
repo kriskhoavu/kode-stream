@@ -22,6 +22,8 @@ clearer local Git operations.
 - Lists a workspace's agent sessions in Agent Space, in one list of two kinds: interactive sessions a person drives in
   a terminal, and harness sessions the harness runs headless for a task, each with its changes.
 - Indexes LLM Wiki content and graph relationships for structured knowledge workflows.
+- Keeps default settings for every workspace and each workspace's own choices over them: its AI provider, harness
+  switches, tests, models, role skills and sources. A team shares chosen parts through `.kode-stream/settings.yaml`.
 - Stores app registry, cache, audit log, filters, recents, and AI settings outside managed repositories.
 
 ## Deployment Modes
@@ -317,7 +319,9 @@ Common workspace files:
   belongs to the source its `fields.source` names, by the source's path or its last part, so one file serves every
   source of a repository. A source that no rule names reads `workspace-settings.yaml` inside the source. The settings
   page saves to the file it read and replaces only that source's rules. `pathPattern` is relative to the source.
-- `.kode-stream/harness.yaml`: optional; maps each harness role to the repository's own skill and track.
+- `.kode-stream/settings.yaml`: optional; chosen parts of a workspace's settings, shared through the repository. Kode
+  Stream writes it when a person exports from a workspace's page in Settings and reads it only when they import. It
+  holds no tool permission, executable or credential.
 - `plan.yaml`: item metadata such as `status`, `owner`, `tags`, and optional title overrides.
 - `README.md`: primary item document and default title source.
 
@@ -338,7 +342,8 @@ cards:
 ## Safety Model
 
 - Server access is local by default.
-- Writes are limited to configured workspace sources and `.kode-stream/workspace-settings.yaml`.
+- Writes are limited to configured workspace sources, `.kode-stream/workspace-settings.yaml` and, on export,
+  `.kode-stream/settings.yaml`.
 - Markdown saves use expected content hashes to prevent stale overwrites.
 - File access rejects path traversal and symlink escapes.
 - Git commits stage only user-selected paths inside configured sources.

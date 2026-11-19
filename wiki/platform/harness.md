@@ -21,9 +21,15 @@ Each role is a coding CLI run headless in the run's own git worktree: the planne
 
 ## A Repository's Own Procedure
 <!-- chunkId: platform-harness-repository-procedure -->
-<!-- keywords: harness.yaml, skill, track, feature-planning -->
+<!-- keywords: role skills, skill, track, feature-planning, workspace settings -->
 
-[live] A repository can name the skill each role follows in `.kode-stream/harness.yaml`: `version: 1` and, under `roles`, a role (`planner`, `plan_reviewer`, `coder`, `code_reviewer`, `qa_fixer`) with a `skill` and an optional `track`. The harness reads the file from the run's worktree for every agent run, and the role's brief then says to follow that skill and track, or to read `.claude/skills/<skill>/SKILL.md` where the CLI cannot load skills. The brief's scope, constraints, report and verification still win over the skill, and a question the skill would put to the user goes into the report's `open`. A role the file does not map keeps the built-in instructions; so does every role when the file is missing, malformed, at another version, or names an unknown role, or a skill or track outside the allowed characters. Agents cannot change the file, because `.kode-stream/` is outside every scope. Evidence: `internal/harness/application/procedure/procedure.go:55`, `internal/harness/build.go:243`, `internal/harness/application/brief/brief.go:211`.
+[live] A workspace's settings can name the skill each role follows in its repository: a role (`planner`, `plan_reviewer`, `coder`, `code_reviewer`, `qa_fixer`) with a `skill` and an optional `track`, set under Role skills on the workspace's page in Settings. The role's brief then says to follow that skill and track, or to read `.claude/skills/<skill>/SKILL.md` where the CLI cannot load skills. The brief's scope, constraints, report and verification still win over the skill, and a question the skill would put to the user goes into the report's `open`. A role without a skill keeps the built-in instructions. A skill or track outside the allowed characters is refused when the settings are saved. A repository's `.kode-stream/harness.yaml`, which held role skills before, is moved into its workspace's settings once, on start. Evidence: `internal/harness/build.go:242`, `internal/harness/teamfile.go:109`, `internal/harness/application/brief/brief.go:211`.
+
+## Defaults And A Workspace's Own Choices
+<!-- chunkId: platform-harness-workspace-settings -->
+<!-- keywords: defaults, workspace override, models per workspace, review per workspace, settings file -->
+
+[live] The harness's settings are defaults every workspace starts from, and a workspace may set its own: whether the harness runs there, whether its tasks start on their own, whether its runs wait at Review, whether an agent may stop and ask, its test command, the paths its Builder may change, each role's engine, model, hard model and most turns, its role skills and its sources. Role pauses, slots, intervals and every tool permission stay the defaults' alone. A team shares a workspace's choices through `.kode-stream/settings.yaml`, which Kode Stream only exports into and imports from when a person asks. See [[workspace-settings]]. Evidence: `internal/harness/domain/settings.go:154`, `internal/harness/dashboard.go:597`.
 
 ## Who Decides
 <!-- chunkId: platform-harness-who-decides -->
