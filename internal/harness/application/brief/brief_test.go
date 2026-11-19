@@ -70,3 +70,20 @@ func TestReadReportPrefersTheFileThenTheFencedBlock(t *testing.T) {
 		t.Fatal("report not cleared")
 	}
 }
+
+func TestReadReportTakesPlanDriftAsTextOrAList(t *testing.T) {
+	for _, test := range []struct{ drift, want string }{
+		{`"Renamed a helper."`, "Renamed a helper."},
+		{`["Renamed a helper.","Added a test case."]`, "Renamed a helper.\nAdded a test case."},
+		{`[]`, ""},
+	} {
+		text := "```json harness-report\n{\"status\":\"done\",\"summary\":\"built\",\"planDrift\":" + test.drift + "}\n```"
+		report, err := ReadReport(t.TempDir(), text, domain.RoleCoder)
+		if err != nil || string(report.PlanDrift) != test.want {
+			t.Fatalf("planDrift %s = %q err=%v", test.drift, report.PlanDrift, err)
+		}
+	}
+	if _, err := ReadReport(t.TempDir(), "```json harness-report\n{\"status\":\"done\",\"planDrift\":{\"a\":1}}\n```", domain.RoleCoder); !errors.Is(err, ErrReportMissing) {
+		t.Fatalf("object planDrift err = %v", err)
+	}
+}

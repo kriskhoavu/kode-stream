@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -417,6 +419,25 @@ type GateRun struct {
 	Head string `json:"head,omitempty"`
 }
 
+// Text is a report field an agent writes as words. A model sometimes writes
+// it as a list of lines instead; Text takes both, joining a list one item a
+// line, so the shape alone never loses a report.
+type Text string
+
+func (t *Text) UnmarshalJSON(data []byte) error {
+	var text string
+	if err := json.Unmarshal(data, &text); err == nil {
+		*t = Text(text)
+		return nil
+	}
+	var lines []string
+	if err := json.Unmarshal(data, &lines); err != nil {
+		return fmt.Errorf("want text or a list of text: %w", err)
+	}
+	*t = Text(strings.Join(lines, "\n"))
+	return nil
+}
+
 type Report struct {
 	Schema       string    `json:"schema"`
 	Status       string    `json:"status"`
@@ -428,7 +449,7 @@ type Report struct {
 	Findings     []Finding `json:"findings,omitempty"`
 	FilesChanged []string  `json:"filesChanged,omitempty"`
 	Gate         *Gate     `json:"gate,omitempty"`
-	PlanDrift    string    `json:"planDrift,omitempty"`
+	PlanDrift    Text      `json:"planDrift,omitempty"`
 	Open         []string  `json:"open,omitempty"`
 }
 

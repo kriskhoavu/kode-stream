@@ -248,7 +248,7 @@ func deliverable(role domain.Role) string {
 	case domain.RolePlanReviewer, domain.RoleCodeReviewer:
 		return common + "- `verdict`: `approve` or `changes_requested`\n- `findings`: each `{severity: blocking|advisory, title, path, line, detail}`; detail at most 800 characters\n"
 	case domain.RoleCoder, domain.RoleQAFixer:
-		return common + "- `filesChanged`: every path you changed\n- `gate`: `{command, passed}` for the verification you ran\n- `planDrift`: anything you did that the plan did not say, or empty\n"
+		return common + "- `filesChanged`: every path you changed\n- `gate`: `{command, passed}` for the verification you ran\n- `planDrift`: anything you did that the plan did not say, as one text, or empty\n"
 	}
 	return common
 }

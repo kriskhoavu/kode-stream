@@ -126,7 +126,7 @@ func Validate(report domain.Report, role domain.Role) (domain.Report, error) {
 	report.FilesChanged = clipAll(report.FilesChanged, 500, 512)
 	report.Open = clipAll(report.Open, 20, 600)
 	report.PlanPath = clip(report.PlanPath, 512)
-	report.PlanDrift = clip(report.PlanDrift, domain.MaxDetailChars)
+	report.PlanDrift = domain.Text(clip(string(report.PlanDrift), domain.MaxDetailChars))
 	if report.Gate != nil {
 		report.Gate.Command = clip(report.Gate.Command, 512)
 	}
