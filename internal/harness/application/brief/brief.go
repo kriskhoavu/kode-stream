@@ -39,6 +39,10 @@ type Input struct {
 	// Findings are the previous round's review findings, or the reason a
 	// person gave when asking for changes.
 	Findings []domain.Finding
+	// Requests are the changes a person asked for on top of the issue, when
+	// approving a plan or at Review. A checker judges the work against them
+	// as it does against the issue; a producer gets them among its Findings.
+	Requests []domain.Finding
 	// Answers are what a person replied when an earlier run of this role
 	// stopped to ask; the agent continues from them instead of asking again.
 	Answers []domain.Answer
@@ -116,6 +120,19 @@ func Compose(input Input) string {
 			findings.WriteString("\n")
 		}
 		b.WriteString(Data(findings.String()))
+		b.WriteString("\n")
+	}
+	if len(input.Requests) > 0 {
+		b.WriteString("\nA person asked for these changes on top of the issue. They are part of what the work must do: judge it against them as against the issue, and do not ask to undo them:\n\n")
+		var requests strings.Builder
+		for _, request := range input.Requests {
+			fmt.Fprintf(&requests, "- %s", request.Title)
+			if request.Detail != "" {
+				fmt.Fprintf(&requests, ": %s", request.Detail)
+			}
+			requests.WriteString("\n")
+		}
+		b.WriteString(Data(requests.String()))
 		b.WriteString("\n")
 	}
 	if len(input.Answers) > 0 {

@@ -278,3 +278,30 @@ func TestJanitorRemovesExpiredWorktreesOnly(t *testing.T) {
 		t.Fatal("the janitor deleted an unpushed branch")
 	}
 }
+
+func TestACheckerJudgesTheChangeAgainstWhatAPersonAskedAtReview(t *testing.T) {
+	var briefs []string
+	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
+		if role == domain.RoleCodeReviewer {
+			briefs = append(briefs, invocation.Brief)
+		}
+		return happyScript(role, call, invocation)
+	}, func(settings *domain.Settings) { settings.RequireReview = true })
+	withOrigin(t, fixture)
+	fixture.service.pulls = []ports.PullRequests{&fakePulls{}}
+	fixture.settle(t)
+	approvePlan(t, fixture)
+	fixture.settle(t)
+	review(t, fixture, DecisionReject, "Also print the year")
+	if len(briefs) != 2 {
+		t.Fatalf("code reviews = %d", len(briefs))
+	}
+	if strings.Contains(briefs[0], "A person asked for these changes") {
+		t.Fatalf("the first check had no request:\n%s", briefs[0])
+	}
+	for _, want := range []string{"A person asked for these changes on top of the issue", "Asked in Review by", "Also print the year", "do not ask to undo them"} {
+		if !strings.Contains(briefs[1], want) {
+			t.Fatalf("second check lacks %q:\n%s", want, briefs[1])
+		}
+	}
+}

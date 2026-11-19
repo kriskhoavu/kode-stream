@@ -506,6 +506,13 @@ func (s *Service) briefInput(ctx context.Context, run domain.Run, stage domain.S
 				input.Answers = append(input.Answers, answer)
 			}
 		}
+	} else {
+		// A person's requests have round 0; a checker holds the work to them.
+		for _, finding := range stage.Findings {
+			if finding.Round == 0 {
+				input.Requests = append(input.Requests, finding)
+			}
+		}
 	}
 	return s.decorateBrief(ctx, input, run, stage, agentRun)
 }

@@ -58,6 +58,8 @@ The harness runs as one replica. SQLite has one connection, so code inside a tra
 
 [live] Review follows QA when `requireReview` is on, the default. Its `review` gate takes `approve` (hand off), `reject` (back to Build) or `replan` (back to Plan); the last two need a reason. Any decision first commits what is uncommitted in the worktree as `Apply the review of …`. A hand-off goes straight to the draft PR when the run's commit is the one QA last verified (QA records it as `lastGate.head`), and otherwise through a QA stage marked `reviewed`, whose pass goes on to the draft PR. Back to Build or Plan starts a new stage of that kind carrying the reason as a blocking finding, and the run comes back to Review. `POST /api/harness/runs/{id}/review-session` starts a person's embedded session in the worktree of a run at Review, on its branch, with intent `harness_review`; any other run is refused. Evidence: `internal/harness/approvals.go:510`, `internal/harness/approvals.go:544`, `internal/harness/stages.go:106`, `internal/server/api/harness_controller.go:447`.
 
+[live] What a person asks for when sending work back, at Review or plan approval, reaches the next producer as a blocking finding and every checker after it as a request on top of the issue, which the checker judges the work against and does not ask to undo. Evidence: `internal/harness/work.go:490`, `internal/harness/application/brief/brief.go:126`.
+
 [live] A passed run's worktree is removed at once; a cancelled or failed run keeps its worktree for `retentionDays` and its branch after that. Evidence: `internal/harness/stages.go:283`.
 
 ## Engines And Briefs
