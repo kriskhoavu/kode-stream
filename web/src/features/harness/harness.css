@@ -2343,7 +2343,7 @@ a.hx-source:hover {
 
 /* A conversation reads as a page, not a chat: every turn spans the reader, the harness's brief included. */
 .hx-workbench-thread .agent-turn,
-.hx-workbench-section-thread .agent-turn { justify-self: stretch; }
+.hx-workbench-thread .agent-turn.role-user { justify-self: stretch; max-width: 100%; }
 
 .hx-workbench-thread-meta {
 	margin: 0 0 12px;
