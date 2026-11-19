@@ -29,10 +29,12 @@ import (
 	harnesswebhook "kode-stream/internal/harness/adapters/notifier/webhook"
 	harnessprbitbucket "kode-stream/internal/harness/adapters/pr/bitbucket"
 	harnessprgithub "kode-stream/internal/harness/adapters/pr/github"
+	harnessprlocal "kode-stream/internal/harness/adapters/pr/local"
 	harnessranker "kode-stream/internal/harness/adapters/ranker/openai"
 	harnessbitbucket "kode-stream/internal/harness/adapters/scout/bitbucket"
 	harnessgithub "kode-stream/internal/harness/adapters/scout/github"
 	harnessjira "kode-stream/internal/harness/adapters/scout/jira"
+	harnesslocal "kode-stream/internal/harness/adapters/scout/local"
 	harnessworktree "kode-stream/internal/harness/adapters/worktree/gitworktree"
 	"kode-stream/internal/harness/domain"
 	"kode-stream/internal/harness/ports"
@@ -104,7 +106,7 @@ func NewServer(port int) (*Server, error) {
 	harnessService := harness.New(harness.Dependencies{
 		Repository: state.Harness,
 		Workspaces: reg,
-		Scouts:     []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New()},
+		Scouts:     []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New(), harnesslocal.New()},
 		Engines:    []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath), harnesscodex.New(), harnessopencode.New()},
 		Reranker:   harnessranker.New(),
 		Transcripts: func(path string, limit int) ([]domain.TranscriptTurn, error) {
@@ -268,11 +270,12 @@ func deprecatedSPAPath(path string) bool {
 
 // harnessPullRequests opens pull requests where the workspace's checkout
 // points: GitHub or Bitbucket, read from its origin when the registry holds
-// no remote.
+// no remote. A workspace with a local task folder opens none.
 func harnessPullRequests(git *appgit.GitAdapter) []ports.PullRequests {
 	github := harnessprgithub.New()
 	github.RemoteURL = git.RemoteURL
 	bitbucket := harnessprbitbucket.New()
 	bitbucket.RemoteURL = git.RemoteURL
-	return []ports.PullRequests{github, bitbucket}
+	// A workspace with a local task folder hands off without a pull request.
+	return []ports.PullRequests{harnessprlocal.New(), github, bitbucket}
 }

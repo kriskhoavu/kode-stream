@@ -9,14 +9,15 @@ import { engineLabel, formatAgo, modelLabel, plural, roleLabels, roleOrder, sour
 
 const modelSuggestions = ['opus', 'sonnet', 'haiku'];
 
-/** The kinds a person can add. Bitbucket Server has no issue tracker, so its work comes in through Jira. */
-const addableKinds: HarnessSourceKind[] = ['jira', 'github'];
+/** The kinds a person can add. Bitbucket Server has no issue tracker, so its work comes in through Jira. A local folder is for trying the pipeline. */
+const addableKinds: HarnessSourceKind[] = ['jira', 'github', 'local'];
 
 /** A sensible first query: the workspace's own Jira project, open issues, newest change first. */
 export function defaultSourceQuery(kind: HarnessSourceKind, workspace?: HarnessWorkspaceOption): string {
 	if (kind === 'jira' && workspace?.jiraProjectKey) {
 		return `project = ${workspace.jiraProjectKey} AND sprint in openSprints() AND statusCategory != Done ORDER BY updated DESC`;
 	}
+	if (kind === 'local') return '.harness/tasks';
 	return '';
 }
 
@@ -192,7 +193,7 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 				<div className="hx-sources">
 					{draft.sources.length === 0 && <p className="hx-muted">No sources yet. Add one below.</p>}
 					{draft.sources.map((source, index) => (
-						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} workspaceName={workspaceNames.get(source.workspaceId)} now={now} askDefault={draft.askQuestions} firstOfWorkspace={draft.sources.findIndex((other) => other.workspaceId === source.workspaceId) === index} onChange={(patch) => updateSource(index, patch)} onWorkspaceQuestions={(askQuestions) => update({ sources: draft.sources.map((other) => other.workspaceId === source.workspaceId ? { ...other, askQuestions } : other) })} onRemove={() => removeSource(index)} onClear={() => setConfirmClear(source.workspaceId)} clearing={clearing} />
+						<SourceRow key={`${source.workspaceId}-${source.kind}-${index}`} source={source} workspaceName={workspaceNames.get(source.workspaceId)} now={now} askDefault={draft.askQuestions} firstOfWorkspace={draft.sources.findIndex((other) => other.workspaceId === source.workspaceId) === index} onChange={(patch) => updateSource(index, patch)} onWorkspaceQuestions={(askQuestions) => update({ sources: draft.sources.map((other) => other.workspaceId === source.workspaceId ? { ...other, askQuestions } : other) })} onWorkspaceTests={(verificationCommands) => update({ sources: draft.sources.map((other) => other.workspaceId === source.workspaceId ? { ...other, verificationCommands } : other) })} onRemove={() => removeSource(index)} onClear={() => setConfirmClear(source.workspaceId)} clearing={clearing} />
 					))}
 				</div>
 				<form className="hx-add-source" aria-label="Add a source" onSubmit={(event) => { event.preventDefault(); addSource(); }}>
@@ -296,9 +297,10 @@ function ModelInput({ label, value, hideLabel = false, onChange }: { label: stri
 	);
 }
 
-function SourceRow({ source, workspaceName, now, askDefault, firstOfWorkspace, onChange, onWorkspaceQuestions, onRemove, onClear, clearing }: { source: HarnessSourceSettings; workspaceName?: string; now: number; askDefault: boolean; firstOfWorkspace: boolean; onChange: (patch: Partial<HarnessSourceSettings>) => void; onWorkspaceQuestions: (askQuestions: boolean | null) => void; onRemove: () => void; onClear: () => void; clearing: boolean }) {
+function SourceRow({ source, workspaceName, now, askDefault, firstOfWorkspace, onChange, onWorkspaceQuestions, onWorkspaceTests, onRemove, onClear, clearing }: { source: HarnessSourceSettings; workspaceName?: string; now: number; askDefault: boolean; firstOfWorkspace: boolean; onChange: (patch: Partial<HarnessSourceSettings>) => void; onWorkspaceQuestions: (askQuestions: boolean | null) => void; onWorkspaceTests: (commands: string[]) => void; onRemove: () => void; onClear: () => void; clearing: boolean }) {
 	const checked = source.lastCheckedAt ? `Looked ${formatAgo(source.lastCheckedAt, now)}${source.lastFound !== undefined ? ` · ${source.lastFound} new` : ''}` : 'Not looked yet';
-	const queryLabel = source.kind === 'jira' ? 'Jira search (JQL)' : source.kind === 'github' ? 'Repository (owner/name)' : 'Repository (workspace/name)';
+	const queryLabel = source.kind === 'jira' ? 'Jira search (JQL)' : source.kind === 'github' ? 'Repository (owner/name)' : source.kind === 'local' ? 'Task folder (inside the workspace, or a full path)' : 'Repository (workspace/name)';
+	const workspaceLabel = workspaceName ?? source.workspaceId;
 	return (
 		<div className="hx-source-row">
 			<div className="hx-source-head">
@@ -319,12 +321,19 @@ function SourceRow({ source, workspaceName, now, askDefault, firstOfWorkspace, o
 					</select>
 				</label>
 			)}
+			{firstOfWorkspace && (
+				<label className="hx-field hx-field-inline">
+					<span>Test command</span>
+					<input aria-label={`Test command for ${workspaceLabel}`} placeholder="None: Test passes without running anything" value={(source.verificationCommands ?? []).join(' && ')} onChange={(event) => onWorkspaceTests(event.target.value.trim() ? [event.target.value] : [])} />
+				</label>
+			)}
+			{source.kind === 'local' && <p className="hx-muted">One Markdown file per task: its name is the key, its first heading the title. Hand-off pushes the branch and opens no pull request.</p>}
 			<details className="hx-advanced" open={source.query === '' ? true : undefined}>
 				<summary>Advanced</summary>
 				<div className="hx-advanced-fields">
 					<label className="hx-field"><span>{queryLabel}</span><input value={source.query} onChange={(event) => onChange({ query: event.target.value })} /></label>
-					{source.kind !== 'jira' && <label className="hx-field"><span>Labels to pick up (comma separated)</span><input value={(source.labels ?? []).join(', ')} onChange={(event) => onChange({ labels: event.target.value.split(',').map((label) => label.trim()).filter(Boolean) })} /></label>}
-					{source.kind !== 'jira' && <label className="hx-field"><span>Name of the environment setting that holds the token</span><input value={source.tokenEnvVar ?? ''} onChange={(event) => onChange({ tokenEnvVar: event.target.value.trim() || undefined })} /></label>}
+					{source.kind !== 'jira' && source.kind !== 'local' && <label className="hx-field"><span>Labels to pick up (comma separated)</span><input value={(source.labels ?? []).join(', ')} onChange={(event) => onChange({ labels: event.target.value.split(',').map((label) => label.trim()).filter(Boolean) })} /></label>}
+					{source.kind !== 'jira' && source.kind !== 'local' && <label className="hx-field"><span>Name of the environment setting that holds the token</span><input value={source.tokenEnvVar ?? ''} onChange={(event) => onChange({ tokenEnvVar: event.target.value.trim() || undefined })} /></label>}
 				</div>
 			</details>
 		</div>

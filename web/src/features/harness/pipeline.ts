@@ -139,7 +139,7 @@ export function pipelineModel(detail: HarnessRunDetail, now = Date.now()): Pipel
 	const draftStatus: HxStatus = draft ? stageStatus(draft.state) : 'not_started';
 	const draftCard: StepCard = {
 		id: 'draft_pr', step: 'draft_pr', label: hxSteps.draft_pr.label, status: draftStatus,
-		meta: detail.run.prUrl ? [prLabel(detail.run.prUrl)] : draftStatus === 'not_started' ? [review || !draft ? 'after your review' : 'after the tests'] : [],
+		meta: detail.run.prUrl ? [prLabel(detail.run.prUrl)] : draftStatus === 'done' ? ['pushed, no pull request'] : draftStatus === 'not_started' ? [review || !draft ? 'after your review' : 'after the tests'] : [],
 		current: false
 	};
 

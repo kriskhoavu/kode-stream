@@ -70,6 +70,13 @@ type GitHubSourceSettings struct {
 	TokenEnvVar string   `json:"tokenEnvVar"`
 }
 
+// LocalSourceSettings names a folder of task files, one Markdown file per
+// task. A relative Dir is read from the workspace's checkout.
+type LocalSourceSettings struct {
+	Enabled bool   `json:"enabled"`
+	Dir     string `json:"dir"`
+}
+
 type BitbucketSourceSettings struct {
 	Enabled     bool   `json:"enabled"`
 	Workspace   string `json:"workspace"`
@@ -92,6 +99,7 @@ type WorkspaceSettings struct {
 	Jira      *JiraSourceSettings      `json:"jira,omitempty"`
 	GitHub    *GitHubSourceSettings    `json:"github,omitempty"`
 	Bitbucket *BitbucketSourceSettings `json:"bitbucket,omitempty"`
+	Local     *LocalSourceSettings     `json:"local,omitempty"`
 }
 
 type LLMRankerSettings struct {
@@ -331,6 +339,9 @@ func (s Settings) Normalize() (Settings, error) {
 			if workspace.Bitbucket.TokenEnvVar == "" {
 				workspace.Bitbucket.TokenEnvVar = "BITBUCKET_TOKEN"
 			}
+		}
+		if workspace.Local != nil && workspace.Local.Enabled && strings.TrimSpace(workspace.Local.Dir) == "" {
+			return s, Invalid("workspace %s local.dir is required when the local source is enabled", workspace.WorkspaceID)
 		}
 	}
 	policy, err := s.ModelPolicy.Normalize()

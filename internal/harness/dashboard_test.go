@@ -117,6 +117,35 @@ func TestDashboardSettingsRoundTripKeepsWhatTheScreenDoesNotShow(t *testing.T) {
 	}
 }
 
+func TestDashboardSettingsCarryALocalSourceAndTheWorkspaceTests(t *testing.T) {
+	ctx := context.Background()
+	service, _ := newQueueService(t)
+	view, err := service.DashboardSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view.Sources = append(view.Sources, DashboardSource{WorkspaceID: "ws", Kind: "local", Enabled: true, Query: "/tmp/sandbox/tasks", VerificationCommands: []string{" go test ./... ", ""}})
+	saved, err := service.SaveDashboardSettings(ctx, view, domain.Actor{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	local := saved.Sources[len(saved.Sources)-1]
+	if local.Kind != "local" || local.Query != "/tmp/sandbox/tasks" || len(local.VerificationCommands) != 1 || local.VerificationCommands[0] != "go test ./..." {
+		t.Fatalf("local source = %#v", local)
+	}
+	// A save that does not name the tests keeps them.
+	for i := range saved.Sources {
+		saved.Sources[i].VerificationCommands = nil
+	}
+	if _, err := service.SaveDashboardSettings(ctx, saved, domain.Actor{}); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := service.Settings(ctx)
+	if workspace, _ := after.Workspace("ws"); workspace.Local == nil || !workspace.Local.Enabled || len(workspace.VerificationCommands) != 1 {
+		t.Fatalf("stored = %#v", workspace)
+	}
+}
+
 func TestMoveBeforeRanksATaskJustAboveAnother(t *testing.T) {
 	ctx := context.Background()
 	service, repository := newQueueService(t, jiraCandidate("PM-1", "Low"), jiraCandidate("PM-2", "High"))

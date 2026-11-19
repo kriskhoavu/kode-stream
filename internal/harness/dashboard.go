@@ -386,13 +386,16 @@ type DashboardSource struct {
 	Enabled     bool   `json:"enabled"`
 	// AskQuestions is the workspace's own answer to "may an agent stop and
 	// ask", carried on each of its sources; nil follows the settings.
-	AskQuestions  *bool      `json:"askQuestions,omitempty"`
-	Query         string     `json:"query"`
-	Labels        []string   `json:"labels,omitempty"`
-	TokenEnvVar   string     `json:"tokenEnvVar,omitempty"`
-	LastCheckedAt *time.Time `json:"lastCheckedAt,omitempty"`
-	LastFound     int        `json:"lastFound,omitempty"`
-	LastError     string     `json:"lastError,omitempty"`
+	AskQuestions *bool `json:"askQuestions,omitempty"`
+	// VerificationCommands are the workspace's test commands, carried on each
+	// of its sources like AskQuestions; nil keeps the stored ones.
+	VerificationCommands []string   `json:"verificationCommands,omitempty"`
+	Query                string     `json:"query"`
+	Labels               []string   `json:"labels,omitempty"`
+	TokenEnvVar          string     `json:"tokenEnvVar,omitempty"`
+	LastCheckedAt        *time.Time `json:"lastCheckedAt,omitempty"`
+	LastFound            int        `json:"lastFound,omitempty"`
+	LastError            string     `json:"lastError,omitempty"`
 }
 
 type DashboardRolePolicy struct {
@@ -447,6 +450,14 @@ func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, err
 		}
 		if bitbucket := workspace.Bitbucket; bitbucket != nil {
 			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceBitbucket), Enabled: bitbucket.Enabled, Query: bitbucket.Workspace + "/" + bitbucket.Repo, TokenEnvVar: bitbucket.TokenEnvVar, AskQuestions: workspace.AskQuestions})
+		}
+		if local := workspace.Local; local != nil {
+			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceLocal), Enabled: local.Enabled, Query: local.Dir, AskQuestions: workspace.AskQuestions})
+		}
+	}
+	for i := range view.Sources {
+		if workspace, ok := settings.Workspace(view.Sources[i].WorkspaceID); ok && len(workspace.VerificationCommands) > 0 {
+			view.Sources[i].VerificationCommands = workspace.VerificationCommands
 		}
 	}
 	for _, role := range domain.Roles {
@@ -548,7 +559,13 @@ func applySources(settings *domain.Settings, sources []DashboardSource) error {
 				break
 			}
 		}
-		workspace.Jira, workspace.GitHub = nil, nil
+		for _, source := range kinds {
+			if source.VerificationCommands != nil {
+				workspace.VerificationCommands = cleanCommands(source.VerificationCommands)
+				break
+			}
+		}
+		workspace.Jira, workspace.GitHub, workspace.Local = nil, nil, nil
 		previousBitbucket := workspace.Bitbucket
 		workspace.Bitbucket = nil
 		for kind, source := range kinds {
@@ -565,12 +582,25 @@ func applySources(settings *domain.Settings, sources []DashboardSource) error {
 					bitbucket.Cloud, bitbucket.BaseURL = previousBitbucket.Cloud, previousBitbucket.BaseURL
 				}
 				workspace.Bitbucket = bitbucket
+			case domain.SourceLocal:
+				workspace.Local = &domain.LocalSourceSettings{Enabled: source.Enabled, Dir: query}
 			default:
-				return domain.Invalid("source kind %q must be jira, github or bitbucket", kind)
+				return domain.Invalid("source kind %q must be jira, github, bitbucket or local", kind)
 			}
 		}
 	}
 	return nil
+}
+
+// cleanCommands drops blank test commands and trims the rest.
+func cleanCommands(commands []string) []string {
+	out := []string{}
+	for _, command := range commands {
+		if command = strings.TrimSpace(command); command != "" {
+			out = append(out, command)
+		}
+	}
+	return out
 }
 
 // --- events ---

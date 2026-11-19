@@ -200,6 +200,10 @@ func (s *Service) openPullRequest(ctx context.Context, settings domain.Settings,
 		s.record(ctx, run, "harness.pull_request", models.AuditStatusFailed, "Draft pull request failed", err)
 		return "", err
 	}
+	if url == "" {
+		s.record(ctx, run, "harness.pull_request", models.AuditStatusSuccess, "Handed off "+remote+" without a pull request: the task is local", nil)
+		return "", nil
+	}
 	s.record(ctx, run, "harness.pull_request", models.AuditStatusSuccess, "Opened draft pull request "+url, nil)
 	return url, nil
 }

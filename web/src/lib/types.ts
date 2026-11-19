@@ -1027,7 +1027,8 @@ export interface GitOperationResult {
 // Mirrors the backend contract in plans/platform/PM-044 (API section). Every
 // timestamp is an RFC 3339 string; every cost is US dollars as a number.
 
-export type HarnessSourceKind = 'jira' | 'github' | 'bitbucket';
+/** `local` reads tasks from Markdown files in a folder; its hand-off pushes and opens no pull request. */
+export type HarnessSourceKind = 'jira' | 'github' | 'bitbucket' | 'local';
 export type HarnessTaskState = 'discovered' | 'ranked' | 'running' | 'blocked' | 'done' | 'dismissed' | 'stale' | 'cancelled';
 export type HarnessRunState = 'running' | 'blocked' | 'passed' | 'failed' | 'cancelled';
 export type HarnessStageKind = 'plan' | 'plan_approval' | 'implement' | 'qa' | 'review' | 'draft_pr';
@@ -1279,10 +1280,12 @@ export interface HarnessSourceSettings {
   workspaceId: string;
   kind: HarnessSourceKind;
   enabled: boolean;
-  /** Jira search query, GitHub `owner/repo`, or Bitbucket `workspace/repo`. */
+  /** Jira search query, GitHub `owner/repo`, Bitbucket `workspace/repo`, or a local task folder. */
   query: string;
   /** The workspace's own answer to "may an agent stop and ask"; absent follows the settings. */
   askQuestions?: boolean | null;
+  /** The workspace's test commands, carried on each of its sources; absent keeps the stored ones. */
+  verificationCommands?: string[];
   labels?: string[];
   tokenEnvVar?: string;
   lastCheckedAt?: string;

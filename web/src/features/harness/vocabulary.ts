@@ -120,7 +120,7 @@ export const gateTitles: Record<HarnessApprovalGate, string> = {
 	question: 'answer a question on'
 };
 
-export const sourceLabels: Record<HarnessSourceKind, string> = { jira: 'Jira', github: 'GitHub', bitbucket: 'Bitbucket' };
+export const sourceLabels: Record<HarnessSourceKind, string> = { jira: 'Jira', github: 'GitHub', bitbucket: 'Bitbucket', local: 'Local folder' };
 
 export const channelLabels: Record<HarnessChannel, string> = { dashboard: 'here', webex: 'via Webex', api: 'via the API' };
 

@@ -15,6 +15,10 @@ const (
 	SourceJira      SourceKind = "jira"
 	SourceGitHub    SourceKind = "github"
 	SourceBitbucket SourceKind = "bitbucket"
+	// SourceLocal reads tasks from Markdown files in a folder, for trying the
+	// pipeline without an issue tracker; its hand-off pushes and opens no
+	// pull request.
+	SourceLocal SourceKind = "local"
 )
 
 type TaskState string
