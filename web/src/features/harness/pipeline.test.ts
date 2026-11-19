@@ -10,7 +10,7 @@ async function detail(runId: string) {
 describe('pipeline model', () => {
 	it('reads the building run as the mockup does', async () => {
 		const model = pipelineModel(await detail('run-pm-02'));
-		expect(model.groups.map((group) => group.label)).toEqual(['Start', 'Plan · round 2 of 3', 'You', 'Build · round 1 of 3', 'Test', 'Hand-off']);
+		expect(model.groups.map((group) => group.label)).toEqual(['Start', 'Plan · round 2 of 3', 'You', 'Build · round 1 of 3', 'Test', 'Review', 'Hand-off']);
 		const cards = Object.fromEntries(model.groups.flatMap((group) => group.cards).map((card) => [card.id, card]));
 		expect(cards.start).toMatchObject({ status: 'done', meta: ['Khoa · here', '31 min ago'] });
 		expect(cards.plan).toMatchObject({ status: 'done', meta: ['2 rounds', '8 min', '$3.03'] });
@@ -19,7 +19,8 @@ describe('pipeline model', () => {
 		expect(cards.build).toMatchObject({ status: 'working', current: true });
 		expect(cards.code_check).toMatchObject({ status: 'not_started', meta: ['after Build'] });
 		expect(cards.fix).toMatchObject({ status: 'not_started', meta: ['only if a test fails'] });
-		expect(cards.draft_pr.meta).toEqual(['you approve first']);
+		expect(cards.review).toMatchObject({ status: 'not_started', meta: ['after the tests'] });
+		expect(cards.draft_pr.meta).toEqual(['after your review']);
 		expect(model.groups[model.activeGroup].id).toBe('build');
 	});
 

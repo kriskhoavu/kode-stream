@@ -39,6 +39,8 @@ type Worktrees interface {
 	Diff(ctx context.Context, path, base string) ([]DiffFile, string, error)
 	RestorePaths(ctx context.Context, path, base string, paths []string) error
 	Commit(ctx context.Context, path, message string) (string, error)
+	// Head is the commit the worktree at path is at.
+	Head(ctx context.Context, path string) (string, error)
 	// Push pushes the local harness/* branch under RemoteBranch's name.
 	Push(ctx context.Context, path, branch string) error
 	// RemoteBranch is the name a local harness/* branch has at the remote.

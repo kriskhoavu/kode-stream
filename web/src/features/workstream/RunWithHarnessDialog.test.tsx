@@ -10,7 +10,7 @@ import type { HarnessSettings, ItemSummary } from '../../lib/types';
 afterEach(cleanup);
 
 const settings: HarnessSettings = {
-	revision: 1, enabled: true, autoStart: true, requirePrApproval: true, askQuestions: true,
+	revision: 1, enabled: true, autoStart: true, requireReview: true, askQuestions: true,
 	slots: { scout: 1, sorter: 1, planner: 1, coder: 1, reviewer: 1, qa: 1 }, paused: {}, sources: [],
 	modelPolicy: {
 		planner: { engine: 'claudecode', model: 'claude-opus-5-5', maxTurns: 20 },
@@ -39,7 +39,7 @@ describe('RunWithHarnessDialog', () => {
 		expect(screen.getByRole('dialog', { name: 'Run PM-2 with the harness' })).toBeInTheDocument();
 		expect(screen.getByText('harness/PM-2-…')).toBeInTheDocument();
 		expect(await screen.findByText((_, element) => element?.tagName === 'LI' && element.textContent === 'Builder writes the code: Codex · gpt-5 (Codex · gpt-5-pro when the plan is hard)')).toBeInTheDocument();
-		expect(screen.getByText(/The draft pull request: yours to approve/)).toBeInTheDocument();
+		expect(screen.getByText(/Before hand-off: you try the change in a session of your own/)).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Run with the harness' }));
 		await waitFor(() => expect(onStarted).toHaveBeenCalled());
 		expect(harness.createTask).toHaveBeenCalledWith({ workspaceId: 'ws', key: 'PM-2', title: 'Quiet card', body: 'What the ticket says', startNow: true });

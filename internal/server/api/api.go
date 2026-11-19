@@ -175,7 +175,7 @@ func New(deps Dependencies) *API {
 		runtimeConfig: runtimeConfig,
 		storage:       &storageController{status: deps.StorageStatus, sync: deps.StorageSync},
 		cloud:         cloud,
-		harness:       &harnessController{harness: deps.Harness},
+		harness:       &harnessController{harness: deps.Harness, ai: aiSessionsController},
 		harnessBot:    &harnessBotController{harness: deps.Harness},
 	}
 }

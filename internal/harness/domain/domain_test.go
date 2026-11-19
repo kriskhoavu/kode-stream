@@ -44,12 +44,12 @@ func TestTaskStateMachineRefusesReopeningTerminalStates(t *testing.T) {
 	}
 }
 
-func TestStageSequenceSkipsPRApprovalUnlessRequired(t *testing.T) {
+func TestStageSequenceSkipsReviewUnlessRequired(t *testing.T) {
 	if got := NextStage(StageQA, false); got != StageDraftPR {
 		t.Fatalf("after qa = %s", got)
 	}
-	if got := NextStage(StageQA, true); got != StagePRApproval {
-		t.Fatalf("after qa with approval = %s", got)
+	if got := NextStage(StageQA, true); got != StageReview {
+		t.Fatalf("after qa with review = %s", got)
 	}
 	if got := NextStage(StageDraftPR, true); got != "" {
 		t.Fatalf("after draft_pr = %s", got)

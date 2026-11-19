@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { ApiError } from '../../shared/api';
 import { newIdempotencyKey } from '../../shared/api/idempotency';
-import type { HarnessApproval, HarnessCreateTaskInput, HarnessRoleId, HarnessTask, HarnessRun } from '../../lib/types';
+import type { HarnessApproval, HarnessCreateTaskInput, HarnessDecision, HarnessRoleId, HarnessTask, HarnessRun } from '../../lib/types';
 import type { HarnessClient } from './harnessClient';
 import { harnessReducer, initialHarnessState, startOfDay } from './harnessState';
 import type { HarnessAction, HarnessState } from './harnessState';
@@ -13,7 +13,8 @@ export interface HarnessController {
 	refresh: () => Promise<void>;
 	loadRun: (runId: string) => Promise<void>;
 	approve: (approval: HarnessApproval, reason?: string) => Promise<void>;
-	reject: (approval: HarnessApproval, reason: string) => Promise<void>;
+	/** `replan` answers Review only: back to Plan instead of Build. */
+	reject: (approval: HarnessApproval, reason: string, decision?: 'reject' | 'replan') => Promise<void>;
 	pin: (task: HarnessTask, pinned: boolean) => Promise<void>;
 	setPriority: (task: HarnessTask, input: { priorityOverride?: number; before?: string }) => Promise<void>;
 	start: (task: HarnessTask) => Promise<void>;
@@ -73,14 +74,14 @@ export function useHarness(client: HarnessClient): HarnessController {
 		}
 	}, [client]);
 
-	const decide = useCallback(async (approval: HarnessApproval, decision: 'approve' | 'reject', reason?: string) => {
+	const decide = useCallback(async (approval: HarnessApproval, decision: HarnessDecision, reason?: string) => {
 		// One key per approval and decision, so a retry after a dropped reply is a replay, not a second decision.
 		const keyName = `${approval.id}:${decision}:${approval.revision}`;
 		const key = keys.current.get(keyName) ?? newIdempotencyKey('harness');
 		keys.current.set(keyName, key);
 		dispatch({ type: 'decision.sent', approvalId: approval.id, decision, reason });
 		try {
-			const decided = decision === 'approve' ? await client.approve(approval, key, reason) : await client.reject(approval, key, reason ?? '');
+			const decided = decision === 'approve' ? await client.approve(approval, key, reason) : await client.reject(approval, key, reason ?? '', decision);
 			dispatch({ type: 'decision.done', approvalId: approval.id, approval: decided });
 			if (!decided) void refresh();
 		} catch (error) {
@@ -89,7 +90,7 @@ export function useHarness(client: HarnessClient): HarnessController {
 	}, [client, refresh]);
 
 	const approve = useCallback((approval: HarnessApproval, reason?: string) => decide(approval, 'approve', reason), [decide]);
-	const reject = useCallback((approval: HarnessApproval, reason: string) => decide(approval, 'reject', reason), [decide]);
+	const reject = useCallback((approval: HarnessApproval, reason: string, decision: 'reject' | 'replan' = 'reject') => decide(approval, decision, reason), [decide]);
 
 	const saveTask = useCallback(async (save: () => Promise<HarnessTask>) => {
 		try {

@@ -8,13 +8,13 @@ import { HxStatusBadge } from './HxStatusBadge';
 import { agentRoleLabels, formatAgo, formatCost, formatMinutes, gateTitles, plural } from './vocabulary';
 import { useNow } from './useNow';
 
-type GateWords = { approve: string; reject: string; askTitle: string; askLabel: string; askPlaceholder: string; answerOnApprove?: boolean; answerLabel?: string; answerPlaceholder?: string; answerSubmit?: string; noteLink?: string };
+type GateWords = { approve: string; reject: string; askTitle: string; askLabel: string; askPlaceholder: string; replan?: { label: string; title: string; placeholder: string }; answerOnApprove?: boolean; answerLabel?: string; answerPlaceholder?: string; answerSubmit?: string; noteLink?: string };
 
 export const gateWords: Record<HarnessApprovalGate, GateWords> = {
 	start: { approve: 'Start', reject: 'Not now', askTitle: 'Why not now?', askLabel: 'Reason', askPlaceholder: 'Say why this task should wait. The Sorter keeps it in line.' },
 	plan: { approve: 'Approve', reject: 'Ask for changes', askTitle: 'What should change?', askLabel: 'What should change?', askPlaceholder: 'Tell the Planner what to change. This is sent back with the plan.' },
 	resume: { approve: 'Retry', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task stays in the Task Queue as Stopped, and Start again begins a new run.', noteLink: 'Retry with a note', answerLabel: 'A note for the next try', answerPlaceholder: 'Optional. What to do differently this time. The agent reads it with the Checker\'s findings.', answerSubmit: 'Send and retry' },
-	draft_pr: { approve: 'Open draft PR', reject: 'Not yet', askTitle: 'Why not yet?', askLabel: 'Reason', askPlaceholder: 'Say what should happen first. The Builder gets this note.' },
+	review: { approve: 'Hand off', reject: 'Back to Build', askTitle: 'What should the Builder change?', askLabel: 'What should change?', askPlaceholder: 'Tell the Builder what to change. The change comes back to your review once its tests pass.', replan: { label: 'Back to Plan', title: 'What should the plan change?', placeholder: 'Tell the Planner what to change. You approve the new plan, the Builder follows it, and the change comes back to your review.' } },
 	question: { approve: 'Answer and continue', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task stays in the Task Queue as Stopped, and Start again begins a new run.', answerOnApprove: true, answerLabel: 'Your answers', answerPlaceholder: 'Answer each question in a line or two. The agent continues from your answers and does not ask again.', answerSubmit: 'Send and continue' }
 };
 
@@ -31,7 +31,7 @@ export function consequence(approval: HarnessApproval): string {
 	switch (approval.gate) {
 		case 'start': return `Approving lets the Planner start on this task. Nothing runs before that.${usually}`;
 		case 'plan': return `Approving lets the Builder start writing code.${usually}`;
-		case 'draft_pr': return 'The tests passed twice. Approving pushes the branch and opens a draft pull request for a person to review. Nothing merges on its own.';
+		case 'review': return 'The tests passed twice. Try the change in a session of your own in its worktree, and change what you like. Hand off commits your changes, tests them again if there are any, and opens a draft pull request. Nothing merges on its own.';
 		case 'resume': return approval.summary ?? 'The harness stopped and cannot decide alone how to continue.';
 		case 'question': return `${approval.summary ?? `The ${askerLabel(approval)} stopped to ask you before going on.`} Nothing runs on this task until you answer.`;
 	}
@@ -44,19 +44,23 @@ export function gateHeading(approval: HarnessApproval, task?: HarnessTask): stri
 	return `Waiting on you: ${gateTitles[approval.gate]} ${name}`;
 }
 
-export function GateCard({ approval, task, sent, attention = false, autoFocus = false, onApprove, onReject, onOpen, openLabel = 'See the plan' }: {
+export function GateCard({ approval, task, sent, attention = false, autoFocus = false, onApprove, onReject, onOpen, openLabel = 'See the plan', onSession, sessionLabel = 'Try it in a session' }: {
 	approval: HarnessApproval;
 	task?: HarnessTask;
 	sent?: SentDecision;
 	attention?: boolean;
 	autoFocus?: boolean;
 	onApprove: (reason?: string) => void;
-	onReject: (reason: string) => void;
+	/** `replan` comes from Review's Back to Plan; every other refusal is `reject`. */
+	onReject: (reason: string, decision?: 'reject' | 'replan') => void;
 	onOpen?: () => void;
 	openLabel?: string;
+	/** Opens a person's session in the run's worktree, for Review. */
+	onSession?: () => void;
+	sessionLabel?: string;
 }) {
 	const now = useNow(30_000);
-	const [dialog, setDialog] = useState<'reject' | 'answer' | undefined>();
+	const [dialog, setDialog] = useState<'reject' | 'replan' | 'answer' | undefined>();
 	const approveRef = useRef<HTMLButtonElement | null>(null);
 	const words = gateWords[approval.gate];
 	const decided = approval.state !== 'requested';
@@ -110,6 +114,7 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 					{context?.verdict === 'approve' && <HxStatusBadge status="done" label={approval.gate === 'plan' ? 'Plan check passed' : 'Checks passed'} />}
 					{stuck && <HxStatusBadge status="stopped" />}
 					{facts && <span className="hx-muted hx-num">{facts}</span>}
+					{onSession && <button type="button" className="hx-link" onClick={onSession}>{sessionLabel}</button>}
 					{onOpen && <button type="button" className="hx-link" onClick={onOpen}>{stuck ? 'See what the Checker said' : openLabel}</button>}
 					{words.noteLink && <button type="button" className="hx-link" disabled={sending} onClick={() => setDialog('answer')}>{words.noteLink}</button>}
 				</div>
@@ -118,19 +123,21 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 			<div className="hx-gate-actions">
 				<button ref={approveRef} type="button" className="primary" disabled={sending} data-autofocus={autoFocus || undefined} onClick={() => words.answerOnApprove ? setDialog('answer') : onApprove()}>{sending && sent?.decision === 'approve' ? 'Sending…' : words.approve}</button>
 				<button type="button" className="secondary" disabled={sending} onClick={() => setDialog('reject')}>{words.reject}</button>
+				{words.replan && <button type="button" className="secondary" disabled={sending} onClick={() => setDialog('replan')}>{words.replan.label}</button>}
 			</div>
 			{dialog && (
 				<GateDecisionDialog
-					title={dialog === 'answer' ? (words.answerLabel ?? 'Your answer') : words.askTitle}
+					title={dialog === 'answer' ? (words.answerLabel ?? 'Your answer') : dialog === 'replan' && words.replan ? words.replan.title : words.askTitle}
 					label={dialog === 'answer' ? (words.answerLabel ?? 'Answer the question the Planner could not decide') : words.askLabel}
-					placeholder={dialog === 'answer' ? (words.answerPlaceholder ?? 'Your answer is added to the task and the Planner starts a fresh round.') : words.askPlaceholder}
-					submitLabel={dialog === 'answer' ? (words.answerSubmit ?? 'Send and retry') : approval.gate === 'plan' ? 'Send to Planner' : 'Send'}
+					placeholder={dialog === 'answer' ? (words.answerPlaceholder ?? 'Your answer is added to the task and the Planner starts a fresh round.') : dialog === 'replan' && words.replan ? words.replan.placeholder : words.askPlaceholder}
+					submitLabel={dialog === 'answer' ? (words.answerSubmit ?? 'Send and retry') : approval.gate === 'plan' || dialog === 'replan' ? 'Send to Planner' : approval.gate === 'review' ? 'Send to Builder' : 'Send'}
 					questions={dialog === 'answer' && asking ? questions : undefined}
 					optional={dialog === 'answer' && Boolean(words.noteLink)}
 					onCancel={() => setDialog(undefined)}
 					onSubmit={(reason) => {
 						setDialog(undefined);
 						if (dialog === 'answer') onApprove(reason);
+						else if (dialog === 'replan') onReject(reason, 'replan');
 						else onReject(reason);
 					}}
 				/>

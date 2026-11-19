@@ -102,6 +102,9 @@ func (s *Service) runQA(ctx context.Context, settings domain.Settings, stage dom
 			s.record(ctx, run, "harness.commit", models.AuditStatusSuccess, "Committed the tester's fixes", nil)
 		}
 	}
+	if gate.Passed {
+		gate.Head = s.head(ctx, run)
+	}
 	err = s.atomic(ctx, func(tx domain.Repository, record func(domain.Event) error) error {
 		st, err := s.loadStep(ctx, tx, record, settings, stage.RunID, stage.ID)
 		if err != nil {

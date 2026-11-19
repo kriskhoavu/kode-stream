@@ -1030,17 +1030,18 @@ export interface GitOperationResult {
 export type HarnessSourceKind = 'jira' | 'github' | 'bitbucket';
 export type HarnessTaskState = 'discovered' | 'ranked' | 'running' | 'blocked' | 'done' | 'dismissed' | 'stale' | 'cancelled';
 export type HarnessRunState = 'running' | 'blocked' | 'passed' | 'failed' | 'cancelled';
-export type HarnessStageKind = 'plan' | 'plan_approval' | 'implement' | 'qa' | 'pr_approval' | 'draft_pr';
+export type HarnessStageKind = 'plan' | 'plan_approval' | 'implement' | 'qa' | 'review' | 'draft_pr';
 export type HarnessStageState = 'pending' | 'running' | 'awaiting_approval' | 'passed' | 'failed' | 'retry_wait' | 'cancelled' | 'skipped';
 export type HarnessAgentRole = 'planner' | 'plan_reviewer' | 'coder' | 'code_reviewer' | 'qa_fixer';
 export type HarnessAgentRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted';
-export type HarnessApprovalGate = 'start' | 'plan' | 'resume' | 'draft_pr' | 'question';
+export type HarnessApprovalGate = 'start' | 'plan' | 'resume' | 'review' | 'question';
 export type HarnessApprovalState = 'requested' | 'approved' | 'rejected' | 'expired' | 'superseded';
 export type HarnessChannel = 'dashboard' | 'webex' | 'api';
 /** The orchestrator's loops a person can pause; `reviewer` covers plan and code review. */
 export type HarnessRoleId = 'scout' | 'sorter' | 'planner' | 'coder' | 'reviewer' | 'qa';
 export type HarnessEngineId = 'claudecode' | 'codex' | 'opencode';
-export type HarnessDecision = 'approve' | 'reject';
+/** `replan` answers Review only: it sends the change back to Plan; `reject` sends it back to Build. */
+export type HarnessDecision = 'approve' | 'reject' | 'replan';
 
 export interface HarnessActor { actorId: string; displayName: string; email?: string }
 
@@ -1178,6 +1179,8 @@ export interface HarnessRun {
 export interface HarnessApproval {
   id: string;
   runId?: string;
+  /** The stage that asked, when a stage did: two Reviews of one run are told apart by it. */
+  stageId?: string;
   taskId: string;
   gate: HarnessApprovalGate;
   state: HarnessApprovalState;
@@ -1291,7 +1294,8 @@ export interface HarnessSettings {
   revision: number;
   enabled: boolean;
   autoStart: boolean;
-  requirePrApproval: boolean;
+  /** A run whose tests passed waits at Review, where a person tries it before hand-off. */
+  requireReview: boolean;
   /** Agents may stop and ask a person when they cannot decide alone. */
   askQuestions: boolean;
   slots: Record<HarnessRoleId, number>;

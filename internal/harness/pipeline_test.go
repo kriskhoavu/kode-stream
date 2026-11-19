@@ -122,6 +122,8 @@ func newPipeline(t *testing.T, s script, adjust ...func(*domain.Settings)) *pipe
 	service := New(Dependencies{Repository: repository, Workspaces: fakeWorkspaces{"ws": workspace}, Engines: []ports.Engine{engine}, Worktrees: gitworktree.New(filepath.Join(t.TempDir(), "worktrees"), appgit.New()), Transcripts: transcripts, Config: Config{LocalMode: true}})
 	settings := domain.DefaultSettings()
 	settings.Enabled = true
+	// Most tests follow a run to its end; a Review test turns Review back on.
+	settings.RequireReview = false
 	settings.Workspaces = []domain.WorkspaceSettings{{WorkspaceID: "ws", VerificationCommands: []string{"true"}}}
 	for _, apply := range adjust {
 		apply(&settings)

@@ -163,6 +163,13 @@ func (a *Adapter) Commit(ctx context.Context, path, message string) (string, err
 	return a.Git.CommitAllContext(ctx, path, message)
 }
 
+func (a *Adapter) Head(ctx context.Context, path string) (string, error) {
+	if err := a.inside(path); err != nil {
+		return "", err
+	}
+	return a.Git.RevParseContext(ctx, path, "HEAD")
+}
+
 func (a *Adapter) Push(ctx context.Context, path, branch string) error {
 	if err := a.inside(path); err != nil {
 		return err

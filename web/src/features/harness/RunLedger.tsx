@@ -19,7 +19,7 @@ type LedgerGroup = { id: string; title: string; note?: string; rows: LedgerRow[]
 function decidedNote(approval: HarnessApproval | undefined): string | undefined {
 	if (!approval || approval.state === 'requested') return approval ? 'Waiting on you' : undefined;
 	const who = approval.decidedBy?.displayName ?? 'Someone';
-	const verb = approval.state === 'approved' ? 'approved' : approval.state === 'rejected' ? 'asked for changes' : approval.state;
+	const verb = approval.state === 'approved' ? (approval.gate === 'review' ? 'handed it off' : 'approved') : approval.state === 'rejected' ? (approval.gate === 'review' ? 'sent it back' : 'asked for changes') : approval.state;
 	return `${who} ${verb}${approval.channel && approval.channel !== 'dashboard' ? ` ${channelLabels[approval.channel]}` : ''}`;
 }
 
@@ -40,7 +40,8 @@ export function ledgerGroups(detail: HarnessRunDetail): LedgerGroup[] {
 		const open = false;
 		if (stage.kind === 'plan') groups.push({ id: stage.id, title: 'Plan', note: decidedNote(approvalOf('plan')), rows, open });
 		if (stage.kind === 'implement') groups.push({ id: stage.id, title: 'Build', rows, open });
-		if (stage.kind === 'qa') groups.push({ id: stage.id, title: 'Test', note: decidedNote(approvalOf('draft_pr')), rows, open });
+		if (stage.kind === 'qa') groups.push({ id: stage.id, title: 'Test', rows, open });
+		if (stage.kind === 'review' && stage.state !== 'pending') groups.push({ id: stage.id, title: 'Your review', note: decidedNote(detail.approvals.filter((approval) => approval.stageId === stage.id).at(-1)), rows: [{ id: stage.id, step: 'Tried and decided by a person', stage }], open });
 		if (stage.kind === 'draft_pr' && stage.state !== 'pending') groups.push({ id: stage.id, title: 'Draft pull request', rows: [{ id: stage.id, step: 'Push and open', stage }], open });
 	}
 	const kept = groups.filter((group) => group.rows.length > 0);

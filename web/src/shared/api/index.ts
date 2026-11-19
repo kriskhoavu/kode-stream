@@ -561,7 +561,10 @@ export const api = {
   harnessApprovals: async (signal?: AbortSignal) => (await request<{ approvals?: HarnessApproval[] | null }>('/api/harness/approvals', { signal }, !signal)).approvals ?? [],
   /** Resolves to the decided approval, or `undefined` when someone else already decided it (409 `already_decided`). */
   approveHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason?: string) => decideHarnessGate(approval, 'approve', idempotencyKey, reason),
-  rejectHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason: string) => decideHarnessGate(approval, 'reject', idempotencyKey, reason),
+  /** `replan` sends a change at Review back to Plan; `reject` sends it back to Build, or asks for changes at any other gate. */
+  rejectHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason: string, decision: 'reject' | 'replan' = 'reject') => decideHarnessGate(approval, decision, idempotencyKey, reason),
+  /** Starts a person's session in the worktree of a run waiting at Review. */
+  startHarnessReviewSession: (runId: string, input: { provider: string; idempotencyKey: string; columns: number; rows: number }) => request<EmbeddedAISessionResult>(`/api/harness/runs/${encodeURIComponent(runId)}/review-session`, { method: 'POST', body: JSON.stringify(input) }, false),
   pinHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, pinned: boolean) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/pin`, { method: 'POST', body: JSON.stringify({ pinned, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   /** `before` names the task this one should now sit above in the Task Queue; omitted means last. */
   setHarnessPriority: (task: Pick<HarnessTask, 'id' | 'revision'>, input: { priorityOverride?: number; before?: string }) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/priority`, { method: 'POST', body: JSON.stringify({ ...input, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	appaisession "kode-stream/internal/ai"
 	"kode-stream/internal/harness"
 	"kode-stream/internal/harness/domain"
 )
@@ -19,6 +20,8 @@ const maxHarnessBodyBytes int64 = 256 << 10
 // to calls on the harness service and errors back to HTTP, nothing else.
 type harnessController struct {
 	harness *harness.Service
+	// ai starts a person's session at a run's Review stage.
+	ai *aiController
 }
 
 func (a *harnessController) route(handler http.HandlerFunc) gin.HandlerFunc {
@@ -430,6 +433,44 @@ func (a *harnessController) decide(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusOK, a.harness.DashboardDecision(r.Context(), approval))
 	}
+}
+
+type harnessReviewSessionRequest struct {
+	Provider       string `json:"provider"`
+	IdempotencyKey string `json:"idempotencyKey"`
+	Columns        uint16 `json:"columns"`
+	Rows           uint16 `json:"rows"`
+}
+
+// reviewSession starts a person's embedded session in the worktree of a run
+// waiting at Review.
+func (a *harnessController) reviewSession(w http.ResponseWriter, r *http.Request) {
+	var request harnessReviewSessionRequest
+	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {
+		return
+	}
+	if request.Columns < 20 || request.Columns > maxTerminalDimension || request.Rows < 5 || request.Rows > 200 || len(request.Provider) > 64 || len(request.IdempotencyKey) > 200 {
+		writeError(w, http.StatusBadRequest, "review session input exceeds the allowed limits")
+		return
+	}
+	if a.ai == nil || a.ai.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI sessions are unavailable")
+		return
+	}
+	target, err := a.harness.ReviewSession(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeHarnessError(w, err)
+		return
+	}
+	if !a.ai.authorizeWorkspace(w, r, target.WorkspaceID) {
+		return
+	}
+	result, err := a.ai.aiSessions.StartEmbeddedReview(appaisession.ReviewInput{WorkspaceID: target.WorkspaceID, Dir: target.Dir, Branch: target.Branch, Prompt: target.Prompt, Provider: request.Provider, IdempotencyKey: request.IdempotencyKey, Columns: request.Columns, Rows: request.Rows})
+	if err != nil {
+		writeEmbeddedLaunchError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, result)
 }
 
 func (a *harnessController) pauseRole(w http.ResponseWriter, r *http.Request) {

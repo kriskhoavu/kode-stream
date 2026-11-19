@@ -170,7 +170,7 @@ export function createFixtureStore(now = Date.now()): Store {
 			revision: 3,
 			enabled: true,
 			autoStart: false,
-			requirePrApproval: true,
+			requireReview: true,
 			askQuestions: true,
 			slots: { scout: 1, sorter: 1, planner: 1, coder: 2, reviewer: 1, qa: 1 },
 			paused: { qa: false },
@@ -189,7 +189,7 @@ export function createFixtureStore(now = Date.now()): Store {
 		}
 	};
 
-	const kinds: HarnessStageKind[] = ['plan', 'plan_approval', 'implement', 'qa', 'pr_approval', 'draft_pr'];
+	const kinds: HarnessStageKind[] = ['plan', 'plan_approval', 'implement', 'qa', 'review', 'draft_pr'];
 	const addRun = (key: string, startedAgo: number, extra: Partial<HarnessRun> = {}) => {
 		const owner = task(key);
 		const run: HarnessRun = {
@@ -312,7 +312,7 @@ export function createFixtureStore(now = Date.now()): Store {
 	// PM-01: finished this morning with a draft pull request.
 	const pm01 = addRun('PM-01', 3 * 60 * min, { state: 'passed', finishedAt: at(2 * 60 * min), prUrl: 'https://github.com/example/airship/pull/3103' });
 	kinds.forEach((kind) => stage(pm01, kind, { state: 'passed', turns: kind === 'implement' ? 120 : 20, durationMs: 10 * min, costUsd: kind === 'implement' ? 9.4 : 2.05, startedAt: at(3 * 60 * min), finishedAt: at(2 * 60 * min) }));
-	approval('appr-pm01-pr', 'PM-01', 'draft_pr', 2 * 60 * min + 5 * min, { state: 'approved', decidedAt: at(2 * 60 * min + 2 * min), decidedBy: { actorId: 'khoa', displayName: 'Khoa' }, channel: 'dashboard', revision: 2 });
+	approval('appr-pm01-pr', 'PM-01', 'review', 2 * 60 * min + 5 * min, { state: 'approved', decidedAt: at(2 * 60 * min + 2 * min), decidedBy: { actorId: 'khoa', displayName: 'Khoa' }, channel: 'dashboard', revision: 2 });
 
 	for (const run of store.runs.values()) recomputeTotals(store, run);
 	refreshRoles(store, now);
@@ -431,9 +431,9 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 					(store.stages.get(`${run.id}-plan_approval`) as HarnessStage).state = 'pending';
 					startStage(run, 'plan', 'planner');
 				}
-			} else if (current.gate === 'draft_pr') {
+			} else if (current.gate === 'review') {
 				if (decision === 'approve') {
-					finishStage(run, 'pr_approval');
+					finishStage(run, 'review');
 					startStage(run, 'draft_pr');
 				}
 			} else if (current.gate === 'question') {
@@ -479,14 +479,14 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 		const run = runOf('run-cli-01');
 		if (!run || run.state !== 'running') return;
 		finishStage(run, 'qa');
-		const gate = store.stages.get(`${run.id}-pr_approval`) as HarnessStage;
+		const gate = store.stages.get(`${run.id}-review`) as HarnessStage;
 		gate.state = 'awaiting_approval';
 		gate.startedAt = new Date(now()).toISOString();
 		run.currentStageId = gate.id;
 		const task = store.tasks.get(run.taskId) as HarnessTask;
 		task.needsYou = true;
 		const approval: HarnessApproval = {
-			id: 'appr-cli01-pr', taskId: task.id, runId: run.id, gate: 'draft_pr', state: 'requested', requestedAt: new Date(now()).toISOString(), revision: 1,
+			id: 'appr-cli01-pr', taskId: task.id, runId: run.id, gate: 'review', state: 'requested', requestedAt: new Date(now()).toISOString(), revision: 1,
 			context: { verdict: 'approve', blocking: 0, advisory: 2, rounds: 1, costUsd: run.totals.costUsd, durationMs: run.totals.durationMs }
 		};
 		store.approvals.set(approval.id, approval);

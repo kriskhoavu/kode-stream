@@ -141,7 +141,7 @@ export function HarnessSettings({ client, status, onPause, onResume, onSaved }: 
 				<div className="settings-toggle-list">
 					<Toggle label="Turn the harness on" hint="When off, nothing is found, planned or built." checked={draft.enabled} onChange={(enabled) => update({ enabled })} />
 					<Toggle label="Start tasks on their own" hint="When off, a person approves each task before the Planner starts." checked={draft.autoStart} onChange={(autoStart) => update({ autoStart })} />
-					<Toggle label="Ask before opening a draft pull request" hint="When on, a person approves before the branch leaves this machine." checked={draft.requirePrApproval} onChange={(requirePrApproval) => update({ requirePrApproval })} />
+					<Toggle label="Review before hand-off" hint="When on, a person tries each change in a session of their own once its tests pass, then hands it off or sends it back to Build or Plan. When off, the draft pull request opens at once." checked={draft.requireReview} onChange={(requireReview) => update({ requireReview })} />
 					<Toggle label="Let an agent stop and ask you" hint="When on, an agent that cannot decide alone stops its round and waits for your answer. When off, it goes on with its best guess and its questions show on the plan approval. A workspace or a task can say otherwise." checked={draft.askQuestions} onChange={(askQuestions) => update({ askQuestions })} />
 				</div>
 			</section>

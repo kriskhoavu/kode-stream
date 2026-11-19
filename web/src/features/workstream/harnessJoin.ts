@@ -35,7 +35,7 @@ export interface HarnessJoin {
 export const syntheticItemPrefix = 'harness:';
 export const syntheticMetadataSource = 'harness';
 
-const stageOrder: readonly HarnessStageKind[] = ['plan', 'plan_approval', 'implement', 'qa', 'pr_approval', 'draft_pr'];
+const stageOrder: readonly HarnessStageKind[] = ['plan', 'plan_approval', 'implement', 'qa', 'review', 'draft_pr'];
 
 /** The key the Jira key joins on. An item's identifier is its ticket: the Jira panel reads the issue by it. */
 export function itemJoinKey(item: Pick<ItemSummary, 'identifier'>): string {
@@ -183,7 +183,7 @@ export function taskColumn(task: HarnessTask, run?: HarnessRun): ItemStatus {
 	switch (run.currentStage?.kind) {
 		case 'implement':
 		case 'qa': return 'in_progress';
-		case 'pr_approval':
+		case 'review':
 		case 'draft_pr': return 'review';
 		default: return 'draft';
 	}

@@ -108,9 +108,11 @@ type RankerSettings struct {
 }
 
 type Settings struct {
-	Enabled           bool `json:"enabled"`
-	AutoStart         bool `json:"autoStart"`
-	RequirePRApproval bool `json:"requirePrApproval"`
+	Enabled   bool `json:"enabled"`
+	AutoStart bool `json:"autoStart"`
+	// RequireReview stops a run whose tests passed at Review, where a person
+	// tries the change before it is handed off. On unless turned off.
+	RequireReview bool `json:"requireReview"`
 	// AskQuestions lets an agent stop its round and ask a person when its
 	// report is blocked or lists open questions; nil means yes. A workspace
 	// or a task may override it.
@@ -196,19 +198,20 @@ func DefaultModelPolicy() ModelPolicy {
 	}
 }
 
-// DefaultSettings: disabled, Start is a human approval, one slot per pool.
+// DefaultSettings: disabled, Start is a human approval, Review is on, one
+// slot per pool.
 func DefaultSettings() Settings {
 	return Settings{
-		Enabled:           false,
-		AutoStart:         false,
-		RequirePRApproval: false,
-		Slots:             Slots{Planner: 1, Reviewer: 1, Coder: 1, QAFixer: 1},
-		Intervals:         Intervals{ScoutSeconds: 300, SorterSeconds: 60, WorkerSeconds: 15, LeaseSeconds: 2700},
-		Paused:            map[RoleKey]bool{},
-		Workspaces:        []WorkspaceSettings{},
-		ModelPolicy:       DefaultModelPolicy(),
-		Ranker:            RankerSettings{LabelBoosts: map[string]float64{"bug": 5, "urgent": 10}, LLM: LLMRankerSettings{Endpoint: "http://127.0.0.1:8000/v1", Model: "qwen", APIKeyEnvVar: "", TopN: 10}},
-		RetentionDays:     3,
+		Enabled:       false,
+		AutoStart:     false,
+		RequireReview: true,
+		Slots:         Slots{Planner: 1, Reviewer: 1, Coder: 1, QAFixer: 1},
+		Intervals:     Intervals{ScoutSeconds: 300, SorterSeconds: 60, WorkerSeconds: 15, LeaseSeconds: 2700},
+		Paused:        map[RoleKey]bool{},
+		Workspaces:    []WorkspaceSettings{},
+		ModelPolicy:   DefaultModelPolicy(),
+		Ranker:        RankerSettings{LabelBoosts: map[string]float64{"bug": 5, "urgent": 10}, LLM: LLMRankerSettings{Endpoint: "http://127.0.0.1:8000/v1", Model: "qwen", APIKeyEnvVar: "", TopN: 10}},
+		RetentionDays: 3,
 	}
 }
 

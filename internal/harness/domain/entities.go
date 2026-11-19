@@ -133,8 +133,10 @@ const (
 	StagePlanApproval StageKind = "plan_approval"
 	StageImplement    StageKind = "implement"
 	StageQA           StageKind = "qa"
-	StagePRApproval   StageKind = "pr_approval"
-	StageDraftPR      StageKind = "draft_pr"
+	// StageReview waits for a person to try the change, in a session of
+	// their own in the run's worktree, and hand it off or send it back.
+	StageReview  StageKind = "review"
+	StageDraftPR StageKind = "draft_pr"
 )
 
 type StageState string
@@ -198,7 +200,10 @@ type Stage struct {
 	Answers []Answer `json:"answers,omitempty"`
 	// LastGate is the harness's latest verification run in a QA stage.
 	LastGate *GateRun `json:"lastGate,omitempty"`
-	Revision int64    `json:"revision"`
+	// Reviewed marks a QA stage a person's hand-off started: it already
+	// went through Review, so passing it goes on to the draft pull request.
+	Reviewed bool  `json:"reviewed,omitempty"`
+	Revision int64 `json:"revision"`
 }
 
 type Role string
@@ -403,6 +408,9 @@ type GateRun struct {
 	// LogTail is the last 8 KB of the failing command's output. It is
 	// untrusted and goes to a brief only inside task-data delimiters.
 	LogTail string `json:"logTail,omitempty"`
+	// Head is the commit a passing run verified, so Review can tell
+	// whether anything changed after it.
+	Head string `json:"head,omitempty"`
 }
 
 type Report struct {
@@ -423,10 +431,12 @@ type Report struct {
 type GateKind string
 
 const (
-	GateStart   GateKind = "start"
-	GatePlan    GateKind = "plan"
-	GateResume  GateKind = "resume"
-	GateDraftPR GateKind = "draft_pr"
+	GateStart  GateKind = "start"
+	GatePlan   GateKind = "plan"
+	GateResume GateKind = "resume"
+	// GateReview is the Review stage: approve hands the change off, reject
+	// sends it back to Build, and replan back to Plan.
+	GateReview GateKind = "review"
 	// GateQuestion is an agent's own stop: it could not decide alone and
 	// asks a person; approving sends the answer back into its round.
 	GateQuestion GateKind = "question"

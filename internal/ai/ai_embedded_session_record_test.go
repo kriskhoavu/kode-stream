@@ -259,3 +259,29 @@ func TestClaudeEmbeddedLaunchIsNamedAfterItsConversation(t *testing.T) {
 		t.Fatalf("claude args = %q, want --session-id %s first", args, conversation)
 	}
 }
+
+func TestReviewSessionStartsInTheRunWorktreeOnItsBranch(t *testing.T) {
+	service, _, workspace, _, _, _ := launchTestService(t, true)
+	manager := NewTerminalManager(Config{})
+	t.Cleanup(func() { _ = manager.Close() })
+	records := NewFileSessionRecordRepository(filepath.Join(t.TempDir(), "session-records.yaml"))
+	service.ConfigureEmbedded(manager).ConfigureSessionRecords(records, gitadapter.New())
+	worktree := t.TempDir()
+
+	input := ReviewInput{WorkspaceID: workspace.ID, Dir: worktree, Branch: "harness/PM-7-abc", Prompt: "Review PM-7", Provider: "test-ai", IdempotencyKey: "review-once", Columns: 80, Rows: 24}
+	first, err := service.StartEmbeddedReview(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.StartEmbeddedReview(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Record == nil || first.Record.Intent != ReviewIntent || first.Record.RequestedBranch != "harness/PM-7-abc" || second.Record == nil || second.Record.ID != first.Record.ID || len(manager.List()) != 1 {
+		t.Fatalf("first=%#v second=%#v", first.Record, second.Record)
+	}
+	listed, err := records.List(workspace.ID, "harness/PM-7-abc")
+	if err != nil || len(listed) != 1 {
+		t.Fatalf("listed=%#v err=%v", listed, err)
+	}
+}

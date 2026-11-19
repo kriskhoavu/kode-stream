@@ -154,23 +154,98 @@ func TestTestsThatKeepFailingBlockTheRunAndAPRApprovalGatesThePush(t *testing.T)
 		t.Fatalf("run=%s qa=%#v", view.State, last.Stage)
 	}
 
-	gated := newPipeline(t, happyScript, func(settings *domain.Settings) { settings.RequirePRApproval = true })
-	withOrigin(t, gated)
+}
+
+// reviewing is a run that passed its tests and waits at Review.
+func reviewing(t *testing.T) (*pipelineFixture, *fakePulls, string) {
+	t.Helper()
+	fixture := newPipeline(t, happyScript, func(settings *domain.Settings) { settings.RequireReview = true })
+	origin := withOrigin(t, fixture)
 	pulls := &fakePulls{}
-	gated.service.pulls = []ports.PullRequests{pulls}
-	gated.settle(t)
-	approvePlan(t, gated)
-	gated.settle(t)
-	approval := gated.waiting(t)
-	if approval.Gate != domain.GateDraftPR || len(pulls.requests) != 0 {
+	fixture.service.pulls = []ports.PullRequests{pulls}
+	fixture.settle(t)
+	approvePlan(t, fixture)
+	fixture.settle(t)
+	if approval := fixture.waiting(t); approval.Gate != domain.GateReview || len(pulls.requests) != 0 {
 		t.Fatalf("approval = %#v requests=%d", approval, len(pulls.requests))
 	}
-	if _, err := gated.service.Decide(context.Background(), approval.ID, DecideInput{Decision: DecisionApprove, IdempotencyKey: "pr-1"}); err != nil {
+	return fixture, pulls, origin
+}
+
+func review(t *testing.T, fixture *pipelineFixture, decision Decision, reason string) {
+	t.Helper()
+	approval := fixture.waiting(t)
+	if approval.Gate != domain.GateReview {
+		t.Fatalf("waiting gate = %s", approval.Gate)
+	}
+	if _, err := fixture.service.Decide(context.Background(), approval.ID, DecideInput{Decision: decision, Reason: reason, IdempotencyKey: "review-" + approval.ID}); err != nil {
 		t.Fatal(err)
 	}
-	gated.settle(t)
-	if view := gated.run(t); view.State != domain.RunPassed || len(pulls.requests) != 1 {
-		t.Fatalf("after PR approval run=%s requests=%d", view.State, len(pulls.requests))
+	fixture.settle(t)
+}
+
+func kinds(view RunView) []string {
+	var out []string
+	for _, stage := range view.Stages {
+		out = append(out, string(stage.Kind))
+	}
+	return out
+}
+
+func TestReviewHandsOffWithoutTestingAgainWhenNothingChanged(t *testing.T) {
+	fixture, pulls, _ := reviewing(t)
+	review(t, fixture, DecisionApprove, "")
+	view := fixture.run(t)
+	if view.State != domain.RunPassed || len(pulls.requests) != 1 {
+		t.Fatalf("run=%s requests=%d", view.State, len(pulls.requests))
+	}
+	if got := strings.Join(kinds(view), ","); got != "plan,plan_approval,implement,qa,review,draft_pr" {
+		t.Fatalf("stages = %s", got)
+	}
+}
+
+func TestReviewCommitsThePersonsChangesAndTestsThemBeforeHandingOff(t *testing.T) {
+	fixture, pulls, origin := reviewing(t)
+	worktree := fixture.run(t).WorktreePath
+	writeIn(t, worktree, "internal/reviewed.go", "package internal\n")
+	review(t, fixture, DecisionApprove, "")
+	view := fixture.run(t)
+	if view.State != domain.RunPassed || len(pulls.requests) != 1 {
+		t.Fatalf("run=%s requests=%d", view.State, len(pulls.requests))
+	}
+	if got := strings.Join(kinds(view), ","); got != "plan,plan_approval,implement,qa,review,qa,draft_pr" {
+		t.Fatalf("stages = %s", got)
+	}
+	if log := gitOutput(t, origin, "log", "--format=%s", "--all"); !strings.Contains(log, "Apply the review of") {
+		t.Fatalf("branch log = %s", log)
+	}
+}
+
+func TestReviewSendsTheChangeBackToBuildOrPlanWithTheReviewersWords(t *testing.T) {
+	fixture, pulls, _ := reviewing(t)
+	review(t, fixture, DecisionReject, "Rename the flag")
+	view := fixture.run(t)
+	if got := strings.Join(kinds(view), ","); got != "plan,plan_approval,implement,qa,review,implement,qa,review" {
+		t.Fatalf("stages after Build = %s", got)
+	}
+	again := view.Stages[5]
+	if len(again.Findings) == 0 || again.Findings[0].Detail != "Rename the flag" || again.Findings[0].Severity != "blocking" {
+		t.Fatalf("findings = %#v", again.Findings)
+	}
+
+	review(t, fixture, DecisionReplan, "Split the export")
+	approvePlan(t, fixture)
+	fixture.settle(t)
+	view = fixture.run(t)
+	if got := strings.Join(kinds(view), ","); got != "plan,plan_approval,implement,qa,review,implement,qa,review,plan,plan_approval,implement,qa,review" {
+		t.Fatalf("stages after Plan = %s", got)
+	}
+	if len(pulls.requests) != 0 {
+		t.Fatalf("requests = %d", len(pulls.requests))
+	}
+	approval := fixture.waiting(t)
+	if _, err := fixture.service.Decide(context.Background(), approval.ID, DecideInput{Decision: DecisionReplan, IdempotencyKey: "replan-empty"}); err == nil {
+		t.Fatal("a replan without a reason was accepted")
 	}
 }
 

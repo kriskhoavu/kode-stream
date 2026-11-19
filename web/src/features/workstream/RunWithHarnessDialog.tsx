@@ -87,7 +87,7 @@ export function RunWithHarnessDialog({ item, workspace, harness, onClose, onStar
 						<dd>
 							<ul className="run-with-harness-roles">
 								<li>The plan: always yours to approve before any code is written.</li>
-								<li>The draft pull request: {settings?.requirePrApproval === false ? 'opens without asking.' : 'yours to approve before the branch leaves this machine.'}</li>
+								<li>Before hand-off: {settings?.requireReview === false ? 'the draft pull request opens without asking.' : 'you try the change in a session of your own, then hand it off or send it back.'}</li>
 							</ul>
 							<label className="run-with-harness-check"><input type="checkbox" checked={asks} onChange={(event) => setAskQuestions(event.target.checked)} /> The agents may stop and ask me when they cannot decide alone</label>
 						</dd>

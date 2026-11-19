@@ -34,7 +34,7 @@ function stubBoard(options: { enabled?: boolean } = {}) {
 		if (url === '/api/harness/approvals') return Promise.resolve(response({ approvals: [approval('a-3', stuck.id, { runId: 'run-3', gate: 'plan', summary: 'Three steps, one file.' })] }));
 		if (url === '/api/harness/tasks' && init?.method === 'POST') return Promise.resolve(response(task('PM-2', { workspaceId: 'ws', startRequested: true }), true, 201));
 		if (url === '/api/harness/scout/poll' && init?.method === 'POST') return Promise.resolve(response({ started: true, sources: [{ workspaceId: 'ws', kind: 'jira', found: 4, added: 1 }] }));
-		if (url === '/api/harness/settings') return Promise.resolve(response({ revision: 1, enabled: true, autoStart: true, requirePrApproval: true, askQuestions: true, slots: {}, paused: {}, sources: [], modelPolicy: {} }));
+		if (url === '/api/harness/settings') return Promise.resolve(response({ revision: 1, enabled: true, autoStart: true, requireReview: true, askQuestions: true, slots: {}, paused: {}, sources: [], modelPolicy: {} }));
 		if (url === '/api/harness/approvals/a-3/decide' && init?.method === 'POST') return Promise.resolve(response({ ...approval('a-3', stuck.id, { runId: 'run-3', gate: 'plan' }), state: 'approved', decidedAt: '2026-11-04T10:00:00.000Z', channel: 'dashboard', revision: 2 }));
 		if (url.startsWith('/api/ai/session-records')) return Promise.resolve(response([]));
 		if (url.startsWith('/api/workspaces/ws/claude-transcripts')) return Promise.resolve(response([]));

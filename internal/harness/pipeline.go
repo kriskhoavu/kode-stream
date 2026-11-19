@@ -255,10 +255,11 @@ func (st *step) lastReport(role domain.Role) *domain.Report {
 // pass ends the current stage and enters the next one, or finishes the run
 // after the last.
 func (st *step) pass() {
-	st.stage.State = domain.StagePassed
-	st.stage.FinishedAt = &st.now
-	st.event(domain.EventStageFinished, st.stage.ID, map[string]any{"kind": st.stage.Kind, "state": st.stage.State, "costUsd": st.stage.CostUSD, "turns": st.stage.Turns})
-	next := domain.NextStage(st.stage.Kind, st.settings.RequirePRApproval)
+	st.close()
+	next := domain.NextStage(st.stage.Kind, st.settings.RequireReview)
+	if st.stage.Kind == domain.StageQA && st.stage.Reviewed {
+		next = domain.StageDraftPR
+	}
 	if next == "" {
 		st.finishRun()
 		return
@@ -266,6 +267,13 @@ func (st *step) pass() {
 	stage := domain.NewStage(st.run.ID, next, st.stage.Ordinal+1)
 	st.enter(&stage)
 	st.newStages = append(st.newStages, stage)
+}
+
+// close marks the current stage passed, without entering another.
+func (st *step) close() {
+	st.stage.State = domain.StagePassed
+	st.stage.FinishedAt = &st.now
+	st.event(domain.EventStageFinished, st.stage.ID, map[string]any{"kind": st.stage.Kind, "state": st.stage.State, "costUsd": st.stage.CostUSD, "turns": st.stage.Turns})
 }
 
 // enter starts a stage: model stages queue their producer, approval stages
@@ -289,9 +297,9 @@ func (st *step) enter(stage *domain.Stage) {
 			summary = report.Summary
 		}
 		st.request(domain.GatePlan, *stage, summary)
-	case domain.StagePRApproval:
+	case domain.StageReview:
 		stage.State, stage.StartedAt = domain.StageAwaitingApproval, &st.now
-		st.request(domain.GateDraftPR, *stage, "The change passed its tests. Approve to push the branch and open a draft pull request.")
+		st.request(domain.GateReview, *stage, "The change passed its tests. Try it in a session of your own, then hand it off, or send it back to Build or Plan.")
 	default:
 		stage.State = domain.StagePending
 	}
@@ -415,8 +423,8 @@ func stageWord(kind domain.StageKind) string {
 		return "Build"
 	case domain.StageQA:
 		return "Test"
-	case domain.StagePRApproval:
-		return "Your approval of the pull request"
+	case domain.StageReview:
+		return "Review"
 	case domain.StageDraftPR:
 		return "Draft pull request"
 	}

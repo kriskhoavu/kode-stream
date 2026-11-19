@@ -52,7 +52,7 @@ describe('harness reducer', () => {
 
 	it('announces a new approval assertively and a finished stage politely', () => {
 		let state = loaded();
-		state = harnessReducer(state, { type: 'event', event: { seq: 11, at: '', type: 'approval.requested', approval: approval('ap-2', 'task-A', { gate: 'draft_pr' }) } });
+		state = harnessReducer(state, { type: 'event', event: { seq: 11, at: '', type: 'approval.requested', approval: approval('ap-2', 'task-A', { gate: 'review' }) } });
 		expect(state.announcement).toMatchObject({ text: 'A is waiting on you', assertive: true });
 		expect(waitingApprovals(state).map((item) => item.id)).toEqual(['ap-1', 'ap-2']);
 		state = harnessReducer(state, { type: 'event', event: { seq: 12, at: '', type: 'stage.finished', stage: stage('run-2', 'implement', { state: 'passed' }) } });

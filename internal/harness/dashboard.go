@@ -403,16 +403,16 @@ type DashboardRolePolicy struct {
 }
 
 type DashboardSettings struct {
-	Revision          int64                               `json:"revision"`
-	Enabled           bool                                `json:"enabled"`
-	AutoStart         bool                                `json:"autoStart"`
-	RequirePRApproval bool                                `json:"requirePrApproval"`
-	AskQuestions      bool                                `json:"askQuestions"`
-	Slots             map[string]int                      `json:"slots"`
-	Paused            map[string]bool                     `json:"paused"`
-	Sources           []DashboardSource                   `json:"sources"`
-	ModelPolicy       map[domain.Role]DashboardRolePolicy `json:"modelPolicy"`
-	ExpectedRevision  *int64                              `json:"expectedRevision,omitempty"`
+	Revision         int64                               `json:"revision"`
+	Enabled          bool                                `json:"enabled"`
+	AutoStart        bool                                `json:"autoStart"`
+	RequireReview    bool                                `json:"requireReview"`
+	AskQuestions     bool                                `json:"askQuestions"`
+	Slots            map[string]int                      `json:"slots"`
+	Paused           map[string]bool                     `json:"paused"`
+	Sources          []DashboardSource                   `json:"sources"`
+	ModelPolicy      map[domain.Role]DashboardRolePolicy `json:"modelPolicy"`
+	ExpectedRevision *int64                              `json:"expectedRevision,omitempty"`
 }
 
 func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, error) {
@@ -420,7 +420,7 @@ func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, err
 	if err != nil {
 		return DashboardSettings{}, err
 	}
-	view := DashboardSettings{Revision: settings.Revision, Enabled: settings.Enabled, AutoStart: settings.AutoStart, RequirePRApproval: settings.RequirePRApproval, AskQuestions: settings.QuestionGate(domain.Task{}),
+	view := DashboardSettings{Revision: settings.Revision, Enabled: settings.Enabled, AutoStart: settings.AutoStart, RequireReview: settings.RequireReview, AskQuestions: settings.QuestionGate(domain.Task{}),
 		Slots:  map[string]int{"scout": 1, "sorter": 1, "planner": settings.Slots.Planner, "reviewer": settings.Slots.Reviewer, "coder": settings.Slots.Coder, "qa": settings.Slots.QAFixer},
 		Paused: map[string]bool{}, Sources: []DashboardSource{}, ModelPolicy: map[domain.Role]DashboardRolePolicy{}}
 	for key, paused := range settings.Paused {
@@ -468,7 +468,7 @@ func (s *Service) SaveDashboardSettings(ctx context.Context, view DashboardSetti
 	if view.ExpectedRevision != nil {
 		expected = *view.ExpectedRevision
 	}
-	settings.Enabled, settings.AutoStart, settings.RequirePRApproval = view.Enabled, view.AutoStart, view.RequirePRApproval
+	settings.Enabled, settings.AutoStart, settings.RequireReview = view.Enabled, view.AutoStart, view.RequireReview
 	ask := view.AskQuestions
 	settings.AskQuestions = &ask
 	slot := func(key string, current int) int {

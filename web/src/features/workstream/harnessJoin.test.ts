@@ -95,7 +95,7 @@ describe('taskColumn', () => {
 		expect(taskColumn(task('PM-1', { state: 'running', needsYou: true }), run('r', 't', { currentStage: stage('r', 'plan_approval', { state: 'awaiting_approval' }) }))).toBe('draft');
 		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'implement', { state: 'running' }) }))).toBe('in_progress');
 		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'qa', { state: 'running' }) }))).toBe('in_progress');
-		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'pr_approval', { state: 'awaiting_approval' }) }))).toBe('review');
+		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'review', { state: 'awaiting_approval' }) }))).toBe('review');
 		expect(taskColumn(task('PM-1', { state: 'done' }), run('r', 't', { state: 'passed' }))).toBe('done');
 		expect(taskColumn(task('PM-1', { finishedOutside: { at: '2026-11-01T00:00:00.000Z' } }))).toBe('done');
 	});

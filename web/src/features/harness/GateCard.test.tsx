@@ -34,6 +34,27 @@ describe('GateCard', () => {
 		expect(dialog).not.toBeInTheDocument();
 	});
 
+	it('hands a reviewed change off, or sends it back to Build or Plan with what to change', () => {
+		const onApprove = vi.fn();
+		const onReject = vi.fn();
+		const onSession = vi.fn();
+		render(<GateCard approval={approval('a1', 'task-A', { gate: 'review' })} task={task('A', { title: 'Add export' })} onApprove={onApprove} onReject={onReject} onSession={onSession} />);
+		expect(screen.getByRole('heading', { name: 'Waiting on you: review A · Add export' })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Try it in a session' }));
+		expect(onSession).toHaveBeenCalled();
+		fireEvent.click(screen.getByRole('button', { name: 'Back to Build' }));
+		fireEvent.change(screen.getByRole('textbox', { name: 'What should change?' }), { target: { value: 'Rename the flag' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Send to Builder' }));
+		expect(onReject).toHaveBeenLastCalledWith('Rename the flag');
+		fireEvent.click(screen.getByRole('button', { name: 'Back to Plan' }));
+		expect(screen.getByRole('dialog', { name: 'What should the plan change?' })).toBeInTheDocument();
+		fireEvent.change(screen.getByRole('textbox', { name: 'What should change?' }), { target: { value: 'Split the export' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Send to Planner' }));
+		expect(onReject).toHaveBeenLastCalledWith('Split the export', 'replan');
+		fireEvent.click(screen.getByRole('button', { name: 'Hand off' }));
+		expect(onApprove).toHaveBeenCalledWith();
+	});
+
 	it('shows Sending… while the decision is in flight', () => {
 		render(<GateCard approval={approval('a1', 'task-A')} task={task('A')} sent={{ approvalId: 'a1', decision: 'approve', state: 'sending' }} onApprove={vi.fn()} onReject={vi.fn()} />);
 		expect(screen.getByRole('button', { name: 'Sending…' })).toBeDisabled();

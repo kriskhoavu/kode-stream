@@ -290,3 +290,64 @@ func (s *Service) recordsGet(id string) (SessionRecord, bool, error) {
 	}
 	return s.records.Get(id)
 }
+
+// ReviewIntent marks a session a person opened at a harness run's Review
+// stage. Its branch is the run's own branch, which names the run.
+const ReviewIntent = "harness_review"
+
+// ReviewInput starts a session in a harness run's worktree. The harness
+// supplies the folder, branch and brief; the caller only picks a provider.
+type ReviewInput struct {
+	WorkspaceID    string
+	Dir            string
+	Branch         string
+	Prompt         string
+	Provider       string
+	IdempotencyKey string
+	Columns        uint16
+	Rows           uint16
+}
+
+// StartEmbeddedReview starts an embedded session in a harness run's
+// worktree, so a person can try the change and edit it on the run's branch.
+func (s *Service) StartEmbeddedReview(input ReviewInput) (EmbeddedResult, error) {
+	if s.embedded == nil {
+		return EmbeddedResult{}, launchError("launch_failed", "embedded AI sessions are unavailable")
+	}
+	s.embeddedLaunchMu.Lock()
+	defer s.embeddedLaunchMu.Unlock()
+	if result, found, err := s.existingSession(input.WorkspaceID, input.IdempotencyKey); err != nil || found {
+		return result, err
+	}
+	settings, err := s.Settings()
+	if err != nil {
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	providerID := strings.TrimSpace(input.Provider)
+	provider, ok := settings.Providers[providerID]
+	if !ok || !provider.Enabled {
+		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
+	}
+	capability := s.detect(provider.Executable)
+	if !capability.Detected {
+		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
+	}
+	values := map[string]string{"workspace": input.Dir, "contextFile": "run worktree", "itemPath": "run worktree", "identifier": input.Branch, "contextMode": "workspace_only", "intent": ReviewIntent, "prompt": input.Prompt}
+	recordID, args := embeddedSessionID(providerID, provider, launchProviderArgs("workspace_only", provider.Args, values))
+	now := s.sessionNow()
+	record, err := s.persistStartingSession(SessionRecord{ID: recordID, WorkspaceID: input.WorkspaceID, Provider: providerID, Intent: ReviewIntent, RequestedBranch: input.Branch, IdempotencyKey: input.IdempotencyKey, State: StateStarting, StartedAt: now, LastKnownAt: now})
+	if err != nil {
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, WorkspaceID: input.WorkspaceID, Provider: providerID, Intent: ReviewIntent, Executable: capability.Executable, Args: args, Dir: input.Dir, Columns: input.Columns, Rows: input.Rows})
+	if err != nil {
+		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
+			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))
+		}
+		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	}
+	if saved, ok, getErr := s.recordsGet(record.ID); getErr == nil && ok {
+		record = saved
+	}
+	return EmbeddedResult{Session: session, Grant: grant, Record: &record}, nil
+}

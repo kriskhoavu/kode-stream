@@ -75,7 +75,7 @@ export function RunWorkbench({ client, detail, request }: { client: HarnessClien
 		if (card.step === 'plan' || card.step === 'approval') { if (planFiles[0]) show(`plan:${planFiles[0].path}`); else setMode('plan'); return; }
 		if ((card.step === 'build' || card.step === 'fix') && codeFiles[0] && !card.agentRun) { show(`file:${codeFiles[0].path}`); return; }
 		if (card.agentRun) { show(`agent:${card.agentRun.id}`); return; }
-		if (card.step === 'build' || card.step === 'pr_approval') { setMode('changes'); if (codeFiles[0]) show(`file:${codeFiles[0].path}`); return; }
+		if (card.step === 'build' || card.step === 'review') { setMode('changes'); if (codeFiles[0]) show(`file:${codeFiles[0].path}`); return; }
 		setSide('steps');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [request]);

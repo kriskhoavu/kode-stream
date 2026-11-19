@@ -127,15 +127,21 @@ export function pipelineModel(detail: HarnessRunDetail, now = Date.now()): Pipel
 	}
 
 	const draft = stageOf('draft_pr');
-	const prGate = stageOf('pr_approval');
-	const handOff: StepCard[] = [];
-	if (prGate && prGate.state !== 'skipped') handOff.push(approvalCard('pr_approval', 'pr_approval', prGate, approvalOf('draft_pr'), 'after the tests', now));
+	const review = stageOf('review');
+	const reviewCard = approvalCard('review', 'review', review, approvalOf('review'), 'after the tests', now);
+	// A run that reached its pull request without a Review stage ran with Review turned off.
+	if (!review && draft) {
+		reviewCard.status = 'skipped';
+		reviewCard.meta = ['turned off'];
+	}
+	// Sent back, a review is done with: the run is building or planning again, and comes back to it.
+	if (review && review.state === 'passed' && reviewCard.status === 'needs_fix') reviewCard.meta = [`sent back · ${reviewCard.meta.join(' · ')}`];
 	const draftStatus: HxStatus = draft ? stageStatus(draft.state) : 'not_started';
-	handOff.push({
+	const draftCard: StepCard = {
 		id: 'draft_pr', step: 'draft_pr', label: hxSteps.draft_pr.label, status: draftStatus,
-		meta: detail.run.prUrl ? [prLabel(detail.run.prUrl)] : draftStatus === 'not_started' ? [prGate ? 'you approve first' : 'after the tests'] : [],
+		meta: detail.run.prUrl ? [prLabel(detail.run.prUrl)] : draftStatus === 'not_started' ? [review || !draft ? 'after your review' : 'after the tests'] : [],
 		current: false
-	});
+	};
 
 	const groups: StepGroup[] = [
 		{ id: 'start', label: 'Start', cards: [startCard] },
@@ -149,7 +155,8 @@ export function pipelineModel(detail: HarnessRunDetail, now = Date.now()): Pipel
 			agentCard('code_check', 'code_check', implement, detail.agentRuns, ['code_reviewer'], false, 'after Build')
 		] },
 		{ id: 'test', label: 'Test', cards: [testCard, fixCard] },
-		{ id: 'handoff', label: 'Hand-off', cards: handOff }
+		{ id: 'review', label: 'Review', cards: [reviewCard] },
+		{ id: 'handoff', label: 'Hand-off', cards: [draftCard] }
 	];
 
 	// The current step: the first waiting or working one, else the first not done.

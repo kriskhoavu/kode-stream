@@ -187,6 +187,16 @@
 .session-harness-round.active { border-color: color-mix(in srgb, var(--button-accent) 60%, var(--line)); background: color-mix(in srgb, var(--button-accent) 8%, var(--panel)); color: var(--text); }
 .session-harness-round .hx-swatch { width: 8px; height: 8px; border-radius: 50%; }
 
+/* ── Harness detail: Review, the person's own session ───────────────────── */
+
+.session-harness-review { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.session-harness-review-head { display: grid; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.session-harness-review-head .hx-gate { margin: 0; }
+.session-harness-review-session { display: flex; flex: 1; flex-direction: column; gap: 10px; min-height: 0; padding: 12px 20px 16px; }
+.session-harness-review-session .session-browser-terminal { flex: 1; min-height: 320px; }
+.session-harness-review-note { margin: 0; color: var(--muted); font-size: 12.5px; }
+.session-harness-review > .session-harness-review-note { padding: 16px 20px; }
+
 /* ── Harness detail: the conversation ──────────────────────────────────── */
 
 .session-harness-conversation { flex: 1; min-height: 0; padding: 16px 20px 24px; }

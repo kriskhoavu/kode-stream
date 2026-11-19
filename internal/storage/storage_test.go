@@ -118,7 +118,7 @@ func TestOpenAppOwnedStateRunsSQLiteMigrations(t *testing.T) {
 	if !health.OK {
 		t.Fatalf("health = %#v", health)
 	}
-	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 12 {
+	if health.Driver != StorageDriverSQLite || health.MigrationVersion != 13 {
 		t.Fatalf("health = %#v, want sqlite version 12", health)
 	}
 	for _, table := range []string{"workspaces", "branch_scans", "indexed_items", "import_status", "canvas_layouts", "canvas_placements", "ai_session_records", "harness_tasks", "harness_events", "harness_settings"} {
@@ -170,7 +170,7 @@ func TestSQLiteOwnershipMigrationsUpgradeExistingSchemaWithoutReset(t *testing.T
 			t.Fatal(err)
 		}
 	}
-	if version, err := ensureMigrations(context.Background(), db, StorageDriverSQLite, "auto", migrations); err != nil || version != 12 {
+	if version, err := ensureMigrations(context.Background(), db, StorageDriverSQLite, "auto", migrations); err != nil || version != 13 {
 		t.Fatalf("upgrade version=%d err=%v", version, err)
 	}
 	var owner string
@@ -1351,4 +1351,35 @@ func databaseEnv(key string) string {
 
 func mapEnv(values map[string]string) func(string) string {
 	return func(key string) string { return values[key] }
+}
+
+func TestSQLiteReviewMigrationRenamesThePullRequestApproval(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "review.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	migrations := sqliteMigrations()
+	if _, err := ensureMigrations(context.Background(), db, StorageDriverSQLite, "auto", migrations[:12]); err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range []string{
+		`INSERT INTO harness_runs (id, task_id, workspace_id, state, revision, data_json, started_at) VALUES ('run', 'task', 'ws', 'running', 1, '{"id":"run","currentStageKind":"pr_approval"}', '2026-01-01T00:00:00Z')`,
+		`INSERT INTO harness_stages (id, run_id, kind, ordinal, state, revision, data_json, created_at) VALUES ('stage', 'run', 'pr_approval', 5, 'awaiting_approval', 1, '{"id":"stage","kind":"pr_approval"}', '2026-01-01T00:00:00Z')`,
+		`INSERT INTO harness_approvals (id, run_id, task_id, stage_id, gate, state, revision, requested_at, data_json) VALUES ('approval', 'run', 'task', 'stage', 'draft_pr', 'requested', 1, '2026-01-01T00:00:00Z', '{"id":"approval","gate":"draft_pr"}')`,
+	} {
+		if _, err := db.Exec(statement); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := ensureMigrations(context.Background(), db, StorageDriverSQLite, "auto", migrations); err != nil {
+		t.Fatal(err)
+	}
+	var run, kind, stage, gate, approval string
+	if err := db.QueryRow(`SELECT r.data_json, s.kind, s.data_json, a.gate, a.data_json FROM harness_runs r, harness_stages s, harness_approvals a`).Scan(&run, &kind, &stage, &gate, &approval); err != nil {
+		t.Fatal(err)
+	}
+	if kind != "review" || gate != "review" || !strings.Contains(run, `"currentStageKind":"review"`) || !strings.Contains(stage, `"kind":"review"`) || !strings.Contains(approval, `"gate":"review"`) {
+		t.Fatalf("run=%s kind=%s stage=%s gate=%s approval=%s", run, kind, stage, gate, approval)
+	}
 }

@@ -607,6 +607,10 @@ DELETE FROM scan_warnings WHERE workspace_id NOT IN (SELECT id FROM workspaces);
 		Version: 12,
 		Name:    "harness_core",
 		SQL:     harnessCoreDDL("INTEGER PRIMARY KEY AUTOINCREMENT", "REAL", "INTEGER"),
+	}, {
+		Version: 13,
+		Name:    "harness_review_stage",
+		SQL:     harnessReviewStageSQL,
 	}}
 }
 
@@ -622,9 +626,16 @@ func postgresMigrations() []Migration {
 		{Version: 9, Name: "cloud_agent_enrollment_tokens", SQL: `CREATE TABLE IF NOT EXISTS cloud_agent_enrollment_tokens (id TEXT PRIMARY KEY, expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ NOT NULL);`},
 		{Version: 10, Name: "cloud_workspace_publication_revisions", SQL: `ALTER TABLE cloud_workspaces ADD COLUMN IF NOT EXISTS publication_revision BIGINT NOT NULL DEFAULT 0;`},
 		{Version: 11, Name: "canvas_terminal_dimensions", SQL: `ALTER TABLE canvas_placements ADD COLUMN IF NOT EXISTS width DOUBLE PRECISION; ALTER TABLE canvas_placements ADD COLUMN IF NOT EXISTS height DOUBLE PRECISION;`},
-		{Version: 12, Name: "harness_core", SQL: harnessCoreDDL("BIGSERIAL PRIMARY KEY", "DOUBLE PRECISION", "BIGINT")}}
+		{Version: 12, Name: "harness_core", SQL: harnessCoreDDL("BIGSERIAL PRIMARY KEY", "DOUBLE PRECISION", "BIGINT")},
+		{Version: 13, Name: "harness_review_stage", SQL: harnessReviewStageSQL}}
 
 }
+
+// harnessReviewStageSQL renames the pull request approval to Review: its
+// stage kind, its gate and a run that waits at it.
+const harnessReviewStageSQL = `UPDATE harness_stages SET kind = 'review', data_json = REPLACE(data_json, '"kind":"pr_approval"', '"kind":"review"') WHERE kind = 'pr_approval';
+UPDATE harness_approvals SET gate = 'review', data_json = REPLACE(data_json, '"gate":"draft_pr"', '"gate":"review"') WHERE gate = 'draft_pr';
+UPDATE harness_runs SET data_json = REPLACE(data_json, '"currentStageKind":"pr_approval"', '"currentStageKind":"review"') WHERE data_json LIKE '%"currentStageKind":"pr_approval"%';`
 
 const postgresAppOwnedStateDDL = `CREATE TABLE IF NOT EXISTS workspaces (
 id TEXT PRIMARY KEY, name TEXT NOT NULL, path_label TEXT NOT NULL, baseline_branch TEXT NOT NULL,

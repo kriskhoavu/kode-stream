@@ -15,7 +15,7 @@ lastVerified: 2026-11-07
 <!-- chunkId: platform-harness-what-it-does -->
 <!-- keywords: harness, planner, builder, reviewer, draft pull request -->
 
-[live] The harness turns issues into draft pull requests: scouts fill a ranked queue, a person starts a task, and an orchestrator moves its run through plan, plan approval, build, test and draft pull request. Evidence: `internal/harness/domain/transitions.go:44`, `internal/harness/work.go:79`.
+[live] The harness turns issues into draft pull requests: scouts fill a ranked queue, a person starts a task, and an orchestrator moves its run through plan, plan approval, build, test, review and draft pull request. Evidence: `internal/harness/domain/transitions.go:153`, `internal/harness/work.go:79`.
 
 Each role is a coding CLI run headless in the run's own git worktree: the planner and plan checker, the builder and code checker, and the tester. Claude Code is the default; Codex and OpenCode run the same roles through the same port. The harness has no model runtime of its own.
 
@@ -31,13 +31,15 @@ Each role is a coding CLI run headless in the run's own git worktree: the planne
 
 [live] Work starts only when a person presses Start, unless `autoStart` is on, and a plan reaches the builder only after a person approves it; a blocked run resumes only on a person's approval. Evidence: `internal/harness/queue.go:211`, `internal/harness/approvals.go:42`.
 
+[live] A run whose tests passed waits at Review, unless the settings turn `requireReview` off; it is on by default. There the person opens a session of their own in the run's worktree, from the ticket's Review step in Agent Space, tries the change and edits it. Then they decide: **Hand off** commits what they changed and opens the draft pull request, after running the tests again if anything changed since they passed; **Back to Build** and **Back to Plan** send their words to the Builder or the Planner as a must-fix finding, and the run comes back to Review once its tests pass again. Evidence: `internal/harness/approvals.go:510`, `internal/harness/approvals.go:544`.
+
 A gate can be decided on the Workstream board or from Webex through chat-bot; the decision records its channel and who made it, and the same idempotency key always returns the same decision. See [[platform-harness-bot-contract]].
 
 ## What It Will Not Do
 <!-- chunkId: platform-harness-boundaries -->
 <!-- keywords: never commit, baseline, transcript, budget, datadir -->
 
-[live] Agents never commit, push or switch branches; the harness commits on `harness/*` branches only, after an approved plan, an approved build, and passing tests. Evidence: `internal/harness/domain/settings.go:149`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:70`.
+[live] Agents never commit, push or switch branches; the harness commits on `harness/*` branches only, after an approved plan, an approved build, passing tests, and a Review decision, which commits what the person changed in their session. Evidence: `internal/harness/domain/settings.go:149`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:70`.
 
 [live] No prompt, brief or transcript is stored; an agent run keeps its usage, cost, bounded report and the path of the CLI's transcript. Evidence: `internal/harness/work.go:262`.
 

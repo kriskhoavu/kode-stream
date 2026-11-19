@@ -148,19 +148,19 @@ func AgentTerminal(state AgentRunState) bool {
 	return state == AgentSucceeded || state == AgentFailed || state == AgentCancelled
 }
 
-// StageSequence is the order stages are created in. pr_approval is skipped
-// unless the settings require it.
-func StageSequence(requirePRApproval bool) []StageKind {
+// StageSequence is the order stages are created in. Review is skipped
+// when the settings turn it off.
+func StageSequence(requireReview bool) []StageKind {
 	sequence := []StageKind{StagePlan, StagePlanApproval, StageImplement, StageQA}
-	if requirePRApproval {
-		sequence = append(sequence, StagePRApproval)
+	if requireReview {
+		sequence = append(sequence, StageReview)
 	}
 	return append(sequence, StageDraftPR)
 }
 
 // NextStage returns the kind after current, or "" when current is the last.
-func NextStage(current StageKind, requirePRApproval bool) StageKind {
-	sequence := StageSequence(requirePRApproval)
+func NextStage(current StageKind, requireReview bool) StageKind {
+	sequence := StageSequence(requireReview)
 	for i, kind := range sequence {
 		if kind == current && i+1 < len(sequence) {
 			return sequence[i+1]

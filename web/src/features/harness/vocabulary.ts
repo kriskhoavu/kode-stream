@@ -41,7 +41,7 @@ export const hxStatuses: Record<HxStatus, { label: string; tone: HxTone; icon: L
 };
 
 /** Stage words. Plan check, Code check and Fix are the reviewer and fixer halves of their stage. */
-export type HxStep = 'start' | 'plan' | 'plan_check' | 'approval' | 'build' | 'code_check' | 'test' | 'fix' | 'pr_approval' | 'draft_pr';
+export type HxStep = 'start' | 'plan' | 'plan_check' | 'approval' | 'build' | 'code_check' | 'test' | 'fix' | 'review' | 'draft_pr';
 
 export const hxSteps: Record<HxStep, { label: string; explain: string }> = {
 	start: { label: 'Start', explain: 'A person said this task may begin. Nothing runs before that.' },
@@ -52,7 +52,7 @@ export const hxSteps: Record<HxStep, { label: string; explain: string }> = {
 	code_check: { label: 'Code check', explain: 'The Checker reads the change and lists must-fix items. The Builder fixes them, up to 3 rounds.' },
 	test: { label: 'Test', explain: "The project's own tests run twice. Both runs must pass, so a flaky result is caught." },
 	fix: { label: 'Fix', explain: 'If a test fails, the Builder gets the failure and fixes it, up to 2 rounds.' },
-	pr_approval: { label: 'Your approval', explain: 'A person agrees before the branch leaves this machine.' },
+	review: { label: 'Your review', explain: 'You try the change in a session of your own, in the run\'s worktree. Then you hand it off, or send it back to Build or Plan with what to change.' },
 	draft_pr: { label: 'Draft pull request', explain: 'The branch is pushed and a draft pull request opens for a person to review. Nothing merges on its own.' }
 };
 
@@ -61,7 +61,7 @@ export const stageKindLabels: Record<HarnessStageKind, string> = {
 	plan_approval: 'Your approval',
 	implement: 'Build',
 	qa: 'Test',
-	pr_approval: 'Your approval',
+	review: 'Your review',
 	draft_pr: 'Draft pull request'
 };
 
@@ -71,7 +71,7 @@ export const stageKindWhere: Record<HarnessStageKind, string> = {
 	plan_approval: 'at your plan approval',
 	implement: 'while building',
 	qa: 'while testing',
-	pr_approval: 'at your pull request approval',
+	review: 'at your review',
 	draft_pr: 'while opening the draft pull request'
 };
 
@@ -81,7 +81,7 @@ export const stageKindDoing: Record<HarnessStageKind, string> = {
 	plan_approval: 'Waiting for your approval',
 	implement: 'Building',
 	qa: 'Testing',
-	pr_approval: 'Waiting for your approval',
+	review: 'Waiting for your review',
 	draft_pr: 'Opening the draft pull request'
 };
 
@@ -116,7 +116,7 @@ export const gateTitles: Record<HarnessApprovalGate, string> = {
 	start: 'start work on',
 	plan: 'approve the plan for',
 	resume: 'decide how to continue',
-	draft_pr: 'open a draft pull request for',
+	review: 'review',
 	question: 'answer a question on'
 };
 

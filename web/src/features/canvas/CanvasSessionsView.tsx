@@ -54,7 +54,7 @@ export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch,
 	return <div className="canvas-work-area canvas-sessions-view">
 {error && <div className="canvas-state error" role="alert">{error}<button type="button" onClick={() => setReloadToken((token) => token + 1)}>Retry</button></div>}
 		{!error && !records && <div className="canvas-state" role="status">Loading sessions…</div>}
-		{!error && records && <SessionBrowser rows={rows} harness={harness.rows} renderHarnessDetail={(row) => <HarnessSessionDetail row={row} client={harness.controller.client} onOpenRun={onOpenHarnessRun} onStopRun={harness.controller.cancelRun} />} grouping="plan" persistKey={`workbench:${workspaceId}`} onStop={stop} onRemove={remove} onReload={onReload} onOpenOnBoard={(row) => onOpenOnBoard(row.record.id)} onOpenOnCard={onOpenOnCard ? (row) => { if (row.record.planRef) onOpenOnCard(row.record.planRef.itemId, row.record.id); } : undefined} emptyMessage="No sessions for this workspace and branch." />}
+		{!error && records && <SessionBrowser rows={rows} harness={harness.rows} renderHarnessDetail={(row) => <HarnessSessionDetail row={row} client={harness.controller.client} onOpenRun={onOpenHarnessRun} onStopRun={harness.controller.cancelRun} decide={{ approve: harness.controller.approve, reject: harness.controller.reject, decisions: harness.controller.state.decisions }} />} grouping="plan" persistKey={`workbench:${workspaceId}`} onStop={stop} onRemove={remove} onReload={onReload} onOpenOnBoard={(row) => onOpenOnBoard(row.record.id)} onOpenOnCard={onOpenOnCard ? (row) => { if (row.record.planRef) onOpenOnCard(row.record.planRef.itemId, row.record.id); } : undefined} emptyMessage="No sessions for this workspace and branch." />}
 	</div>;
 }
 

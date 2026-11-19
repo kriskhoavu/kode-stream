@@ -17,6 +17,8 @@ type Decision string
 const (
 	DecisionApprove Decision = "approve"
 	DecisionReject  Decision = "reject"
+	// DecisionReplan answers Review only: it sends the change back to Plan.
+	DecisionReplan Decision = "replan"
 )
 
 type DecideInput struct {
@@ -29,6 +31,10 @@ type DecideInput struct {
 	RequestID        string
 	Actor            domain.Actor
 	Channel          domain.Channel
+
+	// head is the run's commit once a Review decision committed the
+	// reviewer's own changes; set by Decide, never by a caller.
+	head string
 }
 
 // AlreadyDecidedError carries the approval as it was decided.
@@ -49,10 +55,10 @@ func (s *Service) Decide(ctx context.Context, approvalID string, input DecideInp
 	if input.IdempotencyKey == "" || len(input.IdempotencyKey) > 200 {
 		return domain.Approval{}, domain.Invalid("idempotencyKey is required and at most 200 characters")
 	}
-	if input.Decision != DecisionApprove && input.Decision != DecisionReject {
-		return domain.Approval{}, domain.Invalid("decision must be approve or reject")
+	if input.Decision != DecisionApprove && input.Decision != DecisionReject && input.Decision != DecisionReplan {
+		return domain.Approval{}, domain.Invalid("decision must be approve, reject or replan")
 	}
-	if input.Decision == DecisionReject && input.Reason == "" {
+	if input.Decision != DecisionApprove && input.Reason == "" {
 		return domain.Approval{}, domain.Invalid("a reason is required to ask for changes")
 	}
 	// A question gate's approval is the answer itself; it is checked once the
@@ -69,6 +75,7 @@ func (s *Service) Decide(ctx context.Context, approvalID string, input DecideInp
 		return recorded, nil
 	}
 	settings := s.settingsNow(ctx)
+	input.head = s.commitReview(ctx, approvalID)
 	var decided domain.Approval
 	err := s.atomic(ctx, func(tx domain.Repository, record func(domain.Event) error) error {
 		approval, err := tx.GetApproval(ctx, approvalID)
@@ -83,8 +90,11 @@ func (s *Service) Decide(ctx context.Context, approvalID string, input DecideInp
 		}
 		expect := domain.Expect{State: string(approval.State), Revision: approval.Revision}
 		now := s.now()
+		if input.Decision == DecisionReplan && approval.Gate != domain.GateReview {
+			return domain.Invalid("replan answers Review only")
+		}
 		approval.State = domain.ApprovalApproved
-		if input.Decision == DecisionReject {
+		if input.Decision != DecisionApprove {
 			approval.State = domain.ApprovalRejected
 		}
 		actor := input.Actor
@@ -159,7 +169,13 @@ func (s *Service) applyDecision(ctx context.Context, tx domain.Repository, recor
 		st.enqueue(role, false)
 		st.event(domain.EventStageRound, st.stage.ID, map[string]any{"kind": st.stage.Kind, "round": st.stage.Round, "answered": true, "role": role})
 		return st.save()
-	case domain.GatePlan, domain.GateDraftPR:
+	case domain.GateReview:
+		if st.stage.State != domain.StageAwaitingApproval || st.run.State != domain.RunRunning {
+			return domain.IllegalTransitionError{Entity: "stage", From: string(st.stage.State), To: "decided"}
+		}
+		st.task.NeedsYou = false
+		return s.applyReview(st, input)
+	case domain.GatePlan:
 		if st.stage.State != domain.StageAwaitingApproval || st.run.State != domain.RunRunning {
 			return domain.IllegalTransitionError{Entity: "stage", From: string(st.stage.State), To: "decided"}
 		}
@@ -199,13 +215,10 @@ func (s *Service) applyDecision(ctx context.Context, tx domain.Repository, recor
 }
 
 // retryKind is the stage a resume starts again: a rejected plan approval
-// goes back to planning, a rejected PR approval back to testing.
+// goes back to planning.
 func retryKind(kind domain.StageKind) domain.StageKind {
-	switch kind {
-	case domain.StagePlanApproval:
+	if kind == domain.StagePlanApproval {
 		return domain.StagePlan
-	case domain.StagePRApproval:
-		return domain.StageQA
 	}
 	return kind
 }
@@ -489,4 +502,115 @@ func (s *Service) Plan(ctx context.Context, runID string) (RunPlan, error) {
 	}
 	plan.Files, plan.From = files, from
 	return plan, nil
+}
+
+// commitReview commits what a person changed in the run's worktree during
+// Review, before any decision on it, so a handed-off change carries it and
+// a builder sent back starts from it. It returns the run's commit after.
+func (s *Service) commitReview(ctx context.Context, approvalID string) string {
+	approval, err := s.repository.GetApproval(ctx, approvalID)
+	if err != nil || approval.Gate != domain.GateReview || approval.State != domain.ApprovalRequested {
+		return ""
+	}
+	run, err := s.repository.GetRun(ctx, approval.RunID)
+	if err != nil {
+		return ""
+	}
+	if commit, err := s.commitRun(ctx, run, "Apply the review of "); err != nil {
+		log.Printf("harness: commit the review of run %s: %v", run.ID, err)
+	} else if commit != "" {
+		s.record(ctx, run, "harness.commit", models.AuditStatusSuccess, "Committed the changes made in Review", nil)
+	}
+	return s.head(ctx, run)
+}
+
+// head is the commit a run's worktree is at, or "" when it is unknown.
+func (s *Service) head(ctx context.Context, run domain.Run) string {
+	if s.worktrees == nil || run.WorktreePath == "" {
+		return ""
+	}
+	head, err := s.worktrees.Head(ctx, run.WorktreePath)
+	if err != nil {
+		return ""
+	}
+	return head
+}
+
+// applyReview applies a person's Review decision. A hand-off goes on to the
+// draft pull request, through the tests again when the change moved after
+// they passed. Reject sends the change back to Build, replan back to Plan,
+// each with the reviewer's words as a blocking finding; both come back to
+// Review once their tests pass.
+func (s *Service) applyReview(st *step, input DecideInput) error {
+	if input.Decision == DecisionApprove {
+		tested := ""
+		if stages, err := st.tx.ListStages(st.ctx, st.run.ID); err == nil {
+			for _, stage := range stages {
+				if stage.Kind == domain.StageQA && stage.LastGate != nil && stage.LastGate.Passed {
+					tested = stage.LastGate.Head
+				}
+			}
+		}
+		if input.head == tested {
+			st.pass()
+			return st.save()
+		}
+		st.close()
+		retest := domain.NewStage(st.run.ID, domain.StageQA, st.stage.Ordinal+1)
+		retest.Reviewed = true
+		st.enter(&retest)
+		st.newStages = append(st.newStages, retest)
+		return st.save()
+	}
+	kind, where := domain.StageImplement, "Build"
+	if input.Decision == DecisionReplan {
+		kind, where = domain.StagePlan, "Plan"
+	}
+	st.stage.Findings = append(st.stage.Findings, domain.Finding{Severity: "advisory", Title: "Sent back to " + where + " by " + nonEmptyName(input.Actor), Detail: input.Reason})
+	st.close()
+	again := domain.NewStage(st.run.ID, kind, st.stage.Ordinal+1)
+	again.Findings = []domain.Finding{{Severity: "blocking", Title: "Asked in Review by " + nonEmptyName(input.Actor), Detail: input.Reason}}
+	st.enter(&again)
+	st.newStages = append(st.newStages, again)
+	st.event(domain.EventStageRound, st.stage.ID, map[string]any{"kind": st.stage.Kind, "sentBackTo": kind})
+	return st.save()
+}
+
+// ReviewTarget is where a person's Review session runs: the run's own
+// worktree, on its branch, with a brief that says what they are looking at.
+type ReviewTarget struct {
+	WorkspaceID string
+	Dir         string
+	Branch      string
+	Prompt      string
+}
+
+// ReviewSession names the worktree of a run waiting at Review. A run at any
+// other stage, or without a worktree, has none.
+func (s *Service) ReviewSession(ctx context.Context, runID string) (ReviewTarget, error) {
+	if !s.Supported() {
+		return ReviewTarget{}, domain.ErrNotFound
+	}
+	run, err := s.repository.GetRun(ctx, runID)
+	if err != nil {
+		return ReviewTarget{}, err
+	}
+	if run.State != domain.RunRunning || run.CurrentStageKind != domain.StageReview {
+		return ReviewTarget{}, domain.IllegalTransitionError{Entity: "run", From: string(run.CurrentStageKind), To: "review session"}
+	}
+	if run.WorktreePath == "" || run.WorktreeRemoved {
+		return ReviewTarget{}, domain.Invalid("this run has no worktree left to open")
+	}
+	task, err := s.repository.GetTask(ctx, run.TaskID)
+	if err != nil {
+		return ReviewTarget{}, err
+	}
+	var prompt strings.Builder
+	prompt.WriteString("You are helping a person review a change the harness made for " + task.Source.Key + ": " + task.Title + ".\n")
+	prompt.WriteString("This folder is the run's own worktree, on branch " + run.Branch + ". The change passed its tests.\n")
+	if run.PlanPath != "" {
+		prompt.WriteString("The approved plan is " + run.PlanPath + ".\n")
+	}
+	prompt.WriteString("Start by summarising what changed (git log and git diff against the base). Then help the person try it and make the changes they ask for. Do not push. The harness commits what is left when the person hands the change off.")
+	return ReviewTarget{WorkspaceID: run.WorkspaceID, Dir: run.WorktreePath, Branch: run.Branch, Prompt: prompt.String()}, nil
 }

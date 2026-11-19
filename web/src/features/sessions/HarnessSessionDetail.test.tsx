@@ -1,11 +1,18 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { HarnessAgentRun, HarnessRun, HarnessRunDetail, HarnessStage, HarnessTask } from '../../lib/types';
+import type { HarnessAgentRun, HarnessApproval, HarnessRun, HarnessRunDetail, HarnessStage, HarnessTask } from '../../lib/types';
 import type { HarnessClient } from '../harness/harnessClient';
 import type { HarnessSessionRow } from './agentSessions';
 import { HarnessSessionDetail } from './HarnessSessionDetail';
 
 vi.mock('./SessionChangesPanel', () => ({ SessionChangesPanel: () => <div data-testid="mock-changes" /> }));
+vi.mock('./SessionBrowserTerminal', () => ({ SessionBrowserTerminal: ({ record }: { record: { id: string } }) => <div data-testid="mock-terminal">{record.id}</div> }));
+const apiMock = vi.hoisted(() => ({
+	aiSessionRecords: vi.fn(),
+	aiSettings: vi.fn(),
+	startHarnessReviewSession: vi.fn()
+}));
+vi.mock('../../shared/api', () => ({ api: apiMock }));
 
 const minute = (n: number) => new Date(Date.parse('2026-01-01T00:00:00Z') + n * 60_000).toISOString();
 const run = { id: 'run-1', taskId: 'task-1', workspaceId: 'workspace-1', branch: 'harness/DI-7-1', state: 'running', startedAt: minute(0), revision: 3 } as unknown as HarnessRun;
@@ -50,6 +57,31 @@ describe('HarnessSessionDetail', () => {
 		fireEvent.click(stepButton('Test'));
 		expect(screen.getByText(/Test has no agent conversation in this run/)).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'Conversation' })).not.toBeInTheDocument();
+	});
+});
+
+describe('HarnessSessionDetail at Review', () => {
+	it('opens on Review, starts a session in the run worktree, and sends the decisions', async () => {
+		const reviewStage = { ...stage('s-review', 'review', 5, 'awaiting_approval') } as HarnessStage;
+		const waiting = { id: 'ap-review', runId: 'run-1', taskId: 'task-1', stageId: 's-review', gate: 'review', state: 'requested', requestedAt: minute(9), revision: 1 } as HarnessApproval;
+		const atReview = { ...detail, run: { ...run, currentStage: reviewStage }, stages: [...detail.stages, reviewStage], approvals: [waiting] } as unknown as HarnessRunDetail;
+		const record = { id: 'review-session', workspaceId: 'workspace-1', provider: 'claude', intent: 'harness_review', requestedBranch: 'harness/DI-7-1', state: 'running', startedAt: minute(10), lastKnownAt: minute(10), live: true };
+		apiMock.aiSessionRecords.mockResolvedValue([]);
+		apiMock.aiSettings.mockResolvedValue({ defaultProvider: 'claude' });
+		apiMock.startHarnessReviewSession.mockResolvedValue({ record });
+		const decide = { approve: vi.fn(), reject: vi.fn(), decisions: {} };
+		const client = { agentRunTranscript: vi.fn().mockResolvedValue({ turns: [] }) } as unknown as HarnessClient;
+		render(<HarnessSessionDetail row={{ key: 'DI-7', task, runs: [atReview] }} client={client} decide={decide} />);
+
+		expect(stepButton('Your review')).toHaveAttribute('aria-pressed', 'true');
+		await waitFor(() => expect(apiMock.aiSessionRecords).toHaveBeenCalledWith('workspace-1', 'harness/DI-7-1', expect.anything()));
+		fireEvent.click(screen.getByRole('button', { name: 'Try it in a session' }));
+		await waitFor(() => expect(screen.getByTestId('mock-terminal')).toHaveTextContent('review-session'));
+		expect(apiMock.startHarnessReviewSession).toHaveBeenCalledWith('run-1', expect.objectContaining({ provider: 'claude' }));
+		expect(screen.queryByRole('button', { name: /in a session/ })).not.toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole('button', { name: 'Hand off' }));
+		expect(decide.approve).toHaveBeenCalledWith(waiting, undefined);
 	});
 });
 

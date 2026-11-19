@@ -42,7 +42,7 @@ The harness runs as one replica. SQLite has one connection, so code inside a tra
 
 ## Stages
 <!-- chunkId: platform-harness-reference-stages -->
-<!-- keywords: review rounds, gate, qa twice, draft pr, resume -->
+<!-- keywords: review rounds, gate, qa twice, review, hand off, draft pr, resume -->
 
 [live] A producer's report that is `blocked` or lists `open` questions stops its round at a `question` gate when the question gate is on: the stage waits in its round, the card and the "Needs you" strip on the board show what the agent asks, and the person's answer sends the same role out again with the questions and the answer in its brief; a rejection cancels the run. With the gate off, a blocked report blocks the run and open questions ride along onto the plan gate. The gate is on unless the settings, the workspace or the task says otherwise, the task's word winning. Evidence: `internal/harness/pipeline.go:208`, `internal/harness/domain/settings.go:132`.
 
@@ -51,6 +51,8 @@ The harness runs as one replica. SQLite has one connection, so code inside a tra
 [live] After each builder and tester run the harness reverts paths outside the scope, then runs the verification commands itself; a failing gate sends the builder back with the end of the log. Evidence: `internal/harness/build.go:56`, `internal/harness/build.go:89`.
 
 [live] QA runs the verification and the runtime's smoke check twice; both must pass, with at most two tester rounds. The draft PR stage pushes the local `harness/<key>-<run>` branch as `feature/<key>-<run>`, the name branch hooks such as `feature/[A-Z0-9]+-\d+-.+` accept, and opens a draft pull request from it on GitHub or Bitbucket, retrying a minute apart. Evidence: `internal/harness/stages.go:82`, `internal/harness/stages.go:170`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:22`.
+
+[live] Review follows QA when `requireReview` is on, the default. Its `review` gate takes `approve` (hand off), `reject` (back to Build) or `replan` (back to Plan); the last two need a reason. Any decision first commits what is uncommitted in the worktree as `Apply the review of …`. A hand-off goes straight to the draft PR when the run's commit is the one QA last verified (QA records it as `lastGate.head`), and otherwise through a QA stage marked `reviewed`, whose pass goes on to the draft PR. Back to Build or Plan starts a new stage of that kind carrying the reason as a blocking finding, and the run comes back to Review. `POST /api/harness/runs/{id}/review-session` starts a person's embedded session in the worktree of a run at Review, on its branch, with intent `harness_review`; any other run is refused. Evidence: `internal/harness/approvals.go:510`, `internal/harness/approvals.go:544`, `internal/harness/stages.go:106`, `internal/server/api/harness_controller.go:447`.
 
 [live] A passed run's worktree is removed at once; a cancelled or failed run keeps its worktree for `retentionDays` and its branch after that. Evidence: `internal/harness/stages.go:283`.
 

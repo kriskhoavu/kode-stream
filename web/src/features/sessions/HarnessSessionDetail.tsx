@@ -12,6 +12,8 @@ import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, hxSteps, plural
 import type { HxStep } from '../harness/vocabulary';
 import '../harness/harness.css';
 import { readableTurns } from './agentSessions';
+import { HarnessReviewPanel } from './HarnessReviewPanel';
+import type { ReviewDecide } from './HarnessReviewPanel';
 import type { HarnessSessionRow } from './agentSessions';
 import { SessionKindTag, focusAgent, harnessAgentLabel, harnessGlyph, harnessRunGlyph, startedAgents } from './SessionCard';
 import { SessionChangesPanel } from './SessionChangesPanel';
@@ -29,13 +31,17 @@ type Pick = { step: HxStep; agentRunId?: string };
  * a step, its round chips pick one agent of that step, and the agent's
  * conversation shows below; so a ticket with many rounds stays one card in
  * the list. Agents run headless, so there is no terminal: steering happens on
- * the run page, through the run's questions and approvals.
+ * the run page, through the run's questions and approvals. Review is the
+ * exception: there a person opens a session of their own in the run's
+ * worktree, and decides from here.
  */
-export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
+export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun, decide }: {
 	row: HarnessSessionRow;
 	client: HarnessClient;
 	onOpenRun?: (runId: string) => void;
 	onStopRun?: (run: HarnessRun) => Promise<void>;
+	/** Sends Review's decisions; without it Review only shows what was decided. */
+	decide?: ReviewDecide;
 }) {
 	const { task } = row;
 	const [runId, setRunId] = useState<string>();
@@ -48,8 +54,10 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 	const agents = useMemo(() => startedAgents(detail), [detail]);
 	const model = useMemo(() => pipelineModel(detail), [detail]);
 	const picked = pick?.agentRunId ? agents.find((agentRun) => agentRun.id === pick.agentRunId) : undefined;
-	const agent: HarnessAgentRun | undefined = pick ? picked : focusAgent(detail);
-	const step = pick?.step ?? (agent ? roleSteps[agent.role] : undefined);
+	// A run waiting at Review opens there: the person's own session is what is in play.
+	const atReview = run.state === 'running' && run.currentStage?.kind === 'review';
+	const agent: HarnessAgentRun | undefined = pick ? picked : atReview ? undefined : focusAgent(detail);
+	const step: HxStep | undefined = pick?.step ?? (atReview ? 'review' : agent ? roleSteps[agent.role] : undefined);
 	const rounds = step ? agents.filter((agentRun) => roleSteps[agentRun.role] === step) : [];
 	const transcript = useAgentTranscript(client, agent);
 	const readable = useMemo(() => readableTurns(transcript.turns), [transcript.turns]);
@@ -109,9 +117,10 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 					setTab('conversation');
 				}}
 			/>
-			<p className="session-harness-hint">Click a step to read its agent&apos;s conversation. Questions and approvals are on the run page.</p>
+			<p className="session-harness-hint">Click a step to read its agent&apos;s conversation, or Your review to try the change yourself. Other questions and approvals are on the run page.</p>
 		</section>
-		<div className="session-harness-agent-bar">
+		{step === 'review' && <HarnessReviewPanel detail={detail} task={task} changes={changes} decide={decide} />}
+		{step !== 'review' && <div className="session-harness-agent-bar">
 			{agent
 				? <p className="session-harness-agent">
 					<strong>{`${agentRoleLabels[agent.role]} · round ${agent.round}`}</strong>
@@ -130,8 +139,8 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun }: {
 					</button>;
 				})}
 			</div>}
-		</div>
-		{agent && <>
+		</div>}
+		{step !== 'review' && agent && <>
 			<div className="hx-tabs session-browser-detail-tabs" role="tablist" aria-label="Session detail tabs">
 				<button type="button" role="tab" className={tab === 'conversation' ? 'on' : ''} aria-selected={tab === 'conversation'} onClick={() => setTab('conversation')}>Conversation</button>
 				<button type="button" role="tab" className={tab === 'changes' ? 'on' : ''} aria-selected={tab === 'changes'} onClick={() => setTab('changes')}>Changes</button>

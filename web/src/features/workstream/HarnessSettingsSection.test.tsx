@@ -10,7 +10,7 @@ describe('HarnessSettingsSection', () => {
 		vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
 			const url = String(input);
 			if (url === '/api/harness/status') return Promise.resolve({ ok: true, json: async () => status({ roles: [{ role: 'coder', paused: false, working: 0, slots: 1, queued: 0 }] }) });
-			if (url === '/api/harness/settings') return Promise.resolve({ ok: true, json: async () => ({ revision: 1, enabled: true, autoStart: false, requirePrApproval: true, askQuestions: true, slots: { scout: 1, sorter: 1, planner: 1, coder: 1, reviewer: 1, qa: 1 }, paused: {}, sources: [], modelPolicy: { planner: { engine: 'claudecode', model: 'opus', maxTurns: 1 }, plan_reviewer: { engine: 'claudecode', model: 'opus', maxTurns: 1 }, coder: { engine: 'claudecode', model: 'opus', maxTurns: 1 }, code_reviewer: { engine: 'claudecode', model: 'opus', maxTurns: 1 }, qa_fixer: { engine: 'claudecode', model: 'opus', maxTurns: 1 } } }) });
+			if (url === '/api/harness/settings') return Promise.resolve({ ok: true, json: async () => ({ revision: 1, enabled: true, autoStart: false, requireReview: true, askQuestions: true, slots: { scout: 1, sorter: 1, planner: 1, coder: 1, reviewer: 1, qa: 1 }, paused: {}, sources: [], modelPolicy: { planner: { engine: 'claudecode', model: 'opus', maxTurns: 1 }, plan_reviewer: { engine: 'claudecode', model: 'opus', maxTurns: 1 }, coder: { engine: 'claudecode', model: 'opus', maxTurns: 1 }, code_reviewer: { engine: 'claudecode', model: 'opus', maxTurns: 1 }, qa_fixer: { engine: 'claudecode', model: 'opus', maxTurns: 1 } } }) });
 			if (url === '/api/workspaces') return Promise.resolve({ ok: true, json: async () => [] });
 			return Promise.resolve({ ok: true, json: async () => ({}) });
 		}));

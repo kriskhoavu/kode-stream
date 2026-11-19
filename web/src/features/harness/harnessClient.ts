@@ -54,7 +54,7 @@ export interface HarnessClient {
 	/** The last turns of an agent run's transcript; polled while the agent works. */
 	agentRunTranscript(agentRunId: string, limit?: number, signal?: AbortSignal): Promise<HarnessTranscript>;
 	approve(approval: HarnessApproval, idempotencyKey: string, reason?: string): Promise<HarnessApproval | undefined>;
-	reject(approval: HarnessApproval, idempotencyKey: string, reason: string): Promise<HarnessApproval | undefined>;
+	reject(approval: HarnessApproval, idempotencyKey: string, reason: string, decision?: 'reject' | 'replan'): Promise<HarnessApproval | undefined>;
 	pin(task: HarnessTask, pinned: boolean): Promise<HarnessTask>;
 	setPriority(task: HarnessTask, input: { priorityOverride?: number; before?: string }): Promise<HarnessTask>;
 	/** Sets, for one task, whether its agents may stop and ask; null follows the workspace and the settings again. */
@@ -97,7 +97,7 @@ export const apiHarnessClient: HarnessClient = {
 	agentRun: (agentRunId, signal) => api.harnessAgentRun(agentRunId, signal),
 	agentRunTranscript: (agentRunId, limit, signal) => api.harnessAgentRunTranscript(agentRunId, limit, signal),
 	approve: (approval, key, reason) => api.approveHarnessGate(approval, key, reason),
-	reject: (approval, key, reason) => api.rejectHarnessGate(approval, key, reason),
+	reject: (approval, key, reason, decision) => api.rejectHarnessGate(approval, key, reason, decision),
 	pin: (task, pinned) => api.pinHarnessTask(task, pinned),
 	setPriority: (task, input) => api.setHarnessPriority(task, input),
 	start: (task, idempotencyKey) => api.startHarnessTask(task, idempotencyKey),
