@@ -1047,9 +1047,11 @@ export type HarnessStageKind = 'plan' | 'plan_approval' | 'implement' | 'qa' | '
 export type HarnessStageState = 'pending' | 'running' | 'awaiting_approval' | 'passed' | 'failed' | 'retry_wait' | 'cancelled' | 'skipped';
 export type HarnessAgentRole = 'planner' | 'plan_reviewer' | 'coder' | 'code_reviewer' | 'qa_fixer';
 export type HarnessAgentRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted';
-export type HarnessApprovalGate = 'start' | 'plan' | 'resume' | 'review' | 'question';
+/** `clarify` waits for a ticket's reporter, not for the person working on it. */
+export type HarnessApprovalGate = 'start' | 'plan' | 'resume' | 'review' | 'question' | 'clarify';
 export type HarnessApprovalState = 'requested' | 'approved' | 'rejected' | 'expired' | 'superseded';
-export type HarnessChannel = 'dashboard' | 'webex' | 'api';
+/** `source` is a decision the harness took on what the ticket said, such as its reporter replying. */
+export type HarnessChannel = 'dashboard' | 'webex' | 'api' | 'source';
 /** The orchestrator's loops a person can pause; `reviewer` covers plan and code review. */
 export type HarnessRoleId = 'scout' | 'sorter' | 'planner' | 'coder' | 'reviewer' | 'qa';
 export type HarnessEngineId = 'claudecode' | 'codex' | 'opencode';
@@ -1067,6 +1069,8 @@ export interface HarnessTaskSource {
   priority?: string;
   assignee?: string;
   updatedAt?: string;
+  /** Who opened the issue, where the source names them. */
+  reporter?: { name: string; mention?: string };
 }
 
 export interface HarnessTask {
@@ -1080,6 +1084,8 @@ export interface HarnessTask {
   priorityOverride: number;
   pinned: boolean;
   needsYou: boolean;
+  /** Who the run waits for at a clarify gate: the ticket's reporter, not you. */
+  waitingFor?: string;
   /** A person pressed Start; the next free Planner takes it. */
   startRequested?: boolean;
   /** This task's own answer to "may an agent stop and ask"; absent follows the workspace, then the settings. */
@@ -1208,7 +1214,7 @@ export interface HarnessApproval {
   summary?: string;
   /** What the next step usually takes, shown in the consequence sentence. */
   estimate?: { minMinutes?: number; maxMinutes?: number; costUsd?: number };
-  context?: { difficulty?: 'easy' | 'hard'; subtasks?: number; rounds?: number; blocking?: number; advisory?: number; costUsd?: number; durationMs?: number; verdict?: 'approve' | 'changes_requested'; questions?: string[]; role?: HarnessAgentRole };
+  context?: { difficulty?: 'easy' | 'hard'; subtasks?: number; rounds?: number; blocking?: number; advisory?: number; costUsd?: number; durationMs?: number; verdict?: 'approve' | 'changes_requested'; questions?: string[]; role?: HarnessAgentRole; reporter?: string; draft?: string };
 }
 
 /** The last turns of an agent run's own transcript, read from the coding tool's file when asked for. */
@@ -1296,6 +1302,10 @@ export interface HarnessSourceSettings {
   query: string;
   labels?: string[];
   tokenEnvVar?: string;
+  /** Jira only: whether a ticket in a ready status starts on its own and is first checked for enough context. Absent means on. */
+  checkReady?: boolean;
+  /** Jira only: the statuses that mean ready; empty means READY. */
+  readyStatuses?: string[];
   lastCheckedAt?: string;
   lastFound?: number;
   lastError?: string;

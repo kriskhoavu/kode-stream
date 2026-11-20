@@ -77,6 +77,24 @@ describe('HarnessSettings', () => {
 		expect(sources[3]).toMatchObject({ workspaceId: 'airship-docs', kind: 'jira', enabled: true });
 	});
 
+	it('starts ready Jira tickets on their own by default, with the statuses a workspace names', async () => {
+		const { client } = await setup('airship-docs', 'sources');
+		const form = await screen.findByRole('form', { name: 'Add a source' });
+		fireEvent.change(within(form).getByRole('combobox', { name: 'Look in' }), { target: { value: 'jira' } });
+		fireEvent.click(within(form).getByRole('button', { name: 'Add source' }));
+		const ready = screen.getByRole('switch', { name: 'Start ready tickets on their own' });
+		expect(ready).toBeChecked();
+		const statuses = screen.getByRole('textbox', { name: 'Ready statuses (comma separated)' });
+		expect(statuses).toHaveAttribute('placeholder', 'READY');
+		fireEvent.change(statuses, { target: { value: 'Ready, Ready for dev,' } });
+		expect(statuses).toHaveValue('Ready, Ready for dev,');
+		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved.'));
+		expect((await client.settings()).sources[3]).toMatchObject({ kind: 'jira', readyStatuses: ['Ready', 'Ready for dev'] });
+		fireEvent.click(ready);
+		expect(statuses).toBeDisabled();
+	});
+
 	it('refuses a second source of the same kind for one workspace, and offers Jira, GitHub and a local folder', async () => {
 		await setup('airship', 'sources');
 		const form = await screen.findByRole('form', { name: 'Add a source' });

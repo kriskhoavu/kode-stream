@@ -2599,3 +2599,71 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+/* A clarify gate waits for the ticket's reporter, and holds the comment to ask them. */
+.hx-gate-icon.reporter {
+	color: var(--hx-waiting);
+}
+
+.hx-gate-draft {
+	display: grid;
+	gap: 6px;
+	margin-top: 10px;
+	padding: 10px 12px;
+	border: 1px dashed color-mix(in srgb, var(--hx-waiting) 45%, var(--line));
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--hx-waiting) 6%, var(--panel));
+}
+
+.hx-gate-draft header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--muted);
+}
+
+.hx-gate-draft header span {
+	margin-right: auto;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+}
+
+.hx-gate-draft header .hx-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+.hx-gate-draft pre {
+	margin: 0;
+	max-height: 240px;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.45;
+	color: var(--text);
+}
+
+.hx-ready-check {
+	display: grid;
+	gap: 8px;
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+}
+
+.hx-ready-check .hx-field {
+	max-width: 360px;
+}
+
+.hx-ready-check p {
+	margin: 0;
+	font-size: 12.5px;
+}

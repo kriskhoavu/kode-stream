@@ -43,6 +43,8 @@ export function ByHandChip() {
  * name, which sounds like the plan itself stopped; the status and the stage otherwise.
  */
 export function badgeLabel(work: CardWork): string | undefined {
+	// The reporter's name says more than the stage: the Planner waits for them.
+	if (work.status === 'reporter' && work.task.waitingFor) return `Waiting for ${work.task.waitingFor}`;
 	if (!work.stageLabel) return undefined;
 	if (work.status === 'working') return work.stageLabel;
 	const kind = work.run?.currentStage?.kind;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Hand, MessageCircleQuestion, TriangleAlert } from 'lucide-react';
+import { Check, Copy, ExternalLink, Hand, MessageCircleQuestion, TriangleAlert } from 'lucide-react';
 import type { HarnessApproval, HarnessApprovalGate, HarnessTask } from '../../lib/types';
 import { useModalDialog } from '../../components/overlay';
 import type { SentDecision } from './harnessState';
@@ -15,8 +15,14 @@ export const gateWords: Record<HarnessApprovalGate, GateWords> = {
 	plan: { approve: 'Approve', reject: 'Ask for changes', askTitle: 'What should change?', askLabel: 'What should change?', askPlaceholder: 'Tell the Planner what to change. This is sent back with the plan.' },
 	resume: { approve: 'Retry', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task stays in the Task Queue as Stopped, and Start again begins a new run.', noteLink: 'Retry with a note', answerLabel: 'A note for the next try', answerPlaceholder: 'Optional. What to do differently this time. The agent reads it with the Checker\'s findings.', answerSubmit: 'Send and retry' },
 	review: { approve: 'Hand off', reject: 'Back to Build', askTitle: 'What should the Builder change?', askLabel: 'What should change?', askPlaceholder: 'Tell the Builder what to change. The change comes back to your review once its tests pass.', replan: { label: 'Back to Plan', title: 'What should the plan change?', placeholder: 'Tell the Planner what to change. You approve the new plan, the Builder follows it, and the change comes back to your review.' } },
+	clarify: { approve: 'Continue anyway', reject: 'Dismiss', askTitle: 'Why dismiss it?', askLabel: 'Reason', askPlaceholder: 'Say why. The run stops, and the task stays in the Task Queue as Stopped.', answerOnApprove: true, answerLabel: 'What the Planner should know', answerPlaceholder: 'Answer what you can. The Planner plans from your answer and the ticket, and stops waiting for the reporter.', answerSubmit: 'Send and continue' },
 	question: { approve: 'Answer and continue', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task stays in the Task Queue as Stopped, and Start again begins a new run.', answerOnApprove: true, answerLabel: 'Your answers', answerPlaceholder: 'Answer each question in a line or two. The agent continues from your answers and does not ask again.', answerSubmit: 'Send and continue' }
 };
+
+/** Who a clarify gate waits for. */
+export function reporterLabel(approval: HarnessApproval): string {
+	return approval.context?.reporter || 'the reporter';
+}
 
 function askerLabel(approval: HarnessApproval): string {
 	return approval.context?.role ? agentRoleLabels[approval.context.role] : 'Planner';
@@ -34,6 +40,7 @@ export function consequence(approval: HarnessApproval): string {
 		case 'review': return 'The tests passed twice. Try the change in a session of your own in its worktree, and change what you like. Hand off commits your changes, tests them again if there are any, and opens a draft pull request. Nothing merges on its own.';
 		case 'resume': return approval.summary ?? 'The harness stopped and cannot decide alone how to continue.';
 		case 'question': return `${approval.summary ?? `The ${askerLabel(approval)} stopped to ask you before going on.`} Nothing runs on this task until you answer.`;
+		case 'clarify': return `The Planner found the ticket does not say enough to plan from. ${approval.summary ?? ''} Post the comment below on the ticket: when ${reporterLabel(approval)} replies there, the Planner reads the reply and goes on. Kode Stream posts nothing.`.replace(/ {2,}/g, ' ');
 	}
 }
 
@@ -41,6 +48,7 @@ export function gateHeading(approval: HarnessApproval, task?: HarnessTask): stri
 	const name = task ? `${task.source.key} · ${task.title}` : 'this task';
 	if (approval.gate === 'resume') return `Waiting on you: ${name} is stuck`;
 	if (approval.gate === 'question') return `Waiting on you: the ${askerLabel(approval)} asks about ${name}`;
+	if (approval.gate === 'clarify') return `Waiting for ${reporterLabel(approval)}: ${name}`;
 	return `Waiting on you: ${gateTitles[approval.gate]} ${name}`;
 }
 
@@ -86,7 +94,8 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 
 	const context = approval.context;
 	const stuck = approval.gate === 'resume';
-	const asking = approval.gate === 'question';
+	const clarifying = approval.gate === 'clarify';
+	const asking = approval.gate === 'question' || clarifying;
 	const questions = context?.questions ?? [];
 	const facts = [
 		context?.blocking !== undefined ? `${context.blocking} must fix` : '',
@@ -98,18 +107,19 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 
 	return (
 		<article className={['hx-card', 'hx-gate', attention ? 'hx-gate-attention' : ''].filter(Boolean).join(' ')} aria-label={gateHeading(approval, task)}>
-			<div className="hx-gate-icon" aria-hidden="true">{stuck ? <TriangleAlert /> : asking ? <MessageCircleQuestion /> : <Hand />}</div>
+			<div className={clarifying ? 'hx-gate-icon reporter' : 'hx-gate-icon'} aria-hidden="true">{stuck ? <TriangleAlert /> : asking ? <MessageCircleQuestion /> : <Hand />}</div>
 			<div className="hx-gate-body">
 				<h3>{gateHeading(approval, task)}</h3>
 				<p>{consequence(approval)}</p>
 				{questions.length > 0 && (
 					<div className="hx-gate-questions">
 						{!asking && <p className="hx-muted">The {askerLabel(approval)} left these open and went on with its own best guess:</p>}
-						<ol aria-label={asking ? `What the ${askerLabel(approval)} asks` : `Open questions from the ${askerLabel(approval)}`}>
+						<ol aria-label={clarifying ? `Questions for ${reporterLabel(approval)}` : asking ? `What the ${askerLabel(approval)} asks` : `Open questions from the ${askerLabel(approval)}`}>
 							{questions.map((question, index) => <li key={index}>{question}</li>)}
 						</ol>
 					</div>
 				)}
+				{clarifying && context?.draft && <ClarifyDraft draft={context.draft} url={task?.source.url} />}
 				<div className="hx-gate-facts">
 					{context?.verdict === 'approve' && <HxStatusBadge status="done" label={approval.gate === 'plan' ? 'Plan check passed' : 'Checks passed'} />}
 					{stuck && <HxStatusBadge status="stopped" />}
@@ -203,5 +213,29 @@ export function GateDecisionDialog({ title, label, placeholder, submitLabel, que
 				</form>
 			</section>
 		</div>
+	);
+}
+
+/** The comment a person may post on the ticket to ask its reporter. Kode Stream never posts it. */
+function ClarifyDraft({ draft, url }: { draft: string; url?: string }) {
+	const [copied, setCopied] = useState<'yes' | 'no' | undefined>();
+	const copy = async () => {
+		try {
+			await navigator.clipboard.writeText(draft);
+			setCopied('yes');
+		} catch {
+			setCopied('no');
+		}
+	};
+	return (
+		<section className="hx-gate-draft" aria-label="Comment for the ticket">
+			<header>
+				<span>Comment for the ticket</span>
+				<button type="button" className="hx-link" onClick={() => void copy()}><Copy size={13} aria-hidden="true" />{copied === 'yes' ? 'Copied' : 'Copy'}</button>
+				{url && <a className="hx-link" href={url} target="_blank" rel="noreferrer"><ExternalLink size={13} aria-hidden="true" />Open the ticket</a>}
+			</header>
+			<pre>{draft}</pre>
+			{copied === 'no' && <p className="hx-muted" role="status">Copying is not allowed here. Select the text and copy it.</p>}
+		</section>
 	);
 }

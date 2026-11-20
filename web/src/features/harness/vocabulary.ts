@@ -1,4 +1,4 @@
-import { Check, CircleDashed, CircleDot, CircleX, Hand, LoaderCircle, OctagonX, SkipForward, UserCheck, Wrench } from 'lucide-react';
+import { Check, CircleDashed, CircleDot, CircleX, Hand, LoaderCircle, MessageCircleQuestion, OctagonX, SkipForward, UserCheck, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type {
 	HarnessAgentRole,
@@ -19,12 +19,12 @@ import type {
  * reaches them except through this module (raw ids go in tooltips only).
  */
 
-export type HxStatus = 'not_started' | 'up_next' | 'starting' | 'working' | 'waiting' | 'done' | 'needs_fix' | 'failed' | 'stopped' | 'skipped' | 'manual';
+export type HxStatus = 'not_started' | 'up_next' | 'starting' | 'working' | 'waiting' | 'reporter' | 'done' | 'needs_fix' | 'failed' | 'stopped' | 'skipped' | 'manual';
 
 /** Colour family of a status; each maps to one --hx-* token. */
 export type HxTone = 'idle' | 'running' | 'waiting' | 'done' | 'stopped' | 'manual';
 
-export const hxStatusOrder: readonly HxStatus[] = ['waiting', 'working', 'needs_fix', 'up_next', 'not_started', 'stopped', 'failed', 'done', 'manual', 'skipped'];
+export const hxStatusOrder: readonly HxStatus[] = ['waiting', 'reporter', 'working', 'needs_fix', 'up_next', 'not_started', 'stopped', 'failed', 'done', 'manual', 'skipped'];
 
 export const hxStatuses: Record<HxStatus, { label: string; tone: HxTone; icon: LucideIcon }> = {
 	not_started: { label: 'Not started', tone: 'idle', icon: CircleDashed },
@@ -32,6 +32,7 @@ export const hxStatuses: Record<HxStatus, { label: string; tone: HxTone; icon: L
 	starting: { label: 'Starting', tone: 'running', icon: LoaderCircle },
 	working: { label: 'Working', tone: 'running', icon: LoaderCircle },
 	waiting: { label: 'Waiting on you', tone: 'waiting', icon: Hand },
+	reporter: { label: 'Waiting for reporter', tone: 'waiting', icon: MessageCircleQuestion },
 	done: { label: 'Done', tone: 'done', icon: Check },
 	needs_fix: { label: 'Needs a fix', tone: 'waiting', icon: Wrench },
 	failed: { label: "Didn't pass", tone: 'stopped', icon: CircleX },
@@ -117,12 +118,13 @@ export const gateTitles: Record<HarnessApprovalGate, string> = {
 	plan: 'approve the plan for',
 	resume: 'decide how to continue',
 	review: 'review',
-	question: 'answer a question on'
+	question: 'answer a question on',
+	clarify: 'ask the reporter about'
 };
 
 export const sourceLabels: Record<HarnessSourceKind, string> = { jira: 'Jira', github: 'GitHub', bitbucket: 'Bitbucket', local: 'Local folder' };
 
-export const channelLabels: Record<HarnessChannel, string> = { dashboard: 'here', webex: 'via Webex', api: 'via the API' };
+export const channelLabels: Record<HarnessChannel, string> = { dashboard: 'here', webex: 'via Webex', api: 'via the API', source: 'on the ticket' };
 
 export const findingLabels = { blocking: 'Must fix', advisory: 'Suggestion' } as const;
 
@@ -176,6 +178,7 @@ export function agentRunStatus(state: HarnessAgentRunState, verdict?: 'approve' 
 /** A task's plain status. `waitsFor` lists dependencies not yet done; a ready task with none is "Up next". */
 export function taskStatus(task: HarnessTask, waitsFor: readonly string[] = []): HxStatus {
 	if (task.finishedOutside) return 'manual';
+	if (task.waitingFor) return 'reporter';
 	if (task.needsYou) return 'waiting';
 	switch (task.state) {
 		case 'running': return 'working';

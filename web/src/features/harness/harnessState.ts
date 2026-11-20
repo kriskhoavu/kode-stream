@@ -238,8 +238,9 @@ function upsert<T extends { id: string }>(items: T[], item: T): T[] {
 const doneTaskStates = new Set(['done']);
 
 export function waitingApprovals(state: HarnessState): HarnessApproval[] {
+	// A clarify gate waits for a ticket's reporter, not for you.
 	return Object.values(state.approvals)
-		.filter((approval) => approval.state === 'requested')
+		.filter((approval) => approval.state === 'requested' && approval.gate !== 'clarify')
 		.sort((a, b) => Date.parse(b.requestedAt) - Date.parse(a.requestedAt));
 }
 
@@ -308,7 +309,8 @@ export function decisionLine(approval: HarnessApproval, sent?: SentDecision): st
 		if (sent?.state === 'failed') return sent.error ?? 'Could not send. Try again.';
 		return '';
 	}
-	const verb = approval.state === 'approved' ? (approval.gate === 'question' ? 'Answered' : approval.gate === 'review' ? 'Handed off' : 'Approved') : approval.state === 'rejected' ? (approval.gate === 'question' || approval.gate === 'resume' ? 'Stopped' : approval.gate === 'review' ? 'Sent back' : 'Changes asked') : approval.state === 'expired' ? 'Expired' : 'Replaced by a newer request';
+	if (approval.gate === 'clarify' && approval.state === 'approved' && approval.channel === 'source') return `${approval.decidedBy?.displayName ?? 'The reporter'} replied on the ticket`;
+	const verb = approval.state === 'approved' ? (approval.gate === 'question' ? 'Answered' : approval.gate === 'clarify' ? 'Continued' : approval.gate === 'review' ? 'Handed off' : 'Approved') : approval.state === 'rejected' ? (approval.gate === 'question' || approval.gate === 'resume' ? 'Stopped' : approval.gate === 'clarify' ? 'Dismissed' : approval.gate === 'review' ? 'Sent back' : 'Changes asked') : approval.state === 'expired' ? 'Expired' : 'Replaced by a newer request';
 	if (approval.state === 'expired' || approval.state === 'superseded') return verb;
 	const mine = sent && approval.channel === 'dashboard';
 	if (mine) return `${verb} by you`;

@@ -104,7 +104,7 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTab
 
 	if (!task) return null;
 	const waits = waitsFor(task, state.tasks);
-	const status = run ? runStatus(run) : taskStatus(task, waits);
+	const status = task.waitingFor ? 'reporter' : run ? runStatus(run) : taskStatus(task, waits);
 	const waiting = Object.values(state.approvals).filter((approval) => approval.taskId === task.id && (approval.state === 'requested' || state.decisions[approval.id]));
 	const position = queue.findIndex((item) => item.id === task.id);
 

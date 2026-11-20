@@ -100,4 +100,30 @@ describe('GateCard', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Send and retry' }));
 		expect(onApprove).toHaveBeenLastCalledWith('Keep web clients connected');
 	});
+
+	it('waits for the reporter with a comment to copy, and continues only with a note', () => {
+		const onApprove = vi.fn();
+		const onReject = vi.fn();
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		Object.assign(navigator, { clipboard: { writeText } });
+		const draft = 'Hi [~bao],\n\nBefore we start on PM-7, we need a few details.';
+		render(<GateCard approval={approval('a1', 'task-PM-7', { gate: 'clarify', summary: 'The export has no format.', context: { questions: ['Which format?'], reporter: 'Bao', draft } })} task={task('PM-7', { title: 'Add export', source: { kind: 'jira', key: 'PM-7', url: 'https://jira/browse/PM-7', labels: [] } })} onApprove={onApprove} onReject={onReject} />);
+		expect(screen.getByRole('heading', { name: 'Waiting for Bao: PM-7 · Add export' })).toBeInTheDocument();
+		expect(screen.getByText(/The export has no format\. Post the comment below on the ticket: when Bao replies there/)).toBeInTheDocument();
+		expect(screen.getByRole('list', { name: 'Questions for Bao' })).toHaveTextContent('Which format?');
+		const comment = screen.getByRole('region', { name: 'Comment for the ticket' });
+		expect(comment).toHaveTextContent('Hi [~bao],');
+		expect(screen.getByRole('link', { name: 'Open the ticket' })).toHaveAttribute('href', 'https://jira/browse/PM-7');
+		fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+		expect(writeText).toHaveBeenCalledWith(draft);
+		fireEvent.click(screen.getByRole('button', { name: 'Continue anyway' }));
+		const dialog = screen.getByRole('dialog', { name: 'What the Planner should know' });
+		expect(dialog).toHaveTextContent('Which format?');
+		fireEvent.change(screen.getByRole('textbox', { name: 'What the Planner should know' }), { target: { value: 'CSV.' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Send and continue' }));
+		expect(onApprove).toHaveBeenCalledWith('CSV.');
+		fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+		expect(screen.getByRole('dialog', { name: 'Why dismiss it?' })).toBeInTheDocument();
+	});
 });
+
