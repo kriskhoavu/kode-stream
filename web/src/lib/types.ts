@@ -1307,12 +1307,15 @@ export interface HarnessSettings {
   slots: Record<HarnessRoleId, number>;
   paused: Partial<Record<HarnessRoleId, boolean>>;
   sources: HarnessSourceSettings[];
+  /** The models a new workspace starts from; each workspace then holds its own. */
   modelPolicy: Record<HarnessAgentRole, HarnessRolePolicy>;
+  /** Each workspace holds its own models; modelPolicy is only where a new one starts. */
+  workspaceModels?: boolean;
   /** Each workspace's own choices over these settings. */
   workspaces: HarnessWorkspaceSettings[];
 }
 
-/** A role's CLI and model in one workspace; an empty field follows the defaults. Tool permissions stay the defaults' alone. */
+/** A role's CLI and model in one workspace, which holds its own. An empty hard model keeps hard work on the easy model. Tool permissions are not a workspace's to set. */
 export interface HarnessRoleModel {
   engine?: HarnessEngineId;
   model?: string;

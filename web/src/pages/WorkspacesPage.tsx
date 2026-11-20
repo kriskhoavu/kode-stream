@@ -10,6 +10,7 @@ import { applySegmentRole, lastPathSegment, normalizeDroppedPath, parseSources, 
 import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
+import { WorkspaceOwnSettings } from '../features/workspaces/WorkspaceOwnSettings';
 import { useModalDialog } from '../components/overlay';
 
 export { applySegmentRole, normalizeDroppedPath, parseSources, previewPathSegments };
@@ -55,7 +56,10 @@ type WorkspaceNotice = {
 type SettingsEditorState = SourceSettingsEditorModel & {
   repo: WorkspaceConfig;
 };
-type WorkspaceDetailTab = 'overview' | 'health' | 'integrations';
+type WorkspaceDetailTab = 'overview' | 'health' | 'integrations' | 'agents';
+
+const detailTabs: WorkspaceDetailTab[] = ['overview', 'health', 'integrations', 'agents'];
+const detailTabLabels: Record<WorkspaceDetailTab, string> = { overview: 'Overview', health: 'Health', integrations: 'Integrations', agents: 'AI and harness' };
 type WorkspaceEditSection = 'general' | 'sources' | 'jira' | 'knowledge' | 'runtime' | '';
 type OverviewSectionKey = 'general' | 'sources';
 export type WorkspaceImportState = 'selecting' | 'previewing' | 'reviewing' | 'importing' | 'complete' | 'error';
@@ -64,7 +68,7 @@ export function defaultWorkspaceImportSelection(preview: WorkspaceImportPreview)
 	return preview.candidates.filter((candidate) => candidate.status === 'valid' && candidate.selected).map((candidate) => candidate.candidateKey);
 }
 
-export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContext, onChanged }: { workspaces: WorkspaceConfig[]; runtimeContext?: RuntimeContext; onChanged: () => void | Promise<void> }) {
+export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContext, onChanged, showHarness = true }: { workspaces: WorkspaceConfig[]; runtimeContext?: RuntimeContext; onChanged: () => void | Promise<void>; /** The harness's settings are absent on the extension surface. */ showHarness?: boolean }) {
   const [name, setName] = useState('');
   const [registrationMode, setRegistrationMode] = useState<WorkspaceRegistrationMode>('local_path');
   const [path, setPath] = useState('');
@@ -709,7 +713,7 @@ const busy = pendingOperations.length > 0;
           {notice && <WorkspaceNoticePanel notice={notice} onDismiss={() => setNotice(null)} />}
           {selectedWorkspaceId && <div className="workspace-detail-tabs">
             <div className="workspace-detail-tab-list" role="tablist" aria-label="Workspace settings">
-              {(['overview', 'health', 'integrations'] as WorkspaceDetailTab[]).map((tab) => (
+              {detailTabs.map((tab) => (
                 <button
                   key={tab}
                   id={`workspace-tab-${tab}`}
@@ -722,14 +726,14 @@ const busy = pendingOperations.length > 0;
                   onKeyDown={(event) => {
                     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                     event.preventDefault();
-                    const tabs: WorkspaceDetailTab[] = ['overview', 'health', 'integrations'];
+                    const tabs = detailTabs;
                     const offset = event.key === 'ArrowRight' ? 1 : -1;
                     const nextTab = tabs[(tabs.indexOf(tab) + offset + tabs.length) % tabs.length];
                     selectDetailTab(nextTab);
                     requestAnimationFrame(() => document.getElementById(`workspace-tab-${nextTab}`)?.focus());
                   }}
                 >
-                  {tab[0].toUpperCase() + tab.slice(1)}
+                  {detailTabLabels[tab]}
                 </button>
               ))}
             </div>
@@ -819,6 +823,8 @@ const busy = pendingOperations.length > 0;
                     <button className="secondary" type="button" onClick={() => startEdit(repo, 'jira')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
                   </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'knowledge')}>Configure</button></div><div className="workspace-integration-card"><div><strong>Runtime and verification</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'runtime')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div></>}
                 </section>}
+
+                {activeDetailTab === 'agents' && <WorkspaceOwnSettings workspace={repo} showHarness={showHarness} />}
 
               </article>
             ))}
@@ -1434,6 +1440,8 @@ function workspaceDetailSubtitle(tab: WorkspaceDetailTab): string {
     return 'Workspace health and diagnostics';
   case 'integrations':
     return 'Connected services';
+  case 'agents':
+    return 'Provider, harness and models';
   default:
     return 'General and sources';
   }

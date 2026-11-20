@@ -2557,10 +2557,7 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 .hx-workbench .explorer-panel-title .segmented-control-compact { width: 100%; }
 .hx-workbench .segmented-control-compact button { min-width: 0; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }
 
-/* ── Settings: one workspace's own choices, and the file that shares them ── */
-
-.settings-scope { display: inline-flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--muted); }
-.settings-scope select { min-width: 240px; min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font: inherit; }
+/* ── A workspace's own settings, and the file that shares them ── */
 
 .settings-file-state { margin: 0 0 14px; padding: 0 4px; color: var(--muted); font-size: 13px; }
 .settings-file-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }

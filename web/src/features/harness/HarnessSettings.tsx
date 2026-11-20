@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { Workflow } from 'lucide-react';
-import type { HarnessAgentRole, HarnessEngineId, HarnessRoleHealth, HarnessRoleId, HarnessRoleModel, HarnessRolePolicy, HarnessSettings as Settings, HarnessSourceKind, HarnessSourceSettings, HarnessStatus, HarnessWorkspaceSettings } from '../../lib/types';
+import type { HarnessAgentRole, HarnessEngineId, HarnessRoleHealth, HarnessRoleId, HarnessRoleModel, HarnessSettings as Settings, HarnessSourceKind, HarnessSourceSettings, HarnessStatus, HarnessWorkspaceSettings } from '../../lib/types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import type { HarnessClient, HarnessWorkspaceOption } from './harnessClient';
 import { plainError } from './useHarness';
@@ -45,9 +45,9 @@ export function emptyWorkspaceSettings(workspaceId: string): HarnessWorkspaceSet
 
 /**
  * The harness's settings. Without a workspace they are the defaults every
- * workspace starts from: what runs on its own, who does what and which roles
- * are paused. With one, they are that workspace's own choices over the
- * defaults, and the sources its Finder looks at.
+ * workspace starts from: what runs on its own and which roles are paused.
+ * With one, they are that workspace's own: its choices over those defaults,
+ * its models, role skills and the sources its Finder looks at.
  */
 export function HarnessSettings({ client, status, workspaceId, onPause, onResume, onSaved }: {
 	client: HarnessClient;
@@ -91,8 +91,7 @@ export function HarnessSettings({ client, status, workspaceId, onPause, onResume
 
 	const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 	const update = (patch: Partial<Settings>) => { setDraft({ ...draft, ...patch }); setNotice(''); };
-	const updatePolicy = (role: HarnessAgentRole, patch: Partial<HarnessRolePolicy>) => update({ modelPolicy: { ...draft.modelPolicy, [role]: { ...draft.modelPolicy[role], ...patch } } });
-	const updateSource = (index: number, patch: Partial<HarnessSourceSettings>) => update({ sources: draft.sources.map((source, position) => position === index ? { ...source, ...patch } : source) });
+		const updateSource = (index: number, patch: Partial<HarnessSourceSettings>) => update({ sources: draft.sources.map((source, position) => position === index ? { ...source, ...patch } : source) });
 	const removeSource = (index: number) => update({ sources: draft.sources.filter((_, position) => position !== index) });
 	const clearQueue = async (workspaceId: string) => {
 		setConfirmClear(undefined);
@@ -118,12 +117,19 @@ export function HarnessSettings({ client, status, workspaceId, onPause, onResume
 		const next = { ...own, ...patch };
 		update({ workspaces: draft.workspaces.some((workspace) => workspace.workspaceId === own.workspaceId) ? draft.workspaces.map((workspace) => workspace.workspaceId === own.workspaceId ? next : workspace) : [...draft.workspaces, next] });
 	};
+	/** A role's model in this workspace: its own, else the defaults it starts from. */
+	const roleModel = (role: HarnessAgentRole): Required<HarnessRoleModel> => {
+		const fallback = draft.modelPolicy[role];
+		const mine = own.models[role];
+		return {
+			engine: mine?.engine || fallback.engine,
+			model: mine?.model || fallback.model,
+			highDifficultyModel: mine ? mine.highDifficultyModel ?? '' : fallback.hardModel ?? '',
+			maxTurns: mine?.maxTurns || fallback.maxTurns
+		};
+	};
 	const updateModel = (role: HarnessAgentRole, patch: Partial<HarnessRoleModel>) => {
-		const next: HarnessRoleModel = { ...own.models[role], ...patch };
-		const models = { ...own.models };
-		if (Object.values(next).some((value) => value !== undefined && value !== '' && value !== 0)) models[role] = next;
-		else delete models[role];
-		updateOwn({ models });
+		updateOwn({ models: { ...own.models, [role]: { ...roleModel(role), ...patch } } });
 	};
 	const updateSkill = (role: HarnessAgentRole, patch: Partial<{ skill: string; track: string }>) => {
 		const current = own.procedure[role] ?? { skill: '' };
@@ -179,49 +185,9 @@ export function HarnessSettings({ client, status, workspaceId, onPause, onResume
 					<Toggle label="Review before hand-off" hint="When on, a person tries each change in a session of their own once its tests pass, then hands it off or sends it back to Build or Plan. When off, the draft pull request opens at once." checked={draft.requireReview} onChange={(requireReview) => update({ requireReview })} />
 					<Toggle label="Let an agent stop and ask you" hint="When on, an agent that cannot decide alone stops its round and waits for your answer. When off, it goes on with its best guess and its questions show on the plan approval. A workspace or a task can say otherwise." checked={draft.askQuestions} onChange={(askQuestions) => update({ askQuestions })} />
 				</div>
-				<p className="hx-muted">Every workspace starts from these. Pick a workspace at the top of Settings to give it its own models, tests, sources and role skills.</p>
+				<p className="hx-muted">Every workspace starts from these. A workspace's own choices, and its models, tests, role skills and sources, are on its page under Workspaces, in AI and harness.</p>
 			</section>
 
-			<section className="settings-section hx-settings-policy">
-				<header><div><span className="settings-group-label">Models</span><h2>Who does what</h2><p>Each role runs a coding tool already on this machine. The Tester runs the project's own tests and uses no model.</p></div></header>
-				<div className="hx-table-card">
-					<table className="hx-table">
-						<thead><tr><th scope="col">Role</th><th scope="col">Tool</th><th scope="col">Model</th><th scope="col">Most turns</th></tr></thead>
-						<tbody>
-							{policyRows.map((row) => {
-								const policy = draft.modelPolicy[row.role];
-								return (
-									<tr key={row.role}>
-										<th scope="row"><b>{row.name}</b><br /><small className="hx-muted">{row.does}</small></th>
-										<td><EngineSelect value={policy.engine} engines={engines} label={`${row.name} tool for “${row.does}”`} onChange={(engine) => updatePolicy(row.role, { engine })} /></td>
-										<td>
-											{row.role === 'coder' ? (
-												<div className="hx-model-pair">
-													<ModelInput label="Easy" value={policy.model} onChange={(model) => updatePolicy(row.role, { model })} />
-													<ModelInput label="Hard" value={policy.hardModel ?? policy.model} onChange={(hardModel) => updatePolicy(row.role, { hardModel })} />
-													<details className="hx-explainer">
-														<summary>What counts as hard?</summary>
-														<p>The Planner rates each plan easy or hard. Hard means the plan touches many files, changes how two parts talk to each other, or its check found must-fix items twice. Hard work goes to the stronger model.</p>
-													</details>
-												</div>
-											) : <ModelInput label={`${row.name} model for “${row.does}”`} hideLabel value={policy.model} onChange={(model) => updatePolicy(row.role, { model })} />}
-										</td>
-										<td><input className="hx-number" type="number" min={1} max={500} aria-label={`Most turns for “${row.does}”`} value={policy.maxTurns} onChange={(event) => updatePolicy(row.role, { maxTurns: Math.max(1, Number(event.target.value) || 1) })} /></td>
-									</tr>
-								);
-							})}
-							<tr><th scope="row"><b>Tester</b><br /><small className="hx-muted">Runs the tests twice</small></th><td colSpan={3} className="hx-muted">No model.</td></tr>
-						</tbody>
-					</table>
-				</div>
-				{engines.some((engine) => !engine.available || engine.limits?.length) && (
-					<ul className="hx-engine-notes">
-						{engines.filter((engine) => !engine.available || engine.limits?.length).map((engine) => (
-							<li key={engine.id}><b>{engineLabel(engine.id)}</b>{engine.available ? '' : ' is not installed on this machine.'} {engine.limits?.join(' ')}</li>
-						))}
-					</ul>
-				)}
-			</section>
 			</>}
 
 			{workspaceId && <>
@@ -240,34 +206,44 @@ export function HarnessSettings({ client, status, workspaceId, onPause, onResume
 			</section>
 
 			<section className="settings-section hx-settings-policy">
-				<header><div><span className="settings-group-label">Models</span><h2>Who does what here</h2><p>A blank field follows the defaults, shown greyed. Tool permissions are the defaults' alone.</p></div></header>
+				<header><div><span className="settings-group-label">Models</span><h2>Who does what here</h2><p>Each role runs a coding tool already on this machine. These are this workspace's own: a new workspace starts from Kode Stream's defaults, and changing them here changes no other workspace. The Tester runs the project's own tests and uses no model.</p></div></header>
 				<div className="hx-table-card">
 					<table className="hx-table">
 						<thead><tr><th scope="col">Role</th><th scope="col">Tool</th><th scope="col">Model</th><th scope="col">Most turns</th></tr></thead>
 						<tbody>
 							{policyRows.map((row) => {
-								const fallback = draft.modelPolicy[row.role];
-								const model = own.models[row.role] ?? {};
+								const model = roleModel(row.role);
 								return (
 									<tr key={row.role}>
 										<th scope="row"><b>{row.name}</b><br /><small className="hx-muted">{row.does}</small></th>
-										<td><select className="hx-select" aria-label={`${row.name} tool for “${row.does}” here`} value={model.engine ?? ''} onChange={(event) => updateModel(row.role, { engine: (event.target.value || undefined) as HarnessEngineId | undefined })}>
-											<option value="">Default ({engineLabel(fallback.engine)})</option>
-											{(engines.length ? engines.map((engine) => engine.id) : [fallback.engine]).map((id) => <option key={id} value={id}>{engineLabel(id)}</option>)}
-										</select></td>
+										<td><EngineSelect value={model.engine} engines={engines} label={`${row.name} tool for “${row.does}”`} onChange={(engine) => updateModel(row.role, { engine })} /></td>
 										<td>
-											<div className={row.role === 'coder' ? 'hx-model-pair' : undefined}>
-												<label className="hx-model-input"><span className={row.role === 'coder' ? undefined : 'sr-only'}>{row.role === 'coder' ? 'Easy' : `${row.name} model for “${row.does}” here`}</span><input aria-label={row.role === 'coder' ? 'Easy model here' : undefined} placeholder={fallback.model} value={model.model ?? ''} onChange={(event) => updateModel(row.role, { model: event.target.value.trim() || undefined })} /></label>
-												{row.role === 'coder' && <label className="hx-model-input"><span>Hard</span><input aria-label="Hard model here" placeholder={fallback.hardModel ?? fallback.model} value={model.highDifficultyModel ?? ''} onChange={(event) => updateModel(row.role, { highDifficultyModel: event.target.value.trim() || undefined })} /></label>}
-											</div>
+											{row.role === 'coder' ? (
+												<div className="hx-model-pair">
+													<ModelInput label="Easy" value={model.model} onChange={(value) => updateModel(row.role, { model: value })} />
+													<ModelInput label="Hard" value={model.highDifficultyModel} placeholder="Same as Easy" onChange={(value) => updateModel(row.role, { highDifficultyModel: value })} />
+													<details className="hx-explainer">
+														<summary>What counts as hard?</summary>
+														<p>The Planner rates each plan easy or hard. Hard means the plan touches many files, changes how two parts talk to each other, or its check found must-fix items twice. Hard work goes to the stronger model; blank keeps it on the easy one.</p>
+													</details>
+												</div>
+											) : <ModelInput label={`${row.name} model for “${row.does}”`} hideLabel value={model.model} onChange={(value) => updateModel(row.role, { model: value })} />}
 										</td>
-										<td><input className="hx-number" type="number" min={1} max={500} aria-label={`Most turns for “${row.does}” here`} placeholder={String(fallback.maxTurns)} value={model.maxTurns ?? ''} onChange={(event) => updateModel(row.role, { maxTurns: Number(event.target.value) > 0 ? Number(event.target.value) : undefined })} /></td>
+										<td><input className="hx-number" type="number" min={1} max={200} aria-label={`Most turns for “${row.does}”`} value={model.maxTurns} onChange={(event) => updateModel(row.role, { maxTurns: Math.max(1, Number(event.target.value) || 1) })} /></td>
 									</tr>
 								);
 							})}
+							<tr><th scope="row"><b>Tester</b><br /><small className="hx-muted">Runs the tests twice</small></th><td colSpan={3} className="hx-muted">No model.</td></tr>
 						</tbody>
 					</table>
 				</div>
+				{engines.some((engine) => !engine.available || engine.limits?.length) && (
+					<ul className="hx-engine-notes">
+						{engines.filter((engine) => !engine.available || engine.limits?.length).map((engine) => (
+							<li key={engine.id}><b>{engineLabel(engine.id)}</b>{engine.available ? '' : ' is not installed on this machine.'} {engine.limits?.join(' ')}</li>
+						))}
+					</ul>
+				)}
 			</section>
 
 			<section className="settings-section">
@@ -395,12 +371,12 @@ function EngineSelect({ value, engines, label, onChange }: { value: HarnessEngin
 	);
 }
 
-function ModelInput({ label, value, hideLabel = false, onChange }: { label: string; value: string; hideLabel?: boolean; onChange: (model: string) => void }) {
+function ModelInput({ label, value, placeholder, hideLabel = false, onChange }: { label: string; value: string; placeholder?: string; hideLabel?: boolean; onChange: (model: string) => void }) {
 	const listId = useId();
 	return (
 		<label className="hx-model-input">
 			<span className={hideLabel ? 'sr-only' : undefined}>{label}</span>
-			<input value={value} list={listId} title={value} onChange={(event) => onChange(event.target.value.trim())} />
+			<input value={value} list={listId} title={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value.trim())} />
 			<datalist id={listId}>{modelSuggestions.map((model) => <option key={model} value={model}>{modelLabel(model)}</option>)}</datalist>
 			{modelLabel(value) !== value && <small className="hx-muted">{modelLabel(value)}</small>}
 		</label>

@@ -12,13 +12,13 @@ async function setup(workspaceId?: string) {
 	const onResume = vi.fn().mockResolvedValue(undefined);
 	const onSaved = vi.fn();
 	render(<HarnessSettings client={client} status={status} workspaceId={workspaceId} onPause={onPause} onResume={onResume} onSaved={onSaved} />);
-	await screen.findByRole('heading', { name: workspaceId ? 'Who does what here' : 'Who does what' });
+	await screen.findByRole('heading', { name: workspaceId ? 'Who does what here' : 'The harness' });
 	return { client, onPause, onResume, onSaved };
 }
 
 describe('HarnessSettings', () => {
-	it('shows who does what in plain words, with an easy and a hard model for the Builder', async () => {
-		await setup();
+	it('shows a workspace who does what in plain words, starting from the defaults, with an easy and a hard model for the Builder', async () => {
+		await setup('airship');
 		expect(screen.getByRole('combobox', { name: 'Planner tool for “Writes the plan”' })).toHaveDisplayValue('Claude');
 		expect(screen.getAllByRole('option', { name: 'Codex (not installed)' })[0]).toBeDisabled();
 		expect(screen.getByRole('combobox', { name: /^Easy/ })).toHaveValue('claude-sonnet-5-5');
@@ -36,14 +36,16 @@ describe('HarnessSettings', () => {
 		expect(screen.getByText('Looked 12 min ago · 3 new')).toBeInTheDocument();
 	});
 
-	it('saves a changed model and says so', async () => {
-		const { client, onSaved } = await setup();
+	it('saves a changed model as the workspace\'s own, whole, and leaves the defaults alone', async () => {
+		const { client, onSaved } = await setup('airship');
 		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 		fireEvent.change(screen.getByRole('combobox', { name: /^Hard/ }), { target: { value: 'opus' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved.'));
 		expect(onSaved).toHaveBeenCalled();
-		expect((await client.settings()).modelPolicy.coder.hardModel).toBe('opus');
+		const saved = await client.settings();
+		expect(saved.workspaces.find((workspace) => workspace.workspaceId === 'airship')?.models.coder).toEqual({ engine: 'claudecode', model: 'claude-sonnet-5-5', highDifficultyModel: 'opus', maxTurns: saved.modelPolicy.coder.maxTurns });
+		expect(saved.modelPolicy.coder.hardModel).toBe('claude-opus-5-5');
 	});
 
 	it('asks before pausing a role with work in flight, and resumes without asking', async () => {
@@ -101,19 +103,19 @@ describe('HarnessSettings', () => {
 	it('shows only the defaults, with no sources, when no workspace is picked', async () => {
 		await setup();
 		expect(screen.queryByRole('heading', { name: 'Where work comes from' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('heading', { name: /Who does what/ })).not.toBeInTheDocument();
 		expect(screen.getByRole('switch', { name: /Let an agent stop and ask you/ })).toBeChecked();
 	});
 
-	it('gives a workspace its own choices over the defaults, each blank one following them', async () => {
+	it('gives a workspace its own choices over the defaults, and its own models', async () => {
 		const { client } = await setup('airship');
 		const ask = screen.getByRole('combobox', { name: 'Let an agent stop and ask you' });
 		expect(ask).toHaveDisplayValue('Default (on)');
 		fireEvent.change(ask, { target: { value: 'off' } });
 		expect(screen.getByRole('textbox', { name: 'Test command' })).toHaveValue('npm test');
 		fireEvent.change(screen.getByRole('textbox', { name: 'Test command' }), { target: { value: 'go test ./...' } });
-		const easy = screen.getByRole('textbox', { name: 'Easy model here' });
-		expect(easy).toHaveValue('');
-		expect(easy).toHaveAttribute('placeholder', 'claude-sonnet-5-5');
+		const easy = screen.getByRole('combobox', { name: /^Easy/ });
+		expect(easy).toHaveValue('claude-sonnet-5-5');
 		fireEvent.change(easy, { target: { value: 'haiku' } });
 		expect(screen.getByRole('textbox', { name: 'Skill for “Writes the plan”' })).toHaveValue('feature-planning');
 		fireEvent.change(screen.getByRole('textbox', { name: 'Skill for “Writes the code”' }), { target: { value: 'feature-planning' } });
