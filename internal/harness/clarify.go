@@ -62,6 +62,7 @@ func (st *step) clarify(agentRun domain.AgentRun) {
 		Summary: problem, Context: domain.ApprovalContext{CostSoFarUSD: roundCents(st.run.Totals.CostUSD), Round: st.stage.Round, Questions: asked, Role: domain.RolePlanner, Reporter: reporter, Draft: clarifyDraft(st.task, problem, asked)}, RequestedAt: st.now}
 	st.approvals = append(st.approvals, approval)
 	st.task.NeedsYou = false
+	st.task.WaitingFor = nonEmpty(reporter, "the reporter")
 	st.event(domain.EventStageRound, st.stage.ID, map[string]any{"kind": st.stage.Kind, "round": st.stage.Round, "needsInfo": len(asked), "reporter": reporter})
 	st.events = append(st.events, domain.Event{Kind: domain.EventApprovalRequested, TaskID: st.task.ID, RunID: st.run.ID, StageID: st.stage.ID, ApprovalID: approval.ID, Payload: payload(map[string]any{"gate": approval.Gate, "summary": approval.Summary, "sourceKey": st.task.Source.Key, "title": st.task.Title, "questions": asked, "reporter": reporter})})
 }
@@ -104,7 +105,7 @@ func (s *Service) applyClarify(st *step, approval domain.Approval, input DecideI
 	if !fromSource && input.Reason == "" {
 		return domain.Invalid("say what the planner should know to continue")
 	}
-	st.task.NeedsYou = false
+	st.task.NeedsYou, st.task.WaitingFor = false, ""
 	st.stage.State = domain.StageRunning
 	st.stage.Answers = append(st.stage.Answers, domain.Answer{Role: domain.RolePlanner, Round: st.stage.Round, Questions: approval.Context.Questions, Answer: input.Reason, By: nonEmptyName(input.Actor), FromSource: fromSource})
 	st.enqueue(domain.RolePlanner, false)

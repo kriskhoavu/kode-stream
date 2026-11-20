@@ -82,7 +82,7 @@ func TestAReadyTicketWaitsForItsReporterAndPlansFromTheReply(t *testing.T) {
 		t.Fatalf("draft = %q", wait.Context.Draft)
 	}
 	task, _ := fixture.repository.GetTask(ctx, fixture.task.ID)
-	if task.State != domain.TaskRunning || task.NeedsYou {
+	if task.State != domain.TaskRunning || task.NeedsYou || task.WaitingFor != "Bao" {
 		t.Fatalf("a run waiting for the reporter needs the assignee: %#v", task)
 	}
 
@@ -102,6 +102,9 @@ func TestAReadyTicketWaitsForItsReporterAndPlansFromTheReply(t *testing.T) {
 	plan := fixture.waiting(t)
 	if plan.Gate != domain.GatePlan {
 		t.Fatalf("after the reply the run waits at %s", plan.Gate)
+	}
+	if task, _ := fixture.repository.GetTask(ctx, fixture.task.ID); task.WaitingFor != "" {
+		t.Fatalf("the task still waits for %q", task.WaitingFor)
 	}
 	view := fixture.run(t)
 	if answers := view.Stages[0].Answers; len(answers) != 1 || !answers[0].FromSource || answers[0].By != "Bao" {
@@ -156,6 +159,9 @@ func TestDismissingAReadyTicketStopsItsRun(t *testing.T) {
 	}
 	if view := fixture.run(t); view.State != domain.RunCancelled {
 		t.Fatalf("run = %s", view.State)
+	}
+	if task, _ := fixture.repository.GetTask(ctx, fixture.task.ID); task.WaitingFor != "" || task.State != domain.TaskCancelled {
+		t.Fatalf("task = %s waiting for %q", task.State, task.WaitingFor)
 	}
 }
 

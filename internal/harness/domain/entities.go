@@ -88,7 +88,10 @@ type Task struct {
 	PriorityOverride float64   `json:"priorityOverride"`
 	Pinned           bool      `json:"pinned"`
 	NeedsYou         bool      `json:"needsYou"`
-	StartRequested   bool      `json:"startRequested"`
+	// WaitingFor names who the task's run waits for at a clarify gate,
+	// rather than the person working on it.
+	WaitingFor     string `json:"waitingFor,omitempty"`
+	StartRequested bool   `json:"startRequested"`
 	// AskQuestions overrides, for this task, whether an agent may stop and
 	// ask a person; nil follows the workspace, then the settings.
 	AskQuestions     *bool    `json:"askQuestions,omitempty"`

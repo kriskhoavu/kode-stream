@@ -312,7 +312,7 @@ func (s *Service) cancelInTx(st *step, reason string) error {
 	}
 	st.run.State, st.run.FinishedAt, st.run.FailureReason = domain.RunCancelled, &st.now, reason
 	// The start request was spent on this run; starting again asks anew.
-	st.task.State, st.task.NeedsYou, st.task.Note, st.task.StartRequested = domain.TaskCancelled, false, reason, false
+	st.task.State, st.task.NeedsYou, st.task.Note, st.task.StartRequested, st.task.WaitingFor = domain.TaskCancelled, false, reason, false, ""
 	agentRuns, err := st.tx.ListAgentRuns(st.ctx, domain.AgentRunFilter{RunID: st.run.ID, States: []domain.AgentRunState{domain.AgentQueued, domain.AgentRunning, domain.AgentInterrupted}, Limit: 1000})
 	if err != nil {
 		return err
