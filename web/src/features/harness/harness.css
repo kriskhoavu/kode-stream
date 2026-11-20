@@ -2568,3 +2568,8 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 .settings-file-part input { margin-top: 3px; }
 .settings-file-part > span { display: grid; gap: 2px; min-width: 0; }
 .settings-file-part small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+
+/* The settings file opens as a dialog from a workspace's header: wider than a confirmation, and scrolled inside when it holds many parts. */
+.confirm-dialog.settings-file-dialog { width: min(640px, 100%); max-height: min(720px, calc(100vh - 40px)); overflow: auto; }
+.settings-file-dialog .settings-file-state { margin: 0; padding: 0; }
+.settings-file-dialog footer button { display: inline-flex; align-items: center; gap: 6px; }

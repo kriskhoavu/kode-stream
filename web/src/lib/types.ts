@@ -494,8 +494,13 @@ export interface AISettings {
 }
 
 /** The provider a session in a workspace starts with. */
-export function providerFor(settings: Pick<AISettings, 'defaultProvider' | 'workspaceProviders'>, workspaceId?: string): string {
-  return (workspaceId && settings.workspaceProviders?.[workspaceId]) || settings.defaultProvider;
+/** The provider of a workspace that has not chosen one of its own, while it is enabled on this machine. */
+export const workspaceDefaultProvider = 'claude';
+
+/** The provider a session starts with: its workspace's own, else Claude, else the machine's default. */
+export function providerFor(settings: Pick<AISettings, 'defaultProvider' | 'workspaceProviders'> & { providers?: AISettings['providers'] }, workspaceId?: string): string {
+  if (!workspaceId) return settings.defaultProvider;
+  return settings.workspaceProviders?.[workspaceId] || (settings.providers?.[workspaceDefaultProvider]?.enabled ? workspaceDefaultProvider : settings.defaultProvider);
 }
 
 export interface AIPlanPreset {

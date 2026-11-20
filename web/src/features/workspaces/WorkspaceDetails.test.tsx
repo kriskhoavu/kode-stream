@@ -24,9 +24,16 @@ describe('workspace detail settings', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('keeps overview focused on general and sources while health has its own tab', () => {
+  it('opens the settings file from the header, beside Scan workspace, where the harness runs', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
     render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+    const heading = screen.getByRole('button', { name: 'Remove' }).closest('header') as HTMLElement;
+    expect([...heading.querySelectorAll('button')].map((button) => button.textContent?.trim())).toEqual(['Export settings', 'Import settings', 'Scan workspace', 'Remove']);
+  });
+
+  it('keeps overview focused on general and sources while health has its own tab', () => {
+    vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} showHarness={false} />);
 
     expect(screen.getByRole('tab', { name: 'Health' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Sources' })).not.toBeInTheDocument();
@@ -56,7 +63,7 @@ describe('workspace detail settings', () => {
   it('guards tab navigation while a settings draft is open', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
     vi.spyOn(window, 'confirm').mockReturnValue(false);
-    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} showHarness={false} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit general' }));
     fireEvent.change(screen.getByLabelText('Workspace Name'), { target: { value: 'Changed' } });
@@ -69,7 +76,7 @@ describe('workspace detail settings', () => {
 
   it('supports arrow-key navigation between settings tabs', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
-    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} showHarness={false} />);
 
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Overview' }), { key: 'ArrowRight' });
 
@@ -81,7 +88,7 @@ describe('workspace detail settings', () => {
 
   it('opens only the selected integration settings and provides a back action', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
-    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} showHarness={false} />);
 
     fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
     const knowledgeCard = screen.getByText('Knowledge').closest('.workspace-integration-card');
@@ -101,7 +108,7 @@ describe('workspace detail settings', () => {
 
   it('shows runtime and verification tabs with automation settings grouped under verification', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
-    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} showHarness={false} />);
 
     fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
     fireEvent.click(screen.getByRole('button', { name: 'Set runtime' }));
@@ -122,7 +129,7 @@ describe('workspace detail settings', () => {
   it('reveals repository settings after location and keeps Jira in optional step two', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
     vi.spyOn(window, 'confirm').mockReturnValue(false);
-    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} showHarness={false} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add workspace' }));
     expect(screen.queryByLabelText('Workspace Name')).not.toBeInTheDocument();
@@ -142,7 +149,7 @@ describe('workspace detail settings', () => {
 
   it('reveals clone settings only after a remote URL is provided', () => {
     vi.mocked(api.systemConfigPaths).mockImplementation(() => new Promise(() => undefined));
-    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} />);
+    render(<WorkspacesPage workspaces={[workspace]} onChanged={vi.fn()} showHarness={false} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add workspace' }));
     fireEvent.click(screen.getByRole('radio', { name: 'Remote Git URL' }));

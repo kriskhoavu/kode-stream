@@ -47,13 +47,16 @@ export function emptyWorkspaceSettings(workspaceId: string): HarnessWorkspaceSet
  * The harness's settings. Without a workspace they are the defaults every
  * workspace starts from: what runs on its own and which roles are paused.
  * With one, they are that workspace's own: its choices over those defaults,
- * its models, role skills and the sources its Finder looks at.
+ * its models and role skills, or, as part "sources", where its Finder looks,
+ * which sits beside the workspace's Jira connection.
  */
-export function HarnessSettings({ client, status, workspaceId, onPause, onResume, onSaved }: {
+export function HarnessSettings({ client, status, workspaceId, part = 'workspace', onPause, onResume, onSaved }: {
 	client: HarnessClient;
 	status?: HarnessStatus;
 	/** Shows this workspace's own choices; absent shows the defaults. */
 	workspaceId?: string;
+	/** With a workspace: its own choices, or only its sources. */
+	part?: 'workspace' | 'sources';
 	onPause: (role: HarnessRoleId) => Promise<void>;
 	onResume: (role: HarnessRoleId) => Promise<void>;
 	onSaved: () => void;
@@ -185,12 +188,12 @@ export function HarnessSettings({ client, status, workspaceId, onPause, onResume
 					<Toggle label="Review before hand-off" hint="When on, a person tries each change in a session of their own once its tests pass, then hands it off or sends it back to Build or Plan. When off, the draft pull request opens at once." checked={draft.requireReview} onChange={(requireReview) => update({ requireReview })} />
 					<Toggle label="Let an agent stop and ask you" hint="When on, an agent that cannot decide alone stops its round and waits for your answer. When off, it goes on with its best guess and its questions show on the plan approval. A workspace or a task can say otherwise." checked={draft.askQuestions} onChange={(askQuestions) => update({ askQuestions })} />
 				</div>
-				<p className="hx-muted">Every workspace starts from these. A workspace's own choices, and its models, tests, role skills and sources, are on its page under Workspaces, in AI and harness.</p>
+				<p className="hx-muted">Every workspace starts from these. A workspace's own choices, models, tests and role skills are on its page under Workspaces, in AI and harness. Its sources are in Integrations.</p>
 			</section>
 
 			</>}
 
-			{workspaceId && <>
+			{workspaceId && part === 'workspace' && <>
 			<section className="settings-section">
 				<header><div><span className="settings-group-label">Harness</span><h2>The harness in this workspace</h2><p>Each choice follows the defaults until you set it here.</p></div></header>
 				<div className="settings-toggle-list">
@@ -263,7 +266,9 @@ export function HarnessSettings({ client, status, workspaceId, onPause, onResume
 					</table>
 				</div>
 			</section>
+			</>}
 
+			{workspaceId && part === 'sources' && <>
 			<section className="settings-section">
 				<header><div><span className="settings-group-label">Sources</span><h2>Where work comes from</h2><p>The Finder looks at these and adds new tasks to this workspace's Task Queue.</p></div></header>
 				<div className="hx-sources">
@@ -278,7 +283,7 @@ export function HarnessSettings({ client, status, workspaceId, onPause, onResume
 					</label>
 					<button type="submit" className="secondary" disabled={!addWorkspaceId || duplicateSource}>Add source</button>
 					{duplicateSource && <span className="hx-muted">{sourceLabels[addKind]} is already set for this workspace.</span>}
-					{!duplicateSource && addKind === 'jira' && addTarget && !addTarget.jiraProjectKey && <span className="hx-muted">This workspace has no Jira connection yet. Set one in the workspace settings, or type a search under Advanced after adding.</span>}
+					{!duplicateSource && addKind === 'jira' && addTarget && !addTarget.jiraProjectKey && <span className="hx-muted">This workspace has no Jira connection yet. Connect Jira above, or type a search under Advanced after adding.</span>}
 				</form>
 			</section>
 			</>}

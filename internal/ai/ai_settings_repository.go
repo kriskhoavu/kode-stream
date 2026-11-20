@@ -47,10 +47,19 @@ type Settings struct {
 	WorkspaceProviders map[string]string `json:"workspaceProviders,omitempty" yaml:"workspaceProviders,omitempty"`
 }
 
-// ProviderFor is the provider a session in workspaceID starts with.
+// WorkspaceDefaultProvider is the provider of a workspace that has not
+// chosen one of its own, while it is enabled on this machine.
+const WorkspaceDefaultProvider = "claude"
+
+// ProviderFor is the provider a session in workspaceID starts with: the
+// workspace's own, else Claude, else the machine's default. A session outside
+// any workspace starts with the machine's default.
 func (s Settings) ProviderFor(workspaceID string) string {
 	if provider := s.WorkspaceProviders[workspaceID]; provider != "" {
 		return provider
+	}
+	if workspaceID != "" && s.Providers[WorkspaceDefaultProvider].Enabled {
+		return WorkspaceDefaultProvider
 	}
 	return s.DefaultProvider
 }

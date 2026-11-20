@@ -1,19 +1,18 @@
-import { useState } from 'react';
 import { Save } from 'lucide-react';
 import type { AISettings, WorkspaceConfig } from '../../lib/types';
+import { providerFor } from '../../lib/types';
 import { useAISettings } from '../ai-settings/useAISettings';
-import { SettingsFilePanel } from '../settings/SettingsFilePanel';
 import { HarnessSettingsSection } from '../workstream/HarnessSettingsSection';
 import '../harness/harness.css';
 
 /**
  * One workspace's own settings, on its page under Workspaces: the provider a
- * new session starts with, the harness's choices and models for it, and the
- * file that shares them with a team. App-wide settings stay under Settings.
+ * new session starts with, and the harness's choices and models for it. Its
+ * sources sit with its Jira connection under Integrations, and the settings
+ * file opens from the page's header. App-wide settings stay under Settings.
  */
 export function WorkspaceOwnSettings({ workspace, showHarness = true }: { workspace: WorkspaceConfig; /** The harness is absent on the extension surface. */ showHarness?: boolean }) {
 	const ai = useAISettings();
-	const [reload, setReload] = useState(0);
 	return (
 		<section className="settings-page workspace-own-settings">
 			<section className="settings-section ai-settings-section">
@@ -28,15 +27,11 @@ export function WorkspaceOwnSettings({ workspace, showHarness = true }: { worksp
 				{ai.settings && (
 					<>
 						<label className="settings-toggle-row">
-							<span><strong>Provider here</strong><small>Default follows the provider chosen under Settings.</small></span>
-							<select aria-label="Provider here" value={ai.settings.workspaceProviders?.[workspace.id] ?? ''} onChange={(event) => {
-								const next = { ...(ai.settings?.workspaceProviders ?? {}) };
-								if (event.target.value) next[workspace.id] = event.target.value;
-								else delete next[workspace.id];
-								ai.setSettings({ ...(ai.settings as AISettings), workspaceProviders: next });
+							<span><strong>Provider here</strong><small>A workspace starts with Claude until you choose another.</small></span>
+							<select aria-label="Provider here" value={providerFor(ai.settings, workspace.id)} onChange={(event) => {
+								ai.setSettings({ ...(ai.settings as AISettings), workspaceProviders: { ...(ai.settings?.workspaceProviders ?? {}), [workspace.id]: event.target.value } });
 							}}>
-								<option value="">Default ({ai.settings.defaultProvider || 'none'})</option>
-								{Object.entries(ai.settings.providers).filter(([, template]) => template.enabled).map(([id]) => <option key={id} value={id}>{id}</option>)}
+								{Object.entries(ai.settings.providers).filter(([id, template]) => template.enabled || id === providerFor(ai.settings as AISettings, workspace.id)).map(([id]) => <option key={id} value={id}>{id}</option>)}
 							</select>
 						</label>
 						<div className="settings-actions">
@@ -49,8 +44,7 @@ export function WorkspaceOwnSettings({ workspace, showHarness = true }: { worksp
 				)}
 				{ai.error && <p className="settings-error" role="alert">{ai.error}</p>}
 			</section>
-			{showHarness && <HarnessSettingsSection key={`${workspace.id}:${reload}`} workspaceId={workspace.id} />}
-			{showHarness && <SettingsFilePanel workspaceId={workspace.id} workspaceName={workspace.name} onImported={() => { setReload((value) => value + 1); void ai.refresh(); }} />}
+			{showHarness && <HarnessSettingsSection workspaceId={workspace.id} />}
 		</section>
 	);
 }

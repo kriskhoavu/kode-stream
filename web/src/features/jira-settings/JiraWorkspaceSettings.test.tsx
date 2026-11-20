@@ -14,7 +14,7 @@ describe('workspace Jira settings', () => {
     vi.mocked(api.systemConfigPaths).mockResolvedValue({ dataDir: '/data', defaultDataDir: '/data', cloneRootDir: '/clone' });
     vi.mocked(api.workspaceHealth).mockResolvedValue({ workspaceId: 'w1', checkedAt: '', summary: 'ok', checks: [] });
     vi.mocked(api.testJiraConnection).mockResolvedValue({ ok: true, deploymentType: 'server', projectKey: 'DI', message: 'Jira connection succeeded' });
-    const { container } = render(<WorkspacesPage workspaces={[{ id: 'w1', name: 'Repo', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '', jira: { deploymentType: 'server', baseUrl: 'https://jira.example.com', projectKey: 'DI', tokenEnvVar: 'JIRA_PAT' } }]} onChanged={vi.fn()} />);
+    const { container } = render(<WorkspacesPage workspaces={[{ id: 'w1', name: 'Repo', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '', jira: { deploymentType: 'server', baseUrl: 'https://jira.example.com', projectKey: 'DI', tokenEnvVar: 'JIRA_PAT' } }]} onChanged={vi.fn()} showHarness={false} />);
     expect(screen.queryByText('Token Environment Variable')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
     fireEvent.click(within(screen.getByText('Jira').closest('.workspace-integration-card') as HTMLElement).getByRole('button', { name: 'Configure' }));
@@ -28,7 +28,7 @@ describe('workspace Jira settings', () => {
     vi.mocked(api.systemConfigPaths).mockResolvedValue({ dataDir: '/data', defaultDataDir: '/data', cloneRootDir: '/clone' });
     vi.mocked(api.workspaceHealth).mockResolvedValue({ workspaceId: 'w1', checkedAt: '', summary: 'ok', checks: [] });
     vi.mocked(api.testJiraConnection).mockRejectedValue(new Error('Jira unavailable'));
-    const { container } = render(<WorkspacesPage workspaces={[{ id: 'w1', name: 'Repo', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '', jira: { deploymentType: 'server', baseUrl: 'https://jira.example.com', projectKey: 'DI', tokenEnvVar: 'JIRA_PAT' } }]} onChanged={vi.fn()} />);
+    const { container } = render(<WorkspacesPage workspaces={[{ id: 'w1', name: 'Repo', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '', jira: { deploymentType: 'server', baseUrl: 'https://jira.example.com', projectKey: 'DI', tokenEnvVar: 'JIRA_PAT' } }]} onChanged={vi.fn()} showHarness={false} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
     fireEvent.click(within(screen.getByText('Jira').closest('.workspace-integration-card') as HTMLElement).getByRole('button', { name: 'Configure' }));
     fireEvent.click(screen.getByRole('button', { name: 'Test Jira connection' }));

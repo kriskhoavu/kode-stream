@@ -5,14 +5,14 @@ import { createFixtureClient } from './fixture';
 
 afterEach(cleanup);
 
-async function setup(workspaceId?: string) {
+async function setup(workspaceId?: string, part?: 'workspace' | 'sources') {
 	const client = createFixtureClient({ tickMs: 0, arrivalMs: 0 });
 	const status = await client.status();
 	const onPause = vi.fn().mockResolvedValue(undefined);
 	const onResume = vi.fn().mockResolvedValue(undefined);
 	const onSaved = vi.fn();
-	render(<HarnessSettings client={client} status={status} workspaceId={workspaceId} onPause={onPause} onResume={onResume} onSaved={onSaved} />);
-	await screen.findByRole('heading', { name: workspaceId ? 'Who does what here' : 'The harness' });
+	render(<HarnessSettings client={client} status={status} workspaceId={workspaceId} part={part} onPause={onPause} onResume={onResume} onSaved={onSaved} />);
+	await screen.findByRole('heading', { name: !workspaceId ? 'The harness' : part === 'sources' ? 'Where work comes from' : 'Who does what here' });
 	return { client, onPause, onResume, onSaved };
 }
 
@@ -30,7 +30,7 @@ describe('HarnessSettings', () => {
 	});
 
 	it('keeps the source query folded under Advanced', async () => {
-		await setup('airship');
+		await setup('airship', 'sources');
 		const advanced = screen.getAllByText('Advanced')[0].closest('details') as HTMLDetailsElement;
 		expect(advanced.open).toBe(false);
 		expect(screen.getByText('Looked 12 min ago · 3 new')).toBeInTheDocument();
@@ -64,7 +64,7 @@ describe('HarnessSettings', () => {
 	});
 
 	it('adds a Jira source for a workspace with its project as the first query, and saves it', async () => {
-		const { client } = await setup('airship-docs');
+		const { client } = await setup('airship-docs', 'sources');
 		const form = await screen.findByRole('form', { name: 'Add a source' });
 		fireEvent.change(within(form).getByRole('combobox', { name: 'Look in' }), { target: { value: 'jira' } });
 		fireEvent.click(within(form).getByRole('button', { name: 'Add source' }));
@@ -78,7 +78,7 @@ describe('HarnessSettings', () => {
 	});
 
 	it('refuses a second source of the same kind for one workspace, and offers Jira, GitHub and a local folder', async () => {
-		await setup('airship');
+		await setup('airship', 'sources');
 		const form = await screen.findByRole('form', { name: 'Add a source' });
 		expect(within(form).getAllByRole('option').map((option) => option.textContent)).toEqual(['Jira', 'GitHub', 'Local folder']);
 		expect(within(form).getByRole('button', { name: 'Add source' })).toBeDisabled();
@@ -86,7 +86,7 @@ describe('HarnessSettings', () => {
 	});
 
 	it('clears a workspace queue after a confirmation and says how many tasks went', async () => {
-		const { client, onSaved } = await setup('airship');
+		const { client, onSaved } = await setup('airship', 'sources');
 		const before = (await client.tasks()).filter((task) => task.workspaceId === 'airship' && (task.state === 'ranked' || task.state === 'discovered' || task.state === 'stale' || task.state === 'dismissed')).length;
 		expect(before).toBeGreaterThan(0);
 		fireEvent.click(screen.getAllByRole('button', { name: 'Clear the Task Queue for Airship' })[0]);
@@ -128,7 +128,7 @@ describe('HarnessSettings', () => {
 	});
 
 	it('removes a source and names workspaces by their name', async () => {
-		await setup('airship-client');
+		await setup('airship-client', 'sources');
 		expect(screen.getByText('· Airship client')).toBeInTheDocument();
 		fireEvent.click(screen.getByRole('button', { name: 'Remove Bitbucket for Airship client' }));
 		expect(screen.queryByText('· Airship client')).not.toBeInTheDocument();

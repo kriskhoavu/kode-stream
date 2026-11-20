@@ -1,5 +1,5 @@
 import { type DragEvent, type Dispatch, type FormEvent, type ReactNode, type RefObject, type SetStateAction, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FolderGit2, FolderOpen, HardDrive, Link2, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Download, ExternalLink, FolderGit2, FolderOpen, HardDrive, Link2, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../shared/api';
@@ -11,6 +11,8 @@ import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSetting
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
 import { WorkspaceOwnSettings } from '../features/workspaces/WorkspaceOwnSettings';
+import { SettingsFileDialog, type SettingsFileMode } from '../features/settings/SettingsFileDialog';
+import { HarnessSettingsSection } from '../features/workstream/HarnessSettingsSection';
 import { useModalDialog } from '../components/overlay';
 
 export { applySegmentRole, normalizeDroppedPath, parseSources, previewPathSegments };
@@ -79,6 +81,8 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
   const [jira, setJira] = useState<JiraConnection | null>(null);
   const [systemConfig, setSystemConfig] = useState<SystemConfigPaths | null>(null);
   const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
+  const [settingsFile, setSettingsFile] = useState<SettingsFileMode | null>(null);
+  const [settingsImports, setSettingsImports] = useState(0);
   const [registrationLog, setRegistrationLog] = useState('');
   const [registrationLogOpen, setRegistrationLogOpen] = useState(false);
   const [pendingOperations, setPendingOperations] = useState<string[]>([]);
@@ -748,6 +752,10 @@ const busy = pendingOperations.length > 0;
                   <div className="repo-row-icon"><HardDrive size={18} /></div>
                   <div><h2>{repo.name}</h2><span>{workspaceDetailSubtitle(activeDetailTab)}</span></div>
                   <div className="workspace-detail-heading-actions">
+                    {showHarness && <>
+                      <button className="secondary" type="button" onClick={() => setSettingsFile('export')} title="Write this workspace's settings into .kode-stream/settings.yaml"><Upload size={16} /> Export settings</button>
+                      <button className="secondary" type="button" onClick={() => setSettingsFile('import')} title="Take settings from .kode-stream/settings.yaml"><Download size={16} /> Import settings</button>
+                    </>}
                     <button className="secondary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all') || !canScan}><RotateCw size={16} /> Scan workspace</button>
                     <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])} disabled={!canWrite}><Trash2 size={16} /> Remove</button>
                   </div>
@@ -821,10 +829,13 @@ const busy = pendingOperations.length > 0;
                   </> : <><div className="workspace-integration-card">
                     <div><strong>Jira</strong><span>{repo.jira ? `${repo.jira.projectKey} · ${repo.jira.deploymentType === 'cloud' ? 'Cloud' : 'Server / Data Center'}` : 'Not configured'}</span></div>
                     <button className="secondary" type="button" onClick={() => startEdit(repo, 'jira')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
-                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'knowledge')}>Configure</button></div><div className="workspace-integration-card"><div><strong>Runtime and verification</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'runtime')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div></>}
+                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'knowledge')}>Configure</button></div><div className="workspace-integration-card"><div><strong>Runtime and verification</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'runtime')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div>
+                  {showHarness && <HarnessSettingsSection key={`${repo.id}:${settingsImports}`} workspaceId={repo.id} part="sources" />}</>}
                 </section>}
 
-                {activeDetailTab === 'agents' && <WorkspaceOwnSettings workspace={repo} showHarness={showHarness} />}
+                {activeDetailTab === 'agents' && <WorkspaceOwnSettings key={`${repo.id}:${settingsImports}`} workspace={repo} showHarness={showHarness} />}
+
+                {settingsFile && <SettingsFileDialog mode={settingsFile} workspaceId={repo.id} workspaceName={repo.name} onClose={() => setSettingsFile(null)} onImported={() => setSettingsImports((value) => value + 1)} />}
 
               </article>
             ))}
@@ -1439,7 +1450,7 @@ function workspaceDetailSubtitle(tab: WorkspaceDetailTab): string {
   case 'health':
     return 'Workspace health and diagnostics';
   case 'integrations':
-    return 'Connected services';
+    return 'Services and task sources';
   case 'agents':
     return 'Provider, harness and models';
   default:
