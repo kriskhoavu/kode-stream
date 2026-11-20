@@ -155,7 +155,7 @@ func (p *Poller) upsert(ctx context.Context, workspaceID string, candidate domai
 		task := domain.Task{
 			ID: domain.NewID("tsk"), WorkspaceID: workspaceID, Source: normalizedSource(candidate.Source), Title: bounded(candidate.Title, 1024),
 			Body: bounded(candidate.Body, domain.MaxTaskBodyBytes), State: domain.TaskDiscovered, ScoreReasons: []string{}, DependsOn: []string{},
-			DependsOnKeys: candidate.DependsOnKeys, EstimatedMinutes: candidate.EstimatedMinutes, DiscoveredAt: now, UpdatedAt: now,
+			DependsOnKeys: candidate.DependsOnKeys, EstimatedMinutes: candidate.EstimatedMinutes, Comments: boundedComments(candidate.Comments), DiscoveredAt: now, UpdatedAt: now,
 		}
 		if err := p.repository.InsertTask(ctx, task); errors.Is(err, domain.ErrDuplicate) {
 			return false, nil
@@ -177,6 +177,7 @@ func (p *Poller) upsert(ctx context.Context, workspaceID string, candidate domai
 	updated.Body = bounded(candidate.Body, domain.MaxTaskBodyBytes)
 	updated.DependsOnKeys = candidate.DependsOnKeys
 	updated.EstimatedMinutes = candidate.EstimatedMinutes
+	updated.Comments = boundedComments(candidate.Comments)
 	reopened := updated.State == domain.TaskStale
 	if reopened {
 		updated.State = domain.TaskDiscovered
@@ -206,6 +207,10 @@ func normalizedSource(source domain.Source) domain.Source {
 	}
 	source.Key = bounded(source.Key, 256)
 	source.URL = bounded(source.URL, 2048)
+	if source.Reporter != nil {
+		reporter := domain.Person{Name: bounded(source.Reporter.Name, 256), Mention: bounded(source.Reporter.Mention, 256)}
+		source.Reporter = &reporter
+	}
 	return source
 }
 
@@ -214,7 +219,27 @@ func fingerprint(task domain.Task) string {
 	sort.Strings(labels)
 	deps := append([]string{}, task.DependsOnKeys...)
 	sort.Strings(deps)
-	return strings.Join([]string{string(task.State), task.Title, task.Body, task.Source.Status, task.Source.Priority, task.Source.Assignee, task.Source.Milestone, task.Source.Epic, task.Source.URL, strings.Join(labels, ","), strings.Join(deps, ","), fmt.Sprint(task.EstimatedMinutes)}, "\x00")
+	reporter, lastComment := "", ""
+	if task.Source.Reporter != nil {
+		reporter = task.Source.Reporter.Name + "\x01" + task.Source.Reporter.Mention
+	}
+	if count := len(task.Comments); count > 0 {
+		lastComment = fmt.Sprint(count, "\x01", task.Comments[count-1].ID)
+	}
+	return strings.Join([]string{reporter, lastComment, string(task.State), task.Title, task.Body, task.Source.Status, task.Source.Priority, task.Source.Assignee, task.Source.Milestone, task.Source.Epic, task.Source.URL, strings.Join(labels, ","), strings.Join(deps, ","), fmt.Sprint(task.EstimatedMinutes)}, "\x00")
+}
+
+// boundedComments keeps the latest MaxTaskComments comments, each bounded.
+func boundedComments(comments []domain.Comment) []domain.Comment {
+	if len(comments) > domain.MaxTaskComments {
+		comments = comments[len(comments)-domain.MaxTaskComments:]
+	}
+	out := make([]domain.Comment, 0, len(comments))
+	for _, comment := range comments {
+		comment.ID, comment.Author, comment.Body = bounded(comment.ID, 256), bounded(comment.Author, 256), bounded(comment.Body, domain.MaxCommentBytes)
+		out = append(out, comment)
+	}
+	return out
 }
 
 // bounded cuts value to at most limit bytes without splitting a rune.

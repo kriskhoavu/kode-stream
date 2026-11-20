@@ -169,6 +169,8 @@ func (s *Service) applyDecision(ctx context.Context, tx domain.Repository, recor
 		st.enqueue(role, false)
 		st.event(domain.EventStageRound, st.stage.ID, map[string]any{"kind": st.stage.Kind, "round": st.stage.Round, "answered": true, "role": role})
 		return st.save()
+	case domain.GateClarify:
+		return s.applyClarify(st, approval, input)
 	case domain.GateReview:
 		if st.stage.State != domain.StageAwaitingApproval || st.run.State != domain.RunRunning {
 			return domain.IllegalTransitionError{Entity: "stage", From: string(st.stage.State), To: "decided"}

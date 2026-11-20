@@ -48,7 +48,30 @@ type Source struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	Milestone string     `json:"milestone,omitempty"`
 	Epic      string     `json:"epic,omitempty"`
+	// Reporter is who opened the issue, where the source names one.
+	Reporter *Person `json:"reporter,omitempty"`
 }
+
+// Person is someone at a task's source, as the source names them. Mention is
+// the source's own markup that mentions them in a comment, where it has one.
+type Person struct {
+	Name    string `json:"name"`
+	Mention string `json:"mention,omitempty"`
+}
+
+// Comment is one comment on a task's issue. Every field is untrusted.
+type Comment struct {
+	ID        string    `json:"id"`
+	Author    string    `json:"author"`
+	CreatedAt time.Time `json:"createdAt"`
+	Body      string    `json:"body"`
+}
+
+// MaxTaskComments and MaxCommentBytes bound the comments kept on a task.
+const (
+	MaxTaskComments = 10
+	MaxCommentBytes = 4 << 10
+)
 
 // MaxTaskBodyBytes bounds the untrusted task body kept on a task.
 const MaxTaskBodyBytes = 16 << 10
@@ -68,17 +91,19 @@ type Task struct {
 	StartRequested   bool      `json:"startRequested"`
 	// AskQuestions overrides, for this task, whether an agent may stop and
 	// ask a person; nil follows the workspace, then the settings.
-	AskQuestions     *bool     `json:"askQuestions,omitempty"`
-	Note             string    `json:"note,omitempty"`
-	RunID            string    `json:"runId,omitempty"`
-	Attempts         int       `json:"attempts"`
-	DependsOn        []string  `json:"dependsOn"`
-	DependsOnKeys    []string  `json:"dependsOnKeys,omitempty"`
-	EstimatedMinutes int       `json:"estimatedMinutes,omitempty"`
-	MissedPolls      int       `json:"missedPolls,omitempty"`
-	Revision         int64     `json:"revision"`
-	DiscoveredAt     time.Time `json:"discoveredAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	AskQuestions     *bool    `json:"askQuestions,omitempty"`
+	Note             string   `json:"note,omitempty"`
+	RunID            string   `json:"runId,omitempty"`
+	Attempts         int      `json:"attempts"`
+	DependsOn        []string `json:"dependsOn"`
+	DependsOnKeys    []string `json:"dependsOnKeys,omitempty"`
+	EstimatedMinutes int      `json:"estimatedMinutes,omitempty"`
+	// Comments are the issue's latest comments, oldest first.
+	Comments     []Comment `json:"comments,omitempty"`
+	MissedPolls  int       `json:"missedPolls,omitempty"`
+	Revision     int64     `json:"revision"`
+	DiscoveredAt time.Time `json:"discoveredAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 // Candidate is what a scout found for one issue.
@@ -89,6 +114,7 @@ type Candidate struct {
 	Body             string
 	DependsOnKeys    []string
 	EstimatedMinutes int
+	Comments         []Comment
 }
 
 type RunState string
@@ -386,6 +412,9 @@ type Answer struct {
 	Questions []string `json:"questions"`
 	Answer    string   `json:"answer"`
 	By        string   `json:"by,omitempty"`
+	// FromSource marks a reply on the ticket itself, which the harness read
+	// from the source, rather than an answer a person gave in Kode Stream.
+	FromSource bool `json:"fromSource,omitempty"`
 }
 
 type Finding struct {
@@ -465,7 +494,20 @@ const (
 	// GateQuestion is an agent's own stop: it could not decide alone and
 	// asks a person; approving sends the answer back into its round.
 	GateQuestion GateKind = "question"
+	// GateClarify waits for a ticket's reporter: the planner found the
+	// ticket does not say enough to plan from. A new comment on the ticket
+	// sends the planner out again; a person may also continue with what they
+	// know, or dismiss the ticket.
+	GateClarify GateKind = "clarify"
 )
+
+// ReportNeedsInfo is the status a planner reports when a ready ticket does
+// not say enough to plan from.
+const ReportNeedsInfo = "needs_info"
+
+// MaxClarifyRounds bounds how often a planner waits for a ticket's reporter
+// before it asks a person instead.
+const MaxClarifyRounds = 3
 
 type ApprovalState string
 
@@ -483,6 +525,9 @@ const (
 	ChannelDashboard Channel = "dashboard"
 	ChannelWebex     Channel = "webex"
 	ChannelAPI       Channel = "api"
+	// ChannelSource is a decision the harness took on what the source said,
+	// such as the reporter replying on a ticket.
+	ChannelSource Channel = "source"
 )
 
 type Actor struct {
@@ -501,6 +546,10 @@ type ApprovalContext struct {
 	Questions []string `json:"questions,omitempty"`
 	// Role is the agent that asked.
 	Role Role `json:"role,omitempty"`
+	// Reporter is who a clarify gate waits for, and Draft the comment a
+	// person may post on the ticket to ask them.
+	Reporter string `json:"reporter,omitempty"`
+	Draft    string `json:"draft,omitempty"`
 }
 
 // MaxQuestions bounds how many questions one report may raise.

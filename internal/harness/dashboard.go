@@ -49,7 +49,9 @@ type DashboardTask struct {
 
 func dashboardTask(task domain.Task) DashboardTask {
 	view := DashboardTask{Task: task, Milestone: task.Source.Milestone, Epic: task.Source.Epic, CreatedAt: task.DiscoveredAt}
-	view.Body = ""
+	// A list carries neither the untrusted body nor the comments; the
+	// detail view and the brief read them.
+	view.Body, view.Comments = "", nil
 	if task.Source.Labels == nil {
 		view.Source.Labels = []string{}
 	}
@@ -154,6 +156,10 @@ type DashboardApprovalContext struct {
 	Verdict    domain.Verdict `json:"verdict,omitempty"`
 	Questions  []string       `json:"questions,omitempty"`
 	Role       domain.Role    `json:"role,omitempty"`
+	// Reporter and Draft belong to a clarify gate: who it waits for, and the
+	// comment a person may post on the ticket to ask them.
+	Reporter string `json:"reporter,omitempty"`
+	Draft    string `json:"draft,omitempty"`
 }
 
 type DashboardApproval struct {
@@ -173,7 +179,7 @@ func plainDifficulty(difficulty string) string {
 }
 
 func (s *Service) dashboardApproval(ctx context.Context, approval domain.Approval) DashboardApproval {
-	view := DashboardApproval{Approval: approval, Context: DashboardApprovalContext{Difficulty: plainDifficulty(approval.Context.Difficulty), Subtasks: approval.Context.Subtasks, Rounds: approval.Context.Round, CostUSD: approval.Context.CostSoFarUSD, Questions: approval.Context.Questions, Role: approval.Context.Role}}
+	view := DashboardApproval{Approval: approval, Context: DashboardApprovalContext{Difficulty: plainDifficulty(approval.Context.Difficulty), Subtasks: approval.Context.Subtasks, Rounds: approval.Context.Round, CostUSD: approval.Context.CostSoFarUSD, Questions: approval.Context.Questions, Role: approval.Context.Role, Reporter: approval.Context.Reporter, Draft: approval.Context.Draft}}
 	if approval.RunID != "" {
 		if run, err := s.repository.GetRun(ctx, approval.RunID); err == nil {
 			view.Context.DurationMs, view.Context.Blocking, view.Context.Advisory = run.Totals.DurationMs, run.Totals.Blocking, run.Totals.Advisory
@@ -381,12 +387,16 @@ func DashboardCostOf(summary domain.CostSummary) DashboardCost {
 // --- settings ---
 
 type DashboardSource struct {
-	WorkspaceID   string     `json:"workspaceId"`
-	Kind          string     `json:"kind"`
-	Enabled       bool       `json:"enabled"`
-	Query         string     `json:"query"`
-	Labels        []string   `json:"labels,omitempty"`
-	TokenEnvVar   string     `json:"tokenEnvVar,omitempty"`
+	WorkspaceID string   `json:"workspaceId"`
+	Kind        string   `json:"kind"`
+	Enabled     bool     `json:"enabled"`
+	Query       string   `json:"query"`
+	Labels      []string `json:"labels,omitempty"`
+	TokenEnvVar string   `json:"tokenEnvVar,omitempty"`
+	// CheckReady and ReadyStatuses are a Jira source's readiness check: nil
+	// CheckReady means on, and empty ReadyStatuses means READY.
+	CheckReady    *bool      `json:"checkReady,omitempty"`
+	ReadyStatuses []string   `json:"readyStatuses,omitempty"`
 	LastCheckedAt *time.Time `json:"lastCheckedAt,omitempty"`
 	LastFound     int        `json:"lastFound,omitempty"`
 	LastError     string     `json:"lastError,omitempty"`
@@ -457,7 +467,7 @@ func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, err
 	}
 	for _, workspace := range settings.Workspaces {
 		if jira := workspace.Jira; jira != nil {
-			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceJira), Enabled: jira.Enabled, Query: jira.JQL})
+			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceJira), Enabled: jira.Enabled, Query: jira.JQL, CheckReady: jira.CheckReady, ReadyStatuses: jira.ReadyStatuses})
 		}
 		if github := workspace.GitHub; github != nil {
 			add(DashboardSource{WorkspaceID: workspace.WorkspaceID, Kind: string(domain.SourceGitHub), Enabled: github.Enabled, Query: github.Repo, Labels: github.Labels, TokenEnvVar: github.TokenEnvVar})
@@ -579,7 +589,7 @@ func applySources(settings *domain.Settings, sources []DashboardSource) error {
 			query := strings.TrimSpace(source.Query)
 			switch domain.SourceKind(kind) {
 			case domain.SourceJira:
-				workspace.Jira = &domain.JiraSourceSettings{Enabled: source.Enabled, JQL: query}
+				workspace.Jira = &domain.JiraSourceSettings{Enabled: source.Enabled, JQL: query, CheckReady: source.CheckReady, ReadyStatuses: source.ReadyStatuses}
 			case domain.SourceGitHub:
 				workspace.GitHub = &domain.GitHubSourceSettings{Enabled: source.Enabled, Repo: query, Labels: source.Labels, TokenEnvVar: source.TokenEnvVar}
 			case domain.SourceBitbucket:
@@ -797,6 +807,6 @@ func DashboardTasks(tasks []domain.Task) []DashboardTask { return dashboardTasks
 // detail view.
 func DashboardTaskWithBody(task domain.Task) DashboardTask {
 	view := dashboardTask(task)
-	view.Body = task.Body
+	view.Body, view.Comments = task.Body, task.Comments
 	return view
 }

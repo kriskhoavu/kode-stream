@@ -5,6 +5,7 @@ package jira
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"kode-stream/internal/common/models"
@@ -19,6 +20,22 @@ type Searcher interface {
 type Scout struct{ client Searcher }
 
 func New(client Searcher) *Scout { return &Scout{client: client} }
+
+// jiraTime is how Jira writes a timestamp.
+const jiraTime = "2006-01-02T15:04:05.000-0700"
+
+// mention is Jira's wiki markup that mentions a person in a comment: an
+// account id on Jira Cloud, a user name on Server and Data Center.
+func mention(connection models.JiraConnection, id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" || strings.ContainsAny(id, "[]~|") {
+		return ""
+	}
+	if connection.DeploymentType == "cloud" {
+		return "[~accountid:" + id + "]"
+	}
+	return "[~" + id + "]"
+}
 
 func (s *Scout) Kind() domain.SourceKind { return domain.SourceJira }
 
@@ -43,11 +60,19 @@ func (s *Scout) Poll(ctx context.Context, workspace models.WorkspaceConfig, sett
 		if len(issue.FixVersions) > 0 {
 			source.Milestone = issue.FixVersions[0]
 		}
-		if updated, err := time.Parse("2006-01-02T15:04:05.000-0700", issue.UpdatedAt); err == nil {
+		if updated, err := time.Parse(jiraTime, issue.UpdatedAt); err == nil {
 			updated = updated.UTC()
 			source.UpdatedAt = &updated
 		}
-		candidates = append(candidates, domain.Candidate{WorkspaceID: workspace.ID, Source: source, Title: issue.Summary, Body: issue.Description, DependsOnKeys: issue.BlockedBy, EstimatedMinutes: int(issue.OriginalEstimateSeconds / 60)})
+		if issue.Reporter != nil && issue.Reporter.DisplayName != "" {
+			source.Reporter = &domain.Person{Name: issue.Reporter.DisplayName, Mention: mention(*workspace.Jira, issue.Reporter.AccountID)}
+		}
+		comments := make([]domain.Comment, 0, len(issue.Comments))
+		for _, comment := range issue.Comments {
+			created, _ := time.Parse(jiraTime, comment.CreatedAt)
+			comments = append(comments, domain.Comment{ID: comment.ID, Author: comment.Author, CreatedAt: created.UTC(), Body: comment.Body})
+		}
+		candidates = append(candidates, domain.Candidate{WorkspaceID: workspace.ID, Source: source, Title: issue.Summary, Body: issue.Description, DependsOnKeys: issue.BlockedBy, EstimatedMinutes: int(issue.OriginalEstimateSeconds / 60), Comments: comments})
 	}
 	return candidates, nil
 }

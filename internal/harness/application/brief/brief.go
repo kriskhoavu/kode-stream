@@ -22,6 +22,10 @@ type TaskInfo struct {
 	Title string
 	URL   string
 	Body  string
+	// Reporter is who opened the issue, where its source names them.
+	Reporter string
+	// Comments are the issue's latest comments, oldest first.
+	Comments []domain.Comment
 }
 
 type Input struct {
@@ -52,6 +56,10 @@ type Input struct {
 	GateCommands []string
 	LogTail      string
 	Reminder     bool
+	// ReadyCheck asks a planner to judge first whether the issue says
+	// enough to plan from, and to report needs_info instead of a plan when
+	// it does not.
+	ReadyCheck bool
 	// Procedure is the skill the repository's `.kode-stream/harness.yaml` maps
 	// this role to; empty keeps the built-in instructions alone.
 	Procedure Procedure
@@ -81,6 +89,7 @@ func Compose(input Input) string {
 
 	section("1. Goal")
 	b.WriteString(goal(input))
+	b.WriteString(readiness(input))
 	b.WriteString(procedure(input.Procedure))
 
 	section("2. Context")
@@ -102,6 +111,19 @@ func Compose(input Input) string {
 	issue := fmt.Sprintf("Key: %s\nTitle: %s\nURL: %s\n\n%s", input.Task.Key, input.Task.Title, input.Task.URL, input.Task.Body)
 	b.WriteString(Data(issue))
 	b.WriteString("\n")
+	if len(input.Task.Comments) > 0 {
+		b.WriteString("\nThe issue's latest comments, oldest first:\n\n")
+		var comments strings.Builder
+		for _, comment := range input.Task.Comments {
+			when := ""
+			if !comment.CreatedAt.IsZero() {
+				when = " on " + comment.CreatedAt.Format("2006-01-02 15:04")
+			}
+			fmt.Fprintf(&comments, "- %s%s:\n%s\n\n", nonEmpty(comment.Author, "Someone"), when, strings.TrimSpace(comment.Body))
+		}
+		b.WriteString(Data(comments.String()))
+		b.WriteString("\n")
+	}
 	if len(input.Findings) > 0 {
 		b.WriteString("\nFindings to address from the last review:\n\n")
 		var findings strings.Builder
@@ -136,7 +158,7 @@ func Compose(input Input) string {
 		b.WriteString("\n")
 	}
 	if len(input.Answers) > 0 {
-		b.WriteString("\nYou stopped earlier to ask. A person answered; continue from these answers and do not ask them again:\n\n")
+		b.WriteString("\nYou stopped earlier to ask. Continue from these answers, and from the issue's comments where an answer points to them, and do not ask again what they settle:\n\n")
 		var answers strings.Builder
 		for _, answer := range input.Answers {
 			for _, question := range answer.Questions {
@@ -145,6 +167,9 @@ func Compose(input Input) string {
 			who := answer.By
 			if who == "" {
 				who = "a person"
+			}
+			if answer.FromSource {
+				who += ", on the issue"
 			}
 			fmt.Fprintf(&answers, "  A (%s): %s\n", who, answer.Answer)
 		}
@@ -172,6 +197,9 @@ func Compose(input Input) string {
 	section("5. Deliverable")
 	fmt.Fprintf(&b, "Write `%s` as one JSON object with `\"schema\": %q` and these fields:\n\n", ReportPath, domain.ReportSchema)
 	b.WriteString(deliverable(input.Role))
+	if input.ReadyCheck {
+		b.WriteString("\nIf the issue does not say enough to plan from, write no plan and report `status: needs_info` with `summary` (the problem as you understand it) and `open` (the questions for the reporter), and leave `planPath`, `difficulty` and `subtasks` empty.\n")
+	}
 	b.WriteString("\nIf you cannot write the file, end your final message with the same JSON in a fenced block that opens with ```json harness-report.\n")
 
 	section("6. Verification")
@@ -221,6 +249,17 @@ func goal(input Input) string {
 		return "The verification commands failed after the build. Find the cause and fix it with the smallest change that makes them pass.\n"
 	}
 	return ""
+}
+
+// readiness tells a planner to judge first whether the issue says enough to
+// plan from, and who would answer if it does not.
+func readiness(input Input) string {
+	if !input.ReadyCheck || input.Role != domain.RolePlanner {
+		return ""
+	}
+	reporter := nonEmpty(input.Task.Reporter, "the person who opened the issue")
+	return "\nBefore you plan, judge whether the issue, its comments and the code give you enough to plan from. They do not when the problem or the result expected is unclear, or when a choice only " + reporter + " can make is missing. Read the code before you decide: do not ask what the repository already answers.\n" +
+		"If they do not, write no plan. Report `needs_info` instead (see Deliverable): summarise the problem as you understand it, and list the questions for " + reporter + ", each one answerable on its own. Kode Stream shows them to the assignee, who asks " + reporter + " on the issue; their reply comes back to you as a comment.\n"
 }
 
 // procedure tells the agent to follow the repository's own skill for this

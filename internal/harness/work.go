@@ -122,7 +122,10 @@ func (s *Service) nextStartable(ctx context.Context, settings domain.Settings, w
 		return domain.Task{}, false, err
 	}
 	for _, task := range tasks {
-		if !settings.AutoStart && !task.StartRequested {
+		// A ticket in a ready status starts on its own: its planner first judges
+		// whether the ticket says enough, and nothing is built before a person
+		// approves the plan.
+		if !settings.AutoStart && !task.StartRequested && !settings.ReadyCheck(task) {
 			continue
 		}
 		ready := true
@@ -490,10 +493,14 @@ func (s *Service) finishAgentRun(ctx context.Context, agentRunID string, apply f
 // briefInput gathers what a brief needs: the task, the run, the plan and
 // the findings the producer must address.
 func (s *Service) briefInput(ctx context.Context, run domain.Run, stage domain.Stage, task domain.Task, agentRun domain.AgentRun, settings domain.Settings) brief.Input {
-	input := brief.Input{Role: agentRun.Role, Task: brief.TaskInfo{Key: task.Source.Key, Title: task.Title, URL: task.Source.URL, Body: task.Body}, Branch: run.Branch, BaseCommit: run.BaseCommit, Round: stage.Round, MaxRounds: stage.MaxRounds, Difficulty: run.Difficulty, PlanPath: run.PlanPath, Reminder: agentRun.Reminder}
+	input := brief.Input{Role: agentRun.Role, Task: brief.TaskInfo{Key: task.Source.Key, Title: task.Title, URL: task.Source.URL, Body: task.Body, Comments: task.Comments}, Branch: run.Branch, BaseCommit: run.BaseCommit, Round: stage.Round, MaxRounds: stage.MaxRounds, Difficulty: run.Difficulty, PlanPath: run.PlanPath, Reminder: agentRun.Reminder}
 	if workspace, found, err := s.workspaces.Get(run.WorkspaceID); err == nil && found {
 		input.WorkspaceName, input.Baseline = workspace.Name, workspace.BaselineBranch
 	}
+	if task.Source.Reporter != nil {
+		input.Task.Reporter = task.Source.Reporter.Name
+	}
+	input.ReadyCheck = agentRun.Role == domain.RolePlanner && readinessOpen(settings, task, stage)
 	if workspaceSettings, ok := settings.Workspace(run.WorkspaceID); ok {
 		input.GateCommands = workspaceSettings.VerificationCommands
 	}

@@ -62,6 +62,43 @@ type JiraSourceSettings struct {
 	Enabled bool   `json:"enabled"`
 	JQL     string `json:"jql"`
 	Max     int    `json:"max"`
+	// CheckReady turns the readiness check on or off; nil means on. With it
+	// on, a ticket in one of ReadyStatuses starts on its own, and its planner
+	// first judges whether the ticket says enough to plan from.
+	CheckReady *bool `json:"checkReady,omitempty"`
+	// ReadyStatuses are the Jira statuses that mean a ticket is ready to
+	// work on; empty means DefaultReadyStatuses.
+	ReadyStatuses []string `json:"readyStatuses,omitempty"`
+}
+
+// DefaultReadyStatuses is the Jira status a ticket is ready in, unless a
+// workspace names its own.
+var DefaultReadyStatuses = []string{"READY"}
+
+// MaxReadyStatuses bounds how many ready statuses a workspace names.
+const MaxReadyStatuses = 10
+
+// Ready reports whether the readiness check applies to a ticket in status:
+// Jira is on, the check is on, and status is one of the ready ones, in any
+// case.
+func (j *JiraSourceSettings) Ready(status string) bool {
+	if j == nil || !j.Enabled || (j.CheckReady != nil && !*j.CheckReady) {
+		return false
+	}
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return false
+	}
+	statuses := j.ReadyStatuses
+	if len(statuses) == 0 {
+		statuses = DefaultReadyStatuses
+	}
+	for _, ready := range statuses {
+		if strings.EqualFold(strings.TrimSpace(ready), status) {
+			return true
+		}
+	}
+	return false
 }
 
 type GitHubSourceSettings struct {
@@ -309,6 +346,17 @@ func (s Settings) QuestionGate(task Task) bool {
 	return true
 }
 
+// ReadyCheck reports whether task is a Jira ticket in one of its workspace's
+// ready statuses with the readiness check on: such a task starts on its own,
+// and its planner first judges whether the ticket says enough to plan from.
+func (s Settings) ReadyCheck(task Task) bool {
+	if task.Source.Kind != SourceJira {
+		return false
+	}
+	workspace, ok := s.Workspace(task.WorkspaceID)
+	return ok && workspace.Jira.Ready(task.Source.Status)
+}
+
 func (s Settings) Workspace(id string) (WorkspaceSettings, bool) {
 	for _, workspace := range s.Workspaces {
 		if workspace.WorkspaceID == id {
@@ -477,6 +525,21 @@ func (s Settings) Normalize() (Settings, error) {
 			if workspace.Jira.Enabled && strings.TrimSpace(workspace.Jira.JQL) == "" {
 				return s, Invalid("workspace %s jira.jql is required when Jira is enabled", workspace.WorkspaceID)
 			}
+			if len(workspace.Jira.ReadyStatuses) > MaxReadyStatuses {
+				return s, Invalid("workspace %s names more than %d ready statuses", workspace.WorkspaceID, MaxReadyStatuses)
+			}
+			statuses := []string{}
+			for _, status := range workspace.Jira.ReadyStatuses {
+				status = strings.TrimSpace(status)
+				if status == "" {
+					continue
+				}
+				if len(status) > 64 {
+					return s, Invalid("workspace %s ready status %q is longer than 64 characters", workspace.WorkspaceID, status)
+				}
+				statuses = append(statuses, status)
+			}
+			workspace.Jira.ReadyStatuses = statuses
 		}
 		if workspace.GitHub != nil {
 			if workspace.GitHub.Labels == nil {

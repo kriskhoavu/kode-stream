@@ -489,6 +489,7 @@ func (s *Service) PollNow(ctx context.Context, workspaceID string) ([]SourceHeal
 	if err != nil {
 		return nil, err
 	}
+	s.answerFromSource(ctx)
 	out := make([]SourceHealth, 0, len(polled))
 	for _, health := range polled {
 		out = append(out, SourceHealth{WorkspaceID: health.WorkspaceID, Kind: string(health.Kind), LastPolledAt: health.LastPolledAt, Found: health.Found, Added: health.Added, LastError: health.LastError})

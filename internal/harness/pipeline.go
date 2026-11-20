@@ -355,6 +355,10 @@ func describeFailure(agentRun domain.AgentRun) string {
 // advance applies a successful agent run's report to its stage.
 func (st *step) advance(agentRun domain.AgentRun) {
 	report := agentRun.Report
+	if agentRun.Role == domain.RolePlanner && report.Status == domain.ReportNeedsInfo {
+		st.needsInfo(agentRun)
+		return
+	}
 	if producer(agentRun.Role) && st.stopsToAsk(agentRun) {
 		return
 	}

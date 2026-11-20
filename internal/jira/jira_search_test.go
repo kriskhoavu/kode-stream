@@ -14,10 +14,10 @@ func TestSearchIssuesUsesTheDeploymentsSearchEndpoint(t *testing.T) {
 	var paths []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
-		if r.URL.Query().Get("jql") != "project = PM" || r.URL.Query().Get("maxResults") != "5" || !strings.Contains(r.URL.Query().Get("fields"), "issuelinks") {
+		if r.URL.Query().Get("jql") != "project = PM" || r.URL.Query().Get("maxResults") != "5" || !strings.Contains(r.URL.Query().Get("fields"), "issuelinks") || !strings.Contains(r.URL.Query().Get("fields"), "reporter,comment") {
 			t.Fatalf("query = %s", r.URL.RawQuery)
 		}
-		_, _ = w.Write([]byte(`{"issues":[{"key":"PM-2","fields":{"summary":"Add harness","description":"Plain text","status":{"name":"To Do","statusCategory":{"key":"new"}},"issuetype":{"name":"Story"},"assignee":{"displayName":"Anna"},"priority":{"name":"High"},"labels":["bug"],"updated":"2026-11-01T10:00:00.000+0000","fixVersions":[{"name":"M1"}],"parent":{"key":"PM-1"},"timeoriginalestimate":3600,"issuelinks":[{"type":{"inward":"is blocked by"},"inwardIssue":{"key":"PM-3"}},{"type":{"inward":"relates to"},"inwardIssue":{"key":"PM-9"}}]}}]}`))
+		_, _ = w.Write([]byte(`{"issues":[{"key":"PM-2","fields":{"summary":"Add harness","description":"Plain text","status":{"name":"To Do","statusCategory":{"key":"new"}},"issuetype":{"name":"Story"},"assignee":{"displayName":"Anna"},"reporter":{"displayName":"Bao","name":"bao"},"comment":{"comments":[{"id":"10","author":{"displayName":"Bao"},"body":"Which tenant?","created":"2026-11-02T09:00:00.000+0000"}]},"priority":{"name":"High"},"labels":["bug"],"updated":"2026-11-01T10:00:00.000+0000","fixVersions":[{"name":"M1"}],"parent":{"key":"PM-1"},"timeoriginalestimate":3600,"issuelinks":[{"type":{"inward":"is blocked by"},"inwardIssue":{"key":"PM-3"}},{"type":{"inward":"relates to"},"inwardIssue":{"key":"PM-9"}}]}}]}`))
 	}))
 	defer server.Close()
 	client := New()
@@ -29,6 +29,9 @@ func TestSearchIssuesUsesTheDeploymentsSearchEndpoint(t *testing.T) {
 	issue := issues[0]
 	if issue.Key != "PM-2" || issue.Priority != "High" || issue.Assignee != "Anna" || issue.Epic != "PM-1" || issue.OriginalEstimateSeconds != 3600 || len(issue.BlockedBy) != 1 || issue.BlockedBy[0] != "PM-3" || issue.FixVersions[0] != "M1" || issue.Description != "Plain text" {
 		t.Fatalf("issue = %#v", issue)
+	}
+	if issue.Reporter == nil || issue.Reporter.DisplayName != "Bao" || issue.Reporter.AccountID != "bao" || len(issue.Comments) != 1 || issue.Comments[0].Author != "Bao" || issue.Comments[0].Body != "Which tenant?" || issue.Comments[0].ID != "10" {
+		t.Fatalf("reporter and comments = %#v %#v", issue.Reporter, issue.Comments)
 	}
 	if _, err := client.SearchIssues(context.Background(), models.JiraConnection{DeploymentType: "cloud", BaseURL: server.URL, AccountEmail: "a@example.com", TokenEnvVar: "JIRA_TOKEN"}, "project = PM", 5); err != nil {
 		t.Fatal(err)

@@ -96,6 +96,7 @@ func (s *Service) scoutCycle(ctx context.Context) error {
 		return nil
 	}
 	polled, err := s.poller.Poll(ctx, settings, "")
+	s.answerFromSource(ctx)
 	for _, health := range polled {
 		if health.Added > 0 {
 			wake(s.sortWake)

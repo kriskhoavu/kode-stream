@@ -20,7 +20,7 @@ func TestAPlannerWithOpenQuestionsStopsToAskAndContinuesFromTheAnswer(t *testing
 			report["open"] = []string{"Should the export include archived offers?", "Is CSV enough, or XLSX too?"}
 			return report, ports.Result{Turns: 1, CostUSD: 0.2}
 		}
-		if role == domain.RolePlanner && strings.Contains(invocation.Brief, "A person answered") {
+		if role == domain.RolePlanner && strings.Contains(invocation.Brief, "Continue from these answers") {
 			report := planReport(role)
 			report["summary"] = "Planned with the answers."
 			return report, ports.Result{Turns: 1, CostUSD: 0.2}
@@ -49,7 +49,7 @@ func TestAPlannerWithOpenQuestionsStopsToAskAndContinuesFromTheAnswer(t *testing
 	}
 	fixture.settle(t)
 	second := fixture.engine.brief(domain.RolePlanner, 1)
-	if !strings.Contains(second, "A person answered") || !strings.Contains(second, "Q: Should the export include archived offers?") || !strings.Contains(second, "A (Anna): Archived too. CSV is enough.") {
+	if !strings.Contains(second, "Continue from these answers") || !strings.Contains(second, "Q: Should the export include archived offers?") || !strings.Contains(second, "A (Anna): Archived too. CSV is enough.") {
 		t.Fatalf("second brief:\n%s", second)
 	}
 	view = fixture.run(t)

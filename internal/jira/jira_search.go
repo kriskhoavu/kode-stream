@@ -33,7 +33,27 @@ type SearchedIssue struct {
 	FixVersions             []string `json:"fixVersions"`
 	Epic                    string   `json:"epic,omitempty"`
 	OriginalEstimateSeconds int64    `json:"originalEstimateSeconds,omitempty"`
+	// Reporter is who opened the issue; nil when Jira names nobody.
+	Reporter *Person `json:"reporter,omitempty"`
+	// Comments are the issue's latest comments, oldest first, at most
+	// MaxSearchedComments, each bounded.
+	Comments []SearchedComment `json:"comments"`
 }
+
+// SearchedComment is one comment on a searched issue. Its body is untrusted.
+type SearchedComment struct {
+	ID        string `json:"id"`
+	Author    string `json:"author"`
+	CreatedAt string `json:"createdAt"`
+	Body      string `json:"body"`
+}
+
+// MaxSearchedComments and maxCommentBytes bound what a search keeps of an
+// issue's comments.
+const (
+	MaxSearchedComments = 10
+	maxCommentBytes     = 4 << 10
+)
 
 type jiraSearchResponse struct {
 	Issues []struct {
@@ -51,6 +71,15 @@ type jiraSearchResponse struct {
 				Name string `json:"name"`
 			} `json:"issuetype"`
 			Assignee *jiraPerson `json:"assignee"`
+			Reporter *jiraPerson `json:"reporter"`
+			Comment  *struct {
+				Comments []struct {
+					ID      string          `json:"id"`
+					Author  *jiraPerson     `json:"author"`
+					Body    json.RawMessage `json:"body"`
+					Created string          `json:"created"`
+				} `json:"comments"`
+			} `json:"comment"`
 			Priority *struct {
 				Name string `json:"name"`
 			} `json:"priority"`
@@ -75,7 +104,7 @@ type jiraSearchResponse struct {
 	} `json:"issues"`
 }
 
-const searchFields = "summary,status,description,issuetype,assignee,priority,labels,updated,fixVersions,parent,timeoriginalestimate,issuelinks"
+const searchFields = "summary,status,description,issuetype,assignee,reporter,comment,priority,labels,updated,fixVersions,parent,timeoriginalestimate,issuelinks"
 
 // SearchIssues runs a JQL search: Jira Server and Data Center through API 2
 // search, Jira Cloud through API 3 search/jql. It reads only.
@@ -128,7 +157,27 @@ func (c *Client) SearchIssues(ctx context.Context, connection models.JiraConnect
 		category, _ := boundedString(raw.Fields.Status.StatusCategory.Key, maxScalarBytes)
 		issueType, _ := boundedString(raw.Fields.IssueType.Name, maxScalarBytes)
 		updated, _ := boundedString(raw.Fields.Updated, maxScalarBytes)
-		issue := SearchedIssue{Key: key, Summary: summary, Description: description, Status: status, StatusCategory: category, IssueType: issueType, Labels: boundedStrings(raw.Fields.Labels, maxLabels, maxScalarBytes, &truncated), UpdatedAt: updated, BrowserURL: connection.BaseURL + "/browse/" + url.PathEscape(key), BlockedBy: []string{}, FixVersions: []string{}}
+		issue := SearchedIssue{Key: key, Summary: summary, Description: description, Status: status, StatusCategory: category, IssueType: issueType, Labels: boundedStrings(raw.Fields.Labels, maxLabels, maxScalarBytes, &truncated), UpdatedAt: updated, BrowserURL: connection.BaseURL + "/browse/" + url.PathEscape(key), BlockedBy: []string{}, FixVersions: []string{}, Comments: []SearchedComment{}}
+		if person, _ := normalizePerson(raw.Fields.Reporter); person != nil {
+			issue.Reporter = person
+		}
+		if raw.Fields.Comment != nil {
+			comments := raw.Fields.Comment.Comments
+			if len(comments) > MaxSearchedComments {
+				comments = comments[len(comments)-MaxSearchedComments:]
+			}
+			for _, comment := range comments {
+				body, _ := normalizeDescription(comment.Body)
+				body, _ = boundedString(body, maxCommentBytes)
+				id, _ := boundedString(comment.ID, maxScalarBytes)
+				created, _ := boundedString(comment.Created, maxScalarBytes)
+				author := ""
+				if person, _ := normalizePerson(comment.Author); person != nil {
+					author = person.DisplayName
+				}
+				issue.Comments = append(issue.Comments, SearchedComment{ID: id, Author: author, CreatedAt: created, Body: body})
+			}
+		}
 		if raw.Fields.Priority != nil {
 			issue.Priority, _ = boundedString(raw.Fields.Priority.Name, maxScalarBytes)
 		}
