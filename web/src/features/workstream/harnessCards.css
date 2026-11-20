@@ -438,3 +438,19 @@
 	color: var(--muted);
 }
 
+
+button.card-kind-key {
+	min-width: 0;
+	border: 0;
+	background: transparent;
+	padding: 0;
+	font: inherit;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+button.card-kind-key:hover,
+button.card-kind-key:focus-visible {
+	color: var(--button-accent);
+	text-decoration: underline;
+}

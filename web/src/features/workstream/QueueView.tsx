@@ -140,9 +140,9 @@ function FinishedList({ tasks, harness, onOpenTask }: { tasks: HarnessTask[]; ha
 					return (
 						<li key={task.id} className="hx-row hx-queue-row" data-task-id={task.id}>
 							<span className="hx-queue-rank" />
-							<span className="hx-row-key"><b>{task.source.key}</b><SourceBadge kind={task.source.kind} url={task.source.url} /></span>
+							<span className="hx-row-key"><button type="button" className="hx-key-button" title={`Open ${task.source.key}`} onClick={() => onOpenTask(task)}>{task.source.key}</button><SourceBadge kind={task.source.kind} url={task.source.url} /></span>
 							<span className="hx-row-title">
-								<button type="button" className="hx-title-button" onClick={() => onOpenTask(task)}>{task.title}</button>
+								<span className="hx-row-name">{task.title}</span>
 								<small className="hx-muted">{at ? `Finished ${formatAgo(at, now)}` : 'Finished'}{task.note ? ` · ${task.note}` : ''}</small>
 							</span>
 							<span />

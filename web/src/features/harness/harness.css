@@ -2573,3 +2573,29 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 .confirm-dialog.settings-file-dialog { width: min(640px, 100%); max-height: min(720px, calc(100vh - 40px)); overflow: auto; }
 .settings-file-dialog .settings-file-state { margin: 0; padding: 0; }
 .settings-file-dialog footer button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* A task's key opens its details; its title is plain text. */
+.hx-key-button {
+	border: 0;
+	background: transparent;
+	padding: 0;
+	color: var(--text);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 700;
+	text-align: left;
+	cursor: pointer;
+}
+
+.hx-key-button:hover,
+.hx-key-button:focus-visible {
+	color: var(--accent-text);
+	text-decoration: underline;
+}
+
+.hx-row-name {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

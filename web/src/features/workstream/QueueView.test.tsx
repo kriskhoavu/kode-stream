@@ -59,6 +59,15 @@ describe('QueueView', () => {
 		expect(rows[1]).toHaveClass('selected');
 	});
 
+	it('opens a task from its key, not its title', () => {
+		const onOpenTask = vi.fn();
+		render(<QueueView tasks={Object.values(state.tasks)} harness={controller(state)} onOpenTask={onOpenTask} />);
+		const list = screen.getByRole('list', { name: 'Task Queue in order' });
+		expect(within(list).queryByRole('button', { name: ready.title })).not.toBeInTheDocument();
+		fireEvent.click(within(list).getByRole('button', { name: 'PM-1' }));
+		expect(onOpenTask).toHaveBeenCalledWith(expect.objectContaining({ id: ready.id }));
+	});
+
 	it('ranks the rows with their scores, explains the chosen one and says what starts next', () => {
 		render(<QueueView tasks={Object.values(state.tasks)} harness={controller(state)} onOpenTask={vi.fn()} />);
 		const rows = within(screen.getByRole('list', { name: 'Task Queue in order' })).getAllByRole('listitem');

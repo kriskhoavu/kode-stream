@@ -1541,6 +1541,8 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   // wiki items arrived as metadataSource "workspace-settings" and printed it twice.
   const tags = (docs ? plan.tags.filter((tag) => tag !== plan.scope && tag !== plan.identifier) : plan.tags).filter((tag) => tag !== source);
   const synthetic = isSyntheticItem(plan);
+  // The card's key opens it where the card shows one; else its title does.
+  const keyOpens = !docs && (synthetic || showItem);
   const draggable = isItemDraggable(plan) && !pending && !synthetic && !autoStatus;
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -1582,13 +1584,15 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
           <span className={synthetic ? 'card-kind ticket' : 'card-kind plan'} title={synthetic ? 'A Jira ticket the harness holds. No plan on this branch yet.' : undefined}>
             {synthetic ? <Ticket size={13} aria-hidden="true" /> : <FileText size={13} aria-hidden="true" />}
             <span>{synthetic ? 'Jira ticket' : 'Plan'}</span>
-            {(synthetic || showItem) && <><span aria-hidden="true">·</span><span className="card-kind-key">{plan.identifier}</span></>}
+            {keyOpens && <><span aria-hidden="true">·</span><button type="button" className="card-kind-key" title={`Open ${plan.identifier}`} onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.identifier}</button></>}
           </span>
           {!synthetic && <AgentCluster agents={agents} title={plan.title} onOpen={onOpenAgent} />}
         </div>
       )}
       <div className="plan-card-title">
-        <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
+        {keyOpens
+          ? <strong className="plan-card-heading">{plan.title}</strong>
+          : <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>}
         {docs && source && <span className="card-badges"><span className="source-badge docs">{source}</span></span>}
       </div>
       {docs && showItem && <span className="plan-card-identifier">{plan.identifier}</span>}

@@ -81,9 +81,9 @@ export function QueueList({ tasks, allTasks, runs, onPin, onOpen, onSelect, sele
 						onClick={onSelect ? () => onSelect(task) : undefined}
 					>
 						<span className="hx-queue-rank hx-num" aria-label={`Position ${index + 1}`}>{onMove && <GripVertical size={13} aria-hidden="true" className="hx-queue-grip" />}{index + 1}</span>
-						<span className="hx-row-key"><b>{task.source.key}</b><SourceBadge kind={task.source.kind} url={task.source.url} /></span>
+						<span className="hx-row-key"><button type="button" className="hx-key-button" title={`Open ${task.source.key}`} onClick={(event) => { event.stopPropagation(); onOpen(task); }}>{task.source.key}</button><SourceBadge kind={task.source.kind} url={task.source.url} /></span>
 						<span className="hx-row-title">
-							<button type="button" className="hx-title-button" onClick={(event) => { event.stopPropagation(); onOpen(task); }}>{task.title}</button>
+							<span className="hx-row-name">{task.title}</span>
 							<small className="hx-muted" title={task.scoreReasons.join(' · ') || undefined}>
 								{waiting.length ? `Waits for ${waiting.join(', ')}` : task.scoreReasons[0] ?? ''}
 							</small>

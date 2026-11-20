@@ -250,7 +250,9 @@ describe('WorkstreamPage', () => {
 
     render(<WorkstreamPage workspace={{ ...workspace, sources: ['items', 'wiki'] }} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
-    await screen.findByRole('button', { name: 'Master Data' });
+    // A card that shows its key opens from the key; its title is plain text.
+    await screen.findByRole('button', { name: 'master-data' });
+    expect(screen.queryByRole('button', { name: 'Master Data' })).not.toBeInTheDocument();
     const card = document.querySelector('.plan-card');
     expect(card).toBeInstanceOf(HTMLElement);
     // A work item's card names its kind, not its source: the Source filter carries that, and the tag that repeats it is dropped.

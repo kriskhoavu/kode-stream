@@ -115,3 +115,16 @@
 	width: 132px;
 }
 
+
+.plan-list-id {
+	flex: 0 0 auto;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.plan-list-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

@@ -12,7 +12,7 @@ import './planList.css';
 /**
  * The plans on the branch as rows, one group per status in board order. A
  * person moves a plan with its status menu, as on the board; a row opens the
- * plan's drawer, its title the plan's page.
+ * plan's drawer, its ID the plan's page, or its title where the ID repeats it.
  */
 export function PlanListView({ items, workspace, loading, pendingIds, workOf, onPreview, onOpen, onMove }: {
 	items: ItemSummary[];
@@ -58,8 +58,9 @@ export function PlanListView({ items, workspace, loading, pendingIds, workOf, on
 									<td className="plan-list-title">
 										<span className="plan-list-title-inner">
 											<FileText size={14} aria-hidden="true" />
-											<button type="button" className="plan-list-link" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.title}</button>
-											{showKey && <span className="plan-list-key">{item.identifier}</span>}
+											{showKey
+												? <><button type="button" className="plan-list-link plan-list-id" title={`Open ${item.identifier}`} onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.identifier}</button><span className="plan-list-name">{item.title}</span></>
+												: <button type="button" className="plan-list-link" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.title}</button>}
 										</span>
 									</td>
 									<td onClick={(event) => event.stopPropagation()}>
