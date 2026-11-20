@@ -22,8 +22,8 @@ clearer local Git operations.
 - Lists a workspace's agent sessions in Agent Space, in one list of two kinds: interactive sessions a person drives in
   a terminal, and harness sessions the harness runs headless for a task, each with its changes.
 - Indexes LLM Wiki content and graph relationships for structured knowledge workflows.
-- Keeps default settings for every workspace and each workspace's own choices over them: its AI provider, harness
-  switches, tests, models, role skills and sources. A team shares chosen parts through `.kode-stream/settings.yaml`.
+- Keeps app-wide settings under Settings and each workspace's own on its page under Workspaces: its AI provider,
+  harness switches, tests, models, role skills and sources. A team shares chosen parts through `.kode-stream/settings.yaml`.
 - Stores app registry, cache, audit log, filters, recents, and AI settings outside managed repositories.
 
 ## Deployment Modes

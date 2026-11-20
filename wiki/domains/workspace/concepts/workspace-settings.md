@@ -3,7 +3,7 @@ slug: workspace-settings
 title: Defaults And A Workspace's Own Settings
 pageType: CONCEPT
 topics: workspace, settings, harness, ai provider, settings file, export, import
-summary: Every workspace starts from the app's defaults and may set its own provider, harness switches, tests, models, role skills and sources, which a team shares through .kode-stream/settings.yaml.
+summary: Settings holds what is the same on this machine for every workspace; each workspace's page under Workspaces holds its own provider, harness switches, tests, models, role skills and sources, which a team shares through .kode-stream/settings.yaml.
 sourceRef: |
   PM-044 | Workspace settings
 lastVerified: 2026-11-20
@@ -11,21 +11,23 @@ lastVerified: 2026-11-20
 
 ## Two Layers
 <!-- chunkId: workspace-settings-two-layers -->
-<!-- keywords: defaults, workspace override, settings for, picker -->
+<!-- keywords: defaults, workspace override, workspaces page, ai and harness tab, own models -->
 
-[live] Settings opens on the defaults every workspace starts from. A picker at its top, Settings for, switches to one workspace, whose page holds only what that workspace may set for itself. A blank value follows the defaults, and its field shows the default greyed or names it, as in `Default (on)`. Evidence: `web/src/pages/SettingsPage.tsx:54`.
+[live] Settings holds what is the same for every workspace on this machine: how Kode Stream looks, storage, the AI tools' executables and terminals and the default provider, the harness switches every workspace starts from, and the role pauses. A workspace's own settings are on its page under Workspaces, in the AI and harness tab. Evidence: `web/src/pages/SettingsPage.tsx:33`, `web/src/pages/WorkspacesPage.tsx:827`.
 
-[live] Kode Stream keeps both layers itself. The harness resolves a run's settings as the defaults with its workspace's choices laid over them: whether the harness runs there, whether a task starts on its own, whether a run waits at Review, and each role's engine, model, hard model and most turns. Evidence: `internal/harness/domain/settings.go:154`, `internal/harness/work.go:229`.
+[live] A workspace's switches and provider follow the defaults until it sets them, and their fields name the default, as in `Default (on)`. Its models are its own outright: every workspace holds each role's engine, model, hard model and most turns, copied from Kode Stream's defaults when it is first seen on start, so changing one workspace's models changes no other. An empty hard model keeps hard work on the easy model. Evidence: `internal/harness/domain/settings.go:200`, `internal/harness/teamfile.go:157`.
+
+[live] Kode Stream keeps both layers itself. The harness resolves a run's settings as the defaults with its workspace's choices laid over them. Evidence: `internal/harness/domain/settings.go:154`, `internal/harness/work.go:229`.
 
 ## What A Workspace Sets
 <!-- chunkId: workspace-settings-what-a-workspace-sets -->
 <!-- keywords: provider, test command, scope, models, role skills, sources, machine-wide -->
 
-| Area | A workspace sets | Stays the defaults' alone |
+| Area | The workspace's page | Settings, for every workspace |
 |---|---|---|
-| Local AI tools | the provider a new session starts with | executables, terminals and their arguments |
-| Harness | run here, start on its own, Review before hand-off, stop and ask | role pauses, slots, intervals, retention |
-| Models | each role's engine, model, hard model and most turns | tool permissions and allowed tools |
+| Local AI tools | the provider a new session starts with | executables, terminals and their arguments, the default provider |
+| Harness | run here, start on its own, Review before hand-off, stop and ask | the same switches as defaults, role pauses, slots, intervals, retention |
+| Models | each role's engine, model, hard model and most turns, all its own | tool permissions and allowed tools |
 | Work | test command, paths the Builder may change, role skills, sources | — |
 
 [live] A session started in a workspace, by the launch dialog or at a run's Review, starts with that workspace's provider, else the default. Evidence: `web/src/lib/types.ts:497`, `internal/ai/ai_settings_repository.go:51`.
@@ -36,7 +38,7 @@ lastVerified: 2026-11-20
 <!-- chunkId: workspace-settings-file -->
 <!-- keywords: .kode-stream/settings.yaml, export, import, parts, team, commit -->
 
-[live] A team shares a workspace's settings through `.kode-stream/settings.yaml` in its repository. Kode Stream never reads the file on its own. The workspace's Settings file panel exports chosen parts of its settings into the file, creating it, and imports chosen parts of the file over its settings, showing each part as the file holds it beside what the workspace has now. A part the import does not name stays as it was. Evidence: `web/src/features/settings/SettingsFilePanel.tsx:38`, `internal/server/api/settings_file_controller.go:81`, `internal/server/api/settings_file_controller.go:112`.
+[live] A team shares a workspace's settings through `.kode-stream/settings.yaml` in its repository. Kode Stream never reads the file on its own. The Settings file panel in the workspace's AI and harness tab exports chosen parts of its settings into the file, creating it, and imports chosen parts of the file over its settings, showing each part as the file holds it beside what the workspace has now. A part the import does not name stays as it was. Evidence: `web/src/features/settings/SettingsFilePanel.tsx:38`, `internal/server/api/settings_file_controller.go:81`, `internal/server/api/settings_file_controller.go:112`.
 
 The parts are the AI provider, the harness switches, the test command, the paths the Builder may change, the models, the role skills and the sources. A personal value, such as a Jira search that names its owner, stays in Kode Stream unless someone exports it.
 
