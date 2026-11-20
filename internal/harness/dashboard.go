@@ -424,8 +424,11 @@ type DashboardSettings struct {
 	Sources       []DashboardSource `json:"sources"`
 	// Workspaces holds each workspace's own choices over these settings. A
 	// save that omits it keeps the stored ones.
-	Workspaces       []DashboardWorkspace                `json:"workspaces"`
+	Workspaces []DashboardWorkspace `json:"workspaces"`
+	// ModelPolicy is the models a new workspace starts with. Once
+	// WorkspaceModels is set, a save leaves it as it is.
 	ModelPolicy      map[domain.Role]DashboardRolePolicy `json:"modelPolicy"`
+	WorkspaceModels  bool                                `json:"workspaceModels"`
 	ExpectedRevision *int64                              `json:"expectedRevision,omitempty"`
 }
 
@@ -434,7 +437,7 @@ func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, err
 	if err != nil {
 		return DashboardSettings{}, err
 	}
-	view := DashboardSettings{Revision: settings.Revision, Enabled: settings.Enabled, AutoStart: settings.AutoStart, RequireReview: settings.RequireReview, AskQuestions: settings.QuestionGate(domain.Task{}),
+	view := DashboardSettings{Revision: settings.Revision, WorkspaceModels: settings.WorkspaceModels, Enabled: settings.Enabled, AutoStart: settings.AutoStart, RequireReview: settings.RequireReview, AskQuestions: settings.QuestionGate(domain.Task{}),
 		Slots:  map[string]int{"scout": 1, "sorter": 1, "planner": settings.Slots.Planner, "reviewer": settings.Slots.Reviewer, "coder": settings.Slots.Coder, "qa": settings.Slots.QAFixer},
 		Paused: map[string]bool{}, Sources: []DashboardSource{}, Workspaces: []DashboardWorkspace{}, ModelPolicy: map[domain.Role]DashboardRolePolicy{}}
 	for key, paused := range settings.Paused {
@@ -519,16 +522,20 @@ func (s *Service) SaveDashboardSettings(ctx context.Context, view DashboardSetti
 	if view.Workspaces != nil {
 		applyWorkspaces(&settings, view.Workspaces)
 	}
-	for role, policy := range view.ModelPolicy {
-		current, ok := settings.ModelPolicy.Roles[role]
-		if !ok {
-			return DashboardSettings{}, domain.Invalid("unknown role %q in modelPolicy", role)
+	// Models are each workspace's own once moved; before that, the defaults'
+	// still decide the workspaces that set none.
+	if !settings.WorkspaceModels {
+		for role, policy := range view.ModelPolicy {
+			current, ok := settings.ModelPolicy.Roles[role]
+			if !ok {
+				return DashboardSettings{}, domain.Invalid("unknown role %q in modelPolicy", role)
+			}
+			current.Engine, current.Model, current.MaxTurns = policy.Engine, policy.Model, policy.MaxTurns
+			if role == domain.RoleCoder {
+				current.HighDifficultyModel = policy.HardModel
+			}
+			settings.ModelPolicy.Roles[role] = current
 		}
-		current.Engine, current.Model, current.MaxTurns = policy.Engine, policy.Model, policy.MaxTurns
-		if role == domain.RoleCoder {
-			current.HighDifficultyModel = policy.HardModel
-		}
-		settings.ModelPolicy.Roles[role] = current
 	}
 	if _, err := s.SaveSettings(ctx, settings, expected, actor); err != nil {
 		return DashboardSettings{}, err

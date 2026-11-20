@@ -150,3 +150,27 @@ func (s *Service) MoveProcedureFiles(ctx context.Context) {
 		log.Printf("harness: moving role skills into the settings: %v", err)
 	}
 }
+
+// OwnWorkspaceModels gives every registered workspace its own models, copied
+// from the defaults, so that a change to the defaults never moves a
+// workspace's. It runs on start, after MoveProcedureFiles.
+func (s *Service) OwnWorkspaceModels(ctx context.Context) {
+	if s.workspaces == nil || s.mutable() != nil {
+		return
+	}
+	workspaces, err := s.workspaces.List()
+	if err != nil {
+		return
+	}
+	ids := make([]string, 0, len(workspaces))
+	for _, config := range workspaces {
+		ids = append(ids, config.ID)
+	}
+	settings := s.settingsNow(ctx)
+	if !settings.OwnModels(ids) {
+		return
+	}
+	if _, err := s.SaveSettings(ctx, settings, settings.Revision, domain.Actor{ActorID: "harness", DisplayName: "Kode Stream"}); err != nil {
+		log.Printf("harness: giving each workspace its own models: %v", err)
+	}
+}

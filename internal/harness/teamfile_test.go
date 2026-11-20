@@ -60,3 +60,41 @@ func TestHarnessYamlMovesIntoTheSettingsOnce(t *testing.T) {
 		t.Fatalf("harness.yaml was read again: %#v", again.Procedure)
 	}
 }
+
+func TestEachWorkspaceGetsItsOwnModelsOnce(t *testing.T) {
+	ctx := context.Background()
+	fixture := newPipeline(t, happyScript, func(settings *domain.Settings) {
+		// What a person had set before: a default and one override.
+		coder := settings.ModelPolicy.Roles[domain.RoleCoder]
+		coder.Model = "haiku"
+		settings.ModelPolicy.Roles[domain.RoleCoder] = coder
+		settings.Workspaces[0].Models = map[domain.Role]domain.RoleModel{domain.RolePlanner: {Model: "sonnet"}}
+	})
+	fixture.service.OwnWorkspaceModels(ctx)
+	settings, _ := fixture.service.Settings(ctx)
+	workspace, _ := settings.Workspace("ws")
+	if !settings.WorkspaceModels || len(workspace.Models) != len(domain.Roles) {
+		t.Fatalf("models were not moved: %#v", workspace.Models)
+	}
+	// The workspace keeps what it ran with: its override, and the old default.
+	if workspace.Models[domain.RolePlanner].Model != "sonnet" || workspace.Models[domain.RoleCoder].Model != "haiku" || workspace.Models[domain.RoleCoder].HighDifficultyModel != "opus" {
+		t.Fatalf("workspace models = %#v", workspace.Models)
+	}
+	// The defaults go back to Kode Stream's own.
+	if settings.ModelPolicy.Roles[domain.RoleCoder].Model != "sonnet" {
+		t.Fatalf("defaults = %#v", settings.ModelPolicy.Roles[domain.RoleCoder])
+	}
+	// A hard model the workspace clears stays cleared: it is the workspace's own now.
+	coder := workspace.Models[domain.RoleCoder]
+	coder.HighDifficultyModel = ""
+	workspace.Models[domain.RoleCoder] = coder
+	settings.Workspaces[0] = workspace
+	if _, err := fixture.service.SaveSettings(ctx, settings, settings.Revision, domain.Actor{}); err != nil {
+		t.Fatal(err)
+	}
+	fixture.service.OwnWorkspaceModels(ctx)
+	settings, _ = fixture.service.Settings(ctx)
+	if got := settings.For("ws").ModelPolicy.ModelFor(domain.RoleCoder, "high"); got != "haiku" {
+		t.Fatalf("hard work runs with %q, want the workspace's own haiku", got)
+	}
+}

@@ -176,7 +176,9 @@ func (s Settings) For(workspaceID string) Settings {
 				if model.Model != "" {
 					policy.Model = model.Model
 				}
-				if model.HighDifficultyModel != "" {
+				// Once models are the workspace's own, an empty hard model
+				// means it has none, not that it follows anything.
+				if s.WorkspaceModels || model.HighDifficultyModel != "" {
 					policy.HighDifficultyModel = model.HighDifficultyModel
 				}
 				if model.MaxTurns > 0 {
@@ -188,6 +190,69 @@ func (s Settings) For(workspaceID string) Settings {
 		out.ModelPolicy.Roles = roles
 	}
 	return out
+}
+
+// OwnModels gives each listed workspace a model for every role, so the
+// workspace holds its own and nothing global decides them. The first time,
+// a workspace's choices are completed from the settings' models, which are
+// then set back to Kode Stream's defaults; after that a workspace that lacks
+// a role starts from those defaults. It reports whether anything changed.
+func (s *Settings) OwnModels(workspaceIDs []string) bool {
+	first := !s.WorkspaceModels
+	source := DefaultModelPolicy().Roles
+	if first {
+		source = s.ModelPolicy.Roles
+	}
+	changed := first
+	for _, id := range workspaceIDs {
+		index := -1
+		for i := range s.Workspaces {
+			if s.Workspaces[i].WorkspaceID == id {
+				index = i
+			}
+		}
+		if index < 0 {
+			s.Workspaces = append(s.Workspaces, WorkspaceSettings{WorkspaceID: id})
+			index = len(s.Workspaces) - 1
+		}
+		workspace := &s.Workspaces[index]
+		if workspace.Models == nil {
+			workspace.Models = map[Role]RoleModel{}
+		}
+		for _, role := range Roles {
+			from := source[role]
+			model, had := workspace.Models[role]
+			before := model
+			if model.Engine == "" {
+				model.Engine = from.Engine
+			}
+			if model.Model == "" {
+				model.Model = from.Model
+			}
+			// Before the move an empty hard model followed the settings';
+			// after it, a role the workspace already holds keeps its choice.
+			if model.HighDifficultyModel == "" && (first || !had) {
+				model.HighDifficultyModel = from.HighDifficultyModel
+			}
+			if model.MaxTurns == 0 {
+				model.MaxTurns = from.MaxTurns
+			}
+			if !had || model != before {
+				workspace.Models[role] = model
+				changed = true
+			}
+		}
+	}
+	if first {
+		defaults := DefaultModelPolicy().Roles
+		for role, policy := range s.ModelPolicy.Roles {
+			fallback := defaults[role]
+			policy.Engine, policy.Model, policy.HighDifficultyModel, policy.MaxTurns = fallback.Engine, fallback.Model, fallback.HighDifficultyModel, fallback.MaxTurns
+			s.ModelPolicy.Roles[role] = policy
+		}
+		s.WorkspaceModels = true
+	}
+	return changed
 }
 
 type LLMRankerSettings struct {
@@ -220,8 +285,12 @@ type Settings struct {
 	ModelPolicy   ModelPolicy         `json:"modelPolicy"`
 	Ranker        RankerSettings      `json:"ranker"`
 	RetentionDays int                 `json:"retentionDays"`
-	Revision      int64               `json:"revision"`
-	UpdatedAt     *time.Time          `json:"updatedAt,omitempty"`
+	// WorkspaceModels records that each workspace holds its own models,
+	// copied from the defaults once; ModelPolicy's engines and models are
+	// then only what a new workspace starts with.
+	WorkspaceModels bool       `json:"workspaceModels,omitempty"`
+	Revision        int64      `json:"revision"`
+	UpdatedAt       *time.Time `json:"updatedAt,omitempty"`
 }
 
 // QuestionGate reports whether an agent working on task may stop and ask a

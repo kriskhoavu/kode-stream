@@ -156,9 +156,11 @@ func NewServer(port int) (*Server, error) {
 		Harness:             harnessService,
 	})
 
-	// Role skills live in each workspace's harness settings; a repository's
-	// harness.yaml is moved there once, before any run reads them.
+	// Role skills and models live in each workspace's harness settings; a
+	// repository's harness.yaml is moved there once, and every workspace gets
+	// its own models, before any run reads them.
 	harnessService.MoveProcedureFiles(context.Background())
+	harnessService.OwnWorkspaceModels(context.Background())
 	if err := harnessService.Start(context.Background()); err != nil {
 		log.Printf("harness did not start: %v", err)
 	}

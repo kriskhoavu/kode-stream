@@ -234,6 +234,11 @@ func (s *Service) SaveSettings(ctx context.Context, settings domain.Settings, ex
 	if err := s.checkEngines(normalized.ModelPolicy); err != nil {
 		return domain.Settings{}, err
 	}
+	for _, workspace := range normalized.Workspaces {
+		if err := s.checkEngines(normalized.For(workspace.WorkspaceID).ModelPolicy); err != nil {
+			return domain.Settings{}, domain.Invalid("workspace %s: %v", workspace.WorkspaceID, err)
+		}
+	}
 	if s.workspaces != nil {
 		for _, workspace := range normalized.Workspaces {
 			if _, found, err := s.workspaces.Get(workspace.WorkspaceID); err != nil {
