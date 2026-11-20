@@ -28,4 +28,18 @@ describe('PlanListView', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Sort the queue' }));
 		expect(onOpen).toHaveBeenCalledTimes(1);
 	});
+
+	it('shows what the card shows, and offers the harness on a plan it does not hold', () => {
+		const onRunWithHarness = vi.fn();
+		render(<PlanListView items={[plan({ description: 'Rank the work by score.', tags: ['harness', 'web'], author: 'Anna', updatedAt: new Date().toISOString() })]} loading={false} pendingIds={new Set()} workOf={() => undefined} harnessOn onPreview={vi.fn()} onOpen={vi.fn()} onMove={vi.fn()} onRunWithHarness={onRunWithHarness} />);
+		expect(screen.getByText('Rank the work by score.')).toBeInTheDocument();
+		expect(screen.getByText('#harness')).toBeInTheDocument();
+		expect(screen.queryByText('#web')).not.toBeInTheDocument();
+		expect(screen.getByText('Anna')).toBeInTheDocument();
+		expect(screen.getByText('Updated just now')).toBeInTheDocument();
+		expect(screen.getByText('By hand')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+		expect(onRunWithHarness).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }));
+		expect(screen.getByRole('button', { name: 'Move Sort the queue' }).closest('.status-move-control')).toHaveClass('toned', 'plan-status-draft');
+	});
 });

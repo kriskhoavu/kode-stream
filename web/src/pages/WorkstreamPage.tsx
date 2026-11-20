@@ -835,9 +835,13 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           loading={loading}
           pendingIds={pendingItemIds}
           workOf={workOf}
+          agentsOf={(id) => itemAgents.get(id)}
+          harnessOn={harnessOn}
           onPreview={(item) => { setDrawerPlanId(item.id); setDrawerAgent(undefined); }}
           onOpen={(item) => onOpenPlan(item.id)}
           onMove={(item, status) => void moveItem(item.id, status)}
+          onOpenAgent={(item, focus) => { setDrawerPlanId(item.id); setDrawerAgent(focus); }}
+          onRunWithHarness={harnessOn ? (item) => { if (!harnessJoin.byItemId.has(item.id)) setRunDialogItemId(item.id); } : undefined}
         />
       )}
       {runDialogItem && <RunWithHarnessDialog item={runDialogItem} workspace={workspace} harness={harness} onClose={() => setRunDialogItemId('')} onStarted={() => { setRunDialogItemId(''); void harness.refresh(); }} />}
