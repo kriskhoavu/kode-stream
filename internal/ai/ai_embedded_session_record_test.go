@@ -285,3 +285,38 @@ func TestReviewSessionStartsInTheRunWorktreeOnItsBranch(t *testing.T) {
 		t.Fatalf("listed=%#v err=%v", listed, err)
 	}
 }
+
+func TestRemoveBranchSessionsStopsAndDeletesOnlyThatBranch(t *testing.T) {
+	service, item, _, _, _, _ := launchTestService(t, true)
+	manager := NewTerminalManager(Config{})
+	t.Cleanup(func() { _ = manager.Close() })
+	records := NewFileSessionRecordRepository(filepath.Join(t.TempDir(), "session-records.yaml"))
+	service.ConfigureEmbedded(manager).ConfigureSessionRecords(records, gitadapter.New())
+	live, err := service.StartEmbedded(item.ID, EmbeddedInput{Provider: "test-ai", ContextMode: "card_context", ExpectedWorkspaceID: item.WorkspaceID, ExpectedBranch: item.Branch})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	for _, record := range []SessionRecord{
+		{ID: "ended", WorkspaceID: item.WorkspaceID, Provider: "test-ai", Intent: ReviewIntent, RequestedBranch: item.Branch, State: StateExited, StartedAt: now, LastKnownAt: now},
+		{ID: "other", WorkspaceID: item.WorkspaceID, Provider: "test-ai", Intent: ReviewIntent, RequestedBranch: "elsewhere", State: StateExited, StartedAt: now, LastKnownAt: now},
+	} {
+		if _, err := records.Upsert(record); err != nil {
+			t.Fatal(err)
+		}
+	}
+	removed, err := service.RemoveBranchSessions(item.WorkspaceID, item.Branch)
+	if err != nil || removed != 2 {
+		t.Fatalf("removed = %d err=%v", removed, err)
+	}
+	if session, err := manager.Get(live.Session.ID); err == nil && (session.State == StateRunning || session.State == StateStarting) {
+		t.Fatalf("the live session still runs: %#v", session)
+	}
+	left, _ := records.List(item.WorkspaceID, "")
+	if len(left) != 1 || left[0].ID != "other" {
+		t.Fatalf("records left = %#v", left)
+	}
+	if removed, err := service.RemoveBranchSessions(item.WorkspaceID, ""); err != nil || removed != 0 {
+		t.Fatalf("an empty branch removed %d err=%v", removed, err)
+	}
+}

@@ -2,6 +2,7 @@ import { GripVertical, Pin, PinOff, Play, RotateCcw } from 'lucide-react';
 import type { DragEvent } from 'react';
 import { useState } from 'react';
 import type { HarnessRun, HarnessTask } from '../../lib/types';
+import { RemoveTaskButton } from './RemoveTaskButton';
 import { StopRunButton, canStopRun } from './StopRunButton';
 import { HxStatusBadge } from './HxStatusBadge';
 import { SourceBadge } from './SourceBadge';
@@ -10,17 +11,19 @@ import { canStartTask, startPending, waitsFor } from './harnessState';
 
 /**
  * The queue in rank order: what the Sorter will hand out next, first. With
- * the optional handlers it also shows each row's score, lets a person start
- * or retry a task, select a row for the side panel, and drag a row above
+ * the optional handlers it also shows each row's score, lets a person start,
+ * retry or remove a task, select a row for the side panel, and drag a row above
  * another to move it in the Task Queue.
  */
-export function QueueList({ tasks, allTasks, runs, onPin, onOpen, onSelect, selectedId, showScore = false, onStart, onRetry, canRetry, onMove, onStop, pendingIds }: {
+export function QueueList({ tasks, allTasks, runs, onPin, onOpen, onSelect, selectedId, showScore = false, onStart, onRetry, canRetry, onMove, onStop, onRemove, pendingIds }: {
 	tasks: HarnessTask[];
 	allTasks: Record<string, HarnessTask>;
 	/** The runs by id, so a row whose run is under way can offer Stop. */
 	runs?: Record<string, HarnessRun>;
 	/** Stops a row's run, after a confirmation. */
 	onStop?: (run: HarnessRun) => Promise<void>;
+	/** Removes a row's task in any state, after a confirmation. */
+	onRemove?: (task: HarnessTask) => Promise<void>;
 	onPin: (task: HarnessTask, pinned: boolean) => void;
 	onOpen: (task: HarnessTask) => void;
 	/** Chooses a row for the side panel. */
@@ -95,6 +98,7 @@ export function QueueList({ tasks, allTasks, runs, onPin, onOpen, onSelect, sele
 								{task.pinned ? <PinOff size={15} aria-hidden="true" /> : <Pin size={15} aria-hidden="true" />}
 								<span>{task.pinned ? 'Pinned' : 'Pin'}</span>
 							</button>
+							{onRemove && <RemoveTaskButton task={task} onRemove={onRemove} compact />}
 						</span>
 					</li>
 				);

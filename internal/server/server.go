@@ -120,6 +120,10 @@ func NewServer(port int) (*Server, error) {
 			}
 			return out, nil
 		},
+		Sessions: func(_ context.Context, workspaceID, branch string) error {
+			_, err := aiSessionService.RemoveBranchSessions(workspaceID, branch)
+			return err
+		},
 		Worktrees:    harnessworktree.New(harnessConfig.WorktreeRoot, git),
 		PullRequests: harnessPullRequests(git),
 		Audit:        auditStore,

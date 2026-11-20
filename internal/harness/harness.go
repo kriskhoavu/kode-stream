@@ -79,8 +79,11 @@ type Dependencies struct {
 	// Transcripts reads an agent run's transcript for the dashboard; nil
 	// when no engine writes one the platform can read.
 	Transcripts ports.TranscriptReader
-	Now         func() time.Time
-	Config      Config
+	// Sessions closes a person's sessions in a run's working copy before
+	// Remove or Reset deletes it; nil where no session can run there.
+	Sessions ports.SessionCloser
+	Now      func() time.Time
+	Config   Config
 }
 
 type Service struct {
@@ -93,6 +96,7 @@ type Service struct {
 	rules       queue.RuleRanker
 	reranker    queue.Reranker
 	transcripts ports.TranscriptReader
+	sessions    ports.SessionCloser
 
 	engines    map[string]ports.Engine
 	engineList []ports.Engine
@@ -124,7 +128,7 @@ func New(deps Dependencies) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	service := &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), reranker: deps.Reranker, transcripts: deps.Transcripts, progress: map[string]string{},
+	service := &Service{repository: deps.Repository, workspaces: deps.Workspaces, now: func() time.Time { return now().UTC() }, config: deps.Config, feed: feed.NewBroadcaster(), reranker: deps.Reranker, transcripts: deps.Transcripts, sessions: deps.Sessions, progress: map[string]string{},
 		pollWake: make(chan struct{}, 1), sortWake: make(chan struct{}, 1), workWakes: map[string]chan struct{}{},
 		engines: map[string]ports.Engine{}, engineList: deps.Engines, worktrees: deps.Worktrees, pulls: deps.PullRequests, notifier: deps.Notifier, audit: deps.Audit, runtimeCmd: deps.RuntimeVerifyCommand, handles: map[string]agentProcess{}, busy: map[domain.RoleKey]int{}}
 	for _, name := range workLoopNames {

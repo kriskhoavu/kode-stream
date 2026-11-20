@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { QueueView, removeWarning } from './QueueView';
+import { removeWarning } from '../harness/RemoveTaskButton';
+import { QueueView } from './QueueView';
 import { initialHarnessState } from '../harness/harnessState';
 import type { HarnessState } from '../harness/harnessState';
 import { approval, run, status, task } from '../harness/testData';
@@ -42,6 +43,19 @@ describe('QueueView', () => {
 		expect(dialog).toHaveTextContent('PM-2 stays in the Task Queue as Stopped');
 		fireEvent.click(within(dialog).getByRole('button', { name: 'Stop this task' }));
 		await waitFor(() => expect(cancelRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'run-2' })));
+		expect(rows[1]).toHaveClass('selected');
+	});
+
+	it('removes a task whose run is under way from its row, after the warning, without selecting the row', async () => {
+		const harness = controller(state);
+		render(<QueueView tasks={Object.values(state.tasks)} harness={harness} onOpenTask={vi.fn()} />);
+		const rows = within(screen.getByRole('list', { name: 'Task Queue in order' })).getAllByRole('listitem');
+		fireEvent.click(rows[1]);
+		fireEvent.click(within(rows[0]).getByRole('button', { name: 'Remove PM-2' }));
+		const dialog = screen.getByRole('dialog', { name: 'Remove PM-2?' });
+		expect(dialog).toHaveTextContent('A run in progress stops.');
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+		await waitFor(() => expect(harness.removeTask).toHaveBeenCalledWith(expect.objectContaining({ id: stuck.id })));
 		expect(rows[1]).toHaveClass('selected');
 	});
 
@@ -107,6 +121,6 @@ describe('QueueView finished tasks', () => {
 	});
 
 	it('words the warning for the task it removes', () => {
-		expect(removeWarning(done)).toContain('PM-9 and its runs, steps and conversations are deleted from Kode Stream. Its branch and pull request stay.');
+		expect(removeWarning(done)).toContain('PM-9 is deleted from Kode Stream with its runs, plan, steps, conversations, sessions, working copy and local branch.');
 	});
 });

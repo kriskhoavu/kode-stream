@@ -265,3 +265,39 @@ func (s *Service) persistStartingSession(record SessionRecord) (SessionRecord, e
 	}
 	return s.records.Upsert(record)
 }
+
+// RemoveBranchSessions stops every session that runs on one branch of a
+// workspace and deletes their records. The harness calls it before it deletes
+// a run's working copy, so no session is left in a folder that is gone. An
+// empty workspace or branch removes nothing.
+func (s *Service) RemoveBranchSessions(workspaceID, branch string) (int, error) {
+	workspaceID, branch = strings.TrimSpace(workspaceID), strings.TrimSpace(branch)
+	if s.records == nil || workspaceID == "" || branch == "" {
+		return 0, nil
+	}
+	records, err := s.records.List(workspaceID, branch)
+	if err != nil {
+		return 0, err
+	}
+	removed := 0
+	for _, record := range records {
+		if record.WorkspaceID != workspaceID || record.RequestedBranch != branch {
+			continue
+		}
+		if s.embedded != nil {
+			if _, err := s.embedded.Cancel(record.ID); err != nil && !errors.Is(err, ErrNotFound) {
+				return removed, err
+			}
+		}
+		s.sessionRecordMu.Lock()
+		deleted, err := s.records.Delete(record.ID)
+		s.sessionRecordMu.Unlock()
+		if err != nil {
+			return removed, err
+		}
+		if deleted {
+			removed++
+		}
+	}
+	return removed, nil
+}

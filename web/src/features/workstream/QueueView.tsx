@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { ExternalLink, Radar, Trash2 } from 'lucide-react';
+import { ExternalLink, Radar } from 'lucide-react';
 import type { HarnessTask } from '../../lib/types';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { HxStatusBadge } from '../harness/HxStatusBadge';
 import { SourceBadge } from '../harness/SourceBadge';
 import { prLabel } from '../harness/pipeline';
-import { plainError } from '../harness/useHarness';
+import { RemoveTaskButton } from '../harness/RemoveTaskButton';
 import { isFinishedTask } from './harnessJoin';
 import { QueueList } from '../harness/QueueList';
 import { compareTasks, waitsFor } from '../harness/harnessState';
@@ -48,6 +47,7 @@ export function QueueView({ tasks, finished = [], harness, onOpenTask }: {
 				allTasks={state.tasks}
 				runs={state.runs}
 				onStop={harness.cancelRun}
+				onRemove={harness.removeTask}
 				onPin={actions.pin}
 				onOpen={onOpenTask}
 				onSelect={(task) => setSelectedId(task.id)}
@@ -126,41 +126,19 @@ function QueueSidePanel({ selected, tasks, harness }: { selected?: HarnessTask; 
 type QueueShown = 'active' | 'finished' | 'all';
 const queueShownOptions: { id: QueueShown; label: string }[] = [{ id: 'active', label: 'Active' }, { id: 'finished', label: 'Finished' }, { id: 'all', label: 'All' }];
 
-/** The warning a person reads before removing a finished task. */
-export function removeWarning(task: HarnessTask): string {
-	const key = task.source.key;
-	return `${key} and its runs, steps and conversations are deleted from Kode Stream. Its branch and pull request stay. If ${key} is still open in Jira and the Finder's search still matches it, the Finder adds it back as Up next on its next look.`;
-}
-
 /** Every task that is done, stopped, dismissed or closed at its source, with Remove. */
 function FinishedList({ tasks, harness, onOpenTask }: { tasks: HarnessTask[]; harness: HarnessController; onOpenTask: (task: HarnessTask) => void }) {
 	const { state } = harness;
 	const now = useNow(60_000);
-	const [confirm, setConfirm] = useState<HarnessTask | undefined>();
-	const [busyId, setBusyId] = useState<string | undefined>();
-	const [error, setError] = useState('');
-	const remove = async (task: HarnessTask) => {
-		setConfirm(undefined);
-		setBusyId(task.id);
-		setError('');
-		try {
-			await harness.removeTask(task);
-		} catch (caught) {
-			setError(plainError(caught, `${task.source.key} could not be removed.`));
-		} finally {
-			setBusyId(undefined);
-		}
-	};
 	if (tasks.length === 0) return <div className="hx-card hx-empty"><span>Nothing has finished yet.</span></div>;
 	return (
 		<>
-			{error && <p className="hx-banner" role="alert">{error}</p>}
 			<ol className="hx-queue-list queue-finished" aria-label="Finished tasks">
 				{tasks.map((task) => {
 					const run = task.runId ? state.runs[task.runId] : undefined;
 					const at = run?.finishedAt ?? task.finishedOutside?.at ?? task.updatedAt;
 					return (
-						<li key={task.id} className="hx-row hx-queue-row" data-task-id={task.id} aria-busy={busyId === task.id || undefined}>
+						<li key={task.id} className="hx-row hx-queue-row" data-task-id={task.id}>
 							<span className="hx-queue-rank" />
 							<span className="hx-row-key"><b>{task.source.key}</b><SourceBadge kind={task.source.kind} url={task.source.url} /></span>
 							<span className="hx-row-title">
@@ -171,22 +149,12 @@ function FinishedList({ tasks, harness, onOpenTask }: { tasks: HarnessTask[]; ha
 							<HxStatusBadge status={taskStatus(task)} />
 							<span className="hx-queue-actions">
 								{run?.prUrl && <a className="hx-link" href={run.prUrl} target="_blank" rel="noreferrer"><ExternalLink size={13} aria-hidden="true" /> Draft PR {prLabel(run.prUrl)}</a>}
-								<button type="button" className="secondary hx-small-button" disabled={busyId === task.id} onClick={() => setConfirm(task)}><Trash2 size={13} aria-hidden="true" />{busyId === task.id ? 'Removing…' : 'Remove'}</button>
+								<RemoveTaskButton task={task} onRemove={harness.removeTask} />
 							</span>
 						</li>
 					);
 				})}
 			</ol>
-			{confirm && (
-				<ConfirmDialog
-					title={`Remove ${confirm.source.key}?`}
-					message={removeWarning(confirm)}
-					confirmLabel="Remove"
-					danger
-					onCancel={() => setConfirm(undefined)}
-					onConfirm={() => void remove(confirm)}
-				/>
-			)}
 		</>
 	);
 }

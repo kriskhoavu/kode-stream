@@ -220,11 +220,12 @@ func (s *Service) DismissTask(ctx context.Context, id, reason string, expectedRe
 	})
 }
 
-// RemoveTask deletes a finished task from the harness with its runs and
-// their history: done, cancelled, dismissed, or closed at its source. A
-// working copy a run still holds is removed; its branch and pull request
-// stay. If the source still lists the issue, the Finder adds it back on its
-// next look, as a new task.
+// RemoveTask deletes a task from the harness in any state, with everything
+// the harness did for it. A run in flight is stopped first. Every run's
+// sessions, working copy and local harness branch are deleted, and so are its
+// runs, stages, agent runs and approvals. A pushed branch and a pull request
+// stay at the remote. If the source still lists the issue, the Finder adds it
+// back on its next look, as a new task.
 func (s *Service) RemoveTask(ctx context.Context, id string, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
 	if err := s.mutable(); err != nil {
 		return domain.Task{}, err
@@ -233,32 +234,16 @@ func (s *Service) RemoveTask(ctx context.Context, id string, expectedRevision in
 	if err != nil {
 		return domain.Task{}, err
 	}
-	if !domain.TaskTerminal(task.State) && task.State != domain.TaskStale && task.State != domain.TaskCancelled {
-		return domain.Task{}, domain.Invalid("only a finished or stopped task can be removed; stop or dismiss %s first", task.Source.Key)
-	}
 	if task.Revision != expectedRevision {
 		return domain.Task{}, domain.ErrStateMoved
 	}
-	runs, err := s.repository.ListRuns(ctx, domain.RunFilter{TaskID: task.ID, Limit: 1000})
+	runs, err := s.discardTaskWork(ctx, task, "removed", actor)
 	if err != nil {
 		return domain.Task{}, err
 	}
-	if s.workspaces != nil {
-		if workspace, found, err := s.workspaces.Get(task.WorkspaceID); err == nil && found {
-			for _, run := range runs {
-				if !run.WorktreeRemoved && run.WorktreePath != "" {
-					s.removeWorktree(ctx, run, workspace, false)
-				}
-			}
-		}
-	}
 	err = s.atomic(ctx, func(tx domain.Repository, record func(domain.Event) error) error {
-		current, err := tx.GetTask(ctx, id)
-		if err != nil {
+		if _, err := tx.GetTask(ctx, id); err != nil {
 			return err
-		}
-		if current.Revision != expectedRevision {
-			return domain.ErrStateMoved
 		}
 		if err := tx.DeleteTaskHistory(ctx, id); err != nil {
 			return err
@@ -272,9 +257,49 @@ func (s *Service) RemoveTask(ctx context.Context, id string, expectedRevision in
 	return task, nil
 }
 
+// discardTaskWork stops a task's run in flight, then closes every run's
+// sessions and deletes its working copy and local branch. It returns the
+// task's runs, whose records the caller deletes.
+func (s *Service) discardTaskWork(ctx context.Context, task domain.Task, reason string, actor domain.Actor) ([]domain.Run, error) {
+	if task.RunID != "" {
+		run, err := s.repository.GetRun(ctx, task.RunID)
+		if err != nil && !errors.Is(err, domain.ErrNotFound) {
+			return nil, err
+		}
+		if err == nil && !domain.RunTerminal(run.State) {
+			// A run with no stage yet has nothing to cancel; its processes end below.
+			if _, err := s.CancelRun(ctx, run.ID, reason, nil, actor); err != nil && !errors.Is(err, domain.ErrNotFound) {
+				return nil, err
+			}
+		}
+	}
+	runs, err := s.repository.ListRuns(ctx, domain.RunFilter{TaskID: task.ID, Limit: 1000})
+	if err != nil {
+		return nil, err
+	}
+	for _, run := range runs {
+		s.killRun(run.ID)
+		if s.sessions != nil && run.Branch != "" {
+			if err := s.sessions(ctx, task.WorkspaceID, run.Branch); err != nil {
+				log.Printf("harness: close the sessions of run %s: %v", run.ID, err)
+			}
+		}
+	}
+	if s.workspaces != nil {
+		if workspace, found, err := s.workspaces.Get(task.WorkspaceID); err == nil && found {
+			for _, run := range runs {
+				if run.WorktreePath != "" {
+					s.removeWorktree(ctx, run, workspace, true)
+				}
+			}
+		}
+	}
+	return runs, nil
+}
+
 // ResetTask puts a task back as the Finder left it, so its work begins again
-// from nothing. A run in flight is stopped first. Every run's working copy and
-// local harness branch are deleted, and so are its runs, stages, agent runs
+// from nothing. A run in flight is stopped first. Every run's sessions,
+// working copy and local harness branch are deleted, and so are its runs, stages, agent runs
 // and approvals. The task keeps its place in the queue, its pin and its
 // questions setting, and waits for Start. A pushed branch and a pull request
 // stay at the remote; events stay as the log of what happened.
@@ -292,29 +317,9 @@ func (s *Service) ResetTask(ctx context.Context, id string, expectedRevision int
 	if task.State == domain.TaskDismissed || task.State == domain.TaskStale {
 		return domain.Task{}, domain.Invalid("%s is not in the queue; only a task in the queue can be reset", task.Source.Key)
 	}
-	if task.RunID != "" {
-		run, err := s.repository.GetRun(ctx, task.RunID)
-		if err != nil && !errors.Is(err, domain.ErrNotFound) {
-			return domain.Task{}, err
-		}
-		if err == nil && !domain.RunTerminal(run.State) {
-			if _, err := s.CancelRun(ctx, run.ID, "reset", nil, actor); err != nil {
-				return domain.Task{}, err
-			}
-		}
-	}
-	runs, err := s.repository.ListRuns(ctx, domain.RunFilter{TaskID: task.ID, Limit: 1000})
+	runs, err := s.discardTaskWork(ctx, task, "reset", actor)
 	if err != nil {
 		return domain.Task{}, err
-	}
-	if s.workspaces != nil {
-		if workspace, found, err := s.workspaces.Get(task.WorkspaceID); err == nil && found {
-			for _, run := range runs {
-				if run.WorktreePath != "" {
-					s.removeWorktree(ctx, run, workspace, true)
-				}
-			}
-		}
 	}
 	settings := s.settingsNow(ctx)
 	var fresh domain.Task

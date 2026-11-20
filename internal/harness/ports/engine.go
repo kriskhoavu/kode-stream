@@ -87,6 +87,11 @@ type TranscriptLocator interface {
 // path. A file that does not exist yet reads as no turns.
 type TranscriptReader func(path string, limit int) ([]domain.TranscriptTurn, error)
 
+// SessionCloser stops every person's session that runs on a branch of a
+// workspace and deletes its record. The harness calls it before it deletes
+// a run's working copy.
+type SessionCloser func(ctx context.Context, workspaceID, branch string) error
+
 // Handle is one running CLI process.
 type Handle interface {
 	Events() <-chan EngineEvent

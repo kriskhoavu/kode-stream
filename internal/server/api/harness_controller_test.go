@@ -299,9 +299,6 @@ func TestHarnessQueueOperationRoutes(t *testing.T) {
 	if queuedOnly.Code != http.StatusCreated || strings.Contains(queuedOnly.Body.String(), `"startRequested":true`) {
 		t.Fatalf("queued = %d %s", queuedOnly.Code, queuedOnly.Body.String())
 	}
-	if open := serveHarness(handler, http.MethodPost, "/api/harness/tasks/tsk-2/remove", `{"expectedRevision":1}`); open.Code != http.StatusBadRequest {
-		t.Fatalf("remove open = %d %s", open.Code, open.Body.String())
-	}
 	if noPath := serveHarness(handler, http.MethodGet, "/api/harness/runs/run-1/diff", ""); noPath.Code != http.StatusBadRequest {
 		t.Fatalf("diff without a path = %d %s", noPath.Code, noPath.Body.String())
 	}

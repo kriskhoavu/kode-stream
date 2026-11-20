@@ -251,7 +251,7 @@ func TestCreateTaskFromACardRanksAndStartsIt(t *testing.T) {
 	}
 }
 
-func TestRemoveTaskDeletesAFinishedTaskWithItsHistory(t *testing.T) {
+func TestRemoveTaskDeletesATaskInAnyStateWithItsHistory(t *testing.T) {
 	ctx := context.Background()
 	service, repository := newQueueService(t)
 	actor := domain.Actor{ActorID: "local"}
@@ -259,10 +259,34 @@ func TestRemoveTaskDeletesAFinishedTaskWithItsHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.RemoveTask(ctx, open.ID, open.Revision, actor); !IsInvalid(err) {
-		t.Fatalf("an open task was removed: %v", err)
-	}
 	now := testNow
+	var closed []string
+	service.sessions = func(_ context.Context, workspaceID, branch string) error {
+		closed = append(closed, workspaceID+"@"+branch)
+		return nil
+	}
+	working := domain.Task{ID: "tsk-working", WorkspaceID: "ws", Source: domain.Source{Kind: domain.SourceJira, Key: "PM-3", Labels: []string{}}, Title: "Working", State: domain.TaskRunning, RunID: "run-3", ScoreReasons: []string{}, DependsOn: []string{}, Revision: 2, DiscoveredAt: now, UpdatedAt: now}
+	if err := repository.InsertTask(ctx, working); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.InsertRun(ctx, domain.Run{ID: "run-3", TaskID: working.ID, WorkspaceID: "ws", Branch: "harness/PM-3-abc", State: domain.RunRunning, CurrentStageID: "stg-3", StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.InsertStage(ctx, domain.Stage{ID: "stg-3", RunID: "run-3", Kind: domain.StageImplement, State: domain.StageRunning}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.RemoveTask(ctx, working.ID, working.Revision, actor); err != nil {
+		t.Fatalf("a task with a run in flight was not removed: %v", err)
+	}
+	if _, err := repository.GetTask(ctx, working.ID); err == nil {
+		t.Fatal("the working task is still stored")
+	}
+	if _, err := repository.GetRun(ctx, "run-3"); err == nil {
+		t.Fatal("the working task's run is still stored")
+	}
+	if len(closed) != 1 || closed[0] != "ws@harness/PM-3-abc" {
+		t.Fatalf("closed sessions = %v", closed)
+	}
 	done := domain.Task{ID: "tsk-done", WorkspaceID: "ws", Source: domain.Source{Kind: domain.SourceJira, Key: "PM-2", Labels: []string{}}, Title: "Done", State: domain.TaskDone, RunID: "run-2", ScoreReasons: []string{}, DependsOn: []string{}, Revision: 4, DiscoveredAt: now, UpdatedAt: now}
 	if err := repository.InsertTask(ctx, done); err != nil {
 		t.Fatal(err)
@@ -298,6 +322,9 @@ func TestRemoveTaskDeletesAFinishedTaskWithItsHistory(t *testing.T) {
 	}
 	if _, err := repository.GetTask(ctx, open.ID); err != nil {
 		t.Fatalf("another task went too: %v", err)
+	}
+	if _, err := service.RemoveTask(ctx, open.ID, open.Revision, actor); err != nil {
+		t.Fatalf("an open task was not removed: %v", err)
 	}
 }
 

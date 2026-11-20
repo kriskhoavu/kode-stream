@@ -58,7 +58,7 @@ Interactive sessions follow the checkout: the view lists those launched on the b
 <!-- chunkId: workspace-agent-sessions-not-supported -->
 <!-- keywords: typing into harness, harness terminal, per-agent changes, canvas node, global list -->
 
-[live] A harness session has no terminal and cannot be typed into, and it cannot be removed from the list: Reset on the task removes a run's sessions. Its Changes are the whole run's, not one agent's. Harness sessions are not drawn on the Canvas, and the Sessions view's live count counts interactive sessions only. While the harness is off, the view lists interactive sessions alone, without the kind filter.
+[live] A harness session has no terminal and cannot be typed into, and it cannot be removed from the list: Reset or Remove on the task removes a run's sessions, and a person's review sessions on its branch with them. Its Changes are the whole run's, not one agent's. Harness sessions are not drawn on the Canvas, and the Sessions view's live count counts interactive sessions only. While the harness is off, the view lists interactive sessions alone, without the kind filter.
 
 ## Related pages
 

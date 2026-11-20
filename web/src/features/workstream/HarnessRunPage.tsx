@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import type { HarnessRunTab as HarnessRunTabId } from '../../app/router';
 import type { HarnessTask } from '../../lib/types';
+import { RemoveTaskButton } from '../harness/RemoveTaskButton';
 import { ResetTaskButton, canResetTask } from '../harness/ResetTaskButton';
 import { RunDrawer } from '../harness/RunDrawer';
 import { RunView } from '../harness/RunView';
@@ -33,10 +34,11 @@ export function HarnessRunPage({ runId, task, onBack }: { runId: string; task: H
 				</div>
 				<div className="workspace-header-actions">
 					{canResetTask(task) && <ResetTaskButton task={task} onReset={(reset) => harness.resetTask(reset).then(onBack)} />}
+					<RemoveTaskButton task={task} onRemove={(removed) => harness.removeTask(removed).then(onBack)} />
 				</div>
 			</header>
 			<RunView state={harness.state} runId={runId} onSelectRun={() => undefined} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onCancel={harness.cancelRun} onOpenTab={(tab, agentRunId) => setRunTab({ tab, agentRunId })} workbench={(detail, request) => <RunWorkbench client={harness.client} detail={detail} request={request} />} />
-			{runTab && <RunDrawer state={harness.state} client={harness.client} taskId={task.id} tab={runTab.tab} agentRunId={runTab.agentRunId} queue={queueOrder(harness.state, task.workspaceId)} onTabChange={(tab) => setRunTab({ tab })} onClose={() => setRunTab(undefined)} onCancel={harness.cancelRun} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={actions.pin} onMove={actions.move} onStart={actions.start} onReset={(reset) => harness.resetTask(reset).then(onBack)} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />}
+			{runTab && <RunDrawer state={harness.state} client={harness.client} taskId={task.id} tab={runTab.tab} agentRunId={runTab.agentRunId} queue={queueOrder(harness.state, task.workspaceId)} onTabChange={(tab) => setRunTab({ tab })} onClose={() => setRunTab(undefined)} onCancel={harness.cancelRun} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={actions.pin} onMove={actions.move} onStart={actions.start} onReset={(reset) => harness.resetTask(reset).then(onBack)} onRemove={(removed) => harness.removeTask(removed).then(onBack)} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />}
 		</section>
 	);
 }
