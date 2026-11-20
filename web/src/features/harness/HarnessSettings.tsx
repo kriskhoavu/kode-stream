@@ -285,7 +285,7 @@ export function HarnessSettings({ client, status, workspaceId, onPause, onResume
 
 			{!workspaceId && <section className="settings-section">
 				<header><div><span className="settings-group-label">Roles</span><h2>Pause a role</h2><p>A paused role starts nothing new. Pausing takes effect at once.</p></div></header>
-				<div className="settings-toggle-list">
+				<div className="settings-toggle-list hx-role-list">
 					{roleOrder.map((role) => {
 						const health = roles.get(role);
 						const paused = Boolean(health?.paused ?? draft.paused[role]);

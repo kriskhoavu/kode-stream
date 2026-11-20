@@ -1,0 +1,85 @@
+/*
+ * The Settings page on a wide screen: its sections sit in two columns, the
+ * look and storage of this machine on the left and the AI tools and the
+ * harness on the right, and short lists lay their choices side by side, so
+ * the page uses the width instead of growing tall. Below two columns' width
+ * it is one column, as before.
+ */
+
+.settings-page.settings-layout { max-width: 1680px; }
+
+.settings-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr));
+  align-items: start;
+  gap: 24px;
+}
+
+.settings-column { display: grid; gap: 24px; min-width: 0; }
+
+/* The harness's own sections join the column instead of nesting a page in it. */
+.settings-column .hx.harness-settings-section,
+.settings-column .hx-settings { display: contents; }
+.settings-column .hx-settings-actions { padding: 0 2px; }
+
+.settings-section header p { max-width: 68ch; }
+
+/* Short lists of choices: side by side, each a small card. */
+.settings-toggle-list.settings-toggle-grid {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  padding: 14px 20px 18px;
+}
+
+.settings-toggle-grid .settings-toggle-row,
+.settings-toggle-grid .settings-toggle-row:last-child {
+  min-height: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  align-items: flex-start;
+}
+
+.settings-toggle-grid .settings-toggle-row:has(input:checked) {
+  border-color: color-mix(in srgb, var(--button-accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--button-accent) 6%, var(--panel));
+}
+
+/* The roles to pause: two to a row once there is room. */
+.settings-toggle-list.hx-role-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.hx-role-list .settings-toggle-row { min-height: 54px; }
+.hx-role-list .settings-toggle-row:last-child { border-bottom: 1px solid var(--line); }
+
+/* An AI tool is one line; its command opens on demand. */
+.ai-tool-row { padding: 10px 14px; gap: 6px 16px; }
+.ai-tool-command { grid-column: 1 / -1; min-width: 0; }
+.ai-tool-command > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+.ai-tool-command > summary code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+.ai-tool-command[open] {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(220px, 2fr);
+  gap: 10px 16px;
+}
+.ai-tool-command[open] > summary { grid-column: 1 / -1; }
+.ai-tool-command > label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+
+@media (max-width: 640px) {
+  .ai-tool-group { margin: 14px 12px; }
+  .ai-tool-row,
+  .ai-tool-command[open] { grid-template-columns: minmax(0, 1fr); }
+  .ai-tool-heading { flex-wrap: wrap; gap: 6px 12px; }
+}

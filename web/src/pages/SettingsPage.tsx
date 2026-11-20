@@ -8,6 +8,7 @@ import { StorageSettings } from '../features/settings/StorageSettings';
 import { backdropVariants } from '../components/HeaderBackdrop';
 import { HarnessSettingsSection } from '../features/workstream/HarnessSettingsSection';
 import '../features/harness/harness.css';
+import '../features/settings/settings.css';
 import type { BackdropVariant } from '../components/HeaderBackdrop';
 
 /*
@@ -31,12 +32,14 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
   };
 
   return (
-    <section className="settings-page">
+    <section className="settings-page settings-layout">
       <header className="settings-title">
         <h1><SettingsIcon size={22} /> Settings</h1>
         <p>How Kode Stream looks and runs on this machine, and the harness defaults. A workspace's own provider, harness choices, models and sources are on its page under Workspaces.</p>
       </header>
 
+      <div className="settings-columns">
+      <div className="settings-column">
       <section className="settings-section">
         <header>
           <div>
@@ -46,7 +49,7 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
           </div>
           <span className="settings-count">{settings.visibleWorkstreamStatuses.length} visible</span>
         </header>
-        <div className="settings-toggle-list">
+        <div className="settings-toggle-list settings-toggle-grid">
           {statusOrder.map((status) => (
             <label className="settings-toggle-row" key={status}>
               <span>
@@ -72,7 +75,7 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
             <p>The decoration behind the topbar and filter rows on Workstream, Agent Space and Knowledge.</p>
           </div>
         </header>
-        <div className="settings-toggle-list" role="radiogroup" aria-label="Header backdrop">
+        <div className="settings-toggle-list settings-toggle-grid" role="radiogroup" aria-label="Header backdrop">
           {backdropVariants.map((variant) => (
             <label className="settings-toggle-row" key={variant}>
               <span>
@@ -93,7 +96,9 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
       </section>
 
       <StorageSettings />
+      </div>
 
+      <div className="settings-column">
       <section className="settings-section ai-settings-section">
         <header>
           <div>
@@ -121,6 +126,8 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
         )}
       </section>
       {showHarness && <HarnessSettingsSection />}
+      </div>
+      </div>
     </section>
   );
 }
@@ -156,8 +163,11 @@ function ToolSettingsGroup({ kind, templates, settings, capabilities, onChange }
               <span className={capability?.detected ? 'tool-state detected' : 'tool-state missing'}>{capability?.detected ? 'Detected' : capability?.reason ?? 'Not detected'}</span>
               <label><input type="checkbox" checked={template.enabled} onChange={(event) => toggleEnabled(id, event.target.checked)} /> Enabled</label>
             </div>
-            <label>Executable<input value={template.executable} onChange={(event) => update(id, { ...template, executable: event.target.value })} /></label>
-            <label>Arguments, one per line<textarea rows={2} value={args.join('\n')} onChange={(event) => update(id, { ...template, args: event.target.value.split('\n') })} /></label>
+            <details className="ai-tool-command">
+              <summary><span>Command</span><code>{[template.executable, ...args].filter(Boolean).join(' ') || 'Not set'}</code></summary>
+              <label>Executable<input value={template.executable} onChange={(event) => update(id, { ...template, executable: event.target.value })} /></label>
+              <label>Arguments, one per line<textarea rows={2} value={args.join('\n')} onChange={(event) => update(id, { ...template, args: event.target.value.split('\n') })} /></label>
+            </details>
           </div>
         );
       })}
