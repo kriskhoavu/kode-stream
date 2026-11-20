@@ -171,10 +171,10 @@ describe('WorkstreamPage board views', () => {
 		renderBoard();
 		await showPlans();
 		fireEvent.click(within(screen.getByRole('group', { name: 'Board view' })).getByRole('button', { name: 'List' }));
-		const group = await screen.findByRole('rowgroup', { name: 'In Progress' });
-		expect(within(group).getAllByRole('row').map((row) => row.getAttribute('data-item-id')).filter(Boolean).sort()).toEqual(['p1', 'p2', 'p3']);
+		const group = await screen.findByRole('list', { name: 'In Progress' });
+		expect(within(group).getAllByRole('listitem').map((row) => row.getAttribute('data-item-id')).filter(Boolean).sort()).toEqual(['p1', 'p2', 'p3']);
 		expect(document.querySelector('.workstream-board')).toBeNull();
-		const quietRow = within(group).getAllByRole('row').find((row) => row.textContent?.includes('Quiet card'))!;
+		const quietRow = within(group).getAllByRole('listitem').find((row) => row.textContent?.includes('Quiet card'))!;
 		expect(within(quietRow).getByText('By hand')).toBeInTheDocument();
 		fireEvent.click(within(quietRow).getByRole('button', { name: 'Move Quiet card' }));
 		fireEvent.click(screen.getByRole('menuitemradio', { name: 'Review' }));
