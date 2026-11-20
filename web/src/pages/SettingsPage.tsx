@@ -1,4 +1,5 @@
-import { RefreshCw, Save, Settings as SettingsIcon } from 'lucide-react';
+import { useState } from 'react';
+import { Bot, Database, Palette, RefreshCw, Save, Settings as SettingsIcon, TerminalSquare } from 'lucide-react';
 import { statusLabels, statusOrder } from '../shared/api';
 import type { ItemStatus } from '../lib/types';
 import type { AppSettings } from '../features/settings/appSettings';
@@ -21,9 +22,26 @@ const backdropLabels: Record<BackdropVariant, { name: string; description: strin
   none: { name: 'None', description: 'No backdrop. The topbar keeps its own background and border.' }
 };
 
+type SettingsArea = 'appearance' | 'ai' | 'harness' | 'storage';
+
+const areas: { id: SettingsArea; label: string; hint: string; icon: typeof Palette }[] = [
+  { id: 'appearance', label: 'Appearance', hint: 'Board columns and header backdrop', icon: Palette },
+  { id: 'ai', label: 'AI tools', hint: 'Providers and terminals', icon: TerminalSquare },
+  { id: 'harness', label: 'Harness', hint: 'Defaults and role pauses', icon: Bot },
+  { id: 'storage', label: 'Storage', hint: 'Where app state lives', icon: Database }
+];
+
+/**
+ * Settings, one area at a time: a menu of areas beside the chosen one, so
+ * each area fits a screen and its Save saves only what it shows. On a phone
+ * the menu is a select above the area.
+ */
 export function SettingsPage({ settings, onChange, showHarness = true }: { settings: AppSettings; onChange: (settings: AppSettings) => void; /** The harness has no page of its own; its settings live here, except on the extension surface. */ showHarness?: boolean }) {
   const visible = new Set(settings.visibleWorkstreamStatuses);
   const ai = useAISettings();
+  const shownAreas = areas.filter((area) => showHarness || area.id !== 'harness');
+  const [area, setArea] = useState<SettingsArea>('appearance');
+  const current = shownAreas.find((candidate) => candidate.id === area) ?? shownAreas[0];
   const toggleStatus = (status: ItemStatus) => {
     const next = visible.has(status)
       ? settings.visibleWorkstreamStatuses.filter((item) => item !== status)
@@ -38,95 +56,113 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
         <p>How Kode Stream looks and runs on this machine, and the harness defaults. A workspace's own provider, harness choices, models and sources are on its page under Workspaces.</p>
       </header>
 
-      <div className="settings-columns">
-      <div className="settings-column">
-      <section className="settings-section">
-        <header>
-          <div>
-            <span className="settings-group-label">Board View</span>
-            <h2>Status columns</h2>
-            <p>Show or hide the statuses that appear as board columns.</p>
-          </div>
-          <span className="settings-count">{settings.visibleWorkstreamStatuses.length} visible</span>
-        </header>
-        <div className="settings-toggle-list settings-toggle-grid">
-          {statusOrder.map((status) => (
-            <label className="settings-toggle-row" key={status}>
-              <span>
-                <strong>{statusLabels[status]}</strong>
-                <small>{status}</small>
-              </span>
-              <input
-                type="checkbox"
-                checked={visible.has(status)}
-                onChange={() => toggleStatus(status)}
-                aria-label={`Show ${statusLabels[status]} status`}
-              />
-            </label>
+      <div className="settings-shell">
+        <nav className="settings-nav" aria-label="Settings areas">
+          {shownAreas.map(({ id, label, hint, icon: Icon }) => (
+            <button key={id} type="button" className={id === current.id ? 'active' : undefined} aria-current={id === current.id ? 'page' : undefined} onClick={() => setArea(id)}>
+              <Icon size={16} aria-hidden="true" />
+              <span><strong>{label}</strong><small>{hint}</small></span>
+            </button>
           ))}
-        </div>
-      </section>
+        </nav>
+        <label className="settings-nav-select">
+          <span>Settings area</span>
+          <select value={current.id} onChange={(event) => setArea(event.target.value as SettingsArea)}>
+            {shownAreas.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </label>
 
-      <section className="settings-section">
-        <header>
-          <div>
-            <span className="settings-group-label">Appearance</span>
-            <h2>Header backdrop</h2>
-            <p>The decoration behind the topbar and filter rows on Workstream, Agent Space and Knowledge.</p>
-          </div>
-        </header>
-        <div className="settings-toggle-list settings-toggle-grid" role="radiogroup" aria-label="Header backdrop">
-          {backdropVariants.map((variant) => (
-            <label className="settings-toggle-row" key={variant}>
-              <span>
-                <strong>{backdropLabels[variant].name}</strong>
-                <small>{backdropLabels[variant].description}</small>
-              </span>
-              <input
-                type="radio"
-                name="header-backdrop"
-                value={variant}
-                checked={settings.headerBackdrop === variant}
-                onChange={() => onChange({ ...settings, headerBackdrop: variant })}
-                aria-label={backdropLabels[variant].name}
-              />
-            </label>
-          ))}
-        </div>
-      </section>
+        <div className={`settings-area settings-area-${current.id}`}>
+          {current.id === 'appearance' && <>
+            <section className="settings-section">
+              <header>
+                <div>
+                  <span className="settings-group-label">Board View</span>
+                  <h2>Status columns</h2>
+                  <p>Show or hide the statuses that appear as board columns. Saved as you change them.</p>
+                </div>
+                <span className="settings-count">{settings.visibleWorkstreamStatuses.length} visible</span>
+              </header>
+              <div className="settings-toggle-list settings-toggle-grid">
+                {statusOrder.map((status) => (
+                  <label className="settings-toggle-row" key={status}>
+                    <span>
+                      <strong>{statusLabels[status]}</strong>
+                      <small>{status}</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={visible.has(status)}
+                      onChange={() => toggleStatus(status)}
+                      aria-label={`Show ${statusLabels[status]} status`}
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
 
-      <StorageSettings />
-      </div>
+            <section className="settings-section">
+              <header>
+                <div>
+                  <span className="settings-group-label">Appearance</span>
+                  <h2>Header backdrop</h2>
+                  <p>The decoration behind the topbar and filter rows on Workstream, Agent Space and Knowledge.</p>
+                </div>
+              </header>
+              <div className="settings-toggle-list settings-toggle-grid" role="radiogroup" aria-label="Header backdrop">
+                {backdropVariants.map((variant) => (
+                  <label className="settings-toggle-row" key={variant}>
+                    <span>
+                      <strong>{backdropLabels[variant].name}</strong>
+                      <small>{backdropLabels[variant].description}</small>
+                    </span>
+                    <input
+                      type="radio"
+                      name="header-backdrop"
+                      value={variant}
+                      checked={settings.headerBackdrop === variant}
+                      onChange={() => onChange({ ...settings, headerBackdrop: variant })}
+                      aria-label={backdropLabels[variant].name}
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
+          </>}
 
-      <div className="settings-column">
-      <section className="settings-section ai-settings-section">
-        <header>
-          <div>
-            <span className="settings-group-label">Local AI tools</span>
-            <h2>Providers and terminals</h2>
-            <p>Use detected presets or override executable paths and argument templates for this machine.</p>
-          </div>
-          <button className="ghost" type="button" onClick={() => void ai.refresh()} disabled={ai.loading || ai.saving}>
-            <RefreshCw size={15} /> Detect again
-          </button>
-        </header>
-        {ai.loading && <p role="status">Detecting local AI tools...</p>}
-        {ai.error && <p className="settings-error" role="alert">{ai.error}</p>}
-        {ai.settings && (
-          <>
-            <ToolSettingsGroup kind="provider" templates={ai.settings.providers} settings={ai.settings} capabilities={ai.capabilities} onChange={ai.setSettings} />
-            <ToolSettingsGroup kind="terminal" templates={ai.settings.terminals} settings={ai.settings} capabilities={ai.capabilities} onChange={ai.setSettings} />
-            <div className="settings-actions">
-              {ai.saved && <span role="status">AI settings saved.</span>}
-              <button className="primary" type="button" onClick={() => void ai.save()} disabled={ai.saving}>
-                <Save size={15} /> {ai.saving ? 'Saving...' : 'Save AI settings'}
+          {current.id === 'ai' && <section className="settings-section ai-settings-section">
+            <header>
+              <div>
+                <span className="settings-group-label">Local AI tools</span>
+                <h2>Providers and terminals</h2>
+                <p>Use detected presets or override executable paths and argument templates for this machine.</p>
+              </div>
+              <button className="ghost" type="button" onClick={() => void ai.refresh()} disabled={ai.loading || ai.saving}>
+                <RefreshCw size={15} /> Detect again
               </button>
-            </div>
-          </>
-        )}
-      </section>
-      {showHarness && <HarnessSettingsSection />}
-      </div>
+            </header>
+            {ai.loading && <p role="status">Detecting local AI tools...</p>}
+            {ai.error && <p className="settings-error" role="alert">{ai.error}</p>}
+            {ai.settings && (
+              <>
+                <div className="ai-tool-groups">
+                  <ToolSettingsGroup kind="provider" templates={ai.settings.providers} settings={ai.settings} capabilities={ai.capabilities} onChange={ai.setSettings} />
+                  <ToolSettingsGroup kind="terminal" templates={ai.settings.terminals} settings={ai.settings} capabilities={ai.capabilities} onChange={ai.setSettings} />
+                </div>
+                <div className="settings-actions">
+                  {ai.saved && <span role="status">AI settings saved.</span>}
+                  <button className="primary" type="button" onClick={() => void ai.save()} disabled={ai.saving}>
+                    <Save size={15} /> {ai.saving ? 'Saving...' : 'Save AI settings'}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>}
+
+          {current.id === 'harness' && <HarnessSettingsSection />}
+
+          {current.id === 'storage' && <StorageSettings />}
+        </div>
       </div>
     </section>
   );

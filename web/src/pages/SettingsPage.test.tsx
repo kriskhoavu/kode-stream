@@ -27,6 +27,7 @@ describe('SettingsPage AI settings', () => {
     ]);
     vi.mocked(api.saveAISettings).mockImplementation(async (value) => value);
     render(<SettingsPage settings={defaultAppSettings} onChange={vi.fn()} />);
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Settings areas' })).getByRole('button', { name: /AI tools/ }));
     expect(await screen.findByText('Detected')).toBeInTheDocument();
     const executable = screen.getAllByLabelText('Executable')[0];
     fireEvent.change(executable, { target: { value: '/custom/codex' } });
@@ -45,6 +46,7 @@ describe('SettingsPage AI settings', () => {
     vi.mocked(api.aiCapabilities).mockResolvedValue([]);
 
     render(<SettingsPage settings={defaultAppSettings} onChange={vi.fn()} />);
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Settings areas' })).getByRole('button', { name: /AI tools/ }));
 
     expect(await screen.findByText('Codex')).toBeInTheDocument();
     expect(screen.getAllByLabelText('Arguments, one per line')[0]).toHaveValue('');
@@ -77,5 +79,34 @@ describe('SettingsPage header backdrop', () => {
     fireEvent.click(screen.getByRole('radio', { name: /none/i }));
 
     expect(onChange).toHaveBeenCalledWith({ ...settings, headerBackdrop: 'none' });
+  });
+});
+
+describe('SettingsPage areas', () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it('shows one area at a time, chosen from the menu or, on a phone, the select', () => {
+    vi.mocked(api.aiSettings).mockResolvedValue(null as never);
+    vi.mocked(api.aiCapabilities).mockResolvedValue([]);
+    render(<SettingsPage settings={defaultAppSettings} onChange={vi.fn()} />);
+    const menu = screen.getByRole('navigation', { name: 'Settings areas' });
+
+    expect(within(menu).getByRole('button', { name: /Appearance/ })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('radiogroup', { name: 'Header backdrop' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Harness settings' })).not.toBeInTheDocument();
+
+    fireEvent.click(within(menu).getByRole('button', { name: /Harness/ }));
+    expect(screen.getByRole('region', { name: 'Harness settings' })).toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Header backdrop' })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Settings area' }), { target: { value: 'appearance' } });
+    expect(screen.getByRole('radiogroup', { name: 'Header backdrop' })).toBeInTheDocument();
+  });
+
+  it('leaves the harness out of the menu where it does not run', () => {
+    vi.mocked(api.aiSettings).mockResolvedValue(null as never);
+    vi.mocked(api.aiCapabilities).mockResolvedValue([]);
+    render(<SettingsPage settings={defaultAppSettings} onChange={vi.fn()} showHarness={false} />);
+    expect(within(screen.getByRole('navigation', { name: 'Settings areas' })).queryByRole('button', { name: /Harness/ })).not.toBeInTheDocument();
   });
 });
