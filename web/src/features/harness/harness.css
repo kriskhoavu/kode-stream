@@ -2688,3 +2688,59 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 .workspace-own-settings .ai-settings-section .settings-actions {
 	padding-top: 14px;
 }
+
+/* A workspace's own on or off: three small cards in one radio group, as wide as the other controls. */
+.hx-choice-cards {
+	flex: none;
+	width: min(320px, 50%);
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 6px;
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card {
+	position: relative;
+	display: grid;
+	gap: 1px;
+	justify-items: center;
+	padding: 7px 6px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+	cursor: pointer;
+	transition: border-color 0.15s var(--hx-ease), background 0.15s var(--hx-ease);
+}
+
+.hx-choice-card input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card strong {
+	font-size: 13px;
+}
+
+.hx-choice-card small {
+	font-size: 11px;
+	color: var(--muted);
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card:hover {
+	border-color: var(--muted);
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card.on {
+	border-color: var(--accent-text);
+	background: color-mix(in srgb, var(--accent-text) 12%, var(--panel));
+	box-shadow: 0 0 0 1px var(--accent-text);
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card.on strong {
+	color: var(--accent-text);
+}
+
+.hx-choice-card:has(input:focus-visible) {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 2px;
+}
