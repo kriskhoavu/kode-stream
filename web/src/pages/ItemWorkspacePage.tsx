@@ -60,6 +60,7 @@ import { E2EQualityPanel } from '../features/e2e-testing/E2EQualityPanel';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import { providerLabel } from '../features/ai-session/providerDisplay';
+import { ModalLayer } from '../components/ModalLayer';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'jira' | 'quality' | 'agents';
@@ -1411,7 +1412,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
       </div>
       )}
       {artifactPreview && (
-        <section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setArtifactPreview(null); }}>
+        <ModalLayer><section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setArtifactPreview(null); }}>
           <div ref={artifactDialog.ref as RefObject<HTMLDivElement>} className="modal-panel artifact-preview-modal" role="dialog" aria-modal="true" aria-label="Artifact preview">
             <header>
               <div>
@@ -1427,10 +1428,10 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
               <button className="primary" type="button" onClick={() => setArtifactPreview(null)}>Close</button>
             </div>
           </div>
-        </section>
+        </section></ModalLayer>
       )}
       {specPickerOpen && (
-        <section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSpecPickerOpen(false); }}>
+        <ModalLayer><section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSpecPickerOpen(false); }}>
           <div ref={specPickerDialog.ref as RefObject<HTMLDivElement>} className="modal-panel spec-picker-modal" role="dialog" aria-modal="true" aria-label="Browse automation specs">
             <header>
               <div>
@@ -1463,10 +1464,10 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
               <button className="primary" type="button" disabled={specPickerSelected.length === 0 || verificationTestsBusy} onClick={() => void addPickedSpecs()}>Add {specPickerSelected.length || ''} spec{specPickerSelected.length === 1 ? '' : 's'}</button>
             </footer>
           </div>
-        </section>
+        </section></ModalLayer>
       )}
       {createPathKind && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creatingPath) { setCreatePathKind(null); setCreatePathName(''); } }}>
+        <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creatingPath) { setCreatePathKind(null); setCreatePathName(''); } }}>
           <section ref={createPathDialog.ref} className="modal-panel" role="dialog" aria-modal="true" aria-label={`Create new ${createPathKind}`}>
             <header><h2>New {createPathKind === 'file' ? 'file' : 'folder'}</h2></header>
             <div className="metadata-form">
@@ -1478,10 +1479,10 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
               <button className="primary" type="button" disabled={creatingPath || !createPathName.trim()} onClick={() => void createItemPath()}>{creatingPath ? 'Creating...' : 'Create'}</button>
             </footer>
           </section>
-        </div>
+        </div></ModalLayer>
       )}
       {renameOpen && selectedTreeNode && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !renamingPath) { setRenameOpen(false); setRenameName(''); } }}>
+        <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !renamingPath) { setRenameOpen(false); setRenameName(''); } }}>
           <section ref={renamePathDialog.ref} className="modal-panel" role="dialog" aria-modal="true" aria-label="Rename path">
             <header><h2>Rename {selectedTreeNode.type}</h2></header>
             <div className="metadata-form">
@@ -1493,7 +1494,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
               <button className="primary" type="button" disabled={renamingPath || !renameName.trim()} onClick={() => void renameItemPath()}>{renamingPath ? 'Renaming...' : 'Rename'}</button>
             </footer>
           </section>
-        </div>
+        </div></ModalLayer>
       )}
       {revertDialogOpen && file && (
         <ConfirmDialog

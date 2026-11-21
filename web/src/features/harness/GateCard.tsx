@@ -7,6 +7,7 @@ import { decisionLine } from './harnessState';
 import { HxStatusBadge } from './HxStatusBadge';
 import { agentRoleLabels, formatAgo, formatCost, formatMinutes, gateTitles, plural } from './vocabulary';
 import { useNow } from './useNow';
+import { ModalLayer } from '../../components/ModalLayer';
 
 type GateWords = { approve: string; reject: string; askTitle: string; askLabel: string; askPlaceholder: string; replan?: { label: string; title: string; placeholder: string }; answerOnApprove?: boolean; answerLabel?: string; answerPlaceholder?: string; answerSubmit?: string; noteLink?: string };
 
@@ -180,7 +181,7 @@ export function GateDecisionDialog({ title, label, placeholder, submitLabel, que
 		onSubmit(reason.trim());
 	};
 	return (
-		<div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
+		<ModalLayer><div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
 			<section ref={dialog.ref} className="confirm-dialog hx-dialog" role="dialog" aria-modal="true" aria-labelledby={dialog.titleId}>
 				<header>
 					<h2 id={dialog.titleId}>{title}</h2>
@@ -212,7 +213,7 @@ export function GateDecisionDialog({ title, label, placeholder, submitLabel, que
 					</footer>
 				</form>
 			</section>
-		</div>
+		</div></ModalLayer>
 	);
 }
 

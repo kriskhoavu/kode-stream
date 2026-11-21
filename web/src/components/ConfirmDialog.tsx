@@ -1,4 +1,5 @@
 import { useModalDialog } from './overlay';
+import { ModalLayer } from './ModalLayer';
 
 export function ConfirmDialog({ title, message, confirmLabel, busy, danger, onCancel, onConfirm }: {
   title: string;
@@ -12,7 +13,7 @@ export function ConfirmDialog({ title, message, confirmLabel, busy, danger, onCa
   const dialog = useModalDialog(onCancel, !busy);
 
   return (
-    <div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}>
+    <ModalLayer><div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}>
       <section ref={dialog.ref} className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby={dialog.titleId}>
         <header>
           <h2 id={dialog.titleId}>{title}</h2>
@@ -24,6 +25,6 @@ export function ConfirmDialog({ title, message, confirmLabel, busy, danger, onCa
           <button data-autofocus className={danger ? 'danger-confirm' : 'primary'} type="button" disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
         </footer>
       </section>
-    </div>
+    </div></ModalLayer>
   );
 }

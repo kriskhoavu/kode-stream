@@ -19,6 +19,7 @@ import { providerFor } from '../../lib/types';
 import { appendJiraDescriptionPrompt, removeJiraDescriptionPrompt } from './jiraPrompt';
 import { useModalDialog } from '../../components/overlay';
 import { toolLabel as label } from './providerDisplay';
+import { ModalLayer } from '../../components/ModalLayer';
 
 type EmbeddedLaunchGuards = Pick<EmbeddedAISessionLaunchInput, 'expectedWorkspaceId' | 'expectedBranch' | 'observedCommit' | 'idempotencyKey'>;
 
@@ -189,7 +190,7 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 	};
 
 	return (
-		<div className="modal-backdrop ai-launch-backdrop" role="presentation">
+		<ModalLayer><div className="modal-backdrop ai-launch-backdrop" role="presentation">
 			<section ref={dialog.ref} className="modal-panel ai-launch-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-launch-title">
 				<header><div><h2 id="ai-launch-title"><Bot size={19} /> {e2eMode ? 'Run E2E test' : 'Open AI session'}</h2><span>{e2eMode ? `Runbook: ${e2eRunbook!.title}` : workspaceMode ? 'Start an interactive CLI at this workspace root.' : 'Start an interactive CLI with this workspace and item context.'}</span></div><button data-autofocus className="icon-button" type="button" aria-label="Close AI session dialog" disabled={launching} onClick={onClose}><X size={18} /></button></header>
 				{loading && <p role="status">Loading available tools...</p>}
@@ -224,7 +225,7 @@ export function AISessionLaunchDialog({ itemId, workspaceTarget, e2eRunbook, pre
 				</div>}
 				<footer className="modal-actions"><button className="ghost" type="button" disabled={launching} onClick={onClose}>Cancel</button><button className="primary" type="button" disabled={!canLaunch} onClick={() => void launch()}>{launching ? 'Opening...' : 'Open session'}</button></footer>
 			</section>
-		</div>
+		</div></ModalLayer>
 	);
 }
 

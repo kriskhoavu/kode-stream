@@ -27,6 +27,7 @@ import { parseGitDiff } from '../shared/domain/diff';
 import { ContentSearchResultRow, PathSearchResultRow } from '../features/content-search/ContentSearch';
 import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
+import { ModalLayer } from '../components/ModalLayer';
 
 type EditorTab = 'preview' | 'raw' | 'diff';
 type PathDialog = { kind: 'file' | 'directory' | 'rename'; parentPath: string; currentPath?: string; initialName?: string };
@@ -538,13 +539,13 @@ function ExplorerPathDialog({ dialog, busy, error, onCancel, onSubmit }: { dialo
   const [name, setName] = useState(dialog.initialName ?? '');
   const title = dialog.kind === 'file' ? 'Create file' : dialog.kind === 'directory' ? 'Create directory' : 'Rename path';
   const modal = useModalDialog(onCancel, !busy);
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}><section ref={modal.ref as RefObject<HTMLElement>} className="explorer-path-dialog" role="dialog" aria-modal="true" aria-labelledby="explorer-path-dialog-title">
+  return <ModalLayer><div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}><section ref={modal.ref as RefObject<HTMLElement>} className="explorer-path-dialog" role="dialog" aria-modal="true" aria-labelledby="explorer-path-dialog-title">
     <header><h2 id="explorer-path-dialog-title">{title}</h2><button className="icon-button" onClick={onCancel} aria-label="Close"><X size={16} /></button></header>
     <p>Parent: {dialog.parentPath || 'workspace root'}</p>
     <label>Name<input data-autofocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && name.trim()) void onSubmit(name.trim()); }} /></label>
     {error && <p className="error">{error}</p>}
     <footer><button className="ghost" disabled={busy} onClick={onCancel}>Cancel</button><button className="primary" disabled={busy || !name.trim()} onClick={() => void onSubmit(name.trim())}>{busy ? 'Saving...' : dialog.kind === 'rename' ? 'Rename' : 'Create'}</button></footer>
-  </section></div>;
+  </section></div></ModalLayer>;
 }
 
 function ExplorerEmpty({ row }: { row?: VisibleExplorerRow }) {

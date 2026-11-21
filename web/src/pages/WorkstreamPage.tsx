@@ -57,12 +57,12 @@ import { QueueView } from '../features/workstream/QueueView';
 import { useTaskActions } from '../features/workstream/useTaskActions';
 import { RunDrawer } from '../features/harness/RunDrawer';
 import { WorkspaceOwnSettings } from '../features/workspaces/WorkspaceOwnSettings';
-import { createPortal } from 'react-dom';
 import { canStartTask, startPending } from '../features/harness/harnessState';
 import type { HarnessRunTab as HarnessRunTabId } from '../app/router';
 import type { HarnessTask } from '../lib/types';
 import '../features/harness/harness.css';
 import '../features/workstream/harnessCards.css';
+import { ModalLayer } from '../components/ModalLayer';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
 /** What the board shows: the harness's tasks, whose columns follow their runs, or the plans on the branch, moved by hand. */
@@ -972,9 +972,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           }}
         />
       )}
-      {/* Into the body: the page's own stacking order puts the app's top bar above a dialog drawn inside it. */}
-      {harnessSettingsOpen && workspace && createPortal(
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setHarnessSettingsOpen(false); void harness.refresh(); } }}>
+      {harnessSettingsOpen && workspace && (
+        <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setHarnessSettingsOpen(false); void harness.refresh(); } }}>
           <div ref={harnessSettingsDialog.ref as RefObject<HTMLDivElement>} className="modal-panel workspace-settings-modal" role="dialog" aria-modal="true" aria-label="AI and harness">
             <header>
               <div>
@@ -987,11 +986,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
             </header>
             <WorkspaceOwnSettings workspace={workspace} />
           </div>
-        </div>,
-        document.body
+        </div></ModalLayer>
       )}
       {sourceItemsOpen && workspace && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !sourceItemsSaving) setSourceItemsOpen(false); }}>
+        <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !sourceItemsSaving) setSourceItemsOpen(false); }}>
           <div ref={sourceItemsDialog.ref as RefObject<HTMLDivElement>} className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
             <header>
               <div>
@@ -1058,10 +1056,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
               </button>
             </footer>
           </div>
-        </div>
+        </div></ModalLayer>
       )}
       {newPlanOpen && workspace && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creatingPlan) closeNewPlan(); }}>
+        <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creatingPlan) closeNewPlan(); }}>
           <section ref={newItemDialog.ref} className={newPlanDraft.origin === 'jira' ? 'modal-panel new-work-item-modal jira-mode' : 'modal-panel new-work-item-modal'} role="dialog" aria-modal="true" aria-label="Create new work item">
             <header>
               <h2>New Work Item</h2>
@@ -1193,7 +1191,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
               </button>
             </footer>
           </section>
-        </div>
+        </div></ModalLayer>
       )}
     </section>
   );

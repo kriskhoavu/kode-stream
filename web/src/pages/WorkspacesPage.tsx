@@ -14,6 +14,7 @@ import { WorkspaceOwnSettings } from '../features/workspaces/WorkspaceOwnSetting
 import { SettingsFileDialog, type SettingsFileMode } from '../features/settings/SettingsFileDialog';
 import { HarnessSettingsSection } from '../features/workstream/HarnessSettingsSection';
 import { useModalDialog } from '../components/overlay';
+import { ModalLayer } from '../components/ModalLayer';
 
 export { applySegmentRole, normalizeDroppedPath, parseSources, previewPathSegments };
 
@@ -844,7 +845,7 @@ const busy = pendingOperations.length > 0;
         </div>
       </div>
 
-      {registrationOpen && <section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closeRegistration(); }}>
+      {registrationOpen && <ModalLayer><section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closeRegistration(); }}>
         <div ref={registrationDialog.ref as RefObject<HTMLDivElement>} className="modal-panel workspace-registration-modal" role="dialog" aria-modal="true" aria-labelledby="add-workspace-title">
           <header>
             <div><h2 id="add-workspace-title">Add workspace</h2><span>Register, clone, or import existing workspace definitions.</span></div>
@@ -932,7 +933,7 @@ const busy = pendingOperations.length > 0;
           </form>
           </>}
         </div>
-      </section>}
+      </section></ModalLayer>}
 		{importConfirmOpen && <ConfirmDialog
 			title="Import selected workspaces"
 			message={`Import ${importSelection.length} workspace${importSelection.length === 1 ? '' : 's'} into ${importPreview?.destinationPath ?? 'the effective registry'} and start indexing?`}
@@ -953,7 +954,7 @@ const busy = pendingOperations.length > 0;
         />
       )}
       {settingsEditor && (
-        <section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setSettingsEditor(null); }}>
+        <ModalLayer><section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setSettingsEditor(null); }}>
           <div ref={sourceStructureDialog.ref as RefObject<HTMLDivElement>} className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
             <header>
               <div>
@@ -1008,7 +1009,7 @@ const busy = pendingOperations.length > 0;
               </button>
             </footer>
           </div>
-        </section>
+        </section></ModalLayer>
       )}
     </section>
   );

@@ -4,6 +4,7 @@ import { useModalDialog } from '../../components/overlay';
 import type { HarnessController } from '../harness/useHarness';
 import { plainError } from '../harness/useHarness';
 import { agentRoleLabels, workerLabel } from '../harness/vocabulary';
+import { ModalLayer } from '../../components/ModalLayer';
 
 const roleRows: { role: HarnessAgentRole; does: string }[] = [
 	{ role: 'planner', does: 'writes the plan' },
@@ -60,7 +61,7 @@ export function RunWithHarnessDialog({ item, workspace, harness, onClose, onStar
 		}
 	};
 	return (
-		<div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+		<ModalLayer><div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
 			<section ref={dialog.ref} className="confirm-dialog hx-dialog run-with-harness" role="dialog" aria-modal="true" aria-labelledby={dialog.titleId}>
 				<header>
 					<h2 id={dialog.titleId}>Run {key} with the harness</h2>
@@ -104,6 +105,6 @@ export function RunWithHarnessDialog({ item, workspace, harness, onClose, onStar
 					</footer>
 				</form>
 			</section>
-		</div>
+		</div></ModalLayer>
 	);
 }
