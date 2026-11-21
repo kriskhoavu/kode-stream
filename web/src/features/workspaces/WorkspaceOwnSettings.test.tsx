@@ -4,7 +4,7 @@ import type { WorkspaceConfig } from '../../lib/types';
 import { api } from '../../shared/api';
 import { WorkspaceOwnSettings } from './WorkspaceOwnSettings';
 
-vi.mock('../workstream/HarnessSettingsSection', () => ({ HarnessSettingsSection: ({ workspaceId }: { workspaceId?: string }) => <section aria-label={`Harness settings for ${workspaceId}`} /> }));
+vi.mock('../workstream/HarnessSettingsSection', () => ({ HarnessSettingsSection: ({ workspaceId, view }: { workspaceId?: string; view?: string }) => <section aria-label={`Harness settings for ${workspaceId}`} data-view={view} /> }));
 vi.mock('../../shared/api', async (importOriginal) => {
 	const original = await importOriginal<typeof import('../../shared/api')>();
 	return { ...original, api: { ...original.api, aiSettings: vi.fn(), aiCapabilities: vi.fn(), saveAISettings: vi.fn() } };
@@ -33,11 +33,25 @@ describe('WorkspaceOwnSettings', () => {
 		await waitFor(() => expect(api.saveAISettings).toHaveBeenCalledWith(expect.objectContaining({ defaultProvider: 'codex', workspaceProviders: { 'ws-1': 'codex' } })));
 	});
 
+	it('holds the provider and harness choices in one tab, the models and role skills in the other', async () => {
+		vi.mocked(api.aiSettings).mockResolvedValue({ defaultProvider: 'claude', defaultTerminal: '', providers: { claude: { enabled: true, executable: 'claude', args: [] } }, terminals: {} });
+		vi.mocked(api.aiCapabilities).mockResolvedValue([]);
+		render(<WorkspaceOwnSettings workspace={workspace} />);
+		await screen.findByRole('combobox', { name: 'Provider here' });
+		expect(screen.getByRole('tab', { name: 'Tools and harness' })).toHaveAttribute('aria-selected', 'true');
+		expect(screen.getByRole('region', { name: 'Harness settings for ws-1' })).toHaveAttribute('data-view', 'choices');
+		fireEvent.click(screen.getByRole('tab', { name: 'Models and skills' }));
+		expect(screen.queryByRole('combobox', { name: 'Provider here' })).not.toBeInTheDocument();
+		// The same harness form stays mounted, so an unsaved edit survives the switch.
+		expect(screen.getByRole('region', { name: 'Harness settings for ws-1' })).toHaveAttribute('data-view', 'models');
+	});
+
 	it('leaves the harness out where it does not run', async () => {
 		vi.mocked(api.aiSettings).mockResolvedValue({ defaultProvider: 'claude', defaultTerminal: '', providers: {}, terminals: {} });
 		vi.mocked(api.aiCapabilities).mockResolvedValue([]);
 		render(<WorkspaceOwnSettings workspace={workspace} showHarness={false} />);
 		await screen.findByRole('combobox', { name: 'Provider here' });
 		expect(screen.queryByRole('region', { name: /Harness settings/ })).not.toBeInTheDocument();
+		expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
 	});
 });

@@ -50,13 +50,18 @@ export function emptyWorkspaceSettings(workspaceId: string): HarnessWorkspaceSet
  * its models and role skills, or, as part "sources", where its Finder looks,
  * which sits beside the workspace's Jira connection.
  */
-export function HarnessSettings({ client, status, workspaceId, part = 'workspace', onPause, onResume, onSaved }: {
+/** One half of a workspace's own harness settings. */
+export type HarnessSettingsView = 'choices' | 'models';
+
+export function HarnessSettings({ client, status, workspaceId, part = 'workspace', view, onPause, onResume, onSaved }: {
 	client: HarnessClient;
 	status?: HarnessStatus;
 	/** Shows this workspace's own choices; absent shows the defaults. */
 	workspaceId?: string;
 	/** With a workspace: its own choices, or only its sources. */
 	part?: 'workspace' | 'sources';
+	/** Of part "workspace": its choices alone, or its models and role skills alone; absent shows both. The draft and Save cover all of it. */
+	view?: HarnessSettingsView;
 	onPause: (role: HarnessRoleId) => Promise<void>;
 	onResume: (role: HarnessRoleId) => Promise<void>;
 	onSaved: () => void;
@@ -193,7 +198,7 @@ export function HarnessSettings({ client, status, workspaceId, part = 'workspace
 
 			</>}
 
-			{workspaceId && part === 'workspace' && <>
+			{workspaceId && part === 'workspace' && view !== 'models' && (
 			<section className="settings-section">
 				<header><div><span className="settings-group-label">Harness</span><h2>The harness in this workspace</h2><p>Each choice follows the defaults until you set it here.</p></div></header>
 				<div className="settings-toggle-list">
@@ -201,13 +206,19 @@ export function HarnessSettings({ client, status, workspaceId, part = 'workspace
 					<Override label="Start tasks on their own" hint="Off: a person approves each task before the Planner starts." value={own.autoStart} fallback={draft.autoStart} onChange={(autoStart) => updateOwn({ autoStart })} />
 					<Override label="Review before hand-off" hint="On: a person tries each change once its tests pass, then hands it off or sends it back." value={own.requireReview} fallback={draft.requireReview} onChange={(requireReview) => updateOwn({ requireReview })} />
 					<Override label="Let an agent stop and ask you" hint="Off: an agent goes on with its best guess and its questions show on the plan approval." value={own.askQuestions} fallback={draft.askQuestions} onChange={(askQuestions) => updateOwn({ askQuestions })} />
-				</div>
-				<div className="hx-advanced-fields">
-					<label className="hx-field"><span>Test command</span><input aria-label="Test command" placeholder="None: Test passes without running anything" value={own.verificationCommands.join(' && ')} onChange={(event) => updateOwn({ verificationCommands: event.target.value.trim() ? [event.target.value] : [] })} /></label>
-					<label className="hx-field"><span>Paths the Builder may change (comma separated, empty for any)</span><input aria-label="Scope" placeholder="Any path that is not protected" value={own.scope.join(', ')} onChange={(event) => updateOwn({ scope: event.target.value.split(',').map((path) => path.trim()).filter(Boolean) })} /></label>
+					<label className="settings-toggle-row">
+						<span><strong>Test command</strong><small>Runs in the task's working copy after each build. Empty: the Test step runs nothing and succeeds.</small></span>
+						<input className="hx-select" aria-label="Test command" placeholder="None" value={own.verificationCommands.join(' && ')} onChange={(event) => updateOwn({ verificationCommands: event.target.value.trim() ? [event.target.value] : [] })} />
+					</label>
+					<label className="settings-toggle-row">
+						<span><strong>Paths the Builder may change</strong><small>Comma separated. Empty: any path that is not protected.</small></span>
+						<input className="hx-select" aria-label="Scope" placeholder="Any path" value={own.scope.join(', ')} onChange={(event) => updateOwn({ scope: event.target.value.split(',').map((path) => path.trim()).filter(Boolean) })} />
+					</label>
 				</div>
 			</section>
+			)}
 
+			{workspaceId && part === 'workspace' && view !== 'choices' && <>
 			<section className="settings-section hx-settings-policy">
 				<header><div><span className="settings-group-label">Models</span><h2>Who does what here</h2><p>Each role runs a coding tool already on this machine. These are this workspace's own: a new workspace starts from Kode Stream's defaults, and changing them here changes no other workspace. The Tester runs the project's own tests and uses no model.</p></div></header>
 				<div className="hx-table-card">

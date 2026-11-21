@@ -2667,3 +2667,14 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 	margin: 0;
 	font-size: 12.5px;
 }
+
+/* A workspace's own choices: every control on the right is the same width, so the rows line up. */
+.hx-settings .settings-toggle-row > .hx-select {
+	flex: none;
+	width: min(320px, 50%);
+}
+
+/* A workspace's own settings in two tabs: tools and harness, then models and skills. */
+.workspace-own-settings > .hx-tabs {
+	margin-bottom: 4px;
+}
