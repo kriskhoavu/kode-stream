@@ -394,7 +394,7 @@ type DashboardSource struct {
 	Labels      []string `json:"labels,omitempty"`
 	TokenEnvVar string   `json:"tokenEnvVar,omitempty"`
 	// CheckReady and ReadyStatuses are a Jira source's readiness check: nil
-	// CheckReady means on, and empty ReadyStatuses means READY.
+	// CheckReady means off, and empty ReadyStatuses means READY.
 	CheckReady    *bool      `json:"checkReady,omitempty"`
 	ReadyStatuses []string   `json:"readyStatuses,omitempty"`
 	LastCheckedAt *time.Time `json:"lastCheckedAt,omitempty"`

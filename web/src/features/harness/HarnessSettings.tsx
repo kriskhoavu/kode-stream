@@ -421,11 +421,11 @@ function SourceRow({ source, workspaceName, now, onChange, onRemove, onClear, cl
  * own, and its Planner first judges whether the ticket says enough.
  */
 function ReadyCheckFields({ source, onChange }: { source: HarnessSourceSettings; onChange: (patch: Partial<HarnessSourceSettings>) => void }) {
-	const on = source.checkReady !== false;
+	const on = source.checkReady === true;
 	const [text, setText] = useState((source.readyStatuses ?? []).join(', '));
 	return (
 		<div className="hx-ready-check">
-			<label className="hx-inline-switch"><input type="checkbox" role="switch" checked={on} onChange={(event) => onChange({ checkReady: event.target.checked ? undefined : false })} /> Start ready tickets on their own</label>
+			<label className="hx-inline-switch"><input type="checkbox" role="switch" checked={on} onChange={(event) => onChange({ checkReady: event.target.checked ? true : undefined })} /> Start ready tickets on their own</label>
 			<label className="hx-field">
 				<span>Ready statuses (comma separated)</span>
 				<input value={text} placeholder="READY" disabled={!on} onChange={(event) => {

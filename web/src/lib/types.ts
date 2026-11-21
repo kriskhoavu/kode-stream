@@ -1302,7 +1302,7 @@ export interface HarnessSourceSettings {
   query: string;
   labels?: string[];
   tokenEnvVar?: string;
-  /** Jira only: whether a ticket in a ready status starts on its own and is first checked for enough context. Absent means on. */
+  /** Jira only: whether a ticket in a ready status starts on its own and is first checked for enough context. Absent means off. */
   checkReady?: boolean;
   /** Jira only: the statuses that mean ready; empty means READY. */
   readyStatuses?: string[];

@@ -62,8 +62,7 @@ type JiraSourceSettings struct {
 	Enabled bool   `json:"enabled"`
 	JQL     string `json:"jql"`
 	Max     int    `json:"max"`
-	// CheckReady turns the readiness check on or off; nil means on. With it
-	// on, a ticket in one of ReadyStatuses starts on its own, and its planner
+	// CheckReady turns the readiness check on; nil means off. With it on, a ticket in one of ReadyStatuses starts on its own, and its planner
 	// first judges whether the ticket says enough to plan from.
 	CheckReady *bool `json:"checkReady,omitempty"`
 	// ReadyStatuses are the Jira statuses that mean a ticket is ready to
@@ -82,7 +81,7 @@ const MaxReadyStatuses = 10
 // Jira is on, the check is on, and status is one of the ready ones, in any
 // case.
 func (j *JiraSourceSettings) Ready(status string) bool {
-	if j == nil || !j.Enabled || (j.CheckReady != nil && !*j.CheckReady) {
+	if j == nil || !j.Enabled || j.CheckReady == nil || !*j.CheckReady {
 		return false
 	}
 	status = strings.TrimSpace(status)

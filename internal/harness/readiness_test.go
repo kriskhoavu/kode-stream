@@ -10,10 +10,10 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// readyJira turns the workspace's Jira source on, which the readiness check
-// needs.
+// readyJira turns the workspace's Jira source and its readiness check on.
 func readyJira(settings *domain.Settings) {
-	settings.Workspaces[0].Jira = &domain.JiraSourceSettings{Enabled: true, JQL: "project = PM"}
+	on := true
+	settings.Workspaces[0].Jira = &domain.JiraSourceSettings{Enabled: true, JQL: "project = PM", CheckReady: &on}
 }
 
 // makeReady puts the fixture's ticket in READY with a reporter and an
@@ -177,6 +177,9 @@ func TestOnlyAReadyTicketStartsOnItsOwn(t *testing.T) {
 		"check off": {status: "READY", adjust: func(settings *domain.Settings) {
 			readyJira(settings)
 			settings.Workspaces[0].Jira.CheckReady = &off
+		}},
+		"check unset": {status: "READY", adjust: func(settings *domain.Settings) {
+			settings.Workspaces[0].Jira = &domain.JiraSourceSettings{Enabled: true, JQL: "project = PM"}
 		}},
 		"no Jira source": {status: "READY", adjust: func(*domain.Settings) {}},
 	} {

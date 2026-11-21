@@ -77,20 +77,22 @@ describe('HarnessSettings', () => {
 		expect(sources[3]).toMatchObject({ workspaceId: 'airship-docs', kind: 'jira', enabled: true });
 	});
 
-	it('starts ready Jira tickets on their own by default, with the statuses a workspace names', async () => {
+	it('leaves ready Jira tickets to a person by default, and starts them with the statuses a workspace names once turned on', async () => {
 		const { client } = await setup('airship-docs', 'sources');
 		const form = await screen.findByRole('form', { name: 'Add a source' });
 		fireEvent.change(within(form).getByRole('combobox', { name: 'Look in' }), { target: { value: 'jira' } });
 		fireEvent.click(within(form).getByRole('button', { name: 'Add source' }));
 		const ready = screen.getByRole('switch', { name: 'Start ready tickets on their own' });
-		expect(ready).toBeChecked();
+		expect(ready).not.toBeChecked();
 		const statuses = screen.getByRole('textbox', { name: 'Ready statuses (comma separated)' });
+		expect(statuses).toBeDisabled();
+		fireEvent.click(ready);
 		expect(statuses).toHaveAttribute('placeholder', 'READY');
 		fireEvent.change(statuses, { target: { value: 'Ready, Ready for dev,' } });
 		expect(statuses).toHaveValue('Ready, Ready for dev,');
 		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 		await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved.'));
-		expect((await client.settings()).sources[3]).toMatchObject({ kind: 'jira', readyStatuses: ['Ready', 'Ready for dev'] });
+		expect((await client.settings()).sources[3]).toMatchObject({ kind: 'jira', checkReady: true, readyStatuses: ['Ready', 'Ready for dev'] });
 		fireEvent.click(ready);
 		expect(statuses).toBeDisabled();
 	});
