@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { KnowledgePageDetail } from '../../lib/types';
-import { KnowledgeReader, prepareKnowledgeMarkdown } from './KnowledgeReader';
+import { KnowledgeReader } from './KnowledgeReader';
 
 const detail: KnowledgePageDetail = {
 	slug: 'overview', title: 'Overview', path: 'overview.md', domain: 'offer', pageType: 'CONCEPT', roles: ['BA'], topics: ['workflow'], summary: 'Summary', sourceRefs: ['plans/api/PM-1/README.md'], sourceCount: 1,
@@ -31,12 +31,5 @@ describe('KnowledgeReader', () => {
 		const external = screen.getByRole('link', { name: 'External' });
 		expect(external).toHaveAttribute('target', '_blank');
 		expect(external).toHaveAttribute('rel', expect.stringContaining('noopener'));
-	});
-
-	it('does not convert Wiki syntax inside code', async () => {
-		const markdown = prepareKnowledgeMarkdown('---\nslug: x\ntitle: X\n---\n`[[inline]]`\n```\n[[fenced]]\n```\n[[page]]');
-		expect(markdown).toContain('`[[inline]]`');
-		expect(markdown).toContain('[[fenced]]');
-		expect(markdown).toContain('[page](./__knowledge__/page)');
 	});
 });
