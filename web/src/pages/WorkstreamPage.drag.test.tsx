@@ -64,7 +64,7 @@ describe('Workstream card drag and drop', () => {
     const sameColumnTransfer = createDataTransfer();
     act(() => {
       fireEvent.dragStart(cardFor('Draggable item'), { dataTransfer: sameColumnTransfer });
-      fireEvent.drop(column('Draft'), { dataTransfer: sameColumnTransfer });
+      fireEvent.drop(column('Planning'), { dataTransfer: sameColumnTransfer });
       fireEvent.dragEnd(cardFor('Draggable item'), { dataTransfer: sameColumnTransfer });
     });
 
@@ -75,7 +75,7 @@ describe('Workstream card drag and drop', () => {
     });
 
     expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(0);
-    expect(within(column('Draft')).getByText('Draggable item')).toBeInTheDocument();
+    expect(within(column('Planning')).getByText('Draggable item')).toBeInTheDocument();
   });
 
   it('clears the active drag state without writing when the interaction is cancelled', async () => {

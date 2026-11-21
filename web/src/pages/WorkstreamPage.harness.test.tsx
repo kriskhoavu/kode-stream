@@ -33,6 +33,7 @@ function stubBoard(options: { enabled?: boolean } = {}) {
 		] }));
 		if (url === '/api/harness/approvals') return Promise.resolve(response({ approvals: [approval('a-3', stuck.id, { runId: 'run-3', gate: 'plan', summary: 'Three steps, one file.' })] }));
 		if (url === '/api/harness/tasks' && init?.method === 'POST') return Promise.resolve(response(task('PM-2', { workspaceId: 'ws', startRequested: true }), true, 201));
+		if (url === `/api/harness/tasks/${found.id}/start` && init?.method === 'POST') return Promise.resolve(response({ ...found, startRequested: true, revision: 2 }));
 		if (url === '/api/harness/scout/poll' && init?.method === 'POST') return Promise.resolve(response({ started: true, sources: [{ workspaceId: 'ws', kind: 'jira', found: 4, added: 1 }] }));
 		if (url === '/api/harness/settings') return Promise.resolve(response({ revision: 1, enabled: true, autoStart: true, requireReview: true, askQuestions: true, slots: {}, paused: {}, sources: [], modelPolicy: {} }));
 		if (url === '/api/harness/approvals/a-3/decide' && init?.method === 'POST') return Promise.resolve(response({ ...approval('a-3', stuck.id, { runId: 'run-3', gate: 'plan' }), state: 'approved', decidedAt: '2026-11-04T10:00:00.000Z', channel: 'dashboard', revision: 2 }));
@@ -83,23 +84,44 @@ describe('WorkstreamPage with the harness', () => {
 		expect(screen.queryByText('Found by the Finder')).not.toBeInTheDocument();
 	});
 
-	it('puts each task in the column its run has reached, and offers no way to move it by hand', async () => {
+	it('puts each task in the column its run has reached, and moves none of them by hand but a start', async () => {
 		stubBoard();
 		renderBoard();
 		await screen.findByText('Found by the Finder');
 		expect(within(column('unsorted')).getByRole('heading', { name: 'To do' })).toBeInTheDocument();
 		expect(within(column('unsorted')).getByText('Found by the Finder')).toBeInTheDocument();
-		// Started, its plan waiting for approval: Draft. Its plan approved and being built: In Progress.
+		// Started, its plan waiting for approval: Planning. Its plan approved and being built: In Progress.
 		expect(within(column('draft')).getByText('Needs a decision')).toBeInTheDocument();
 		expect(within(column('in_progress')).getByText('Built by the harness')).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Move item status' })).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: '+ New item' })).not.toBeInTheDocument();
 		expect(screen.queryByTitle('Configure source items')).not.toBeInTheDocument();
-		expect(document.querySelector('.plan-card.draggable')).toBeNull();
+		// Only the task nobody started may be dragged, and only to start it.
+		expect([...document.querySelectorAll('.plan-card.draggable')].map((card) => card.textContent)).toEqual([expect.stringContaining('Found by the Finder')]);
 		await showPlans();
 		// On the Plans board a plan keeps the status a person gave it.
 		expect(within(column('in_progress')).getByText('Needs a decision')).toBeInTheDocument();
 		expect(screen.getAllByRole('button', { name: 'Move item status' }).length).toBeGreaterThan(0);
+	});
+
+	it('starts a task dragged from To do to Planning, and from nowhere else', async () => {
+		const fetchMock = stubBoard();
+		renderBoard();
+		const card = (await screen.findByText('Found by the Finder')).closest('.plan-card') as HTMLElement;
+		const transfer = { data: '', effectAllowed: '', dropEffect: '', setData(_: string, value: string) { this.data = value; }, getData() { return this.data; } };
+		const starts = () => fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/start'));
+		fireEvent.dragStart(card, { dataTransfer: transfer });
+		fireEvent.dragOver(column('in_progress'), { dataTransfer: transfer });
+		expect(column('in_progress')).not.toHaveClass('drop-target');
+		fireEvent.drop(column('in_progress'), { dataTransfer: transfer });
+		expect(starts()).toHaveLength(0);
+		fireEvent.dragOver(column('draft'), { dataTransfer: transfer });
+		expect(column('draft')).toHaveClass('drop-target');
+		expect(within(column('draft')).getByRole('heading', { name: 'Planning' })).toBeInTheDocument();
+		fireEvent.drop(column('draft'), { dataTransfer: transfer });
+		fireEvent.dragEnd(card);
+		await waitFor(() => expect(starts()).toHaveLength(1));
+		expect(JSON.parse(String(starts()[0][1]?.body))).toMatchObject({ expectedRevision: 1 });
 	});
 
 	it('lists what needs you above the board and approves from there', async () => {

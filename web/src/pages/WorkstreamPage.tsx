@@ -56,6 +56,7 @@ import { RunWithHarnessDialog } from '../features/workstream/RunWithHarnessDialo
 import { QueueView } from '../features/workstream/QueueView';
 import { useTaskActions } from '../features/workstream/useTaskActions';
 import { RunDrawer } from '../features/harness/RunDrawer';
+import { canStartTask, startPending } from '../features/harness/harnessState';
 import type { HarnessRunTab as HarnessRunTabId } from '../app/router';
 import type { HarnessTask } from '../lib/types';
 import '../features/harness/harness.css';
@@ -72,6 +73,8 @@ const boardKindPreference = 'workstreamBoardKind';
 const layoutPreferences: Record<BoardKind, string> = { tasks: 'workstreamTaskLayout', plans: 'workstreamPlanLayout' };
 /** The Tasks board's first column: a task nobody has started. */
 const taskColumnLabels: Partial<Record<ItemStatus, string>> = { unsorted: 'To do' };
+/** The one column a task may be dragged to: dropping a task that has not started there starts it. */
+const taskStartColumn: ItemStatus = 'draft';
 function readBoardKind(): BoardKind {
   return readStringPreference(boardKindPreference) === 'plans' ? 'plans' : 'tasks';
 }
@@ -185,6 +188,13 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const boardTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id), [harness.state, workspace?.id]);
   const finishedTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id, { finished: true }), [harness.state, workspace?.id]);
   const taskActions = useTaskActions(harness);
+  /** A task in the first column that has not started: dragging it to the second starts it. */
+  const startableTask = useCallback((id: string) => {
+    if (!tasksShown) return undefined;
+    const work = taskWorkById.get(id);
+    const card = boardTaskCards.find((candidate) => candidate.item.id === id);
+    return work && card?.item.status === 'unsorted' && canStartTask(work.task) && !startPending(work.task) && !taskActions.pendingIds.has(work.task.id) ? work.task : undefined;
+  }, [tasksShown, taskWorkById, boardTaskCards, taskActions.pendingIds]);
   // A task with no card of its own opens the harness's own drawer.
   const [taskDrawer, setTaskDrawer] = useState<{ taskId: string; tab: HarnessRunTabId } | undefined>();
   // The card being handed to the harness.
@@ -437,7 +447,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     if (firstWorkspaceUnsortedSource) return firstWorkspaceUnsortedSource;
     return Array.from(unsortedSources)[0] ?? sourcesShownIn(workspace, 'workstream')[0] ?? '';
   }, [items, workspace]);
-  const activeItem = activeItemId ? items.find((item) => item.id === activeItemId) : undefined;
+  const activeItem = activeItemId ? boardItems.find((item) => item.id === activeItemId) : undefined;
 
   const scan = async () => {
     if (!workspace) return;
@@ -508,6 +518,14 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   };
 
   const handleCardDragStart = (event: DragEvent<HTMLElement>, itemId: string) => {
+    if (tasksShown) {
+      if (!startableTask(itemId)) { event.preventDefault(); return; }
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', itemId);
+      setActiveItemId(itemId);
+      suppressPreviewRef.current = { itemId, until: Number.POSITIVE_INFINITY };
+      return;
+    }
     const item = items.find((candidate) => candidate.id === itemId);
     if (!item || !isItemDraggable(item) || pendingItemIds.has(itemId)) {
       event.preventDefault();
@@ -530,7 +548,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   };
 
   const handleColumnDragOver = (event: DragEvent<HTMLElement>, status: ItemStatus) => {
-    if (!activeItemId || !isDropStatus(status)) return;
+    if (!activeItemId || !isDropStatus(status) || (tasksShown && status !== taskStartColumn)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     if (dragTargetStatus !== status) setDragTargetStatus(status);
@@ -545,6 +563,14 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const handleColumnDrop = (event: DragEvent<HTMLElement>, status: ItemStatus) => {
     const itemId = event.dataTransfer.getData('text/plain') || activeItemId;
     if (!itemId || !isDropStatus(status)) return;
+    if (tasksShown) {
+      const task = status === taskStartColumn ? startableTask(itemId) : undefined;
+      if (!task) return;
+      event.preventDefault();
+      setDragTargetStatus('');
+      taskActions.start(task);
+      return;
+    }
     event.preventDefault();
     setDragTargetStatus('');
     void moveItem(itemId, status);
@@ -856,7 +882,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
               itemCount={grouped.get(column)?.length ?? 0}
               loading={loading}
               label={tasksShown ? taskColumnLabels[column] : undefined}
-              dragActive={!tasksShown && Boolean(activeItem)}
+              dragActive={Boolean(activeItem) && (!tasksShown || column === taskStartColumn)}
               dragTargetStatus={dragTargetStatus}
               onDragOver={handleColumnDragOver}
               onDragLeave={handleColumnDragLeave}
@@ -889,6 +915,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                   work={workOf(plan.id)}
                   harnessOn={harnessOn}
                   autoStatus={tasksShown}
+                  startable={Boolean(startableTask(plan.id))}
                   onRunWithHarness={harnessOn && !tasksShown && !harnessJoin.byItemId.has(plan.id) ? () => setRunDialogItemId(plan.id) : undefined}
                   onOpenTask={isSyntheticItem(plan) && workOf(plan.id) ? () => openTask(workOf(plan.id)!.task) : undefined}
                   onOpenAgent={(focus) => {
@@ -1262,7 +1289,7 @@ function SourceStructurePreviewTable({ preview, onChangeField }: {
               <span>
                 <select value={row.status ?? 'draft'} onChange={(event) => onChangeField(row.path, 'status', event.target.value)}>
                   <option value="unsorted">Unsorted</option>
-                  <option value="draft">Draft</option>
+                  <option value="draft">Planning</option>
                   <option value="in_progress">In Progress</option>
                   <option value="review">Review</option>
                   <option value="done">Done</option>
@@ -1512,7 +1539,7 @@ function WorkstreamColumn({ status, label, itemCount, loading, dragActive, dragT
   );
 }
 
-const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, work, harnessOn = false, autoStatus = false, onRunWithHarness, onOpenTask, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
+const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active, created, agents, work, harnessOn = false, autoStatus = false, startable = false, onRunWithHarness, onOpenTask, onDragStart, onDragEnd, onPreview, onOpen, onMove, onOpenAgent }: {
   item: ItemSummary;
   workspace?: WorkspaceConfig;
   pending: boolean;
@@ -1525,6 +1552,8 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   harnessOn?: boolean;
   /** True on the Tasks board, where a card's column follows its run and a person never moves it. */
   autoStatus?: boolean;
+  /** A task not yet started: it may be dragged to the next column, which starts it. */
+  startable?: boolean;
   /** Hands the card to the harness; offered on a card it does not hold. */
   onRunWithHarness?: () => void;
   /** Opens the harness's task behind a ticket card that no plan holds yet. */
@@ -1547,7 +1576,7 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
   const synthetic = isSyntheticItem(plan);
   // The card's key opens it where the card shows one; else its title does.
   const keyOpens = !docs && (synthetic || showItem);
-  const draggable = isItemDraggable(plan) && !pending && !synthetic && !autoStatus;
+  const draggable = startable || (isItemDraggable(plan) && !pending && !synthetic && !autoStatus);
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     if (synthetic) onOpenTask?.(); else onOpen();

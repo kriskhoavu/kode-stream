@@ -70,7 +70,7 @@ describe('WorkstreamPage', () => {
     render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
     expect(screen.getByRole('heading', { name: 'Unsorted' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Draft' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Planning' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Item Manager')).toBeInTheDocument());
   });
 
@@ -274,7 +274,7 @@ describe('WorkstreamPage', () => {
 
     render(<WorkstreamPage workspace={workspace} refreshKey={0} visibleStatuses={['draft', 'review']} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
-    expect(await screen.findByRole('heading', { name: 'Draft' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Planning' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Unsorted' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Done' })).not.toBeInTheDocument();
@@ -388,7 +388,7 @@ describe('WorkstreamPage', () => {
     selectCardStatus('Review');
 
     expect(within(column('Review')).getByText('Drag cards')).toBeInTheDocument();
-    await waitFor(() => expect(within(column('Draft')).getByText('Drag cards')).toBeInTheDocument());
+    await waitFor(() => expect(within(column('Planning')).getByText('Drag cards')).toBeInTheDocument());
     expect(screen.getByText('Status update failed')).toBeInTheDocument();
   });
 
