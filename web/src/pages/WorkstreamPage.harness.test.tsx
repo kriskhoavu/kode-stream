@@ -129,6 +129,8 @@ describe('WorkstreamPage with the harness', () => {
 		renderBoard();
 		await screen.findByText('Found by the Finder');
 		expect(screen.queryByTitle('Configure source items')).not.toBeInTheDocument();
+		// The configure column takes a narrow track of its own, so the five status columns stay in one row.
+		expect((document.querySelector('.task-board') as HTMLElement).style.gridTemplateColumns.split(' 44px')).toHaveLength(2);
 		fireEvent.click(screen.getByTitle('Configure AI and harness'));
 		const dialog = screen.getByRole('dialog', { name: 'AI and harness' });
 		expect(within(dialog).getByText('Sample')).toBeInTheDocument();

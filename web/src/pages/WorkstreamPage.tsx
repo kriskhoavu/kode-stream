@@ -431,9 +431,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   }, [visibleStatuses]);
   const boardStyle = useMemo(() => ({
     gridTemplateColumns: displayedStatuses
-      .flatMap((status) => status === 'unsorted' && !tasksShown ? ['minmax(200px, 1fr)', '44px'] : ['minmax(200px, 1fr)'])
+      // Both boards put a narrow configure column after the first one: source items on Plans, AI and harness on Tasks.
+      .flatMap((status) => status === 'unsorted' && (!tasksShown || workspace) ? ['minmax(200px, 1fr)', '44px'] : ['minmax(200px, 1fr)'])
       .join(' ')
-  }) as CSSProperties, [displayedStatuses, tasksShown]);
+  }) as CSSProperties, [displayedStatuses, tasksShown, workspace]);
   const grouped = useMemo(() => {
     const map = new Map<ItemStatus, ItemSummary[]>();
     displayedStatuses.forEach((item) => map.set(item, []));
