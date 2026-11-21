@@ -2738,3 +2738,8 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 	outline: 2px solid var(--accent-text);
 	outline-offset: 2px;
 }
+
+/* In the AI and harness dialog the settings fill the dialog, not the page's reading width. */
+.workspace-settings-modal .workspace-own-settings {
+	max-width: none;
+}
