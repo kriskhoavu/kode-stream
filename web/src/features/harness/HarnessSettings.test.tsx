@@ -130,7 +130,7 @@ describe('HarnessSettings', () => {
 	it('gives a workspace its own choices over the defaults, and its own models', async () => {
 		const { client } = await setup('airship');
 		const ask = screen.getByRole('radiogroup', { name: 'Let an agent stop and ask you' });
-		expect(within(ask).getByRole('radio', { name: 'Default (on)' })).toBeChecked();
+		expect(within(ask).getByRole('radio', { name: 'On' })).toBeChecked();
 		fireEvent.click(within(ask).getByRole('radio', { name: 'Off' }));
 		expect(within(ask).getByRole('radio', { name: 'Off' })).toBeChecked();
 		expect(screen.getByRole('textbox', { name: 'Test command' })).toHaveValue('npm test');

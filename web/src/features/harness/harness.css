@@ -2689,21 +2689,20 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 	padding-top: 14px;
 }
 
-/* A workspace's own on or off: three small cards in one radio group, as wide as the other controls. */
+/* A workspace's on or off: two small cards in one radio group, as wide as the other controls. */
 .hx-choice-cards {
 	flex: none;
 	width: min(320px, 50%);
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
+	grid-template-columns: repeat(2, 1fr);
 	gap: 6px;
 }
 
 .hx-settings .settings-toggle-row .hx-choice-card {
 	position: relative;
 	display: grid;
-	gap: 1px;
 	justify-items: center;
-	padding: 7px 6px;
+	padding: 8px 6px;
 	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: var(--panel-soft);
@@ -2719,11 +2718,6 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 
 .hx-settings .settings-toggle-row .hx-choice-card strong {
 	font-size: 13px;
-}
-
-.hx-choice-card small {
-	font-size: 11px;
-	color: var(--muted);
 }
 
 .hx-settings .settings-toggle-row .hx-choice-card:hover {

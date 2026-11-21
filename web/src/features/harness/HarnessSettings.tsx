@@ -351,24 +351,18 @@ export function HarnessSettings({ client, status, workspaceId, part = 'workspace
 	);
 }
 
-/** A workspace's own on or off, or the default's: three small cards, one chosen. */
-function Override({ label, hint, value, fallback, onChange }: { label: string; hint: string; value?: boolean | null; fallback: boolean; onChange: (value: boolean | undefined) => void }) {
+/** A workspace's on or off as two small cards. Until a person picks one, the default's value is chosen. */
+function Override({ label, hint, value, fallback, onChange }: { label: string; hint: string; value?: boolean | null; fallback: boolean; onChange: (value: boolean) => void }) {
 	const name = useId();
-	const chosen = value === undefined || value === null ? 'default' : value ? 'on' : 'off';
-	const choices: { id: 'default' | 'on' | 'off'; title: string; note: string; value: boolean | undefined }[] = [
-		{ id: 'default', title: 'Default', note: fallback ? 'Now on' : 'Now off', value: undefined },
-		{ id: 'on', title: 'On', note: 'Here', value: true },
-		{ id: 'off', title: 'Off', note: 'Here', value: false }
-	];
+	const on = value === undefined || value === null ? fallback : value;
 	return (
 		<div className="settings-toggle-row">
 			<span><strong>{label}</strong><small>{hint}</small></span>
 			<div className="hx-choice-cards" role="radiogroup" aria-label={label}>
-				{choices.map((choice) => (
-					<label key={choice.id} className={`hx-choice-card${chosen === choice.id ? ' on' : ''}`}>
-						<input type="radio" name={name} value={choice.id} checked={chosen === choice.id} aria-label={choice.id === 'default' ? `Default (${fallback ? 'on' : 'off'})` : choice.title} onChange={() => onChange(choice.value)} />
-						<strong>{choice.title}</strong>
-						<small>{choice.note}</small>
+				{[true, false].map((choice) => (
+					<label key={String(choice)} className={`hx-choice-card${on === choice ? ' on' : ''}`}>
+						<input type="radio" name={name} value={choice ? 'on' : 'off'} checked={on === choice} onChange={() => onChange(choice)} />
+						<strong>{choice ? 'On' : 'Off'}</strong>
 					</label>
 				))}
 			</div>
