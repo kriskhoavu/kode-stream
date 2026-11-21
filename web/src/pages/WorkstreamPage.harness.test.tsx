@@ -90,7 +90,7 @@ describe('WorkstreamPage with the harness', () => {
 		await screen.findByText('Found by the Finder');
 		expect(within(column('unsorted')).getByRole('heading', { name: 'To do' })).toBeInTheDocument();
 		expect(within(column('unsorted')).getByText('Found by the Finder')).toBeInTheDocument();
-		// Started, its plan waiting for approval: Planning. Its plan approved and being built: In Progress.
+		// Started, its plan waiting for approval: Draft. Its plan approved and being built: In Progress.
 		expect(within(column('draft')).getByText('Needs a decision')).toBeInTheDocument();
 		expect(within(column('in_progress')).getByText('Built by the harness')).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Move item status' })).not.toBeInTheDocument();
@@ -104,7 +104,7 @@ describe('WorkstreamPage with the harness', () => {
 		expect(screen.getAllByRole('button', { name: 'Move item status' }).length).toBeGreaterThan(0);
 	});
 
-	it('starts a task dragged from To do to Planning, and from nowhere else', async () => {
+	it('starts a task dragged from To do to Draft, and from nowhere else', async () => {
 		const fetchMock = stubBoard();
 		renderBoard();
 		const card = (await screen.findByText('Found by the Finder')).closest('.plan-card') as HTMLElement;
@@ -117,7 +117,7 @@ describe('WorkstreamPage with the harness', () => {
 		expect(starts()).toHaveLength(0);
 		fireEvent.dragOver(column('draft'), { dataTransfer: transfer });
 		expect(column('draft')).toHaveClass('drop-target');
-		expect(within(column('draft')).getByRole('heading', { name: 'Planning' })).toBeInTheDocument();
+		expect(within(column('draft')).getByRole('heading', { name: 'Draft' })).toBeInTheDocument();
 		fireEvent.drop(column('draft'), { dataTransfer: transfer });
 		fireEvent.dragEnd(card);
 		await waitFor(() => expect(starts()).toHaveLength(1));
