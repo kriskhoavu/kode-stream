@@ -7784,6 +7784,16 @@ body.is-resizing-panel {
   width: min(980px, calc(100vw - 40px));
 }
 
+.workspace-settings-modal {
+  width: min(1080px, calc(100vw - 40px));
+}
+
+.workspace-settings-modal > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
 .artifact-preview-modal {
   width: min(980px, calc(100vw - 40px));
 }

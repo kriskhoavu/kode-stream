@@ -56,6 +56,8 @@ import { RunWithHarnessDialog } from '../features/workstream/RunWithHarnessDialo
 import { QueueView } from '../features/workstream/QueueView';
 import { useTaskActions } from '../features/workstream/useTaskActions';
 import { RunDrawer } from '../features/harness/RunDrawer';
+import { WorkspaceOwnSettings } from '../features/workspaces/WorkspaceOwnSettings';
+import { createPortal } from 'react-dom';
 import { canStartTask, startPending } from '../features/harness/harnessState';
 import type { HarnessRunTab as HarnessRunTabId } from '../app/router';
 import type { HarnessTask } from '../lib/types';
@@ -210,12 +212,15 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     setTaskDrawer({ taskId: task.id, tab: task.runId ? 'plan' : 'ticket' });
   }, [harnessJoin]);
   const [sourceItemsOpen, setSourceItemsOpen] = useState(false);
+  // The workspace's AI and harness settings, opened from the Tasks board.
+  const [harnessSettingsOpen, setHarnessSettingsOpen] = useState(false);
   const [sourceItemsLoading, setSourceItemsLoading] = useState(false);
   const [sourceItemsSaving, setSourceItemsSaving] = useState(false);
   const [sourceItemsDirectory, setSourceItemsDirectory] = useState('');
   const [sourceItemsError, setSourceItemsError] = useState('');
   const [sourceItemsEditor, setSourceItemsEditor] = useState<SourceItemsEditorState | null>(null);
 	const sourceItemsDialog = useModalDialog(() => setSourceItemsOpen(false), !sourceItemsSaving, sourceItemsOpen);
+	const harnessSettingsDialog = useModalDialog(() => { setHarnessSettingsOpen(false); void harness.refresh(); }, true, harnessSettingsOpen);
 	const newItemDialog = useModalDialog(() => closeNewPlan(), !creatingPlan, newPlanOpen);
   const suppressPreviewRef = useRef<{ itemId: string; until: number } | null>(null);
   const appliedFocusRef = useRef('');
@@ -927,6 +932,14 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                 />
               ))}
             </WorkstreamColumn>
+            {column === 'unsorted' && tasksShown && workspace && (
+              <button className="workstream-separator" type="button" onClick={() => setHarnessSettingsOpen(true)} title="Configure AI and harness">
+                <span className="separator-arrow">▶</span>
+                <span className="separator-count">{grouped.get('unsorted')?.length ?? 0}</span>
+                <span className="separator-label">Configure AI & harness</span>
+                <Bot size={15} />
+              </button>
+            )}
             {column === 'unsorted' && !tasksShown && (
               <button className="workstream-separator" type="button" onClick={() => void openSourceItemsDialog()} title="Configure source items">
                 <span className="separator-arrow">▶</span>
@@ -958,6 +971,24 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
             await reloadPlans();
           }}
         />
+      )}
+      {/* Into the body: the page's own stacking order puts the app's top bar above a dialog drawn inside it. */}
+      {harnessSettingsOpen && workspace && createPortal(
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setHarnessSettingsOpen(false); void harness.refresh(); } }}>
+          <div ref={harnessSettingsDialog.ref as RefObject<HTMLDivElement>} className="modal-panel workspace-settings-modal" role="dialog" aria-modal="true" aria-label="AI and harness">
+            <header>
+              <div>
+                <h2>AI and harness</h2>
+                <span>{workspace.name}</span>
+              </div>
+              <button data-autofocus className="icon-button" type="button" onClick={() => { setHarnessSettingsOpen(false); void harness.refresh(); }} aria-label="Close AI and harness">
+                <X size={16} />
+              </button>
+            </header>
+            <WorkspaceOwnSettings workspace={workspace} />
+          </div>
+        </div>,
+        document.body
       )}
       {sourceItemsOpen && workspace && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !sourceItemsSaving) setSourceItemsOpen(false); }}>

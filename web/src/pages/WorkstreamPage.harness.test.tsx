@@ -124,6 +124,21 @@ describe('WorkstreamPage with the harness', () => {
 		expect(JSON.parse(String(starts()[0][1]?.body))).toMatchObject({ expectedRevision: 1 });
 	});
 
+	it('opens the workspace AI and harness settings beside To do, as Plans opens its source items', async () => {
+		stubBoard();
+		renderBoard();
+		await screen.findByText('Found by the Finder');
+		expect(screen.queryByTitle('Configure source items')).not.toBeInTheDocument();
+		fireEvent.click(screen.getByTitle('Configure AI and harness'));
+		const dialog = screen.getByRole('dialog', { name: 'AI and harness' });
+		expect(within(dialog).getByText('Sample')).toBeInTheDocument();
+		fireEvent.click(within(dialog).getByRole('button', { name: 'Close AI and harness' }));
+		expect(screen.queryByRole('dialog', { name: 'AI and harness' })).not.toBeInTheDocument();
+		await showPlans();
+		expect(screen.queryByTitle('Configure AI and harness')).not.toBeInTheDocument();
+		expect(await screen.findByTitle('Configure source items')).toBeInTheDocument();
+	});
+
 	it('lists what needs you above the board and approves from there', async () => {
 		const fetchMock = stubBoard();
 		renderBoard();
