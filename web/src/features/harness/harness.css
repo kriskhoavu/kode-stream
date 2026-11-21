@@ -2678,3 +2678,13 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 .workspace-own-settings > .hx-tabs {
 	margin-bottom: 4px;
 }
+
+/* The provider row matches the harness rows below it, and its Save sits clear of the row's border. */
+.workspace-own-settings .ai-settings-section .settings-toggle-row > select {
+	flex: none;
+	width: min(320px, 50%);
+}
+
+.workspace-own-settings .ai-settings-section .settings-actions {
+	padding-top: 14px;
+}
