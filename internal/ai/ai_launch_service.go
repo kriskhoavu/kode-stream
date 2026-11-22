@@ -1,16 +1,12 @@
 package ai
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -111,24 +107,6 @@ type PlanPreset struct {
 	Prompt      string `json:"prompt"`
 	ContextMode string `json:"contextMode"`
 	Provider    string `json:"provider,omitempty"`
-}
-
-type CapabilityDescriptor struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Kind        string `json:"kind"`
-	Provider    string `json:"provider"`
-	Scope       string `json:"scope"`
-	SourcePath  string `json:"sourcePath"`
-}
-
-type ProviderCapabilityCatalog struct {
-	Provider                string                 `json:"provider"`
-	Skills                  []CapabilityDescriptor `json:"skills"`
-	Agents                  []CapabilityDescriptor `json:"agents"`
-	SupportsNativeSelection bool                   `json:"supportsNativeSelection"`
-	SupportsPromptFallback  bool                   `json:"supportsPromptFallback"`
 }
 
 type Eligibility struct {
@@ -243,134 +221,6 @@ func (s *Service) resolvePrompt(presetID, promptDraft, customPrompt string) (str
 	return "", "", launchError("invalid_prompt", "selected AI preset is unavailable")
 }
 
-func (s *Service) composePrompt(providerID, itemID, contextMode, presetID, promptDraft, customPrompt string, selectedSkills, selectedAgents []string) (string, string, error) {
-	catalog, catalogErr := s.ProviderCapabilities(providerID, itemID)
-	if catalogErr != nil {
-		return "", "", catalogErr
-	}
-	return s.composePromptWithCatalog(catalog, contextMode, presetID, promptDraft, customPrompt, selectedSkills, selectedAgents)
-}
-
-func (s *Service) composeWorkspacePrompt(providerID, workspaceID, contextMode, presetID, promptDraft, customPrompt string, selectedSkills, selectedAgents []string) (string, string, error) {
-	catalog, catalogErr := s.ProviderCapabilitiesForWorkspace(providerID, workspaceID)
-	if catalogErr != nil {
-		return "", "", catalogErr
-	}
-	return s.composePromptWithCatalog(catalog, contextMode, presetID, promptDraft, customPrompt, selectedSkills, selectedAgents)
-}
-
-func (s *Service) composePromptWithCatalog(catalog ProviderCapabilityCatalog, contextMode, presetID, promptDraft, customPrompt string, selectedSkills, selectedAgents []string) (string, string, error) {
-	basePrompt, resolvedPresetID, err := s.resolvePrompt(presetID, promptDraft, customPrompt)
-	if err != nil {
-		return "", "", err
-	}
-	skills, missingSkills := normalizeCapabilitySelection(selectedSkills, catalog.Skills)
-	agents, missingAgents := normalizeCapabilitySelection(selectedAgents, catalog.Agents)
-	if len(missingSkills) > 0 || len(missingAgents) > 0 {
-		return "", "", launchError("capability_missing", "one or more selected AI capabilities are unavailable")
-	}
-	if len(skills) == 0 && len(agents) == 0 {
-		return basePrompt, resolvedPresetID, nil
-	}
-	if !catalog.SupportsPromptFallback {
-		return basePrompt, resolvedPresetID, nil
-	}
-	block := buildCapabilityPromptBlock(contextMode, skills, agents)
-	if strings.TrimSpace(basePrompt) == "" {
-		return block, resolvedPresetID, nil
-	}
-	return strings.TrimSpace(basePrompt) + "\n\n" + block, resolvedPresetID, nil
-}
-
-func (s *Service) ProviderCapabilities(providerID, itemID string) (ProviderCapabilityCatalog, error) {
-	return s.ProviderCapabilitiesContext(context.Background(), providerID, itemID)
-}
-
-func (s *Service) ProviderCapabilitiesContext(ctx context.Context, providerID, itemID string) (ProviderCapabilityCatalog, error) {
-	settings, err := s.Settings()
-	if err != nil {
-		return ProviderCapabilityCatalog{}, err
-	}
-	id := strings.TrimSpace(providerID)
-	if id == "" {
-		id = settings.DefaultProvider
-	}
-	if _, ok := settings.Providers[id]; !ok {
-		return ProviderCapabilityCatalog{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
-	}
-	workspacePath := ""
-	if strings.TrimSpace(itemID) != "" {
-		if s.launch == nil || s.launch.registry == nil || s.launch.index == nil {
-			return ProviderCapabilityCatalog{}, launchError("launch_failed", "AI session launch is unavailable")
-		}
-		item, found, getErr := s.launch.index.Get(strings.TrimSpace(itemID))
-		if getErr != nil {
-			return ProviderCapabilityCatalog{}, launchErrorWith("launch_failed", getErr)
-		}
-		if !found {
-			return ProviderCapabilityCatalog{}, launchError("item_not_found", "item not found")
-		}
-		workspace, found, getErr := s.launch.registry.Get(item.WorkspaceID)
-		if getErr != nil {
-			return ProviderCapabilityCatalog{}, launchErrorWith("launch_failed", getErr)
-		}
-		if !found {
-			return ProviderCapabilityCatalog{}, launchError("workspace_not_found", "workspace not found")
-		}
-		workspacePath = workspace.Path
-	}
-	skills, agents := discoverProviderCapabilitiesContext(ctx, id, workspacePath)
-	if err := ctx.Err(); err != nil {
-		return ProviderCapabilityCatalog{}, err
-	}
-	return ProviderCapabilityCatalog{
-		Provider:                id,
-		Skills:                  skills,
-		Agents:                  agents,
-		SupportsNativeSelection: false,
-		SupportsPromptFallback:  true,
-	}, nil
-}
-
-func (s *Service) ProviderCapabilitiesForWorkspace(providerID, workspaceID string) (ProviderCapabilityCatalog, error) {
-	return s.ProviderCapabilitiesForWorkspaceContext(context.Background(), providerID, workspaceID)
-}
-
-func (s *Service) ProviderCapabilitiesForWorkspaceContext(ctx context.Context, providerID, workspaceID string) (ProviderCapabilityCatalog, error) {
-	if s.launch == nil || s.launch.registry == nil {
-		return ProviderCapabilityCatalog{}, launchError("launch_failed", "AI session launch is unavailable")
-	}
-	workspace, found, err := s.launch.registry.Get(strings.TrimSpace(workspaceID))
-	if err != nil {
-		return ProviderCapabilityCatalog{}, launchErrorWith("launch_failed", err)
-	}
-	if !found {
-		return ProviderCapabilityCatalog{}, launchError("workspace_not_found", "workspace not found")
-	}
-	settings, err := s.Settings()
-	if err != nil {
-		return ProviderCapabilityCatalog{}, err
-	}
-	id := strings.TrimSpace(providerID)
-	if id == "" {
-		id = settings.DefaultProvider
-	}
-	if _, ok := settings.Providers[id]; !ok {
-		return ProviderCapabilityCatalog{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
-	}
-	skills, agents := discoverProviderCapabilitiesContext(ctx, id, workspace.Path)
-	if err := ctx.Err(); err != nil {
-		return ProviderCapabilityCatalog{}, err
-	}
-	return ProviderCapabilityCatalog{
-		Provider:                id,
-		Skills:                  skills,
-		Agents:                  agents,
-		SupportsNativeSelection: false,
-		SupportsPromptFallback:  true,
-	}, nil
-}
-
 // ItemWorkspace is deliberately narrow transport support for ownership checks;
 // it does not expose the workspace path or item content.
 func (s *Service) ItemWorkspace(itemID string) (string, error) {
@@ -413,44 +263,6 @@ func (s *Service) startTerminal(id string, terminal LaunchTemplate, terminalArgs
 	return nil
 }
 
-func writeWrapper(wrapperDir, workspace, executable string, args []string, checkpoint verificationCheckpoint) (string, error) {
-	if err := os.MkdirAll(wrapperDir, 0o700); err != nil {
-		return "", err
-	}
-	path := filepath.Join(wrapperDir, "launch-"+randomID()+".command")
-	command := "#!/bin/sh\ncd -- " + shellQuote(workspace) + " || exit 1\nself=$0\nrm -f -- \"$self\"\n" + shellQuote(executable)
-	for _, arg := range args {
-		command += " " + shellQuote(arg)
-	}
-	command += "\ncode=$?\n"
-	if callback := checkpointCommand(checkpoint); callback != "" {
-		command += callback + "\n"
-	}
-	command += "exit $code\n"
-	if err := writeAtomic(path, []byte(command), 0o700); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-func checkpointCommand(checkpoint verificationCheckpoint) string {
-	if strings.TrimSpace(checkpoint.WorkspaceID) == "" {
-		return ""
-	}
-	body, err := json.Marshal(map[string]string{
-		"eventType":    "session_completed",
-		"profile":      firstNonEmpty(strings.TrimSpace(checkpoint.Profile), "smoke"),
-		"provider":     strings.TrimSpace(checkpoint.Provider),
-		"sessionId":    strings.TrimSpace(checkpoint.SessionID),
-		"terminalMode": firstNonEmpty(strings.TrimSpace(checkpoint.TerminalMode), "external"),
-	})
-	if err != nil {
-		return ""
-	}
-	urlValue := fmt.Sprintf("http://127.0.0.1:%s/api/workspaces/%s/verification-checkpoints", serverPort(), url.PathEscape(checkpoint.WorkspaceID))
-	return "if command -v curl >/dev/null 2>&1; then curl -sS -X POST -H 'Content-Type: application/json' --data " + shellQuote(string(body)) + " " + shellQuote(urlValue) + " >/dev/null 2>&1 || true; fi"
-}
-
 func serverPort() string {
 	value := strings.TrimSpace(os.Getenv("KODE_STREAM_PORT"))
 	if value == "" {
@@ -470,154 +282,6 @@ func firstNonEmpty(values ...string) string {
 	}
 	return ""
 }
-
-func writeAtomic(path string, data []byte, mode os.FileMode) error {
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".ai-session-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryPath, path)
-}
-
-func expand(value string, values map[string]string) string {
-	for key, replacement := range values {
-		value = strings.ReplaceAll(value, "{"+key+"}", replacement)
-	}
-	return value
-}
-
-func expandAll(values []string, replacements map[string]string) []string {
-	result := make([]string, len(values))
-	for index, value := range values {
-		result[index] = expand(value, replacements)
-	}
-	return result
-}
-
-func expandProviderArgs(values []string, replacements map[string]string) []string {
-	expanded := expandAll(values, replacements)
-	if containsPlaceholder(values, "{prompt}") {
-		return expanded
-	}
-	if prompt := strings.TrimSpace(replacements["prompt"]); prompt != "" {
-		return append(expanded, prompt)
-	}
-	return expanded
-}
-
-func launchProviderArgs(contextMode string, values []string, replacements map[string]string) []string {
-	if strings.TrimSpace(contextMode) == "workspace_only" {
-		prompt := strings.TrimSpace(replacements["prompt"])
-		if prompt == "" {
-			return nil
-		}
-		return []string{prompt}
-	}
-	return expandProviderArgs(values, replacements)
-}
-
-func containsPlaceholder(values []string, placeholder string) bool {
-	for _, value := range values {
-		if strings.Contains(value, placeholder) {
-			return true
-		}
-	}
-	return false
-}
-
-func normalizeCapabilitySelection(selected []string, allowed []CapabilityDescriptor) ([]CapabilityDescriptor, []string) {
-	if len(selected) == 0 {
-		return nil, nil
-	}
-	allowedByID := map[string]CapabilityDescriptor{}
-	allowedByAlias := map[string][]CapabilityDescriptor{}
-	for _, item := range allowed {
-		allowedByID[item.ID] = item
-		for _, alias := range capabilityAliases(item) {
-			allowedByAlias[alias] = append(allowedByAlias[alias], item)
-		}
-	}
-	result := make([]CapabilityDescriptor, 0, len(selected))
-	missing := make([]string, 0)
-	seen := map[string]bool{}
-	for _, id := range selected {
-		id = strings.TrimSpace(id)
-		item, ok := allowedByID[id]
-		if !ok {
-			candidates := allowedByAlias[normalizeCapabilityAlias(id)]
-			if len(candidates) == 1 {
-				item, ok = candidates[0], true
-			}
-		}
-		if !ok {
-			missing = append(missing, id)
-			continue
-		}
-		if seen[item.ID] {
-			continue
-		}
-		seen[item.ID] = true
-		result = append(result, item)
-	}
-	return result, missing
-}
-
-func capabilityAliases(item CapabilityDescriptor) []string {
-	nameAlias := normalizeCapabilityAlias(item.Name)
-	base := strings.TrimSuffix(filepath.Base(item.SourcePath), filepath.Ext(item.SourcePath))
-	if isGenericCapabilityBasename(base) {
-		base = filepath.Base(filepath.Dir(item.SourcePath))
-	}
-	pathAlias := normalizeCapabilityAlias(base)
-	if pathAlias == nameAlias {
-		return []string{nameAlias}
-	}
-	return []string{nameAlias, pathAlias}
-}
-
-func normalizeCapabilityAlias(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
-	value = strings.ReplaceAll(value, "_", "-")
-	return strings.Join(strings.Fields(value), "-")
-}
-
-func buildCapabilityPromptBlock(contextMode string, skills, agents []CapabilityDescriptor) string {
-	lines := []string{"Capability directives:"}
-	if len(skills) > 0 {
-		names := make([]string, 0, len(skills))
-		for _, skill := range skills {
-			names = append(names, skill.Name)
-		}
-		lines = append(lines, "- Skills: "+strings.Join(names, ", "))
-	}
-	if len(agents) > 0 {
-		names := make([]string, 0, len(agents))
-		for _, agent := range agents {
-			names = append(names, agent.Name)
-		}
-		lines = append(lines, "- Agents: "+strings.Join(names, ", "))
-	}
-	if strings.TrimSpace(contextMode) != "" {
-		lines = append(lines, "- Keep behavior consistent with context mode: "+strings.TrimSpace(contextMode)+".")
-	}
-	lines = append(lines, "- Treat these directives as user-selected guidance for this session.")
-	return strings.Join(lines, "\n")
-}
-
-func shellQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }
 
 func randomID() string {
 	var value [8]byte
