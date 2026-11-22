@@ -1,5 +1,5 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
-import { Workflow } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
+import { CircleHelp, Workflow } from 'lucide-react';
 import type { HarnessAgentRole, HarnessEngineId, HarnessRoleHealth, HarnessRoleId, HarnessRoleModel, HarnessSettings as Settings, HarnessSourceKind, HarnessSourceSettings, HarnessStatus, HarnessWorkspaceSettings } from '../../lib/types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import type { HarnessClient, HarnessWorkspaceOption } from './harnessClient';
@@ -234,13 +234,8 @@ export function HarnessSettings({ client, status, workspaceId, part = 'workspace
 										<td>
 											{row.role === 'coder' ? (
 												<div className="hx-model-pair">
-													<ModelInput label="Easy" value={model.model} onChange={(value) => updateModel(row.role, { model: value })} />
-													<ModelInput label="Hard" value={model.highDifficultyModel} placeholder="Same as Easy" onChange={(value) => updateModel(row.role, { highDifficultyModel: value })} aside={(
-														<details className="hx-explainer">
-															<summary>What counts as hard?</summary>
-															<p>The Planner rates each plan easy or hard. Hard means the plan touches many files, changes how two parts talk to each other, or its check found must-fix items twice. Hard work goes to the stronger model; blank keeps it on the easy one.</p>
-														</details>
-													)} />
+													<ModelInput label="Easy" hint="Builds every plan the Planner rates easy: a few files, no change to how two parts talk to each other." value={model.model} onChange={(value) => updateModel(row.role, { model: value })} />
+													<ModelInput label="Hard" hint="Builds every plan the Planner rates hard: it touches many files, changes how two parts talk to each other, or its check found must-fix items twice. Blank keeps hard work on the Easy model." value={model.highDifficultyModel} placeholder="Same as Easy" onChange={(value) => updateModel(row.role, { highDifficultyModel: value })} />
 												</div>
 											) : <ModelInput label={`${row.name} model for “${row.does}”`} hideLabel value={model.model} onChange={(value) => updateModel(row.role, { model: value })} />}
 										</td>
@@ -393,13 +388,19 @@ function EngineSelect({ value, engines, label, onChange }: { value: HarnessEngin
 	);
 }
 
-function ModelInput({ label, value, placeholder, hideLabel = false, aside, onChange }: { label: string; value: string; placeholder?: string; hideLabel?: boolean; aside?: ReactNode; onChange: (model: string) => void }) {
+function ModelInput({ label, value, placeholder, hideLabel = false, hint, onChange }: { label: string; value: string; placeholder?: string; hideLabel?: boolean; hint?: string; onChange: (model: string) => void }) {
 	const listId = useId();
 	const inputId = useId();
+	const hintId = useId();
 	return (
 		<div className="hx-model-input">
-			<span className={hideLabel ? 'sr-only' : 'hx-model-label'}><label htmlFor={inputId}>{label}</label>{aside}</span>
-			<input id={inputId} value={value} list={listId} title={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value.trim())} />
+			<span className={hideLabel ? 'sr-only' : 'hx-model-label'}><label htmlFor={inputId}>{label}</label>{hint && (
+				<span className="hx-hint">
+					<button type="button" className="hx-hint-button" aria-label={`What ${label} means`} aria-describedby={hintId}><CircleHelp size={13} aria-hidden="true" /></button>
+					<span id={hintId} role="tooltip" className="hx-hint-text">{hint}</span>
+				</span>
+			)}</span>
+			<input id={inputId} aria-describedby={hint ? hintId : undefined} value={value} list={listId} title={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value.trim())} />
 			<datalist id={listId}>{modelSuggestions.map((model) => <option key={model} value={model}>{modelLabel(model)}</option>)}</datalist>
 		</div>
 	);

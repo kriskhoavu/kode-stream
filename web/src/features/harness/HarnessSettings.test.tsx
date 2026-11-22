@@ -23,7 +23,7 @@ describe('HarnessSettings', () => {
 		expect(screen.getAllByRole('option', { name: 'Codex (not installed)' })[0]).toBeDisabled();
 		expect(screen.getByRole('combobox', { name: /^Easy/ })).toHaveValue('claude-sonnet-5-5');
 		expect(screen.getByRole('combobox', { name: /^Hard/ })).toHaveValue('claude-opus-5-5');
-		expect(screen.getByText('What counts as hard?')).toBeInTheDocument();
+		expect(screen.getByRole('combobox', { name: /^Hard/ })).toHaveAccessibleDescription(/rates hard/);
 		expect(screen.getByText('No model.')).toBeInTheDocument();
 		expect(screen.getByText(/Cannot limit which tools an agent may use/)).toBeInTheDocument();
 		expect(screen.queryByText(/worktree|SSE/i)).not.toBeInTheDocument();

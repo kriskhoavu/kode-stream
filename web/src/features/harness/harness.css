@@ -1669,45 +1669,72 @@ a.hx-source:hover {
 	gap: 10px 14px;
 }
 
-.hx-explainer {
-	font-size: 12px;
-}
-
-/* A model field's label line: the label, and at the right end of the Hard one its explainer. */
+/* A model field's label line: the label, then a "?" whose tooltip says what the field means. */
 .hx-model-label {
 	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 10px;
-	position: relative;
+	align-items: center;
+	gap: 4px;
 }
 
-/* The explanation opens over the rows below rather than pushing the label line apart. */
-.hx-model-label .hx-explainer p {
+.hx-hint {
+	position: relative;
+	display: inline-flex;
+}
+
+.hx-settings .hx-hint-button {
+	display: inline-grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: none;
+	color: var(--muted);
+	cursor: help;
+}
+
+.hx-settings .hx-hint-button:hover,
+.hx-settings .hx-hint-button:focus-visible {
+	color: var(--accent-text);
+}
+
+.hx-hint-text {
 	position: absolute;
-	top: 100%;
-	right: 0;
+	top: calc(100% + 6px);
+	left: 50%;
 	z-index: 3;
-	width: 360px;
-	padding: 10px 12px;
+	width: 300px;
+	padding: 8px 10px;
 	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: var(--panel);
 	box-shadow: var(--shadow-soft);
+	color: var(--muted);
+	font-size: 12px;
 	font-weight: 400;
+	line-height: 1.45;
+	text-transform: none;
+	letter-spacing: normal;
+	white-space: normal;
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+	transform: translateX(-50%);
+	transition: opacity 120ms var(--hx-ease);
 }
 
-.hx-explainer summary,
+.hx-hint:hover .hx-hint-text,
+.hx-hint:focus-within .hx-hint-text {
+	opacity: 1;
+	visibility: visible;
+}
+
 .hx-advanced summary {
 	cursor: pointer;
 	color: var(--accent-text);
 	font-weight: 600;
-}
-
-.hx-explainer p {
-	margin: 6px 0 0;
-	max-width: 520px;
-	color: var(--muted);
 }
 
 .hx-engine-notes {
