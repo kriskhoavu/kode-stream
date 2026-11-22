@@ -77,18 +77,10 @@ func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput
 			return EmbeddedResult{}, launchError("invalid_context_path", "context path must be an existing Markdown file inside the workspace")
 		}
 	}
-	settings, err := s.Settings()
-	if err != nil {
-		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
-	}
 	providerID := strings.TrimSpace(input.Provider)
-	provider, ok := settings.Providers[providerID]
-	if !ok || !provider.Enabled {
-		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
-	}
-	capability := s.detect(provider.Executable)
-	if !capability.Detected {
-		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
+	provider, capability, err := s.embeddedProvider(providerID)
+	if err != nil {
+		return EmbeddedResult{}, err
 	}
 	prompt, _, err := s.composeWorkspacePrompt(providerID, workspaceID, "workspace_only", input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
 	if err != nil {
@@ -105,17 +97,7 @@ func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
-	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
-	if err != nil {
-		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
-			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))
-		}
-		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
-	}
-	if saved, ok, getErr := s.recordsGet(record.ID); getErr == nil && ok {
-		record = saved
-	}
-	return EmbeddedResult{Session: session, Grant: grant, Record: &record}, nil
+	return s.startRecorded(record, StartRequest{ID: record.ID, WorkspaceID: workspace.ID, Provider: providerID, Intent: "workspace_only", Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 }
 
 type EmbeddedResult struct {
@@ -130,36 +112,16 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	}
 	s.embeddedLaunchMu.Lock()
 	defer s.embeddedLaunchMu.Unlock()
-	item, found, err := s.launch.index.Get(itemID)
+	item, workspace, err := s.embeddedTarget(itemID, input.ExpectedWorkspaceID)
 	if err != nil {
-		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
-	}
-	if !found {
-		return EmbeddedResult{}, launchError("item_not_found", "item not found")
-	}
-	workspace, found, err := s.launch.registry.Get(item.WorkspaceID)
-	if err != nil {
-		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
-	}
-	if !found {
-		return EmbeddedResult{}, launchError("workspace_not_found", "workspace not found")
-	}
-	if expected := strings.TrimSpace(input.ExpectedWorkspaceID); expected != "" && expected != item.WorkspaceID {
-		return EmbeddedResult{}, launchErrorWithDetails("terminal_workspace_mismatch", "the plan reference moved to a different workspace", map[string]string{"expectedWorkspaceId": expected, "currentWorkspaceId": item.WorkspaceID})
+		return EmbeddedResult{}, err
 	}
 	if result, found, err := s.existingSession(workspace.ID, input.IdempotencyKey); err != nil || found {
 		return result, err
 	}
-	if expected := strings.TrimSpace(input.ExpectedBranch); expected != "" && strings.TrimSpace(item.Branch) != "" && expected != item.Branch {
-		return EmbeddedResult{}, launchErrorWithDetails("terminal_branch_mismatch", "the plan reference moved to a different branch", map[string]string{"expectedBranch": expected, "currentBranch": item.Branch})
-	}
-	requestedBranch := strings.TrimSpace(item.Branch)
-	if requestedBranch == "" {
-		requestedBranch = strings.TrimSpace(input.ExpectedBranch)
-	}
-	observedCommit := strings.TrimSpace(input.ObservedCommit)
-	if observedCommit == "" {
-		observedCommit = strings.TrimSpace(item.Commit)
+	requestedBranch, observedCommit, err := embeddedRevision(item, input)
+	if err != nil {
+		return EmbeddedResult{}, err
 	}
 	branch, commit, err := s.validateSessionBranch(workspace, requestedBranch, observedCommit)
 	if err != nil {
@@ -170,29 +132,13 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 		return s.resumeClaudeEmbedded(itemID, item, workspace, branch, commit, resume, input)
 	}
 	mode := strings.TrimSpace(input.ContextMode)
-	if mode != "workspace_only" && mode != "card_context" {
-		return EmbeddedResult{}, launchError("invalid_context_mode", "contextMode must be workspace_only or card_context")
-	}
-	if mode == "card_context" {
-		if item.SourceMode == "snapshot" || !item.Editable {
-			return EmbeddedResult{}, launchError("item_not_editable", "context-based AI sessions require an editable working-tree item")
-		}
-		if _, err := pathguard.SafeJoin(workspace.Path, item.ItemPath); err != nil {
-			return EmbeddedResult{}, launchError("item_not_editable", "item path is outside the workspace")
-		}
-	}
-	settings, err := s.Settings()
-	if err != nil {
-		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
+	if err := checkEmbeddedContext(mode, item, workspace); err != nil {
+		return EmbeddedResult{}, err
 	}
 	providerID := strings.TrimSpace(input.Provider)
-	provider, ok := settings.Providers[providerID]
-	if !ok || !provider.Enabled {
-		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
-	}
-	capability := s.detect(provider.Executable)
-	if !capability.Detected {
-		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
+	provider, capability, err := s.embeddedProvider(providerID)
+	if err != nil {
+		return EmbeddedResult{}, err
 	}
 	prompt, _, promptErr := s.composePrompt(input.Provider, itemID, input.ContextMode, input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
 	if promptErr != nil {
@@ -205,17 +151,7 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
-	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
-	if err != nil {
-		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
-			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))
-		}
-		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
-	}
-	if saved, ok, getErr := s.recordsGet(record.ID); getErr == nil && ok {
-		record = saved
-	}
-	return EmbeddedResult{Session: session, Grant: grant, Record: &record}, nil
+	return s.startRecorded(record, StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 }
 
 // resumeClaudeEmbedded continues one of the workspace's Claude conversations
@@ -254,7 +190,88 @@ func (s *Service) resumeClaudeEmbedded(itemID string, item models.ItemDetail, wo
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
-	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: intent, Executable: capability.Executable, Args: []string{"--resume", conversation}, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+	return s.startRecorded(record, StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: intent, Executable: capability.Executable, Args: []string{"--resume", conversation}, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
+}
+
+// embeddedTarget finds the item and its workspace, and refuses an item that
+// moved to a workspace other than the one the caller saw.
+func (s *Service) embeddedTarget(itemID, expectedWorkspaceID string) (models.ItemDetail, models.WorkspaceConfig, error) {
+	item, found, err := s.launch.index.Get(itemID)
+	if err != nil {
+		return models.ItemDetail{}, models.WorkspaceConfig{}, launchErrorWith("launch_failed", err)
+	}
+	if !found {
+		return models.ItemDetail{}, models.WorkspaceConfig{}, launchError("item_not_found", "item not found")
+	}
+	workspace, found, err := s.launch.registry.Get(item.WorkspaceID)
+	if err != nil {
+		return models.ItemDetail{}, models.WorkspaceConfig{}, launchErrorWith("launch_failed", err)
+	}
+	if !found {
+		return models.ItemDetail{}, models.WorkspaceConfig{}, launchError("workspace_not_found", "workspace not found")
+	}
+	if expected := strings.TrimSpace(expectedWorkspaceID); expected != "" && expected != item.WorkspaceID {
+		return models.ItemDetail{}, models.WorkspaceConfig{}, launchErrorWithDetails("terminal_workspace_mismatch", "the plan reference moved to a different workspace", map[string]string{"expectedWorkspaceId": expected, "currentWorkspaceId": item.WorkspaceID})
+	}
+	return item, workspace, nil
+}
+
+// embeddedRevision picks the branch and commit a session starts from, and
+// refuses an item that moved to a branch other than the one the caller saw.
+func embeddedRevision(item models.ItemDetail, input EmbeddedInput) (string, string, error) {
+	if expected := strings.TrimSpace(input.ExpectedBranch); expected != "" && strings.TrimSpace(item.Branch) != "" && expected != item.Branch {
+		return "", "", launchErrorWithDetails("terminal_branch_mismatch", "the plan reference moved to a different branch", map[string]string{"expectedBranch": expected, "currentBranch": item.Branch})
+	}
+	requestedBranch := strings.TrimSpace(item.Branch)
+	if requestedBranch == "" {
+		requestedBranch = strings.TrimSpace(input.ExpectedBranch)
+	}
+	observedCommit := strings.TrimSpace(input.ObservedCommit)
+	if observedCommit == "" {
+		observedCommit = strings.TrimSpace(item.Commit)
+	}
+	return requestedBranch, observedCommit, nil
+}
+
+// checkEmbeddedContext accepts the two context modes, and card context only
+// for an editable working-tree item inside its workspace.
+func checkEmbeddedContext(mode string, item models.ItemDetail, workspace models.WorkspaceConfig) error {
+	if mode != "workspace_only" && mode != "card_context" {
+		return launchError("invalid_context_mode", "contextMode must be workspace_only or card_context")
+	}
+	if mode != "card_context" {
+		return nil
+	}
+	if item.SourceMode == "snapshot" || !item.Editable {
+		return launchError("item_not_editable", "context-based AI sessions require an editable working-tree item")
+	}
+	if _, err := pathguard.SafeJoin(workspace.Path, item.ItemPath); err != nil {
+		return launchError("item_not_editable", "item path is outside the workspace")
+	}
+	return nil
+}
+
+// embeddedProvider returns an enabled provider whose executable is installed.
+func (s *Service) embeddedProvider(providerID string) (LaunchTemplate, Capability, error) {
+	settings, err := s.Settings()
+	if err != nil {
+		return LaunchTemplate{}, Capability{}, launchErrorWith("launch_failed", err)
+	}
+	provider, ok := settings.Providers[providerID]
+	if !ok || !provider.Enabled {
+		return LaunchTemplate{}, Capability{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
+	}
+	capability := s.detect(provider.Executable)
+	if !capability.Detected {
+		return LaunchTemplate{}, Capability{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
+	}
+	return provider, capability, nil
+}
+
+// startRecorded starts the terminal for a persisted starting record. When the
+// start fails it marks the record failed, so no record stays starting.
+func (s *Service) startRecorded(record SessionRecord, request StartRequest) (EmbeddedResult, error) {
+	session, grant, err := s.embedded.Start(request)
 	if err != nil {
 		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
 			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))
@@ -319,18 +336,10 @@ func (s *Service) StartEmbeddedReview(input ReviewInput) (EmbeddedResult, error)
 	if result, found, err := s.existingSession(input.WorkspaceID, input.IdempotencyKey); err != nil || found {
 		return result, err
 	}
-	settings, err := s.Settings()
-	if err != nil {
-		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
-	}
 	providerID := strings.TrimSpace(input.Provider)
-	provider, ok := settings.Providers[providerID]
-	if !ok || !provider.Enabled {
-		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
-	}
-	capability := s.detect(provider.Executable)
-	if !capability.Detected {
-		return EmbeddedResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
+	provider, capability, err := s.embeddedProvider(providerID)
+	if err != nil {
+		return EmbeddedResult{}, err
 	}
 	values := map[string]string{"workspace": input.Dir, "contextFile": "run worktree", "itemPath": "run worktree", "identifier": input.Branch, "contextMode": "workspace_only", "intent": ReviewIntent, "prompt": input.Prompt}
 	recordID, args := embeddedSessionID(providerID, provider, launchProviderArgs("workspace_only", provider.Args, values))
@@ -339,15 +348,5 @@ func (s *Service) StartEmbeddedReview(input ReviewInput) (EmbeddedResult, error)
 	if err != nil {
 		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
 	}
-	session, grant, err := s.embedded.Start(StartRequest{ID: record.ID, WorkspaceID: input.WorkspaceID, Provider: providerID, Intent: ReviewIntent, Executable: capability.Executable, Args: args, Dir: input.Dir, Columns: input.Columns, Rows: input.Rows})
-	if err != nil {
-		if compensationErr := s.markLaunchFailed(record); compensationErr != nil {
-			return EmbeddedResult{}, launchErrorWith("launch_failed", fmt.Errorf("%w; session compensation failed: %v", err, compensationErr))
-		}
-		return EmbeddedResult{}, launchErrorWith("launch_failed", err)
-	}
-	if saved, ok, getErr := s.recordsGet(record.ID); getErr == nil && ok {
-		record = saved
-	}
-	return EmbeddedResult{Session: session, Grant: grant, Record: &record}, nil
+	return s.startRecorded(record, StartRequest{ID: record.ID, WorkspaceID: input.WorkspaceID, Provider: providerID, Intent: ReviewIntent, Executable: capability.Executable, Args: args, Dir: input.Dir, Columns: input.Columns, Rows: input.Rows})
 }
