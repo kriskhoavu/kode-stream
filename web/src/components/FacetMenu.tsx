@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useDismiss } from './useDismiss';
 import { ChevronDown, Search, X } from 'lucide-react';
 
 /** One choice in a facet: the stored value and the words shown for it. */
@@ -23,24 +24,7 @@ export function FacetMenu({ title, options, selected, open, onOpen, onClose, onT
   const visibleOptions = options.filter((option) => option.value);
   const searchedOptions = visibleOptions.filter((option) => option.label.toLowerCase().includes(optionQuery.toLowerCase()));
 
-  useEffect(() => {
-    if (!open) return;
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      onClose();
-    };
-    document.addEventListener('pointerdown', closeOnOutsideClick);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [onClose, open]);
+  useDismiss(menuRef, open, onClose);
 
   if (visibleOptions.length === 0) return null;
   return (

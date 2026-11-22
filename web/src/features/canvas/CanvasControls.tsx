@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
+import { useDismiss } from '../../components/useDismiss';
 import { useReactFlow } from '@xyflow/react';
 import { ChevronDown, Expand, LayoutGrid, Maximize, Minimize2, Minus, Plus, RotateCcw, Search, WandSparkles } from 'lucide-react';
 
@@ -26,28 +27,14 @@ export function CanvasSearch({ query, onQueryChange }: { query: string; onQueryC
 
 export function CanvasFacetMenu({ title, options, selected, open, onOpen, onClose, onToggle, onClear }: { title: string; options: Array<{ value: string; label: string }>; selected: string[]; open: boolean; onOpen: () => void; onClose: () => void; onToggle: (value: string) => void; onClear: () => void }) {
 	const menuRef = useRef<HTMLElement>(null);
-	useEffect(() => {
-		if (!open) return;
-		const outside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) onClose(); };
-		const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-		document.addEventListener('pointerdown', outside);
-		document.addEventListener('keydown', escape);
-		return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
-	}, [onClose, open]);
+	useDismiss(menuRef, open, onClose);
 	if (options.length === 0) return null;
 	return <section className="facet-menu" ref={menuRef}><button type="button" className={selected.length ? 'facet-trigger active' : 'facet-trigger'} aria-expanded={open} onClick={onOpen}><span>{title}</span><span className="facet-trigger-right">{selected.length > 0 && <strong>{selected.length}</strong>}<ChevronDown className={open ? 'facet-chevron open' : 'facet-chevron'} size={15} /></span></button>{open && <div className="facet-popover"><div className="facet-popover-header"><strong>{title}</strong><button type="button" onClick={onClear} disabled={selected.length === 0}>Clear</button></div><div className="facet-option-list">{options.map((option) => <label className="facet-option" key={option.value}><input type="checkbox" checked={selected.includes(option.value)} onChange={() => onToggle(option.value)} /><span>{option.label}</span></label>)}</div></div>}</section>;
 }
 
 export function CanvasArrangeMenu({ open, disabled, onOpen, onClose, onArrange }: { open: boolean; disabled: boolean; onOpen: () => void; onClose: () => void; onArrange: (grouping: 'status' | 'service' | 'service_status') => void }) {
 	const menuRef = useRef<HTMLElement>(null);
-	useEffect(() => {
-		if (!open) return;
-		const outside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) onClose(); };
-		const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-		document.addEventListener('pointerdown', outside);
-		document.addEventListener('keydown', escape);
-		return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
-	}, [onClose, open]);
+	useDismiss(menuRef, open, onClose);
 	const choose = (value: 'status' | 'service' | 'service_status') => { onArrange(value); onClose(); };
 	return <section className="facet-menu canvas-arrange-menu" ref={menuRef}><button type="button" className="facet-trigger" aria-expanded={open} disabled={disabled} onClick={onOpen}><span>Group</span><ChevronDown className={open ? 'facet-chevron open' : 'facet-chevron'} size={15} /></button>{open && <div className="facet-popover"><div className="facet-popover-header"><strong>Arrange plans by</strong></div><div className="facet-option-list"><button type="button" onClick={() => choose('status')}>Status</button><button type="button" onClick={() => choose('service')}>Service</button><button type="button" onClick={() => choose('service_status')}>Service + status</button></div></div>}</section>;
 }

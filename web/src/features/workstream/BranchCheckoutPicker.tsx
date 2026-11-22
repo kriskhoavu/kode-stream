@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDismiss } from '../../components/useDismiss';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { ChevronDown, GitBranch, GitCommitHorizontal, Search, ArchiveRestore } from 'lucide-react';
 import { ApiError, api } from '../../shared/api';
@@ -20,7 +21,7 @@ export function BranchCheckoutPicker({ workspaceId, currentCheckoutBranch, branc
   const generationRef = useRef(0); const stashesAbortRef = useRef<AbortController | null>(null);
   const gitState = checkoutGitState(resolvedGitStatus);
   const options = useMemo(() => { const query = search.trim().toLowerCase(); const all = order(unique([...branches, currentCheckoutBranch]), currentCheckoutBranch); const pinned = all.filter((branch) => primary(branch) || branch === currentCheckoutBranch); return order(unique([...pinned, ...all.filter((branch) => !query || branch.toLowerCase().includes(query))]), currentCheckoutBranch); }, [branches, currentCheckoutBranch, search]);
-  useEffect(() => { if (!open) return; const outside = (event: PointerEvent) => { if (!pickerRef.current?.contains(event.target as Node | null)) { setOpen(false); setSearch(''); } }; const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); setSearch(''); } }; document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape); return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); }; }, [open]);
+  useDismiss(pickerRef, open, () => { setOpen(false); setSearch(''); });
   useEffect(() => { if (open) setActiveIndex(Math.max(0, options.indexOf(currentCheckoutBranch))); }, [currentCheckoutBranch, open, options]);
   useEffect(() => { if (open) optionRefs.current[activeIndex]?.scrollIntoView?.({ block: 'nearest' }); }, [activeIndex, open]);
   useEffect(() => {

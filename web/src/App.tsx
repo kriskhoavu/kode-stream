@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useDismiss } from './components/useDismiss';
 import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Search, Sun, Boxes, FolderGit2, PanelLeftClose, PanelLeftOpen, Settings, Bot } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { sourcePaths } from './lib/sources';
@@ -55,30 +56,8 @@ export function App() {
   const cloudUserLabel = runtimeContext.user?.name || runtimeContext.user?.email || runtimeContext.user?.id || 'Cloud user';
   const modeLabel = dataStatus === 'unavailable' ? 'Runtime unavailable' : runtimeContext.mode === 'cloud' ? `Cloud · ${runtimeContext.role ?? 'viewer'} · ${runtimeContext.agent.status}` : 'Local';
 
-  useEffect(() => {
-    if (!workspaceMenuOpen && !profileMenuOpen) return;
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(target)) {
-        setWorkspaceMenuOpen(false);
-      }
-      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
-        setProfileMenuOpen(false);
-      }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setWorkspaceMenuOpen(false);
-        setProfileMenuOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', closeOnOutsideClick);
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick);
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [workspaceMenuOpen, profileMenuOpen]);
+  useDismiss(workspaceMenuRef, workspaceMenuOpen, () => setWorkspaceMenuOpen(false));
+  useDismiss(profileMenuRef, profileMenuOpen, () => setProfileMenuOpen(false));
 
   const selectWorkspace = (repo: WorkspaceConfig) => {
     selectWorkspaceState(repo);
