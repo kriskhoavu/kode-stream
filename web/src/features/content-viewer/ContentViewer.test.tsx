@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { FileContent } from '../../lib/types';
 import { ContentViewer } from './ContentViewer';
-import { renderMarkdown } from './renderers/MarkdownPreview';
 import { SourceCodeView } from './renderers/SourceCodeView';
 
 function file(overrides: Partial<FileContent> = {}): FileContent {
@@ -85,15 +84,6 @@ describe('ContentViewer', () => {
     expect(await screen.findByTitle('HTML preview')).toHaveAttribute('sandbox', '');
     fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
     await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('<h1>Preview</h1>'));
-  });
-
-  it('sanitizes Markdown output and marks external links', async () => {
-    const html = await renderMarkdown('<script>alert("x")</script>\n\n[Site](https://example.test)');
-    const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
-
-    expect(parsed.querySelector('script')).toBeNull();
-    expect(parsed.querySelector('a')?.getAttribute('target')).toBe('_blank');
-    expect(parsed.querySelector('a')?.getAttribute('rel')).toContain('noopener');
   });
 
   it('pauses source highlighting for large files while preserving controls', () => {

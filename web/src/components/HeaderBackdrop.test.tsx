@@ -1,6 +1,6 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { HeaderBackdrop, backdropRoutes, backdropVariants, bandClasses, toBackdropVariant } from './HeaderBackdrop';
+import { HeaderBackdrop, backdropVariants, bandClasses, toBackdropVariant } from './HeaderBackdrop';
 
 afterEach(cleanup);
 
@@ -21,10 +21,6 @@ describe('HeaderBackdrop', () => {
   it('renders nothing at all for none', () => {
     const { container } = render(<HeaderBackdrop variant="none" />);
     expect(container.firstChild).toBeNull();
-  });
-
-  it('decorates the workstream, workbench and knowledge routes only', () => {
-    expect([...backdropRoutes]).toEqual(['workstream', 'canvas', 'knowledge', 'harness']);
   });
 
   /*

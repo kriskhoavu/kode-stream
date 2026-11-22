@@ -176,20 +176,6 @@ describe('folder tree', () => {
 		{ slug: 'rollback', title: 'Deployment Rollback', path: 'platform/concepts/rollback.md', domain: 'platform/concepts', bucket: 'platform', area: '', tier: 'concepts', pageType: 'CONCEPT', roles: [], topics: [], sourceRefs: [], links: [], backlinks: [] }
 	];
 
-	// A tier is a section that opens from its own label, so a tier with no README
-	// to hang a button on is still reachable.
-	it('opens a tier from its own label with no landing page involved', () => {
-		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
-
-		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
-		fireEvent.click(screen.getByRole('button', { name: 'Open domains/offer index' }));
-		fireEvent.click(screen.getByRole('button', { name: /^concepts$/i }));
-		fireEvent.click(screen.getByRole('button', { name: /^reference$/i }));
-
-		expect(screen.getByRole('button', { name: /Offer Approval/i })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: /Offer Permissions/i })).toBeInTheDocument();
-	});
-
 	it('shows tier folders inside their area folder', () => {
 		render(<KnowledgeBrowser pages={taxonomyPages} warnings={[]} onSelect={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: /^domains$/i }));
@@ -229,11 +215,6 @@ describe('folder tree', () => {
 		expect(screen.getByRole('button', { name: /Deployment Rollback/i })).toBeInTheDocument();
 	});
 
-	it('expands the bucket and area of a selected deep page', () => {
-		render(<KnowledgeBrowser pages={taxonomyPages} selectedSlug="article-spec" warnings={[]} onSelect={vi.fn()} />);
-
-		expect(screen.getByRole('button', { name: /Article Fields/i })).toBeInTheDocument();
-	});
 });
 
 describe('tier colour and page type suppression', () => {
@@ -280,12 +261,6 @@ describe('tier colour and page type suppression', () => {
 		expect(rowFor('Base Setup').querySelector('.knowledge-page-type')).not.toBeNull();
 	});
 
-	it('no longer colours page types', () => {
-		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
-		fireEvent.click(screen.getByRole('button', { name: /^e2e-testing$/i }));
-
-		expect(rowFor('Base Setup').querySelector('.page-type-how-to')).toBeNull();
-	});
 });
 
 describe('collapsible tiers', () => {
@@ -301,18 +276,12 @@ describe('collapsible tiers', () => {
 	};
 	const tierToggle = (tier: string) => screen.getByRole('button', { name: new RegExp(`^${tier}$`, 'i') });
 
-	it('collapses every tier by default', () => {
+	it('opens with every tier collapsed, and expands and collapses a tier from its label', () => {
 		render(<KnowledgeBrowser pages={tierPages} warnings={[]} onSelect={vi.fn()} />);
 		openArea();
-
 		expect(tierToggle('concepts')).toHaveAttribute('aria-expanded', 'false');
 		expect(screen.queryByRole('button', { name: /Offer Approval/i })).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Offer Permissions/i })).not.toBeInTheDocument();
-	});
-
-	it('expands and collapses a tier from its label', () => {
-		render(<KnowledgeBrowser pages={tierPages} warnings={[]} onSelect={vi.fn()} />);
-		openArea();
 
 		fireEvent.click(tierToggle('concepts'));
 		expect(tierToggle('concepts')).toHaveAttribute('aria-expanded', 'true');

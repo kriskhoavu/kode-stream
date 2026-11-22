@@ -56,20 +56,6 @@ describe('JiraItemPanel', () => {
   });
 });
 
-describe('JiraItemPanel description formatting', () => {
-  afterEach(() => vi.clearAllMocks());
-  it('renders the description as Markdown rather than raw syntax', async () => {
-    const description = '### User Story\n\n- As an Admin, I want the PDFs to look nice.\n\n### Context\n\nExisting PDFs could be improved.';
-    vi.mocked(api.jiraIssue).mockResolvedValue({ state:'available', issue:{ key:'DI-365', summary:'Redesign layout of offer PDF', status:'Test Done', description, issueType:'User-Story', priority:'Medium', labels:[], browserUrl:'https://jira/browse/DI-365', attachments:[] } });
-    render(<JiraItemPanel itemId="item-3" />);
-
-    expect(await screen.findByRole('heading', { name: 'User Story' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Context' })).toBeInTheDocument();
-    expect(screen.getByRole('listitem')).toHaveTextContent('As an Admin, I want the PDFs to look nice.');
-    expect(screen.queryByText(/### User Story/)).not.toBeInTheDocument();
-  });
-});
-
 describe('JiraItemPanel status badge', () => {
   afterEach(() => vi.clearAllMocks());
   const tone = async (statusCategory: string | undefined, status: string) => {

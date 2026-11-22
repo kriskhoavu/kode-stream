@@ -140,18 +140,6 @@ describe('Knowledge graph', () => {
 		expect(reactFlowSpy.mock.calls.at(-1)?.[0].nodes.find((node: { id: string }) => node.id === 'a')?.className).not.toContain('selected');
 	});
 
-	it('shows gray domain grouping links in the overview and adds a page’s links when it is clicked', async () => {
-		const { KnowledgeGraph } = await import('./KnowledgeGraph');
-		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" onSelect={vi.fn()} onOpenDetails={vi.fn()} />);
-		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(2);
-		expect(screen.queryByRole('button', { name: /selected links/ })).not.toBeInTheDocument();
-		expect(screen.queryByRole('combobox', { name: 'Filter graph page type' })).not.toBeInTheDocument();
-		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
-		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(3);
-		fireEvent.click(within(screen.getByTestId('flow')).getByRole('button', { name: 'Alpha' }));
-		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(2);
-	});
-
 	it('shows links on a click, hides them on a second, and opens the review panel on a double click', async () => {
 		const { KnowledgeGraph } = await import('./KnowledgeGraph');
 		const onSelect = vi.fn();
@@ -159,6 +147,9 @@ describe('Knowledge graph', () => {
 		render(<KnowledgeGraph graph={graph} pages={pages} selectedSlug="a" selectedDetail={detail} onSelect={onSelect} onOpenDetails={onOpenDetails} />);
 
 		expect(reactFlowSpy).toHaveBeenCalled();
+		expect(reactFlowSpy.mock.calls.at(-1)?.[0].edges).toHaveLength(2);
+		expect(screen.queryByRole('button', { name: /selected links/ })).not.toBeInTheDocument();
+		expect(screen.queryByRole('combobox', { name: 'Filter graph page type' })).not.toBeInTheDocument();
 		expect(screen.getByTestId('flow')).toHaveAttribute('data-draggable', 'true');
 		expect(screen.getByRole('button', { name: 'Beautify graph layout' })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Auto arrange graph' })).toBeInTheDocument();

@@ -96,11 +96,6 @@ export const workspaceApi = {
   saveWorkspaceRuntime: (workspaceId: string, input: WorkspaceRuntimeConfig | null) => request<WorkspaceRuntimeConfig | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/runtime`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
   scan: (workspaceId: string) => request<ScanResult>(`/api/workspaces/${workspaceId}/scan`, { method: 'POST' }),
-  loadWorkstreamBranch: (workspaceId: string, input: { branch?: string; force?: boolean } = {}) =>
-    request<WorkstreamBranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/workstream/branch`, {
-      method: 'POST',
-      body: JSON.stringify(input)
-    }, true).then(normalizeWorkstreamBranchLoadResult),
 	loadWorkstreamCheckout: (workspaceId: string, input: { force?: boolean } = {}, signal?: AbortSignal) =>
 		request<WorkstreamBranchLoadResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/workstream/checkout`, {
 			method: 'POST', body: JSON.stringify(input), signal

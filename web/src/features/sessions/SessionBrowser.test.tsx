@@ -14,7 +14,6 @@ vi.mock('./SessionChangesPanel', () => ({
 	SessionChangesPanel: ({ session }: { session: SafeSessionRecord }) => <div data-testid="mock-changes" data-session={session.id} />
 }));
 
-import { SessionBrowserTerminal } from './SessionBrowserTerminal';
 
 function record(overrides: Partial<SafeSessionRecord> = {}): SafeSessionRecord {
 	return { id: 'session-1', workspaceId: 'workspace-1', provider: 'codex', intent: 'Investigate flaky test', requestedBranch: 'main', state: 'running', startedAt: new Date(Date.now() - 60_000).toISOString(), lastKnownAt: '', live: true, ...overrides };
@@ -91,7 +90,6 @@ describe('SessionBrowser', () => {
 		expect(card).toHaveAttribute('aria-current', 'true');
 		expect(screen.getByTestId('mock-terminal')).toHaveAttribute('data-session', 'a');
 		expect(screen.getByTestId('mock-terminal')).toHaveAttribute('data-visible', 'true');
-		expect(vi.mocked(SessionBrowserTerminal)).toHaveBeenCalled();
 	});
 
 	it('moves the selection with arrow keys and opens it with Enter', () => {

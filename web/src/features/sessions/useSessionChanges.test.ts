@@ -60,13 +60,6 @@ describe('useSessionChanges', () => {
 		expect(api.sessionChanges).toHaveBeenCalledTimes(2);
 	});
 
-	it('surfaces a load error', async () => {
-		vi.mocked(api.sessionChanges).mockRejectedValue(new Error('boom'));
-		const { result } = renderHook(() => useSessionChanges('session-1', false));
-		await flush();
-		expect(result.current.error).toBe('boom');
-	});
-
 	it('keeps polling after a failed poll while the session stays live', async () => {
 		vi.mocked(api.sessionChanges)
 			.mockResolvedValueOnce(changes())

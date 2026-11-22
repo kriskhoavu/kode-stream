@@ -1,4 +1,4 @@
-import type { AICapability, AIProviderCapabilityCatalog, AISettings, AIPlanPreset, AISessionEligibility, AISessionLaunchInput, AISessionLaunchResult, EmbeddedAISession, EmbeddedAISessionLaunchInput, EmbeddedAISessionResult, SafeSessionRecord, SessionChanges, SessionScope, ClaudeTranscript, ClaudeTurn, GlobalSessionsResponse } from '../../lib/types';
+import type { AICapability, AIProviderCapabilityCatalog, AISettings, AIPlanPreset, AISessionEligibility, AISessionLaunchInput, AISessionLaunchResult, EmbeddedAISession, EmbeddedAISessionLaunchInput, EmbeddedAISessionResult, SafeSessionRecord, SessionChanges, ClaudeTranscript, ClaudeTurn } from '../../lib/types';
 import { request } from './http';
 import { normalizeAISettings } from './normalize';
 
@@ -32,7 +32,6 @@ export const aiApi = {
 		return (await request<ClaudeTranscript[] | null>(`/api/workspaces/${encodeURIComponent(workspaceId)}/claude-transcripts${query}`, { signal }, false)) ?? [];
 	},
 	claudeTranscriptTail: (workspaceId: string, sessionId: string, limit = 20, signal?: AbortSignal) => request<ClaudeTurn[]>(`/api/workspaces/${encodeURIComponent(workspaceId)}/claude-transcripts/${encodeURIComponent(sessionId)}/tail?limit=${limit}`, { signal }, false),
-	listSessions: (scope: SessionScope) => request<GlobalSessionsResponse>(`/api/sessions?scope=${encodeURIComponent(scope)}`),
 	deleteSession: (sessionId: string) => request<void>(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
 	sessionChanges: (sessionId: string, signal?: AbortSignal) => request<SessionChanges>(`/api/sessions/${encodeURIComponent(sessionId)}/changes`, { signal }, !signal),
 	sessionFileDiff: (sessionId: string, path: string, signal?: AbortSignal) => request<{ path: string; diff: string; truncated: boolean }>(`/api/sessions/${encodeURIComponent(sessionId)}/diff?path=${encodeURIComponent(path)}`, { signal }, !signal)

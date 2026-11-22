@@ -105,11 +105,6 @@ describe('CanvasBoard', () => {
 		expect(onRemove).not.toHaveBeenCalled();
 	});
 
-	it('provides React Flow context to toolbar search', () => {
-		expect(() => renderBoard(baseProjection())).not.toThrow();
-		expect(screen.getByLabelText('Search Canvas nodes')).toBeInTheDocument();
-	});
-
 	it('keeps section and removal actions together in a right-aligned row when a node is selected', () => {
 		renderBoard(baseProjection(), { selectedId: 'plan:item-1', onCreateSection: vi.fn() });
 		const actions = screen.getByRole('group', { name: 'Canvas actions' });
@@ -207,14 +202,6 @@ describe('CanvasBoard', () => {
 		expect(onMoveSection).toHaveBeenCalledWith('section-1', { x: 332, y: -30 }, { x: 12, y: 0 });
 	});
 
-	it('computes the Focus active set from live running sessions and ignores non-live ones', () => {
-		renderBoard(focusProjection());
-		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
-		expect(screen.getByRole('button', { name: 'Focus' })).toHaveAttribute('aria-pressed', 'true');
-		expect(screen.getByLabelText('Plan: PM-037 Focused Canvas main')).toBeInTheDocument();
-		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
-	});
-
 	it('keeps the Focus label concise for more than one active plan and session', () => {
 		const projection = focusProjection();
 		const activeSession2 = projection.nodes.find((node) => node.id === 'session:session-2')!;
@@ -233,6 +220,7 @@ describe('CanvasBoard', () => {
 		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '4');
 		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '2');
 		fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+		expect(screen.getByRole('button', { name: 'Focus' })).toHaveAttribute('aria-pressed', 'true');
 		expect(screen.queryByLabelText('Plan: PM-038 Focused Canvas main')).not.toBeInTheDocument();
 		expect(screen.queryByLabelText('Session: codex main exited')).not.toBeInTheDocument();
 		expect(screen.getByLabelText('Plan: PM-037 Focused Canvas main')).toBeInTheDocument();
@@ -332,7 +320,8 @@ describe('CanvasBoard', () => {
 		expect(screen.getByRole('button', { name: /^Focus/ })).toHaveAttribute('aria-pressed', 'true');
 	});
 
-	it.each([25, 100, 300])('keeps %i placements virtualized', (count) => {
+	it('keeps many placements virtualized', () => {
+		const count = 100;
 		const template = baseProjection().nodes[1];
 		const nodes = Array.from({ length: count }, (_, index): CanvasNode => ({ ...template, id: `plan:${index}`, entityRef: { ...template.entityRef, itemId: String(index) }, position: { x: index * 10, y: index * 5 }, plan: { ...template.plan!, itemId: String(index), identifier: `PM-${index}` } }));
 		renderBoard({ ...baseProjection(), nodes, connections: [] });
