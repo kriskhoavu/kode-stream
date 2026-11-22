@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useHorizontalDrag } from '../components/useHorizontalDrag';
 import { useFileTabs } from '../features/file-editor/useFileTabs';
+import { createItemPath, relativePathParts, renamedPath, renameItemPath } from '../features/item-workspace/itemPathActions';
 import type { CSSProperties, MutableRefObject } from 'react';
 import { ArrowLeft, Bot, Code2, FilePlus2, FileText, FolderOpen, FolderPlus, GitCompare, GripVertical, Info, Ticket, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -103,31 +104,17 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     setRecoveryHint(result.recoveryHint ?? '');
   };
 
-  const createItemPath = async (createPathName: string): Promise<boolean> => {
+  const createPath = async (createPathName: string): Promise<boolean> => {
     if (!plan?.itemPath || !createPathKind || !createPathName.trim()) return false;
-    const parts = createPathName.trim().split('/');
-    if (parts.some((part) => !part || part === '.' || part === '..')) {
+    const folder = { workspaceId: plan.workspaceId, itemPath: plan.itemPath };
+    const parts = relativePathParts(createPathName);
+    if (!parts) {
       setError('Use a relative path without empty, ".", or ".." segments.');
       return false;
     }
     setError('');
     try {
-      const directoryParts = createPathKind === 'file' ? parts.slice(0, -1) : parts;
-      const existingDirectories = fileDirectoryPaths(files);
-      let relativeParent = selectedDirectoryPath;
-      for (const directory of directoryParts) {
-        const relativePath = relativeParent ? `${relativeParent}/${directory}` : directory;
-        if (!existingDirectories.has(relativePath)) {
-          const parentPath = relativeParent ? `${plan.itemPath}/${relativeParent}` : plan.itemPath;
-          await api.createWorkspaceDirectory(plan.workspaceId, { parentPath, name: directory });
-          existingDirectories.add(relativePath);
-        }
-        relativeParent = relativePath;
-      }
-      if (createPathKind === 'file') {
-        const parentPath = relativeParent ? `${plan.itemPath}/${relativeParent}` : plan.itemPath;
-        await api.createWorkspaceFile(plan.workspaceId, { parentPath, name: parts.at(-1)!, content: '' });
-      }
+      await createItemPath(folder, createPathKind, parts, selectedDirectoryPath, fileDirectoryPaths(files));
       setFiles(await api.files(itemId));
       await onContentChanged?.();
       notifyReliabilityChanged();
@@ -138,22 +125,17 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     }
   };
 
-  const renameItemPath = async (renameName: string): Promise<boolean> => {
+  const renamePath = async (renameName: string): Promise<boolean> => {
     if (!plan?.itemPath || !selectedTreeNode || !renameName.trim()) return false;
-    const name = renameName.trim();
-    if (name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
+    const folder = { workspaceId: plan.workspaceId, itemPath: plan.itemPath };
+    const destination = renamedPath(selectedTreeNode.path, renameName);
+    if (destination === null) {
       setError('Rename must be a single file or directory name.');
       return false;
     }
-    const separator = selectedTreeNode.path.lastIndexOf('/');
-    const parent = separator >= 0 ? selectedTreeNode.path.slice(0, separator) : '';
-    const destination = parent ? `${parent}/${name}` : name;
     setError('');
     try {
-      await api.renameWorkspacePath(plan.workspaceId, {
-        path: `${plan.itemPath}/${selectedTreeNode.path}`,
-        destinationPath: `${plan.itemPath}/${destination}`
-      });
+      await renameItemPath(folder, selectedTreeNode.path, destination);
       setFiles(await api.files(itemId));
       if (selectedTreeNode.type === 'file') editor.open(null);
       if (selectedDirectoryPath === selectedTreeNode.path) setSelectedDirectoryPath(destination);
@@ -794,8 +776,8 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
         </aside>
       </div>
       )}
-      {createPathKind && <CreateItemPathDialog kind={createPathKind} parent={selectedDirectoryPath} onCancel={() => setCreatePathKind(null)} onCreate={createItemPath} />}
-      {renameOpen && selectedTreeNode && <RenameItemPathDialog node={selectedTreeNode} onCancel={() => setRenameOpen(false)} onRename={renameItemPath} />}
+      {createPathKind && <CreateItemPathDialog kind={createPathKind} parent={selectedDirectoryPath} onCancel={() => setCreatePathKind(null)} onCreate={createPath} />}
+      {renameOpen && selectedTreeNode && <RenameItemPathDialog node={selectedTreeNode} onCancel={() => setRenameOpen(false)} onRename={renamePath} />}
       {revertDialogOpen && file && (
         <ConfirmDialog
           title="Revert file"
