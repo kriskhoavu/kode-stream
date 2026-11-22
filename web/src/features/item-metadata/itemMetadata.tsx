@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { StatusMenu } from '../../components/StatusMenu';
 import type { ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../../lib/types';
 import { isDocumentationMetadataSource, labels } from '../../lib/vocabulary';
@@ -20,11 +20,13 @@ export function isMetadataDirty(draft: ItemMetadataUpdateInput, plan: ItemDetail
 }
 
 /** The item metadata form. The drawer leaves out the scope field; the item page shows it. */
-export function ItemMetadataFields({ draft, onChange, showScope = true, className = 'metadata-form' }: {
+export function ItemMetadataFields({ draft, onChange, showScope = true, className = 'metadata-form', children }: {
 	draft: ItemMetadataUpdateInput;
 	onChange: Dispatch<SetStateAction<ItemMetadataUpdateInput>>;
 	showScope?: boolean;
 	className?: string;
+	/** Drawn after the fields, inside the form, where a layout keeps its own actions. */
+	children?: ReactNode;
 }) {
 	const set = (patch: ItemMetadataUpdateInput) => onChange((current) => ({ ...current, ...patch }));
 	return (
@@ -35,6 +37,7 @@ export function ItemMetadataFields({ draft, onChange, showScope = true, classNam
 			<label>Status<StatusMenu value={(draft.status ?? 'draft') as ItemStatus} onChange={(status) => set({ status })} /></label>
 			<label>Owner<input value={draft.owner ?? ''} onChange={(event) => set({ owner: event.target.value })} /></label>
 			<label>Tags<input value={(draft.tags ?? []).join(', ')} onChange={(event) => set({ tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) })} /></label>
+			{children}
 		</div>
 	);
 }
