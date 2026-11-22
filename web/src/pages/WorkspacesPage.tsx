@@ -3,7 +3,7 @@ import { ArrowLeft, CheckCircle2, Download, ExternalLink, FolderGit2, FolderOpen
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../shared/api';
-import type { JiraConnection, KnowledgeSettings, RuntimeContext, WorkspaceConfig, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceSurface, SourceStructureSettings, SystemConfigPaths } from '../lib/types';
+import type { JiraConnection, KnowledgeSettings, RuntimeContext, WorkspaceConfig, WorkspaceRuntimeConfig, SourceSurface, SourceStructureSettings, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { sourcePaths, sourceSurfaces, workspaceSources } from '../lib/sources';
 import { lastPathSegment, parseSources } from '../features/workspaces/sourceSettings';
@@ -15,8 +15,10 @@ import { SettingsFileDialog, type SettingsFileMode } from '../features/settings/
 import { HarnessSettingsSection } from '../features/workstream/HarnessSettingsSection';
 import { useModalDialog } from '../components/overlay';
 import { ModalLayer } from '../components/ModalLayer';
+import { useWorkspaceRegistrationDraft } from '../features/workspaces/useWorkspaceRegistrationDraft';
+import { useWorkspaceImport } from '../features/workspaces/useWorkspaceImport';
 import { applySourceItemsProposal, clearSourceItemsProposal, SourceStructurePreviewTable, SourceStructureProposalList, updateSourceItemsPreviewField } from '../features/workspaces/sourceStructureEditor';
-import { type WorkspaceImportState, defaultWorkspaceImportSelection, WorkspaceImportReview, WorkspaceImportResults } from '../features/workspaces/workspaceImportReview';
+import { WorkspaceImportReview, WorkspaceImportResults } from '../features/workspaces/workspaceImportReview';
 import { CloudAgentRegistration } from '../features/workspaces/CloudAgentRegistration';
 import { type WorkspaceNotice, WorkspaceNoticePanel, scanNotice, sourceSettingsNotice, scanSummary, scanWarnings } from '../features/workspaces/workspaceNotice';
 import { errorMessage, buildWorkspaceInput, normalizeKnowledgeSettings, cloneRuntimeConfig, inferWorkspaceNameFromRemoteURL, workspaceRemovalMessage, pathFromDrop, settingsEditorFromResult, shownInByPath, sourcesFromDraft, toggleSourceSurface, type SettingsEditorState } from '../features/workspaces/workspaceDraft';
@@ -35,14 +37,6 @@ const localRuntimeContext: RuntimeContext = {
   agent: { available: true, status: 'local' }
 };
 export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContext, onChanged, showHarness = true }: { workspaces: WorkspaceConfig[]; runtimeContext?: RuntimeContext; onChanged: () => void | Promise<void>; /** The harness's settings are absent on the extension surface. */ showHarness?: boolean }) {
-  const [name, setName] = useState('');
-  const [registrationMode, setRegistrationMode] = useState<WorkspaceRegistrationMode>('local_path');
-  const [path, setPath] = useState('');
-  const [remoteUrl, setRemoteUrl] = useState('');
-  const [cloneRoot, setCloneRoot] = useState('');
-  const [baselineBranch, setBaselineBranch] = useState('master');
-  const [sources, setSources] = useState('');
-  const [jira, setJira] = useState<JiraConnection | null>(null);
   const [systemConfig, setSystemConfig] = useState<SystemConfigPaths | null>(null);
   const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
   const [settingsFile, setSettingsFile] = useState<SettingsFileMode | null>(null);
@@ -64,18 +58,11 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
   const [agentDeepLink, setAgentDeepLink] = useState('');
   const [agentStatusLabel, setAgentStatusLabel] = useState('');
   const [activeDetailTab, setActiveDetailTab] = useState<WorkspaceDetailTab>('overview');
-  const [registrationStep, setRegistrationStep] = useState<1 | 2>(1);
-  const [registrationNameEdited, setRegistrationNameEdited] = useState(false);
-	const [importSourcePath, setImportSourcePath] = useState('');
-	const [importState, setImportState] = useState<WorkspaceImportState>('selecting');
-	const [importPreview, setImportPreview] = useState<WorkspaceImportPreview | null>(null);
-	const [importSelection, setImportSelection] = useState<string[]>([]);
-	const [importResults, setImportResults] = useState<WorkspaceImportResult[]>([]);
-	const [importError, setImportError] = useState('');
-	const [importConfirmOpen, setImportConfirmOpen] = useState(false);
   const [collapsedOverviewSections, setCollapsedOverviewSections] = useState<Record<OverviewSectionKey, boolean>>({ general: false, sources: false });
+  const draft = useWorkspaceRegistrationDraft();
+  const { name, setName, registrationMode, setRegistrationMode, path, setPath, remoteUrl, setRemoteUrl, cloneRoot, setCloneRoot, baselineBranch, setBaselineBranch, sources, setSources, jira, setJira, registrationStep, setRegistrationStep, registrationNameEdited, setRegistrationNameEdited } = draft;
   const selectAllRef = useRef<HTMLInputElement | null>(null);
-	const importStatusRef = useRef<HTMLDivElement | null>(null);
+  const { importSourcePath, importState, importPreview, importSelection, importResults, importError, importConfirmOpen, setImportConfirmOpen, importStatusRef, resetWorkspaceImport, changeImportSourcePath, toggleImportCandidate, toggleAllImportCandidates, importExistingWorkspaces, browseImportSource, previewExistingWorkspaces } = useWorkspaceImport({ onChanged });
   const registrationController = useRef<AbortController | null>(null);
   const registrationDialog = useModalDialog(closeRegistration, true, registrationOpen);
 
@@ -118,9 +105,6 @@ const busy = pendingOperations.length > 0;
 
   useEffect(() => () => registrationController.current?.abort(), []);
 
-	useEffect(() => {
-		if (importState === 'reviewing' || importState === 'complete') importStatusRef.current?.focus();
-	}, [importState]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -265,19 +249,10 @@ const busy = pendingOperations.length > 0;
 		setRegistrationOpen(false);
 		return;
 	}
-	const dirty = Boolean(name.trim() || path.trim() || remoteUrl.trim() || importSourcePath.trim() || sources.trim() || jira);
+	const dirty = draft.dirty || Boolean(importSourcePath.trim());
     if (dirty && !window.confirm('Discard this workspace registration draft?')) return;
     registrationController.current?.abort();
-    setName('');
-    setRegistrationMode('local_path');
-    setPath('');
-    setRemoteUrl('');
-    setCloneRoot(systemConfig?.cloneRootDir ?? '');
-    setBaselineBranch('master');
-    setSources('');
-    setJira(null);
-    setRegistrationStep(1);
-    setRegistrationNameEdited(false);
+    draft.reset(systemConfig?.cloneRootDir ?? '');
 	resetWorkspaceImport();
     setRegistrationOpen(false);
   }
@@ -291,81 +266,6 @@ const busy = pendingOperations.length > 0;
     if (!registrationLocationReady || !name.trim()) return;
     setRegistrationStep(2);
   };
-
-	const resetWorkspaceImport = () => {
-		setImportSourcePath('');
-		setImportState('selecting');
-		setImportPreview(null);
-		setImportSelection([]);
-		setImportResults([]);
-		setImportError('');
-		setImportConfirmOpen(false);
-	};
-
-	const changeImportSourcePath = (value: string) => {
-		setImportSourcePath(value);
-		setImportState('selecting');
-		setImportPreview(null);
-		setImportSelection([]);
-		setImportResults([]);
-		setImportError('');
-	};
-
-	const toggleImportCandidate = (candidateKey: string) => {
-		setImportSelection((current) => current.includes(candidateKey) ? current.filter((key) => key !== candidateKey) : [...current, candidateKey]);
-	};
-
-	const toggleAllImportCandidates = () => {
-		if (!importPreview) return;
-		const selectable = importPreview.candidates.filter((candidate) => candidate.status === 'valid').map((candidate) => candidate.candidateKey);
-		setImportSelection((current) => selectable.every((key) => current.includes(key)) ? [] : selectable);
-	};
-
-	const importExistingWorkspaces = async () => {
-		if (!importPreview || importSelection.length === 0) return;
-		setImportConfirmOpen(false);
-		setImportState('importing');
-		setImportError('');
-		try {
-			const results = await api.importWorkspaces({ sourcePath: importPreview.sourcePath, sourceFingerprint: importPreview.sourceFingerprint, candidateKeys: importSelection });
-			setImportResults(results);
-			setImportState('complete');
-			if (results.some((result) => result.workspace)) await onChanged();
-		} catch (err) {
-			setImportState('error');
-			setImportError(errorMessage(err));
-		}
-	};
-
-	const browseImportSource = async () => {
-		setImportError('');
-		try {
-			const selection = await api.selectYAMLFile();
-			if (!selection.path) return;
-			changeImportSourcePath(selection.path);
-		} catch (err) {
-			setImportState('error');
-			setImportError(errorMessage(err));
-		}
-	};
-
-	const previewExistingWorkspaces = async () => {
-		if (!importSourcePath.trim()) return;
-		setImportState('previewing');
-		setImportError('');
-		try {
-			const preview = await api.previewWorkspaceImport(importSourcePath.trim());
-			setImportPreview(preview);
-			setImportSourcePath(preview.sourcePath);
-			setImportSelection(defaultWorkspaceImportSelection(preview));
-			setImportState('reviewing');
-		} catch (err) {
-			setImportPreview(null);
-			setImportSelection([]);
-			setImportState('error');
-			setImportError(errorMessage(err));
-		}
-	};
 
   const saveEdit = async (repo: WorkspaceConfig) => {
     setBusy(true);
