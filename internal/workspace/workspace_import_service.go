@@ -100,19 +100,7 @@ func (s *Service) Import(request models.WorkspaceImportRequest) ([]models.Worksp
 	if strings.TrimSpace(request.SourceFingerprint) == "" || request.SourceFingerprint != preview.SourceFingerprint {
 		return nil, ErrStaleImportPreview
 	}
-	selected := make([]string, 0, len(request.CandidateKeys))
-	selectedSet := map[string]struct{}{}
-	for _, key := range request.CandidateKeys {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		if _, exists := selectedSet[key]; exists {
-			continue
-		}
-		selectedSet[key] = struct{}{}
-		selected = append(selected, key)
-	}
+	selected := uniqueImportKeys(request.CandidateKeys)
 	results := make([]models.WorkspaceImportResult, len(selected))
 	resultIndex := make(map[string]int, len(selected))
 	for i, key := range selected {
@@ -161,31 +149,56 @@ func (s *Service) Import(request models.WorkspaceImportRequest) ([]models.Worksp
 		workspace := outcome.Workspace
 		results[index].Workspace = &workspace
 		s.recordImportAudit(workspace.ID, models.AuditStatusSuccess, "Workspace imported.")
-		if s.importScan == nil && (s.scans == nil || s.scans.scanner == nil || s.index == nil) {
-			results[index].Status = "scan_failed"
-			results[index].Message = "workspace was registered but indexing is unavailable"
-			s.recordScanAudit(workspace.ID, models.AuditStatusFailed, "Imported workspace indexing failed.")
-			continue
-		}
-		var scan models.ScanResult
-		var scanErr error
-		if s.importScan != nil {
-			scan, scanErr = s.importScan(workspace.ID)
-		} else {
-			scan, scanErr = s.Scan(workspace.ID)
-		}
-		if scanErr != nil {
-			results[index].Status = "scan_failed"
-			results[index].Message = "workspace was registered but indexing failed"
-			s.recordScanAudit(workspace.ID, models.AuditStatusFailed, "Imported workspace indexing failed.")
-			continue
-		}
-		results[index].Status = "indexed"
-		results[index].Scan = &scan
-		results[index].Message = "workspace imported and indexed"
-		s.recordScanAudit(workspace.ID, models.AuditStatusSuccess, "Imported workspace indexed.")
+		s.indexImported(workspace.ID, &results[index])
 	}
 	return results, nil
+}
+
+// uniqueImportKeys trims the selected candidate keys and drops blanks and
+// repeats, keeping the caller's order.
+func uniqueImportKeys(keys []string) []string {
+	selected := make([]string, 0, len(keys))
+	seen := map[string]struct{}{}
+	for _, key := range keys {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		selected = append(selected, key)
+	}
+	return selected
+}
+
+// indexImported scans one imported workspace and records the outcome on its
+// result and in the audit log.
+func (s *Service) indexImported(workspaceID string, result *models.WorkspaceImportResult) {
+	if s.importScan == nil && (s.scans == nil || s.scans.scanner == nil || s.index == nil) {
+		result.Status = "scan_failed"
+		result.Message = "workspace was registered but indexing is unavailable"
+		s.recordScanAudit(workspaceID, models.AuditStatusFailed, "Imported workspace indexing failed.")
+		return
+	}
+	var scan models.ScanResult
+	var scanErr error
+	if s.importScan != nil {
+		scan, scanErr = s.importScan(workspaceID)
+	} else {
+		scan, scanErr = s.Scan(workspaceID)
+	}
+	if scanErr != nil {
+		result.Status = "scan_failed"
+		result.Message = "workspace was registered but indexing failed"
+		s.recordScanAudit(workspaceID, models.AuditStatusFailed, "Imported workspace indexing failed.")
+		return
+	}
+	result.Status = "indexed"
+	result.Scan = &scan
+	result.Message = "workspace imported and indexed"
+	s.recordScanAudit(workspaceID, models.AuditStatusSuccess, "Imported workspace indexed.")
 }
 
 func importSkipMessage(status string) string {
