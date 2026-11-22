@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"kode-stream/internal/audit"
-	"kode-stream/internal/common/models"
 	"kode-stream/internal/filesystem/pathguard"
 	"kode-stream/internal/item/index"
 	"kode-stream/internal/workspace/registry"
@@ -212,107 +211,6 @@ func (s *Service) Eligibility(itemID string) (Eligibility, error) {
 	}
 	result.CardContextAvailable = true
 	return result, nil
-}
-
-func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult, err error) {
-	started := time.Now()
-	workspaceID := ""
-	defer func() {
-		if s.launch == nil || s.launch.audit == nil {
-			return
-		}
-		status := models.AuditStatusSuccess
-		message := "External AI session launched"
-		errorText := ""
-		if err != nil {
-			status = models.AuditStatusBlocked
-			message = "External AI session launch blocked"
-			errorText = err.Error()
-			var launchErr *LaunchError
-			if errors.As(err, &launchErr) && launchErr.Code == "launch_failed" {
-				status = models.AuditStatusFailed
-				message = "External AI session launch failed"
-			}
-		}
-		_, _ = s.launch.audit.Append(models.AuditEvent{
-			WorkspaceID: workspaceID, ItemID: itemID, Operation: "ai_session_launch",
-			Status: status, Message: message, DurationMS: time.Since(started).Milliseconds(), Error: errorText,
-		})
-	}()
-	if s.launch == nil || s.launch.registry == nil || s.launch.index == nil {
-		return LaunchResult{}, launchError("launch_failed", "AI session launch is unavailable")
-	}
-	item, found, getErr := s.launch.index.Get(itemID)
-	if getErr != nil {
-		return LaunchResult{}, launchErrorWith("launch_failed", getErr)
-	}
-	if !found {
-		return LaunchResult{}, launchError("item_not_found", "item not found")
-	}
-	workspaceID = item.WorkspaceID
-	workspace, found, getErr := s.launch.registry.Get(item.WorkspaceID)
-	if getErr != nil {
-		return LaunchResult{}, launchErrorWith("launch_failed", getErr)
-	}
-	if !found {
-		return LaunchResult{}, launchError("workspace_not_found", "workspace not found")
-	}
-	contextMode := strings.TrimSpace(input.ContextMode)
-	if contextMode != "workspace_only" && contextMode != "card_context" {
-		return LaunchResult{}, launchError("invalid_context_mode", "contextMode must be workspace_only or card_context")
-	}
-	if contextMode == "card_context" {
-		if item.SourceMode == "snapshot" || !item.Editable {
-			return LaunchResult{}, launchError("item_not_editable", "context-based AI sessions require an editable working-tree item")
-		}
-		_, joinErr := pathguard.SafeJoin(workspace.Path, item.ItemPath)
-		if joinErr != nil {
-			return LaunchResult{}, launchError("item_not_editable", "item path is outside the workspace")
-		}
-	}
-	settings, settingsErr := s.Settings()
-	if settingsErr != nil {
-		return LaunchResult{}, launchErrorWith("launch_failed", settingsErr)
-	}
-	providerID := strings.TrimSpace(input.Provider)
-	terminalID := strings.TrimSpace(input.Terminal)
-	provider, ok := settings.Providers[providerID]
-	if !ok || !provider.Enabled {
-		return LaunchResult{}, launchError("ai_provider_missing", "selected AI provider is unavailable")
-	}
-	terminal, ok := settings.Terminals[terminalID]
-	if !ok || !terminal.Enabled {
-		return LaunchResult{}, launchError("terminal_missing", "selected terminal is unavailable")
-	}
-	if !s.detect(provider.Executable).Detected {
-		return LaunchResult{}, launchError("ai_provider_missing", "selected AI provider executable was not found")
-	}
-	if !s.detect(terminal.Executable).Detected {
-		return LaunchResult{}, launchError("terminal_missing", "selected terminal executable was not found")
-	}
-	prompt, presetID, promptErr := s.composePrompt(input.Provider, itemID, input.ContextMode, input.PresetID, input.PromptDraft, input.CustomPrompt, input.SelectedSkills, input.SelectedAgents)
-	if promptErr != nil {
-		return LaunchResult{}, promptErr
-	}
-	values := map[string]string{
-		"workspace": workspace.Path, "contextFile": item.ItemPath, "itemPath": item.ItemPath,
-		"identifier": item.Identifier, "contextMode": contextMode, "intent": contextMode, "prompt": prompt,
-	}
-	providerName := expand(provider.Executable, values)
-	providerArgs := launchProviderArgs(contextMode, provider.Args, values)
-	terminalArgs := expandAll(terminal.Args, values)
-	sessionID := "external-" + randomID()
-	checkpoint := verificationCheckpoint{
-		WorkspaceID:  workspace.ID,
-		Provider:     providerID,
-		SessionID:    sessionID,
-		TerminalMode: "external",
-		Profile:      "smoke",
-	}
-	if startErr := s.startTerminal(terminalID, terminal, terminalArgs, workspace.Path, providerName, providerArgs, checkpoint); startErr != nil {
-		return LaunchResult{}, launchErrorWith("launch_failed", startErr)
-	}
-	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, Surface: "external", PresetID: presetID, SessionID: sessionID, StartedAt: s.launch.now().UTC()}, nil
 }
 
 func (s *Service) resolvePrompt(presetID, promptDraft, customPrompt string) (string, string, error) {
