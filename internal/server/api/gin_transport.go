@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"kode-stream/internal/common/httpx"
 	"kode-stream/internal/common/models"
 	"kode-stream/internal/system"
 )
@@ -72,16 +71,6 @@ func timeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 func ginJSON(c *gin.Context, status int, data any) {
 	c.Header("Content-Type", "application/json")
 	c.JSON(status, data)
-}
-
-func ginAppError(c *gin.Context, err error) {
-	status, message, code := httpx.MapError(err)
-	payload := map[string]string{"error": message}
-	if code != "" {
-		payload["code"] = string(code)
-	}
-	c.Header("Content-Type", "application/json")
-	c.JSON(status, payload)
 }
 
 func ginHTTPHandler(handler http.HandlerFunc) gin.HandlerFunc {

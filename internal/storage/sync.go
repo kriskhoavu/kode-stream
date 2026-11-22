@@ -238,14 +238,6 @@ func (s storageSnapshot) summary() map[string]int {
 	}
 }
 
-func (s *StorageSyncService) writeDatabaseSnapshot(snapshot storageSnapshot) error {
-	target := s.config.SQLitePath
-	if target == "" {
-		target = s.paths.SQLiteDatabaseFile
-	}
-	return s.writeDatabaseSnapshotAt(snapshot, target)
-}
-
 func (s *StorageSyncService) writeDatabaseSnapshotAt(snapshot storageSnapshot, target string) error {
 	config := s.config
 	config.StorageOption = StorageOptionDatabase

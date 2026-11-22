@@ -247,61 +247,6 @@ func providerGlobalRoots(providerID string) []capabilityRoot {
 	}
 }
 
-func discoverCapabilityFiles(root capabilityRoot) ([]string, error) {
-	info, err := os.Stat(root.path)
-	if err != nil || !info.IsDir() {
-		return nil, err
-	}
-	switch root.mode {
-	case "skill_dirs":
-		return discoverDirectoryCapabilities(root.path, root.kind)
-	case "files":
-		fallthrough
-	default:
-		return discoverDirectCapabilityFiles(root.path)
-	}
-}
-
-func discoverDirectCapabilityFiles(root string) ([]string, error) {
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return nil, err
-	}
-	files := []string{}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		path := filepath.Join(root, entry.Name())
-		if !isCapabilityFile(path) {
-			continue
-		}
-		files = append(files, path)
-	}
-	return files, nil
-}
-
-func discoverDirectoryCapabilities(root string, kind string) ([]string, error) {
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return nil, err
-	}
-	files := []string{}
-	for _, entry := range entries {
-		path := filepath.Join(root, entry.Name())
-		if entry.IsDir() {
-			if file, ok := findCapabilityEntrypoint(path, kind); ok {
-				files = append(files, file)
-			}
-			continue
-		}
-		if isCapabilityFile(path) {
-			files = append(files, path)
-		}
-	}
-	return files, nil
-}
-
 func findCapabilityEntrypoint(root string, kind string) (string, bool) {
 	candidates := []string{"README.md"}
 	if kind == "agent" {
@@ -327,37 +272,6 @@ func isCapabilityFile(path string) bool {
 		return true
 	}
 	return strings.Contains(name, "agent") || strings.Contains(name, "prompt") || strings.Contains(name, "skill") || strings.Contains(name, "command") || strings.Contains(name, "chatmode")
-}
-
-func buildCapabilityDescriptor(providerID string, root capabilityRoot, file string) (CapabilityDescriptor, bool) {
-	relative, err := filepath.Rel(root.path, file)
-	if err != nil {
-		return CapabilityDescriptor{}, false
-	}
-	if strings.HasPrefix(relative, "..") {
-		return CapabilityDescriptor{}, false
-	}
-	kind := root.kind
-	if kind == "" {
-		kind = classifyCapabilityKind(providerID, file)
-	}
-	normalizedRelative := filepath.ToSlash(strings.TrimSpace(relative))
-	name, description := capabilityMetadata(file, normalizedRelative)
-	sourcePath := file
-	if root.displayBase != "" {
-		if displayRelative, relErr := filepath.Rel(root.displayBase, file); relErr == nil && !strings.HasPrefix(displayRelative, "..") {
-			sourcePath = filepath.ToSlash(displayRelative)
-		}
-	}
-	return CapabilityDescriptor{
-		ID:          providerID + ":" + root.scope + ":" + sourcePath,
-		Name:        name,
-		Description: firstNonEmpty(strings.TrimSpace(description), capabilityDescription(kind, providerID, root.scope, normalizedRelative)),
-		Kind:        kind,
-		Provider:    providerID,
-		Scope:       root.scope,
-		SourcePath:  sourcePath,
-	}, true
 }
 
 func buildCapabilityDescriptorContext(ctx context.Context, providerID string, root capabilityRoot, canonicalRoot, file string) (CapabilityDescriptor, bool) {
@@ -464,33 +378,6 @@ func capabilitySortKey(item CapabilityDescriptor) string {
 		scopeRank = "0"
 	}
 	return scopeRank + ":" + strings.ToLower(item.Name) + ":" + strings.ToLower(item.SourcePath)
-}
-
-func capabilityMetadata(filePath, fallbackRelativePath string) (string, string) {
-	name := capabilityNameFromPath(fallbackRelativePath)
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return name, ""
-	}
-	if metaName, metaDescription, ok := decodeStructuredCapabilityMetadata(data); ok {
-		return firstNonEmpty(metaName, name), metaDescription
-	}
-	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
-	title := ""
-	for _, raw := range lines {
-		line := strings.TrimSpace(raw)
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "---") {
-			continue
-		}
-		if strings.HasPrefix(line, "#") {
-			title = strings.TrimSpace(strings.TrimLeft(line, "#"))
-			break
-		}
-	}
-	return firstNonEmpty(title, name), ""
 }
 
 func capabilityMetadataContext(ctx context.Context, filePath, fallbackRelativePath string) (string, string) {

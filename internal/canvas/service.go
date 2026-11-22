@@ -235,10 +235,6 @@ func (s *Service) PatchPlacementsContext(ctx context.Context, ownerUserID, layou
 	return s.ProjectContext(ctx, ownerUserID, layoutID)
 }
 
-func (s *Service) canonicalizeNewPlacementPatches(layout Layout, patches []PlacementPatch) ([]PlacementPatch, error) {
-	return s.canonicalizeNewPlacementPatchesContext(context.Background(), layout, patches)
-}
-
 func (s *Service) canonicalizeNewPlacementPatchesContext(ctx context.Context, layout Layout, patches []PlacementPatch) ([]PlacementPatch, error) {
 	placements, err := s.placementsContext(ctx, layout.ID)
 	if err != nil {
@@ -335,10 +331,6 @@ func (s *Service) RemovePlacementContext(ctx context.Context, ownerUserID, layou
 		return Projection{}, err
 	}
 	return s.ProjectContext(ctx, ownerUserID, layoutID)
-}
-
-func (s *Service) ownedLayout(ownerUserID, layoutID string) (Layout, error) {
-	return s.ownedLayoutContext(context.Background(), ownerUserID, layoutID)
 }
 
 func (s *Service) ownedLayoutContext(ctx context.Context, ownerUserID, layoutID string) (Layout, error) {

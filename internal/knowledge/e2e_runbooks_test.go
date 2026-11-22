@@ -63,12 +63,6 @@ func TestKnowledgeE2ERunbookProvidesSafeFallbackBeforeFirstRun(t *testing.T) {
 	}
 }
 
-func TestParseE2EResultRejectsUnknownStatus(t *testing.T) {
-	if result := parseE2EResult("Status: maybe\n"); result.Status != "not run" {
-		t.Fatalf("status = %q", result.Status)
-	}
-}
-
 func TestKnowledgeE2ERunbookBoundsRunbookBeforeFingerprinting(t *testing.T) {
 	root := t.TempDir()
 	pagePath := "e2e-testing/example.md"

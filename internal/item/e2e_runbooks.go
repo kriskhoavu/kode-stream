@@ -130,34 +130,6 @@ func readE2ERunbook(workspaceRoot, fullPath, relativePath, resultRelativePath, s
 	return runbook
 }
 
-func parseE2ELatestResult(content string) *models.E2ELatestResult {
-	result := &models.E2ELatestResult{Status: "not run", Evidence: []string{}}
-	for _, line := range strings.Split(content, "\n") {
-		key, value, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-		switch strings.ToLower(strings.TrimSpace(key)) {
-		case "status":
-			result.Status = strings.ToLower(strings.TrimSpace(value))
-		case "provider":
-			result.Provider = strings.TrimSpace(value)
-		case "environment":
-			result.Environment = strings.TrimSpace(value)
-		case "failed step":
-			result.FailedStep = strings.TrimSpace(value)
-		case "evidence":
-			if evidence := strings.TrimSpace(value); evidence != "" {
-				result.Evidence = append(result.Evidence, evidence)
-			}
-		}
-	}
-	if !validE2EStatus(result.Status) {
-		result.Status = "not run"
-	}
-	return result
-}
-
 func validE2EStatus(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "passed", "failed", "blocked", "not run":

@@ -555,36 +555,6 @@ func sourceReferencePath(value string) string {
 	return filepath.ToSlash(filepath.Clean(value))
 }
 
-func parseE2EResult(content string) *models.E2ELatestResult {
-	result := &models.E2ELatestResult{Status: "not run", Evidence: []string{}}
-	for _, line := range strings.Split(content, "\n") {
-		key, value, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-		switch strings.ToLower(strings.TrimSpace(key)) {
-		case "status":
-			result.Status = strings.ToLower(strings.TrimSpace(value))
-		case "provider":
-			result.Provider = strings.TrimSpace(value)
-		case "environment":
-			result.Environment = strings.TrimSpace(value)
-		case "failed step":
-			result.FailedStep = strings.TrimSpace(value)
-		case "evidence":
-			if evidence := strings.TrimSpace(value); evidence != "" {
-				result.Evidence = append(result.Evidence, evidence)
-			}
-		}
-	}
-	switch result.Status {
-	case "passed", "failed", "blocked", "not run":
-	default:
-		result.Status = "not run"
-	}
-	return result
-}
-
 func (s *KnowledgeService) Graph(workspaceID, root string) (KnowledgeGraph, error) {
 	return s.GraphContext(context.Background(), workspaceID, root)
 }

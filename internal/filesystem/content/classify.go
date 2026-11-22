@@ -91,10 +91,6 @@ func ClassifyPath(path string) Classification {
 	return Classification{Kind: FileKindText, Language: "text"}
 }
 
-func language(path string) string {
-	return ClassifyPath(path).Language
-}
-
 func isBinary(data []byte) bool {
 	if len(data) > binarySampleBytes {
 		data = data[:binarySampleBytes]

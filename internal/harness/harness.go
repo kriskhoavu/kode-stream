@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -661,18 +660,6 @@ func (s *Service) LastEventSeq(ctx context.Context) (int64, error) {
 func (s *Service) Subscribe(buffer int) *feed.Subscription { return s.feed.Subscribe(buffer) }
 
 // --- helpers shared by the service files ---
-
-func sortTasksForQueue(tasks []domain.Task) {
-	sort.SliceStable(tasks, func(i, j int) bool {
-		if tasks[i].Pinned != tasks[j].Pinned {
-			return tasks[i].Pinned
-		}
-		if tasks[i].Score != tasks[j].Score {
-			return tasks[i].Score > tasks[j].Score
-		}
-		return tasks[i].DiscoveredAt.Before(tasks[j].DiscoveredAt)
-	})
-}
 
 // IsNotFound and friends let the transport map errors without importing the
 // domain package's sentinels one by one.

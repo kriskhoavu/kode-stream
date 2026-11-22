@@ -17,7 +17,6 @@ import (
 	"kode-stream/internal/filesystem/guardedwrite"
 	appgit "kode-stream/internal/git"
 	appitem "kode-stream/internal/item"
-	appworkspace "kode-stream/internal/workspace"
 	workspaceaccess "kode-stream/internal/workspace/files"
 )
 
@@ -48,39 +47,8 @@ func decodeLimitedJSON(w http.ResponseWriter, r *http.Request, target any, limit
 	return true
 }
 
-func nonNilWarnings(warnings []models.ScanWarning) []models.ScanWarning {
-	return appworkspace.NonNilWarnings(warnings)
-}
-
 func validateGitPaths(workspace models.WorkspaceConfig, paths []string) error {
 	return appgit.ValidatePaths(workspace, paths)
-}
-
-func statusForError(err error) int {
-	if err != nil {
-		return http.StatusBadRequest
-	}
-	return http.StatusOK
-}
-
-func fallbackItemPath(workspace models.WorkspaceConfig, item models.ItemDetail) string {
-	return appitem.FallbackPath(workspace, item)
-}
-
-func fullReadmeDescription(workspace models.WorkspaceConfig, item models.ItemDetail) string {
-	return appitem.FullReadmeDescription(workspace, item)
-}
-
-func normalizeItemSummary(item models.ItemSummary) models.ItemSummary {
-	return appitem.NormalizeSummary(item)
-}
-
-func normalizeItemDetail(item models.ItemDetail) models.ItemDetail {
-	return appitem.NormalizeDetail(item)
-}
-
-func firstMarkdownParagraph(markdown string) string {
-	return appitem.FirstMarkdownParagraph(markdown)
 }
 
 func respond(w http.ResponseWriter, data any, err error) {

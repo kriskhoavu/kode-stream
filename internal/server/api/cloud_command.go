@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 
 const maxCloudCommandBodyBytes int64 = 64 << 10
 
-var secretPattern = regexp.MustCompile(`(?i)(token|secret|password|key)=(\S+)`)
 
 func (a *cloudController) cloudWorkspaceCommand(w http.ResponseWriter, r *http.Request) {
 	session, ok := cloudSessionFromContext(r.Context())
@@ -76,10 +74,6 @@ func capabilityForCommandType(commandType string) models.Capability {
 	default:
 		return models.CapabilityRead
 	}
-}
-
-func redactCommandLog(log string) string {
-	return secretPattern.ReplaceAllString(log, "$1=[REDACTED]")
 }
 
 func cloudHostedExecutionRoute(method, path string) bool {

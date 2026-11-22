@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -606,8 +605,4 @@ func scanSessionRecord(row sqlRow) (ai.SessionRecord, error) {
 		record.ExitCode = &value
 	}
 	return record, nil
-}
-
-func sortSessionRecords(records []ai.SessionRecord) {
-	sort.Slice(records, func(i, j int) bool { return records[i].ID < records[j].ID })
 }

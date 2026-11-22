@@ -965,50 +965,6 @@ func parseChangeLine(line string) models.GitChange {
 	return change
 }
 
-func parseActivityChunk(chunk string) (models.GitActivityEntry, bool) {
-	lines := strings.Split(strings.TrimSpace(chunk), "\n")
-	if len(lines) == 0 {
-		return models.GitActivityEntry{}, false
-	}
-	meta := strings.SplitN(strings.TrimSpace(lines[0]), "\x1f", 4)
-	if len(meta) < 4 {
-		return models.GitActivityEntry{}, false
-	}
-	committedAt, err := time.Parse(time.RFC3339, strings.TrimSpace(meta[1]))
-	if err != nil {
-		committedAt = time.Time{}
-	}
-	entry := models.GitActivityEntry{
-		Commit:      strings.TrimSpace(meta[0]),
-		CommittedAt: committedAt,
-		Author:      strings.TrimSpace(meta[2]),
-		Message:     strings.TrimSpace(meta[3]),
-		Paths:       []models.GitActivityPath{},
-	}
-	for _, line := range lines[1:] {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		statusToken, payload, found := strings.Cut(line, "\t")
-		if !found {
-			continue
-		}
-		status := activityStatus(statusToken)
-		parts := strings.Split(payload, "\t")
-		pathValue := strings.TrimSpace(parts[len(parts)-1])
-		if pathValue == "" {
-			continue
-		}
-		pathEntry := models.GitActivityPath{Path: pathValue, Status: status}
-		if (status == models.GitChangeRenamed || status == models.GitChangeCopied) && len(parts) > 1 {
-			pathEntry.OldPath = strings.TrimSpace(parts[0])
-		}
-		entry.Paths = append(entry.Paths, pathEntry)
-	}
-	return entry, true
-}
-
 func activityStatus(code string) models.GitChangeStatus {
 	trimmed := strings.TrimSpace(code)
 	if trimmed == "" {
