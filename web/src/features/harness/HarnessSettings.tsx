@@ -409,7 +409,6 @@ function ModelInput({ label, value, placeholder, hideLabel = false, hint, onChan
 function SourceRow({ source, workspaceName, now, onChange, onRemove, onClear, clearing }: { source: HarnessSourceSettings; workspaceName?: string; now: number; onChange: (patch: Partial<HarnessSourceSettings>) => void; onRemove: () => void; onClear: () => void; clearing: boolean }) {
 	const checked = source.lastCheckedAt ? `Looked ${formatAgo(source.lastCheckedAt, now)}${source.lastFound !== undefined ? ` · ${source.lastFound} new` : ''}` : 'Not looked yet';
 	const queryLabel = source.kind === 'jira' ? 'Jira search (JQL)' : source.kind === 'github' ? 'Repository (owner/name)' : source.kind === 'local' ? 'Task folder (inside the workspace, or a full path)' : 'Repository (workspace/name)';
-	const workspaceLabel = workspaceName ?? source.workspaceId;
 	return (
 		<div className="hx-source-row">
 			<div className="hx-source-head">

@@ -1,6 +1,6 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react';
-import { BookmarkPlus, Bot, ChevronDown, Columns3, ListOrdered, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
+import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, RefObject, SetStateAction } from 'react';
+import { BookmarkPlus, Bot, Columns3, ListOrdered, PanelRightClose, PanelRightOpen, Code2, FileText, Filter, GitBranch, GripVertical, Info, RefreshCw, RotateCw, Search, SlidersHorizontal, Ticket, Trash2, X } from 'lucide-react';
 import { FacetMenu, SelectedFilters } from '../components/FacetMenu';
 import { FileMenu } from '../components/FileMenu';
 import { useModalDialog } from '../components/overlay';
@@ -25,7 +25,6 @@ import type {
   JiraIssueState,
   SavedFilter,
   SourceSettingsResult,
-  SourceStructureCard,
   SourceStructurePreview,
   SourceStructureProposal,
   SourceStructureSettings,
@@ -38,7 +37,7 @@ import type { FacetOption, FilterKey, Filters } from '../features/workstream/fil
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
 import { MarkdownPreview } from '../features/content-viewer/renderers/MarkdownPreview';
-import { lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
+import { previewPathSegments } from '../features/workspaces/sourceSettings';
 import { canonicalSourceSettingsCard, normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { AgentCluster, AgentPane, AgentsTab, agentFocusKey, useHeldAgentSessions, type AgentFocus, type AgentPaneHarness, type AgentsMode } from '../features/workstream/AgentsPanel';
@@ -423,7 +422,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     + filters.authors.length
     + filters.workedBy.length
     + (text ? 1 : 0);
-  const sourceMode = branchContext?.sourceMode ?? 'working_tree';
   const displayedStatuses = useMemo(() => {
     const visible = new Set(visibleStatuses);
     const statuses = statusOrder.filter((status) => visible.has(status));

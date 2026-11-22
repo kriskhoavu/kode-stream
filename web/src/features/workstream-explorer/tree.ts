@@ -99,7 +99,3 @@ function matchesRow(row: VisibleExplorerRow, query: string): boolean {
 export function normalizeExplorerPath(path: string): string {
   return path.replaceAll('\\', '/').replace(/^\/+|\/+$/g, '');
 }
-
-export function isDirectoryEntry(node: VisibleExplorerRow['node']): node is WorkspaceTreeEntry {
-  return node.type === 'directory';
-}

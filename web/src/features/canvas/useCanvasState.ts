@@ -450,10 +450,6 @@ function messageFrom(error: unknown): string {
 	return error instanceof Error ? error.message : 'Canvas request failed.';
 }
 
-export function canvasNodeById(nodes: CanvasNode[], id: string) {
-	return nodes.find((node) => node.id === id);
-}
-
 function nodeID(ref: CanvasProjection['unplaced'][number]) {
 	if (ref.kind === 'workspace') return `workspace:${ref.workspaceId}`;
 	if (ref.kind === 'plan') return `plan:${ref.itemId}`;

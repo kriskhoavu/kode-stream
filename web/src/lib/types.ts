@@ -726,18 +726,6 @@ export interface FileSaveInput {
 
 export type SourceMode = 'working_tree' | 'snapshot';
 
-export interface BranchScanMetadata {
-  workspaceId: string;
-  branch: string;
-  branchRef?: string;
-  commit?: string;
-  sourceMode?: SourceMode;
-  editable: boolean;
-  sourceConfigurationHash?: string;
-  scannedAt: string;
-  warnings: { itemPath?: string; message: string }[];
-}
-
 export interface WorkstreamBranchLoadResult {
   workspaceId: string;
   branch: string;

@@ -2365,7 +2365,6 @@ select {
   overflow-wrap: anywhere;
 }
 
-.branch-option-icon-slot,
 .branch-option-checkout-slot {
   width: 14px;
   min-width: 14px;
@@ -2390,11 +2389,6 @@ select {
   padding: 10px;
   color: var(--muted);
   font-size: 13px;
-}
-
-.branch-option-check {
-  flex: 0 0 auto;
-  color: var(--branch-picker-accent);
 }
 
 .branch-option-checkout {

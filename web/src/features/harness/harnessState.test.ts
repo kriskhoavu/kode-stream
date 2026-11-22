@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decisionLine, doneToday, startOfDay, harnessReducer, initialHarnessState, queueTasks, waitingApprovals, waitsFor, workingRuns } from './harnessState';
+import { decisionLine, harnessReducer, initialHarnessState, queueTasks, waitingApprovals, waitsFor } from './harnessState';
 import type { HarnessState } from './harnessState';
 import { approval, run, stage, status, task } from './testData';
 
@@ -20,7 +20,6 @@ describe('harness reducer', () => {
 		expect(state.lastSeq).toBe(10);
 		expect(queueTasks(state.tasks).map((item) => item.source.key)).toEqual(['D', 'C', 'B', 'A']);
 		expect(waitsFor(state.tasks['task-B'], state.tasks)).toEqual(['A']);
-		expect(workingRuns(state).map((item) => item.id)).toEqual(['run-2']);
 	});
 
 	it('ignores events it has already seen', () => {
@@ -78,16 +77,5 @@ describe('harness reducer', () => {
 		let state = harnessReducer(loaded(), { type: 'decision.done', approvalId: 'ap-1', approval: approval('ap-1', 'task-D', { state: 'approved', revision: 3 }) });
 		state = harnessReducer(state, { type: 'event', event: { seq: 11, at: '', type: 'approval.requested', approval: approval('ap-1', 'task-D', { revision: 2 }) } });
 		expect(state.approvals['ap-1'].state).toBe('approved');
-	});
-
-	it('lists runs and hand-finished tasks done today', () => {
-		const now = Date.now();
-		const today = (hours: number) => new Date(startOfDay(now) + hours * 3_600_000).toISOString();
-		const state = harnessReducer(initialHarnessState, {
-			type: 'snapshot', status: status(), approvals: [],
-			tasks: [task('A'), task('M', { state: 'done', finishedOutside: { by: 'Anna', at: today(0.5) } })],
-			runs: [run('r1', 'task-A', { state: 'passed', finishedAt: today(0.75) }), run('r0', 'task-A', { state: 'passed', finishedAt: today(-30) })]
-		});
-		expect(doneToday(state, now).map((entry) => entry.kind === 'run' ? entry.run.id : entry.task.id)).toEqual(['r1', 'task-M']);
 	});
 });

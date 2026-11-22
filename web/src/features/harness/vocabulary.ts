@@ -24,8 +24,6 @@ export type HxStatus = 'not_started' | 'up_next' | 'starting' | 'working' | 'wai
 /** Colour family of a status; each maps to one --hx-* token. */
 export type HxTone = 'idle' | 'running' | 'waiting' | 'done' | 'stopped' | 'manual';
 
-export const hxStatusOrder: readonly HxStatus[] = ['waiting', 'reporter', 'working', 'needs_fix', 'up_next', 'not_started', 'stopped', 'failed', 'done', 'manual', 'skipped'];
-
 export const hxStatuses: Record<HxStatus, { label: string; tone: HxTone; icon: LucideIcon }> = {
 	not_started: { label: 'Not started', tone: 'idle', icon: CircleDashed },
 	up_next: { label: 'Up next', tone: 'done', icon: CircleDot },
@@ -76,16 +74,6 @@ export const stageKindWhere: Record<HarnessStageKind, string> = {
 	draft_pr: 'while opening the draft pull request'
 };
 
-/** The verb shown on a working row: "Planning · round 1 of 3". */
-export const stageKindDoing: Record<HarnessStageKind, string> = {
-	plan: 'Planning',
-	plan_approval: 'Waiting for your approval',
-	implement: 'Building',
-	qa: 'Testing',
-	review: 'Waiting for your review',
-	draft_pr: 'Opening the draft pull request'
-};
-
 export const roleLabels: Record<HarnessRoleId, string> = {
 	scout: 'Finder',
 	sorter: 'Sorter',
@@ -125,8 +113,6 @@ export const gateTitles: Record<HarnessApprovalGate, string> = {
 export const sourceLabels: Record<HarnessSourceKind, string> = { jira: 'Jira', github: 'GitHub', bitbucket: 'Bitbucket', local: 'Local folder' };
 
 export const channelLabels: Record<HarnessChannel, string> = { dashboard: 'here', webex: 'via Webex', api: 'via the API', source: 'on the ticket' };
-
-export const findingLabels = { blocking: 'Must fix', advisory: 'Suggestion' } as const;
 
 const engineLabels: Record<HarnessEngineId, string> = { claudecode: 'Claude', codex: 'Codex', opencode: 'OpenCode' };
 
@@ -227,12 +213,6 @@ export function formatAgo(at: string | undefined, now: number): string {
 	const hours = Math.round(minutes / 60);
 	if (hours < 24) return `${hours} h ago`;
 	return `${Math.round(hours / 24)} d ago`;
-}
-
-export function formatTime(at: string | undefined): string {
-	if (!at) return '';
-	const date = new Date(at);
-	return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
 export function plural(count: number, one: string, many = `${one}s`): string {

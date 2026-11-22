@@ -437,11 +437,6 @@ function statusFetchMock(updateStatus: () => Promise<Response>, item: ItemSummar
   });
 }
 
-function statusRequestBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
-  const call = fetchMock.mock.calls.find(([url]) => isItemStatusUrl(url));
-  return JSON.parse(String(call?.[1]?.body ?? '{}')) as Record<string, unknown>;
-}
-
 function workstreamBranchLoadResult(items: ItemSummary[], branch: string, sourceMode: SourceMode = 'working_tree', currentCheckoutBranch = 'main'): WorkstreamBranchLoadResult {
   return {
     workspaceId: 'r1',

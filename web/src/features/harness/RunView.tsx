@@ -16,7 +16,7 @@ import { WorkerChip } from './WorkerChip';
 import { CostCounter } from './CostCounter';
 import { pipelineModel, runStatus } from './pipeline';
 import { useNow } from './useNow';
-import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, plural, sourceLabels, stageKindLabels } from './vocabulary';
+import { agentRoleLabels, formatMinutes, hxStatuses, plural, sourceLabels, stageKindLabels } from './vocabulary';
 
 /** The pipeline for one run: where it stands, what waits on a person, and what each step took. */
 export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onApprove, onReject, onCancel, onOpenTab, workbench }: {

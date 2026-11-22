@@ -244,33 +244,6 @@ export function waitingApprovals(state: HarnessState): HarnessApproval[] {
 		.sort((a, b) => Date.parse(b.requestedAt) - Date.parse(a.requestedAt));
 }
 
-/** Approvals decided since local midnight, newest first. */
-export function decidedToday(state: HarnessState, now: number): HarnessApproval[] {
-	const midnight = startOfDay(now);
-	return Object.values(state.approvals)
-		.filter((approval) => approval.state !== 'requested' && approval.decidedAt && Date.parse(approval.decidedAt) >= midnight)
-		.sort((a, b) => Date.parse(b.decidedAt ?? '') - Date.parse(a.decidedAt ?? ''));
-}
-
-export function workingRuns(state: HarnessState): HarnessRun[] {
-	return Object.values(state.runs)
-		.filter((run) => run.state === 'running' && run.currentStage?.state !== 'awaiting_approval')
-		.sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
-}
-
-export type DoneTodayEntry = { kind: 'run'; run: HarnessRun; task?: HarnessTask; at: string } | { kind: 'manual'; task: HarnessTask; at: string };
-
-export function doneToday(state: HarnessState, now: number): DoneTodayEntry[] {
-	const midnight = startOfDay(now);
-	const runs: DoneTodayEntry[] = Object.values(state.runs)
-		.filter((run) => run.state === 'passed' && run.finishedAt && Date.parse(run.finishedAt) >= midnight)
-		.map((run) => ({ kind: 'run', run, task: state.tasks[run.taskId], at: run.finishedAt ?? '' }));
-	const manual: DoneTodayEntry[] = Object.values(state.tasks)
-		.filter((task) => task.finishedOutside?.at && Date.parse(task.finishedOutside.at) >= midnight)
-		.map((task) => ({ kind: 'manual', task, at: task.finishedOutside?.at ?? '' }));
-	return [...runs, ...manual].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-}
-
 /** The queue as the Sorter ranked it: waiting on you first, then pinned, then by score. */
 export function queueTasks(tasks: Record<string, HarnessTask>, options: { includeFinished?: boolean } = {}): HarnessTask[] {
 	return Object.values(tasks)

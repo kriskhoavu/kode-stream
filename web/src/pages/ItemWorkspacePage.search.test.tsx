@@ -28,7 +28,7 @@ describe('ItemWorkspacePage embedded explorer', () => {
 	});
 
 	it('renders the merged explorer surface for item details', async () => {
-		render(<ItemWorkspacePage itemId="item-1" refreshKey={0} workspaces={[{ id: 'ws', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }]} onBack={vi.fn()} onOpenItem={vi.fn()} />);
+		render(<ItemWorkspacePage itemId="item-1" refreshKey={0} workspaces={[{ id: 'ws', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }]} onBack={vi.fn()} />);
 		expect(await screen.findByTestId('embedded-explorer')).toBeInTheDocument();
 	});
 
@@ -37,9 +37,9 @@ describe('ItemWorkspacePage embedded explorer', () => {
 	it('refreshes in place on an app refresh, without reopening the default file', async () => {
 		apiMock.files.mockResolvedValue([{ id: 'README_md', name: 'README.md', path: 'README.md', type: 'file' }]);
 		const workspaces = [{ id: 'ws', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }];
-		const view = render(<ItemWorkspacePage itemId="item-1" refreshKey={0} workspaces={workspaces} onBack={vi.fn()} onOpenItem={vi.fn()} />);
+		const view = render(<ItemWorkspacePage itemId="item-1" refreshKey={0} workspaces={workspaces} onBack={vi.fn()} />);
 		await waitFor(() => expect(apiMock.file).toHaveBeenCalledTimes(1));
-		view.rerender(<ItemWorkspacePage itemId="item-1" refreshKey={1} workspaces={workspaces} onBack={vi.fn()} onOpenItem={vi.fn()} />);
+		view.rerender(<ItemWorkspacePage itemId="item-1" refreshKey={1} workspaces={workspaces} onBack={vi.fn()} />);
 		await waitFor(() => expect(apiMock.files).toHaveBeenCalledTimes(2));
 		expect(apiMock.item).toHaveBeenCalledTimes(2);
 		expect(apiMock.file).toHaveBeenCalledTimes(1);

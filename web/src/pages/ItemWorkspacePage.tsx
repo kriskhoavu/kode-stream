@@ -10,7 +10,6 @@ import {
   FileText,
   FolderOpen,
   FolderPlus,
-  GitBranch,
   GitCompare,
   GripVertical,
   Info,
@@ -69,7 +68,7 @@ type PendingConfirm = { title: string; message: string; confirmLabel: string; da
 type DetailViewMode = 'plan' | 'workspace' | 'git';
 type OpenItemFileTab = { id: string; path: string; name: string; editable: boolean };
 
-export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, workspaces, onBack, onOpenItem, onContentChanged, allowEmbeddedAISessions = true }: { itemId: string; /** `run` shows the item's harness run whole, full width. */ view?: ItemView; onViewChange?: (view?: ItemView) => void; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onOpenItem: (itemId: string) => void; onContentChanged?: () => void | Promise<void>; allowEmbeddedAISessions?: boolean }) {
+export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, workspaces, onBack, onContentChanged, allowEmbeddedAISessions = true }: { itemId: string; /** `run` shows the item's harness run whole, full width. */ view?: ItemView; onViewChange?: (view?: ItemView) => void; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onContentChanged?: () => void | Promise<void>; allowEmbeddedAISessions?: boolean }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
@@ -1736,15 +1735,6 @@ function parentDirectoryPath(path: string): string {
   const normalized = path.replace(/\/+$/, '');
   const separator = normalized.lastIndexOf('/');
   return separator >= 0 ? normalized.slice(0, separator) : '';
-}
-
-function toWorkspaceRelativePath(workspacePath: string | undefined, absolutePath: string): string {
-  if (!workspacePath) return '';
-  const normalizedWorkspace = workspacePath.replace(/\\/g, '/').replace(/\/+$/, '');
-  const normalizedTarget = absolutePath.replace(/\\/g, '/');
-  if (normalizedTarget === normalizedWorkspace) return '';
-  if (!normalizedTarget.startsWith(`${normalizedWorkspace}/`)) return '';
-  return normalizedTarget.slice(normalizedWorkspace.length + 1);
 }
 
 function readStoredToggle(key: string): boolean {

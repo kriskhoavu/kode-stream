@@ -3,7 +3,7 @@ import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Download, ExternalL
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { ApiError, api } from '../shared/api';
-import type { JiraConnection, KnowledgeSettings, RuntimeContext, RuntimeType, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceSurface, WorkspaceSource, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
+import type { JiraConnection, KnowledgeSettings, RuntimeContext, RuntimeType, WorkspaceConfig, WorkspaceImportCandidate, WorkspaceImportPreview, WorkspaceImportResult, WorkspaceInput, WorkspaceRegistrationMode, WorkspaceRuntimeConfig, SourceSurface, WorkspaceSource, SourceStructureSettings, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { defaultShownIn, sourcePaths, sourceSurfaces, workspaceSources } from '../lib/sources';
 import { applySegmentRole, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';

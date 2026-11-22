@@ -11,7 +11,7 @@ import { formatSessionDate, isSessionLive, SessionConfirmDialog } from '../sessi
 
 type WorkbenchTab = 'info' | 'jira' | 'quality' | 'terminal' | 'changes';
 
-export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen = false, onAISessionDialogOpenChange, onClose, onReload, onSelectNode, onPlaceSession, onOpenFullView }: { projection: CanvasProjection; selectedNode?: CanvasNode; aiSessionDialogOpen?: boolean; onAISessionDialogOpenChange?: (open: boolean) => void; onClose: () => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void }) {
+export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen = false, onAISessionDialogOpenChange, onReload, onSelectNode, onPlaceSession, onOpenFullView }: { projection: CanvasProjection; selectedNode?: CanvasNode; aiSessionDialogOpen?: boolean; onAISessionDialogOpenChange?: (open: boolean) => void; onReload: () => Promise<unknown> | void; onSelectNode: (id: string) => void; onPlaceSession: (sessionId: string) => Promise<unknown> | void; onOpenFullView?: (node: CanvasNode) => void }) {
 	const [rightPanelTab, setRightPanelTab] = useState<WorkbenchTab>('info');
 	const [collapsed, setCollapsed] = useState(false);
 	const [panelWidth, setPanelWidth] = useState(410);

@@ -34,7 +34,3 @@ export function sourcePaths(workspace?: Pick<WorkspaceConfig, 'sources'> | null)
 export function sourcesShownIn(workspace: Pick<WorkspaceConfig, 'sources'> | null | undefined, surface: SourceSurface): string[] {
   return workspaceSources(workspace).filter((source) => source.shownIn.includes(surface)).map((source) => source.path);
 }
-
-export function showsIn(source: WorkspaceSourceLike, surface: SourceSurface): boolean {
-  return toWorkspaceSource(source).shownIn.includes(surface);
-}

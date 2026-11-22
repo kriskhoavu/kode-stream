@@ -1,6 +1,6 @@
 import type { Edge, MarkerType, Node } from '@xyflow/react';
 import type { KnowledgeGraph, KnowledgeGraphNode } from '../../lib/types';
-import { areaKey, bucketKey, formatArea, formatSegment, groupingOf, rootGroupKey, type Grouping } from './taxonomy';
+import { areaKey, bucketKey, formatArea, formatSegment, groupingOf, rootGroupKey } from './taxonomy';
 
 export type KnowledgeHierarchyRole = 'domain' | 'root' | 'parent' | 'leaf' | 'related';
 

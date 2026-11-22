@@ -8,7 +8,7 @@ vi.mock('../features/canvas/useCanvasState', () => ({ useCanvasState: () => ({ p
 vi.mock('../features/canvas/CanvasBoard', () => ({ CanvasBoard: ({ projection, onSelect, onReset }: { projection: CanvasProjection; onSelect: (id?: string) => void; onReset: () => void }) => <><button type="button" onClick={onReset}>Reset board</button>{projection.nodes.map((node) => <button key={node.id} data-canvas-node-id={node.id} aria-label={node.session ? `Session: ${node.session.record.provider}` : 'Plan: PM-037 Canvas main'} type="button" onClick={() => onSelect(node.id)}>{node.session ? 'Session node' : 'Plan node'}</button>)}</> }));
 vi.mock('../features/canvas/CanvasSessionsView', () => ({ CanvasSessionsView: ({ onOpenOnBoard }: { onOpenOnBoard: (sessionId: string) => void }) => <section aria-label="Sessions view"><button type="button" onClick={() => onOpenOnBoard('session-1')}>Open session on Canvas</button></section> }));
 vi.mock('../features/workstream-explorer/useWorkspaceBranches', () => ({ useWorkspaceBranches: () => ({ states: { 'workspace-1': { current: 'main', branches: ['main'] } } }) }));
-vi.mock('../features/canvas/CanvasWorkbench', () => ({ CanvasWorkbench: ({ selectedNode, onClose }: { selectedNode?: unknown; onClose: () => void }) => selectedNode ? <aside aria-label="Canvas Workbench"><button type="button" onClick={onClose}>Close Workbench</button></aside> : null }));
+vi.mock('../features/canvas/CanvasWorkbench', () => ({ CanvasWorkbench: ({ selectedNode }: { selectedNode?: unknown }) => selectedNode ? <aside aria-label="Canvas Workbench" /> : null }));
 
 describe('CanvasPage', () => {
 	it('continues rendering when browser preference storage is unavailable', async () => {
@@ -20,12 +20,12 @@ describe('CanvasPage', () => {
 		vi.unstubAllGlobals();
 	});
 
-	it('returns keyboard focus to the selected node after closing the Workbench', async () => {
+	it('returns keyboard focus to the selected node after Escape closes the Workbench', async () => {
 		canvasState.projection = projection();
 		render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id, view: 'canvas' }} onLocationChange={vi.fn()} />);
 		const node = screen.getByRole('button', { name: 'Plan: PM-037 Canvas main' });
 		fireEvent.click(node);
-		fireEvent.click(screen.getByRole('button', { name: 'Close Workbench' }));
+		fireEvent.keyDown(window, { key: 'Escape' });
 		await waitFor(() => expect(node).toHaveFocus());
 	});
 

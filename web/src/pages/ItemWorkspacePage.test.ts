@@ -97,8 +97,7 @@ describe('ItemWorkspacePage', () => {
     const props = {
       refreshKey: 0,
       workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }],
-      onBack: vi.fn(),
-      onOpenItem: vi.fn()
+      onBack: vi.fn()
     };
     const view = render(createElement(ItemWorkspacePage, { ...props, itemId: 'item-1' }));
 
@@ -123,7 +122,7 @@ describe('ItemWorkspacePage', () => {
       if (url === '/api/items/snapshot-item') return Promise.resolve(errorResponse(409, 'snapshot item is available only in Branch Review', 'snapshot_review_only'));
       return Promise.resolve(response({}));
     }));
-    const props = { refreshKey: 0, workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }], onBack: vi.fn(), onOpenItem: vi.fn() };
+    const props = { refreshKey: 0, workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }], onBack: vi.fn() };
     const view = render(createElement(ItemWorkspacePage, { ...props, itemId: 'item-1' }));
     expect(await screen.findByRole('button', { name: 'Plan' })).toBeInTheDocument();
 
@@ -189,7 +188,7 @@ describe('ItemWorkspacePage', () => {
       return Promise.resolve(response({}));
     }));
 
-    render(createElement(ItemWorkspacePage, { itemId: 'item-1', refreshKey: 0, workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['items'], createdAt: '2026-07-10T00:00:00Z' }], onBack: vi.fn(), onOpenItem: vi.fn(), onContentChanged: vi.fn() }));
+    render(createElement(ItemWorkspacePage, { itemId: 'item-1', refreshKey: 0, workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['items'], createdAt: '2026-07-10T00:00:00Z' }], onBack: vi.fn(), onContentChanged: vi.fn() }));
 
     expect(await screen.findByRole('button', { name: 'Plan' })).toHaveClass('active');
     expect(await screen.findByText('Checkout: main')).toBeInTheDocument();
@@ -232,7 +231,6 @@ describe('ItemWorkspacePage', () => {
       refreshKey: 0,
       workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }],
       onBack: vi.fn(),
-      onOpenItem: vi.fn(),
       onContentChanged: vi.fn()
     }));
 
@@ -285,7 +283,7 @@ describe('ItemWorkspacePage', () => {
       return Promise.resolve(response({}));
     }));
 
-    render(createElement(ItemWorkspacePage, { itemId: 'item-1', refreshKey: 0, workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }], onBack: vi.fn(), onOpenItem: vi.fn(), onContentChanged: vi.fn() }));
+    render(createElement(ItemWorkspacePage, { itemId: 'item-1', refreshKey: 0, workspaces: [{ id: 'ws-1', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }], onBack: vi.fn(), onContentChanged: vi.fn() }));
 
     const gitTab = await screen.findByRole('button', { name: 'Git' });
     fireEvent.click(gitTab);
@@ -376,7 +374,6 @@ describe('ItemWorkspacePage', () => {
         }
       }],
       onBack: vi.fn(),
-      onOpenItem: vi.fn(),
       onContentChanged: vi.fn()
     }));
 
@@ -492,7 +489,6 @@ describe('ItemWorkspacePage', () => {
         { id: 'automation-ws', name: 'Automation', path: '/automation', baselineBranch: 'main', sources: [], createdAt: '2026-07-10T00:00:00Z' }
       ],
       onBack: vi.fn(),
-      onOpenItem: vi.fn(),
       onContentChanged: vi.fn()
     }));
 

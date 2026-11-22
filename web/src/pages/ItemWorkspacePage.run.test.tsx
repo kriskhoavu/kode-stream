@@ -41,7 +41,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 describe('ItemWorkspacePage with a harness run', () => {
 	it('offers the Harness run mode on the Agents tab', async () => {
 		stub();
-		render(<ItemWorkspacePage itemId="item-1" refreshKey={0} workspaces={workspaces} onBack={vi.fn()} onOpenItem={vi.fn()} onViewChange={vi.fn()} />);
+		render(<ItemWorkspacePage itemId="item-1" refreshKey={0} workspaces={workspaces} onBack={vi.fn()} onViewChange={vi.fn()} />);
 		fireEvent.click(await screen.findByRole('button', { name: /Agents/ }));
 		expect(await screen.findByRole('tab', { name: 'Harness run' })).toHaveAttribute('aria-selected', 'true');
 		expect(await screen.findByText('Working · Build · round 1 of 3')).toBeInTheDocument();
@@ -51,7 +51,7 @@ describe('ItemWorkspacePage with a harness run', () => {
 	it('shows the run whole, full width, with Stop in its bar, on ?view=run', async () => {
 		stub();
 		const onViewChange = vi.fn();
-		render(<ItemWorkspacePage itemId="item-1" view="run" refreshKey={0} workspaces={workspaces} onBack={vi.fn()} onOpenItem={vi.fn()} onViewChange={onViewChange} />);
+		render(<ItemWorkspacePage itemId="item-1" view="run" refreshKey={0} workspaces={workspaces} onBack={vi.fn()} onViewChange={onViewChange} />);
 		expect(await screen.findByRole('region', { name: 'Harness run, full width' })).toBeInTheDocument();
 		await waitFor(() => expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument());
 		expect(screen.getByRole('list', { name: 'Progress for PM-012' })).toBeInTheDocument();

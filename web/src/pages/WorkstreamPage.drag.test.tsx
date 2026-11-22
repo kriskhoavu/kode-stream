@@ -201,11 +201,6 @@ function boardFetchMock(boardItems: ItemSummary[] = items) {
   });
 }
 
-function statusRequestBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
-  const call = fetchMock.mock.calls.find(([url]) => isItemStatusUrl(url));
-  return JSON.parse(String(call?.[1]?.body ?? '{}')) as Record<string, unknown>;
-}
-
 function workstreamBranchLoadResult(items: ItemSummary[]): WorkstreamBranchLoadResult {
   return {
     workspaceId: workspace.id,

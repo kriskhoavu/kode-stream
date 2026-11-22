@@ -1,4 +1,3 @@
-import type { SourceStructureCard } from '../../lib/types';
 
 export type SourceStructureSegmentRole = 'folder' | 'item' | 'literal';
 

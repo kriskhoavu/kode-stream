@@ -159,7 +159,7 @@ function renderWorkbench(selectedNode: CanvasNode, overrides: Partial<React.Comp
 }
 
 function defaultProps(projection: CanvasProjection, selectedNode?: CanvasNode): React.ComponentProps<typeof CanvasWorkbench> {
-	return { projection, selectedNode, onClose: vi.fn(), onReload: vi.fn(), onSelectNode: vi.fn(), onPlaceSession: vi.fn() };
+	return { projection, selectedNode, onReload: vi.fn(), onSelectNode: vi.fn(), onPlaceSession: vi.fn() };
 }
 
 function baseProjection(nodes: CanvasNode[] = [planNode()]): CanvasProjection {
