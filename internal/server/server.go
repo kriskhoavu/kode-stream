@@ -98,40 +98,14 @@ func NewServer(port int) (*Server, error) {
 	knowledgeService := knowledge.NewService(reg, state.Knowledge).ConfigureActions(knowledge.NewDetector(), appgit.NewService(reg, writer, git), auditStore).ConfigureCheckout(git)
 	runtimeService := appruntime.NewService()
 	verificationService := verification.NewService(reg, runtimeService)
-	harnessConfig := harness.ResolveConfig(os.Getenv, paths.Dir, runtimeConfig.Mode == models.RuntimeModeLocal)
-	var harnessNotifier ports.Notifier
-	if harnessConfig.WebhookURL != "" {
-		harnessNotifier = harnesswebhook.New(harnessConfig.WebhookURL, harnessConfig.WebhookSecret)
-	}
-	harnessService := harness.New(harness.Dependencies{
-		Repository: state.Harness,
-		Workspaces: reg,
-		Scouts:     []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New(), harnesslocal.New()},
-		Engines:    []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath), harnesscodex.New(), harnessopencode.New()},
-		Reranker:   harnessranker.New(),
-		Transcripts: func(path string, limit int) ([]domain.TranscriptTurn, error) {
-			turns, err := ai.ReadClaudeTranscriptActivity(path, limit)
-			if err != nil {
-				return nil, err
-			}
-			out := make([]domain.TranscriptTurn, 0, len(turns))
-			for _, turn := range turns {
-				out = append(out, domain.TranscriptTurn{Role: turn.Role, Text: turn.Text, At: turn.At})
-			}
-			return out, nil
-		},
-		Sessions: func(_ context.Context, workspaceID, branch string) error {
-			_, err := aiSessionService.RemoveBranchSessions(workspaceID, branch)
-			return err
-		},
-		Worktrees:    harnessworktree.New(harnessConfig.WorktreeRoot, git),
-		PullRequests: harnessPullRequests(git),
-		Audit:        auditStore,
-		Notifier:     harnessNotifier,
-		RuntimeVerifyCommand: func(config *models.WorkspaceRuntimeConfig) string {
-			return runtimeService.VerifyCommand(config, appruntime.VerifyProfileSmoke)
-		},
-		Config: harnessConfig,
+	harnessService := newHarnessService(harnessWiring{
+		paths:    paths,
+		runtime:  runtimeConfig,
+		state:    state,
+		git:      git,
+		sessions: aiSessionService,
+		runtimes: runtimeService,
+		audit:    auditStore,
 	})
 	canvasService := canvas.NewService(state.Canvas, reg, idx, git, aiSessionService, verificationService, runtimeConfig.Mode, canvasDatastore(state.Config), runtimeConfig.Capabilities)
 	apiHandler := api.New(api.Dependencies{
@@ -173,6 +147,59 @@ func NewServer(port int) (*Server, error) {
 	mux.Handle("/api/", apiHandler.Routes())
 	mux.Handle("/", spaHandler())
 	return &Server{port: port, bindAddress: runtimeConfig.BindAddress, app: api.Log(mux), sessions: sessionManager, storage: state.SQLStore, harness: harnessService}, nil
+}
+
+// harnessWiring holds what the harness service is built from.
+type harnessWiring struct {
+	paths    system.Paths
+	runtime  system.RuntimeConfig
+	state    *storage.AppOwnedState
+	git      *appgit.GitAdapter
+	sessions *ai.Service
+	runtimes *appruntime.Service
+	audit    *audit.Recorder
+}
+
+// newHarnessService wires the harness to its scouts, engines and adapters.
+func newHarnessService(w harnessWiring) *harness.Service {
+	harnessConfig := harness.ResolveConfig(os.Getenv, w.paths.Dir, w.runtime.Mode == models.RuntimeModeLocal)
+	var harnessNotifier ports.Notifier
+	if harnessConfig.WebhookURL != "" {
+		harnessNotifier = harnesswebhook.New(harnessConfig.WebhookURL, harnessConfig.WebhookSecret)
+	}
+	return harness.New(harness.Dependencies{
+		Repository:  w.state.Harness,
+		Workspaces:  w.state.Workspaces,
+		Scouts:      []ports.Scout{harnessjira.New(appjira.New()), harnessgithub.New(), harnessbitbucket.New(), harnesslocal.New()},
+		Engines:     []ports.Engine{harnessclaude.New(ai.ClaudeTranscriptPath), harnesscodex.New(), harnessopencode.New()},
+		Reranker:    harnessranker.New(),
+		Transcripts: harnessTranscripts,
+		Sessions: func(_ context.Context, workspaceID, branch string) error {
+			_, err := w.sessions.RemoveBranchSessions(workspaceID, branch)
+			return err
+		},
+		Worktrees:    harnessworktree.New(harnessConfig.WorktreeRoot, w.git),
+		PullRequests: harnessPullRequests(w.git),
+		Audit:        w.audit,
+		Notifier:     harnessNotifier,
+		RuntimeVerifyCommand: func(config *models.WorkspaceRuntimeConfig) string {
+			return w.runtimes.VerifyCommand(config, appruntime.VerifyProfileSmoke)
+		},
+		Config: harnessConfig,
+	})
+}
+
+// harnessTranscripts reads a Claude transcript's activity as harness turns.
+func harnessTranscripts(path string, limit int) ([]domain.TranscriptTurn, error) {
+	turns, err := ai.ReadClaudeTranscriptActivity(path, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.TranscriptTurn, 0, len(turns))
+	for _, turn := range turns {
+		out = append(out, domain.TranscriptTurn{Role: turn.Role, Text: turn.Text, At: turn.At})
+	}
+	return out, nil
 }
 
 func canvasDatastore(config storage.Config) models.AppStateDatastore {
