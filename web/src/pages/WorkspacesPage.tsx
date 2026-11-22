@@ -3,11 +3,9 @@ import { ArrowLeft, CheckCircle2, Download, ExternalLink, FolderGit2, FolderOpen
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../shared/api';
-import type { JiraConnection, KnowledgeSettings, RuntimeContext, WorkspaceConfig, WorkspaceRuntimeConfig, SourceSurface, SourceStructureSettings, SystemConfigPaths } from '../lib/types';
-import { labels } from '../lib/vocabulary';
+import type { JiraConnection, KnowledgeSettings, RuntimeContext, WorkspaceConfig, WorkspaceRuntimeConfig, SourceSurface, SystemConfigPaths } from '../lib/types';
 import { sourcePaths, sourceSurfaces, workspaceSources } from '../lib/sources';
 import { lastPathSegment, parseSources } from '../features/workspaces/sourceSettings';
-import { canonicalSourceSettingsCard, UNSORTED_SOURCE_SELECTION_ID } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
 import { WorkspaceOwnSettings } from '../features/workspaces/WorkspaceOwnSettings';
@@ -17,10 +15,10 @@ import { useModalDialog } from '../components/overlay';
 import { ModalLayer } from '../components/ModalLayer';
 import { useWorkspaceRegistrationDraft } from '../features/workspaces/useWorkspaceRegistrationDraft';
 import { useWorkspaceImport } from '../features/workspaces/useWorkspaceImport';
-import { applySourceItemsProposal, clearSourceItemsProposal, SourceStructurePreviewTable, SourceStructureProposalList, updateSourceItemsPreviewField } from '../features/workspaces/sourceStructureEditor';
 import { WorkspaceImportReview, WorkspaceImportResults } from '../features/workspaces/workspaceImportReview';
 import { CloudAgentRegistration } from '../features/workspaces/CloudAgentRegistration';
-import { type WorkspaceNotice, WorkspaceNoticePanel, scanNotice, sourceSettingsNotice, scanSummary, scanWarnings } from '../features/workspaces/workspaceNotice';
+import { SourceSettingsDialog } from '../features/workspaces/SourceSettingsDialog';
+import { type WorkspaceNotice, WorkspaceNoticePanel, scanNotice, scanSummary, scanWarnings } from '../features/workspaces/workspaceNotice';
 import { errorMessage, buildWorkspaceInput, normalizeKnowledgeSettings, cloneRuntimeConfig, inferWorkspaceNameFromRemoteURL, workspaceRemovalMessage, pathFromDrop, settingsEditorFromResult, shownInByPath, sourcesFromDraft, toggleSourceSurface, type SettingsEditorState } from '../features/workspaces/workspaceDraft';
 import { SourcesField, BranchField, KnowledgeSettingsFields, RuntimeSettingsFields, KnowledgeRoots, JiraConnectionFields, OverviewSection } from '../features/workspaces/workspaceFields';
 import { type WorkspaceDetailTab, detailTabs, detailTabLabels, type WorkspaceEditSection, type OverviewSectionKey, workspaceDetailSubtitle, isIntegrationEditSection, integrationSaveLabel } from '../features/workspaces/workspaceDetailTabs';
@@ -29,7 +27,6 @@ import { type WorkspaceDetailTab, detailTabs, detailTabLabels, type WorkspaceEdi
 const sourceSurfaceLabels: Record<SourceSurface, string> = { workstream: 'Workstream', knowledge: 'Knowledge' };
 
 const maxRegistrationLogChars = 256 * 1024;
-const UNSORTED_SELECTION_ID = UNSORTED_SOURCE_SELECTION_ID;
 const localRuntimeContext: RuntimeContext = {
   mode: 'local',
   role: 'admin',
@@ -69,7 +66,6 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
   const selectedWorkspaces = workspaces.filter((workspace) => selectedWorkspaceIds.includes(workspace.id));
   const allSelected = workspaces.length > 0 && selectedWorkspaces.length === workspaces.length;
 const busy = pendingOperations.length > 0;
-	const sourceStructureDialog = useModalDialog(() => setSettingsEditor(null), !busy, Boolean(settingsEditor));
   const cloudMode = runtimeContext.mode === 'cloud';
   const registrationLocationReady = registrationMode === 'local_path' ? Boolean(path.trim()) : registrationMode === 'remote_clone' ? Boolean(remoteUrl.trim()) : Boolean(importSourcePath.trim());
   const operationBusy = (operation: string) => pendingOperations.includes(operation);
@@ -457,60 +453,6 @@ const busy = pendingOperations.length > 0;
     }
   };
 
-  const saveSourceSettings = async () => {
-    if (!settingsEditor) return;
-    setBusy(true);
-    setNotice(null);
-    try {
-      if (settingsEditor.selectedProposalId === UNSORTED_SELECTION_ID) {
-        if (settingsEditor.exists) {
-          const result = await api.resetSourceStructure(settingsEditor.repo.id, settingsEditor.directory);
-          setNotice(sourceSettingsNotice('Source structure reset', settingsEditor.repo, result.scan));
-        } else {
-          const result = await api.scan(settingsEditor.repo.id);
-          setNotice(scanNotice(settingsEditor.repo, result, 'Source kept unsorted'));
-        }
-        notifyReliabilityChanged();
-        setSettingsEditor(null);
-        await onChanged();
-        return;
-      }
-      const settings: SourceStructureSettings = {
-        version: 1,
-        cards: [canonicalSourceSettingsCard(settingsEditor.card), ...settingsEditor.cards.slice(1).map(canonicalSourceSettingsCard)]
-      };
-      const result = await api.saveSourceStructure(settingsEditor.repo.id, settingsEditor.directory, settings);
-      notifyReliabilityChanged();
-      setSettingsEditor(null);
-      setNotice(sourceSettingsNotice('Source structure saved', settingsEditor.repo, result.scan));
-      await onChanged();
-    } catch (err) {
-      setNotice({ tone: 'error', title: 'Settings failed to save', details: [errorMessage(err)] });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const resetSourceSettings = async () => {
-    if (!settingsEditor) return;
-    const confirmed = window.confirm(`Reset Source Items for ${settingsEditor.directory}? This removes the source's rules and scans the source again.`);
-    if (!confirmed) return;
-    setBusy(true);
-    setNotice(null);
-    try {
-      const { repo, directory } = settingsEditor;
-      const result = await api.resetSourceStructure(repo.id, directory);
-      notifyReliabilityChanged();
-      setSettingsEditor(settingsEditorFromResult(repo, directory, result));
-      setNotice(sourceSettingsNotice('Source structure reset', repo, result.scan));
-      await onChanged();
-    } catch (err) {
-      setNotice({ tone: 'error', title: 'Settings reset failed', details: [errorMessage(err)] });
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const dropPath = (event: DragEvent<HTMLLabelElement>) => {
     if (registrationMode !== 'local_path') {
       event.preventDefault();
@@ -817,62 +759,7 @@ const busy = pendingOperations.length > 0;
         />
       )}
       {settingsEditor && (
-        <ModalLayer><section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setSettingsEditor(null); }}>
-          <div ref={sourceStructureDialog.ref as RefObject<HTMLDivElement>} className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
-            <header>
-              <div>
-                <h2>{labels.sourceStructure}</h2>
-                <span>{settingsEditor.repo.name} / {settingsEditor.directory}</span>
-              </div>
-              <button data-autofocus className="icon-button" type="button" onClick={() => setSettingsEditor(null)} disabled={busy} aria-label="Close source items">
-                <X size={16} />
-              </button>
-            </header>
-            <p className="modal-help">
-              Define how this source should be split into board items.
-            </p>
-            {!settingsEditor.exists && settingsEditor.mode === 'structured' && (
-              <div className="metadata-callout source-structure-supported">
-                <strong>Built-in structure detected</strong>
-                <span>This source already follows a supported item layout. Saving here creates an optional override.</span>
-              </div>
-            )}
-            {!settingsEditor.exists && settingsEditor.mode !== 'structured' && (
-              <div className="metadata-callout">
-                <strong>No settings file yet</strong>
-                <span>Saving adds this source's rules to <code>.kode-stream/workspace-settings.yaml</code>.</span>
-              </div>
-            )}
-            {settingsEditor.warnings.length > 0 && (
-              <div className="plan-warnings">
-                <h3>Warnings</h3>
-                {settingsEditor.warnings.map((warning) => <p key={warning}>{warning}</p>)}
-              </div>
-            )}
-            <SourceStructureProposalList
-              proposals={settingsEditor.proposals}
-              selectedProposalId={settingsEditor.selectedProposalId}
-              onSelect={(proposal) => applySourceItemsProposal(setSettingsEditor, proposal)}
-              onClear={() => clearSourceItemsProposal(setSettingsEditor)}
-            />
-            <SourceStructurePreviewTable
-              preview={settingsEditor.preview}
-              onChangeField={(path, field, value) => updateSourceItemsPreviewField(setSettingsEditor, path, field, value)}
-            />
-            <footer className="modal-actions">
-              {settingsEditor.exists && (
-                <button className="secondary danger" type="button" onClick={() => void resetSourceSettings()} disabled={busy}>
-                  Reset config
-                </button>
-              )}
-              <button className="secondary" type="button" onClick={() => setSettingsEditor(null)} disabled={busy}>Cancel</button>
-              <button className="primary" type="button" onClick={() => void saveSourceSettings()} disabled={busy}>
-                <SlidersHorizontal size={15} />
-                {busy ? 'Saving...' : settingsEditor.selectedProposalId === UNSORTED_SELECTION_ID ? 'Scan Unsorted' : 'Save and Scan'}
-              </button>
-            </footer>
-          </div>
-        </section></ModalLayer>
+        <SourceSettingsDialog editor={settingsEditor} setEditor={setSettingsEditor} busy={busy} setBusy={setBusy} onNotice={setNotice} onChanged={onChanged} />
       )}
     </section>
   );
