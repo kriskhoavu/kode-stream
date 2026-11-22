@@ -100,118 +100,141 @@ func (s *StorageSyncService) Sync(ctx context.Context, request StorageSyncReques
 		return StorageSyncResult{}, &SyncError{Kind: SyncErrorConflict, Err: errors.New("storage sync is already in progress")}
 	}
 	defer s.running.Store(false)
+	direction, err := s.validateSync(request)
+	if err != nil {
+		return StorageSyncResult{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return StorageSyncResult{}, err
+	}
+	result := StorageSyncResult{OK: true, Direction: direction, Summary: map[string]int{}, Warnings: []string{}, SkippedStores: []string{"knowledge"}}
+	sync := s.syncToDatabase
+	if direction == SyncDatabaseToDataDir {
+		sync = s.syncToDataDir
+	}
+	snapshot, err := sync(ctx, &result)
+	if err != nil {
+		return StorageSyncResult{}, err
+	}
+	result.Summary = snapshot.summary()
+	return result, nil
+}
+
+// validateSync checks a request may run here, and returns its direction.
+func (s *StorageSyncService) validateSync(request StorageSyncRequest) (string, error) {
 	direction := strings.ToLower(strings.TrimSpace(request.Direction))
 	if direction != SyncDataDirToDatabase && direction != SyncDatabaseToDataDir {
-		return StorageSyncResult{}, &SyncError{Kind: SyncErrorValidation, Err: fmt.Errorf("direction must be %s or %s", SyncDataDirToDatabase, SyncDatabaseToDataDir)}
+		return "", &SyncError{Kind: SyncErrorValidation, Err: fmt.Errorf("direction must be %s or %s", SyncDataDirToDatabase, SyncDatabaseToDataDir)}
 	}
 	if !request.Confirm {
-		return StorageSyncResult{}, &SyncError{Kind: SyncErrorValidation, Err: errors.New("storage sync requires confirmation")}
+		return "", &SyncError{Kind: SyncErrorValidation, Err: errors.New("storage sync requires confirmation")}
 	}
 	if s.runtime.Mode == models.RuntimeModeCloud {
-		return StorageSyncResult{}, &SyncError{Kind: SyncErrorValidation, Err: errors.New("storage sync is only available in local mode")}
+		return "", &SyncError{Kind: SyncErrorValidation, Err: errors.New("storage sync is only available in local mode")}
 	}
 	if s.config.Driver == StorageDriverPostgres {
-		return StorageSyncResult{}, &SyncError{Kind: SyncErrorValidation, Err: errors.New("manual synchronization with Local Postgres is not supported")}
+		return "", &SyncError{Kind: SyncErrorValidation, Err: errors.New("manual synchronization with Local Postgres is not supported")}
 	}
 	expected := SyncDataDirToDatabase
 	if s.config.StorageOption == StorageOptionDatabase {
 		expected = SyncDatabaseToDataDir
 	}
 	if direction != expected {
-		return StorageSyncResult{}, &SyncError{Kind: SyncErrorConflict, Err: fmt.Errorf("sync target is the active %s backend", s.config.StorageOption)}
+		return "", &SyncError{Kind: SyncErrorConflict, Err: fmt.Errorf("sync target is the active %s backend", s.config.StorageOption)}
+	}
+	return direction, nil
+}
+
+// syncToDatabase stages the data directory as a database beside the target,
+// backs the target up and moves the stage into its place.
+func (s *StorageSyncService) syncToDatabase(ctx context.Context, result *StorageSyncResult) (storageSnapshot, error) {
+	snapshot, err := readDataDirSnapshot(s.paths)
+	if err != nil {
+		return snapshot, err
 	}
 	if err := ctx.Err(); err != nil {
-		return StorageSyncResult{}, err
+		return snapshot, err
 	}
-	result := StorageSyncResult{OK: true, Direction: direction, Summary: map[string]int{}, Warnings: []string{}, SkippedStores: []string{"knowledge"}}
-	var snapshot storageSnapshot
-	var err error
-	switch direction {
-	case SyncDataDirToDatabase:
-		snapshot, err = readDataDirSnapshot(s.paths)
-		if err != nil {
-			return StorageSyncResult{}, err
-		}
-		if err := ctx.Err(); err != nil {
-			return StorageSyncResult{}, err
-		}
-		target := s.config.SQLitePath
-		if target == "" {
-			target = s.paths.SQLiteDatabaseFile
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
-		}
-		stage, stageErr := os.CreateTemp(filepath.Dir(target), ".storage-sync-*.db")
-		if stageErr != nil {
-			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: stageErr}
-		}
-		stagePath := stage.Name()
-		_ = stage.Close()
-		_ = os.Remove(stagePath)
-		defer os.Remove(stagePath)
-		if err = s.writeDatabaseSnapshotAt(snapshot, stagePath); err != nil {
-			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
-		}
-		if err := ctx.Err(); err != nil {
-			return StorageSyncResult{}, err
-		}
-		if err := s.phase(ctx, "before_backup"); err != nil {
-			return StorageSyncResult{}, err
-		}
-		result.BackupPath, err = backupDatabaseTarget(s.paths, target, direction, time.Now().UTC())
-		if err != nil {
-			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
-		}
-		if err := s.phase(ctx, "before_publish"); err != nil {
-			return StorageSyncResult{}, err
-		}
-		err = os.Rename(stagePath, target)
-	case SyncDatabaseToDataDir:
-		snapshot, err = s.readDatabaseSnapshot()
-		if err != nil {
-			return StorageSyncResult{}, err
-		}
-		if err := ctx.Err(); err != nil {
-			return StorageSyncResult{}, err
-		}
-		stageDir, stageErr := os.MkdirTemp(s.paths.Dir, ".storage-sync-stage-*")
-		if stageErr != nil {
-			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: stageErr}
-		}
-		defer os.RemoveAll(stageDir)
-		stagePaths := syncStagePaths(s.paths, stageDir)
-		if err = writeDataDirSnapshot(stagePaths, snapshot); err != nil {
-			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
-		}
-		if err := s.phase(ctx, "before_backup"); err != nil {
-			return StorageSyncResult{}, err
-		}
-		result.BackupPath, err = backupDataDirTarget(s.paths, direction, time.Now().UTC())
-		if err != nil {
-			return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
-		}
-		if err := ctx.Err(); err != nil {
-			return StorageSyncResult{}, err
-		}
-		if err := s.phase(ctx, "before_publish"); err != nil {
-			return StorageSyncResult{}, err
-		}
-		err = publishDataDirStage(stagePaths, s.paths, result.BackupPath, func(phase string) error {
-			if strings.HasPrefix(phase, "restore:") {
-				if s.beforePhase != nil {
-					return s.beforePhase(phase)
-				}
-				return nil
-			}
-			return s.phase(ctx, phase)
-		})
+	target := s.config.SQLitePath
+	if target == "" {
+		target = s.paths.SQLiteDatabaseFile
 	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return snapshot, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+	}
+	stage, err := os.CreateTemp(filepath.Dir(target), ".storage-sync-*.db")
 	if err != nil {
-		return StorageSyncResult{}, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+		return snapshot, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
 	}
-	result.Summary = snapshot.summary()
-	return result, nil
+	stagePath := stage.Name()
+	_ = stage.Close()
+	_ = os.Remove(stagePath)
+	defer os.Remove(stagePath)
+	if err := s.writeDatabaseSnapshotAt(snapshot, stagePath); err != nil {
+		return snapshot, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+	}
+	if err := ctx.Err(); err != nil {
+		return snapshot, err
+	}
+	if err := s.phase(ctx, "before_backup"); err != nil {
+		return snapshot, err
+	}
+	if result.BackupPath, err = backupDatabaseTarget(s.paths, target, result.Direction, time.Now().UTC()); err != nil {
+		return snapshot, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+	}
+	if err := s.phase(ctx, "before_publish"); err != nil {
+		return snapshot, err
+	}
+	if err := os.Rename(stagePath, target); err != nil {
+		return snapshot, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+	}
+	return snapshot, nil
+}
+
+// syncToDataDir stages the database as data files, backs the data
+// directory up and publishes the stage over it.
+func (s *StorageSyncService) syncToDataDir(ctx context.Context, result *StorageSyncResult) (storageSnapshot, error) {
+	snapshot, err := s.readDatabaseSnapshot()
+	if err != nil {
+		return snapshot, err
+	}
+	if err := ctx.Err(); err != nil {
+		return snapshot, err
+	}
+	stageDir, err := os.MkdirTemp(s.paths.Dir, ".storage-sync-stage-*")
+	if err != nil {
+		return snapshot, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+	}
+	defer os.RemoveAll(stageDir)
+	stagePaths := syncStagePaths(s.paths, stageDir)
+	if err := writeDataDirSnapshot(stagePaths, snapshot); err != nil {
+		return snapshot, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+	}
+	if err := s.phase(ctx, "before_backup"); err != nil {
+		return snapshot, err
+	}
+	if result.BackupPath, err = backupDataDirTarget(s.paths, result.Direction, time.Now().UTC()); err != nil {
+		return snapshot, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+	}
+	if err := ctx.Err(); err != nil {
+		return snapshot, err
+	}
+	if err := s.phase(ctx, "before_publish"); err != nil {
+		return snapshot, err
+	}
+	err = publishDataDirStage(stagePaths, s.paths, result.BackupPath, func(phase string) error {
+		if strings.HasPrefix(phase, "restore:") {
+			if s.beforePhase != nil {
+				return s.beforePhase(phase)
+			}
+			return nil
+		}
+		return s.phase(ctx, phase)
+	})
+	if err != nil {
+		return snapshot, &SyncError{Kind: SyncErrorInfrastructure, Err: err}
+	}
+	return snapshot, nil
 }
 
 func (s *StorageSyncService) phase(ctx context.Context, name string) error {
