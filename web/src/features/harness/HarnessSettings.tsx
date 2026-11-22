@@ -1,25 +1,16 @@
-import { useEffect, useId, useState } from 'react';
-import { CircleHelp, Workflow } from 'lucide-react';
-import type { HarnessAgentRole, HarnessEngineId, HarnessRoleHealth, HarnessRoleId, HarnessRoleModel, HarnessSettings as Settings, HarnessSourceKind, HarnessSourceSettings, HarnessStatus, HarnessWorkspaceSettings } from '../../lib/types';
+import { useEffect, useState } from 'react';
+import type { HarnessAgentRole, HarnessRoleHealth, HarnessRoleId, HarnessRoleModel, HarnessSettings as Settings, HarnessSourceKind, HarnessSourceSettings, HarnessStatus, HarnessWorkspaceSettings } from '../../lib/types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import type { HarnessClient, HarnessWorkspaceOption } from './harnessClient';
 import { plainError } from './useHarness';
 import { useNow } from './useNow';
-import { engineLabel, formatAgo, modelLabel, plural, roleLabels, roleOrder, sourceLabels } from './vocabulary';
-
-const modelSuggestions = ['opus', 'sonnet', 'haiku'];
+import { engineLabel, plural, roleLabels, roleOrder, sourceLabels } from './vocabulary';
+import { Override, Toggle, EngineSelect, ModelInput } from './settingsFields';
+import { SourceRow, defaultSourceQuery } from './settingsSources';
+import { effectiveRoleModel, ownSettings, withOwnSettings, withRoleSkill } from './settingsDraft';
 
 /** The kinds a person can add. Bitbucket Server has no issue tracker, so its work comes in through Jira. A local folder is for trying the pipeline. */
 const addableKinds: HarnessSourceKind[] = ['jira', 'github', 'local'];
-
-/** A sensible first query: the workspace's own Jira project, open issues, newest change first. */
-export function defaultSourceQuery(kind: HarnessSourceKind, workspace?: HarnessWorkspaceOption): string {
-	if (kind === 'jira' && workspace?.jiraProjectKey) {
-		return `project = ${workspace.jiraProjectKey} AND sprint in openSprints() AND statusCategory != Done ORDER BY updated DESC`;
-	}
-	if (kind === 'local') return '.harness/tasks';
-	return '';
-}
 
 const policyRows: { role: HarnessAgentRole; name: string; does: string }[] = [
 	{ role: 'planner', name: 'Planner', does: 'Writes the plan' },
@@ -39,10 +30,6 @@ const pauseConsequence: Record<HarnessRoleId, string> = {
 };
 
 /** A workspace with no choices of its own yet: it follows the defaults everywhere. */
-export function emptyWorkspaceSettings(workspaceId: string): HarnessWorkspaceSettings {
-	return { workspaceId, verificationCommands: [], scope: [], models: {}, procedure: {} };
-}
-
 /**
  * The harness's settings. Without a workspace they are the defaults every
  * workspace starts from: what runs on its own and which roles are paused.
@@ -99,7 +86,7 @@ export function HarnessSettings({ client, status, workspaceId, part = 'workspace
 
 	const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 	const update = (patch: Partial<Settings>) => { setDraft({ ...draft, ...patch }); setNotice(''); };
-		const updateSource = (index: number, patch: Partial<HarnessSourceSettings>) => update({ sources: draft.sources.map((source, position) => position === index ? { ...source, ...patch } : source) });
+	const updateSource = (index: number, patch: Partial<HarnessSourceSettings>) => update({ sources: draft.sources.map((source, position) => position === index ? { ...source, ...patch } : source) });
 	const removeSource = (index: number) => update({ sources: draft.sources.filter((_, position) => position !== index) });
 	const clearQueue = async (workspaceId: string) => {
 		setConfirmClear(undefined);
@@ -120,33 +107,13 @@ export function HarnessSettings({ client, status, workspaceId, part = 'workspace
 	const workspaceNames = new Map(workspaces.map((workspace) => [workspace.id, workspace.name]));
 	const addTarget = workspaces.find((workspace) => workspace.id === (workspaceId ?? addWorkspace));
 	const addWorkspaceId = workspaceId ?? addTarget?.id ?? addWorkspace.trim();
-	const own = draft.workspaces.find((workspace) => workspace.workspaceId === workspaceId) ?? emptyWorkspaceSettings(workspaceId ?? '');
-	const updateOwn = (patch: Partial<HarnessWorkspaceSettings>) => {
-		const next = { ...own, ...patch };
-		update({ workspaces: draft.workspaces.some((workspace) => workspace.workspaceId === own.workspaceId) ? draft.workspaces.map((workspace) => workspace.workspaceId === own.workspaceId ? next : workspace) : [...draft.workspaces, next] });
-	};
-	/** A role's model in this workspace: its own, else the defaults it starts from. */
-	const roleModel = (role: HarnessAgentRole): Required<HarnessRoleModel> => {
-		const fallback = draft.modelPolicy[role];
-		const mine = own.models[role];
-		return {
-			engine: mine?.engine || fallback.engine,
-			model: mine?.model || fallback.model,
-			highDifficultyModel: mine ? mine.highDifficultyModel ?? '' : fallback.hardModel ?? '',
-			maxTurns: mine?.maxTurns || fallback.maxTurns
-		};
-	};
+	const own = ownSettings(draft, workspaceId);
+	const updateOwn = (patch: Partial<HarnessWorkspaceSettings>) => update({ workspaces: withOwnSettings(draft, own, patch) });
+	const roleModel = (role: HarnessAgentRole) => effectiveRoleModel(draft, own, role);
 	const updateModel = (role: HarnessAgentRole, patch: Partial<HarnessRoleModel>) => {
 		updateOwn({ models: { ...own.models, [role]: { ...roleModel(role), ...patch } } });
 	};
-	const updateSkill = (role: HarnessAgentRole, patch: Partial<{ skill: string; track: string }>) => {
-		const current = own.procedure[role] ?? { skill: '' };
-		const next = { ...current, ...patch };
-		const procedure = { ...own.procedure };
-		if (next.skill || next.track) procedure[role] = { skill: next.skill, ...(next.track ? { track: next.track } : {}) };
-		else delete procedure[role];
-		updateOwn({ procedure });
-	};
+	const updateSkill = (role: HarnessAgentRole, patch: Partial<{ skill: string; track: string }>) => updateOwn({ procedure: withRoleSkill(own.procedure, role, patch) });
 	const shownSources = draft.sources.map((source, index) => ({ source, index })).filter(({ source }) => !workspaceId || source.workspaceId === workspaceId);
 	const duplicateSource = draft.sources.some((source) => source.workspaceId === addWorkspaceId && source.kind === addKind);
 	const addSource = () => {
@@ -343,115 +310,6 @@ export function HarnessSettings({ client, status, workspaceId, part = 'workspace
 					onConfirm={() => { const role = confirmPause.role; setConfirmPause(undefined); void onPause(role); }}
 				/>
 			)}
-		</div>
-	);
-}
-
-/** A workspace's on or off as two small cards. Until a person picks one, the default's value is chosen. */
-function Override({ label, hint, value, fallback, onChange }: { label: string; hint: string; value?: boolean | null; fallback: boolean; onChange: (value: boolean) => void }) {
-	const name = useId();
-	const on = value === undefined || value === null ? fallback : value;
-	return (
-		<div className="settings-toggle-row">
-			<span><strong>{label}</strong><small>{hint}</small></span>
-			<div className="hx-choice-cards" role="radiogroup" aria-label={label}>
-				{[true, false].map((choice) => (
-					<label key={String(choice)} className={`hx-choice-card${on === choice ? ' on' : ''}`}>
-						<input type="radio" name={name} value={choice ? 'on' : 'off'} checked={on === choice} onChange={() => onChange(choice)} />
-						<strong>{choice ? 'On' : 'Off'}</strong>
-					</label>
-				))}
-			</div>
-		</div>
-	);
-}
-
-function Toggle({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (checked: boolean) => void }) {
-	return (
-		<label className="settings-toggle-row">
-			<span><strong>{label}</strong><small>{hint}</small></span>
-			<input type="checkbox" role="switch" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-		</label>
-	);
-}
-
-function EngineSelect({ value, engines, label, onChange }: { value: HarnessEngineId; engines: HarnessStatus['engines']; label: string; onChange: (engine: HarnessEngineId) => void }) {
-	const ids: HarnessEngineId[] = engines.length ? engines.map((engine) => engine.id) : [value];
-	return (
-		<select className="hx-select" aria-label={label} value={value} onChange={(event) => onChange(event.target.value as HarnessEngineId)}>
-			{ids.map((id) => {
-				const engine = engines.find((candidate) => candidate.id === id);
-				const unavailable = engine && !engine.available;
-				return <option key={id} value={id} disabled={unavailable && id !== value}>{engineLabel(id)}{unavailable ? ' (not installed)' : ''}</option>;
-			})}
-		</select>
-	);
-}
-
-function ModelInput({ label, value, placeholder, hideLabel = false, hint, onChange }: { label: string; value: string; placeholder?: string; hideLabel?: boolean; hint?: string; onChange: (model: string) => void }) {
-	const listId = useId();
-	const inputId = useId();
-	const hintId = useId();
-	return (
-		<div className="hx-model-input">
-			<span className={hideLabel ? 'sr-only' : 'hx-model-label'}><label htmlFor={inputId}>{label}</label>{hint && (
-				<span className="hx-hint">
-					<button type="button" className="hx-hint-button" aria-label={`What ${label} means`} aria-describedby={hintId}><CircleHelp size={13} aria-hidden="true" /></button>
-					<span id={hintId} role="tooltip" className="hx-hint-text">{hint}</span>
-				</span>
-			)}</span>
-			<input id={inputId} aria-describedby={hint ? hintId : undefined} value={value} list={listId} title={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value.trim())} />
-			<datalist id={listId}>{modelSuggestions.map((model) => <option key={model} value={model}>{modelLabel(model)}</option>)}</datalist>
-		</div>
-	);
-}
-
-function SourceRow({ source, workspaceName, now, onChange, onRemove, onClear, clearing }: { source: HarnessSourceSettings; workspaceName?: string; now: number; onChange: (patch: Partial<HarnessSourceSettings>) => void; onRemove: () => void; onClear: () => void; clearing: boolean }) {
-	const checked = source.lastCheckedAt ? `Looked ${formatAgo(source.lastCheckedAt, now)}${source.lastFound !== undefined ? ` · ${source.lastFound} new` : ''}` : 'Not looked yet';
-	const queryLabel = source.kind === 'jira' ? 'Jira search (JQL)' : source.kind === 'github' ? 'Repository (owner/name)' : source.kind === 'local' ? 'Task folder (inside the workspace, or a full path)' : 'Repository (workspace/name)';
-	return (
-		<div className="hx-source-row">
-			<div className="hx-source-head">
-				<span><Workflow size={14} aria-hidden="true" /> <b>{sourceLabels[source.kind]}</b> <span className="hx-muted">· {workspaceName ?? source.workspaceId}</span></span>
-				<span className="hx-muted">{checked}</span>
-				<label className="hx-inline-switch"><input type="checkbox" role="switch" checked={source.enabled} onChange={(event) => onChange({ enabled: event.target.checked })} /> Look here</label>
-				<button type="button" className="ghost" disabled={clearing} onClick={onClear} aria-label={`Clear the Task Queue for ${workspaceName ?? source.workspaceId}`}>{clearing ? 'Clearing…' : 'Clear the Task Queue'}</button>
-				<button type="button" className="ghost" onClick={onRemove} aria-label={`Remove ${sourceLabels[source.kind]} for ${workspaceName ?? source.workspaceId}`}>Remove</button>
-			</div>
-			{source.lastError && <p className="hx-banner" role="alert">{source.lastError}</p>}
-			{source.kind === 'jira' && <ReadyCheckFields source={source} onChange={onChange} />}
-			{source.kind === 'local' && <p className="hx-muted">One Markdown file per task: its name is the key, its first heading the title. Hand-off pushes the branch and opens no pull request.</p>}
-			<details className="hx-advanced" open={source.query === '' ? true : undefined}>
-				<summary>Advanced</summary>
-				<div className="hx-advanced-fields">
-					<label className="hx-field"><span>{queryLabel}</span><input value={source.query} onChange={(event) => onChange({ query: event.target.value })} /></label>
-					{source.kind !== 'jira' && source.kind !== 'local' && <label className="hx-field"><span>Labels to pick up (comma separated)</span><input value={(source.labels ?? []).join(', ')} onChange={(event) => onChange({ labels: event.target.value.split(',').map((label) => label.trim()).filter(Boolean) })} /></label>}
-					{source.kind !== 'jira' && source.kind !== 'local' && <label className="hx-field"><span>Name of the environment setting that holds the token</span><input value={source.tokenEnvVar ?? ''} onChange={(event) => onChange({ tokenEnvVar: event.target.value.trim() || undefined })} /></label>}
-				</div>
-			</details>
-		</div>
-	);
-}
-
-/**
- * A Jira source's readiness check: a ticket in a ready status starts on its
- * own, and its Planner first judges whether the ticket says enough.
- */
-function ReadyCheckFields({ source, onChange }: { source: HarnessSourceSettings; onChange: (patch: Partial<HarnessSourceSettings>) => void }) {
-	const on = source.checkReady === true;
-	const [text, setText] = useState((source.readyStatuses ?? []).join(', '));
-	return (
-		<div className="hx-ready-check">
-			<label className="hx-inline-switch"><input type="checkbox" role="switch" checked={on} onChange={(event) => onChange({ checkReady: event.target.checked ? true : undefined })} /> Start ready tickets on their own</label>
-			<label className="hx-field">
-				<span>Ready statuses (comma separated)</span>
-				<input value={text} placeholder="READY" disabled={!on} onChange={(event) => {
-					setText(event.target.value);
-					const statuses = event.target.value.split(',').map((status) => status.trim()).filter(Boolean);
-					onChange({ readyStatuses: statuses.length ? statuses : undefined });
-				}} />
-			</label>
-			<p className="hx-muted">A ticket in one of these statuses starts without Start. The Planner first checks that the ticket says enough to plan from. If it does not, the task waits for the ticket's reporter, with a comment you can post to ask them, and a reply on the ticket sends the Planner on. Nothing is built before you approve the plan.</p>
 		</div>
 	);
 }
