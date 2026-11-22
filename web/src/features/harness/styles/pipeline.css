@@ -1,0 +1,518 @@
+/* ── Pipeline ───────────────────────────────────────────────────────────── */
+
+.hx-run {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+	/* The stepper scrolls sideways, so the page takes the whole width a wide screen offers. */
+	max-width: none;
+}
+
+.hx-run-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 14px;
+}
+
+.hx-run-head-spacer {
+	flex: 1;
+}
+
+.hx-eyebrow {
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+}
+
+.hx-run-picker select {
+	min-width: 320px;
+	max-width: 100%;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--text);
+	padding: 8px 12px;
+	font-weight: 600;
+}
+
+.hx-stop-button {
+	color: var(--danger);
+	border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+.hx-small-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 7px 12px;
+	font-size: 13px;
+}
+
+.hx-stepper-card {
+	padding: 18px 20px 14px;
+}
+
+.hx-stepper-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.hx-stepper {
+	display: flex;
+	align-items: center;
+	/* Centred while it fits, scrolling sideways once it does not. */
+	width: fit-content;
+	max-width: 100%;
+	margin: 0 auto;
+	padding: 6px 4px 10px;
+	list-style: none;
+	overflow-x: auto;
+}
+
+.hx-step-group {
+	position: relative;
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 26px 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--panel-soft) 55%, transparent);
+}
+
+.hx-step-group-label {
+	position: absolute;
+	top: 8px;
+	left: 12px;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.hx-stage-slot {
+	position: relative;
+}
+
+.hx-stage {
+	position: relative;
+	width: 182px;
+	min-height: 88px;
+	display: grid;
+	gap: 4px;
+	align-content: start;
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+	box-shadow: var(--hx-card-shadow);
+	color: var(--text);
+	text-align: left;
+	font: inherit;
+}
+
+.hx-stage:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 2px;
+}
+
+.hx-stage-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--hx-tone);
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .02em;
+}
+
+.hx-stage-status svg {
+	width: 14px;
+	height: 14px;
+}
+
+.hx-stage-name {
+	font-size: 14px;
+	font-weight: 700;
+}
+
+.hx-stage-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	color: var(--muted);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-stage-done {
+	border-color: color-mix(in srgb, var(--hx-done) 45%, var(--line));
+}
+
+.hx-stage-working {
+	border-color: var(--hx-running);
+}
+
+.hx-stage-waiting {
+	border-color: var(--hx-waiting);
+	box-shadow: var(--hx-ring), var(--hx-card-shadow);
+}
+
+.hx-stage-stopped,
+.hx-stage-failed {
+	border-color: var(--hx-stopped);
+}
+
+.hx-stage-not_started,
+.hx-stage-skipped {
+	border-style: dashed;
+}
+
+.hx-stage-manual {
+	border-style: dashed;
+	border-color: var(--hx-manual);
+}
+
+.hx-conn {
+	position: relative;
+	flex: none;
+	width: 34px;
+	height: 2px;
+	background: var(--line);
+}
+
+.hx-conn.done {
+	background: var(--hx-done);
+}
+
+.hx-conn.flow {
+	background: repeating-linear-gradient(90deg, var(--hx-running) 0 6px, transparent 6px 16px);
+}
+
+.hx-legend {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 18px;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.hx-legend span {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.hx-legend-hint {
+	margin-left: auto;
+}
+
+.hx-swatch {
+	width: 10px;
+	height: 10px;
+	border-radius: 3px;
+	display: inline-block;
+	background: var(--hx-tone);
+}
+
+.hx-swatch.outline {
+	background: transparent;
+	border: 1px dashed var(--hx-tone);
+}
+
+/* Start, laid out sideways, is a small circle holding its status icon. */
+.hx-step-start {
+	flex: none;
+	display: flex;
+	align-items: center;
+}
+
+.hx-stepper .hx-stage.hx-stage-dot {
+	width: 30px;
+	height: 30px;
+	min-height: 0;
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border: 2px solid var(--hx-tone);
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--hx-tone) 12%, var(--panel));
+	box-shadow: none;
+	color: var(--hx-tone);
+}
+
+.hx-stepper .hx-stage.hx-stage-dot svg {
+	width: 14px;
+	height: 14px;
+}
+
+.hx-stepper .hx-stage.hx-stage-dot.hx-stage-not_started {
+	border-style: dashed;
+	background: var(--panel);
+}
+
+.hx-stepper .hx-stage.hx-stage-dot.hx-stage-waiting {
+	box-shadow: var(--hx-ring);
+}
+
+.hx-step-start + .hx-conn {
+	width: 18px;
+}
+
+/* The vertical stepper lives in the drawer: one column, connectors become a rail. */
+.hx-stepper.vertical {
+	flex-direction: column;
+	align-items: stretch;
+	overflow: visible;
+}
+
+.hx-stepper.vertical .hx-conn {
+	width: 2px;
+	height: 14px;
+	margin-left: 22px;
+}
+
+.hx-stepper.vertical .hx-stage {
+	width: 100%;
+}
+
+.hx-run-split {
+	display: grid;
+	/* The ledger is numbers; the Checker's words need the room. */
+	grid-template-columns: minmax(360px, 2fr) minmax(0, 3fr);
+	gap: 18px;
+	align-items: start;
+}
+
+.hx-ledger th.num,
+.hx-ledger td.num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+.hx-ledger tr.grp th,
+.hx-ledger tr.grp td {
+	background: var(--panel-soft);
+	font-weight: 700;
+	text-align: left;
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 13px;
+	color: var(--text);
+}
+
+.hx-ledger tr.grp td.num {
+	text-align: right;
+	color: var(--text);
+}
+
+.hx-ledger tr.grp td.note {
+	color: var(--muted);
+	font-weight: 500;
+}
+
+.hx-ledger-fold {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.hx-ledger-fold svg {
+	color: var(--muted);
+	transition: transform 150ms var(--hx-ease);
+}
+
+.hx-ledger-fold[aria-expanded="true"] svg {
+	transform: rotate(90deg);
+}
+
+.hx-ledger-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.hx-ledger tr.grp .hx-ledger-count {
+	color: var(--muted);
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.hx-ledger tr.total th,
+.hx-ledger tr.total td {
+	font-weight: 700;
+	color: var(--text);
+	text-align: left;
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 13px;
+	border-bottom: 0;
+}
+
+.hx-ledger tr.total td.num {
+	text-align: right;
+	color: var(--text);
+}
+
+.hx-findings {
+	display: grid;
+	gap: 14px;
+}
+
+.hx-findings-head {
+	margin: 0 0 6px;
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+}
+
+.hx-findings-head.must {
+	color: var(--hx-stopped);
+}
+
+.hx-findings ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 10px;
+	font-size: 13px;
+}
+
+.hx-findings-section > summary {
+	list-style: none;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.hx-findings-section > summary::-webkit-details-marker {
+	display: none;
+}
+
+.hx-findings-section > summary::before,
+.hx-finding > details > summary::before {
+	content: '';
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-right: 1.5px solid var(--muted);
+	border-bottom: 1.5px solid var(--muted);
+	transform: rotate(-45deg);
+	transition: transform 150ms var(--hx-ease);
+}
+
+.hx-findings-section[open] > summary::before,
+.hx-finding > details[open] > summary::before {
+	transform: rotate(45deg);
+}
+
+.hx-findings-section > summary h3 {
+	margin: 0;
+}
+
+.hx-findings-section > ul {
+	margin-top: 8px;
+}
+
+.hx-finding {
+	padding: 8px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+}
+
+.hx-finding > details > summary {
+	list-style: none;
+	cursor: pointer;
+	display: grid;
+	grid-template-columns: 12px minmax(0, 1fr);
+	gap: 2px 8px;
+	align-items: baseline;
+}
+
+.hx-finding > details > summary::-webkit-details-marker {
+	display: none;
+}
+
+.hx-finding > details > summary::before {
+	margin-top: 5px;
+	align-self: start;
+}
+
+.hx-finding > details > summary > .hx-finding-where {
+	grid-column: 2;
+}
+
+.hx-finding-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+.hx-finding-where {
+	font-size: 12px;
+}
+
+.hx-finding-detail {
+	margin: 8px 0 2px 20px;
+	color: var(--muted);
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+.hx-findings code {
+	font-size: 12px;
+	background: var(--panel-soft);
+	padding: 1px 6px;
+	border-radius: 4px;
+	overflow-wrap: anywhere;
+}
+
+.hx-finding-fixed {
+	flex: none;
+	color: var(--hx-done);
+}
+
+.hx-panel-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding-top: 6px;
+	border-top: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+	.hx-run-split {
+		grid-template-columns: 1fr;
+	}
+	.hx-run-picker select {
+		min-width: 0;
+		width: 100%;
+	}
+	.hx-legend-hint {
+		margin-left: 0;
+	}
+}

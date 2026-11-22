@@ -1,0 +1,203 @@
+/* ── A workspace's own settings, and the file that shares them ── */
+
+.settings-file-state { margin: 0 0 14px; padding: 0 4px; color: var(--muted); font-size: 13px; }
+.settings-file-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.settings-file-parts { display: grid; gap: 8px; align-content: start; min-width: 0; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; }
+.settings-file-parts legend { padding: 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.settings-file-parts > button { justify-self: start; display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; }
+.settings-file-part { display: flex; align-items: flex-start; gap: 10px; min-width: 0; font-size: 13px; }
+.settings-file-part input { margin-top: 3px; }
+.settings-file-part > span { display: grid; gap: 2px; min-width: 0; }
+.settings-file-part small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+
+/* The settings file opens as a dialog from a workspace's header: wider than a confirmation, and scrolled inside when it holds many parts. */
+.confirm-dialog.settings-file-dialog { width: min(640px, 100%); max-height: min(720px, calc(100vh - 40px)); overflow: auto; }
+.settings-file-dialog .settings-file-state { margin: 0; padding: 0; }
+.settings-file-dialog footer button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* A task's key opens its details; its title is plain text. */
+.hx-key-button {
+	border: 0;
+	background: transparent;
+	padding: 0;
+	color: var(--text);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 700;
+	text-align: left;
+	cursor: pointer;
+}
+
+.hx-key-button:hover,
+.hx-key-button:focus-visible {
+	color: var(--accent-text);
+	text-decoration: underline;
+}
+
+.hx-row-name {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* A clarify gate waits for the ticket's reporter, and holds the comment to ask them. */
+.hx-gate-icon.reporter {
+	color: var(--hx-waiting);
+}
+
+.hx-gate-draft {
+	display: grid;
+	gap: 6px;
+	margin-top: 10px;
+	padding: 10px 12px;
+	border: 1px dashed color-mix(in srgb, var(--hx-waiting) 45%, var(--line));
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--hx-waiting) 6%, var(--panel));
+}
+
+.hx-gate-draft header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--muted);
+}
+
+.hx-gate-draft header span {
+	margin-right: auto;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+}
+
+.hx-gate-draft header .hx-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+.hx-gate-draft pre {
+	margin: 0;
+	max-height: 240px;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.45;
+	color: var(--text);
+}
+
+.hx-ready-check {
+	display: grid;
+	gap: 8px;
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+}
+
+.hx-ready-check .hx-field {
+	max-width: 360px;
+}
+
+.hx-ready-check p {
+	margin: 0;
+	font-size: 12.5px;
+}
+
+/* A workspace's own choices: every control on the right is the same width, so the rows line up. */
+.hx-settings .settings-toggle-row > .hx-select {
+	flex: none;
+	width: min(320px, 50%);
+}
+
+/* A workspace's own settings in two tabs: tools and harness, then models and skills. */
+.workspace-own-settings > .hx-tabs {
+	margin-bottom: 4px;
+}
+
+/* The provider row matches the harness rows below it, and its Save sits clear of the row's border. */
+.workspace-own-settings .ai-settings-section .settings-toggle-row > select {
+	flex: none;
+	width: min(320px, 50%);
+	/* A short provider name sits in the middle; the left padding matches the arrow's, so it is centred in the box. */
+	padding-left: 30px;
+	text-align: center;
+	text-align-last: center;
+}
+
+.workspace-own-settings .ai-settings-section .settings-actions {
+	padding-top: 14px;
+}
+
+/* A workspace's on or off: two small cards in one radio group, as wide as the other controls. */
+.hx-choice-cards {
+	flex: none;
+	width: min(320px, 50%);
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 6px;
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card {
+	position: relative;
+	display: grid;
+	justify-items: center;
+	padding: 8px 6px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+	cursor: pointer;
+	transition: border-color 0.15s var(--hx-ease), background 0.15s var(--hx-ease);
+}
+
+.hx-choice-card input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card strong {
+	font-size: 13px;
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card:hover {
+	border-color: var(--muted);
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card.on {
+	border-color: var(--accent-text);
+	background: color-mix(in srgb, var(--accent-text) 12%, var(--panel));
+	box-shadow: 0 0 0 1px var(--accent-text);
+}
+
+.hx-settings .settings-toggle-row .hx-choice-card.on strong {
+	color: var(--accent-text);
+}
+
+.hx-choice-card:has(input:focus-visible) {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 2px;
+}
+
+/* In the AI and harness dialog the settings fill the dialog, not the page's reading width. */
+.workspace-settings-modal .workspace-own-settings,
+.workspace-settings-modal .hx-settings {
+	max-width: none;
+}
+
+/* A role's skill and track: the same field as the rest of the harness settings, filling most of its column. */
+.hx-skill-input {
+	width: min(260px, 100%);
+}
+
+/* A picked value (a tool, a model) sits in the middle of its field. */
+.hx-settings select.hx-select,
+.hx-model-input input {
+	text-align: center;
+	text-align-last: center;
+}

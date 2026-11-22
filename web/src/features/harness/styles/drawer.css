@@ -1,0 +1,371 @@
+/* ── Run drawer ─────────────────────────────────────────────────────────── */
+
+.hx .plan-drawer-body.hx-drawer-body {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.hx-drawer .plan-drawer-header h2:focus {
+	outline: none;
+}
+
+.hx-drawer-status {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	font-size: 13px;
+}
+
+.hx-drawer .drawer-kicker {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.hx-drawer .hx-gate {
+	grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.hx-drawer .hx-gate-actions {
+	grid-column: 1 / -1;
+	flex-direction: row;
+	flex-wrap: wrap;
+}
+
+.hx-drawer-queue {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 12px;
+	font-size: 13px;
+}
+
+.hx-drawer-queue p {
+	margin: 0;
+}
+
+.hx-drawer-queue-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.hx-drawer-questions {
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.hx-drawer-questions p {
+	margin: 0;
+}
+
+.hx-field-inline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+}
+
+.hx-field-inline > span {
+	font-weight: 600;
+}
+
+.hx-field-inline select {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--text);
+	padding: 6px 10px;
+	font: inherit;
+	font-size: 13px;
+}
+
+/* The questions an agent asks sit between the sentence and the facts, numbered, in the gate's own type. */
+.hx-gate-questions ol,
+.hx-dialog-questions {
+	margin: 6px 0 0;
+	padding-left: 22px;
+	display: grid;
+	gap: 4px;
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.hx-gate-questions > p {
+	margin: 6px 0 0;
+	font-size: 13px;
+}
+
+.hx-dialog-questions {
+	margin: 0 0 12px;
+	padding: 10px 10px 10px 30px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+}
+
+.hx-tabs {
+	display: flex;
+	gap: 4px;
+	border-bottom: 1px solid var(--line);
+}
+
+.hx-tabs button {
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: transparent;
+	color: var(--muted);
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.hx-tabs button.on {
+	color: var(--tab-selected-text);
+	border-bottom-color: var(--tab-selected-mark);
+}
+
+.hx-tab-panel {
+	min-height: 0;
+}
+
+/* The Ticket tab hosts the shell's Jira panel; its own padding is the drawer's. */
+.hx-ticket .jira-item-panel,
+.hx-ticket .jira-panel-state {
+	padding: 0;
+}
+
+.hx-ticket-summary {
+	display: grid;
+	gap: 12px;
+	font-size: 13px;
+}
+
+.hx-ticket-summary dl {
+	margin: 0;
+	display: grid;
+	grid-template-columns: minmax(70px, auto) 1fr;
+	gap: 6px 10px;
+}
+
+.hx-ticket-summary dt {
+	color: var(--muted);
+}
+
+.hx-ticket-summary dd {
+	margin: 0;
+}
+
+.hx-ticket-summary a {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--accent-text);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.hx-findings-rounds {
+	display: grid;
+	gap: 18px;
+}
+
+.hx-findings-rounds h3 {
+	margin-bottom: 8px;
+}
+
+.hx-changes ul,
+.hx-links {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.hx-changes li {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.hx-changes code,
+.hx-links code {
+	overflow-wrap: anywhere;
+}
+
+.hx-links a {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--accent-text);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.hx-live {
+	display: grid;
+	gap: 8px;
+}
+
+.hx-live p {
+	margin: 0;
+}
+
+.hx-live-steps,
+.hx-live-steps ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.hx-live-steps {
+	display: grid;
+	gap: 10px;
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+}
+
+.hx-live-stage {
+	display: grid;
+	gap: 4px;
+}
+
+.hx-live-stage-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.hx-live-stage-title svg {
+	transition: transform 150ms var(--hx-ease);
+}
+
+.hx-live-stage-title[aria-expanded="true"] svg {
+	transform: rotate(90deg);
+}
+
+.hx-live-stage-title:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+.hx-live-stage-count {
+	margin-left: 4px;
+	font-weight: 500;
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+.hx-ledger-step {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--accent-text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	text-decoration: underline;
+	text-decoration-color: transparent;
+	text-underline-offset: 3px;
+}
+
+.hx-ledger-step:hover,
+.hx-ledger-step:focus-visible {
+	text-decoration-color: currentColor;
+	outline: none;
+}
+
+.hx-live-steps button {
+	display: grid;
+	grid-template-columns: 22px auto minmax(0, 1fr);
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 3px 6px 3px 2px;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.hx-live-steps button:hover {
+	background: var(--panel);
+}
+
+.hx-live-steps button.on {
+	border-color: var(--accent-text);
+	background: var(--panel);
+}
+
+.hx-live-steps button:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 2px;
+}
+
+.hx-live-step-no {
+	width: 22px;
+	height: 22px;
+	display: inline-grid;
+	place-items: center;
+	border-radius: 50%;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--muted);
+}
+
+.hx-live-steps button.on .hx-live-step-no {
+	border-color: var(--accent-text);
+	color: var(--accent-text);
+}
+
+.hx-live-step-meta {
+	justify-self: end;
+	font-size: 12px;
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+/* The drawer's own padding frames the turns; the list is not a scroll box of its own. */
+.hx-transcript.agent-transcript {
+	padding: 0;
+	overflow: visible;
+	max-height: none;
+}
+
+.hx-transcript .agent-turn {
+	max-width: 100%;
+}
+
+.hx-live-line {
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 12px;
+}

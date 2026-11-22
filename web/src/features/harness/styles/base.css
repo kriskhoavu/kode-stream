@@ -1,0 +1,204 @@
+/*
+ * PM-044 engineering harness. Every rule is hx- prefixed and every token
+ * --hx-*: the shell tokens and classes in styles/app.css are vendored by the
+ * frontend repository, so the harness reads them and never redefines them.
+ */
+
+:root {
+	--hx-done: #047857;
+	--hx-running: #1d4ed8;
+	--hx-waiting: #a16207;
+	--hx-stopped: var(--danger);
+	--hx-idle: #64748b;
+	--hx-manual: var(--purple);
+	--hx-path: var(--accent-text);
+	--hx-mix: 12%;
+	--hx-ring: 0 0 0 3px color-mix(in srgb, var(--hx-waiting) 35%, transparent);
+	--hx-ease: cubic-bezier(.2, .8, .2, 1);
+	--hx-card-shadow: 0 8px 18px rgba(17, 24, 39, .06);
+}
+
+:root[data-theme="dark"] {
+	--hx-done: #4ade80;
+	--hx-running: #60a5fa;
+	--hx-waiting: #facc15;
+	--hx-idle: #94a3b8;
+	--hx-mix: 18%;
+	--hx-card-shadow: 0 10px 28px rgba(0, 0, 0, .38);
+}
+
+.hx {
+	font-size: 14px;
+	line-height: 1.45;
+	color: var(--text);
+}
+
+.hx-page {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+	min-width: 0;
+}
+
+.hx-title {
+	justify-content: flex-start;
+	flex-wrap: wrap;
+	gap: 18px;
+	margin-bottom: 0;
+}
+
+.hx-title h1 {
+	margin: 0;
+	font-size: 22px;
+	font-weight: 700;
+}
+
+/* The section switch wears Agent Space's view switcher; four sections instead of two. */
+.hx-sections.segmented-control {
+	grid-template-columns: repeat(4, auto);
+}
+
+.hx-sections.segmented-control button {
+	min-height: 36px;
+}
+
+.hx-sections .hx-seg-count {
+	min-width: 18px;
+	height: 18px;
+	margin-left: 2px;
+	padding: 0 5px;
+	border-radius: 9px;
+	background: var(--hx-waiting);
+	color: #111;
+	font-size: 11px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.hx-title h1:focus-visible {
+	outline: 2px solid var(--accent-text);
+	outline-offset: 4px;
+	border-radius: 4px;
+}
+
+.hx-title h1:focus:not(:focus-visible) {
+	outline: none;
+}
+
+.hx-title-status {
+	margin-left: auto;
+	font-size: 13px;
+}
+
+.hx-seg {
+	display: inline-flex;
+	gap: 2px;
+	padding: 3px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+}
+
+.hx-seg button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--muted);
+	padding: 6px 14px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.hx-seg button:hover {
+	color: var(--text);
+}
+
+.hx-seg button.on {
+	background: var(--panel-soft);
+	color: var(--text);
+}
+
+.hx-seg-small button {
+	padding: 4px 10px;
+	font-size: 12px;
+}
+
+.hx-seg .hx-seg-count {
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	border-radius: 9px;
+	background: var(--hx-waiting);
+	color: #111;
+	font-size: 11px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.hx-demo-chip {
+	border-style: dashed;
+}
+
+/* The shell mutes every span in a title row; the chip keeps its own colour. */
+.hx-title .hx-chip {
+	color: var(--text);
+}
+
+.hx-muted {
+	color: var(--muted);
+}
+
+.hx-num {
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-card {
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--panel);
+	box-shadow: var(--shadow-soft);
+}
+
+.hx-state {
+	padding: 22px;
+	display: grid;
+	gap: 12px;
+	justify-items: start;
+	max-width: 720px;
+}
+
+.hx-state p {
+	margin: 0;
+}
+
+.hx-banner {
+	margin: 0;
+	padding: 10px 14px;
+	border: 1px solid color-mix(in srgb, var(--hx-stopped) 40%, var(--line));
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--hx-stopped) var(--hx-mix), var(--panel));
+	color: var(--text);
+}
+
+.hx-link {
+	border: 0;
+	background: transparent;
+	color: var(--accent-text);
+	font-weight: 600;
+	font-size: 13px;
+	padding: 6px 8px;
+	border-radius: 6px;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.hx-link:hover {
+	background: var(--panel-soft);
+}

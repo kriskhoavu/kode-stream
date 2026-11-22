@@ -1,0 +1,101 @@
+/* ── Status badges, chips, sources ─────────────────────────────────────── */
+
+.hx-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 24px;
+	padding: 0 9px;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .02em;
+	white-space: nowrap;
+	justify-self: start;
+	color: var(--hx-tone);
+	background: color-mix(in srgb, var(--hx-tone) var(--hx-mix), var(--panel));
+}
+
+.hx-badge svg {
+	width: 13px;
+	height: 13px;
+	flex: none;
+}
+
+.hx-badge time {
+	color: inherit;
+}
+
+.hx-badge-sm {
+	height: 20px;
+	padding: 0 7px;
+	font-size: 11px;
+}
+
+.hx-badge-sm svg {
+	width: 11px;
+	height: 11px;
+}
+
+.hx-tone-idle { --hx-tone: var(--hx-idle); }
+.hx-tone-running { --hx-tone: var(--hx-running); }
+.hx-tone-waiting { --hx-tone: var(--hx-waiting); }
+.hx-tone-done { --hx-tone: var(--hx-done); }
+.hx-tone-stopped { --hx-tone: var(--hx-stopped); }
+.hx-tone-manual { --hx-tone: var(--hx-manual); }
+
+/* "Up next" is ready but not started: outlined rather than filled. */
+.hx-status-up_next {
+	background: transparent;
+	border-color: color-mix(in srgb, var(--hx-done) 45%, var(--line));
+}
+
+/* "Done by hand" is the one status also told apart by its dashed edge. */
+.hx-status-manual {
+	border-style: dashed;
+	border-color: var(--hx-manual);
+}
+
+.hx-status-not_started svg {
+	stroke-dasharray: 3 3;
+}
+
+.hx-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 22px;
+	padding: 0 8px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--panel-soft);
+	color: var(--text);
+	font-size: 12px;
+	font-weight: 600;
+	white-space: nowrap;
+	justify-self: start;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.hx-chip svg {
+	flex: none;
+}
+
+.hx-source {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .02em;
+	text-transform: uppercase;
+	text-decoration: none;
+}
+
+a.hx-source:hover {
+	color: var(--accent-text);
+}

@@ -1,0 +1,142 @@
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+/* At most two things move on a screen; tables, findings, counts and words never do. */
+
+.hx-stage-working::after {
+	content: "";
+	position: absolute;
+	inset: -4px;
+	border: 2px solid var(--hx-running);
+	border-radius: 13px;
+	pointer-events: none;
+	animation: hx-pulse 1.8s ease-in-out infinite;
+}
+
+.hx-stage.just-done {
+	animation: hx-glow .4s ease-out;
+}
+
+.hx-check-draw path,
+.hx-check-draw polyline {
+	stroke-dasharray: 24;
+	stroke-dashoffset: 24;
+	animation: hx-check .28s var(--hx-ease) .05s forwards;
+}
+
+.hx-gate-attention {
+	animation: hx-gate-in .22s var(--hx-ease) both, hx-gate-ring 1.2s .3s ease-out both;
+}
+
+.hx-conn.flow {
+	background-size: 32px 2px;
+	animation: hx-flow 1.4s linear infinite;
+}
+
+.hx-stage {
+	transition: transform .15s ease, border-color .15s ease;
+}
+
+.hx-stage:not(.static):hover {
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--accent-text) 55%, var(--line));
+}
+
+/* A step that opens nothing stays still under the pointer. */
+.hx-stage.static { cursor: default; }
+
+/* The step whose work the page below shows. */
+.hx-stage.selected { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-text) 70%, transparent); }
+
+/* A task that is starting or working turns its badge's loader, so the change shows at once. */
+.hx-badge.hx-status-starting svg,
+.hx-badge.hx-status-working svg { animation: hx-spin 1.2s linear infinite; }
+
+@keyframes hx-spin {
+	to { transform: rotate(360deg); }
+}
+
+@keyframes hx-pulse {
+	0%, 100% { opacity: .9; transform: scale(1); }
+	50% { opacity: .25; transform: scale(1.04); }
+}
+
+@keyframes hx-glow {
+	from { box-shadow: 0 0 0 4px color-mix(in srgb, var(--hx-done) 35%, transparent), var(--hx-card-shadow); }
+	to { box-shadow: 0 0 0 4px transparent, var(--hx-card-shadow); }
+}
+
+@keyframes hx-check {
+	to { stroke-dashoffset: 0; }
+}
+
+@keyframes hx-gate-in {
+	from { opacity: 0; transform: translateY(-8px); }
+	to { opacity: 1; transform: none; }
+}
+
+@keyframes hx-gate-ring {
+	from { box-shadow: var(--hx-ring), var(--shadow-soft); }
+	to { box-shadow: 0 0 0 3px transparent, var(--shadow-soft); }
+}
+
+@keyframes hx-flow {
+	to { background-position: 32px 0; }
+}
+
+@keyframes hx-edge-flow {
+	to { stroke-dashoffset: -32; }
+}
+
+@keyframes hx-blink {
+	0%, 100% { opacity: 1; }
+	50% { opacity: .2; }
+}
+
+@keyframes hx-rise {
+	from { opacity: 1; transform: translateY(0); }
+	to { opacity: 0; transform: translateY(-14px); }
+}
+
+@keyframes hx-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* The working ring stays, still. */
+	.hx-badge.hx-status-starting svg,
+	.hx-badge.hx-status-working svg { animation: none; }
+	.hx-stage-working::after {
+		animation: none;
+		opacity: .9;
+	}
+	.hx-stage.just-done,
+	.hx-cost-ghost {
+		animation: none;
+	}
+	.hx-cost-ghost {
+		display: none;
+	}
+	.hx-check-draw path,
+	.hx-check-draw polyline {
+		animation: none;
+		stroke-dashoffset: 0;
+	}
+	/* A new approval only fades in; no slide and no ring. */
+	.hx-gate-attention {
+		animation: hx-fade-in .22s linear both;
+	}
+	.hx-conn.flow {
+		animation: none;
+		background: var(--hx-running);
+	}
+	/* The words "Reconnecting…" carry the state without the blink. */
+	.hx-connection.reconnecting .hx-connection-dot {
+		animation: none;
+	}
+	.hx-stage {
+		transition: none;
+	}
+	.hx-stage:hover {
+		transform: none;
+	}
+}

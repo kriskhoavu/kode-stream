@@ -1,0 +1,113 @@
+/* ── Gate cards ─────────────────────────────────────────────────────────── */
+
+.hx-gate {
+	position: relative;
+	padding: 20px 22px;
+	display: grid;
+	grid-template-columns: 44px minmax(0, 1fr) auto;
+	gap: 16px;
+	align-items: start;
+}
+
+.hx-gate-attention {
+	box-shadow: var(--hx-ring), var(--shadow-soft);
+}
+
+.hx-gate-decided {
+	opacity: .92;
+	align-items: center;
+}
+
+.hx-gate-icon {
+	width: 44px;
+	height: 44px;
+	border-radius: 12px;
+	display: grid;
+	place-items: center;
+	color: var(--hx-waiting);
+	background: color-mix(in srgb, var(--hx-waiting) var(--hx-mix), var(--panel));
+}
+
+.hx-gate-icon.ok {
+	color: var(--hx-done);
+	background: color-mix(in srgb, var(--hx-done) var(--hx-mix), var(--panel));
+}
+
+.hx-gate-icon svg {
+	width: 22px;
+	height: 22px;
+}
+
+.hx-gate-body h3 {
+	margin: 0 0 4px;
+	font-size: 16px;
+	font-weight: 700;
+}
+
+.hx-gate-body p {
+	margin: 0;
+	color: var(--muted);
+}
+
+.hx-gate-facts {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin-top: 10px;
+	font-size: 13px;
+}
+
+.hx-gate .hx-gate-status {
+	margin-top: 10px;
+	color: var(--text);
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.hx-gate .hx-gate-status.error {
+	color: var(--hx-stopped);
+}
+
+.hx-gate-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 160px;
+}
+
+.hx-dialog form {
+	display: grid;
+	gap: 12px;
+}
+
+.hx-field {
+	display: grid;
+	gap: 6px;
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.hx-field textarea,
+.hx-field input,
+.hx-field select {
+	width: 100%;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-soft);
+	color: var(--text);
+	padding: 10px;
+	font: inherit;
+	font-weight: 400;
+}
+
+.hx-field textarea {
+	min-height: 96px;
+	resize: vertical;
+}
+
+.hx-field-error {
+	margin: 0;
+	color: var(--hx-stopped);
+	font-size: 13px;
+}

@@ -1,0 +1,41 @@
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+
+.hx-table-card {
+	padding: 6px 4px 4px;
+	overflow-x: auto;
+}
+
+.hx-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.hx-table th {
+	text-align: left;
+	font-size: 11px;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	color: var(--muted);
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--line);
+}
+
+.hx-table tbody th {
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 13px;
+	color: var(--text);
+	font-weight: 400;
+}
+
+.hx-table td {
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--line);
+	vertical-align: middle;
+}
+
+.hx-table tr:last-child td,
+.hx-table tbody tr:last-child th {
+	border-bottom: 0;
+}

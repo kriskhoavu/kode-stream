@@ -1,0 +1,51 @@
+/* ── Queue list ─────────────────────────────────────────────────────────── */
+
+.hx-queue-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 8px;
+	max-width: 1040px;
+}
+
+.hx-queue-row {
+	grid-template-columns: 32px 120px minmax(0, 1fr) 160px auto;
+}
+
+.hx-queue-rank {
+	color: var(--muted);
+	font-weight: 700;
+	text-align: right;
+}
+
+.hx-title-button {
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	padding: 0;
+	text-align: left;
+	max-width: 100%;
+}
+
+.hx-title-button:hover {
+	color: var(--accent-text);
+}
+
+.hx-icon-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--muted);
+	padding: 5px 10px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-icon-toggle.on {
+	color: var(--accent-text);
+	border-color: color-mix(in srgb, var(--accent-text) 45%, var(--line));
+}

@@ -1,0 +1,246 @@
+/* ── Settings ───────────────────────────────────────────────────────────── */
+
+.hx-settings {
+	max-width: 1180px;
+}
+
+.hx-settings .settings-toggle-row strong {
+	font-size: 14px;
+}
+
+.hx-settings-policy .hx-table-card {
+	box-shadow: none;
+	border: 0;
+	padding: 4px 8px 8px;
+}
+
+.hx-settings .hx-table th[scope="row"] {
+	font-weight: 400;
+	white-space: nowrap;
+}
+
+.hx-select,
+.hx-model-input input,
+.hx-number {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--text);
+	padding: 6px 8px;
+	font: inherit;
+	font-size: 13px;
+}
+
+.hx-number {
+	width: 76px;
+	font-variant-numeric: tabular-nums;
+}
+
+.hx-model-input {
+	display: grid;
+	gap: 2px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-model-input input {
+	width: 180px;
+	font-weight: 400;
+}
+
+.hx-model-pair {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 10px 14px;
+}
+
+/* A model field's label line: the label, then a "?" whose tooltip says what the field means. */
+.hx-model-label {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.hx-hint {
+	position: relative;
+	display: inline-flex;
+}
+
+.hx-settings .hx-hint-button {
+	display: inline-grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: none;
+	color: var(--muted);
+	cursor: help;
+}
+
+.hx-settings .hx-hint-button:hover,
+.hx-settings .hx-hint-button:focus-visible {
+	color: var(--accent-text);
+}
+
+.hx-hint-text {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 50%;
+	z-index: 3;
+	width: 300px;
+	padding: 8px 10px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	box-shadow: var(--shadow-soft);
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 1.45;
+	text-transform: none;
+	letter-spacing: normal;
+	white-space: normal;
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+	transform: translateX(-50%);
+	transition: opacity 120ms var(--hx-ease);
+}
+
+.hx-hint:hover .hx-hint-text,
+.hx-hint:focus-within .hx-hint-text {
+	opacity: 1;
+	visibility: visible;
+}
+
+.hx-advanced summary {
+	cursor: pointer;
+	color: var(--accent-text);
+	font-weight: 600;
+}
+
+.hx-engine-notes {
+	margin: 0;
+	padding: 4px 20px 16px 36px;
+	color: var(--muted);
+	font-size: 13px;
+}
+
+.hx-sources {
+	display: grid;
+}
+
+.hx-source-row {
+	display: grid;
+	gap: 8px;
+	padding: 14px 20px;
+	border-bottom: 1px solid var(--line);
+}
+
+.hx-source-row:last-child {
+	border-bottom: 0;
+}
+
+.hx-drawer-start {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px 16px;
+	padding: 12px 14px;
+	border: 1px solid color-mix(in srgb, var(--hx-running) 45%, var(--line));
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--hx-running) var(--hx-mix), var(--panel));
+}
+
+.hx-drawer-start p {
+	margin: 0;
+	font-size: 13px;
+}
+
+.hx-add-source {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 10px 14px;
+	padding: 14px 20px;
+	border-top: 1px solid var(--line);
+	background: var(--panel-soft);
+}
+
+.hx-add-source .hx-field {
+	min-width: 200px;
+}
+
+.hx-add-source .hx-muted {
+	flex-basis: 100%;
+	font-size: 13px;
+}
+
+.hx-source-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+	font-size: 13px;
+}
+
+.hx-source-head > span:first-child {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.hx-inline-switch {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+}
+
+.hx-advanced {
+	font-size: 13px;
+}
+
+.hx-advanced-fields {
+	display: grid;
+	gap: 10px;
+	margin-top: 10px;
+	max-width: 640px;
+}
+
+.hx-role-row {
+	gap: 20px;
+}
+
+.hx-role-switch {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.hx-role-switch small {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.hx-slots {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.hx-settings-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+}
