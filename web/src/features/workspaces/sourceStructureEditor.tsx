@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { SourceSettingsResult, SourceStructurePreview, SourceStructureProposal, WorkspaceConfig } from '../../lib/types';
-import { previewPathSegments } from '../workspaces/sourceSettings';
-import { normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from '../workspaces/sourceSettingsEditor';
+import { previewPathSegments } from './sourceSettings';
+import { normalizeSourceSettingsCard, sourceSettingsEditorFromResult, UNSORTED_SOURCE_SELECTION_ID, type SourceSettingsEditorModel } from './sourceSettingsEditor';
 
 export const UNSORTED_SELECTION_ID = UNSORTED_SOURCE_SELECTION_ID;
 
@@ -170,8 +170,8 @@ export function sourceItemsEditorFromResult(workspace: WorkspaceConfig, director
   return { workspace, ...sourceSettingsEditorFromResult(directory, result) };
 }
 
-export function applySourceItemsProposal(
-  setSourceItemsEditor: Dispatch<SetStateAction<SourceItemsEditorState | null>>,
+export function applySourceItemsProposal<T extends SourceSettingsEditorModel>(
+  setSourceItemsEditor: Dispatch<SetStateAction<T | null>>,
   proposal: SourceStructureProposal
 ) {
   setSourceItemsEditor((current) => {
@@ -186,8 +186,8 @@ export function applySourceItemsProposal(
   });
 }
 
-export function clearSourceItemsProposal(
-  setSourceItemsEditor: Dispatch<SetStateAction<SourceItemsEditorState | null>>
+export function clearSourceItemsProposal<T extends SourceSettingsEditorModel>(
+  setSourceItemsEditor: Dispatch<SetStateAction<T | null>>
 ) {
   setSourceItemsEditor((current) => current ? {
     ...current,
@@ -196,8 +196,8 @@ export function clearSourceItemsProposal(
   } : current);
 }
 
-export function updateSourceItemsPreviewField(
-  setSourceItemsEditor: Dispatch<SetStateAction<SourceItemsEditorState | null>>,
+export function updateSourceItemsPreviewField<T extends SourceSettingsEditorModel>(
+  setSourceItemsEditor: Dispatch<SetStateAction<T | null>>,
   path: string,
   field: 'item' | 'title' | 'status',
   value: string

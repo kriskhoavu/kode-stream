@@ -10,7 +10,7 @@ import { api } from '../../shared/api';
 import type { SourceStructureSettings, WorkspaceConfig } from '../../lib/types';
 import { notifyReliabilityChanged } from '../reliability/hooks';
 import { canonicalSourceSettingsCard } from '../workspaces/sourceSettingsEditor';
-import { applySourceItemsProposal, clearSourceItemsProposal, sourceItemsEditorFromResult, SourceStructurePreviewTable, SourceStructureProposalList, UNSORTED_SELECTION_ID, updateSourceItemsPreviewField, type SourceItemsEditorState } from './sourceItemsEditor';
+import { applySourceItemsProposal, clearSourceItemsProposal, sourceItemsEditorFromResult, SourceStructurePreviewTable, SourceStructureProposalList, UNSORTED_SELECTION_ID, updateSourceItemsPreviewField, type SourceItemsEditorState } from '../workspaces/sourceStructureEditor';
 import { useWorkspaceGuard } from './useWorkspaceGuard';
 
 /**

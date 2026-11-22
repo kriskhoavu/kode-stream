@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { applySegmentRole, buildWorkspaceInput, defaultWorkspaceImportSelection, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, normalizeKnowledgeSettings, parseSources, previewPathSegments, settingsEditorFromResult, sourcesFromDraft, toggleSourceSurface, workspaceRemovalMessage } from './WorkspacesPage';
+import { applySegmentRole, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
+import { buildWorkspaceInput, inferWorkspaceNameFromRemoteURL, normalizeKnowledgeSettings, settingsEditorFromResult, sourcesFromDraft, toggleSourceSurface, workspaceRemovalMessage } from '../features/workspaces/workspaceDraft';
+import { defaultWorkspaceImportSelection } from '../features/workspaces/workspaceImportReview';
 
 describe('normalizeDroppedPath', () => {
   it('decodes file URLs dropped onto the path field', () => {
