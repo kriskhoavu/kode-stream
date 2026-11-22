@@ -3,14 +3,16 @@ import { Bot, PanelRightClose, PanelRightOpen, Code2, FileText, GitBranch, GripV
 import { FileMenu } from '../../../components/FileMenu';
 import { useResizableDrawer } from '../../../components/useResizableDrawer';
 import { writePreference, readTogglePreference } from '../../../shared/preferences/store';
+import { autoSaveLabel, useFileEditorSession } from '../../file-editor/useFileEditorSession';
+import { preferredFile } from '../../../shared/domain/fileTree';
 import { ItemGitPanel } from '../../item-git/ItemGitPanel';
 import { useItemGit } from '../../item-git/useItemGit';
 import { StatusMenu } from '../../../components/StatusMenu';
 import { ContentViewer } from '../../content-viewer/ContentViewer';
 import { JiraItemPanel } from '../../jira/JiraItemPanel';
 import { api, statusLabels } from '../../../shared/api';
-import type { FileContent, FileNode, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../../../lib/types';
-import { isDocumentationMetadataSource, labels, metadataSourceLabel as genericMetadataSourceLabel } from '../../../lib/vocabulary';
+import type { FileNode, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../../../lib/types';
+import { isDocumentationMetadataSource, labels, metadataSourceLabel } from '../../../lib/vocabulary';
 import { notifyReliabilityChanged } from '../../reliability/hooks';
 import { AgentPane, AgentsTab, agentFocusKey, useHeldAgentSessions, type AgentFocus, type AgentPaneHarness, type AgentsMode } from '../AgentsPanel';
 import { HarnessRunTab } from '../HarnessRunTab';
@@ -27,11 +29,6 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
   const paneHarness: AgentPaneHarness = { client: harness.client, run: work?.run, detail: work?.run ? harness.state.details[work.run.id] : undefined, reload: () => (work?.run ? harness.loadRun(work.run.id) : Promise.resolve()) };
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
-  const [file, setFile] = useState<FileContent | null>(null);
-  const [editorContent, setEditorContent] = useState('');
-  const [savedContent, setSavedContent] = useState('');
-  const [savingFile, setSavingFile] = useState(false);
-  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
   const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [diff, setDiff] = useState('');
@@ -53,17 +50,14 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
   const { heldLiveSessionIds, release: releaseHeldSession } = useHeldAgentSessions(agents, agentFocus, itemId);
   const [error, setError] = useState('');
   const { width, style: drawerStyle, startResize } = useResizableDrawer({ initial: 1120 });
-  const autoSaveTimerRef = useRef<number | null>(null);
   // The Raw editor grows with the document so the whole file shows, as the
   // preview does, and the drawer scrolls instead of a small box.
   const rawEditorRef = useRef<HTMLTextAreaElement | null>(null);
-  const autoSaveSettledTimerRef = useRef<number | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
   const drawerGenerationRef = useRef(0);
   const fileLoadAbortRef = useRef<AbortController | null>(null);
   const autoSaveRefreshAbortRef = useRef<AbortController | null>(null);
   const compact = width < 700;
-  const dirtyFile = file !== null && editorContent !== savedContent;
   const activityPath = plan?.itemPath || '';
   const git = useItemGit({
     workspaceId: plan?.workspaceId,
@@ -85,23 +79,50 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
   );
 
-  const clearDrawerAutoSaveTimers = () => {
-    clearTimeoutRef(autoSaveTimerRef);
-    clearTimeoutRef(autoSaveSettledTimerRef);
+  const editor = useFileEditorSession({
+    save: (targetFile, content) => api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash }),
+    onSaved: () => {
+      notifyReliabilityChanged();
+      refreshAfterSave();
+    },
+    onError: (caught) => setError(operationErrorMessage(caught, 'File save failed'))
+  });
+  const { file, content: editorContent, setContent: setEditorContent, dirty: dirtyFile, state: autoSaveState, saveNow: saveDrawerFileNow } = editor;
+
+  // A moment after a save, the diff and the Git status catch up with it.
+  const refreshAfterSave = () => {
+    const generation = drawerGenerationRef.current;
+    const isCurrent = () => drawerGenerationRef.current === generation;
     clearTimeoutRef(autoSaveRefreshTimerRef);
+    autoSaveRefreshTimerRef.current = window.setTimeout(() => {
+      if (!isCurrent()) return;
+      autoSaveRefreshAbortRef.current?.abort();
+      const controller = new AbortController();
+      autoSaveRefreshAbortRef.current = controller;
+      api.diff(itemId, controller.signal)
+        .then((payload) => {
+          if (!controller.signal.aborted && isCurrent()) setDiff(payload.diff || 'No local changes.');
+        })
+        .catch(() => {
+          if (!controller.signal.aborted && isCurrent()) setDiff('No diff available.');
+        });
+      void git.loadStatus();
+    }, 600);
   };
 
+  // One listener for the drawer's life; it calls the latest close, so typing does not re-subscribe it.
+  const closeDrawerRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       // Escape typed into an agent's terminal belongs to the agent (it
       // interrupts Claude, for one); it must not close the drawer.
       if (event.target instanceof Element && event.target.closest('.agent-pane-body')) return;
-      closeDrawer();
+      closeDrawerRef.current();
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [agentFocus, agents, dirtyFile, editorContent, file, onClose, savedContent]);
+  }, []);
 
   useLayoutEffect(() => {
     const editor = rawEditorRef.current;
@@ -120,7 +141,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     fileLoadAbortRef.current?.abort();
     autoSaveRefreshAbortRef.current?.abort();
     setPlan(null);
-    setFile(null);
+    editor.open(null);
     setFiles([]);
     setDiff('');
     setError('');
@@ -132,16 +153,11 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     api.files(itemId, undefined, controller.signal).then(async (tree) => {
       if (controller.signal.aborted) return;
       setFiles(tree);
-      const previewFile = preferredPreviewFile(tree);
+      const previewFile = preferredFile(tree);
       if (previewFile) {
         try {
           const content = await api.file(itemId, previewFile.id, undefined, controller.signal);
-          if (!controller.signal.aborted) {
-            setFile(content);
-            setEditorContent(content.content);
-            setSavedContent(content.content);
-            setAutoSaveState('idle');
-          }
+          if (!controller.signal.aborted) editor.open(content);
         } catch (err) {
           if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'File failed to load');
         }
@@ -159,7 +175,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
       if (drawerGenerationRef.current === generation) drawerGenerationRef.current += 1;
       fileLoadAbortRef.current?.abort();
       autoSaveRefreshAbortRef.current?.abort();
-      clearDrawerAutoSaveTimers();
+      clearTimeoutRef(autoSaveRefreshTimerRef);
     };
   }, [itemId]);
 
@@ -196,75 +212,6 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     });
   }, [plan]);
 
-  useEffect(() => {
-    if (!file) {
-      setAutoSaveState('idle');
-      return;
-    }
-    if (editorContent === savedContent) {
-      if (autoSaveState === 'pending') setAutoSaveState('idle');
-      return;
-    }
-    if (savingFile) {
-      setAutoSaveState('pending');
-      return;
-    }
-    clearTimeoutRef(autoSaveTimerRef);
-    setAutoSaveState('pending');
-    autoSaveTimerRef.current = window.setTimeout(() => {
-      void saveDrawerFile(file, editorContent);
-    }, 900);
-    return () => clearTimeoutRef(autoSaveTimerRef);
-  }, [file, editorContent, savedContent, savingFile]);
-
-  const saveDrawerFileNow = async () => {
-    if (!file || editorContent === savedContent) return true;
-    return saveDrawerFile(file, editorContent);
-  };
-
-  const saveDrawerFile = async (targetFile: FileContent, content: string) => {
-    const generation = drawerGenerationRef.current;
-    const activeItemId = itemId;
-    const isCurrent = () => drawerGenerationRef.current === generation;
-    clearTimeoutRef(autoSaveTimerRef);
-    clearTimeoutRef(autoSaveSettledTimerRef);
-    setSavingFile(true);
-    setAutoSaveState('saving');
-    setError('');
-    try {
-      const updated = await api.saveFile(activeItemId, targetFile.id, { content, expectedHash: targetFile.hash });
-      notifyReliabilityChanged();
-      if (!isCurrent()) return false;
-      setFile(updated);
-      setSavedContent(content);
-      setAutoSaveState('saved');
-      autoSaveSettledTimerRef.current = window.setTimeout(() => setAutoSaveState('idle'), 1400);
-      clearTimeoutRef(autoSaveRefreshTimerRef);
-      autoSaveRefreshTimerRef.current = window.setTimeout(() => {
-        if (!isCurrent()) return;
-        autoSaveRefreshAbortRef.current?.abort();
-        const controller = new AbortController();
-        autoSaveRefreshAbortRef.current = controller;
-        api.diff(activeItemId, controller.signal)
-          .then((payload) => {
-            if (!controller.signal.aborted && isCurrent()) setDiff(payload.diff || 'No local changes.');
-          })
-          .catch(() => {
-            if (!controller.signal.aborted && isCurrent()) setDiff('No diff available.');
-          });
-        if (isCurrent()) void git.loadStatus();
-      }, 600);
-      return true;
-    } catch (err) {
-      if (!isCurrent()) return false;
-      setError(operationErrorMessage(err, 'File save failed'));
-      setAutoSaveState('error');
-      return false;
-    } finally {
-      if (isCurrent()) setSavingFile(false);
-    }
-  };
-
   const loadDrawerFile = async (fileId: string) => {
     fileLoadAbortRef.current?.abort();
     const controller = new AbortController();
@@ -273,10 +220,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     try {
       const content = await api.file(itemId, fileId, undefined, controller.signal);
       if (controller.signal.aborted || drawerGenerationRef.current !== generation) return;
-      setFile(content);
-      setEditorContent(content.content);
-      setSavedContent(content.content);
-      setAutoSaveState('idle');
+      editor.open(content);
     } catch (err) {
       if (!controller.signal.aborted && drawerGenerationRef.current === generation) setError(err instanceof Error ? err.message : 'File failed to load');
     } finally {
@@ -299,6 +243,8 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
       if (saved) onClose();
     });
   };
+
+  closeDrawerRef.current = closeDrawer;
 
   const openFullDetails = () => {
     if (!dirtyFile) {
@@ -458,19 +404,6 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
   );
 }
 
-export function firstFile(nodes: FileNode[]): FileNode | null {
-  for (const node of nodes) {
-    if (node.type === 'file') return node;
-    const child = firstFile(node.children ?? []);
-    if (child) return child;
-  }
-  return null;
-}
-
-export function preferredPreviewFile(nodes: FileNode[]): FileNode | null {
-  return findReadme(nodes, true) ?? findReadme(nodes, false) ?? firstFile(nodes);
-}
-
 export function flattenFileOptions(nodes: FileNode[], parentPath = ''): DrawerFileOption[] {
   return nodes.flatMap((node) => {
     const path = parentPath ? `${parentPath}/${node.name}` : node.name;
@@ -481,37 +414,6 @@ export function flattenFileOptions(nodes: FileNode[], parentPath = ''): DrawerFi
   });
 }
 
-export function findReadme(nodes: FileNode[], rootOnly: boolean): FileNode | null {
-  for (const node of nodes) {
-    if (node.type === 'file' && node.name.toLowerCase() === 'readme.md') return node;
-    if (!rootOnly && node.type === 'directory') {
-      const child = findReadme(node.children ?? [], false);
-      if (child) return child;
-    }
-  }
-  return null;
-}
-
-export function metadataSourceLabel(source?: string): string {
-  return genericMetadataSourceLabel(source);
-}
-
 export function DrawerStatusBadge({ status }: { status: ItemStatus }) {
   return <span className={`status-badge ${status}`}>{statusLabels[status]}</span>;
-}
-
-export function autoSaveLabel(state: 'idle' | 'pending' | 'saving' | 'saved' | 'error'): string {
-  switch (state) {
-    case 'pending':
-      return 'Autosave pending';
-    case 'saving':
-      return 'Saving...';
-    case 'saved':
-      return 'Saved';
-    case 'error':
-      return 'Autosave failed';
-    case 'idle':
-    default:
-      return 'Autosave on';
-  }
 }

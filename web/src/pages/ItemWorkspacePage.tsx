@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useModalDialog } from '../components/overlay';
+import { firstFile, preferredFile } from '../shared/domain/fileTree';
 import { ItemGitPanel } from '../features/item-git/ItemGitPanel';
 import { useItemGit } from '../features/item-git/useItemGit';
 import { StatusMenu } from '../components/StatusMenu';
@@ -1472,19 +1473,6 @@ const TreeNode = memo(function TreeNode({ node, onOpen, activePath, depth, fileS
   );
 });
 
-function firstFile(nodes: FileNode[]): FileNode | null {
-  for (const node of nodes) {
-    if (node.type === 'file') return node;
-    const child = firstFile(node.children ?? []);
-    if (child) return child;
-  }
-  return null;
-}
-
-function preferredFile(nodes: FileNode[]): FileNode | null {
-	return findReadme(nodes, true) ?? findReadme(nodes, false) ?? firstFile(nodes);
-}
-
 function fileDirectoryPaths(nodes: FileNode[]): Set<string> {
   const paths = new Set<string>();
   const visit = (entries: FileNode[]) => entries.forEach((node) => {
@@ -1494,17 +1482,6 @@ function fileDirectoryPaths(nodes: FileNode[]): Set<string> {
   });
   visit(nodes);
   return paths;
-}
-
-function findReadme(nodes: FileNode[], rootOnly: boolean): FileNode | null {
-	for (const node of nodes) {
-		if (node.type === 'file' && node.name.toLowerCase() === 'readme.md') return node;
-		if (!rootOnly && node.type === 'directory') {
-			const child = findReadme(node.children ?? [], false);
-			if (child) return child;
-		}
-	}
-	return null;
 }
 
 function hasFile(nodes: FileNode[]): boolean {
